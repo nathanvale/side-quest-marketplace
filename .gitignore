@@ -1,0 +1,16 @@
+# OS files
+.DS_Store
+*.swp
+*.swo
+
+# Editor files
+.idea/
+.vscode/
+*.sublime-*
+
+# Local overrides
+*.local
+*.local.*
+
+# Logs
+*.log

@@ -1,0 +1,117 @@
+{
+  "name": "nathan-vale-claude-code",
+  "version": "1.0.0",
+  "description": "Nathan's personal Claude Code setup with productivity commands, specialized agents, and custom skills for dotfiles management and development workflows",
+  "author": {
+    "name": "Nathan Vale"
+  },
+  "license": "MIT",
+  "commands": [
+    {
+      "name": "index",
+      "path": "commands/index.md",
+      "description": "Create or update PROJECT_INDEX.json for codebase awareness"
+    },
+    {
+      "name": "learn",
+      "path": "commands/learn.md",
+      "description": "Interactive 7-stage structured learning tutor"
+    },
+    {
+      "name": "merge",
+      "path": "commands/merge.md",
+      "description": "Merge a PR and clean up worktree and branches"
+    },
+    {
+      "name": "next",
+      "path": "commands/next.md",
+      "description": "Start the next highest-priority READY task"
+    },
+    {
+      "name": "pm",
+      "path": "commands/pm.md",
+      "description": "Project Manager - task execution and status tracking"
+    },
+    {
+      "name": "start",
+      "path": "commands/start.md",
+      "description": "Universal task starter - works in any project"
+    },
+    {
+      "name": "start-review",
+      "path": "commands/start-review.md",
+      "description": "Decompose a review into individual task files"
+    },
+    {
+      "name": "attach-trace",
+      "path": "commands/attach-trace.md",
+      "description": "Phase B attachment migration with trace logging"
+    },
+    {
+      "name": "review-code",
+      "path": "commands/review-code.md",
+      "description": "Comprehensive code review across 7 quality dimensions"
+    },
+    {
+      "name": "docs",
+      "path": "commands/docs.md",
+      "description": "Documentation helper"
+    },
+    {
+      "name": "analyze-last-run",
+      "path": "commands/analyze-last-run.md",
+      "description": "Analyze the last Claude Code run"
+    },
+    {
+      "name": "migrate-debug",
+      "path": "commands/migrate-debug.md",
+      "description": "Debug migration issues"
+    },
+    {
+      "name": "migrate-rollback",
+      "path": "commands/migrate-rollback.md",
+      "description": "Rollback migration changes"
+    },
+    {
+      "name": "melanie",
+      "path": "commands/melanie.md",
+      "description": "Melanie helper command"
+    },
+    {
+      "name": "sw-mode",
+      "path": "commands/sw-mode.md",
+      "description": "Create or edit SuperWhisper custom modes"
+    },
+    {
+      "name": "sw-integrate",
+      "path": "commands/sw-integrate.md",
+      "description": "Create SuperWhisper integration scripts"
+    },
+    {
+      "name": "sw-fix",
+      "path": "commands/sw-fix.md",
+      "description": "Troubleshoot SuperWhisper issues"
+    }
+  ],
+  "agents": [
+    {
+      "name": "code-analyzer",
+      "path": "agents/code-analyzer.md",
+      "description": "Analyze code changes for potential bugs and trace logic flow"
+    },
+    {
+      "name": "file-analyzer",
+      "path": "agents/file-analyzer.md",
+      "description": "Analyze and summarize file contents, particularly log files"
+    }
+  ],
+  "tags": [
+    "productivity",
+    "dotfiles",
+    "shell",
+    "development",
+    "automation",
+    "hyperflow",
+    "superwhisper"
+  ]
+}

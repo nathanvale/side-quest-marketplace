@@ -1,0 +1,25 @@
+{
+  "PostToolUse": [
+    {
+      "matcher": "Bash",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "./hooks/atuin-post-tool.sh",
+          "timeout": 5
+        }
+      ]
+    }
+  ],
+  "SessionStart": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "./hooks/log-agent-start.sh",
+          "timeout": 5
+        }
+      ]
+    }
+  ]
+}

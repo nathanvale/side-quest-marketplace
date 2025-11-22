@@ -1,0 +1,21 @@
+{
+  "name": "nathan-vale-claude-code",
+  "owner": {
+    "name": "Nathan Vale",
+    "contact": "github.com/nathanvale"
+  },
+  "description": "Nathan's personal Claude Code setup with productivity commands, specialized agents, and custom skills",
+  "plugins": [
+    {
+      "name": "nathan-vale-claude-code",
+      "source": "./",
+      "description": "Personal Claude Code configuration with slash commands, AI agents, and skills for dotfiles management, HyperFlow keyboard orchestration, and development workflows",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Vale",
+        "email": "nathan@example.com"
+      },
+      "tags": ["productivity", "dotfiles", "shell", "development", "automation"]
+    }
+  ]
+}
