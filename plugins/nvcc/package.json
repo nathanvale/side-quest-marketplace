@@ -1,0 +1,16 @@
+{
+	"name": "@nvcc/nvcc",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Nathan Vale Claude Code core plugin",
+	"type": "module",
+	"scripts": {
+		"test": "echo 'No tests yet'",
+		"typecheck": "echo 'No typecheck yet'",
+		"format": "echo 'No format yet'",
+		"format:check": "echo 'No format:check yet'",
+		"lint": "echo 'No lint yet'",
+		"check": "echo 'No check yet'",
+		"ci": "echo 'No ci yet'"
+	}
+}

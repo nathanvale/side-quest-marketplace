@@ -1,32 +1,42 @@
 {
-  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "nathan-vale-claude-code",
-  "version": "1.0.0",
-  "description": "Personal Claude Code plugin marketplace with productivity commands, specialized agents, and custom skills for dotfiles management and development workflows.",
-  "owner": {
-    "name": "Nathan Vale",
-    "email": "nathan@example.com"
-  },
-  "plugins": [
-    {
-      "name": "nvcc",
-      "description": "Nathan's personal Claude Code setup with productivity commands, specialized agents, and custom skills for dotfiles management, shell workflows, HyperFlow keyboard orchestration, and SuperWhisper voice dictation.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Nathan Vale"
-      },
-      "source": "./plugins/nvcc",
-      "category": "productivity"
-    },
-    {
-      "name": "atuin",
-      "description": "Atuin shell history integration - search, capture, and manage bash command history with AI. Includes MCP server, hooks, and skills.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Nathan Vale"
-      },
-      "source": "./plugins/atuin",
-      "category": "shell"
-    }
-  ]
+	"$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+	"name": "nathan-vale-claude-code",
+	"version": "1.0.0",
+	"description": "Personal Claude Code plugin marketplace with productivity commands, specialized agents, and custom skills for dotfiles management and development workflows.",
+	"owner": {
+		"name": "Nathan Vale",
+		"email": "nathan@example.com"
+	},
+	"plugins": [
+		{
+			"name": "nvcc",
+			"description": "Nathan's personal Claude Code setup with productivity commands, specialized agents, and custom skills for dotfiles management, shell workflows, HyperFlow keyboard orchestration, and SuperWhisper voice dictation.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"source": "./plugins/nvcc",
+			"category": "productivity"
+		},
+		{
+			"name": "atuin",
+			"description": "Atuin shell history integration - search, capture, and manage bash command history with AI. Includes MCP server, hooks, and skills.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"source": "./plugins/atuin",
+			"category": "shell"
+		},
+		{
+			"name": "git",
+			"description": "Git intelligence for Claude Code - session context, commit history, smart commits with gitmoji. Includes MCP server with 6 git tools, SessionStart/PreCompact hooks, and slash commands for commits, PRs, and history exploration.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"source": "./plugins/git",
+			"category": "git"
+		}
+	]
 }
