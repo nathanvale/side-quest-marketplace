@@ -1,16 +1,19 @@
 {
-	"name": "@nvcc/nvcc",
+	"name": "@sidequest/core",
 	"version": "1.0.0",
 	"private": true,
 	"description": "Nathan Vale Claude Code core plugin",
 	"type": "module",
 	"scripts": {
 		"test": "echo 'No tests yet'",
-		"typecheck": "echo 'No typecheck yet'",
-		"format": "echo 'No format yet'",
-		"format:check": "echo 'No format:check yet'",
-		"lint": "echo 'No lint yet'",
-		"check": "echo 'No check yet'",
-		"ci": "echo 'No ci yet'"
+		"typecheck": "bunx tsc --noEmit",
+		"format": "bunx @biomejs/biome format --write .",
+		"format:check": "bunx @biomejs/biome format .",
+		"lint": "bunx @biomejs/biome lint .",
+		"check": "bunx @biomejs/biome check --write ."
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
+		"bun-types": "^1.3.3"
 	}
 }

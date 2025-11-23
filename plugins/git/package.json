@@ -1,5 +1,5 @@
 {
-	"name": "@nvcc/git",
+	"name": "@sidequest/git",
 	"version": "1.0.0",
 	"private": true,
 	"description": "Git intelligence plugin for Claude Code",

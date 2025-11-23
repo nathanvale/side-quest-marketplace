@@ -56,7 +56,7 @@ function parseFrontmatter(content: string): TaskFrontmatter | null {
 	const frontmatterRegex = /^---\s*\n([\s\S]*?)\n---/;
 	const match = content.match(frontmatterRegex);
 
-	if (!match) {
+	if (!match?.[1]) {
 		return null;
 	}
 

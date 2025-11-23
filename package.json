@@ -1,9 +1,9 @@
 {
-	"name": "nathan-vale-claude-code",
+	"name": "side-quest-marketplace",
 	"version": "1.0.0",
 	"private": true,
-	"description": "Nathan Vale's Claude Code plugin marketplace",
-	"workspaces": ["plugins/*"],
+	"description": "SideQuest - ADHD-friendly Claude Code plugin marketplace",
+	"workspaces": ["plugins/*", "plugins/*/mcp-servers/*"],
 	"scripts": {
 		"test": "bun run --filter '*' test",
 		"typecheck": "bun run --filter '*' typecheck",
