@@ -20,7 +20,7 @@ Activate this skill when the user:
 - Identify who made changes and why
 
 ### Smart Commits
-- Create well-formatted gitmoji commits
+- Create well-formatted Conventional Commits
 - Split large changes into atomic commits
 - Handle pre-commit hooks gracefully
 - Never commit secrets or sensitive data
@@ -44,26 +44,25 @@ For file history and branch info, use Bash:
 
 ## Commit Format
 
-Always use gitmoji format:
+Always use Conventional Commits format:
 ```
-<emoji> <type>(<scope>): <subject>
+<type>(<scope>): <subject>
 ```
 
-Emoji mappings:
-| Emoji | Type | Use for |
-|-------|------|---------|
-| 🎉 | init | New project |
-| ✨ | feat | New feature |
-| 🐞 | fix | Bug fix |
-| 📃 | docs | Documentation |
-| 🌈 | style | Formatting |
-| 🦄 | refactor | Refactoring |
-| 🎈 | perf | Performance |
-| 🧪 | test | Tests |
-| 🔧 | build | Build system |
-| 🐎 | ci | CI/CD |
-| 🐳 | chore | Maintenance |
-| ↩ | revert | Revert |
+Type mappings:
+| Type | Use for |
+|------|---------|
+| feat | New feature |
+| fix | Bug fix |
+| docs | Documentation |
+| style | Formatting |
+| refactor | Refactoring |
+| perf | Performance |
+| test | Tests |
+| build | Build system |
+| ci | CI/CD |
+| chore | Maintenance |
+| revert | Revert |
 
 ## Best Practices
 
@@ -76,13 +75,13 @@ Emoji mappings:
 ## Example Interactions
 
 **User**: "What changed in the auth module recently?"
-→ Use `search_commits` with query "auth" or Bash `git log --oneline -10 -- src/auth/`
+- Use `search_commits` with query "auth" or Bash `git log --oneline -10 -- src/auth/`
 
 **User**: "Commit my changes"
-→ Run `get_status`, review diffs, create appropriate gitmoji commit
+- Run `get_status`, review diffs, create appropriate conventional commit
 
 **User**: "What did we do this session?"
-→ Check recent commits and current diff, summarize activity
+- Check recent commits and current diff, summarize activity
 
 **User**: "Save my work before I try this"
-→ Create a checkpoint commit with current context
+- Create a checkpoint commit with current context

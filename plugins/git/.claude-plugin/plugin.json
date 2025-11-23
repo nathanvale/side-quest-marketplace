@@ -1,11 +1,11 @@
 {
 	"name": "git",
-	"description": "Git intelligence for Claude Code - session context, commit history, smart commits with gitmoji",
+	"description": "Git intelligence for Claude Code - session context, commit history, smart commits with Conventional Commits",
 	"version": "1.0.0",
 	"author": {
 		"name": "Nathan Vale",
 		"email": "hi@nathanvale.com"
 	},
-	"keywords": ["git", "commits", "history", "gitmoji", "mcp", "session"],
+	"keywords": ["git", "commits", "history", "conventional-commits", "mcp", "session"],
 	"license": "MIT"
 }

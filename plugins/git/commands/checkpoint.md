@@ -11,7 +11,7 @@ Create a quick checkpoint commit to save work-in-progress. This is useful for:
 
 ### Workflow
 
-1. **Check current status** → Use `get_status` MCP tool
+1. **Check current status** - Use `get_status` MCP tool
    - Quickly see staged, modified, and untracked files
    - Check for any files that shouldn't be committed (secrets, etc.)
 
@@ -23,9 +23,9 @@ Create a quick checkpoint commit to save work-in-progress. This is useful for:
 3. **Create checkpoint commit**:
    ```bash
    git commit -m "$(cat <<'EOF'
-   🐳 chore(wip): checkpoint - <brief description>
+   chore(wip): checkpoint - <brief description>
 
-   🤖 Generated with [Claude Code](https://claude.ai/code)
+   Generated with [Claude Code](https://claude.ai/code)
 
    Co-Authored-By: Claude <noreply@anthropic.com>
    EOF
@@ -41,7 +41,7 @@ Create a quick checkpoint commit to save work-in-progress. This is useful for:
 ### Arguments
 
 If the user provides a description after the command, use it:
-- `/git:checkpoint before api changes` → `🐳 chore(wip): checkpoint - before api changes`
-- `/git:checkpoint` → Ask for a brief description or use current context
+- `/git:checkpoint before api changes` -> `chore(wip): checkpoint - before api changes`
+- `/git:checkpoint` -> Ask for a brief description or use current context
 
 Now create a checkpoint commit.

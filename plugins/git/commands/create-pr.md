@@ -1,11 +1,11 @@
 ---
-description: Create pull requests using GitHub CLI with gitmoji format
+description: Create pull requests using GitHub CLI with Conventional Commits format
 argument-hint: None required - interactive guide for PR creation
 ---
 
-# Create Pull Request with Gitmoji
+# Create Pull Request
 
-Create well-formatted pull requests using GitHub CLI with gitmoji convention.
+Create well-formatted pull requests using GitHub CLI with Conventional Commits specification.
 
 ## Prerequisites
 
@@ -26,9 +26,9 @@ gh auth login
 
 Use MCP tools for efficient data gathering:
 
-- **Status** → Use `get_status` MCP tool
-- **Recent commits** → Use `get_recent_commits` MCP tool
-- **Diff summary** → Use `get_diff_summary` MCP tool
+- **Status** - Use `get_status` MCP tool
+- **Recent commits** - Use `get_recent_commits` MCP tool
+- **Diff summary** - Use `get_diff_summary` MCP tool
 
 For branch info and comparison, use Bash:
 ```bash
@@ -51,21 +51,20 @@ git diff main...HEAD --stat
 
 ### 3. Determine PR Title
 
-Use gitmoji format matching the primary change type:
+Use Conventional Commits format matching the primary change type:
 
-| Emoji | Type | Example |
-|-------|------|---------|
-| 🎉 | init | `🎉 init(project): bootstrap new service` |
-| ✨ | feat | `✨ feat(auth): add OAuth2 login support` |
-| 🐞 | fix | `🐞 fix(api): handle null response` |
-| 📃 | docs | `📃 docs(readme): update installation guide` |
-| 🌈 | style | `🌈 style(ui): improve button styling` |
-| 🦄 | refactor | `🦄 refactor(core): simplify data flow` |
-| 🎈 | perf | `🎈 perf(queries): optimize database calls` |
-| 🧪 | test | `🧪 test(auth): add login integration tests` |
-| 🔧 | build | `🔧 build(deps): upgrade to Node 20` |
-| 🐎 | ci | `🐎 ci(actions): add deployment workflow` |
-| 🐳 | chore | `🐳 chore(deps): update dependencies` |
+| Type | Example |
+|------|---------|
+| feat | `feat(auth): add OAuth2 login support` |
+| fix | `fix(api): handle null response` |
+| docs | `docs(readme): update installation guide` |
+| style | `style(ui): improve button styling` |
+| refactor | `refactor(core): simplify data flow` |
+| perf | `perf(queries): optimize database calls` |
+| test | `test(auth): add login integration tests` |
+| build | `build(deps): upgrade to Node 20` |
+| ci | `ci(actions): add deployment workflow` |
+| chore | `chore(deps): update dependencies` |
 
 ### 4. Create the PR
 
@@ -74,7 +73,7 @@ Use gitmoji format matching the primary change type:
 git push -u origin HEAD
 
 # Create PR with HEREDOC for body
-gh pr create --title "<emoji> <type>(<scope>): <subject>" --body "$(cat <<'EOF'
+gh pr create --title "<type>(<scope>): <subject>" --body "$(cat <<'EOF'
 ## Summary
 
 <1-3 bullet points describing what this PR does>
@@ -90,7 +89,7 @@ gh pr create --title "<emoji> <type>(<scope>): <subject>" --body "$(cat <<'EOF'
 
 ---
 
-🤖 Generated with [Claude Code](https://claude.ai/code)
+Generated with [Claude Code](https://claude.ai/code)
 EOF
 )"
 ```
@@ -120,7 +119,7 @@ EOF
 
 ---
 
-🤖 Generated with [Claude Code](https://claude.ai/code)
+Generated with [Claude Code](https://claude.ai/code)
 ```
 
 ## Useful Commands

@@ -1,6 +1,6 @@
-# Gitmoji Smart Commit
+# Smart Commit
 
-Create well-formatted commits using gitmoji convention with commitlint validation.
+Create well-formatted commits using Conventional Commits specification.
 
 ## Instructions
 
@@ -8,24 +8,23 @@ You are a git commit specialist. Create atomic, well-documented commits followin
 
 ### Commit Format
 ```
-<emoji> <type>(<scope>): <subject>
+<type>(<scope>): <subject>
 ```
 
-### Emoji + Type Mappings (REQUIRED - use exactly these)
-| Emoji | Type | Description |
-|-------|------|-------------|
-| 🎉 | init | Begin a project |
-| ✨ | feat | A new feature |
-| 🐞 | fix | A bug fix |
-| 📃 | docs | Documentation changes |
-| 🌈 | style | Code style changes (formatting, etc) |
-| 🦄 | refactor | Code refactoring |
-| 🎈 | perf | Performance improvements |
-| 🧪 | test | Adding or updating tests |
-| 🔧 | build | Build system changes |
-| 🐎 | ci | CI/CD configuration changes |
-| 🐳 | chore | Maintenance tasks |
-| ↩ | revert | Revert changes |
+### Types (REQUIRED - use exactly these)
+| Type | Description |
+|------|-------------|
+| feat | A new feature |
+| fix | A bug fix |
+| docs | Documentation changes |
+| style | Code style changes (formatting, etc) |
+| refactor | Code refactoring |
+| perf | Performance improvements |
+| test | Adding or updating tests |
+| build | Build system changes |
+| ci | CI/CD configuration changes |
+| chore | Maintenance tasks |
+| revert | Revert changes |
 
 ### Rules
 - Subject line max 100 characters
@@ -55,11 +54,11 @@ You are a git commit specialist. Create atomic, well-documented commits followin
 4. **Create the commit**:
    ```bash
    git commit -m "$(cat <<'EOF'
-   <emoji> <type>(<scope>): <subject>
+   <type>(<scope>): <subject>
 
    [optional body explaining what and why]
 
-   🤖 Generated with [Claude Code](https://claude.ai/code)
+   Generated with [Claude Code](https://claude.ai/code)
 
    Co-Authored-By: Claude <noreply@anthropic.com>
    EOF
@@ -75,33 +74,33 @@ You are a git commit specialist. Create atomic, well-documented commits followin
 
 **Feature commit:**
 ```
-✨ feat(auth): add OAuth2 login support
+feat(auth): add OAuth2 login support
 
 Implement OAuth2 flow with Google and GitHub providers.
 Includes token refresh and session management.
 
-🤖 Generated with [Claude Code](https://claude.ai/code)
+Generated with [Claude Code](https://claude.ai/code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
 **Bug fix commit:**
 ```
-🐞 fix(api): handle null response in user endpoint
+fix(api): handle null response in user endpoint
 
 The /api/users endpoint was crashing when the database
 returned null for deleted users.
 
-🤖 Generated with [Claude Code](https://claude.ai/code)
+Generated with [Claude Code](https://claude.ai/code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
 **Chore commit:**
 ```
-🐳 chore(deps): update dependencies to latest versions
+chore(deps): update dependencies to latest versions
 
-🤖 Generated with [Claude Code](https://claude.ai/code)
+Generated with [Claude Code](https://claude.ai/code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```

@@ -28,8 +28,8 @@ Six tools for efficient git queries:
 
 ### Slash Commands
 
-- `/git:commit` - Smart gitmoji commits with commitlint validation
-- `/git:create-pr` - Create pull requests with gitmoji format
+- `/git:commit` - Smart commits with Conventional Commits format
+- `/git:create-pr` - Create pull requests with proper formatting
 - `/git:checkpoint` - Quick WIP checkpoint commits
 - `/git:session-log` - Show session git activity
 - `/git:history [query]` - Interactive history exploration
@@ -59,26 +59,25 @@ Dependencies are automatically installed on first session start.
 
 ## Commit Format
 
-Uses gitmoji convention with commitlint:
+Uses [Conventional Commits](https://www.conventionalcommits.org/) specification:
 
 ```
-<emoji> <type>(<scope>): <subject>
+<type>(<scope>): <subject>
 ```
 
-| Emoji | Type | Description |
-|-------|------|-------------|
-| 🎉 | init | Begin a project |
-| ✨ | feat | A new feature |
-| 🐞 | fix | A bug fix |
-| 📃 | docs | Documentation |
-| 🌈 | style | Code style (formatting) |
-| 🦄 | refactor | Code refactoring |
-| 🎈 | perf | Performance improvements |
-| 🧪 | test | Adding/updating tests |
-| 🔧 | build | Build system changes |
-| 🐎 | ci | CI/CD configuration |
-| 🐳 | chore | Maintenance tasks |
-| ↩ | revert | Revert changes |
+| Type | Description |
+|------|-------------|
+| feat | A new feature |
+| fix | A bug fix |
+| docs | Documentation |
+| style | Code style (formatting) |
+| refactor | Code refactoring |
+| perf | Performance improvements |
+| test | Adding/updating tests |
+| build | Build system changes |
+| ci | CI/CD configuration |
+| chore | Maintenance tasks |
+| revert | Revert changes |
 
 ## Configuration
 
@@ -91,7 +90,7 @@ export CLAUDE_GIT_DEBUG=1
 
 ### Session Summary Location
 
-Session summaries are saved to `.claude-session-summary` in the git root directory. Add this to your `.gitignore` if you don't want to track it.
+Session summaries are saved to `~/.claude/session-summaries/{repo-name}.md` to avoid polluting your repository.
 
 ## Usage Examples
 
@@ -123,7 +122,7 @@ Shows commits made and current changes during this session.
 ```
 /git:create-pr
 ```
-Analyzes all commits on the branch and creates a PR with gitmoji title format.
+Analyzes all commits on the branch and creates a PR with proper formatting.
 
 ## License
 
