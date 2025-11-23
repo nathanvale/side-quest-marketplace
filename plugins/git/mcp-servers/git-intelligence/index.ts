@@ -7,322 +7,358 @@
  * Enables efficient git queries without burning conversation tokens.
  */
 
-import { type ExecSyncOptionsWithStringEncoding, execSync } from "node:child_process";
-import { startServer, tool, z } from "mcpez";
+import {
+  type ExecSyncOptionsWithStringEncoding,
+  execSync,
+} from 'node:child_process'
+import { startServer, tool, z } from 'mcpez'
 
 // Types
 
 interface Commit {
-	hash: string;
-	short: string;
-	subject: string;
-	author: string;
-	relative_time: string;
-	refs?: string;
+  hash: string
+  short: string
+  subject: string
+  author: string
+  relative_time: string
+  refs?: string
 }
 
 interface CommitResult {
-	count: number;
-	commits: Commit[];
-	message?: string;
-	file?: string;
+  count: number
+  commits: Commit[]
+  message?: string
+  file?: string
 }
 
 interface ErrorResult {
-	error: string;
+  error: string
 }
 
 interface DiffFile {
-	file: string;
-	added: number;
-	deleted: number;
+  file: string
+  added: number
+  deleted: number
 }
 
 interface DiffResult {
-	ref: string;
-	files_changed: number;
-	total_added: number;
-	total_deleted: number;
-	files: DiffFile[];
+  ref: string
+  files_changed: number
+  total_added: number
+  total_deleted: number
+  files: DiffFile[]
 }
 
 interface SearchOptions {
-	limit?: number;
-	searchCode?: boolean;
-	cwd?: string;
+  limit?: number
+  searchCode?: boolean
+  cwd?: string
 }
 
-type GitResult<T> = T | ErrorResult;
+type GitResult<T> = T | ErrorResult
 
-function isError<T extends object>(result: GitResult<T>): result is ErrorResult {
-	return typeof result === "object" && result !== null && "error" in result;
+function isError<T extends object>(
+  result: GitResult<T>,
+): result is ErrorResult {
+  return typeof result === 'object' && result !== null && 'error' in result
 }
 
 /**
  * Execute a git command and return output
  */
 function git(args: string, cwd: string = process.cwd()): string {
-	try {
-		const options: ExecSyncOptionsWithStringEncoding = {
-			encoding: "utf8",
-			cwd,
-			maxBuffer: 10 * 1024 * 1024,
-		};
-		return execSync(`git ${args}`, options).trim();
-	} catch (error: unknown) {
-		const execError = error as { stderr?: string; message: string };
-		if (execError.stderr) {
-			throw new Error(execError.stderr.trim());
-		}
-		throw error;
-	}
+  try {
+    const options: ExecSyncOptionsWithStringEncoding = {
+      encoding: 'utf8',
+      cwd,
+      maxBuffer: 10 * 1024 * 1024,
+    }
+    return execSync(`git ${args}`, options).trim()
+  } catch (error: unknown) {
+    const execError = error as { stderr?: string; message: string }
+    if (execError.stderr) {
+      throw new Error(execError.stderr.trim())
+    }
+    throw error
+  }
 }
 
 /**
  * Check if we're in a git repository
  */
 function isGitRepo(cwd: string = process.cwd()): boolean {
-	try {
-		git("rev-parse --git-dir", cwd);
-		return true;
-	} catch {
-		return false;
-	}
+  try {
+    git('rev-parse --git-dir', cwd)
+    return true
+  } catch {
+    return false
+  }
 }
 
 /**
  * Parse commit line from git log output
  */
 function parseCommitLine(line: string, includeRefs = false): Commit {
-	const parts = line.split("\x00");
-	return {
-		hash: parts[0] ?? "",
-		short: parts[1] ?? "",
-		subject: parts[2] ?? "",
-		author: parts[3] ?? "",
-		relative_time: parts[4] ?? "",
-		...(includeRefs ? { refs: (parts[5] ?? "").trim() } : {}),
-	};
+  const parts = line.split('\x00')
+  return {
+    hash: parts[0] ?? '',
+    short: parts[1] ?? '',
+    subject: parts[2] ?? '',
+    author: parts[3] ?? '',
+    relative_time: parts[4] ?? '',
+    ...(includeRefs ? { refs: (parts[5] ?? '').trim() } : {}),
+  }
 }
 
 /**
  * Get recent commits with details
  */
-function getRecentCommits(limit = 10, cwd: string = process.cwd()): GitResult<CommitResult> {
-	if (!isGitRepo(cwd)) {
-		return { error: "Not a git repository" };
-	}
+function getRecentCommits(
+  limit = 10,
+  cwd: string = process.cwd(),
+): GitResult<CommitResult> {
+  if (!isGitRepo(cwd)) {
+    return { error: 'Not a git repository' }
+  }
 
-	const format = "%H%x00%h%x00%s%x00%an%x00%ar%x00%d";
-	const output = git(`log --oneline -${limit} --format="${format}"`, cwd);
+  const format = '%H%x00%h%x00%s%x00%an%x00%ar%x00%d'
+  const output = git(`log --oneline -${limit} --format="${format}"`, cwd)
 
-	if (!output) {
-		return { count: 0, commits: [] };
-	}
+  if (!output) {
+    return { count: 0, commits: [] }
+  }
 
-	const commits = output.split("\n").map((line) => parseCommitLine(line, true));
+  const commits = output.split('\n').map((line) => parseCommitLine(line, true))
 
-	return { count: commits.length, commits };
+  return { count: commits.length, commits }
 }
 
 /**
  * Search commits by message or content
  */
-function searchCommits(query: string, options: SearchOptions = {}): GitResult<CommitResult> {
-	const { limit = 20, searchCode = false, cwd = process.cwd() } = options;
+function searchCommits(
+  query: string,
+  options: SearchOptions = {},
+): GitResult<CommitResult> {
+  const { limit = 20, searchCode = false, cwd = process.cwd() } = options
 
-	if (!isGitRepo(cwd)) {
-		return { error: "Not a git repository" };
-	}
+  if (!isGitRepo(cwd)) {
+    return { error: 'Not a git repository' }
+  }
 
-	const format = "%H%x00%h%x00%s%x00%an%x00%ar";
-	let cmd: string;
+  const format = '%H%x00%h%x00%s%x00%an%x00%ar'
+  let cmd: string
 
-	if (searchCode) {
-		cmd = `log -${limit} -S "${query}" --format="${format}"`;
-	} else {
-		cmd = `log -${limit} --grep="${query}" --format="${format}"`;
-	}
+  if (searchCode) {
+    cmd = `log -${limit} -S "${query}" --format="${format}"`
+  } else {
+    cmd = `log -${limit} --grep="${query}" --format="${format}"`
+  }
 
-	try {
-		const output = git(cmd, cwd);
+  try {
+    const output = git(cmd, cwd)
 
-		if (!output) {
-			return {
-				count: 0,
-				commits: [],
-				message: `No commits found matching: ${query}`,
-			};
-		}
+    if (!output) {
+      return {
+        count: 0,
+        commits: [],
+        message: `No commits found matching: ${query}`,
+      }
+    }
 
-		const commits = output.split("\n").map((line) => parseCommitLine(line));
+    const commits = output.split('\n').map((line) => parseCommitLine(line))
 
-		return { count: commits.length, commits };
-	} catch (error: unknown) {
-		const err = error as Error;
-		return { error: err.message };
-	}
+    return { count: commits.length, commits }
+  } catch (error: unknown) {
+    const err = error as Error
+    return { error: err.message }
+  }
 }
 
 /**
  * Get diff summary
  */
-function getDiffSummary(ref = "HEAD", cwd: string = process.cwd()): GitResult<DiffResult> {
-	if (!isGitRepo(cwd)) {
-		return { error: "Not a git repository" };
-	}
+function getDiffSummary(
+  ref = 'HEAD',
+  cwd: string = process.cwd(),
+): GitResult<DiffResult> {
+  if (!isGitRepo(cwd)) {
+    return { error: 'Not a git repository' }
+  }
 
-	try {
-		const numstat = git(`diff --numstat ${ref}`, cwd);
+  try {
+    const numstat = git(`diff --numstat ${ref}`, cwd)
 
-		const files: DiffFile[] = [];
-		if (numstat) {
-			numstat.split("\n").forEach((line) => {
-				const parts = line.split("\t");
-				const added = parts[0] ?? "0";
-				const deleted = parts[1] ?? "0";
-				const file = parts[2] ?? "";
-				files.push({
-					file,
-					added: Number.parseInt(added, 10) || 0,
-					deleted: Number.parseInt(deleted, 10) || 0,
-				});
-			});
-		}
+    const files: DiffFile[] = []
+    if (numstat) {
+      numstat.split('\n').forEach((line) => {
+        const parts = line.split('\t')
+        const added = parts[0] ?? '0'
+        const deleted = parts[1] ?? '0'
+        const file = parts[2] ?? ''
+        files.push({
+          file,
+          added: Number.parseInt(added, 10) || 0,
+          deleted: Number.parseInt(deleted, 10) || 0,
+        })
+      })
+    }
 
-		const totalAdded = files.reduce((sum, f) => sum + f.added, 0);
-		const totalDeleted = files.reduce((sum, f) => sum + f.deleted, 0);
+    const totalAdded = files.reduce((sum, f) => sum + f.added, 0)
+    const totalDeleted = files.reduce((sum, f) => sum + f.deleted, 0)
 
-		return {
-			ref,
-			files_changed: files.length,
-			total_added: totalAdded,
-			total_deleted: totalDeleted,
-			files,
-		};
-	} catch (error: unknown) {
-		const err = error as Error;
-		return { error: err.message };
-	}
+    return {
+      ref,
+      files_changed: files.length,
+      total_added: totalAdded,
+      total_deleted: totalDeleted,
+      files,
+    }
+  } catch (error: unknown) {
+    const err = error as Error
+    return { error: err.message }
+  }
 }
 
 /**
  * Format commits for display
  */
 function formatCommits(results: GitResult<CommitResult>): string {
-	if (isError(results)) {
-		return `Error: ${results.error}`;
-	}
+  if (isError(results)) {
+    return `Error: ${results.error}`
+  }
 
-	if (results.count === 0) {
-		return results.message || "No commits found.";
-	}
+  if (results.count === 0) {
+    return results.message || 'No commits found.'
+  }
 
-	let output = `Found ${results.count} commit${results.count === 1 ? "" : "s"}:\n\n`;
+  let output = `Found ${results.count} commit${results.count === 1 ? '' : 's'}:\n\n`
 
-	results.commits.forEach((commit, idx) => {
-		output += `${idx + 1}. ${commit.short} - ${commit.subject}\n`;
-		output += `   Author: ${commit.author} | ${commit.relative_time}`;
-		if (commit.refs) {
-			output += ` | ${commit.refs}`;
-		}
-		output += "\n\n";
-	});
+  results.commits.forEach((commit, idx) => {
+    output += `${idx + 1}. ${commit.short} - ${commit.subject}\n`
+    output += `   Author: ${commit.author} | ${commit.relative_time}`
+    if (commit.refs) {
+      output += ` | ${commit.refs}`
+    }
+    output += '\n\n'
+  })
 
-	return output.trim();
+  return output.trim()
 }
 
 // Register tools
 
 tool(
-	"get_recent_commits",
-	{
-		description:
-			"Get recent git commits with hash, message, author, and relative time. Use this to understand recent changes before making related edits.",
-		inputSchema: {
-			limit: z.number().optional().describe("Number of commits to retrieve (default: 10)"),
-			path: z.string().optional().describe("Repository path (default: current directory)"),
-		},
-	},
-	async (args: { limit?: number; path?: string }) => {
-		const { limit, path } = args;
-		const results = getRecentCommits(limit ?? 10, path);
-		return {
-			content: [{ type: "text" as const, text: formatCommits(results) }],
-		};
-	}
-);
+  'get_recent_commits',
+  {
+    description:
+      'Get recent git commits with hash, message, author, and relative time. Use this to understand recent changes before making related edits.',
+    inputSchema: {
+      limit: z
+        .number()
+        .optional()
+        .describe('Number of commits to retrieve (default: 10)'),
+      path: z
+        .string()
+        .optional()
+        .describe('Repository path (default: current directory)'),
+    },
+  },
+  async (args: { limit?: number; path?: string }) => {
+    const { limit, path } = args
+    const results = getRecentCommits(limit ?? 10, path)
+    return {
+      content: [{ type: 'text' as const, text: formatCommits(results) }],
+    }
+  },
+)
 
 tool(
-	"search_commits",
-	{
-		description:
-			"Search git commit history by message or code changes. Use --grep style search for commit messages, or -S style search for code changes.",
-		inputSchema: {
-			query: z.string().describe("Search query for commit messages or code"),
-			search_code: z
-				.boolean()
-				.optional()
-				.describe("Search for code changes (-S) instead of commit messages (default: false)"),
-			limit: z.number().optional().describe("Maximum results to return (default: 20)"),
-			path: z.string().optional().describe("Repository path (default: current directory)"),
-		},
-	},
-	async (args: Record<string, unknown>) => {
-		const { query, search_code, limit, path } = args as {
-			query: string;
-			search_code?: boolean;
-			limit?: number;
-			path?: string;
-		};
-		const results = searchCommits(query, {
-			limit: limit ?? 20,
-			searchCode: search_code ?? false,
-			cwd: path,
-		});
-		return {
-			content: [{ type: "text" as const, text: formatCommits(results) }],
-		};
-	}
-);
+  'search_commits',
+  {
+    description:
+      'Search git commit history by message or code changes. Use --grep style search for commit messages, or -S style search for code changes.',
+    inputSchema: {
+      query: z.string().describe('Search query for commit messages or code'),
+      search_code: z
+        .boolean()
+        .optional()
+        .describe(
+          'Search for code changes (-S) instead of commit messages (default: false)',
+        ),
+      limit: z
+        .number()
+        .optional()
+        .describe('Maximum results to return (default: 20)'),
+      path: z
+        .string()
+        .optional()
+        .describe('Repository path (default: current directory)'),
+    },
+  },
+  async (args: Record<string, unknown>) => {
+    const { query, search_code, limit, path } = args as {
+      query: string
+      search_code?: boolean
+      limit?: number
+      path?: string
+    }
+    const results = searchCommits(query, {
+      limit: limit ?? 20,
+      searchCode: search_code ?? false,
+      cwd: path,
+    })
+    return {
+      content: [{ type: 'text' as const, text: formatCommits(results) }],
+    }
+  },
+)
 
 tool(
-	"get_diff_summary",
-	{
-		description:
-			"Get a summary of changes (files changed, lines added/deleted) compared to a reference.",
-		inputSchema: {
-			ref: z.string().optional().describe("Git reference to compare against (default: HEAD)"),
-			path: z.string().optional().describe("Repository path (default: current directory)"),
-		},
-	},
-	async (args: { ref?: string; path?: string }) => {
-		const { ref, path } = args;
-		const diff = getDiffSummary(ref ?? "HEAD", path);
+  'get_diff_summary',
+  {
+    description:
+      'Get a summary of changes (files changed, lines added/deleted) compared to a reference.',
+    inputSchema: {
+      ref: z
+        .string()
+        .optional()
+        .describe('Git reference to compare against (default: HEAD)'),
+      path: z
+        .string()
+        .optional()
+        .describe('Repository path (default: current directory)'),
+    },
+  },
+  async (args: { ref?: string; path?: string }) => {
+    const { ref, path } = args
+    const diff = getDiffSummary(ref ?? 'HEAD', path)
 
-		if (isError(diff)) {
-			return {
-				content: [{ type: "text" as const, text: `Error: ${diff.error}` }],
-			};
-		}
+    if (isError(diff)) {
+      return {
+        content: [{ type: 'text' as const, text: `Error: ${diff.error}` }],
+      }
+    }
 
-		if (diff.files_changed === 0) {
-			return {
-				content: [{ type: "text" as const, text: `No changes compared to ${diff.ref}` }],
-			};
-		}
+    if (diff.files_changed === 0) {
+      return {
+        content: [
+          { type: 'text' as const, text: `No changes compared to ${diff.ref}` },
+        ],
+      }
+    }
 
-		let output = `Changes vs ${diff.ref}:\n`;
-		output += `${diff.files_changed} file${diff.files_changed === 1 ? "" : "s"} changed, `;
-		output += `+${diff.total_added} -${diff.total_deleted}\n\n`;
+    let output = `Changes vs ${diff.ref}:\n`
+    output += `${diff.files_changed} file${diff.files_changed === 1 ? '' : 's'} changed, `
+    output += `+${diff.total_added} -${diff.total_deleted}\n\n`
 
-		diff.files.forEach((f) => {
-			output += `  +${f.added} -${f.deleted}\t${f.file}\n`;
-		});
+    diff.files.forEach((f) => {
+      output += `  +${f.added} -${f.deleted}\t${f.file}\n`
+    })
 
-		return { content: [{ type: "text" as const, text: output.trim() }] };
-	}
-);
+    return { content: [{ type: 'text' as const, text: output.trim() }] }
+  },
+)
 
 // Start the MCP server
-startServer("git-intelligence", { version: "1.0.0" });
+startServer('git-intelligence', { version: '1.0.0' })

@@ -8,26 +8,26 @@
  * Output: JSON with pass/fail status
  */
 
-import { existsSync } from "node:fs";
-import { basename, dirname } from "node:path";
-import { spawn } from "bun";
+import { existsSync } from 'node:fs'
+import { basename, dirname } from 'node:path'
+import { spawn } from 'bun'
 
 // --- Types ---
 
 export interface HookInput {
-	tool_input?: {
-		file_path?: string;
-	};
+  tool_input?: {
+    file_path?: string
+  }
 }
 
 export interface HookResult {
-	status: "pass" | "fail";
-	message?: string;
+  status: 'pass' | 'fail'
+  message?: string
 }
 
 // --- Constants ---
 
-const PLUGIN_FILES = new Set(["marketplace.json", "plugin.json", "hooks.json"]);
+const PLUGIN_FILES = new Set(['marketplace.json', 'plugin.json', 'hooks.json'])
 
 // --- Exported Functions (for testing) ---
 
@@ -35,7 +35,7 @@ const PLUGIN_FILES = new Set(["marketplace.json", "plugin.json", "hooks.json"]);
  * Check if a filename is a plugin-related file that should be validated
  */
 export function isPluginFile(filename: string): boolean {
-	return PLUGIN_FILES.has(filename);
+  return PLUGIN_FILES.has(filename)
 }
 
 /**
@@ -43,26 +43,26 @@ export function isPluginFile(filename: string): boolean {
  * Returns the directory containing .claude-plugin/
  */
 export function findPluginRoot(filePath: string): string | null {
-	const filename = basename(filePath);
-	const dir = dirname(filePath);
+  const filename = basename(filePath)
+  const dir = dirname(filePath)
 
-	// If file is inside .claude-plugin/, the parent is the plugin root
-	if (basename(dir) === ".claude-plugin") {
-		return dirname(dir);
-	}
+  // If file is inside .claude-plugin/, the parent is the plugin root
+  if (basename(dir) === '.claude-plugin') {
+    return dirname(dir)
+  }
 
-	// For hooks.json or plugin.json outside .claude-plugin, walk up to find it
-	if (filename === "plugin.json" || filename === "hooks.json") {
-		let searchDir = dir;
-		while (searchDir !== "/") {
-			if (existsSync(`${searchDir}/.claude-plugin`)) {
-				return searchDir;
-			}
-			searchDir = dirname(searchDir);
-		}
-	}
+  // For hooks.json or plugin.json outside .claude-plugin, walk up to find it
+  if (filename === 'plugin.json' || filename === 'hooks.json') {
+    let searchDir = dir
+    while (searchDir !== '/') {
+      if (existsSync(`${searchDir}/.claude-plugin`)) {
+        return searchDir
+      }
+      searchDir = dirname(searchDir)
+    }
+  }
 
-	return null;
+  return null
 }
 
 /**
@@ -70,84 +70,87 @@ export function findPluginRoot(filePath: string): string | null {
  * Returns the validation output and whether it passed
  */
 export async function runValidation(
-	pluginRoot: string
+  pluginRoot: string,
 ): Promise<{ passed: boolean; output: string }> {
-	const proc = spawn({
-		cmd: ["claude", "plugin", "validate", pluginRoot],
-		stdout: "pipe",
-		stderr: "pipe",
-	});
+  const proc = spawn({
+    cmd: ['claude', 'plugin', 'validate', pluginRoot],
+    stdout: 'pipe',
+    stderr: 'pipe',
+  })
 
-	const exitCode = await proc.exited;
-	const stdout = await new Response(proc.stdout).text();
-	const stderr = await new Response(proc.stderr).text();
-	const output = `${stdout}${stderr}`.trim();
+  const exitCode = await proc.exited
+  const stdout = await new Response(proc.stdout).text()
+  const stderr = await new Response(proc.stderr).text()
+  const output = `${stdout}${stderr}`.trim()
 
-	// Check if validation passed (exit code 0 or output contains "Validation passed")
-	const passed = exitCode === 0 || output.includes("Validation passed");
+  // Check if validation passed (exit code 0 or output contains "Validation passed")
+  const passed = exitCode === 0 || output.includes('Validation passed')
 
-	return { passed, output };
+  return { passed, output }
 }
 
 /**
  * Process the hook input and return the result
  */
 export async function processHook(input: HookInput): Promise<HookResult> {
-	const filePath = input.tool_input?.file_path;
+  const filePath = input.tool_input?.file_path
 
-	// No file path - pass through
-	if (!filePath) {
-		return { status: "pass" };
-	}
+  // No file path - pass through
+  if (!filePath) {
+    return { status: 'pass' }
+  }
 
-	const filename = basename(filePath);
+  const filename = basename(filePath)
 
-	// Not a plugin file - pass through
-	if (!isPluginFile(filename)) {
-		return { status: "pass" };
-	}
+  // Not a plugin file - pass through
+  if (!isPluginFile(filename)) {
+    return { status: 'pass' }
+  }
 
-	// File doesn't exist (might have been deleted) - pass through
-	if (!existsSync(filePath)) {
-		return { status: "pass" };
-	}
+  // File doesn't exist (might have been deleted) - pass through
+  if (!existsSync(filePath)) {
+    return { status: 'pass' }
+  }
 
-	// Find the plugin root
-	const pluginRoot = findPluginRoot(filePath);
+  // Find the plugin root
+  const pluginRoot = findPluginRoot(filePath)
 
-	// Couldn't find plugin root - pass through
-	if (!pluginRoot) {
-		return { status: "pass" };
-	}
+  // Couldn't find plugin root - pass through
+  if (!pluginRoot) {
+    return { status: 'pass' }
+  }
 
-	// Run validation
-	const { passed, output } = await runValidation(pluginRoot);
+  // Run validation
+  const { passed, output } = await runValidation(pluginRoot)
 
-	if (passed) {
-		return { status: "pass" };
-	}
+  if (passed) {
+    return { status: 'pass' }
+  }
 
-	return {
-		status: "fail",
-		message: `Plugin validation failed:\n\n${output}\n\nPlease fix the issues before continuing.`,
-	};
+  return {
+    status: 'fail',
+    message: `Plugin validation failed:\n\n${output}\n\nPlease fix the issues before continuing.`,
+  }
 }
 
 // --- Main ---
 
 async function main() {
-	try {
-		// Read input from stdin
-		const inputText = await Bun.stdin.text();
-		const input: HookInput = inputText ? JSON.parse(inputText) : {};
+  try {
+    // Read input from stdin
+    const inputText = await Bun.stdin.text()
+    const input: HookInput = inputText ? JSON.parse(inputText) : {}
 
-		// Process and output result
-		const result = await processHook(input);
-		console.log(JSON.stringify(result));
-	} catch (error) {
-		// On any error, pass through to avoid blocking the user
-		console.log(JSON.stringify({ status: "pass" }));
-	}
+    // Process and output result
+    const result = await processHook(input)
+    console.log(JSON.stringify(result))
+  } catch (error) {
+    // On any error, pass through to avoid blocking the user
+    console.log(JSON.stringify({ status: 'pass' }))
+  }
 }
 
-main();
+// Only run main when executed directly, not when imported for tests
+if (import.meta.main) {
+  main()
+}

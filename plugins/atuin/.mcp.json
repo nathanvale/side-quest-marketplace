@@ -1,9 +1,9 @@
 {
-	"mcpServers": {
-		"bash-history": {
-			"command": "node",
-			"args": ["${CLAUDE_PLUGIN_ROOT}/mcp-servers/bash-history/index.js"],
-			"env": {}
-		}
-	}
+  "mcpServers": {
+    "bash-history": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-servers/bash-history/index.js"],
+      "env": {}
+    }
+  }
 }

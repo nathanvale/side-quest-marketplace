@@ -1,68 +1,68 @@
 {
-	"name": "side-quest-marketplace",
-	"owner": {
-		"name": "Nathan Vale",
-		"email": "hi@nathanvale.com"
-	},
-	"metadata": {
-		"description": "SideQuest - ADHD-friendly Claude Code plugins for developers who thrive on hyperfocus. Tools that work with your brain, not against it.",
-		"version": "1.0.0"
-	},
-	"plugins": [
-		{
-			"name": "core",
-			"source": "./plugins/nvcc",
-			"description": "Core productivity commands, specialized agents, and custom skills for dotfiles management, shell workflows, HyperFlow keyboard orchestration, and SuperWhisper voice dictation.",
-			"version": "1.0.0",
-			"author": {
-				"name": "Nathan Vale"
-			},
-			"category": "productivity",
-			"keywords": ["productivity", "dotfiles", "workflows", "voice"]
-		},
-		{
-			"name": "atuin",
-			"source": "./plugins/atuin",
-			"description": "Atuin shell history integration - search, capture, and manage bash command history with AI. Never lose a command again.",
-			"version": "1.0.0",
-			"author": {
-				"name": "Nathan Vale"
-			},
-			"category": "shell",
-			"keywords": ["shell", "history", "atuin", "bash"]
-		},
-		{
-			"name": "git",
-			"source": "./plugins/git",
-			"description": "Git intelligence for Claude Code - session context, commit history, smart commits with Conventional Commits. Includes MCP server, SessionStart/PreCompact hooks, and slash commands.",
-			"version": "1.0.0",
-			"author": {
-				"name": "Nathan Vale"
-			},
-			"category": "git",
-			"keywords": ["git", "commits", "version-control", "conventional-commits"]
-		},
-		{
-			"name": "bun-runner",
-			"source": "./plugins/bun-runner",
-			"description": "Smart test runner and linter MCP server. Run tests and lint with structured, token-efficient output. Filters out passing tests and verbose logs, focusing agents on failures.",
-			"version": "1.0.0",
-			"author": {
-				"name": "Nathan Vale"
-			},
-			"category": "testing",
-			"keywords": ["testing", "linting", "biome", "bun", "mcp"]
-		},
-		{
-			"name": "validate-plugin",
-			"source": "./plugins/validate-plugin",
-			"description": "Automatically validates plugin files after edits. Catches invalid marketplace.json, plugin.json, and hooks.json before they cause problems.",
-			"version": "1.0.0",
-			"author": {
-				"name": "Nathan Vale"
-			},
-			"category": "development",
-			"keywords": ["validation", "plugin", "hooks", "linting", "quality"]
-		}
-	]
+  "name": "side-quest-marketplace",
+  "owner": {
+    "name": "Nathan Vale",
+    "email": "hi@nathanvale.com"
+  },
+  "metadata": {
+    "description": "SideQuest - ADHD-friendly Claude Code plugins for developers who thrive on hyperfocus. Tools that work with your brain, not against it.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "core",
+      "source": "./plugins/nvcc",
+      "description": "Core productivity commands, specialized agents, and custom skills for dotfiles management, shell workflows, HyperFlow keyboard orchestration, and SuperWhisper voice dictation.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Vale"
+      },
+      "category": "productivity",
+      "keywords": ["productivity", "dotfiles", "workflows", "voice"]
+    },
+    {
+      "name": "atuin",
+      "source": "./plugins/atuin",
+      "description": "Atuin shell history integration - search, capture, and manage bash command history with AI. Never lose a command again.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Vale"
+      },
+      "category": "shell",
+      "keywords": ["shell", "history", "atuin", "bash"]
+    },
+    {
+      "name": "git",
+      "source": "./plugins/git",
+      "description": "Git intelligence for Claude Code - session context, commit history, smart commits with Conventional Commits. Includes MCP server, SessionStart/PreCompact hooks, and slash commands.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Vale"
+      },
+      "category": "git",
+      "keywords": ["git", "commits", "version-control", "conventional-commits"]
+    },
+    {
+      "name": "bun-runner",
+      "source": "./plugins/bun-runner",
+      "description": "Smart test runner and linter MCP server. Run tests and lint with structured, token-efficient output. Filters out passing tests and verbose logs, focusing agents on failures.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Vale"
+      },
+      "category": "testing",
+      "keywords": ["testing", "linting", "biome", "bun", "mcp"]
+    },
+    {
+      "name": "validate-plugin",
+      "source": "./plugins/validate-plugin",
+      "description": "Automatically validates plugin files after edits. Catches invalid marketplace.json, plugin.json, and hooks.json before they cause problems.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Vale"
+      },
+      "category": "development",
+      "keywords": ["validation", "plugin", "hooks", "linting", "quality"]
+    }
+  ]
 }

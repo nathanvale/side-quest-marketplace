@@ -1,16 +1,16 @@
 {
-	"hooks": {
-		"PostToolUse": [
-			{
-				"matcher": "Edit|Write",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/validate-plugin.ts",
-						"timeout": 30000
-					}
-				]
-			}
-		]
-	}
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/validate-plugin.ts",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
 }

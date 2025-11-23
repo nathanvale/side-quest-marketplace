@@ -1,26 +1,26 @@
 {
-	"name": "side-quest-marketplace",
-	"version": "1.0.0",
-	"private": true,
-	"description": "SideQuest - ADHD-friendly Claude Code plugin marketplace",
-	"workspaces": ["plugins/*", "plugins/*/mcp-servers/*"],
-	"scripts": {
-		"test": "bun run --filter '*' test",
-		"typecheck": "bun run --filter '*' typecheck",
-		"format": "bun run --filter '*' format",
-		"format:check": "bun run --filter '*' format:check",
-		"lint": "bun run --filter '*' lint",
-		"check": "bun run --filter '*' check",
-		"ci": "bun --filter '*' typecheck && bunx @biomejs/biome check . && bun --filter '*' test",
-		"validate": "claude plugin validate .",
-		"ci:full": "bun run ci && bun run validate",
-		"prepare": "husky"
-	},
-	"devDependencies": {
-		"@biomejs/biome": "^1.9.4",
-		"@commitlint/cli": "^20.1.0",
-		"@commitlint/config-conventional": "^20.0.0",
-		"bun-types": "^1.3.3",
-		"husky": "^9.1.7"
-	}
+  "name": "side-quest-marketplace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SideQuest - ADHD-friendly Claude Code plugin marketplace",
+  "workspaces": ["plugins/*", "plugins/*/mcp-servers/*"],
+  "scripts": {
+    "test": "bun run --filter '*' test",
+    "typecheck": "bun run --filter '*' typecheck",
+    "format": "bun run --filter '*' format",
+    "format:check": "bun run --filter '*' format:check",
+    "lint": "bun run --filter '*' lint",
+    "check": "bun run --filter '*' check",
+    "ci": "bun --filter '*' typecheck && bunx @biomejs/biome check . && bun --filter '*' test",
+    "validate": "claude plugin validate .",
+    "ci:full": "bun run ci && bun run validate",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@commitlint/cli": "^20.1.0",
+    "@commitlint/config-conventional": "^20.0.0",
+    "bun-types": "^1.3.3",
+    "husky": "^9.1.7"
+  }
 }

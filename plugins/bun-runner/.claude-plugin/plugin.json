@@ -1,0 +1,11 @@
+{
+  "name": "bun-runner",
+  "description": "Smart test runner and linter MCP server for Bun and Biome",
+  "version": "1.0.0",
+  "author": {
+    "name": "Nathan Vale",
+    "email": "hi@nathanvale.com"
+  },
+  "keywords": ["testing", "linting", "biome", "bun", "mcp"],
+  "license": "MIT"
+}

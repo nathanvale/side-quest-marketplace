@@ -7,141 +7,152 @@
  * Helps maintain continuity across context windows.
  */
 
-import { existsSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
-import type { PreCompactHookInput } from "@anthropic-ai/claude-agent-sdk";
+import { existsSync, mkdirSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import type { PreCompactHookInput } from '@anthropic-ai/claude-agent-sdk'
 
 interface SessionSummary {
-	timestamp: string;
-	branch: string;
-	trigger: "manual" | "auto";
-	sessionCommits: string[];
-	uncommittedChanges: {
-		staged: string;
-		modified: string;
-	};
+  timestamp: string
+  branch: string
+  trigger: 'manual' | 'auto'
+  sessionCommits: string[]
+  uncommittedChanges: {
+    staged: string
+    modified: string
+  }
 }
 
-async function exec(command: string, cwd: string): Promise<{ stdout: string; exitCode: number }> {
-	const proc = Bun.spawn(["sh", "-c", command], {
-		cwd,
-		stdout: "pipe",
-		stderr: "pipe",
-	});
+async function exec(
+  command: string,
+  cwd: string,
+): Promise<{ stdout: string; exitCode: number }> {
+  const proc = Bun.spawn(['sh', '-c', command], {
+    cwd,
+    stdout: 'pipe',
+    stderr: 'pipe',
+  })
 
-	const stdout = await new Response(proc.stdout).text();
-	const exitCode = await proc.exited;
+  const stdout = await new Response(proc.stdout).text()
+  const exitCode = await proc.exited
 
-	return { stdout: stdout.trim(), exitCode };
+  return { stdout: stdout.trim(), exitCode }
 }
 
 async function isGitRepo(cwd: string): Promise<boolean> {
-	const { exitCode } = await exec("git rev-parse --git-dir", cwd);
-	return exitCode === 0;
+  const { exitCode } = await exec('git rev-parse --git-dir', cwd)
+  return exitCode === 0
 }
 
 async function getGitRoot(cwd: string): Promise<string | null> {
-	const { stdout, exitCode } = await exec("git rev-parse --show-toplevel", cwd);
-	return exitCode === 0 ? stdout : null;
+  const { stdout, exitCode } = await exec('git rev-parse --show-toplevel', cwd)
+  return exitCode === 0 ? stdout : null
 }
 
 async function getSessionSummary(
-	cwd: string,
-	trigger: "manual" | "auto"
+  cwd: string,
+  trigger: 'manual' | 'auto',
 ): Promise<SessionSummary | null> {
-	if (!(await isGitRepo(cwd))) {
-		return null;
-	}
+  if (!(await isGitRepo(cwd))) {
+    return null
+  }
 
-	// Get branch
-	const { stdout: branch } = await exec(
-		"git branch --show-current 2>/dev/null || echo '(detached)'",
-		cwd
-	);
+  // Get branch
+  const { stdout: branch } = await exec(
+    "git branch --show-current 2>/dev/null || echo '(detached)'",
+    cwd,
+  )
 
-	// Get commits from the last hour (approximate session length)
-	const { stdout: commitsOut } = await exec(
-		'git log --oneline --since="1 hour ago" 2>/dev/null | head -10',
-		cwd
-	);
-	const sessionCommits = commitsOut.split("\n").filter((line) => line.trim() !== "");
+  // Get commits from the last hour (approximate session length)
+  const { stdout: commitsOut } = await exec(
+    'git log --oneline --since="1 hour ago" 2>/dev/null | head -10',
+    cwd,
+  )
+  const sessionCommits = commitsOut
+    .split('\n')
+    .filter((line) => line.trim() !== '')
 
-	// Get staged changes summary
-	const { stdout: stagedStat } = await exec("git diff --cached --stat 2>/dev/null | tail -1", cwd);
+  // Get staged changes summary
+  const { stdout: stagedStat } = await exec(
+    'git diff --cached --stat 2>/dev/null | tail -1',
+    cwd,
+  )
 
-	// Get modified changes summary
-	const { stdout: modifiedStat } = await exec("git diff --stat 2>/dev/null | tail -1", cwd);
+  // Get modified changes summary
+  const { stdout: modifiedStat } = await exec(
+    'git diff --stat 2>/dev/null | tail -1',
+    cwd,
+  )
 
-	return {
-		timestamp: new Date().toISOString(),
-		branch: branch || "(detached)",
-		trigger,
-		sessionCommits,
-		uncommittedChanges: {
-			staged: stagedStat || "none",
-			modified: modifiedStat || "none",
-		},
-	};
+  return {
+    timestamp: new Date().toISOString(),
+    branch: branch || '(detached)',
+    trigger,
+    sessionCommits,
+    uncommittedChanges: {
+      staged: stagedStat || 'none',
+      modified: modifiedStat || 'none',
+    },
+  }
 }
 
 function formatSummary(summary: SessionSummary): string {
-	let output = "# Claude Session Summary\n";
-	output += `# Generated: ${summary.timestamp}\n`;
-	output += `# Branch: ${summary.branch}\n`;
-	output += `# Trigger: ${summary.trigger}\n\n`;
+  let output = '# Claude Session Summary\n'
+  output += `# Generated: ${summary.timestamp}\n`
+  output += `# Branch: ${summary.branch}\n`
+  output += `# Trigger: ${summary.trigger}\n\n`
 
-	output += "## Session Activity\n\n";
+  output += '## Session Activity\n\n'
 
-	if (summary.sessionCommits.length > 0) {
-		output += "### Commits this session:\n";
-		summary.sessionCommits.forEach((commit) => {
-			output += `- ${commit}\n`;
-		});
-		output += "\n";
-	}
+  if (summary.sessionCommits.length > 0) {
+    output += '### Commits this session:\n'
+    summary.sessionCommits.forEach((commit) => {
+      output += `- ${commit}\n`
+    })
+    output += '\n'
+  }
 
-	if (
-		summary.uncommittedChanges.staged !== "none" ||
-		summary.uncommittedChanges.modified !== "none"
-	) {
-		output += "### Uncommitted changes:\n";
-		if (summary.uncommittedChanges.staged !== "none") {
-			output += `Staged: ${summary.uncommittedChanges.staged}\n`;
-		}
-		if (summary.uncommittedChanges.modified !== "none") {
-			output += `Modified: ${summary.uncommittedChanges.modified}\n`;
-		}
-		output += "\n";
-	}
+  if (
+    summary.uncommittedChanges.staged !== 'none' ||
+    summary.uncommittedChanges.modified !== 'none'
+  ) {
+    output += '### Uncommitted changes:\n'
+    if (summary.uncommittedChanges.staged !== 'none') {
+      output += `Staged: ${summary.uncommittedChanges.staged}\n`
+    }
+    if (summary.uncommittedChanges.modified !== 'none') {
+      output += `Modified: ${summary.uncommittedChanges.modified}\n`
+    }
+    output += '\n'
+  }
 
-	return output;
+  return output
 }
 
 // Main execution
-const input = (await Bun.stdin.json()) as PreCompactHookInput;
-const { cwd, trigger } = input;
+const input = (await Bun.stdin.json()) as PreCompactHookInput
+const { cwd, trigger } = input
 
-const gitRoot = await getGitRoot(cwd);
+const gitRoot = await getGitRoot(cwd)
 
 if (gitRoot) {
-	const summary = await getSessionSummary(cwd, trigger);
+  const summary = await getSessionSummary(cwd, trigger)
 
-	if (summary) {
-		// Write to ~/.claude/session-summaries/ to avoid polluting user repos
-		const claudeDir = join(homedir(), ".claude", "session-summaries");
-		if (!existsSync(claudeDir)) {
-			mkdirSync(claudeDir, { recursive: true });
-		}
+  if (summary) {
+    // Write to ~/.claude/session-summaries/ to avoid polluting user repos
+    const claudeDir = join(homedir(), '.claude', 'session-summaries')
+    if (!existsSync(claudeDir)) {
+      mkdirSync(claudeDir, { recursive: true })
+    }
 
-		// Use repo name as filename to keep summaries separate per project
-		const repoName = gitRoot.split("/").pop() || "unknown";
-		const summaryPath = join(claudeDir, `${repoName}.md`);
-		const content = formatSummary(summary);
+    // Use repo name as filename to keep summaries separate per project
+    const repoName = gitRoot.split('/').pop() || 'unknown'
+    const summaryPath = join(claudeDir, `${repoName}.md`)
+    const content = formatSummary(summary)
 
-		await Bun.write(summaryPath, content);
-		console.log(`Session summary saved to ${summaryPath}`);
-	}
+    await Bun.write(summaryPath, content)
+    console.log(`Session summary saved to ${summaryPath}`)
+  }
 }
 
-process.exit(0);
+process.exit(0)
