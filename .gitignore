@@ -14,3 +14,4 @@
 
 # Logs
 *.log
+.claude-session-summary
