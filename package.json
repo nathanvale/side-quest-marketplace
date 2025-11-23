@@ -12,6 +12,8 @@
 		"lint": "bun run --filter '*' lint",
 		"check": "bun run --filter '*' check",
 		"ci": "bun --filter '*' typecheck && bunx @biomejs/biome check . && bun --filter '*' test",
+		"validate": "claude plugin validate .",
+		"ci:full": "bun run ci && bun run validate",
 		"prepare": "husky"
 	},
 	"devDependencies": {
