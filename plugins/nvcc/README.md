@@ -1,74 +1,16 @@
-# Nathan Vale Claude Code Marketplace
+# NVCC - Nathan Vale's Claude Code Plugin
 
-Personal Claude Code plugin marketplace with productivity-focused plugins for dotfiles management and development workflows.
+Personal Claude Code plugin with productivity commands, specialized agents, and custom skills for dotfiles management and development workflows.
 
-## Key Features
-
-- **Personal Productivity** - Commands and skills refined for daily development workflows
-- **Dotfiles Integration** - Deep integration with shell, tmux, and terminal tools
-- **Voice Dictation** - SuperWhisper AI dictation integration
-- **Keyboard Orchestration** - HyperFlow hyper key system management
-
-## Quick Start
-
-### Step 1: Add the Marketplace
-
-```bash
-# From GitHub
-/plugin marketplace add nathanvale/nathan-vale-claude-code
-
-# Or locally (for development)
-/plugin marketplace add /Users/nathanvale/code/nathan-vale-claude-code
-```
-
-This makes all plugins available for installation.
-
-### Step 2: Install Plugin
+## Installation
 
 ```bash
 /plugin install nvcc@nathan-vale-claude-code
 ```
 
-### Step 3: Use Plugin
+## What's Inside
 
-```bash
-# Start a task
-> /nvcc:start
-
-# Get next priority task
-> /nvcc:next
-
-# Review code
-> /nvcc:review-code
-```
-
-## Update Marketplace
-
-To get the latest plugin updates:
-
-```bash
-/plugin marketplace update nathan-vale-claude-code
-```
-
-## Plugins List
-
-To view all available plugins:
-
-```bash
-/plugin
-```
-
-### NVCC (Nathan Vale Claude Code)
-
-Main plugin with productivity commands, specialized agents, and custom skills.
-
-**How to install**
-
-```bash
-/plugin install nvcc@nathan-vale-claude-code
-```
-
-**Commands (17)**
+### Commands (17)
 
 | Command | Description |
 |---------|-------------|
@@ -90,14 +32,14 @@ Main plugin with productivity commands, specialized agents, and custom skills.
 | `/nvcc:sw-integrate` | Create SuperWhisper integration scripts |
 | `/nvcc:sw-fix` | Troubleshoot SuperWhisper issues |
 
-**Agents (2)**
+### Specialized AI Agents (2)
 
 | Agent | Description |
 |-------|-------------|
 | **code-analyzer** | Analyze code changes for potential bugs and trace logic flow |
 | **file-analyzer** | Analyze and summarize file contents, particularly log files |
 
-**Skills (13)**
+### Custom Skills (13)
 
 | Skill | Description |
 |-------|-------------|
@@ -115,28 +57,19 @@ Main plugin with productivity commands, specialized agents, and custom skills.
 | **superwhisper** | SuperWhisper AI dictation integration |
 | **task-manager** | Task and todo management |
 
-**Hooks**
+### Hooks
 
 - **PostToolUse**: Atuin shell history integration for Bash commands
 - **SessionStart**: Agent start logging
 
-## Customization
+## Best For
 
-After installation, you can fork this repo and customize:
-- Commands in `plugins/nvcc/commands/`
-- Agents in `plugins/nvcc/agents/`
-- Skills in `plugins/nvcc/skills/`
-- Hooks in `plugins/nvcc/hooks/hooks.json`
-
-## Requirements
-
-- Claude Code 2.0.13+
-- Works with any project
+- Dotfiles management
+- Shell/terminal workflows
+- HyperFlow keyboard orchestration
+- SuperWhisper voice dictation
+- Task and project management
 
 ## Author
 
 Created by Nathan Vale
-
----
-
-**Note**: This is my personal setup refined over time. Commands and skills are optimized for my dotfiles and development workflows but can be adapted for any use case.

@@ -1,0 +1,19 @@
+{
+  "name": "bash-history-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for searching bash command history with atuin",
+  "main": "index.js",
+  "type": "module",
+  "bin": {
+    "bash-history-mcp": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": ["mcp", "bash", "history", "atuin"],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "mcpez": "^1.2.1"
+  }
+}

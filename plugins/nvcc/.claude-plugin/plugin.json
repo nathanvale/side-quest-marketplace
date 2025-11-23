@@ -1,0 +1,18 @@
+{
+  "name": "nvcc",
+  "version": "1.0.0",
+  "description": "Nathan's personal Claude Code setup with productivity commands, specialized agents, and custom skills for dotfiles management and development workflows",
+  "author": {
+    "name": "Nathan Vale"
+  },
+  "license": "MIT",
+  "keywords": [
+    "productivity",
+    "dotfiles",
+    "shell",
+    "development",
+    "automation",
+    "hyperflow",
+    "superwhisper"
+  ]
+}
