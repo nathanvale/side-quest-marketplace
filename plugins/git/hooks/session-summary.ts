@@ -7,6 +7,8 @@
  * Helps maintain continuity across context windows.
  */
 
+import { existsSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import type { PreCompactHookInput } from "@anthropic-ai/claude-agent-sdk";
 
@@ -126,7 +128,15 @@ if (gitRoot) {
 	const summary = await getSessionSummary(cwd, trigger);
 
 	if (summary) {
-		const summaryPath = join(gitRoot, ".claude-session-summary");
+		// Write to ~/.claude/session-summaries/ to avoid polluting user repos
+		const claudeDir = join(homedir(), ".claude", "session-summaries");
+		if (!existsSync(claudeDir)) {
+			mkdirSync(claudeDir, { recursive: true });
+		}
+
+		// Use repo name as filename to keep summaries separate per project
+		const repoName = gitRoot.split("/").pop() || "unknown";
+		const summaryPath = join(claudeDir, `${repoName}.md`);
 		const content = formatSummary(summary);
 
 		await Bun.write(summaryPath, content);
