@@ -2,7 +2,7 @@
 	"name": "side-quest-marketplace",
 	"owner": {
 		"name": "Nathan Vale",
-		"email": "nathan@nathanvale.com"
+		"email": "hi@nathanvale.com"
 	},
 	"metadata": {
 		"description": "SideQuest - ADHD-friendly Claude Code plugins for developers who thrive on hyperfocus. Tools that work with your brain, not against it.",
@@ -52,6 +52,17 @@
 			},
 			"category": "testing",
 			"keywords": ["testing", "linting", "biome", "bun", "mcp"]
+		},
+		{
+			"name": "validate-plugin",
+			"source": "./plugins/validate-plugin",
+			"description": "Automatically validates plugin files after edits. Catches invalid marketplace.json, plugin.json, and hooks.json before they cause problems.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "development",
+			"keywords": ["validation", "plugin", "hooks", "linting", "quality"]
 		}
 	]
 }

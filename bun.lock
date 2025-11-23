@@ -71,6 +71,14 @@
         "bun-types": "^1.3.3",
       },
     },
+    "plugins/validate-plugin": {
+      "name": "@sidequest/validate-plugin",
+      "version": "1.0.0",
+      "devDependencies": {
+        "@biomejs/biome": "^1.9.4",
+        "bun-types": "^1.3.3",
+      },
+    },
   },
   "packages": {
     "@babel/code-frame": ["@babel/code-frame@7.27.1", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.27.1", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-cjQ7ZlQ0Mv3b47hABuTevyTuYN4i+loJKGeV9flcCgIK37cCXRh+L1bd3iBHlynerhQ7BhCkn2BPbQUL+rGqFg=="],
@@ -144,6 +152,8 @@
     "@sidequest/mcp-bun-runner": ["@sidequest/mcp-bun-runner@workspace:plugins/bun-runner/mcp-servers/bun-runner"],
 
     "@sidequest/mcp-git-intelligence": ["@sidequest/mcp-git-intelligence@workspace:plugins/git/mcp-servers/git-intelligence"],
+
+    "@sidequest/validate-plugin": ["@sidequest/validate-plugin@workspace:plugins/validate-plugin"],
 
     "@types/conventional-commits-parser": ["@types/conventional-commits-parser@5.0.2", "", { "dependencies": { "@types/node": "*" } }, "sha512-BgT2szDXnVypgpNxOK8aL5SGjUdaQbC++WZNjF1Qge3Og2+zhHj+RWhmehLhYyvQwqAmvezruVfOf8+3m74W+g=="],
 
