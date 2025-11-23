@@ -9,11 +9,21 @@
 
 set -euo pipefail
 
+# Check for jq dependency
+if ! command -v jq >/dev/null 2>&1; then
+    echo "Warning: 'jq' is not installed. Atuin hook skipping." >&2
+    exit 0
+fi
+
 # Configuration
 DEBUG="${CLAUDE_ATUIN_DEBUG:-0}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_FILE="${SCRIPT_DIR}/atuin-hook.log"
-ZSH_HISTORY="${HOME}/.zsh_history"
+# Respect HISTFILE or fallback to standard locations
+HISTORY_FILE="${HISTFILE:-${HOME}/.zsh_history}"
+if [[ ! -f "$HISTORY_FILE" && -f "${HOME}/.bash_history" ]]; then
+    HISTORY_FILE="${HOME}/.bash_history"
+fi
 
 # Helper: Log debug messages
 debug_log() {
@@ -25,6 +35,7 @@ debug_log() {
 # Helper: Log errors (always logged)
 error_log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >> "$LOG_FILE"
+    echo "[Atuin Hook Error] $*" >&2
 }
 
 # Main execution
@@ -47,6 +58,12 @@ main() {
     if [[ "$TOOL_NAME" != "Bash" ]]; then
         debug_log "Skipping non-Bash tool: $TOOL_NAME"
         exit 0
+    fi
+
+    # Append to history file if it exists
+    if [[ -f "$HISTORY_FILE" ]]; then
+        # Format depends on shell, simple append for now
+        echo "$COMMAND" >> "$HISTORY_FILE"
     fi
 
     # Validate command exists
