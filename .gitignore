@@ -15,3 +15,5 @@
 # Logs
 *.log
 .claude-session-summary
+
+settings.local.json
