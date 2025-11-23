@@ -67,11 +67,11 @@ export function findPluginRoot(filePath: string): string | null {
 
 /**
  * Run claude plugin validate on a directory
- * Returns the validation output and whether it passed
+ * Returns the validation output, whether it passed, and whether there are warnings
  */
 export async function runValidation(
   pluginRoot: string,
-): Promise<{ passed: boolean; output: string }> {
+): Promise<{ passed: boolean; hasWarnings: boolean; output: string }> {
   const proc = spawn({
     cmd: ['claude', 'plugin', 'validate', pluginRoot],
     stdout: 'pipe',
@@ -85,8 +85,10 @@ export async function runValidation(
 
   // Check if validation passed (exit code 0 or output contains "Validation passed")
   const passed = exitCode === 0 || output.includes('Validation passed')
+  // Check if there are warnings
+  const hasWarnings = output.includes('warning')
 
-  return { passed, output }
+  return { passed, hasWarnings, output }
 }
 
 /**
@@ -121,9 +123,16 @@ export async function processHook(input: HookInput): Promise<HookResult> {
   }
 
   // Run validation
-  const { passed, output } = await runValidation(pluginRoot)
+  const { passed, hasWarnings, output } = await runValidation(pluginRoot)
 
   if (passed) {
+    // Surface warnings to the user even on pass
+    if (hasWarnings) {
+      return {
+        status: 'pass',
+        message: `Plugin validation passed with warnings:\n\n${output}`,
+      }
+    }
     return { status: 'pass' }
   }
 

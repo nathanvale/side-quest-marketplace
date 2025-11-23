@@ -166,4 +166,22 @@ describe('processHook', () => {
     // Cleanup
     await Bun.$`rm -rf ${tempDir}`
   })
+
+  test('passes with warnings for plugin missing optional fields', async () => {
+    // Create a valid plugin with only required fields (missing version, description, author)
+    const tempDir = '/tmp/test-plugin-with-warnings'
+    await Bun.$`mkdir -p ${tempDir}/.claude-plugin`
+    await Bun.write(`${tempDir}/.claude-plugin/plugin.json`, '{"name": "test-plugin"}')
+
+    const result = await processHook({
+      tool_input: { file_path: `${tempDir}/.claude-plugin/plugin.json` },
+    })
+
+    expect(result.status).toBe('pass')
+    expect(result.message).toContain('warning')
+    expect(result.message).toContain('version')
+
+    // Cleanup
+    await Bun.$`rm -rf ${tempDir}`
+  })
 })
