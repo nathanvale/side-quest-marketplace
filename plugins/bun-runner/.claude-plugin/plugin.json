@@ -7,5 +7,6 @@
     "email": "hi@nathanvale.com"
   },
   "keywords": ["testing", "linting", "biome", "bun", "mcp"],
-  "license": "MIT"
+  "license": "MIT",
+  "hooks": "./hooks/hooks.json"
 }

@@ -1,6 +1,6 @@
 {
   "name": "git",
-  "description": "Git intelligence for Claude Code - session context, commit history, smart commits with Conventional Commits",
+  "description": "Git intelligence for Claude Code - session context, commit history, and smart commits with Conventional Commits",
   "version": "1.0.0",
   "author": {
     "name": "Nathan Vale",
@@ -14,5 +14,6 @@
     "mcp",
     "session"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "hooks": "./hooks/hooks.json"
 }
