@@ -29,6 +29,6 @@
 		}
 	},
 	"files": {
-		"ignore": ["node_modules", "*.md"]
+		"ignore": ["node_modules", "*.md", ".claude"]
 	}
 }
