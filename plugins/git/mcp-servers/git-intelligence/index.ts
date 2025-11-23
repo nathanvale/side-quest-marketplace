@@ -32,25 +32,6 @@ interface ErrorResult {
 	error: string;
 }
 
-interface FileChange {
-	status: string;
-	file: string;
-}
-
-interface StatusResult {
-	branch: string;
-	staged_count: number;
-	modified_count: number;
-	untracked_count: number;
-	ahead: number;
-	behind: number;
-	files: {
-		staged: FileChange[];
-		modified: FileChange[];
-		untracked: string[];
-	};
-}
-
 interface DiffFile {
 	file: string;
 	added: number;
@@ -184,68 +165,6 @@ function searchCommits(query: string, options: SearchOptions = {}): GitResult<Co
 }
 
 /**
- * Get current git status
- */
-function getStatus(cwd: string = process.cwd()): GitResult<StatusResult> {
-	if (!isGitRepo(cwd)) {
-		return { error: "Not a git repository" };
-	}
-
-	try {
-		const branch = git("branch --show-current", cwd) || "(detached)";
-		const statusOutput = git("status --porcelain", cwd);
-
-		const files: StatusResult["files"] = {
-			staged: [],
-			modified: [],
-			untracked: [],
-		};
-
-		if (statusOutput) {
-			statusOutput.split("\n").forEach((line) => {
-				const index = line[0] ?? " ";
-				const worktree = line[1] ?? " ";
-				const file = line.slice(3);
-
-				if (index !== " " && index !== "?") {
-					files.staged.push({ status: index, file });
-				}
-				if (worktree === "M" || worktree === "D") {
-					files.modified.push({ status: worktree, file });
-				}
-				if (index === "?") {
-					files.untracked.push(file);
-				}
-			});
-		}
-
-		let ahead = 0;
-		let behind = 0;
-		try {
-			const tracking = git("rev-list --left-right --count @{u}...HEAD", cwd);
-			const parts = tracking.split("\t");
-			behind = Number.parseInt(parts[0] ?? "0", 10) || 0;
-			ahead = Number.parseInt(parts[1] ?? "0", 10) || 0;
-		} catch {
-			// No upstream tracking
-		}
-
-		return {
-			branch,
-			staged_count: files.staged.length,
-			modified_count: files.modified.length,
-			untracked_count: files.untracked.length,
-			ahead,
-			behind,
-			files,
-		};
-	} catch (error: unknown) {
-		const err = error as Error;
-		return { error: err.message };
-	}
-}
-
-/**
  * Get diff summary
  */
 function getDiffSummary(ref = "HEAD", cwd: string = process.cwd()): GitResult<DiffResult> {
@@ -313,57 +232,6 @@ function formatCommits(results: GitResult<CommitResult>): string {
 	return output.trim();
 }
 
-/**
- * Format status for display
- */
-function formatStatus(status: GitResult<StatusResult>): string {
-	if (isError(status)) {
-		return `Error: ${status.error}`;
-	}
-
-	let output = `Branch: ${status.branch}`;
-
-	if (status.ahead || status.behind) {
-		output += " (";
-		if (status.ahead) output += `${status.ahead} ahead`;
-		if (status.ahead && status.behind) output += ", ";
-		if (status.behind) output += `${status.behind} behind`;
-		output += ")";
-	}
-
-	output += "\n\n";
-
-	if (status.staged_count === 0 && status.modified_count === 0 && status.untracked_count === 0) {
-		output += "Working tree clean.";
-		return output;
-	}
-
-	if (status.staged_count > 0) {
-		output += `Staged (${status.staged_count}):\n`;
-		status.files.staged.forEach((f) => {
-			output += `  ${f.status} ${f.file}\n`;
-		});
-		output += "\n";
-	}
-
-	if (status.modified_count > 0) {
-		output += `Modified (${status.modified_count}):\n`;
-		status.files.modified.forEach((f) => {
-			output += `  ${f.status} ${f.file}\n`;
-		});
-		output += "\n";
-	}
-
-	if (status.untracked_count > 0) {
-		output += `Untracked (${status.untracked_count}):\n`;
-		status.files.untracked.forEach((f) => {
-			output += `  ? ${f}\n`;
-		});
-	}
-
-	return output.trim();
-}
-
 // Register tools
 
 tool(
@@ -415,22 +283,6 @@ tool(
 		return {
 			content: [{ type: "text" as const, text: formatCommits(results) }],
 		};
-	}
-);
-
-tool(
-	"get_status",
-	{
-		description:
-			"Get current git status including branch, staged/modified/untracked files, and ahead/behind tracking info.",
-		inputSchema: {
-			path: z.string().optional().describe("Repository path (default: current directory)"),
-		},
-	},
-	async (args: { path?: string }) => {
-		const { path } = args;
-		const status = getStatus(path);
-		return { content: [{ type: "text" as const, text: formatStatus(status) }] };
 	}
 );
 
