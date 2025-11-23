@@ -37,13 +37,9 @@ Claude can autonomously search your history when you ask questions like:
    /plugin install atuin@nathan-vale-claude-code
    ```
 
-2. Install MCP server dependencies:
-   ```bash
-   cd ~/.claude/plugins/cache/atuin/mcp-servers/bash-history
-   npm install
-   ```
+2. Restart Claude Code to activate the plugin
 
-3. Restart Claude Code to activate the MCP server
+Dependencies are automatically installed on first startup via the SessionStart hook.
 
 ## Configuration
 

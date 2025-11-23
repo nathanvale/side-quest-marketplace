@@ -15,8 +15,9 @@ import { execSync } from "child_process";
  */
 function searchHistory(query, limit = 10, includeFailed = false) {
   try {
-    const includeFailedFlag = includeFailed ? "" : "--exclude-exit 1-255";
-    const cmd = `atuin search --limit ${limit} --search-mode fuzzy --filter-mode global --format "{time}\\t{exit}\\t{command}" ${includeFailedFlag} "${query}"`;
+    // Use --exit 0 to filter only successful commands when not including failed
+    const exitFilter = includeFailed ? "" : "--exit 0";
+    const cmd = `atuin search --limit ${limit} --search-mode fuzzy --filter-mode global --format "{time}\\t{exit}\\t{command}" ${exitFilter} "${query}"`;
 
     const output = execSync(cmd, { encoding: "utf8" });
 
@@ -81,7 +82,7 @@ function getRecentHistory(limit = 10, includeFailed = false) {
  */
 function formatResults(results) {
   if (results.count === 0) {
-    return results.message;
+    return results.message || "No commands found in history.";
   }
 
   let output = `Found ${results.count} command${results.count === 1 ? "" : "s"}:\n\n`;
@@ -109,15 +110,15 @@ tool(
       "Search command history using atuin. Returns matching commands with timestamps, exit codes, and full command text.",
     inputSchema: {
       query: z.string().describe("Search query to find matching commands"),
-      limit: z.number().default(10).describe("Maximum number of results to return (default: 10)"),
+      limit: z.number().optional().describe("Maximum number of results to return (default: 10)"),
       include_failed: z
         .boolean()
-        .default(false)
+        .optional()
         .describe("Include commands that failed (non-zero exit code). Default: false"),
     },
   },
-  async ({ query, limit = 10, include_failed = false }) => {
-    const results = searchHistory(query, limit, include_failed);
+  async ({ query, limit, include_failed }) => {
+    const results = searchHistory(query, limit ?? 10, include_failed ?? false);
     return { content: [{ type: "text", text: formatResults(results) }] };
   }
 );
@@ -127,15 +128,15 @@ tool(
   {
     description: "Get recent command history from atuin with timestamps and exit codes.",
     inputSchema: {
-      limit: z.number().default(10).describe("Number of recent commands to retrieve (default: 10)"),
+      limit: z.number().optional().describe("Number of recent commands to retrieve (default: 10)"),
       include_failed: z
         .boolean()
-        .default(false)
+        .optional()
         .describe("Include commands that failed (non-zero exit code). Default: false"),
     },
   },
-  async ({ limit = 10, include_failed = false }) => {
-    const results = getRecentHistory(limit, include_failed);
+  async ({ limit, include_failed }) => {
+    const results = getRecentHistory(limit ?? 10, include_failed ?? false);
     return { content: [{ type: "text", text: formatResults(results) }] };
   }
 );
