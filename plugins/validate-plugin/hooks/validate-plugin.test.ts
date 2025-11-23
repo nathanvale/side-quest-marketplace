@@ -167,7 +167,7 @@ describe('processHook', () => {
     await Bun.$`rm -rf ${tempDir}`
   })
 
-  test('passes with warnings for plugin missing optional fields', async () => {
+  test('fails with warnings for plugin missing optional fields', async () => {
     // Create a valid plugin with only required fields (missing version, description, author)
     const tempDir = '/tmp/test-plugin-with-warnings'
     await Bun.$`mkdir -p ${tempDir}/.claude-plugin`
@@ -177,7 +177,8 @@ describe('processHook', () => {
       tool_input: { file_path: `${tempDir}/.claude-plugin/plugin.json` },
     })
 
-    expect(result.status).toBe('pass')
+    // Warnings cause fail so user sees the message (Claude Code ignores messages on pass)
+    expect(result.status).toBe('fail')
     expect(result.message).toContain('warning')
     expect(result.message).toContain('version')
 

@@ -126,11 +126,11 @@ export async function processHook(input: HookInput): Promise<HookResult> {
   const { passed, hasWarnings, output } = await runValidation(pluginRoot)
 
   if (passed) {
-    // Surface warnings to the user even on pass
+    // Fail on warnings to ensure user sees them (Claude Code ignores messages on pass)
     if (hasWarnings) {
       return {
-        status: 'pass',
-        message: `Plugin validation passed with warnings:\n\n${output}`,
+        status: 'fail',
+        message: `Plugin validation has warnings:\n\n${output}\n\nFix warnings or ignore to continue.`,
       }
     }
     return { status: 'pass' }
