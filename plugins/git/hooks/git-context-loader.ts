@@ -38,27 +38,43 @@ async function isGitRepo(cwd: string): Promise<boolean> {
 	return exitCode === 0;
 }
 
+export function parseGitStatus(statusOut: string) {
+	const lines = statusOut.split("\n");
+	const branchLine = lines.find((l) => l.startsWith("##"));
+	let branch = "(detached)";
+	if (branchLine) {
+		const parsed = branchLine.substring(3).split("...")[0];
+		if (parsed) branch = parsed.trim();
+	}
+
+	let staged = 0;
+	let modified = 0;
+	let untracked = 0;
+
+	for (const line of lines) {
+		if (line.startsWith("##") || !line.trim()) continue;
+
+		const code = line.substring(0, 2);
+		if (code.startsWith("?") || code === "??") {
+			untracked++;
+		} else {
+			if (code[0] !== " " && code[0] !== "?") staged++;
+			if (code[1] !== " " && code[1] !== "?") modified++;
+		}
+	}
+
+	return { branch, status: { staged, modified, untracked } };
+}
+
 async function getGitContext(cwd: string): Promise<GitContext | null> {
 	if (!(await isGitRepo(cwd))) {
 		return null;
 	}
 
-	// Get branch
-	const { stdout: branch } = await exec(
-		"git branch --show-current 2>/dev/null || echo '(detached)'",
-		cwd
-	);
+	// Get status and branch in one go
+	const { stdout: statusOut } = await exec("git status --porcelain -b 2>/dev/null", cwd);
 
-	// Get status counts
-	const { stdout: stagedOut } = await exec(
-		"git diff --cached --name-only 2>/dev/null | wc -l",
-		cwd
-	);
-	const { stdout: modifiedOut } = await exec("git diff --name-only 2>/dev/null | wc -l", cwd);
-	const { stdout: untrackedOut } = await exec(
-		"git ls-files --others --exclude-standard 2>/dev/null | wc -l",
-		cwd
-	);
+	const { branch, status } = parseGitStatus(statusOut);
 
 	// Get recent commits
 	const { stdout: commitsOut } = await exec(
@@ -69,11 +85,7 @@ async function getGitContext(cwd: string): Promise<GitContext | null> {
 
 	const context: GitContext = {
 		branch: branch || "(detached)",
-		status: {
-			staged: Number.parseInt(stagedOut.trim(), 10) || 0,
-			modified: Number.parseInt(modifiedOut.trim(), 10) || 0,
-			untracked: Number.parseInt(untrackedOut.trim(), 10) || 0,
-		},
+		status,
 		recentCommits,
 	};
 
@@ -135,23 +147,25 @@ interface HookOutput {
 }
 
 // Main execution
-const input = (await Bun.stdin.json()) as SessionStartHookInput;
-const { cwd, source } = input;
+if (import.meta.main) {
+	const input = (await Bun.stdin.json()) as SessionStartHookInput;
+	const { cwd, source } = input;
 
-// Only run on startup, not on resume/clear/compact
-if (source === "startup") {
-	const context = await getGitContext(cwd);
+	// Only run on startup, not on resume/clear/compact
+	if (source === "startup") {
+		const context = await getGitContext(cwd);
 
-	if (context) {
-		const output: HookOutput = {
-			systemMessage: formatSystemMessage(context),
-			hookSpecificOutput: {
-				hookEventName: "SessionStart",
-				additionalContext: formatContext(context),
-			},
-		};
-		console.log(JSON.stringify(output));
+		if (context) {
+			const output: HookOutput = {
+				systemMessage: formatSystemMessage(context),
+				hookSpecificOutput: {
+					hookEventName: "SessionStart",
+					additionalContext: formatContext(context),
+				},
+			};
+			console.log(JSON.stringify(output));
+		}
 	}
-}
 
-process.exit(0);
+	process.exit(0);
+}
