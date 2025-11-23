@@ -1,0 +1,29 @@
+{
+	"name": "@nvcc/git-intelligence-mcp",
+	"version": "1.0.0",
+	"description": "MCP server for git intelligence - commit history, status, and context",
+	"type": "module",
+	"main": "index.ts",
+	"bin": {
+		"git-intelligence-mcp": "./index.ts"
+	},
+	"scripts": {
+		"start": "bun run index.ts",
+		"test": "bun test",
+		"typecheck": "bunx tsc --noEmit",
+		"format": "bunx @biomejs/biome format --write .",
+		"format:check": "bunx @biomejs/biome format .",
+		"lint": "bunx @biomejs/biome lint .",
+		"check": "bunx @biomejs/biome check --write ."
+	},
+	"keywords": ["mcp", "git", "history", "commits"],
+	"license": "MIT",
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.0.4",
+		"mcpez": "^1.2.1"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
+		"bun-types": "^1.3.3"
+	}
+}
