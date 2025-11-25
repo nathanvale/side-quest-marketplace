@@ -1,15 +1,11 @@
+---
+name: git-expert
+description: Git operations, history exploration, and intelligent commit management. Use when users ask about git history ("what did we change", "when did we add"), want to understand past changes, need help with commits ("commit this", "save my work", "checkpoint"), ask about branches, or mention recent work.
+---
+
 # Git Expert Skill
 
-A specialized skill for git operations, history exploration, and intelligent commit management.
-
-## Triggers
-
-Activate this skill when the user:
-- Asks about git history ("what did we change", "when did we add", "who wrote this")
-- Wants to understand past changes ("why was this code written", "what happened to")
-- Needs help with commits ("commit this", "save my work", "checkpoint")
-- Asks about branches ("what's different", "compare branches")
-- Mentions recent work ("what did we do", "show my changes")
+Git operations, history exploration, and intelligent commit management.
 
 ## Capabilities
 

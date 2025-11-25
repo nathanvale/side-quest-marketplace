@@ -82,6 +82,23 @@
         "knowledge-management",
         "tiago-forte"
       ]
+    },
+    {
+      "name": "claude-code-docs",
+      "source": "./plugins/claude-code-docs",
+      "description": "Claude Code documentation plugin - Auto-updating docs from docs.claude.com. Provides offline access to official Claude Code documentation with automated fetching and indexing.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Vale"
+      },
+      "category": "documentation",
+      "keywords": [
+        "documentation",
+        "claude-code",
+        "anthropic",
+        "auto-update",
+        "markdown"
+      ]
     }
   ]
 }

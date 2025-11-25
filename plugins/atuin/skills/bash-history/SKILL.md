@@ -1,30 +1,13 @@
 ---
 name: bash-history
-description: Search and retrieve bash command history using Atuin
-triggers:
-  - history
-  - previous command
-  - how did I
-  - what command
-  - ran before
-  - last time
-  - find command
+description: Search and retrieve bash command history using Atuin. Use when users ask about commands they've run before, want to find a specific command, recall how they did something previously, or ask "how did I..." or "what command did I use to..."
 ---
 
 # Bash History Skill
 
-This skill provides access to bash command history through Atuin, allowing you to search for and retrieve previously executed commands.
+Access bash command history through Atuin to search for and retrieve previously executed commands.
 
-## When to Use
-
-Use this skill when the user:
-- Asks about commands they've run before
-- Wants to find a specific command from history
-- Needs to recall how they did something previously
-- Is looking for a workflow or pattern from past commands
-- Asks "how did I..." or "what command did I use to..."
-
-## Available Tools
+## Tools
 
 ### mcp__bash-history__search_history
 
@@ -62,9 +45,4 @@ Use mcp__bash-history__search_history with query "git" and include_failed true
 
 ## Output Format
 
-Results include:
-- Command text
-- Exit code (0 = success, non-zero = failure)
-- Timestamp when the command was executed
-
-Present the results in a clear, readable format and offer to help the user understand or reuse the commands.
+Results include command text, exit code (0 = success), and timestamp. Present clearly and offer to help reuse commands.
