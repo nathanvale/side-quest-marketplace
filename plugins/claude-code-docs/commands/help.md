@@ -21,9 +21,9 @@ Answer this question about Claude Code: $ARGUMENTS
 
 ## Doc Location
 
-All docs are at: `plugins/claude-code-docs/docs/`
+All docs are at: `${CLAUDE_PLUGIN_ROOT}/docs/`
 
-Read the index first if unsure: `plugins/claude-code-docs/docs/INDEX.md`
+Read the index first if unsure: `${CLAUDE_PLUGIN_ROOT}/docs/INDEX.md`
 
 ## Topic to Doc Mapping
 
@@ -56,7 +56,7 @@ Read the index first if unsure: `plugins/claude-code-docs/docs/INDEX.md`
 ## If No Arguments Provided
 
 If the user runs `/claude-code-docs:help` with no arguments, read and display the index:
-`plugins/claude-code-docs/docs/INDEX.md`
+`${CLAUDE_PLUGIN_ROOT}/docs/INDEX.md`
 
 ## Response Style
 
