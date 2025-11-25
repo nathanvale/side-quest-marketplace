@@ -10,7 +10,7 @@
   },
   "plugins": [
     {
-      "name": "core",
+      "name": "nvcc",
       "source": "./plugins/nvcc",
       "description": "Core productivity commands, specialized agents, and custom skills for dotfiles management, shell workflows, HyperFlow keyboard orchestration, and SuperWhisper voice dictation.",
       "version": "1.0.0",
@@ -63,6 +63,25 @@
       },
       "category": "development",
       "keywords": ["validation", "plugin", "hooks", "linting", "quality"]
+    },
+    {
+      "name": "para-brain",
+      "source": "./plugins/para-brain",
+      "description": "Ultimate PARA method and Building a Second Brain plugin for Obsidian. Includes skills for knowledge management, slash commands for capture/process/review workflows, and templates for Projects, Areas, Resources, and Archives.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Vale"
+      },
+      "category": "productivity",
+      "keywords": [
+        "obsidian",
+        "para",
+        "second-brain",
+        "basb",
+        "pkm",
+        "knowledge-management",
+        "tiago-forte"
+      ]
     }
   ]
 }

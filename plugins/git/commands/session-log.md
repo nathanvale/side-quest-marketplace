@@ -1,3 +1,7 @@
+---
+description: Show git activity during this Claude session
+---
+
 # Session Activity Log
 
 Show what git activity has happened during this session using the git-intelligence MCP tools.

@@ -1,3 +1,7 @@
+---
+description: Create a quick WIP checkpoint commit to save your current work
+---
+
 # Quick Checkpoint Commit
 
 Create a quick WIP checkpoint commit to save your current work.

@@ -1,0 +1,24 @@
+{
+  "name": "@sidequest/claude-code",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Claude Code documentation plugin - maintains up-to-date docs from Eric Buess's repository",
+  "type": "module",
+  "scripts": {
+    "test": "bun test --recursive",
+    "typecheck": "bunx tsc --noEmit",
+    "format": "bunx @biomejs/biome format --write .",
+    "format:check": "bunx @biomejs/biome format .",
+    "lint": "bunx @biomejs/biome lint .",
+    "check": "bunx @biomejs/biome check --write ."
+  },
+  "dependencies": {
+    "cheerio": "^1.1.2",
+    "turndown": "^7.2.2",
+    "xml2js": "^0.6.2"
+  },
+  "devDependencies": {
+    "@types/turndown": "^5.0.6",
+    "@types/xml2js": "^0.4.14"
+  }
+}

@@ -1,7 +1,5 @@
 ---
-description:
-  Comprehensive code review across 7 quality dimensions using parallel code-analyzer agents and
-  PROJECT_INDEX.json graph analysis.
+description: Comprehensive code review across 7 quality dimensions using parallel code-analyzer agents
 ---
 
 Perform a comprehensive code review using parallel code-analyzer agents.

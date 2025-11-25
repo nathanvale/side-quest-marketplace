@@ -1,9 +1,5 @@
 ---
-name: migrate-debug
-description:
-  Debugs a migration run by analyzing logs for a specific correlation ID, then runs code analysis if
-  issues are found. Use when troubleshooting failed or problematic migrations, or when mentioned
-  'debug migration', 'debug run', 'debug correlation'.
+description: Debugs a migration run by analyzing logs for a specific correlation ID, then runs code analysis if issues are found. Use when troubleshooting failed or problematic migrations.
 argument-hint: [correlation-id]
 ---
 

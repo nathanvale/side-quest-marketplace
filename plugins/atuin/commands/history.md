@@ -1,6 +1,5 @@
 ---
-description: Search bash command history using Atuin
-argument-hint: [search-query]
+description: [search-query] - Search bash command history using Atuin
 ---
 
 # Search Bash History

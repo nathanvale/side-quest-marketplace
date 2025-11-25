@@ -1,13 +1,7 @@
 ---
-name: migrate-rollback
-description:
-  Generates a rollback command for referrals created in a migration run by extracting their IDs from
-  migration logs. Use when rolling back a failed migration, recovering from data issues, or when
-  mentioned 'rollback migration', 'undo migration', 'rollback referrals'.
+description: Generates a rollback command for referrals created in a migration run by extracting their IDs from migration logs. Use when rolling back a failed migration or recovering from data issues.
 argument-hint: [migration-correlation-id-optional]
-allowed-tools:
-  Read, Bash(grep:*), Bash(command:*), Bash(date:*), Bash(cut:*), Bash(paste:*), Bash(tail:*),
-  Bash(jq:*)
+allowed-tools: Read, Bash(grep:*), Bash(command:*), Bash(date:*), Bash(cut:*), Bash(paste:*), Bash(tail:*), Bash(jq:*)
 ---
 
 # Migrate Rollback

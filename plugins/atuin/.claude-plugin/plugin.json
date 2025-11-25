@@ -7,6 +7,5 @@
     "email": "hi@nathanvale.com"
   },
   "keywords": ["atuin", "bash", "history", "shell", "mcp"],
-  "license": "MIT",
-  "hooks": "./hooks/hooks.json"
+  "license": "MIT"
 }

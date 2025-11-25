@@ -1,5 +1,4 @@
 ---
-name: index
 description: Create or update PROJECT_INDEX.json for the current project
 ---
 

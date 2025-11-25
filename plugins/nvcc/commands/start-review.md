@@ -1,6 +1,5 @@
 ---
 description: Decompose a review into individual task files
-tags: [task-management, reviews, task-creation]
 ---
 
 # Start Review Command

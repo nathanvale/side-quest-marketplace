@@ -1,3 +1,7 @@
+---
+description: Analyze the most recent Claude Code agent execution from JSONL logs
+---
+
 # Analyze Last Agent Run
 
 You are an expert at analyzing Claude Code agent execution logs and debugging failures.

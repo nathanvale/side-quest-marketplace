@@ -1,6 +1,5 @@
 ---
 description: Universal task starter - works in any project
-tags: [task-management, workflow]
 ---
 
 # Start Task Command

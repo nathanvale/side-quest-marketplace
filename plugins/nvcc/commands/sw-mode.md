@@ -1,6 +1,5 @@
 ---
-description: Create or edit SuperWhisper custom modes using the superwhisper skill
-argument-hint: [create|edit] [mode-name]
+description: [create|edit] [mode-name] - Create or edit SuperWhisper custom modes using the superwhisper skill
 allowed-tools: Read, Edit, Write, Bash(jq:*), Bash(killall:*), Bash(open:*), Bash(ls:*)
 ---
 

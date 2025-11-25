@@ -1,6 +1,5 @@
 ---
 description: Start the next highest-priority READY task
-tags: [task-management, workflow]
 ---
 
 # Next Task Command

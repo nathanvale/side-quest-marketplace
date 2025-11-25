@@ -1,6 +1,5 @@
 ---
 description: Merge a PR and clean up worktree and branches
-tags: [task-management, git, cleanup, workflow]
 ---
 
 # Merge PR Command

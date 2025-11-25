@@ -1,6 +1,5 @@
 ---
-description: Create SuperWhisper integration scripts using the superwhisper skill
-argument-hint: [app-name] [workflow-description]
+description: [app-name] [workflow-description] - Create SuperWhisper integration scripts using the superwhisper skill
 allowed-tools: Read, Write, Edit, Bash(chmod:*), Bash(ls:*), Bash(mkdir:*)
 ---
 

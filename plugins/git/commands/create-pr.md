@@ -1,6 +1,5 @@
 ---
 description: Create pull requests using GitHub CLI with Conventional Commits format
-argument-hint: None required - interactive guide for PR creation
 ---
 
 # Create Pull Request

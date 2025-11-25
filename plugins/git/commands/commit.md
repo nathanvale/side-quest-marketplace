@@ -1,3 +1,7 @@
+---
+description: Create well-formatted commits using Conventional Commits specification
+---
+
 # Smart Commit
 
 Create well-formatted commits using Conventional Commits specification.

@@ -7,6 +7,5 @@
     "email": "hi@nathanvale.com"
   },
   "keywords": ["validation", "plugin", "hooks", "marketplace", "linting"],
-  "license": "MIT",
-  "hooks": "./hooks/hooks.json"
+  "license": "MIT"
 }

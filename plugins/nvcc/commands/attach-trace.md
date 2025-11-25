@@ -1,5 +1,4 @@
 ---
-name: attach-trace
 description: Phase B attachment migration with trace logging, log analysis, and code debugging. Auto-discovers latest manifests and runs complete diagnostic workflow.
 argument-hint: [limit N] [dry-run] [using fixtures]
 ---

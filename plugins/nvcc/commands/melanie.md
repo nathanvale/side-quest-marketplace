@@ -1,3 +1,7 @@
+---
+description: Help Nathan write authentic messages to Melanie in his genuine voice
+---
+
 # Melanie Message Helper
 
 Help Nathan write authentic messages to Melanie in his genuine voice.

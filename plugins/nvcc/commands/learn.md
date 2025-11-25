@@ -1,5 +1,4 @@
 ---
-name: learn
 description: Interactive 7-stage structured learning tutor for mastering any topic
 ---
 

@@ -1,3 +1,7 @@
+---
+description: Explore git commit history using git-intelligence MCP tools
+---
+
 # Git History Explorer
 
 Interactively explore git commit history using the git-intelligence MCP tools.

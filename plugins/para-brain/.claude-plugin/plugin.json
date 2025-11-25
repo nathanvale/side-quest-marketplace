@@ -1,0 +1,26 @@
+{
+  "name": "para-brain",
+  "version": "1.0.0",
+  "description": "Ultimate PARA method and Building a Second Brain plugin for Obsidian. Includes CODE methodology (Capture, Organize, Distill, Express), Progressive Summarization, and complete note management workflows with MCP Obsidian integration.",
+  "author": {
+    "name": "Nathan Vale"
+  },
+  "license": "MIT",
+  "keywords": [
+    "obsidian",
+    "para",
+    "second-brain",
+    "basb",
+    "tiago-forte",
+    "pkm",
+    "knowledge-management",
+    "notes",
+    "capture",
+    "organize",
+    "distill",
+    "express",
+    "progressive-summarization",
+    "productivity"
+  ],
+  "repository": "https://github.com/nathanvale/side-quest-marketplace"
+}

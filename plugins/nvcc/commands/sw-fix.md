@@ -1,9 +1,6 @@
 ---
-description: Troubleshoot SuperWhisper issues using the superwhisper skill
-argument-hint: [issue-description]
-allowed-tools:
-  Read, Bash(ps:*), Bash(ls:*), Bash(grep:*), Bash(killall:*), Bash(open:*), Bash(jq:*),
-  Bash(osascript:*)
+description: [issue-description] - Troubleshoot SuperWhisper issues using the superwhisper skill
+allowed-tools: Read, Bash(ps:*), Bash(ls:*), Bash(grep:*), Bash(killall:*), Bash(open:*), Bash(jq:*), Bash(osascript:*)
 ---
 
 # SuperWhisper Troubleshooting
