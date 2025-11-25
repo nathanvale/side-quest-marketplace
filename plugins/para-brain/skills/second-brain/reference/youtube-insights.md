@@ -2,6 +2,15 @@
 
 > Compiled from video transcripts on PARA, Second Brain, and Obsidian workflows
 
+## Table of Contents
+- [John Mavrick: PARA Beginner to Pro](#john-mavrick-para-beginner-to-pro)
+- [John Mavrick: Second Brain in Obsidian](#john-mavrick-second-brain-in-obsidian)
+- [Paul: YAML Properties Mastery in Obsidian](#paul-yaml-properties-mastery-in-obsidian)
+- [Benjamin Ashton: PARA Game-Changer](#benjamin-ashton-para-game-changer)
+- [File Organizer 2000: AI Automation](#file-organizer-2000-ai-automation)
+- [Common Themes Across All Videos](#common-themes-across-all-videos)
+- [Practical Takeaways](#practical-takeaways)
+
 ---
 
 ## John Mavrick: PARA Beginner to Pro

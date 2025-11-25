@@ -2,6 +2,17 @@
 
 > Source: Building a Second Brain by Tiago Forte
 
+## Table of Contents
+- [Overview](#overview)
+- [1. CAPTURE: Keep What Resonates](#1-capture-keep-what-resonates)
+- [2. ORGANIZE: Save for Actionability](#2-organize-save-for-actionability)
+- [3. DISTILL: Find the Essence](#3-distill-find-the-essence)
+- [4. EXPRESS: Show Your Work](#4-express-show-your-work)
+- [The CODE Cycle](#the-code-cycle)
+- [Weekly Review Integration](#weekly-review-integration)
+
+---
+
 ## Overview
 
 CODE is the four-step workflow for building and using a Second Brain:

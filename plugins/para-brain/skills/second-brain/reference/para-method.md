@@ -2,6 +2,17 @@
 
 > Source: Tiago Forte - fortelabs.com
 
+## Table of Contents
+- [The PARA Definition](#the-para-definition)
+- [The Four Categories](#the-four-categories)
+- [The Key Distinction: Projects vs. Areas](#the-key-distinction-projects-vs-areas)
+- [Why PARA Works](#why-para-works)
+- [Common Mistakes](#common-mistakes)
+- [The PARA Workflow](#the-para-workflow)
+- [Integration with GTD](#integration-with-gtd)
+
+---
+
 ## The PARA Definition
 
 PARA stands for **Projects, Areas, Resources, and Archives** - four top-level categories that encompass every type of information you might encounter in your work and life.

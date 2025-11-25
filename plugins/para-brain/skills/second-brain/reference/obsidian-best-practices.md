@@ -2,6 +2,19 @@
 
 > Compiled from Obsidian forums, Obsibrain documentation, and community wisdom
 
+## Table of Contents
+- [Folder Structure](#folder-structure)
+- [Frontmatter Standards](#frontmatter-standards)
+- [Linking Strategies](#linking-strategies)
+- [Tagging Strategy](#tagging-strategy)
+- [Dataview Queries](#dataview-queries)
+- [Templates](#templates)
+- [File Naming](#file-naming)
+- [Performance Tips](#performance-tips)
+- [Plugin Recommendations](#plugin-recommendations)
+- [Common Mistakes](#common-mistakes)
+- [Quick Reference](#quick-reference)
+
 ---
 
 ## Folder Structure

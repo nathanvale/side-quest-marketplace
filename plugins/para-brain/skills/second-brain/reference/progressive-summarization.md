@@ -2,6 +2,19 @@
 
 > Source: Tiago Forte - Building a Second Brain
 
+## Table of Contents
+- [What is Progressive Summarization?](#what-is-progressive-summarization)
+- [The Core Insight](#the-core-insight)
+- [The Five Layers](#the-five-layers)
+- [When to Summarize](#when-to-summarize)
+- [The Just-in-Time Principle](#the-just-in-time-principle)
+- [Visual Guide](#visual-guide)
+- [Practical Tips](#practical-tips)
+- [Common Mistakes](#common-mistakes)
+- [Integration with Note Types](#integration-with-note-types)
+
+---
+
 ## What is Progressive Summarization?
 
 A technique for distilling notes in layers over time, making them increasingly useful for your future self without requiring upfront effort.

@@ -2,6 +2,17 @@
 
 > A capture filter technique adapted by Tiago Forte for Building a Second Brain
 
+## Table of Contents
+- [The Origin](#the-origin)
+- [The Concept](#the-concept)
+- [How to Use Them](#how-to-use-them)
+- [Crafting Good Problems](#crafting-good-problems)
+- [Maintaining Your List](#maintaining-your-list)
+- [Common Mistakes](#common-mistakes)
+- [Integration with Capture](#integration-with-capture)
+- [Sample Problem Sets](#sample-problem-sets)
+- [Getting Started](#getting-started)
+
 ---
 
 ## The Origin

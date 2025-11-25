@@ -21,25 +21,7 @@ Guide users on building and maintaining a Second Brain using PARA for organizati
 | Progressive Summarization | Distill notes in layers | [progressive-summarization.md](reference/progressive-summarization.md) |
 | Obsidian Best Practices | Vault structure, templates, dataview | [obsidian-best-practices.md](reference/obsidian-best-practices.md) |
 | Feynman 12 Problems | Filter information through open questions | [feynman-12-problems.md](reference/feynman-12-problems.md) |
-
-## PARA Overview
-
-```
-00_Inbox/     → Unprocessed captures (48h max)
-01_Projects/  → HAS END DATE, goal-oriented
-02_Areas/     → Ongoing responsibilities, NO end date
-03_Resources/ → Reference material, interests
-04_Archive/   → Completed/cancelled items
-```
-
-**Key Decision**: Has end date? → Project. Ongoing? → Area.
-
-## CODE Overview
-
-1. **Capture** - Save what resonates (inspiring, useful, personal, surprising)
-2. **Organize** - Place in correct PARA folder
-3. **Distill** - Progressive summarization (bold → highlight → summary)
-4. **Express** - Create outputs from accumulated knowledge
+| YouTube Insights | Community wisdom from PARA/BASB creators | [youtube-insights.md](reference/youtube-insights.md) |
 
 ## MCP Obsidian Tools
 
