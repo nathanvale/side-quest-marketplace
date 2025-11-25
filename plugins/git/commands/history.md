@@ -1,5 +1,8 @@
 ---
 description: Explore git commit history using git-intelligence MCP tools
+model: haiku
+allowed-tools: mcp__plugin_git_git-intelligence__get_recent_commits, mcp__plugin_git_git-intelligence__search_commits, mcp__plugin_git_git-intelligence__get_diff_summary
+argument-hint: [search-query]
 ---
 
 # Git History Explorer

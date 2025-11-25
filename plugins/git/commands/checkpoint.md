@@ -1,5 +1,8 @@
 ---
 description: Create a quick WIP checkpoint commit to save your current work
+model: haiku
+allowed-tools: Bash(git add:*), Bash(git commit:*), mcp__plugin_git_git-intelligence__get_diff_summary
+argument-hint: [description]
 ---
 
 # Quick Checkpoint Commit
