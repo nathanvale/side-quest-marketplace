@@ -1,6 +1,6 @@
 ---
 description: Show git activity during this Claude session
-model: haiku
+model: claude-haiku-4-5-20251001
 allowed-tools: mcp__plugin_git_git-intelligence__get_recent_commits, mcp__plugin_git_git-intelligence__get_diff_summary
 ---
 

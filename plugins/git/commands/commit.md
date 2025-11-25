@@ -1,6 +1,6 @@
 ---
 description: Create well-formatted commits using Conventional Commits specification
-model: sonnet
+model: claude-sonnet-4-5-20250929
 allowed-tools: Bash(git add:*), Bash(git commit:*), mcp__plugin_git_git-intelligence__get_recent_commits, mcp__plugin_git_git-intelligence__get_diff_summary
 ---
 

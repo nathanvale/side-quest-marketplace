@@ -1,6 +1,6 @@
 ---
 description: Create pull requests using GitHub CLI with Conventional Commits format
-model: sonnet
+model: claude-sonnet-4-5-20250929
 allowed-tools: Bash(git push:*), Bash(gh pr:*), mcp__plugin_git_git-intelligence__get_recent_commits, mcp__plugin_git_git-intelligence__get_diff_summary
 ---
 
