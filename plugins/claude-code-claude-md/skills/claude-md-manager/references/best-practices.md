@@ -1,5 +1,15 @@
 # CLAUDE.md Best Practices and Optimization
 
+## Table of Contents
+- [Token Optimization Strategies](#token-optimization-strategies)
+- [Writing Style Best Practices](#writing-style-best-practices)
+- [Organization Best Practices](#organization-best-practices)
+- [Import Best Practices](#import-best-practices)
+- [Maintenance Best Practices](#maintenance-best-practices)
+- [Anti-Patterns to Avoid](#anti-patterns-to-avoid)
+- [Advanced Techniques](#advanced-techniques)
+- [Measuring Effectiveness](#measuring-effectiveness)
+
 ## Token Optimization Strategies
 
 ### Why Optimize for Tokens?

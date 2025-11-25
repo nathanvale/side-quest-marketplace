@@ -1,5 +1,15 @@
 # CLAUDE.md Hierarchy and Cascade System
 
+## Table of Contents
+- [Overview](#overview)
+- [The Four-Tier Hierarchy](#the-four-tier-hierarchy)
+- [Loading Order and Precedence](#loading-order-and-precedence)
+- [Import System](#import-system)
+- [Organizing Large Projects](#organizing-large-projects)
+- [Best Practices for Hierarchy](#best-practices-for-hierarchy)
+- [Common Patterns](#common-patterns)
+- [Troubleshooting](#troubleshooting)
+
 ## Overview
 
 CLAUDE.md files form a hierarchical cascade system where instructions flow from broader (enterprise/user) to narrower (project/module) scopes. Understanding this hierarchy is crucial for organizing your context effectively.
@@ -133,13 +143,15 @@ Use tabs for indentation
 ### Import Syntax
 
 ```markdown
-@path/to/file.md
+@path/to/file
+@~/.claude/my-project-instructions.md
 ```
 
-- Paths are relative to the CLAUDE.md file containing the import
+- Both relative and absolute paths are allowed
 - Use `/` for path separators (works on all platforms)
-- `.md` extension is required
+- `.md` extension is optional
 - Max import depth: 5 hops
+- Not evaluated inside code blocks or code spans
 
 ### Import Behavior
 
@@ -418,12 +430,12 @@ project/CLAUDE.md: "Use spaces"
 
 ### Issue: Import Not Found
 
-**Check relative paths**:
+**Check paths**:
 ```markdown
 # If CLAUDE.md is at project root:
-@./.claude/file.md              # Looks for project/.claude/file.md ✅
+@./.claude/file.md              # Relative path ✅
 @.claude/file.md                # Also works ✅
-@/project/.claude/file.md       # WRONG - not absolute paths ❌
+@~/.claude/personal.md          # Absolute path to home dir ✅
 ```
 
 ### Issue: Too Much Context

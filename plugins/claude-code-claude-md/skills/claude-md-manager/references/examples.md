@@ -1,5 +1,12 @@
 # Real-World CLAUDE.md Examples
 
+## Table of Contents
+- [User-Level Examples](#user-level-examples)
+- [Project-Level Examples](#project-level-examples)
+- [Module-Level Examples](#module-level-examples)
+- [Import Chain Example](#import-chain-example)
+- [Monorepo Example](#monorepo-example)
+
 ## User-Level Examples
 
 ### Example 1: Minimalist Developer

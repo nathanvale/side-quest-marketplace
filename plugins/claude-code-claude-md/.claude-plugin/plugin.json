@@ -2,6 +2,9 @@
   "name": "claude-code-claude-md",
   "description": "CLAUDE.md manager for creating and optimizing memory files across the hierarchical cascade system",
   "version": "1.0.0",
+  "author": {
+    "name": "Nathan Vale"
+  },
   "keywords": [
     "claude-md",
     "memory",
@@ -9,6 +12,5 @@
     "optimization",
     "skills"
   ],
-  "license": "MIT",
-  "skills": "../skills"
+  "license": "MIT"
 }
