@@ -102,6 +102,24 @@
         "markdown",
         "skills"
       ]
+    },
+    {
+      "name": "claude-code-claude-md",
+      "source": "./plugins/claude-code-claude-md",
+      "description": "CLAUDE.md manager for creating and optimizing memory files across the hierarchical cascade system. Includes templates for user/project/module levels, token optimization strategies, and comprehensive best practices.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Vale"
+      },
+      "category": "documentation",
+      "keywords": [
+        "claude-md",
+        "memory",
+        "documentation",
+        "optimization",
+        "templates",
+        "skills"
+      ]
     }
   ]
 }

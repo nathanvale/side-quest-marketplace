@@ -1,0 +1,8 @@
+{
+  "name": "claude-code-claude-md",
+  "version": "1.0.0",
+  "description": "CLAUDE.md manager for creating and optimizing memory files",
+  "type": "module",
+  "keywords": ["claude-md", "memory", "documentation", "optimization"],
+  "license": "MIT"
+}
