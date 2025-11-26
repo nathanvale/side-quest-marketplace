@@ -1,0 +1,11 @@
+{
+  "name": "firecrawl",
+  "description": "Firecrawl plugin for Claude Code",
+  "version": "1.0.0",
+  "author": {
+    "name": "Nathan Vale",
+    "email": "hi@nathanvale.com"
+  },
+  "keywords": ["firecrawl"],
+  "license": "MIT"
+}

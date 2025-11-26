@@ -1,0 +1,18 @@
+{
+  "name": "@sidequest/firecrawl",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Firecrawl plugin for Claude Code",
+  "type": "module",
+  "scripts": {
+    "test": "bun test --recursive",
+    "typecheck": "bunx tsc --noEmit",
+    "format": "bunx @biomejs/biome format --write .",
+    "format:check": "bunx @biomejs/biome format .",
+    "lint": "bunx @biomejs/biome lint .",
+    "check": "bunx @biomejs/biome check --write ."
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
