@@ -120,6 +120,24 @@
         "templates",
         "skills"
       ]
+    },
+    {
+      "name": "plugin-template",
+      "source": "./plugins/plugin-template",
+      "description": "Generate new plugin scaffolds with configurable components. Create commands, MCP servers, hooks, and skills following SideQuest marketplace patterns. TDD-tested generator with comprehensive templates.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Vale"
+      },
+      "category": "development",
+      "keywords": [
+        "plugin",
+        "template",
+        "generator",
+        "scaffold",
+        "development",
+        "tdd"
+      ]
     }
   ]
 }
