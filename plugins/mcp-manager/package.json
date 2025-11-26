@@ -1,0 +1,21 @@
+{
+  "name": "@sidequest/mcp-manager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Manage MCP servers - add, list, enable, and disable",
+  "type": "module",
+  "bin": {
+    "mcp-manager": "./src/cli.ts"
+  },
+  "scripts": {
+    "test": "bun test --recursive",
+    "typecheck": "bunx tsc --noEmit",
+    "format": "bunx @biomejs/biome format --write .",
+    "format:check": "bunx @biomejs/biome format .",
+    "lint": "bunx @biomejs/biome lint .",
+    "check": "bunx @biomejs/biome check --write ."
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

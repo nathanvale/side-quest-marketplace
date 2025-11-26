@@ -1,0 +1,11 @@
+{
+  "name": "mcp-manager",
+  "description": "Manage MCP servers - add, list, enable, and disable",
+  "version": "1.0.0",
+  "author": {
+    "name": "Nathan Vale",
+    "email": "hi@nathanvale.com"
+  },
+  "keywords": ["mcp", "mcp-server", "configuration", "management"],
+  "license": "MIT"
+}
