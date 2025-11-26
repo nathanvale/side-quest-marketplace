@@ -5,6 +5,9 @@ type: resource
 source: <% tp.system.prompt("Source type (book/article/video/course/podcast/etc.)") %>
 source_url: "<% tp.system.prompt("Source URL (optional)", "") %>"
 author: "<% tp.system.prompt("Author (optional)", "") %>"
+areas:
+  - "[[<% tp.system.prompt("Primary area this relates to") %>]]"
+reviewed: <% tp.date.now("YYYY-MM-DD") %>
 tags:
   - resource
   - <% tp.system.prompt("Main topic") %>

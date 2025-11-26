@@ -329,6 +329,37 @@ tags:
 ---
 ```
 
+### Resource Schema
+
+```yaml
+---
+title: "Resource Title"
+created: 2025-01-15
+type: resource
+source: book             # book, article, video, course, podcast, paper, web
+source_url: ""           # Optional URL
+author: ""               # Optional author
+areas:                   # Required - links to one or more areas
+  - "[[Primary Area]]"
+  - "[[Secondary Area]]" # Optional additional areas
+reviewed: 2025-01-15     # Last review date
+tags:
+  - resource
+---
+```
+
+**Why `areas:` is an array:**
+- Resources are reference material that can serve multiple areas
+- A TypeScript book relates to both "Software Development" and "Learning"
+- Unlike projects/tasks which belong to ONE area, resources cross-cut
+
+**Querying resources by area:**
+```dataview
+TABLE source, author
+FROM "03_Resources"
+WHERE contains(areas, [[Health]])
+```
+
 ---
 
 ## Quick Reference

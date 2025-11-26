@@ -29,10 +29,23 @@ Resources are **reference material** and **topics of interest**.
 3. **Based on type, ask follow-ups**:
    - book/article/paper → "Who's the author?"
    - video/course/podcast/web → "What's the URL?" (optional)
-4. **Smart subfolder check**: List `03_Resources/` subfolders, offer if match exists, else use root
-5. **Read template** at `templates/resource.md`
-6. **Replace Templater prompts** with parsed values
-7. **Create file** using `obsidian_append_content`
-8. **Suggest**: "Ready to capture key insights with Progressive Summarization?"
+4. **Ask for areas** (required):
+   - List existing areas from `02_Areas/` using `obsidian_list_files_in_dir`
+   - Ask "Which area(s) does this relate to?" with multi-select
+   - Resources MUST link to at least one area
+   - Can link to multiple areas (array in frontmatter)
+5. **Smart subfolder check**: List `03_Resources/` subfolders, offer if match exists, else use root
+6. **Read template** at `templates/resource.md`
+7. **Replace Templater prompts** with parsed values, including `areas:` array
+8. **Create file** using `obsidian_append_content`
+9. **Suggest**: "Ready to capture key insights with Progressive Summarization?"
+
+## Frontmatter Format
+
+```yaml
+areas:
+  - "[[Primary Area]]"
+  - "[[Secondary Area]]"  # if multiple selected
+```
 
 **Naming**: See `_shared/naming-convention.md` for Title Case rules

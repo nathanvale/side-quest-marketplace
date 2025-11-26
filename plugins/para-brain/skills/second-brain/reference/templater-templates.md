@@ -74,12 +74,23 @@ All para-brain templates use [Templater](https://silentvoid13.github.io/Template
 - Source type (book/article/video/course/podcast/etc.)
 - Source URL (optional)
 - Author (optional)
+- Primary area (required - links resource to an area)
 - Main topic (for tagging)
 
+**Frontmatter**:
+```yaml
+areas:
+  - "[[Primary Area]]"    # Required - at least one area
+  - "[[Secondary Area]]"  # Optional - add more as needed
+reviewed: 2025-11-26      # For review tracking
+```
+
 **Features**:
+- **Area linkage** - Resources link to one or more areas (required)
 - Progressive summarization layers (4 levels)
 - Connection mapping to other notes
 - Action items extraction
+- Review date tracking
 
 **Use for**:
 - Book notes
@@ -87,7 +98,14 @@ All para-brain templates use [Templater](https://silentvoid13.github.io/Template
 - Technical documentation
 - Articles worth saving
 
-**Example**: Create resource from conference talk with key takeaways
+**Querying resources by area**:
+```dataview
+TABLE source, author
+FROM "03_Resources"
+WHERE contains(areas, this.file.link)
+```
+
+**Example**: Create resource from conference talk, link to "Software Development" and "Learning" areas
 
 ---
 
@@ -358,9 +376,9 @@ All templates include standard frontmatter:
 
 ### Linking Strategy
 
-- **Projects** → Link to parent Area
-- **Tasks** → Link to parent Project and/or Area
-- **Resources** → Link to related Projects/Areas
+- **Projects** → Link to parent Area (single `area:` field)
+- **Tasks** → Link to parent Project and/or Area (single `area:` field)
+- **Resources** → Link to related Areas (required `areas:` array - can have multiple)
 - **Daily notes** → Link to Projects touched and Areas maintained
 
 ### Dataview Queries

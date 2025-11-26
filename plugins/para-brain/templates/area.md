@@ -43,7 +43,12 @@ GROUP BY file.link
 
 ## Related Resources
 
--
+```dataview
+TABLE source, author, reviewed as "Last Review"
+FROM "03_Resources"
+WHERE contains(areas, this.file.link)
+SORT reviewed DESC
+```
 
 ## Review Questions
 

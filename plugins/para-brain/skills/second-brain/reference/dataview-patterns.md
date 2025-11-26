@@ -7,6 +7,7 @@
 - [Self-Referential Queries](#self-referential-queries)
 - [Task Queries](#task-queries)
 - [Project Queries](#project-queries)
+- [Resource Queries](#resource-queries)
 - [Review Tracking](#review-tracking)
 - [Dashboard Queries](#dashboard-queries)
 - [Common Patterns](#common-patterns)
@@ -194,6 +195,69 @@ TABLE status, target_completion
 FROM "01_Projects"
 WHERE status = "active"
   AND length(filter(file.tasks, (t) => !t.completed)) = 0
+```
+
+---
+
+## Resource Queries
+
+Resources use an `areas:` array field to link to one or more areas. This enables powerful cross-area queries.
+
+### Resources in This Area
+
+Place in an Area note to show all linked resources:
+```dataview
+TABLE source, author, reviewed as "Last Review"
+FROM "03_Resources"
+WHERE contains(areas, this.file.link)
+SORT reviewed DESC
+```
+
+### All Resources by Area
+
+```dataview
+TABLE areas, source, author
+FROM "03_Resources"
+SORT file.name ASC
+```
+
+### Resources Needing Review
+
+```dataview
+TABLE
+  source,
+  areas,
+  reviewed as "Last Review"
+FROM "03_Resources"
+WHERE reviewed < date(today) - dur(30 days) OR !reviewed
+SORT reviewed ASC
+```
+
+### Resources by Source Type
+
+```dataview
+TABLE author, areas
+FROM "03_Resources"
+WHERE source = "book"
+SORT file.name ASC
+```
+
+### Recently Added Resources
+
+```dataview
+TABLE source, author, areas
+FROM "03_Resources"
+SORT created DESC
+LIMIT 10
+```
+
+### Resources Spanning Multiple Areas
+
+Find resources that relate to multiple areas:
+```dataview
+TABLE areas, source
+FROM "03_Resources"
+WHERE length(areas) > 1
 ```
 
 ---
