@@ -126,6 +126,59 @@ Working on [[Project X]] taught me about [[concept]].
 - Single source of truth
 - Updates propagate automatically
 
+### Wikilink Resolution
+
+**Correct Syntax**
+```markdown
+[[Note Name]]              # Preferred - no extension needed
+[[Note Name.md]]           # Also works
+[[Folder/Note Name]]       # Include path if duplicate names exist
+[[Note Name|Display Text]] # Custom display text
+```
+
+**How Obsidian Resolves Links**
+- Obsidian searches for filenames **across the entire vault**
+- **Does NOT require folder paths** in most cases
+- Finds shortest/closest match first
+- **CRITICAL**: Duplicate filenames cause link conflicts
+
+**Common Issue: Duplicate Filenames**
+```
+# ❌ BROKEN - Two files with same name
+/vault-root/Project Overview.md
+/01_Projects/My Project/Project Overview.md
+
+When you use [[Project Overview]], Obsidian picks ONE (usually wrong one!)
+```
+
+**Solution**
+```markdown
+# ✅ FIX 1: Delete duplicate files
+# Keep only one version in correct location
+
+# ✅ FIX 2: Use unique filenames
+/01_Projects/My Project/My Project Overview.md  # Unique name
+[[My Project Overview]]                         # Works correctly
+
+# ✅ FIX 3: Include folder path (last resort)
+[[01_Projects/My Project/Project Overview]]     # Explicitly specify location
+```
+
+**Best Practices**
+- ✅ Use unique, descriptive filenames (e.g., "2025 Tasmania Holiday" not "Project Overview")
+- ✅ Avoid generic names like "Overview", "README", "Index"
+- ✅ Keep project overview files INSIDE project folders, not in vault root
+- ✅ Search for duplicates: `find /vault -name "*.md" | sort | uniq -d`
+- ❌ Never create files in vault root when they belong in PARA folders
+
+**Debugging Wikilinks**
+If clicking a wikilink tries to create a new note:
+1. The target file doesn't exist, OR
+2. A duplicate filename exists elsewhere (Obsidian found wrong one)
+3. Check for duplicates: Search vault for exact filename
+
+**Reference**: [Official Obsidian Wikilink Documentation](https://help.obsidian.md/Linking+notes+and+files/Internal+links)
+
 ---
 
 ## Tagging Strategy
@@ -310,6 +363,9 @@ Process inbox regularly or it becomes a graveyard.
 
 ### 6. Not Reviewing
 Without weekly review, any system degrades.
+
+### 7. Duplicate Filenames
+Creating files with identical names in different folders breaks wikilinks. Use unique, descriptive names like "2025 Tasmania Holiday" instead of generic "Project Overview".
 
 ---
 

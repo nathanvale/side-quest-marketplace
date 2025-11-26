@@ -21,9 +21,19 @@ Create a project in `01_Projects/`. Projects have **end dates** and can be **fin
 /para:create-project "Learn Piano"
 ```
 
+## File Naming
+
+See: `_shared/naming-convention.md`
+
+**Format**: Title Case with Spaces → `01_Projects/Title Case with Spaces.md`
+
+Convert user input to Title Case:
+- `"tassie holiday 2025"` → `Tassie Holiday 2025.md`
+- `"learn piano"` → `Learn Piano.md`
+
 ## Template
 
-**Location**: `01_Projects/[Title].md`
+**Location**: `01_Projects/[Title in Title Case].md`
 
 ```markdown
 ---
@@ -85,6 +95,7 @@ tags: [project]
 ## Process
 
 1. Parse `$1` (title), `$2` (target date), `$3` (area)
+   - **Convert title to Title Case with Spaces** (see `_shared/naming-convention.md`)
 
 2. **If `$2` missing** → Ask: "What's the target completion date?"
    - Offer suggestions: "1 week", "1 month", "3 months", "Custom date"

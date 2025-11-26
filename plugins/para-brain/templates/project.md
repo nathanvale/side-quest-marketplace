@@ -1,16 +1,19 @@
 ---
-title: "{{title}}"
-created: {{date:YYYY-MM-DD}}
+title: "<% tp.system.prompt("Project title") %>"
+created: <% tp.date.now("YYYY-MM-DD") %>
 type: project
 status: active
-start_date: {{date:YYYY-MM-DD}}
-target_completion: {{target_completion}}
-area: "[[{{area}}]]"
+start_date: <% tp.date.now("YYYY-MM-DD") %>
+target_completion: <% tp.system.prompt("Target completion date (YYYY-MM-DD)") %>
+area: "[[<% tp.system.prompt("Area") %>]]"
+depends_on:
+blocks:
+dependency_type: mandatory
 tags:
   - project
 ---
 
-# {{title}}
+# <% tp.system.prompt("Project title") %>
 
 > **Project = Has an end date = Can be finished**
 
@@ -18,10 +21,13 @@ tags:
 
 | Field | Value |
 |-------|-------|
-| **Start Date** | {{date:YYYY-MM-DD}} |
-| **Target Completion** | {{target_completion}} |
+| **Start Date** | <% tp.date.now("YYYY-MM-DD") %> |
+| **Target Completion** | <% tp.system.prompt("Target completion date (YYYY-MM-DD)") %> |
 | **Status** | Active |
-| **Area** | [[{{area}}]] |
+| **Area** | [[<% tp.system.prompt("Area") %>]] |
+| **Depends On** | [[Prerequisite Project]] |
+| **Blocks** | [[Dependent Project]] |
+| **Dependency Type** | Mandatory / Discretionary |
 
 ## Why This Matters
 
@@ -59,7 +65,7 @@ tags:
 
 ## Progress Log
 
-### {{date:YYYY-MM-DD}} - Project Started
+### <% tp.date.now("YYYY-MM-DD") %> - Project Started
 
 - Initial setup complete
 -
@@ -87,5 +93,5 @@ tags:
 **When complete**:
 1. Update status to "completed"
 2. Add completion_date to frontmatter
-3. Move to `04_Archive/{{date:YYYY}}/`
+3. Move to `04_Archive/<% tp.date.now("YYYY") %>/`
 4. Celebrate!

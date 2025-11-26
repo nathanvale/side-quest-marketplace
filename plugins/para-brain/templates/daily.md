@@ -1,13 +1,13 @@
 ---
-title: "{{date:YYYY-MM-DD}}"
-created: {{date:YYYY-MM-DD}}
+title: "<% tp.date.now("YYYY-MM-DD") %>"
+created: <% tp.date.now("YYYY-MM-DD") %>
 type: daily
 tags:
   - daily
   - journal
 ---
 
-# {{date:dddd, MMMM D, YYYY}}
+# <% tp.date.now("dddd, MMMM D, YYYY") %>
 
 ## Morning Intentions
 
@@ -90,8 +90,8 @@ tags:
 
 ### Related Notes
 
-- [[{{date-1d:YYYY-MM-DD}}]] - Yesterday
-- [[{{date+1d:YYYY-MM-DD}}]] - Tomorrow
+- [[<% tp.date.now("YYYY-MM-DD", -1) %>]] - Yesterday
+- [[<% tp.date.now("YYYY-MM-DD", 1) %>]] - Tomorrow
 
 ### Active Projects Touched
 

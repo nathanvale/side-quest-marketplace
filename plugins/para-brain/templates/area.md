@@ -1,13 +1,13 @@
 ---
-title: "{{title}}"
-created: {{date:YYYY-MM-DD}}
+title: "<% tp.system.prompt("Area title") %>"
+created: <% tp.date.now("YYYY-MM-DD") %>
 type: area
 status: active
 tags:
   - area
 ---
 
-# {{title}}
+# <% tp.system.prompt("Area title") %>
 
 > **Area = Ongoing responsibility = No end date**
 
@@ -32,7 +32,7 @@ tags:
 ```dataview
 TABLE status, target_completion as "Due Date"
 FROM "01_Projects"
-WHERE contains(area, "[[{{title}}]]")
+WHERE contains(area, "[[<% tp.system.prompt("Area title") %>]]")
 SORT target_completion ASC
 ```
 

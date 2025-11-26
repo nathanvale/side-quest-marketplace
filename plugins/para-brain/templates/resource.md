@@ -1,25 +1,25 @@
 ---
-title: "{{title}}"
-created: {{date:YYYY-MM-DD}}
+title: "<% tp.system.prompt("Resource title") %>"
+created: <% tp.date.now("YYYY-MM-DD") %>
 type: resource
-source: {{source_type}}
-source_url: "{{source_url}}"
-author: "{{author}}"
+source: <% tp.system.prompt("Source type (book/article/video/course/podcast/etc.)") %>
+source_url: "<% tp.system.prompt("Source URL (optional)", "") %>"
+author: "<% tp.system.prompt("Author (optional)", "") %>"
 tags:
   - resource
-  - {{topic}}
+  - <% tp.system.prompt("Main topic") %>
 ---
 
-# {{title}}
+# <% tp.system.prompt("Resource title") %>
 
 ## Source Information
 
 | Field | Value |
 |-------|-------|
-| **Type** | {{source_type}} |
-| **Author** | {{author}} |
-| **URL** | {{source_url}} |
-| **Date Consumed** | {{date:YYYY-MM-DD}} |
+| **Type** | <% tp.system.prompt("Source type (book/article/video/course/podcast/etc.)") %> |
+| **Author** | <% tp.system.prompt("Author (optional)", "") %> |
+| **URL** | <% tp.system.prompt("Source URL (optional)", "") %> |
+| **Date Consumed** | <% tp.date.now("YYYY-MM-DD") %> |
 
 ## Summary
 

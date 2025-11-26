@@ -1,28 +1,28 @@
 ---
-title: "{{title}}"
-created: {{date:YYYY-MM-DD HH:mm}}
+title: "<% tp.system.prompt("Title") %>"
+created: <% tp.date.now("YYYY-MM-DD HH:mm") %>
 type: capture
 status: inbox
-captured_from: {{captured_from}}
-resonance: {{resonance}}
-urgency: {{urgency}}
+captured_from: <% tp.system.prompt("Captured from (thought/article/conversation/etc.)") %>
+resonance: <% tp.system.prompt("Resonance (inspiring/useful/personal/surprising)") %>
+urgency: <% tp.system.prompt("Urgency (high/medium/low)") %>
 tags:
   - inbox
 ---
 
-# {{title}}
+# <% tp.system.prompt("Title") %>
 
 ## Capture
 
 <!-- The raw content you're saving -->
 
-{{content}}
+<% tp.system.prompt("Content") %>
 
 ## Why I Saved This
 
 <!-- What resonated? Why is this worth keeping? (1-2 sentences) -->
 
-**Resonance**: {{resonance}}
+**Resonance**: <% tp.system.prompt("Resonance (inspiring/useful/personal/surprising)") %>
 - **inspiring**: Uplifting quote, story, or idea
 - **useful**: Template, process, or mental model
 - **personal**: Experience, reflection, or lesson learned
@@ -34,8 +34,8 @@ tags:
 
 <!-- Where did this come from? What were you doing? -->
 
-- **Source**: {{captured_from}}
-- **Date**: {{date:YYYY-MM-DD HH:mm}}
+- **Source**: <% tp.system.prompt("Captured from (thought/article/conversation/etc.)") %>
+- **Date**: <% tp.date.now("YYYY-MM-DD HH:mm") %>
 
 ## Processing Notes
 

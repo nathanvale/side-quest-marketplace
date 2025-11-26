@@ -1,16 +1,16 @@
 ---
-title: "Weekly Review - {{date:YYYY-[W]ww}}"
-created: {{date:YYYY-MM-DD}}
+title: "Weekly Review - <% tp.date.now("YYYY-[W]ww") %>"
+created: <% tp.date.now("YYYY-MM-DD") %>
 type: weekly-review
-week: {{date:YYYY-[W]ww}}
+week: <% tp.date.now("YYYY-[W]ww") %>
 tags:
   - review
   - weekly
 ---
 
-# Weekly Review: {{date:YYYY-[W]ww}}
+# Weekly Review: <% tp.date.now("YYYY-[W]ww") %>
 
-**Week of**: {{date:MMMM D}} - {{date+6d:MMMM D, YYYY}}
+**Week of**: <% tp.date.now("MMMM D") %> - <% tp.date.now("MMMM D, YYYY", 6) %>
 
 ## Phase 1: Clear the Mind
 
@@ -156,7 +156,7 @@ SORT target_completion ASC
 
 ---
 
-**Next Review**: {{date+7d:YYYY-MM-DD}}
+**Next Review**: <% tp.date.now("YYYY-MM-DD", 7) %>
 
 **Review Checklist**:
 - [ ] Inbox cleared

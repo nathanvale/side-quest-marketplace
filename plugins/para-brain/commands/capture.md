@@ -30,13 +30,17 @@ Based on the content, identify why this is worth saving:
 
 Create a concise, descriptive title from the content.
 
+**File Naming**: See `_shared/naming-convention.md`
+- **Format**: Title Case with Spaces → `00_Inbox/Title Case with Spaces.md`
+- Convert generated title to Title Case (e.g., `React Best Practices.md`)
+
 ### 4. Create Note
 
 Use the Obsidian MCP tool to create the note:
 
 ```
 mcp__MCP_DOCKER__obsidian_append_content
-filepath: 00_Inbox/[generated-title].md
+filepath: 00_Inbox/[Generated Title in Title Case].md
 ```
 
 ### 5. Frontmatter Template

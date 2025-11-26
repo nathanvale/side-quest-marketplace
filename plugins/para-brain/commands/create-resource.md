@@ -21,9 +21,19 @@ Create a resource in `03_Resources/`. Resources are **reference material** and *
 /para:create-resource "React Hooks Guide"
 ```
 
+## File Naming
+
+See: `_shared/naming-convention.md`
+
+**Format**: Title Case with Spaces → `03_Resources/Title Case with Spaces.md`
+
+Convert user input to Title Case:
+- `"typescript best practices"` → `TypeScript Best Practices.md`
+- `"deep work by cal newport"` → `Deep Work by Cal Newport.md`
+
 ## Template
 
-**Location**: `03_Resources/[Title].md`
+**Location**: `03_Resources/[Title in Title Case].md`
 
 ```markdown
 ---
@@ -78,6 +88,7 @@ tags: [resource]
 ## Process
 
 1. Parse `$1` (title), `$2` (source type)
+   - **Convert title to Title Case with Spaces** (see `_shared/naming-convention.md`)
 
 2. **If `$2` missing** → Ask: "What type of source is this?"
    - Options: book, article, video, course, podcast, paper, web

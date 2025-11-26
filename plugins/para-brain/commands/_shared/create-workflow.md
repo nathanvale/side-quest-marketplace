@@ -2,6 +2,20 @@
 
 Reference file for `/para:create-*` commands.
 
+## File Naming Convention (REQUIRED)
+
+See: `naming-convention.md` in this folder.
+
+**Standard**: Title Case with Spaces → `Folder/Title Case with Spaces.md`
+
+| User Input | Filename |
+|------------|----------|
+| `"tassie holiday 2025"` | `Tassie Holiday 2025.md` |
+| `"react best practices"` | `React Best Practices.md` |
+| `"learn piano"` | `Learn Piano.md` |
+
+**Always convert user input to Title Case before creating files.**
+
 ## PARA Principle: Don't Over-Organize
 
 Per Tiago Forte's PARA method:

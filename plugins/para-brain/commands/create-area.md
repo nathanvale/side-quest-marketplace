@@ -19,9 +19,19 @@ Create an area in `02_Areas/`. Areas are **ongoing responsibilities** with **no 
 /para:create-area "Melanie & Relationship"
 ```
 
+## File Naming
+
+See: `_shared/naming-convention.md`
+
+**Format**: Title Case with Spaces → `02_Areas/Title Case with Spaces.md`
+
+Convert user input to Title Case:
+- `"health & fitness"` → `Health and Fitness.md`
+- `"career development"` → `Career Development.md`
+
 ## Template
 
-**Location**: `02_Areas/[Title].md`
+**Location**: `02_Areas/[Title in Title Case].md`
 
 ```markdown
 ---
@@ -70,6 +80,7 @@ WHERE contains(area, "[[$1]]")
 ## Process
 
 1. Parse `$1` (title)
+   - **Convert title to Title Case with Spaces** (see `_shared/naming-convention.md`)
 
 2. **Create note** in `02_Areas/` root using `mcp__MCP_DOCKER__obsidian_append_content`
    - Per PARA: Don't over-organize. Let structure emerge naturally.

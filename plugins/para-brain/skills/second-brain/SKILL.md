@@ -18,6 +18,7 @@ Guide users on building and maintaining a Second Brain using PARA for organizati
 |--------|---------|-----------|
 | PARA | Organization by actionability | [para-method.md](reference/para-method.md) |
 | CODE | Capture → Organize → Distill → Express | [code-method.md](reference/code-method.md) |
+| Templater Templates | 11 PARA templates with Templater syntax | [templater-templates.md](reference/templater-templates.md) |
 | Progressive Summarization | Distill notes in layers | [progressive-summarization.md](reference/progressive-summarization.md) |
 | Obsidian Best Practices | Vault structure, templates, dataview | [obsidian-best-practices.md](reference/obsidian-best-practices.md) |
 | Feynman 12 Problems | Filter information through open questions | [feynman-12-problems.md](reference/feynman-12-problems.md) |
