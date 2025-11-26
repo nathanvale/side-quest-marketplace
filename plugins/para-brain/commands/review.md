@@ -163,3 +163,36 @@ Next review: [date + 7 days]
 - Don't skip the "Express" phase - creation is the goal
 - Celebrate completed projects!
 - Be ruthless about archiving stale items
+
+---
+
+## Lazy Migration: Validate During Review
+
+The weekly review is an ideal time to update outdated note schemas.
+
+**See**: [_shared/validate-note.md](_shared/validate-note.md) for schemas.
+
+### During Each Phase
+
+When reading projects, areas, or resources, check frontmatter against current schema:
+
+1. **Missing `reviewed` field?** → Add it, set to today
+2. **Resource missing `areas`?** → Prompt user to add
+3. **Project missing `review_period`?** → Add default (7d)
+
+### Batch Update Option
+
+At end of Phase 2 (Projects) and Phase 3 (Areas), offer:
+
+```markdown
+### Schema Updates Available
+
+Found X notes with outdated schemas:
+- [[Resource 1]] - missing `areas`
+- [[Resource 2]] - missing `areas`, `reviewed`
+- [[Project 1]] - missing `reviewed`
+
+**Update all now?** I'll prompt for any required input.
+```
+
+This lets user fix multiple notes efficiently during their natural review workflow.

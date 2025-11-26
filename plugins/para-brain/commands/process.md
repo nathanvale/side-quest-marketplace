@@ -114,3 +114,27 @@ Next: Run `/para:review` for your weekly review.
 - When in doubt, put in Resources
 - It's okay to delete things that no longer resonate
 - Link new notes to existing notes when relevant
+
+---
+
+## Lazy Migration: Validate on Process
+
+When moving a note to its destination, ensure it matches the current schema.
+
+**See**: [_shared/validate-note.md](_shared/validate-note.md) for schemas.
+
+### After PARA Decision
+
+When updating frontmatter for the destination folder, always include ALL required fields for that type:
+
+**For Resources (3)**:
+```yaml
+type: resource
+source: [user input]
+areas:                    # REQUIRED - prompt user
+  - "[[Primary Area]]"
+reviewed: [today]         # Set automatically
+tags: [resource]
+```
+
+This ensures notes are created/moved with complete, current schemas.

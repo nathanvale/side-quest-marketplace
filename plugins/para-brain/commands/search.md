@@ -1,6 +1,6 @@
 ---
 description: $ARGUMENTS - Search Obsidian vault with PARA-aware context
-allowed-tools: mcp__MCP_DOCKER__obsidian_simple_search, mcp__MCP_DOCKER__obsidian_complex_search, mcp__MCP_DOCKER__obsidian_get_file_contents, mcp__MCP_DOCKER__obsidian_list_files_in_dir
+allowed-tools: mcp__MCP_DOCKER__obsidian_simple_search, mcp__MCP_DOCKER__obsidian_complex_search, mcp__MCP_DOCKER__obsidian_get_file_contents, mcp__MCP_DOCKER__obsidian_list_files_in_dir, mcp__MCP_DOCKER__obsidian_patch_content, AskUserQuestion
 ---
 
 # Search Second Brain
@@ -123,3 +123,39 @@ If search returns nothing:
 1. Suggest alternative search terms
 2. Check if content might be in a different PARA category
 3. Offer to create a new note with this topic
+
+---
+
+## Lazy Migration: Validate Notes on Read
+
+When user selects a note to view details, validate its frontmatter.
+
+**See**: [_shared/validate-note.md](_shared/validate-note.md) for schemas.
+
+### After Reading a Note
+
+1. Parse frontmatter and check `type:` field
+2. Compare against schema for that type
+3. If missing required fields, show:
+
+```markdown
+### ⚠️ Note needs update
+
+**[[Note Title]]** is missing required fields:
+- `areas` - Which area(s) does this relate to?
+- `reviewed` - Last review date
+
+**Update now?** This takes 10 seconds.
+```
+
+4. If user agrees:
+   - Use `AskUserQuestion` to gather missing values
+   - Use `obsidian_patch_content` to update frontmatter
+   - Confirm update complete
+
+5. Continue with original search results
+
+### Skip Validation If
+
+- Note was reviewed in last 7 days (`reviewed` field is recent)
+- User previously declined to update this note in session
