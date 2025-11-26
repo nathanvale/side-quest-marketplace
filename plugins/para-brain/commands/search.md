@@ -1,5 +1,6 @@
 ---
 description: $ARGUMENTS - Search Obsidian vault with PARA-aware context
+allowed-tools: mcp__MCP_DOCKER__obsidian_simple_search, mcp__MCP_DOCKER__obsidian_complex_search, mcp__MCP_DOCKER__obsidian_get_file_contents, mcp__MCP_DOCKER__obsidian_list_files_in_dir
 ---
 
 # Search Second Brain

@@ -1,5 +1,6 @@
 ---
 description: Process inbox items using PARA decision tree - moves notes to correct folders
+allowed-tools: mcp__MCP_DOCKER__obsidian_list_files_in_dir, mcp__MCP_DOCKER__obsidian_get_file_contents, mcp__MCP_DOCKER__obsidian_patch_content, mcp__MCP_DOCKER__obsidian_delete_file, mcp__MCP_DOCKER__obsidian_append_content, AskUserQuestion
 ---
 
 # Process Inbox Items

@@ -1,15 +1,31 @@
 # PARA Method Reference
 
-> Source: Tiago Forte - fortelabs.com
+> Source: Tiago Forte - fortelabs.com/blog/para
 
 ## Table of Contents
-- [The PARA Definition](#the-para-definition)
+- [The Core Principle](#the-core-principle)
 - [The Four Categories](#the-four-categories)
 - [The Key Distinction: Projects vs. Areas](#the-key-distinction-projects-vs-areas)
+- [Why Breaking Areas into Projects Matters](#why-breaking-areas-into-projects-matters)
 - [Why PARA Works](#why-para-works)
 - [Common Mistakes](#common-mistakes)
 - [The PARA Workflow](#the-para-workflow)
 - [Integration with GTD](#integration-with-gtd)
+
+---
+
+## The Core Principle
+
+> "Instead of organizing information according to broad subjects like in school, organize it according to the projects and goals you are committed to right now. This is what it means to **organize by actionability**."
+> — Tiago Forte
+
+**The ideal organizational system leads directly to tangible benefits.** It should:
+- Be incredibly easy to set up and maintain
+- Be flexible across different seasons of life
+- Be comprehensive across all platforms
+- Pull actions closer and make them easier to start
+
+**PARA is actionable** - it organizes by "when will I use this?" not "what is this about?"
 
 ---
 
@@ -107,6 +123,50 @@ This is where most people struggle:
 | "Buy new car" | "Car" |
 
 **The test**: Can you finish it? If yes → Project. If no → Area.
+
+---
+
+## Why Breaking Areas into Projects Matters
+
+> "As long as you view your work through the lens of areas, you'll never quite know just how much is on your plate."
+> — Tiago Forte
+
+### 1. You Can't Know Your Commitments Without Projects
+
+Looking at an area like "Hiring" - how much work does it represent? Could be anything from a part-time hire every 6 months to filling 50 positions this quarter.
+
+**Break it down:**
+- Review 10 engineering candidates
+- Conduct final interviews for Marketing Manager
+- Onboard new DevOps hire
+
+Now you can actually see the workload.
+
+### 2. You Can't Connect Efforts to Goals Without Projects
+
+Areas never end - they continue indefinitely. Imagine waking up week after week to the same list of never-ending responsibilities:
+- Health
+- Finances
+- Career
+- Relationships
+
+**This kills motivation.** No matter how hard you work, the endless horizon never gets closer.
+
+**Projects create victories.** When you break areas into bite-sized projects, you get a cadence of regular wins:
+- ~~Complete marathon training plan~~ ✓
+- ~~Hit savings goal for Q1~~ ✓
+- ~~Finish certification course~~ ✓
+
+Each completion is a dopamine hit that sustains motivation.
+
+### 3. The Practical Test
+
+Look at your area list. For each one, ask:
+> "What's the next project I could define that would move this forward?"
+
+If you can't answer, you're probably stalled in that area.
+
+---
 
 ## Why PARA Works
 

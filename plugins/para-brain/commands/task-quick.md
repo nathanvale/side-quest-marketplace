@@ -1,58 +1,52 @@
 ---
-description: "[title] [project]" - Quick task checkbox added to project's Next Actions
-argument-hint: [title] [project]
+description: "[title] [project-or-area]" - Quick checkbox in Next Actions section
+argument-hint: [title] [project-or-area]
 allowed-tools: mcp__MCP_DOCKER__obsidian_get_file_contents, mcp__MCP_DOCKER__obsidian_patch_content, mcp__MCP_DOCKER__obsidian_list_files_in_dir
 ---
 
 # Quick Task (Checkbox)
 
-Add a task checkbox to a project's `## Next Actions` section. Fast capture, no separate file.
+Add a task checkbox to a project or area's `## Next Actions` section. No separate file created.
+
+**Use when**: Quick capture, simple tasks that don't need rich metadata.
+
+**Use `/para:task` instead when**: You need due dates, priorities, dependencies, or Dataview queries.
 
 ## Arguments
 
 - `$1` - Task title (required)
-- `$2` - Project name (required)
+- `$2` - Project or area name (required)
 
 **Examples:**
 ```
 /para:task-quick "Book flights" "2025 Tassie Holiday"
 /para:task-quick "Setup SDK wrapper" "Firecrawl Plugin Optimization"
+/para:task-quick "Schedule dentist" "Health"
 ```
 
 ## Process
 
 ### 1. Parse Arguments
 
-Extract:
 - `$1` = Task title
-- `$2` = Project name
+- `$2` = Project or area name
 
-If either is missing, ask the user.
+If either missing, ask the user.
 
-### 2. Locate Project File
+### 2. Find the Note
 
-Check `01_Projects/` for the project:
+Check both locations:
+1. `01_Projects/$2.md` or `01_Projects/$2/$2.md`
+2. `02_Areas/$2.md` or `02_Areas/$2/$2.md`
 
-1. **If folder exists** (`01_Projects/$2/`):
-   - Project file is `01_Projects/$2/$2.md`
+If not found, list available projects/areas and ask.
 
-2. **If flat file exists** (`01_Projects/$2.md`):
-   - Project file is `01_Projects/$2.md`
-
-3. **If neither exists**:
-   - List available projects from `01_Projects/`
-   - Ask user to select or create new project
-
-### 3. Verify Next Actions Section
-
-Read the project file and check if `## Next Actions` section exists.
-
-### 4. Append Task Checkbox
+### 3. Append Checkbox
 
 Use `mcp__MCP_DOCKER__obsidian_patch_content`:
 
 ```yaml
-filepath: [project file path]
+filepath: [found path]
 operation: append
 target_type: heading
 target: "Next Actions"
@@ -67,18 +61,18 @@ content: "\n- [ ] $1"
 - [ ] $1
 ```
 
-### 5. Confirm
+### 4. Confirm
 
-Respond with:
 ```
-Added to [[Project Name]]:
+Added to [[Project/Area]]:
 - [ ] Task title
-
-Quick view: Open project to see all tasks
 ```
 
-## Error Handling
+## When to Use Which
 
-- **Project not found**: List available projects, suggest `/para:create-project`
-- **Section not found**: Create the section, then append
-- **Empty title**: Prompt for task title
+| Scenario | Command |
+|----------|---------|
+| Quick reminder, simple task | `/para:task-quick` |
+| Need due date, priority | `/para:task` |
+| Want to query with Dataview | `/para:task` |
+| Just jotting something down | `/para:task-quick` |

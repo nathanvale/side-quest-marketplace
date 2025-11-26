@@ -1,12 +1,14 @@
 ---
 description: Create a new PARA project note with deadline and area
 argument-hint: [title] [target-date?] [area?]
-allowed-tools: mcp__MCP_DOCKER__obsidian_list_files_in_dir, mcp__MCP_DOCKER__obsidian_append_content, AskUserQuestion
+allowed-tools: Read, mcp__MCP_DOCKER__obsidian_list_files_in_dir, mcp__MCP_DOCKER__obsidian_append_content, AskUserQuestion
 ---
 
 # Create Project Note
 
-Create a project in `01_Projects/`. Projects have **end dates** and can be **finished**.
+Create a project in `01_Projects/` using the template at [templates/project.md](../templates/project.md).
+
+Projects have **end dates** and can be **finished**.
 
 ## Arguments
 
@@ -21,90 +23,14 @@ Create a project in `01_Projects/`. Projects have **end dates** and can be **fin
 /para:create-project "Learn Piano"
 ```
 
-## File Naming
-
-See: `_shared/naming-convention.md`
-
-**Format**: Title Case with Spaces → `01_Projects/Title Case with Spaces.md`
-
-Convert user input to Title Case:
-- `"tassie holiday 2025"` → `Tassie Holiday 2025.md`
-- `"learn piano"` → `Learn Piano.md`
-
-## Template
-
-**Location**: `01_Projects/[Title in Title Case].md`
-
-```markdown
----
-title: "$1"
-created: [TODAY YYYY-MM-DD]
-type: project
-status: active
-start_date: [TODAY YYYY-MM-DD]
-target_completion: [$2 or ask]
-area: "[[$3 or ask]]"
-tags: [project]
----
-
-# $1
-
-> **Project = Has an end date = Can be finished**
-
-## Project Overview
-
-**Start Date**: [TODAY]
-**Target Completion**: [$2]
-**Status**: Active
-**Area**: [[$3]]
-
-## Why This Matters
-
-<!-- What problem does this solve? Why now? -->
-
-## Success Criteria
-
-<!-- How will I know this is DONE? Be specific! -->
-- [ ]
-- [ ]
-- [ ]
-
-## Objectives
-
-- [ ]
-- [ ]
-
-## Key Resources
-
-<!-- Links to relevant notes, documents -->
--
-
-## Progress Log
-
-### [TODAY] - Project Started
-- Initial setup
-
-## Next Actions
-
-- [ ]
-
----
-**When complete**: Update status to "completed" and move to `04_Archive/`
-```
-
 ## Process
 
-1. Parse `$1` (title), `$2` (target date), `$3` (area)
-   - **Convert title to Title Case with Spaces** (see `_shared/naming-convention.md`)
+1. **Parse arguments** - Title (→ Title Case), target date, area
+2. **If target date missing** → Ask with options: "1 week", "1 month", "3 months", "Custom"
+3. **If area missing** → List existing areas from `02_Areas/`, include "None / Create new"
+4. **Read template** at `templates/project.md`
+5. **Replace Templater prompts** with parsed values
+6. **Create file** in `01_Projects/[Title].md` using `obsidian_append_content`
+7. **Confirm** with location and suggest first action
 
-2. **If `$2` missing** → Ask: "What's the target completion date?"
-   - Offer suggestions: "1 week", "1 month", "3 months", "Custom date"
-
-3. **If `$3` missing** → Ask: "Which area does this relate to?"
-   - List existing areas from `02_Areas/` as options
-   - Include "None / Create new area"
-
-4. **Create note** in `01_Projects/` root using `mcp__MCP_DOCKER__obsidian_append_content`
-   - Per PARA: Don't over-organize. Let structure emerge naturally.
-
-5. **Confirm** with location and suggest first action
+**Naming**: See `_shared/naming-convention.md` for Title Case rules

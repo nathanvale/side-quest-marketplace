@@ -1,5 +1,6 @@
 ---
 description: Guided weekly review of your Second Brain using PARA method
+allowed-tools: mcp__MCP_DOCKER__obsidian_list_files_in_dir, mcp__MCP_DOCKER__obsidian_get_file_contents, mcp__MCP_DOCKER__obsidian_get_recent_changes, mcp__MCP_DOCKER__obsidian_get_periodic_note, mcp__MCP_DOCKER__obsidian_simple_search, mcp__MCP_DOCKER__obsidian_patch_content, AskUserQuestion
 ---
 
 # Weekly Review
