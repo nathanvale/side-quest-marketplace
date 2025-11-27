@@ -3,16 +3,14 @@
  *
  * Searches files using tree-sitter AST patterns.
  * Ported from Kit's ASTSearcher class in ast_search.py.
+ *
+ * Performance optimizations:
+ * - Uses fs/promises for non-blocking I/O
+ * - Parses files in parallel chunks to maximize throughput
  */
 
-import {
-  existsSync,
-  readdirSync,
-  readFileSync,
-  type Stats,
-  statSync,
-} from 'node:fs'
-import { extname, join, relative } from 'node:path'
+import { readdir, readFile, stat } from 'node:fs/promises'
+import { join, relative } from 'node:path'
 import { getAstLogger } from '../logger.js'
 import { getDefaultKitPath } from '../types.js'
 import type { SyntaxNode } from './languages.js'
@@ -36,6 +34,12 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024
  * Maximum text length to include in match results.
  */
 const MAX_TEXT_LENGTH = 500
+
+/**
+ * Number of files to parse in parallel.
+ * Balances throughput vs memory usage.
+ */
+const PARALLEL_CHUNK_SIZE = 10
 
 /**
  * Directories to skip during traversal.
@@ -81,6 +85,8 @@ export class ASTSearcher {
   /**
    * Search for AST patterns in the repository.
    *
+   * Files are parsed in parallel chunks for better performance.
+   *
    * @param options - Search options
    * @returns Search results with matching AST nodes
    */
@@ -95,8 +101,8 @@ export class ASTSearcher {
     const astPattern = new ASTPattern(pattern, mode)
     const matches: ASTMatch[] = []
 
-    // Get all files to search
-    const files = this.getMatchingFiles(filePattern)
+    // Get all files to search (async directory traversal)
+    const files = await this.getMatchingFiles(filePattern)
 
     // Debug logging for MCP issues
     const logger = getAstLogger()
@@ -107,22 +113,32 @@ export class ASTSearcher {
       firstFiles: files.slice(0, 3),
     })
 
-    // Search each file
-    for (const filePath of files) {
+    // Process files in parallel chunks
+    for (let i = 0; i < files.length; i += PARALLEL_CHUNK_SIZE) {
       if (matches.length >= maxResults) break
 
-      try {
-        const fileMatches = await this.searchFile(filePath, astPattern)
+      const chunk = files.slice(i, i + PARALLEL_CHUNK_SIZE)
+      const chunkResults = await Promise.all(
+        chunk.map(async (filePath) => {
+          try {
+            return await this.searchFile(filePath, astPattern)
+          } catch (error) {
+            logger.error('Error parsing file', {
+              filePath,
+              error: error instanceof Error ? error.message : String(error),
+            })
+            return []
+          }
+        }),
+      )
+
+      // Flatten results and add to matches
+      for (const fileMatches of chunkResults) {
         for (const match of fileMatches) {
           matches.push(match)
           if (matches.length >= maxResults) break
         }
-      } catch (error) {
-        // Log errors for debugging - tree-sitter failures were being silently swallowed
-        logger.error('Error parsing file', {
-          filePath,
-          error: error instanceof Error ? error.message : String(error),
-        })
+        if (matches.length >= maxResults) break
       }
     }
 
@@ -141,27 +157,28 @@ export class ASTSearcher {
    * @param filePattern - Optional glob pattern to filter files
    * @returns Array of absolute file paths
    */
-  private getMatchingFiles(filePattern?: string): string[] {
+  private async getMatchingFiles(filePattern?: string): Promise<string[]> {
     const files: string[] = []
-    this.walkDirectory(this.repoPath, files, filePattern)
+    await this.walkDirectory(this.repoPath, files, filePattern)
     return files
   }
 
   /**
    * Recursively walk directory and collect matching files.
+   * Uses async fs methods to avoid blocking the event loop.
    */
-  private walkDirectory(
+  private async walkDirectory(
     dir: string,
     files: string[],
     filePattern?: string,
-  ): void {
-    if (!existsSync(dir)) return
+  ): Promise<void> {
+    const logger = getAstLogger()
 
     let entries: string[]
     try {
-      entries = readdirSync(dir)
+      entries = await readdir(dir)
     } catch (error) {
-      const logger = getAstLogger()
+      // Directory doesn't exist or can't be read
       logger.warn('Failed to read directory', {
         dir,
         error: error instanceof Error ? error.message : String(error),
@@ -169,49 +186,50 @@ export class ASTSearcher {
       return
     }
 
-    for (const entry of entries) {
-      // Skip hidden and ignored directories
-      if (SKIP_DIRS.has(entry) || entry.startsWith('.')) continue
+    // Process entries in parallel for faster traversal
+    await Promise.all(
+      entries.map(async (entry) => {
+        // Skip hidden and ignored directories
+        if (SKIP_DIRS.has(entry) || entry.startsWith('.')) return
 
-      const fullPath = join(dir, entry)
+        const fullPath = join(dir, entry)
 
-      let stat: ReturnType<typeof statSync>
-      try {
-        stat = statSync(fullPath)
-      } catch (error) {
-        const logger = getAstLogger()
-        logger.debug('Failed to stat entry', {
-          path: fullPath,
-          error: error instanceof Error ? error.message : String(error),
-        })
-        continue
-      }
-
-      if (stat.isDirectory()) {
-        this.walkDirectory(fullPath, files, filePattern)
-      } else if (stat.isFile()) {
-        // Skip large files
-        if (stat.size > MAX_FILE_SIZE) {
-          const logger = getAstLogger()
-          logger.warn('Skipping large file', {
+        let stats: Awaited<ReturnType<typeof stat>>
+        try {
+          stats = await stat(fullPath)
+        } catch (error) {
+          logger.debug('Failed to stat entry', {
             path: fullPath,
-            size: stat.size,
-            maxSize: MAX_FILE_SIZE,
+            error: error instanceof Error ? error.message : String(error),
           })
-          continue
+          return
         }
 
-        // Check if file is supported for parsing
-        if (!isSupported(fullPath)) continue
+        if (stats.isDirectory()) {
+          await this.walkDirectory(fullPath, files, filePattern)
+        } else if (stats.isFile()) {
+          // Skip large files
+          if (stats.size > MAX_FILE_SIZE) {
+            logger.warn('Skipping large file', {
+              path: fullPath,
+              size: stats.size,
+              maxSize: MAX_FILE_SIZE,
+            })
+            return
+          }
 
-        // Apply file pattern filter if provided
-        if (filePattern && !this.matchesFilePattern(fullPath, filePattern)) {
-          continue
+          // Check if file is supported for parsing
+          if (!isSupported(fullPath)) return
+
+          // Apply file pattern filter if provided
+          if (filePattern && !this.matchesFilePattern(fullPath, filePattern)) {
+            return
+          }
+
+          files.push(fullPath)
         }
-
-        files.push(fullPath)
-      }
-    }
+      }),
+    )
   }
 
   /**
@@ -241,7 +259,7 @@ export class ASTSearcher {
     if (!language) return []
 
     const parser = await getParser(language)
-    const source = readFileSync(filePath, 'utf8')
+    const source = await readFile(filePath, 'utf8')
     const tree = parser.parse(source)
 
     // Handle parse failure

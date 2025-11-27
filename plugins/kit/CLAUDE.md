@@ -4,7 +4,7 @@ Claude Code plugin providing code search, semantic analysis, and symbol extracti
 
 ## Purpose
 
-Kit is the search backbone for Nathan's Obsidian vault and coding projects. This plugin wraps the Kit Python CLI with an MCP server, enabling zero-token code search from any AI assistant.
+Kit is the search backbone for Obsidian vault and coding projects. This plugin wraps the Kit Python CLI with an MCP server, enabling zero-token code search from any AI assistant.
 
 ### Capabilities
 
@@ -130,8 +130,6 @@ Each operation logs start/end with duration metrics.
 4. **Python 3.14 compatibility** - May need pyenv for older Python
 
 ## Future Work
-
-See: `~/.claude/plans/elegant-cooking-honey.md`
 
 - Expand AST language support (Go, Rust)
 - Add tree-sitter query DSL mode
