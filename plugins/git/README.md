@@ -6,13 +6,14 @@ Provides intelligent git context, history exploration, and smart commit capabili
 
 ### MCP Server: git-intelligence
 
-Six tools for efficient git queries:
+Seven tools for efficient git queries:
 - `get_recent_commits` - Recent commit history with details
 - `search_commits` - Search by message or code changes (-S style)
-- `get_file_history` - File-specific commit history
-- `get_status` - Current repository state
-- `get_branch_info` - Local and remote branch information
-- `get_diff_summary` - Summary of uncommitted changes
+- `get_file_history` - File-specific commit history (follows renames)
+- `get_status` - Current repository state (staged, modified, untracked)
+- `get_branch_info` - Current branch, tracking status, local/remote branches
+- `get_diff_summary` - Summary of uncommitted changes vs reference
+- `get_stash_list` - List stashed changes for recovery
 
 ### Hooks
 
