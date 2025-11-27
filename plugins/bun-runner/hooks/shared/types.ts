@@ -10,7 +10,7 @@
  */
 export interface HookInput {
   tool_name: string
-  tool_input: {
+  tool_input?: {
     file_path?: string
     edits?: Array<{ file_path: string }>
   }
@@ -43,6 +43,11 @@ export interface TscParseResult {
  */
 export function extractFilePaths(hookInput: HookInput): string[] {
   const filePaths: string[] = []
+
+  // Guard against missing tool_input (some hook events may not have it)
+  if (!hookInput.tool_input) {
+    return filePaths
+  }
 
   if (hookInput.tool_input.file_path) {
     filePaths.push(hookInput.tool_input.file_path)

@@ -131,4 +131,7 @@ async function main() {
   process.exit(0)
 }
 
-main()
+// Only run main() when executed directly, not when imported by tests
+if (import.meta.main) {
+  main()
+}

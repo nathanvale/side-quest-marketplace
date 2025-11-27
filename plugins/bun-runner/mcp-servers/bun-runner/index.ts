@@ -174,11 +174,14 @@ async function runBunTests(pattern?: string): Promise<TestSummary> {
     signal: controller.signal,
   })
 
-  const exitCode = await proc.exited
+  // IMPORTANT: Consume streams in parallel with waiting for exit.
+  // Reading after proc.exited resolves can miss output (race condition).
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ])
   clearTimeout(timeoutId)
-
-  const stdout = await new Response(proc.stdout).text()
-  const stderr = await new Response(proc.stderr).text()
 
   // Check for timeout via AbortController
   if (controller.signal.aborted) {
@@ -334,11 +337,15 @@ async function runBunTestCoverage(): Promise<{
     signal: controller.signal,
   })
 
-  const exitCode = await proc.exited
+  // IMPORTANT: Consume streams in parallel with waiting for exit.
+  // Reading after proc.exited resolves can miss output (race condition).
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ])
   clearTimeout(timeoutId)
 
-  const stdout = await new Response(proc.stdout).text()
-  const stderr = await new Response(proc.stderr).text()
   const output = `${stdout}\n${stderr}`
 
   // Check for timeout via AbortController
