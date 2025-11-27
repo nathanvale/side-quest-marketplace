@@ -98,6 +98,14 @@ interface SearchOptions {
 
 type GitResult<T> = T | ErrorResult
 
+/**
+ * Response format options for tool output
+ */
+enum ResponseFormat {
+  MARKDOWN = 'markdown',
+  JSON = 'json',
+}
+
 function isError<T extends object>(
   result: GitResult<T>,
 ): result is ErrorResult {
@@ -461,9 +469,18 @@ function getStashList(cwd: string = process.cwd()): GitResult<StashResult> {
 /**
  * Format commits for display
  */
-function formatCommits(results: GitResult<CommitResult>): string {
+function formatCommits(
+  results: GitResult<CommitResult>,
+  format: ResponseFormat = ResponseFormat.MARKDOWN,
+): string {
   if (isError(results)) {
-    return `Error: ${results.error}`
+    return format === ResponseFormat.JSON
+      ? JSON.stringify({ error: results.error }, null, 2)
+      : `Error: ${results.error}`
+  }
+
+  if (format === ResponseFormat.JSON) {
+    return JSON.stringify(results, null, 2)
   }
 
   if (results.count === 0) {
@@ -491,9 +508,18 @@ function formatCommits(results: GitResult<CommitResult>): string {
 /**
  * Format status for display
  */
-function formatStatus(results: GitResult<StatusResult>): string {
+function formatStatus(
+  results: GitResult<StatusResult>,
+  format: ResponseFormat = ResponseFormat.MARKDOWN,
+): string {
   if (isError(results)) {
-    return `Error: ${results.error}`
+    return format === ResponseFormat.JSON
+      ? JSON.stringify({ error: results.error }, null, 2)
+      : `Error: ${results.error}`
+  }
+
+  if (format === ResponseFormat.JSON) {
+    return JSON.stringify(results, null, 2)
   }
 
   let output = `Branch: ${results.branch}`
@@ -543,9 +569,18 @@ function formatStatus(results: GitResult<StatusResult>): string {
 /**
  * Format branch info for display
  */
-function formatBranchInfo(results: GitResult<BranchResult>): string {
+function formatBranchInfo(
+  results: GitResult<BranchResult>,
+  format: ResponseFormat = ResponseFormat.MARKDOWN,
+): string {
   if (isError(results)) {
-    return `Error: ${results.error}`
+    return format === ResponseFormat.JSON
+      ? JSON.stringify({ error: results.error }, null, 2)
+      : `Error: ${results.error}`
+  }
+
+  if (format === ResponseFormat.JSON) {
+    return JSON.stringify(results, null, 2)
   }
 
   let output = `Current: ${results.current}`
@@ -581,11 +616,52 @@ function formatBranchInfo(results: GitResult<BranchResult>): string {
 }
 
 /**
+ * Format diff summary for display
+ */
+function formatDiffSummary(
+  results: GitResult<DiffResult>,
+  format: ResponseFormat = ResponseFormat.MARKDOWN,
+): string {
+  if (isError(results)) {
+    return format === ResponseFormat.JSON
+      ? JSON.stringify({ error: results.error }, null, 2)
+      : `Error: ${results.error}`
+  }
+
+  if (format === ResponseFormat.JSON) {
+    return JSON.stringify(results, null, 2)
+  }
+
+  if (results.files_changed === 0) {
+    return `No changes compared to ${results.ref}`
+  }
+
+  let output = `Changes vs ${results.ref}:\n`
+  output += `${results.files_changed} file${results.files_changed === 1 ? '' : 's'} changed, `
+  output += `+${results.total_added} -${results.total_deleted}\n\n`
+
+  results.files.forEach((f) => {
+    output += `  +${f.added} -${f.deleted}\t${f.file}\n`
+  })
+
+  return output.trim()
+}
+
+/**
  * Format stash list for display
  */
-function formatStashList(results: GitResult<StashResult>): string {
+function formatStashList(
+  results: GitResult<StashResult>,
+  format: ResponseFormat = ResponseFormat.MARKDOWN,
+): string {
   if (isError(results)) {
-    return `Error: ${results.error}`
+    return format === ResponseFormat.JSON
+      ? JSON.stringify({ error: results.error }, null, 2)
+      : `Error: ${results.error}`
+  }
+
+  if (format === ResponseFormat.JSON) {
+    return JSON.stringify(results, null, 2)
   }
 
   if (results.count === 0) {
@@ -605,7 +681,7 @@ function formatStashList(results: GitResult<StashResult>): string {
 // Register tools
 
 tool(
-  'get_recent_commits',
+  'git_get_recent_commits',
   {
     description:
       'Get recent git commits with hash, message, author, and relative time. Use this to understand recent changes before making related edits.',
@@ -618,19 +694,33 @@ tool(
         .string()
         .optional()
         .describe('Repository path (default: current directory)'),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
-  async (args: { limit?: number; path?: string }) => {
-    const { limit, path } = args
+  async (args: { limit?: number; path?: string; response_format?: string }) => {
+    const { limit, path, response_format } = args
+    const format =
+      response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
     const results = getRecentCommits(limit ?? 10, path)
     return {
-      content: [{ type: 'text' as const, text: formatCommits(results) }],
+      content: [
+        { type: 'text' as const, text: formatCommits(results, format) },
+      ],
     }
   },
 )
 
 tool(
-  'search_commits',
+  'git_search_commits',
   {
     description:
       'Search git commit history by message or code changes. Use --grep style search for commit messages, or -S style search for code changes.',
@@ -650,28 +740,43 @@ tool(
         .string()
         .optional()
         .describe('Repository path (default: current directory)'),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
   async (args: Record<string, unknown>) => {
-    const { query, search_code, limit, path } = args as {
+    const { query, search_code, limit, path, response_format } = args as {
       query: string
       search_code?: boolean
       limit?: number
       path?: string
+      response_format?: string
     }
+    const format =
+      response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
     const results = searchCommits(query, {
       limit: limit ?? 20,
       searchCode: search_code ?? false,
       cwd: path,
     })
     return {
-      content: [{ type: 'text' as const, text: formatCommits(results) }],
+      content: [
+        { type: 'text' as const, text: formatCommits(results, format) },
+      ],
     }
   },
 )
 
 tool(
-  'get_file_history',
+  'git_get_file_history',
   {
     description:
       'Get commit history for a specific file, following renames. Use this to understand how a file evolved over time.',
@@ -685,23 +790,38 @@ tool(
         .string()
         .optional()
         .describe('Repository path (default: current directory)'),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
   async (args: Record<string, unknown>) => {
-    const { file, limit, path } = args as {
+    const { file, limit, path, response_format } = args as {
       file: string
       limit?: number
       path?: string
+      response_format?: string
     }
+    const format =
+      response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
     const results = getFileHistory(file, limit ?? 10, path)
     return {
-      content: [{ type: 'text' as const, text: formatCommits(results) }],
+      content: [
+        { type: 'text' as const, text: formatCommits(results, format) },
+      ],
     }
   },
 )
 
 tool(
-  'get_status',
+  'git_get_status',
   {
     description:
       'Get current repository status including branch, staged changes, modified files, and untracked files.',
@@ -710,19 +830,31 @@ tool(
         .string()
         .optional()
         .describe('Repository path (default: current directory)'),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
-  async (args: { path?: string }) => {
-    const { path } = args
+  async (args: { path?: string; response_format?: string }) => {
+    const { path, response_format } = args
+    const format =
+      response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
     const results = getStatus(path)
     return {
-      content: [{ type: 'text' as const, text: formatStatus(results) }],
+      content: [{ type: 'text' as const, text: formatStatus(results, format) }],
     }
   },
 )
 
 tool(
-  'get_branch_info',
+  'git_get_branch_info',
   {
     description:
       'Get branch information including current branch, tracking status, and list of local/remote branches.',
@@ -731,19 +863,33 @@ tool(
         .string()
         .optional()
         .describe('Repository path (default: current directory)'),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
-  async (args: { path?: string }) => {
-    const { path } = args
+  async (args: { path?: string; response_format?: string }) => {
+    const { path, response_format } = args
+    const format =
+      response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
     const results = getBranchInfo(path)
     return {
-      content: [{ type: 'text' as const, text: formatBranchInfo(results) }],
+      content: [
+        { type: 'text' as const, text: formatBranchInfo(results, format) },
+      ],
     }
   },
 )
 
 tool(
-  'get_diff_summary',
+  'git_get_diff_summary',
   {
     description:
       'Get a summary of changes (files changed, lines added/deleted) compared to a reference.',
@@ -756,40 +902,33 @@ tool(
         .string()
         .optional()
         .describe('Repository path (default: current directory)'),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
-  async (args: { ref?: string; path?: string }) => {
-    const { ref, path } = args
-    const diff = getDiffSummary(ref ?? 'HEAD', path)
-
-    if (isError(diff)) {
-      return {
-        content: [{ type: 'text' as const, text: `Error: ${diff.error}` }],
-      }
+  async (args: { ref?: string; path?: string; response_format?: string }) => {
+    const { ref, path, response_format } = args
+    const format =
+      response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
+    const results = getDiffSummary(ref ?? 'HEAD', path)
+    return {
+      content: [
+        { type: 'text' as const, text: formatDiffSummary(results, format) },
+      ],
     }
-
-    if (diff.files_changed === 0) {
-      return {
-        content: [
-          { type: 'text' as const, text: `No changes compared to ${diff.ref}` },
-        ],
-      }
-    }
-
-    let output = `Changes vs ${diff.ref}:\n`
-    output += `${diff.files_changed} file${diff.files_changed === 1 ? '' : 's'} changed, `
-    output += `+${diff.total_added} -${diff.total_deleted}\n\n`
-
-    diff.files.forEach((f) => {
-      output += `  +${f.added} -${f.deleted}\t${f.file}\n`
-    })
-
-    return { content: [{ type: 'text' as const, text: output.trim() }] }
   },
 )
 
 tool(
-  'get_stash_list',
+  'git_get_stash_list',
   {
     description:
       'Get list of stashed changes. Use this to see saved work before operations or to recover stashed changes.',
@@ -798,13 +937,27 @@ tool(
         .string()
         .optional()
         .describe('Repository path (default: current directory)'),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
-  async (args: { path?: string }) => {
-    const { path } = args
+  async (args: { path?: string; response_format?: string }) => {
+    const { path, response_format } = args
+    const format =
+      response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
     const results = getStashList(path)
     return {
-      content: [{ type: 'text' as const, text: formatStashList(results) }],
+      content: [
+        { type: 'text' as const, text: formatStashList(results, format) },
+      ],
     }
   },
 )
