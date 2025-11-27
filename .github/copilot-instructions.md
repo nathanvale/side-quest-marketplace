@@ -17,7 +17,7 @@ This is a **Bun-based monorepo** containing plugins for the Claude Code marketpl
   - Run scripts: `bun run <script>`
 - **Linting & Formatting**: Use **Biome**.
   - Check: `bun run ci` (runs typecheck, biome check, and tests)
-  - Format: `bunx @biomejs/biome check --apply .`
+  - Format: `bun run check` (or `biome check --write .`)
 - **Testing**: `bun run test` (uses Bun's built-in test runner).
 
 ## Key Conventions

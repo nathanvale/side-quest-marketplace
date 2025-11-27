@@ -69,10 +69,10 @@ Before:
 {
   "scripts": {
     "test": "bun test --recursive",
-    "typecheck": "bunx tsc --noEmit",
-    "format": "bunx @biomejs/biome format --write .",
-    "lint": "bunx @biomejs/biome lint .",
-    "check": "bunx @biomejs/biome check --write ."
+    "typecheck": "tsc --noEmit",
+    "format": "biome format --write .",
+    "lint": "biome lint .",
+    "check": "biome check --write ."
   },
   "devDependencies": {
     "@types/bun": "latest"

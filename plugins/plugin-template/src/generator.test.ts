@@ -130,7 +130,7 @@ describe('generatePluginStructure', () => {
     const pkgPath = join(TEST_DIR, 'test-plugin', 'package.json')
     const pkg = await Bun.file(pkgPath).json()
     expect(pkg.scripts.test).toBe('bun test --recursive')
-    expect(pkg.scripts.typecheck).toBe('bunx tsc --noEmit')
+    expect(pkg.scripts.typecheck).toBe('tsc --noEmit')
   })
 
   test('returns result with files created', async () => {

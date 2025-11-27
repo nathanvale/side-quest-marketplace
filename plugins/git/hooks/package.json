@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "bun test",
-    "typecheck": "bunx tsc --noEmit"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "latest"

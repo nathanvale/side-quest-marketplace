@@ -56,11 +56,11 @@ After:
 {
   "scripts": {
     "test": "bun test --recursive",
-    "typecheck": "bunx tsc --noEmit",
-    "format": "bunx @biomejs/biome format --write .",
-    "format:check": "bunx @biomejs/biome format .",
-    "lint": "bunx @biomejs/biome lint .",
-    "check": "bunx @biomejs/biome check --write ."
+    "typecheck": "tsc --noEmit",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint .",
+    "check": "biome check --write ."
   },
   "devDependencies": {
     "@types/bun": "latest"
