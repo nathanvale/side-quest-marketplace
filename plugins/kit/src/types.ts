@@ -198,8 +198,19 @@ export function isError<T extends object>(
 // Default Configuration
 // ============================================================================
 
-/** Default vault path for searches */
-export const DEFAULT_KIT_PATH = '~/code/my-second-brain'
+/** Environment variable name for configuring default path */
+export const KIT_DEFAULT_PATH_ENV = 'KIT_DEFAULT_PATH'
+
+/**
+ * Get the default path for Kit operations using cascading defaults:
+ * 1. KIT_DEFAULT_PATH environment variable (if set)
+ * 2. Current working directory (process.cwd())
+ *
+ * @returns Resolved default path for Kit operations
+ */
+export function getDefaultKitPath(): string {
+  return process.env[KIT_DEFAULT_PATH_ENV] || process.cwd()
+}
 
 /** Default timeout for grep operations (ms) */
 export const GREP_TIMEOUT = 30000

@@ -38,8 +38,8 @@ import type {
   SymbolsResult,
 } from './types.js'
 import {
-  DEFAULT_KIT_PATH,
   GREP_TIMEOUT,
+  getDefaultKitPath,
   SEMANTIC_TIMEOUT,
   SYMBOLS_TIMEOUT,
 } from './types.js'
@@ -154,7 +154,7 @@ export function executeKitGrep(options: GrepOptions): KitResult<GrepResult> {
 
   const {
     pattern,
-    path = DEFAULT_KIT_PATH,
+    path = getDefaultKitPath(),
     caseSensitive = true,
     include,
     exclude,
@@ -303,7 +303,7 @@ export function executeKitSymbols(
     return new KitError(KitErrorType.KitNotInstalled).toJSON()
   }
 
-  const { path = DEFAULT_KIT_PATH, pattern, symbolType } = options
+  const { path = getDefaultKitPath(), pattern, symbolType } = options
 
   // Build command arguments
   const args: string[] = ['symbols', path, '--format', 'json']
@@ -423,7 +423,7 @@ export function executeKitSemantic(
 
   const {
     query,
-    path = DEFAULT_KIT_PATH,
+    path = getDefaultKitPath(),
     topK = 5,
     chunkBy = 'symbols',
     buildIndex = false,

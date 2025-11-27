@@ -7,7 +7,7 @@
 import { existsSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { isAbsolute, normalize, resolve } from 'node:path'
-import { DEFAULT_KIT_PATH } from './types.js'
+import { getDefaultKitPath } from './types.js'
 
 // ============================================================================
 // Path Utilities
@@ -360,7 +360,7 @@ export function validateGrepInputs(inputs: {
   }
 
   // Validate path
-  const pathResult = validatePath(inputs.path || DEFAULT_KIT_PATH)
+  const pathResult = validatePath(inputs.path || getDefaultKitPath())
   if (!pathResult.valid) {
     errors.push(pathResult.error!)
   }
@@ -441,7 +441,7 @@ export function validateSemanticInputs(inputs: {
   }
 
   // Validate path
-  const pathResult = validatePath(inputs.path || DEFAULT_KIT_PATH)
+  const pathResult = validatePath(inputs.path || getDefaultKitPath())
   if (!pathResult.valid) {
     errors.push(pathResult.error!)
   }
@@ -493,7 +493,7 @@ export function validateSymbolsInputs(inputs: {
   const errors: string[] = []
 
   // Validate path
-  const pathResult = validatePath(inputs.path || DEFAULT_KIT_PATH)
+  const pathResult = validatePath(inputs.path || getDefaultKitPath())
   if (!pathResult.valid) {
     errors.push(pathResult.error!)
   }

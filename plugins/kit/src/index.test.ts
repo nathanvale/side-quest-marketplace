@@ -3,14 +3,15 @@ import {
   // Logger
   createCorrelationId,
   createErrorFromOutput,
-  DEFAULT_KIT_PATH,
   DEFAULT_MAX_RESULTS,
   DEFAULT_TOP_K,
   detectErrorType,
   ERROR_MESSAGES,
   GREP_TIMEOUT,
+  getDefaultKitPath,
   isError,
   isSemanticUnavailableError,
+  KIT_DEFAULT_PATH_ENV,
   KitError,
   // Errors
   KitErrorType,
@@ -53,8 +54,30 @@ describe('types', () => {
   })
 
   describe('default constants', () => {
-    test('DEFAULT_KIT_PATH is vault path', () => {
-      expect(DEFAULT_KIT_PATH).toBe('~/code/my-second-brain')
+    test('KIT_DEFAULT_PATH_ENV is correct env var name', () => {
+      expect(KIT_DEFAULT_PATH_ENV).toBe('KIT_DEFAULT_PATH')
+    })
+
+    test('getDefaultKitPath returns cwd when no env var set', () => {
+      const originalEnv = process.env.KIT_DEFAULT_PATH
+      delete process.env.KIT_DEFAULT_PATH
+      expect(getDefaultKitPath()).toBe(process.cwd())
+      // Restore
+      if (originalEnv !== undefined) {
+        process.env.KIT_DEFAULT_PATH = originalEnv
+      }
+    })
+
+    test('getDefaultKitPath returns env var when set', () => {
+      const originalEnv = process.env.KIT_DEFAULT_PATH
+      process.env.KIT_DEFAULT_PATH = '/custom/test/path'
+      expect(getDefaultKitPath()).toBe('/custom/test/path')
+      // Restore
+      if (originalEnv !== undefined) {
+        process.env.KIT_DEFAULT_PATH = originalEnv
+      } else {
+        delete process.env.KIT_DEFAULT_PATH
+      }
     })
 
     test('timeout values are reasonable', () => {

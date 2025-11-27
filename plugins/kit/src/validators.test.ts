@@ -377,15 +377,13 @@ describe('validateGrepInputs', () => {
     expect(result.validated?.maxResults).toBe(50)
   })
 
-  test('uses default path when not provided', () => {
+  test('uses current directory as default path when not provided', () => {
     const result = validateGrepInputs({
       pattern: 'test',
     })
-    // Path may not exist, so we check that validation ran
-    // The error should be about path if it doesn't exist
-    if (!result.valid) {
-      expect(result.errors.some((e) => e.includes('Path'))).toBe(true)
-    }
+    // cwd always exists, so this should pass validation
+    expect(result.valid).toBe(true)
+    expect(result.validated?.path).toBe(process.cwd())
   })
 
   test('validates optional include pattern', () => {

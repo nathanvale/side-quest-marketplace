@@ -50,7 +50,7 @@ Results include file paths, line numbers, and matched content.`,
         .string()
         .optional()
         .describe(
-          'Repository path to search (default: ~/code/my-second-brain)',
+          'Repository path to search (default: current directory, or KIT_DEFAULT_PATH env var)',
         ),
       case_sensitive: z
         .boolean()
@@ -169,7 +169,7 @@ To enable: uv tool install 'cased-kit[ml]'`,
         .string()
         .optional()
         .describe(
-          'Repository path to search (default: ~/code/my-second-brain)',
+          'Repository path to search (default: current directory, or KIT_DEFAULT_PATH env var)',
         ),
       top_k: z
         .number()
@@ -266,7 +266,7 @@ Lists all defined symbols with their locations. Great for:
         .string()
         .optional()
         .describe(
-          'Repository path to analyze (default: ~/code/my-second-brain)',
+          'Repository path to analyze (default: current directory, or KIT_DEFAULT_PATH env var)',
         ),
       pattern: z
         .string()
