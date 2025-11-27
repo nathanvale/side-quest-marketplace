@@ -13,7 +13,7 @@
 
 import { spawn } from 'bun'
 import { TSC_SUPPORTED_EXTENSIONS } from './shared/constants'
-import { isGitTracked } from './shared/git-utils'
+import { isFileInRepo } from './shared/git-utils'
 import {
   extractFilePaths,
   parseHookInput,
@@ -96,9 +96,9 @@ async function main() {
       continue
     }
 
-    // Git-aware: Skip files not tracked by git
-    const isTracked = await isGitTracked(filePath)
-    if (!isTracked) {
+    // Git-aware: Skip files outside the git repository
+    const inRepo = await isFileInRepo(filePath)
+    if (!inRepo) {
       continue
     }
 

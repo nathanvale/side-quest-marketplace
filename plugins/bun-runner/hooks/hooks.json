@@ -11,16 +11,6 @@
             "timeout": 30
           }
         ]
-      },
-      {
-        "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/tsc-check.ts",
-            "timeout": 30
-          }
-        ]
       }
     ],
     "Stop": [
