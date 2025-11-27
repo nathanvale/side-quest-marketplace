@@ -216,30 +216,14 @@ export class ASTSearcher {
 
   /**
    * Check if a file matches the given pattern.
-   * Supports simple glob patterns like "*.ts" or "**\/*.tsx".
+   * Uses Bun.Glob for proper glob pattern matching.
    */
   private matchesFilePattern(filePath: string, pattern: string): boolean {
     const relativePath = relative(this.repoPath, filePath)
 
-    // Simple extension matching
-    if (pattern.startsWith('*.')) {
-      const ext = pattern.slice(1)
-      return filePath.endsWith(ext)
-    }
-
-    // Pattern with path components
-    if (pattern.includes('/')) {
-      // Remove leading **/ for matching
-      const cleanPattern = pattern.replace(/^\*\*\//, '')
-      return (
-        relativePath.includes(cleanPattern) ||
-        relativePath.endsWith(cleanPattern)
-      )
-    }
-
-    // Default: match extension
-    const ext = extname(filePath)
-    return pattern === '*' || pattern.includes(ext)
+    // Use Bun.Glob for proper glob matching
+    const glob = new Bun.Glob(pattern)
+    return glob.match(relativePath)
   }
 
   /**

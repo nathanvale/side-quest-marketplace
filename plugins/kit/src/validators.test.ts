@@ -6,6 +6,9 @@ import {
   isRegexSafe,
   isValidGlob,
   normalizePath,
+  validateAstSearchInputs,
+  validateFileContentInputs,
+  validateFileTreeInputs,
   validateGlob,
   validateGrepInputs,
   validatePath,
@@ -13,6 +16,7 @@ import {
   validateRegex,
   validateSemanticInputs,
   validateSymbolsInputs,
+  validateUsagesInputs,
 } from './validators'
 
 // ============================================================================
@@ -544,5 +548,425 @@ describe('validateSymbolsInputs', () => {
     })
     expect(result.valid).toBe(false)
     expect(result.errors.some((e) => e.includes('File pattern'))).toBe(true)
+  })
+})
+
+// ============================================================================
+// File Tree Validator Tests
+// ============================================================================
+
+describe('validateFileTreeInputs', () => {
+  const validPath = homedir()
+
+  test('validates correct inputs', () => {
+    const result = validateFileTreeInputs({
+      path: validPath,
+      subpath: 'src/components',
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.path).toBe(validPath)
+    expect(result.validated?.subpath).toBe('src/components')
+  })
+
+  test('uses current directory as default path', () => {
+    const result = validateFileTreeInputs({})
+    expect(result.valid).toBe(true)
+    expect(result.validated?.path).toBe(process.cwd())
+  })
+
+  test('validates without subpath', () => {
+    const result = validateFileTreeInputs({
+      path: validPath,
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.subpath).toBeUndefined()
+  })
+
+  test('trims subpath whitespace', () => {
+    const result = validateFileTreeInputs({
+      path: validPath,
+      subpath: '  src/lib  ',
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.subpath).toBe('src/lib')
+  })
+
+  test('rejects path traversal in subpath', () => {
+    const result = validateFileTreeInputs({
+      path: validPath,
+      subpath: '../../../etc',
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.includes('traversal'))).toBe(true)
+  })
+
+  test('rejects embedded path traversal in subpath', () => {
+    const result = validateFileTreeInputs({
+      path: validPath,
+      subpath: 'src/../../../etc/passwd',
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.includes('traversal'))).toBe(true)
+  })
+
+  test('rejects non-existent path', () => {
+    const result = validateFileTreeInputs({
+      path: '/nonexistent/path/abc123',
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.includes('does not exist'))).toBe(true)
+  })
+})
+
+// ============================================================================
+// File Content Validator Tests
+// ============================================================================
+
+describe('validateFileContentInputs', () => {
+  const validPath = homedir()
+
+  test('validates correct inputs', () => {
+    const result = validateFileContentInputs({
+      path: validPath,
+      filePaths: ['src/index.ts', 'package.json'],
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.filePaths).toEqual(['src/index.ts', 'package.json'])
+  })
+
+  test('uses current directory as default path', () => {
+    const result = validateFileContentInputs({
+      filePaths: ['README.md'],
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.path).toBe(process.cwd())
+  })
+
+  test('rejects empty filePaths array', () => {
+    const result = validateFileContentInputs({
+      path: validPath,
+      filePaths: [],
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.includes('At least one'))).toBe(true)
+  })
+
+  test('rejects empty string in filePaths', () => {
+    const result = validateFileContentInputs({
+      path: validPath,
+      filePaths: ['valid.ts', '', 'another.ts'],
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.includes('cannot be empty'))).toBe(true)
+  })
+
+  test('trims whitespace from file paths', () => {
+    const result = validateFileContentInputs({
+      path: validPath,
+      filePaths: ['  src/index.ts  ', '  package.json  '],
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.filePaths).toEqual(['src/index.ts', 'package.json'])
+  })
+
+  test('rejects path traversal in filePaths', () => {
+    const result = validateFileContentInputs({
+      path: validPath,
+      filePaths: ['../../../etc/passwd'],
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.includes('traversal'))).toBe(true)
+  })
+
+  test('rejects embedded path traversal', () => {
+    const result = validateFileContentInputs({
+      path: validPath,
+      filePaths: ['src/../../../etc/passwd'],
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.includes('traversal'))).toBe(true)
+  })
+
+  test('rejects more than 20 files', () => {
+    const tooManyFiles = Array.from({ length: 21 }, (_, i) => `file${i}.ts`)
+    const result = validateFileContentInputs({
+      path: validPath,
+      filePaths: tooManyFiles,
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.includes('more than 20'))).toBe(true)
+  })
+
+  test('accepts exactly 20 files', () => {
+    const maxFiles = Array.from({ length: 20 }, (_, i) => `file${i}.ts`)
+    const result = validateFileContentInputs({
+      path: validPath,
+      filePaths: maxFiles,
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.filePaths).toHaveLength(20)
+  })
+})
+
+// ============================================================================
+// Usages Validator Tests
+// ============================================================================
+
+describe('validateUsagesInputs', () => {
+  const validPath = homedir()
+
+  test('validates correct inputs', () => {
+    const result = validateUsagesInputs({
+      path: validPath,
+      symbolName: 'AuthService',
+      symbolType: 'class',
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.symbolName).toBe('AuthService')
+    expect(result.validated?.symbolType).toBe('class')
+  })
+
+  test('uses current directory as default path', () => {
+    const result = validateUsagesInputs({
+      symbolName: 'myFunction',
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.path).toBe(process.cwd())
+  })
+
+  test('validates without symbolType', () => {
+    const result = validateUsagesInputs({
+      path: validPath,
+      symbolName: 'MyComponent',
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.symbolType).toBeUndefined()
+  })
+
+  test('rejects empty symbolName', () => {
+    const result = validateUsagesInputs({
+      path: validPath,
+      symbolName: '',
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.includes('Symbol name is required'))).toBe(true)
+  })
+
+  test('rejects whitespace-only symbolName', () => {
+    const result = validateUsagesInputs({
+      path: validPath,
+      symbolName: '   ',
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.includes('Symbol name is required'))).toBe(true)
+  })
+
+  test('trims symbolName whitespace', () => {
+    const result = validateUsagesInputs({
+      path: validPath,
+      symbolName: '  trimMe  ',
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.symbolName).toBe('trimMe')
+  })
+
+  test('normalizes symbolType to lowercase', () => {
+    const result = validateUsagesInputs({
+      path: validPath,
+      symbolName: 'Test',
+      symbolType: 'FUNCTION',
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.symbolType).toBe('function')
+  })
+
+  test('rejects invalid symbolType', () => {
+    const result = validateUsagesInputs({
+      path: validPath,
+      symbolName: 'Test',
+      symbolType: 'banana',
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.includes('Invalid symbol type'))).toBe(true)
+  })
+
+  test('validates all allowed symbol types', () => {
+    const validTypes = [
+      'function',
+      'class',
+      'variable',
+      'type',
+      'interface',
+      'method',
+      'property',
+      'constant',
+    ]
+    for (const symbolType of validTypes) {
+      const result = validateUsagesInputs({
+        path: validPath,
+        symbolName: 'Test',
+        symbolType,
+      })
+      expect(result.valid).toBe(true)
+      expect(result.validated?.symbolType).toBe(symbolType)
+    }
+  })
+})
+
+// ============================================================================
+// AST Search Validator Tests
+// ============================================================================
+
+describe('validateAstSearchInputs', () => {
+  const validPath = homedir()
+
+  test('validates correct inputs', () => {
+    const result = validateAstSearchInputs({
+      pattern: 'async function',
+      mode: 'simple',
+      filePattern: '**/*.ts',
+      path: validPath,
+      maxResults: 50,
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.pattern).toBe('async function')
+    expect(result.validated?.mode).toBe('simple')
+    expect(result.validated?.filePattern).toBe('**/*.ts')
+    expect(result.validated?.maxResults).toBe(50)
+  })
+
+  test('uses current directory as default path', () => {
+    const result = validateAstSearchInputs({
+      pattern: 'class',
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.path).toBe(process.cwd())
+  })
+
+  test('uses simple as default mode', () => {
+    const result = validateAstSearchInputs({
+      pattern: 'function',
+      path: validPath,
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.mode).toBe('simple')
+  })
+
+  test('uses 100 as default maxResults', () => {
+    const result = validateAstSearchInputs({
+      pattern: 'import',
+      path: validPath,
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.maxResults).toBe(100)
+  })
+
+  test('rejects empty pattern', () => {
+    const result = validateAstSearchInputs({
+      pattern: '',
+      path: validPath,
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.includes('Pattern cannot be empty'))).toBe(true)
+  })
+
+  test('rejects whitespace-only pattern', () => {
+    const result = validateAstSearchInputs({
+      pattern: '   ',
+      path: validPath,
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.includes('Pattern cannot be empty'))).toBe(true)
+  })
+
+  test('trims pattern whitespace', () => {
+    const result = validateAstSearchInputs({
+      pattern: '  async function  ',
+      path: validPath,
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.pattern).toBe('async function')
+  })
+
+  test('normalizes mode to lowercase', () => {
+    const result = validateAstSearchInputs({
+      pattern: 'class',
+      mode: 'SIMPLE',
+      path: validPath,
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.mode).toBe('simple')
+  })
+
+  test('rejects invalid mode', () => {
+    const result = validateAstSearchInputs({
+      pattern: 'function',
+      mode: 'invalid',
+      path: validPath,
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.includes('Invalid mode'))).toBe(true)
+  })
+
+  test('accepts pattern mode', () => {
+    const result = validateAstSearchInputs({
+      pattern: '{"type": "function_declaration"}',
+      mode: 'pattern',
+      path: validPath,
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.mode).toBe('pattern')
+  })
+
+  test('validates filePattern glob', () => {
+    const result = validateAstSearchInputs({
+      pattern: 'class',
+      filePattern: '**/*.{ts,tsx}',
+      path: validPath,
+    })
+    expect(result.valid).toBe(true)
+    expect(result.validated?.filePattern).toBe('**/*.{ts,tsx}')
+  })
+
+  test('rejects invalid filePattern', () => {
+    const result = validateAstSearchInputs({
+      pattern: 'function',
+      filePattern: '*.ts; rm -rf /',
+      path: validPath,
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.includes('File pattern'))).toBe(true)
+  })
+
+  test('rejects maxResults below 1', () => {
+    const result = validateAstSearchInputs({
+      pattern: 'import',
+      path: validPath,
+      maxResults: 0,
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.includes('maxResults'))).toBe(true)
+  })
+
+  test('rejects maxResults above 500', () => {
+    const result = validateAstSearchInputs({
+      pattern: 'export',
+      path: validPath,
+      maxResults: 501,
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.includes('maxResults'))).toBe(true)
+  })
+
+  test('collects multiple errors', () => {
+    const result = validateAstSearchInputs({
+      pattern: '',
+      mode: 'invalid',
+      filePattern: '*.ts; echo pwned',
+      path: '/nonexistent/path',
+      maxResults: 9999,
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors.length).toBeGreaterThanOrEqual(3)
   })
 })

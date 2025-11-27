@@ -43,8 +43,9 @@ export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
 // Cached language instances
 const languageCache = new Map<string, Language>()
 
-// Parser singleton (reused with different languages)
-let parserInstance: Parser | null = null
+// Parser instances per language (avoids race condition when language is swapped)
+const parserCache = new Map<string, Parser>()
+
 let initialized = false
 
 /**
@@ -72,22 +73,34 @@ export async function initParser(): Promise<void> {
 /**
  * Get a parser configured for a specific language.
  *
+ * Each language gets its own dedicated parser instance to avoid race conditions
+ * when concurrent requests for different languages would otherwise swap the
+ * language on a shared parser mid-parse.
+ *
  * @param language - The language name (e.g., "typescript")
- * @returns Configured parser instance
+ * @returns Configured parser instance for this language
  */
 export async function getParser(language: SupportedLanguage): Promise<Parser> {
   await initParser()
 
-  if (!parserInstance) {
-    parserInstance = new Parser()
+  const logger = getAstLogger()
+
+  // Return cached parser if available
+  if (parserCache.has(language)) {
+    logger.debug('Using cached parser for language', { language })
+    return parserCache.get(language)!
   }
 
-  const logger = getAstLogger()
-  logger.debug('Configuring parser for language', { language })
+  logger.debug('Creating new parser for language', { language })
 
+  // Create a new parser dedicated to this language
+  const parser = new Parser()
   const lang = await loadLanguage(language)
-  parserInstance.setLanguage(lang)
-  return parserInstance
+  parser.setLanguage(lang)
+
+  // Cache and return
+  parserCache.set(language, parser)
+  return parser
 }
 
 /**
