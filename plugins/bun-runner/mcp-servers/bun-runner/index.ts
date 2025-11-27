@@ -16,6 +16,14 @@ import { startServer, tool, z } from 'mcpez'
 
 // --- Types ---
 
+/**
+ * Response format options for tool output
+ */
+enum ResponseFormat {
+  MARKDOWN = 'markdown',
+  JSON = 'json',
+}
+
 export interface TestFailure {
   file: string
   message: string
@@ -395,6 +403,165 @@ async function runBunTestCoverage(): Promise<{
   }
 }
 
+// --- Formatters ---
+
+/**
+ * Format test summary for display
+ */
+function formatTestSummary(
+  summary: TestSummary,
+  format: ResponseFormat = ResponseFormat.MARKDOWN,
+  context?: string,
+): string {
+  if (format === ResponseFormat.JSON) {
+    return JSON.stringify({ ...summary, context }, null, 2)
+  }
+
+  if (summary.failed === 0) {
+    const ctx = context ? ` in ${context}` : ''
+    return `All ${summary.passed} tests passed${ctx}.`
+  }
+
+  let output = `${summary.failed} tests failed${context ? ` in ${context}` : ''} (${summary.passed} passed)\n\n`
+
+  summary.failures.forEach((f, i) => {
+    output += `${i + 1}. ${f.file}:${f.line || '?'}\n`
+    output += `   ${f.message.split('\n')[0]}\n`
+    if (f.stack) {
+      output += `${f.stack
+        .split('\n')
+        .map((l) => `      ${l}`)
+        .join('\n')}\n`
+    }
+    output += '\n'
+  })
+
+  return output.trim()
+}
+
+/**
+ * Format lint summary for display
+ */
+function formatLintSummary(
+  summary: LintSummary,
+  format: ResponseFormat = ResponseFormat.MARKDOWN,
+): string {
+  if (format === ResponseFormat.JSON) {
+    return JSON.stringify(summary, null, 2)
+  }
+
+  if (summary.error_count === 0 && summary.warning_count === 0) {
+    return 'No linting issues found.'
+  }
+
+  let output = `Found ${summary.error_count} errors and ${summary.warning_count} warnings:\n\n`
+
+  summary.diagnostics.forEach((d) => {
+    const icon = d.severity === 'error' ? '[error]' : '[warn]'
+    output += `${icon} ${d.file}:${d.line} [${d.code}]\n`
+    output += `   ${d.message}\n`
+    if (d.suggestion) {
+      output += '   Suggestion available\n'
+    }
+    output += '\n'
+  })
+
+  return output.trim()
+}
+
+/**
+ * Format lint fix result for display
+ */
+function formatLintFixResult(
+  fixed: number,
+  remaining: LintSummary,
+  format: ResponseFormat = ResponseFormat.MARKDOWN,
+): string {
+  if (format === ResponseFormat.JSON) {
+    return JSON.stringify({ fixed, remaining }, null, 2)
+  }
+
+  let output = ''
+
+  if (fixed > 0) {
+    output += `Fixed ${fixed} issue(s)\n\n`
+  }
+
+  if (remaining.error_count === 0 && remaining.warning_count === 0) {
+    if (fixed === 0) {
+      return 'No issues to fix.'
+    }
+    return `${output}All issues resolved.`.trim()
+  }
+
+  output += `${remaining.error_count} error(s) and ${remaining.warning_count} warning(s) remain:\n\n`
+
+  remaining.diagnostics.forEach((d) => {
+    const icon = d.severity === 'error' ? '[error]' : '[warn]'
+    output += `${icon} ${d.file}:${d.line} [${d.code}]\n`
+    output += `   ${d.message}\n\n`
+  })
+
+  return output.trim()
+}
+
+/**
+ * Format coverage result for display
+ */
+function formatCoverageResult(
+  summary: TestSummary,
+  coverage: { percent: number; uncovered: string[] },
+  format: ResponseFormat = ResponseFormat.MARKDOWN,
+): string {
+  if (format === ResponseFormat.JSON) {
+    return JSON.stringify({ summary, coverage }, null, 2)
+  }
+
+  let output = ''
+
+  if (summary.failed === 0) {
+    output += `All ${summary.passed} tests passed.\n\n`
+  } else {
+    output += `${summary.failed} tests failed (${summary.passed} passed)\n\n`
+  }
+
+  output += `Coverage: ${coverage.percent}%\n`
+
+  if (coverage.uncovered.length > 0) {
+    output += '\nFiles with low coverage (<50%):\n'
+    coverage.uncovered.forEach((f) => {
+      output += `   - ${f}\n`
+    })
+  }
+
+  return output.trim()
+}
+
+/**
+ * Format format check result for display
+ */
+function formatFormatCheckResult(
+  formatted: boolean,
+  files: string[],
+  format: ResponseFormat = ResponseFormat.MARKDOWN,
+): string {
+  if (format === ResponseFormat.JSON) {
+    return JSON.stringify({ formatted, unformatted_files: files }, null, 2)
+  }
+
+  if (formatted) {
+    return 'All files are properly formatted.'
+  }
+
+  let output = `${files.length} file(s) need formatting:\n\n`
+  files.forEach((f) => {
+    output += `   - ${f}\n`
+  })
+  output += '\nRun bun_lintFix to auto-format these files.'
+
+  return output.trim()
+}
+
 // --- Tools ---
 
 tool(
@@ -409,38 +576,28 @@ tool(
         .describe(
           "File pattern or test name to filter tests (e.g., 'auth' or 'login.test.ts')",
         ),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
-  async (args: { pattern?: string }) => {
+  async (args: { pattern?: string; response_format?: string }) => {
+    const format =
+      args.response_format === 'json'
+        ? ResponseFormat.JSON
+        : ResponseFormat.MARKDOWN
     const summary = await runBunTests(args.pattern)
-
-    if (summary.failed === 0) {
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `✅ All ${summary.passed} tests passed.`,
-          },
-        ],
-      }
-    }
-
-    let output = `❌ ${summary.failed} tests failed (${summary.passed} passed)\n\n`
-
-    summary.failures.forEach((f, i) => {
-      output += `${i + 1}. ${f.file}:${f.line || '?'}\n`
-      output += `   ${f.message.split('\n')[0]}\n` // First line of message
-      if (f.stack) {
-        output += `${f.stack
-          .split('\n')
-          .map((l) => `      ${l}`)
-          .join('\n')}\n`
-      }
-      output += '\n'
-    })
-
     return {
-      content: [{ type: 'text' as const, text: output }],
+      content: [
+        { type: 'text' as const, text: formatTestSummary(summary, format) },
+      ],
     }
   },
 )
@@ -453,41 +610,34 @@ tool(
     inputSchema: {
       file: z
         .string()
-        .optional()
         .describe("Path to the test file to run (e.g., 'src/utils.test.ts')"),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
-  async (args: { file?: string }) => {
-    const file = args.file || '.'
-    const summary = await runBunTests(file)
-
-    if (summary.failed === 0) {
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `✅ All ${summary.passed} tests passed in ${file}`,
-          },
-        ],
-      }
+  async (args: Record<string, unknown>) => {
+    const { file, response_format } = args as {
+      file: string
+      response_format?: string
     }
-
-    let output = `❌ ${summary.failed} tests failed in ${file} (${summary.passed} passed)\n\n`
-
-    summary.failures.forEach((f, i) => {
-      output += `${i + 1}. ${f.file}:${f.line || '?'}\n`
-      output += `   ${f.message.split('\n')[0]}\n`
-      if (f.stack) {
-        output += `${f.stack
-          .split('\n')
-          .map((l) => `      ${l}`)
-          .join('\n')}\n`
-      }
-      output += '\n'
-    })
-
+    const format =
+      response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
+    const summary = await runBunTests(file)
     return {
-      content: [{ type: 'text' as const, text: output }],
+      content: [
+        {
+          type: 'text' as const,
+          text: formatTestSummary(summary, format, file),
+        },
+      ],
     }
   },
 )
@@ -497,29 +647,32 @@ tool(
   {
     description:
       'Run tests with code coverage and return a summary. Shows overall coverage percentage and files with low coverage.',
+    inputSchema: {
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
-  async () => {
+  async (args: { response_format?: string }) => {
+    const format =
+      args.response_format === 'json'
+        ? ResponseFormat.JSON
+        : ResponseFormat.MARKDOWN
     const { summary, coverage } = await runBunTestCoverage()
-
-    let output = ''
-
-    if (summary.failed === 0) {
-      output += `✅ All ${summary.passed} tests passed.\n\n`
-    } else {
-      output += `❌ ${summary.failed} tests failed (${summary.passed} passed)\n\n`
-    }
-
-    output += `📊 Coverage: ${coverage.percent}%\n`
-
-    if (coverage.uncovered.length > 0) {
-      output += '\n⚠️ Files with low coverage (<50%):\n'
-      coverage.uncovered.forEach((f) => {
-        output += `   - ${f}\n`
-      })
-    }
-
     return {
-      content: [{ type: 'text' as const, text: output }],
+      content: [
+        {
+          type: 'text' as const,
+          text: formatCoverageResult(summary, coverage, format),
+        },
+      ],
     }
   },
 )
@@ -536,33 +689,28 @@ tool(
         .describe(
           'Path to file or directory to check (default: current directory)',
         ),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
-  async (args: { path?: string }) => {
+  async (args: { path?: string; response_format?: string }) => {
+    const format =
+      args.response_format === 'json'
+        ? ResponseFormat.JSON
+        : ResponseFormat.MARKDOWN
     const summary = await runBiomeCheck(args.path)
-
-    if (summary.error_count === 0 && summary.warning_count === 0) {
-      return {
-        content: [
-          { type: 'text' as const, text: '✅ No linting issues found.' },
-        ],
-      }
-    }
-
-    let output = `Found ${summary.error_count} errors and ${summary.warning_count} warnings:\n\n`
-
-    summary.diagnostics.forEach((d) => {
-      const icon = d.severity === 'error' ? '🔴' : '⚠️'
-      output += `${icon} ${d.file}:${d.line} [${d.code}]\n`
-      output += `   ${d.message}\n`
-      if (d.suggestion) {
-        output += '   💡 Suggestion available\n'
-      }
-      output += '\n'
-    })
-
     return {
-      content: [{ type: 'text' as const, text: output }],
+      content: [
+        { type: 'text' as const, text: formatLintSummary(summary, format) },
+      ],
     }
   },
 )
@@ -579,35 +727,31 @@ tool(
         .describe(
           'Path to file or directory to fix (default: current directory)',
         ),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
-  async (args: { path?: string }) => {
+  async (args: { path?: string; response_format?: string }) => {
+    const format =
+      args.response_format === 'json'
+        ? ResponseFormat.JSON
+        : ResponseFormat.MARKDOWN
     const { fixed, remaining } = await runBiomeFix(args.path)
-
-    let output = ''
-
-    if (fixed > 0) {
-      output += `🔧 Fixed ${fixed} issue(s)\n\n`
-    }
-
-    if (remaining.error_count === 0 && remaining.warning_count === 0) {
-      if (fixed === 0) {
-        output = '✅ No issues to fix.'
-      } else {
-        output += '✅ All issues resolved.'
-      }
-    } else {
-      output += `⚠️ ${remaining.error_count} error(s) and ${remaining.warning_count} warning(s) remain:\n\n`
-
-      remaining.diagnostics.forEach((d) => {
-        const icon = d.severity === 'error' ? '🔴' : '⚠️'
-        output += `${icon} ${d.file}:${d.line} [${d.code}]\n`
-        output += `   ${d.message}\n\n`
-      })
-    }
-
     return {
-      content: [{ type: 'text' as const, text: output }],
+      content: [
+        {
+          type: 'text' as const,
+          text: formatLintFixResult(fixed, remaining, format),
+        },
+      ],
     }
   },
 )
@@ -624,30 +768,31 @@ tool(
         .describe(
           'Path to file or directory to check (default: current directory)',
         ),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
-  async (args: { path?: string }) => {
+  async (args: { path?: string; response_format?: string }) => {
+    const format =
+      args.response_format === 'json'
+        ? ResponseFormat.JSON
+        : ResponseFormat.MARKDOWN
     const { formatted, files } = await runBiomeFormatCheck(args.path)
-
-    if (formatted) {
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: '✅ All files are properly formatted.',
-          },
-        ],
-      }
-    }
-
-    let output = `❌ ${files.length} file(s) need formatting:\n\n`
-    files.forEach((f) => {
-      output += `   - ${f}\n`
-    })
-    output += '\nRun bun_lintFix to auto-format these files.'
-
     return {
-      content: [{ type: 'text' as const, text: output }],
+      content: [
+        {
+          type: 'text' as const,
+          text: formatFormatCheckResult(formatted, files, format),
+        },
+      ],
     }
   },
 )
