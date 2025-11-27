@@ -555,6 +555,7 @@ tool(
       searchMode: search_mode ?? 'fuzzy',
     })
     return {
+      ...(isError(results) ? { isError: true } : {}),
       content: [
         { type: 'text' as const, text: formatResults(results, format) },
       ],
@@ -600,6 +601,7 @@ tool(
       response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
     const results = getRecentHistory(limit ?? 10, include_failed ?? false)
     return {
+      ...(isError(results) ? { isError: true } : {}),
       content: [
         { type: 'text' as const, text: formatResults(results, format) },
       ],
@@ -654,6 +656,7 @@ tool(
       limit: limit ?? 20,
     })
     return {
+      ...(isError(results) ? { isError: true } : {}),
       content: [
         { type: 'text' as const, text: formatContextResults(results, format) },
       ],
@@ -699,6 +702,7 @@ tool(
       response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
     const results = getHistoryInsights(period ?? 'today', focus ?? 'all')
     return {
+      ...(isError(results) ? { isError: true } : {}),
       content: [
         { type: 'text' as const, text: formatInsights(results, format) },
       ],

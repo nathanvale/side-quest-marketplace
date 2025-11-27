@@ -712,6 +712,7 @@ tool(
       response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
     const results = getRecentCommits(limit ?? 10, path)
     return {
+      ...(isError(results) ? { isError: true } : {}),
       content: [
         { type: 'text' as const, text: formatCommits(results, format) },
       ],
@@ -768,6 +769,7 @@ tool(
       cwd: path,
     })
     return {
+      ...(isError(results) ? { isError: true } : {}),
       content: [
         { type: 'text' as const, text: formatCommits(results, format) },
       ],
@@ -813,6 +815,7 @@ tool(
       response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
     const results = getFileHistory(file, limit ?? 10, path)
     return {
+      ...(isError(results) ? { isError: true } : {}),
       content: [
         { type: 'text' as const, text: formatCommits(results, format) },
       ],
@@ -848,6 +851,7 @@ tool(
       response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
     const results = getStatus(path)
     return {
+      ...(isError(results) ? { isError: true } : {}),
       content: [{ type: 'text' as const, text: formatStatus(results, format) }],
     }
   },
@@ -881,6 +885,7 @@ tool(
       response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
     const results = getBranchInfo(path)
     return {
+      ...(isError(results) ? { isError: true } : {}),
       content: [
         { type: 'text' as const, text: formatBranchInfo(results, format) },
       ],
@@ -920,6 +925,7 @@ tool(
       response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
     const results = getDiffSummary(ref ?? 'HEAD', path)
     return {
+      ...(isError(results) ? { isError: true } : {}),
       content: [
         { type: 'text' as const, text: formatDiffSummary(results, format) },
       ],
@@ -955,6 +961,7 @@ tool(
       response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
     const results = getStashList(path)
     return {
+      ...(isError(results) ? { isError: true } : {}),
       content: [
         { type: 'text' as const, text: formatStashList(results, format) },
       ],
