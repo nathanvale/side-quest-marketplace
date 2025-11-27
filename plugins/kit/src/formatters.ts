@@ -4,12 +4,16 @@
  * Response formatters for MCP tool output in markdown and JSON formats.
  */
 
+import type { ASTSearchResult } from './ast/types.js'
 import type {
   ErrorResult,
+  FileContentResult,
+  FileTreeResult,
   GrepResult,
   KitResult,
   SemanticResult,
   SymbolsResult,
+  UsagesResult,
 } from './types.js'
 import { isError, ResponseFormat } from './types.js'
 
@@ -268,4 +272,314 @@ function getSymbolIcon(type: string): string {
     module: '📁',
   }
   return icons[type.toLowerCase()] ?? '•'
+}
+
+// ============================================================================
+// File Tree Formatters
+// ============================================================================
+
+/**
+ * Format file tree results for display.
+ * @param result - File tree result or error
+ * @param format - Output format (markdown or json)
+ * @returns Formatted string
+ */
+export function formatFileTreeResults(
+  result: KitResult<FileTreeResult>,
+  format: ResponseFormat = ResponseFormat.MARKDOWN,
+): string {
+  if (isError(result)) {
+    return formatError(result, format)
+  }
+
+  if (format === ResponseFormat.JSON) {
+    return JSON.stringify(result, null, 2)
+  }
+
+  // Markdown format
+  const lines: string[] = []
+
+  lines.push(`## File Tree`)
+  lines.push('')
+
+  if (result.subpath) {
+    lines.push(`Showing \`${result.subpath}\` in \`${result.path}\``)
+  } else {
+    lines.push(`Repository: \`${result.path}\``)
+  }
+
+  lines.push('')
+  lines.push(`**${result.count}** entries`)
+  lines.push('')
+
+  if (result.entries.length === 0) {
+    lines.push('_No files found._')
+    return lines.join('\n')
+  }
+
+  // Build tree structure
+  for (const entry of result.entries) {
+    const icon = entry.isDir ? '📁' : '📄'
+    const size = entry.isDir ? '' : ` (${formatBytes(entry.size)})`
+    lines.push(`- ${icon} \`${entry.path}\`${size}`)
+  }
+
+  return lines.join('\n')
+}
+
+/**
+ * Format bytes to human-readable size.
+ */
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${Number.parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`
+}
+
+// ============================================================================
+// File Content Formatters
+// ============================================================================
+
+/**
+ * Format file content results for display.
+ * @param result - File content result or error
+ * @param format - Output format (markdown or json)
+ * @returns Formatted string
+ */
+export function formatFileContentResults(
+  result: KitResult<FileContentResult>,
+  format: ResponseFormat = ResponseFormat.MARKDOWN,
+): string {
+  if (isError(result)) {
+    return formatError(result, format)
+  }
+
+  if (format === ResponseFormat.JSON) {
+    return JSON.stringify(result, null, 2)
+  }
+
+  // Markdown format
+  const lines: string[] = []
+
+  lines.push(`## File Contents`)
+  lines.push('')
+
+  const found = result.files.filter((f) => f.found).length
+  const notFound = result.files.length - found
+
+  lines.push(`**${found}** of **${result.count}** files retrieved`)
+
+  if (notFound > 0) {
+    lines.push(` (${notFound} not found)`)
+  }
+
+  lines.push('')
+
+  for (const file of result.files) {
+    lines.push(`### ${file.file}`)
+    lines.push('')
+
+    if (!file.found) {
+      lines.push(`> **Error:** ${file.error || 'File not found'}`)
+    } else {
+      // Detect language for syntax highlighting
+      const ext = file.file.split('.').pop() || ''
+      const lang = getLanguageForExtension(ext)
+
+      lines.push('```' + lang)
+      lines.push(truncate(file.content, 5000))
+      lines.push('```')
+    }
+
+    lines.push('')
+  }
+
+  return lines.join('\n')
+}
+
+/**
+ * Get syntax highlighting language for a file extension.
+ */
+function getLanguageForExtension(ext: string): string {
+  const langMap: Record<string, string> = {
+    ts: 'typescript',
+    tsx: 'tsx',
+    js: 'javascript',
+    jsx: 'jsx',
+    py: 'python',
+    rb: 'ruby',
+    go: 'go',
+    rs: 'rust',
+    java: 'java',
+    kt: 'kotlin',
+    swift: 'swift',
+    c: 'c',
+    cpp: 'cpp',
+    h: 'c',
+    hpp: 'cpp',
+    cs: 'csharp',
+    php: 'php',
+    sh: 'bash',
+    bash: 'bash',
+    zsh: 'bash',
+    json: 'json',
+    yaml: 'yaml',
+    yml: 'yaml',
+    toml: 'toml',
+    xml: 'xml',
+    html: 'html',
+    css: 'css',
+    scss: 'scss',
+    md: 'markdown',
+    sql: 'sql',
+  }
+  return langMap[ext.toLowerCase()] || ''
+}
+
+// ============================================================================
+// Usages Formatters
+// ============================================================================
+
+/**
+ * Format symbol usages results for display.
+ * @param result - Usages result or error
+ * @param format - Output format (markdown or json)
+ * @returns Formatted string
+ */
+export function formatUsagesResults(
+  result: KitResult<UsagesResult>,
+  format: ResponseFormat = ResponseFormat.MARKDOWN,
+): string {
+  if (isError(result)) {
+    return formatError(result, format)
+  }
+
+  if (format === ResponseFormat.JSON) {
+    return JSON.stringify(result, null, 2)
+  }
+
+  // Markdown format
+  const lines: string[] = []
+
+  lines.push(`## Symbol Definitions`)
+  lines.push('')
+  lines.push(
+    `Found **${result.count}** definition(s) for \`${result.symbolName}\``,
+  )
+  lines.push('')
+
+  if (result.usages.length === 0) {
+    lines.push('_No definitions found._')
+    return lines.join('\n')
+  }
+
+  for (const usage of result.usages) {
+    const icon = getSymbolTypeIcon(usage.type)
+    const lineInfo = usage.line ? `:${usage.line}` : ''
+
+    lines.push(`### ${icon} ${usage.name}`)
+    lines.push('')
+    lines.push(`- **Type:** ${usage.type}`)
+    lines.push(`- **File:** \`${usage.file}${lineInfo}\``)
+
+    if (usage.context) {
+      lines.push('')
+      lines.push('```')
+      lines.push(usage.context)
+      lines.push('```')
+    }
+
+    lines.push('')
+  }
+
+  return lines.join('\n')
+}
+
+/**
+ * Get an icon for a symbol type (usages variant).
+ */
+function getSymbolTypeIcon(type: string): string {
+  const icons: Record<string, string> = {
+    function: '📦',
+    class: '📚',
+    method: '🔧',
+    property: '🏷️',
+    variable: '📌',
+    constant: '🔒',
+    type: '📝',
+    interface: '📋',
+    enum: '📊',
+    module: '📁',
+  }
+  return icons[type.toLowerCase()] ?? '•'
+}
+
+// ============================================================================
+// AST Search Formatters
+// ============================================================================
+
+/**
+ * Format AST search results for display.
+ * @param result - AST search result or error
+ * @param format - Output format (markdown or json)
+ * @returns Formatted string
+ */
+export function formatAstSearchResults(
+  result: KitResult<ASTSearchResult>,
+  format: ResponseFormat = ResponseFormat.MARKDOWN,
+): string {
+  if (isError(result)) {
+    return formatError(result, format)
+  }
+
+  if (format === ResponseFormat.JSON) {
+    return JSON.stringify(result, null, 2)
+  }
+
+  // Markdown format
+  const lines: string[] = []
+
+  lines.push('## AST Search Results')
+  lines.push('')
+  lines.push(
+    `Found **${result.count}** matches for pattern \`${result.pattern}\` (${result.mode} mode)`,
+  )
+  lines.push('')
+
+  if (result.matches.length === 0) {
+    lines.push('_No matches found._')
+    return lines.join('\n')
+  }
+
+  // Group by file
+  const byFile = new Map<string, typeof result.matches>()
+  for (const match of result.matches) {
+    const existing = byFile.get(match.file) ?? []
+    existing.push(match)
+    byFile.set(match.file, existing)
+  }
+
+  for (const [file, matches] of byFile) {
+    lines.push(`### ${file}`)
+    lines.push('')
+
+    for (const m of matches) {
+      const ctx = m.context.parentFunction
+        ? ` in \`${m.context.parentFunction}\``
+        : m.context.parentClass
+          ? ` in class \`${m.context.parentClass}\``
+          : ''
+
+      lines.push(`- **L${m.line}** \`${m.nodeType}\`${ctx}`)
+      lines.push('```')
+      lines.push(truncate(m.text, 200))
+      lines.push('```')
+    }
+
+    lines.push('')
+  }
+
+  return lines.join('\n')
 }

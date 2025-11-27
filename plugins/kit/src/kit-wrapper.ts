@@ -9,9 +9,15 @@ import {
   type SpawnSyncOptionsWithStringEncoding,
   spawnSync,
 } from 'node:child_process'
-import { existsSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
+import {
+  ASTSearcher,
+  type ASTSearchOptions,
+  type ASTSearchResult,
+} from './ast/index.js'
 import {
   createErrorFromOutput,
   isSemanticUnavailableError,
@@ -20,13 +26,23 @@ import {
   SEMANTIC_INSTALL_HINT,
 } from './errors.js'
 import {
+  astLogger,
   createCorrelationId,
+  fileContentLogger,
+  fileTreeLogger,
   grepLogger,
   semanticLogger,
   symbolsLogger,
+  usagesLogger,
 } from './logger.js'
 import type {
   CodeSymbol,
+  FileContent,
+  FileContentOptions,
+  FileContentResult,
+  FileTreeEntry,
+  FileTreeOptions,
+  FileTreeResult,
   GrepMatch,
   GrepOptions,
   GrepResult,
@@ -36,12 +52,18 @@ import type {
   SemanticResult,
   SymbolsOptions,
   SymbolsResult,
+  SymbolUsage,
+  UsagesOptions,
+  UsagesResult,
 } from './types.js'
 import {
+  FILE_CONTENT_TIMEOUT,
+  FILE_TREE_TIMEOUT,
   GREP_TIMEOUT,
   getDefaultKitPath,
   SEMANTIC_TIMEOUT,
   SYMBOLS_TIMEOUT,
+  USAGES_TIMEOUT,
 } from './types.js'
 
 // ============================================================================
@@ -303,10 +325,15 @@ export function executeKitSymbols(
     return new KitError(KitErrorType.KitNotInstalled).toJSON()
   }
 
-  const { path = getDefaultKitPath(), pattern, symbolType } = options
+  const { path = getDefaultKitPath(), pattern, symbolType, file } = options
 
   // Build command arguments
   const args: string[] = ['symbols', path, '--format', 'json']
+
+  // Add file filter if specified (much faster than full repo scan)
+  if (file) {
+    args.push('--file', file)
+  }
 
   if (pattern) {
     // Kit symbols doesn't have a pattern filter, we'll filter in post
@@ -398,7 +425,9 @@ export function executeKitSymbols(
  */
 interface RawSemanticMatch {
   file: string
-  chunk: string
+  code: string
+  name?: string
+  type?: string
   score: number
   start_line?: number
   end_line?: number
@@ -429,6 +458,9 @@ export function executeKitSemantic(
     buildIndex = false,
   } = options
 
+  // Get global cache directory for this repo's vector index
+  const persistDir = getSemanticCacheDir(path)
+
   // Build command arguments
   const args: string[] = [
     'search-semantic',
@@ -440,6 +472,8 @@ export function executeKitSemantic(
     'json',
     '--chunk-by',
     chunkBy,
+    '--persist-dir',
+    persistDir,
   ]
 
   if (buildIndex) {
@@ -452,6 +486,7 @@ export function executeKitSemantic(
     path,
     topK,
     chunkBy,
+    persistDir,
   })
 
   try {
@@ -499,7 +534,7 @@ export function executeKitSemantic(
     // Transform to our format
     const matches: SemanticMatch[] = rawMatches.map((m) => ({
       file: m.file,
-      chunk: m.chunk,
+      chunk: m.code,
       score: m.score,
       startLine: m.start_line,
       endLine: m.end_line,
@@ -579,6 +614,433 @@ function fallbackToGrep(
 }
 
 // ============================================================================
+// File Tree Execution
+// ============================================================================
+
+/**
+ * Raw file tree entry as returned by Kit CLI.
+ */
+interface RawFileTreeEntry {
+  path: string
+  name: string
+  is_dir: boolean
+  size: number
+}
+
+/**
+ * Execute kit file-tree command.
+ * @param options - File tree options
+ * @returns File tree result or error
+ */
+export function executeKitFileTree(
+  options: FileTreeOptions,
+): KitResult<FileTreeResult> {
+  const cid = createCorrelationId()
+  const startTime = Date.now()
+
+  // Check if Kit is installed
+  if (!isKitInstalled()) {
+    fileTreeLogger.error('Kit not installed', { cid })
+    return new KitError(KitErrorType.KitNotInstalled).toJSON()
+  }
+
+  const { path = getDefaultKitPath(), subpath } = options
+
+  // Use temp file for JSON output
+  const tempFile = join(tmpdir(), `kit-file-tree-${cid}.json`)
+
+  // Build command arguments
+  const args: string[] = ['file-tree', path, '--output', tempFile]
+
+  if (subpath) {
+    args.push('--path', subpath)
+  }
+
+  fileTreeLogger.info('Executing kit file-tree', {
+    cid,
+    path,
+    subpath,
+    args,
+  })
+
+  try {
+    const result = executeKit(args, { timeout: FILE_TREE_TIMEOUT })
+
+    // Check for errors
+    if (result.exitCode !== 0) {
+      fileTreeLogger.error('File tree failed', {
+        cid,
+        exitCode: result.exitCode,
+        stderr: result.stderr,
+        durationMs: Date.now() - startTime,
+      })
+
+      // Clean up temp file if it exists
+      if (existsSync(tempFile)) {
+        rmSync(tempFile)
+      }
+
+      return createErrorFromOutput(result.stderr, result.exitCode).toJSON()
+    }
+
+    // Read and parse JSON output
+    if (!existsSync(tempFile)) {
+      fileTreeLogger.error('Temp file not created', { cid })
+      return new KitError(
+        KitErrorType.OutputParseError,
+        'File tree completed but output file not found',
+      ).toJSON()
+    }
+
+    const jsonContent = readFileSync(tempFile, 'utf8')
+    rmSync(tempFile) // Clean up
+
+    let rawEntries: RawFileTreeEntry[]
+    try {
+      rawEntries = JSON.parse(jsonContent)
+    } catch {
+      fileTreeLogger.error('Failed to parse file tree output', {
+        cid,
+        jsonContent,
+      })
+      return new KitError(
+        KitErrorType.OutputParseError,
+        'Failed to parse file tree JSON output',
+      ).toJSON()
+    }
+
+    // Transform to our format
+    const entries: FileTreeEntry[] = rawEntries.map((e) => ({
+      path: e.path,
+      name: e.name,
+      isDir: e.is_dir,
+      size: e.size,
+    }))
+
+    fileTreeLogger.info('File tree completed', {
+      cid,
+      entryCount: entries.length,
+      durationMs: Date.now() - startTime,
+    })
+
+    return {
+      count: entries.length,
+      entries,
+      path,
+      subpath,
+    }
+  } catch (error) {
+    // Clean up temp file if it exists
+    if (existsSync(tempFile)) {
+      rmSync(tempFile)
+    }
+
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    fileTreeLogger.error('File tree threw exception', { cid, error: message })
+    return new KitError(KitErrorType.KitCommandFailed, message).toJSON()
+  }
+}
+
+// ============================================================================
+// File Content Execution
+// ============================================================================
+
+/**
+ * Execute kit file-content command.
+ * @param options - File content options
+ * @returns File content result or error
+ */
+export function executeKitFileContent(
+  options: FileContentOptions,
+): KitResult<FileContentResult> {
+  const cid = createCorrelationId()
+  const startTime = Date.now()
+
+  // Check if Kit is installed
+  if (!isKitInstalled()) {
+    fileContentLogger.error('Kit not installed', { cid })
+    return new KitError(KitErrorType.KitNotInstalled).toJSON()
+  }
+
+  const { path = getDefaultKitPath(), filePaths } = options
+
+  if (!filePaths || filePaths.length === 0) {
+    return new KitError(
+      KitErrorType.InvalidInput,
+      'At least one file path is required',
+    ).toJSON()
+  }
+
+  fileContentLogger.info('Executing kit file-content', {
+    cid,
+    path,
+    fileCount: filePaths.length,
+  })
+
+  // Fetch each file individually to get proper error handling per file
+  const files: FileContent[] = []
+
+  for (const filePath of filePaths) {
+    const args: string[] = ['file-content', path, filePath]
+
+    try {
+      const result = executeKit(args, { timeout: FILE_CONTENT_TIMEOUT })
+
+      if (result.exitCode !== 0) {
+        // File not found or other error
+        files.push({
+          file: filePath,
+          content: '',
+          found: false,
+          error: result.stderr.trim() || 'File not found',
+        })
+      } else {
+        files.push({
+          file: filePath,
+          content: result.stdout,
+          found: true,
+        })
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      fileContentLogger.warn('Failed to fetch file content', {
+        cid,
+        filePath,
+        error: message,
+      })
+      files.push({
+        file: filePath,
+        content: '',
+        found: false,
+        error: message,
+      })
+    }
+  }
+
+  fileContentLogger.info('File content completed', {
+    cid,
+    fileCount: files.length,
+    foundCount: files.filter((f) => f.found).length,
+    durationMs: Date.now() - startTime,
+  })
+
+  return {
+    count: files.length,
+    files,
+    path,
+  }
+}
+
+// ============================================================================
+// Symbol Usages Execution
+// ============================================================================
+
+/**
+ * Raw symbol usage as returned by Kit CLI.
+ */
+interface RawSymbolUsage {
+  file: string
+  type: string
+  name: string
+  line: number | null
+  context: string | null
+}
+
+/**
+ * Execute kit usages command to find symbol definitions.
+ * @param options - Usages options
+ * @returns Usages result or error
+ */
+export function executeKitUsages(
+  options: UsagesOptions,
+): KitResult<UsagesResult> {
+  const cid = createCorrelationId()
+  const startTime = Date.now()
+
+  // Check if Kit is installed
+  if (!isKitInstalled()) {
+    usagesLogger.error('Kit not installed', { cid })
+    return new KitError(KitErrorType.KitNotInstalled).toJSON()
+  }
+
+  const { path = getDefaultKitPath(), symbolName, symbolType } = options
+
+  if (!symbolName || symbolName.trim() === '') {
+    return new KitError(
+      KitErrorType.InvalidInput,
+      'Symbol name is required',
+    ).toJSON()
+  }
+
+  // Use temp file for JSON output
+  const tempFile = join(tmpdir(), `kit-usages-${cid}.json`)
+
+  // Build command arguments
+  const args: string[] = [
+    'usages',
+    path,
+    symbolName.trim(),
+    '--output',
+    tempFile,
+  ]
+
+  if (symbolType) {
+    args.push('--type', symbolType)
+  }
+
+  usagesLogger.info('Executing kit usages', {
+    cid,
+    path,
+    symbolName,
+    symbolType,
+    args,
+  })
+
+  try {
+    const result = executeKit(args, { timeout: USAGES_TIMEOUT })
+
+    // Check for errors
+    if (result.exitCode !== 0) {
+      usagesLogger.error('Usages failed', {
+        cid,
+        exitCode: result.exitCode,
+        stderr: result.stderr,
+        durationMs: Date.now() - startTime,
+      })
+
+      // Clean up temp file if it exists
+      if (existsSync(tempFile)) {
+        rmSync(tempFile)
+      }
+
+      return createErrorFromOutput(result.stderr, result.exitCode).toJSON()
+    }
+
+    // Read and parse JSON output
+    if (!existsSync(tempFile)) {
+      usagesLogger.error('Temp file not created', { cid })
+      return new KitError(
+        KitErrorType.OutputParseError,
+        'Usages completed but output file not found',
+      ).toJSON()
+    }
+
+    const jsonContent = readFileSync(tempFile, 'utf8')
+    rmSync(tempFile) // Clean up
+
+    let rawUsages: RawSymbolUsage[]
+    try {
+      rawUsages = JSON.parse(jsonContent)
+    } catch {
+      usagesLogger.error('Failed to parse usages output', {
+        cid,
+        jsonContent,
+      })
+      return new KitError(
+        KitErrorType.OutputParseError,
+        'Failed to parse usages JSON output',
+      ).toJSON()
+    }
+
+    // Transform to our format
+    const usages: SymbolUsage[] = rawUsages.map((u) => ({
+      file: u.file,
+      type: u.type,
+      name: u.name,
+      line: u.line,
+      context: u.context,
+    }))
+
+    usagesLogger.info('Usages completed', {
+      cid,
+      symbolName,
+      usageCount: usages.length,
+      durationMs: Date.now() - startTime,
+    })
+
+    return {
+      count: usages.length,
+      usages,
+      symbolName: symbolName.trim(),
+      path,
+    }
+  } catch (error) {
+    // Clean up temp file if it exists
+    if (existsSync(tempFile)) {
+      rmSync(tempFile)
+    }
+
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    usagesLogger.error('Usages threw exception', { cid, error: message })
+    return new KitError(KitErrorType.KitCommandFailed, message).toJSON()
+  }
+}
+
+// ============================================================================
+// AST Search Execution (tree-sitter powered)
+// ============================================================================
+
+/** Default timeout for AST search operations (ms) */
+const AST_SEARCH_TIMEOUT = 60000
+
+/**
+ * Execute AST-based code search using tree-sitter.
+ *
+ * Unlike other Kit commands, this uses an internal tree-sitter
+ * implementation rather than shelling out to the Kit CLI.
+ *
+ * @param options - AST search options
+ * @returns AST search result or error
+ */
+export async function executeAstSearch(
+  options: ASTSearchOptions,
+): Promise<KitResult<ASTSearchResult>> {
+  const cid = createCorrelationId()
+  const startTime = Date.now()
+
+  const { pattern, mode, filePattern, path, maxResults } = options
+
+  astLogger.info('Executing AST search', {
+    cid,
+    pattern,
+    mode,
+    filePattern,
+    path,
+    maxResults,
+  })
+
+  try {
+    const searcher = new ASTSearcher(path)
+
+    // Use Promise.race with timeout
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(
+        () => reject(new Error('AST search timed out')),
+        AST_SEARCH_TIMEOUT,
+      )
+    })
+
+    const result = await Promise.race([
+      searcher.searchPattern(options),
+      timeoutPromise,
+    ])
+
+    astLogger.info('AST search completed', {
+      cid,
+      pattern,
+      matchCount: result.count,
+      durationMs: Date.now() - startTime,
+    })
+
+    return result
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    astLogger.error('AST search failed', { cid, error: message })
+    return new KitError(KitErrorType.KitCommandFailed, message).toJSON()
+  }
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 
@@ -594,4 +1056,46 @@ function globToRegex(pattern: string): RegExp {
     .replace(/{{GLOBSTAR}}/g, '.*')
 
   return new RegExp(escaped)
+}
+
+/**
+ * Environment variable to override the global cache directory.
+ * Defaults to ~/.cache/kit if not set.
+ */
+const KIT_CACHE_DIR_ENV = 'KIT_CACHE_DIR'
+
+/**
+ * Get the base cache directory for Kit vector indexes.
+ * Uses KIT_CACHE_DIR env var if set, otherwise ~/.cache/kit
+ */
+function getKitCacheDir(): string {
+  return process.env[KIT_CACHE_DIR_ENV] || join(homedir(), '.cache', 'kit')
+}
+
+/**
+ * Generate a short hash of a path for use as a cache subdirectory name.
+ * Uses first 12 characters of SHA256 hash for uniqueness while staying readable.
+ */
+function hashPath(repoPath: string): string {
+  return createHash('sha256').update(repoPath).digest('hex').slice(0, 12)
+}
+
+/**
+ * Get the persist directory for a repo's semantic search vector index.
+ * Creates the directory if it doesn't exist.
+ *
+ * Structure: ~/.cache/kit/vector_db/<path-hash>/
+ *
+ * @param repoPath - Absolute path to the repository
+ * @returns Path to the persist directory for this repo's vector index
+ */
+export function getSemanticCacheDir(repoPath: string): string {
+  const cacheDir = join(getKitCacheDir(), 'vector_db', hashPath(repoPath))
+
+  // Ensure directory exists
+  if (!existsSync(cacheDir)) {
+    mkdirSync(cacheDir, { recursive: true })
+  }
+
+  return cacheDir
 }

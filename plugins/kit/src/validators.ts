@@ -481,6 +481,7 @@ export function validateSymbolsInputs(inputs: {
   path?: string
   pattern?: string
   symbolType?: string
+  file?: string
 }): {
   valid: boolean
   errors: string[]
@@ -488,6 +489,7 @@ export function validateSymbolsInputs(inputs: {
     path: string
     pattern?: string
     symbolType?: string
+    file?: string
   }
 } {
   const errors: string[] = []
@@ -496,6 +498,18 @@ export function validateSymbolsInputs(inputs: {
   const pathResult = validatePath(inputs.path || getDefaultKitPath())
   if (!pathResult.valid) {
     errors.push(pathResult.error!)
+  }
+
+  // Validate file (specific file to extract symbols from)
+  let validatedFile: string | undefined
+  if (inputs.file) {
+    // File path is relative to repo, just sanitize
+    const trimmed = inputs.file.trim()
+    if (trimmed.includes('..')) {
+      errors.push('File path cannot contain path traversal sequences')
+    } else {
+      validatedFile = trimmed
+    }
   }
 
   // Validate file pattern (optional glob)
@@ -543,6 +557,279 @@ export function validateSymbolsInputs(inputs: {
       path: pathResult.path!,
       pattern: validatedPattern,
       symbolType: validatedSymbolType,
+      file: validatedFile,
+    },
+  }
+}
+
+/**
+ * Validate all inputs for a file tree operation.
+ * @param inputs - File tree inputs to validate
+ * @returns Combined validation result
+ */
+export function validateFileTreeInputs(inputs: {
+  path?: string
+  subpath?: string
+}): {
+  valid: boolean
+  errors: string[]
+  validated?: {
+    path: string
+    subpath?: string
+  }
+} {
+  const errors: string[] = []
+
+  // Validate path
+  const pathResult = validatePath(inputs.path || getDefaultKitPath())
+  if (!pathResult.valid) {
+    errors.push(pathResult.error!)
+  }
+
+  // Validate subpath (relative path within repo)
+  let validatedSubpath: string | undefined
+  if (inputs.subpath) {
+    const trimmed = inputs.subpath.trim()
+    if (trimmed.includes('..')) {
+      errors.push('Subpath cannot contain path traversal sequences')
+    } else {
+      validatedSubpath = trimmed
+    }
+  }
+
+  if (errors.length > 0) {
+    return { valid: false, errors }
+  }
+
+  return {
+    valid: true,
+    errors: [],
+    validated: {
+      path: pathResult.path!,
+      subpath: validatedSubpath,
+    },
+  }
+}
+
+/**
+ * Validate all inputs for a file content operation.
+ * @param inputs - File content inputs to validate
+ * @returns Combined validation result
+ */
+export function validateFileContentInputs(inputs: {
+  path?: string
+  filePaths: string[]
+}): {
+  valid: boolean
+  errors: string[]
+  validated?: {
+    path: string
+    filePaths: string[]
+  }
+} {
+  const errors: string[] = []
+
+  // Validate path
+  const pathResult = validatePath(inputs.path || getDefaultKitPath())
+  if (!pathResult.valid) {
+    errors.push(pathResult.error!)
+  }
+
+  // Validate file paths
+  if (!inputs.filePaths || inputs.filePaths.length === 0) {
+    errors.push('At least one file path is required')
+  } else {
+    const validatedPaths: string[] = []
+    for (const filePath of inputs.filePaths) {
+      const trimmed = filePath.trim()
+      if (!trimmed) {
+        errors.push('File paths cannot be empty')
+      } else if (trimmed.includes('..')) {
+        errors.push(
+          `File path "${trimmed}" cannot contain path traversal sequences`,
+        )
+      } else {
+        validatedPaths.push(trimmed)
+      }
+    }
+
+    // Check for reasonable limit
+    if (validatedPaths.length > 20) {
+      errors.push('Cannot request more than 20 files at once')
+    }
+  }
+
+  if (errors.length > 0) {
+    return { valid: false, errors }
+  }
+
+  return {
+    valid: true,
+    errors: [],
+    validated: {
+      path: pathResult.path!,
+      filePaths: inputs.filePaths.map((p) => p.trim()),
+    },
+  }
+}
+
+/**
+ * Validate all inputs for a symbol usages operation.
+ * @param inputs - Usages inputs to validate
+ * @returns Combined validation result
+ */
+export function validateUsagesInputs(inputs: {
+  path?: string
+  symbolName: string
+  symbolType?: string
+}): {
+  valid: boolean
+  errors: string[]
+  validated?: {
+    path: string
+    symbolName: string
+    symbolType?: string
+  }
+} {
+  const errors: string[] = []
+
+  // Validate path
+  const pathResult = validatePath(inputs.path || getDefaultKitPath())
+  if (!pathResult.valid) {
+    errors.push(pathResult.error!)
+  }
+
+  // Validate symbol name
+  if (!inputs.symbolName || inputs.symbolName.trim() === '') {
+    errors.push('Symbol name is required')
+  }
+
+  // Validate symbol type (optional)
+  let validatedSymbolType: string | undefined
+  if (inputs.symbolType) {
+    const sanitized = inputs.symbolType.trim().toLowerCase()
+    const validTypes = [
+      'function',
+      'class',
+      'variable',
+      'type',
+      'interface',
+      'method',
+      'property',
+      'constant',
+    ]
+    if (sanitized && !validTypes.includes(sanitized)) {
+      errors.push(
+        `Invalid symbol type: ${inputs.symbolType}. Valid types: ${validTypes.join(', ')}`,
+      )
+    } else {
+      validatedSymbolType = sanitized || undefined
+    }
+  }
+
+  if (errors.length > 0) {
+    return { valid: false, errors }
+  }
+
+  return {
+    valid: true,
+    errors: [],
+    validated: {
+      path: pathResult.path!,
+      symbolName: inputs.symbolName.trim(),
+      symbolType: validatedSymbolType,
+    },
+  }
+}
+
+/**
+ * Validate all inputs for an AST search operation.
+ * @param inputs - AST search inputs to validate
+ * @returns Combined validation result
+ */
+export function validateAstSearchInputs(inputs: {
+  pattern: string
+  mode?: string
+  filePattern?: string
+  path?: string
+  maxResults?: number
+}): {
+  valid: boolean
+  errors: string[]
+  validated?: {
+    pattern: string
+    mode: 'simple' | 'pattern'
+    filePattern?: string
+    path: string
+    maxResults: number
+  }
+} {
+  const errors: string[] = []
+
+  // Validate pattern
+  if (!inputs.pattern || inputs.pattern.trim() === '') {
+    errors.push('Pattern cannot be empty')
+  }
+
+  // Validate mode
+  const validModes = ['simple', 'pattern']
+  const mode = (inputs.mode || 'simple').toLowerCase()
+  if (!validModes.includes(mode)) {
+    errors.push(
+      `Invalid mode: ${inputs.mode}. Valid modes: ${validModes.join(', ')}`,
+    )
+  }
+
+  // Validate pattern mode JSON if mode is 'pattern'
+  if (mode === 'pattern' && inputs.pattern) {
+    try {
+      JSON.parse(inputs.pattern)
+    } catch {
+      // Allow non-JSON patterns - they'll be treated as textMatch
+    }
+  }
+
+  // Validate file pattern (optional glob)
+  let validatedFilePattern: string | undefined
+  if (inputs.filePattern) {
+    const patternResult = validateGlob(inputs.filePattern)
+    if (!patternResult.valid) {
+      errors.push(`File pattern: ${patternResult.error}`)
+    } else {
+      validatedFilePattern = patternResult.pattern
+    }
+  }
+
+  // Validate path
+  const pathResult = validatePath(inputs.path || getDefaultKitPath())
+  if (!pathResult.valid) {
+    errors.push(pathResult.error!)
+  }
+
+  // Validate maxResults
+  const maxResultsResult = validatePositiveInt(inputs.maxResults, {
+    name: 'maxResults',
+    min: 1,
+    max: 500,
+    defaultValue: 100,
+  })
+  if (!maxResultsResult.valid) {
+    errors.push(maxResultsResult.error!)
+  }
+
+  if (errors.length > 0) {
+    return { valid: false, errors }
+  }
+
+  return {
+    valid: true,
+    errors: [],
+    validated: {
+      pattern: inputs.pattern.trim(),
+      mode: mode as 'simple' | 'pattern',
+      filePattern: validatedFilePattern,
+      path: pathResult.path!,
+      maxResults: maxResultsResult.value!,
     },
   }
 }

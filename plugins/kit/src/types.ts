@@ -164,6 +164,136 @@ export interface SymbolsOptions {
   pattern?: string
   /** Filter by symbol type */
   symbolType?: string
+  /** Extract symbols from a specific file only */
+  file?: string
+}
+
+// ============================================================================
+// File Tree Types
+// ============================================================================
+
+/**
+ * A single file tree entry.
+ */
+export interface FileTreeEntry {
+  /** Relative path from repository root */
+  path: string
+  /** Entry name (file or directory name) */
+  name: string
+  /** Whether this is a directory */
+  isDir: boolean
+  /** File size in bytes (0 for directories) */
+  size: number
+}
+
+/**
+ * Result of a file tree operation.
+ */
+export interface FileTreeResult {
+  /** Total number of entries */
+  count: number
+  /** Array of file tree entries */
+  entries: FileTreeEntry[]
+  /** Repository path */
+  path: string
+  /** Subdirectory filter if applied */
+  subpath?: string
+}
+
+/**
+ * Options for file tree retrieval.
+ */
+export interface FileTreeOptions {
+  /** Repository path */
+  path?: string
+  /** Subdirectory to show tree for */
+  subpath?: string
+}
+
+// ============================================================================
+// File Content Types
+// ============================================================================
+
+/**
+ * Content of a single file.
+ */
+export interface FileContent {
+  /** Relative file path */
+  file: string
+  /** File content */
+  content: string
+  /** Whether file was found */
+  found: boolean
+  /** Error message if not found */
+  error?: string
+}
+
+/**
+ * Result of a file content operation.
+ */
+export interface FileContentResult {
+  /** Number of files requested */
+  count: number
+  /** Array of file contents */
+  files: FileContent[]
+  /** Repository path */
+  path: string
+}
+
+/**
+ * Options for file content retrieval.
+ */
+export interface FileContentOptions {
+  /** Repository path */
+  path?: string
+  /** File paths to retrieve (relative to repository root) */
+  filePaths: string[]
+}
+
+// ============================================================================
+// Symbol Usages Types
+// ============================================================================
+
+/**
+ * A symbol usage/definition found by Kit.
+ */
+export interface SymbolUsage {
+  /** File containing the symbol */
+  file: string
+  /** Symbol type (function, class, variable, etc.) */
+  type: string
+  /** Symbol name */
+  name: string
+  /** Line number (may be null in current Kit version) */
+  line: number | null
+  /** Context around the usage */
+  context: string | null
+}
+
+/**
+ * Result of a symbol usages search.
+ */
+export interface UsagesResult {
+  /** Number of usages found */
+  count: number
+  /** Array of symbol usages */
+  usages: SymbolUsage[]
+  /** Symbol name searched for */
+  symbolName: string
+  /** Repository path searched */
+  path: string
+}
+
+/**
+ * Options for symbol usages search.
+ */
+export interface UsagesOptions {
+  /** Repository path */
+  path?: string
+  /** Symbol name to find usages for */
+  symbolName: string
+  /** Filter by symbol type (function, class, etc.) */
+  symbolType?: string
 }
 
 // ============================================================================
@@ -220,6 +350,15 @@ export const SEMANTIC_TIMEOUT = 60000
 
 /** Default timeout for symbol extraction (ms) */
 export const SYMBOLS_TIMEOUT = 45000
+
+/** Default timeout for file tree operations (ms) */
+export const FILE_TREE_TIMEOUT = 30000
+
+/** Default timeout for file content operations (ms) */
+export const FILE_CONTENT_TIMEOUT = 15000
+
+/** Default timeout for symbol usages operations (ms) */
+export const USAGES_TIMEOUT = 45000
 
 /** Default max results for grep */
 export const DEFAULT_MAX_RESULTS = 100

@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'bun:test'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import {
   // Logger
   createCorrelationId,
@@ -9,6 +11,7 @@ import {
   ERROR_MESSAGES,
   GREP_TIMEOUT,
   getDefaultKitPath,
+  getSemanticCacheDir,
   isError,
   isSemanticUnavailableError,
   KIT_DEFAULT_PATH_ENV,
@@ -78,6 +81,28 @@ describe('types', () => {
       } else {
         delete process.env.KIT_DEFAULT_PATH
       }
+    })
+
+    test('getSemanticCacheDir returns global cache path', () => {
+      const cacheDir = getSemanticCacheDir('/some/repo/path')
+      // Should be under ~/.cache/kit/vector_db/
+      expect(cacheDir).toContain(join(homedir(), '.cache', 'kit', 'vector_db'))
+      // Should have a hash suffix (12 hex chars)
+      const parts = cacheDir.split('/')
+      const hashPart = parts[parts.length - 1]
+      expect(hashPart).toMatch(/^[a-f0-9]{12}$/)
+    })
+
+    test('getSemanticCacheDir is deterministic for same path', () => {
+      const dir1 = getSemanticCacheDir('/my/repo')
+      const dir2 = getSemanticCacheDir('/my/repo')
+      expect(dir1).toBe(dir2)
+    })
+
+    test('getSemanticCacheDir differs for different paths', () => {
+      const dir1 = getSemanticCacheDir('/repo/one')
+      const dir2 = getSemanticCacheDir('/repo/two')
+      expect(dir1).not.toBe(dir2)
     })
 
     test('timeout values are reasonable', () => {

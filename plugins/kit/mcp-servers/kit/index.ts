@@ -10,22 +10,40 @@
 import { startServer, tool, z } from 'mcpez'
 
 import {
+  createCorrelationId,
+  executeAstSearch,
+  executeKitFileContent,
+  executeKitFileTree,
   executeKitGrep,
   executeKitSemantic,
   executeKitSymbols,
+  executeKitUsages,
+  formatAstSearchResults,
+  formatFileContentResults,
+  formatFileTreeResults,
   formatGrepResults,
   formatSemanticResults,
   formatSymbolsResults,
+  formatUsagesResults,
+  getKitLogger,
   initLogger,
   isError,
   ResponseFormat,
+  SearchMode,
+  validateAstSearchInputs,
+  validateFileContentInputs,
+  validateFileTreeInputs,
   validateGrepInputs,
   validateSemanticInputs,
   validateSymbolsInputs,
+  validateUsagesInputs,
 } from '../../src/index.js'
 
 // Initialize logging
 initLogger().catch(console.error)
+
+/** MCP layer logger for request/response tracking */
+const mcpLogger = getKitLogger()
 
 // ============================================================================
 // Kit Grep Tool
@@ -94,6 +112,14 @@ Results include file paths, line numbers, and matched content.`,
     directory?: string
     response_format?: string
   }) => {
+    const mcpCid = createCorrelationId()
+    const mcpStartTime = Date.now()
+    mcpLogger.info('MCP tool request', {
+      cid: mcpCid,
+      tool: 'kit_grep',
+      args: { pattern: args.pattern, path: args.path },
+    })
+
     // Validate inputs
     const validation = validateGrepInputs({
       pattern: args.pattern,
@@ -104,6 +130,11 @@ Results include file paths, line numbers, and matched content.`,
     })
 
     if (!validation.valid) {
+      mcpLogger.warn('MCP validation failed', {
+        cid: mcpCid,
+        tool: 'kit_grep',
+        errors: validation.errors,
+      })
       return {
         isError: true,
         content: [
@@ -133,6 +164,14 @@ Results include file paths, line numbers, and matched content.`,
       args.response_format === 'json'
         ? ResponseFormat.JSON
         : ResponseFormat.MARKDOWN
+
+    const mcpDuration = Date.now() - mcpStartTime
+    mcpLogger.info('MCP tool response', {
+      cid: mcpCid,
+      tool: 'kit_grep',
+      success: !isError(result),
+      durationMs: mcpDuration,
+    })
 
     return {
       ...(isError(result) ? { isError: true } : {}),
@@ -203,6 +242,14 @@ To enable: uv tool install 'cased-kit[ml]'`,
     build_index?: boolean
     response_format?: string
   }) => {
+    const mcpCid = createCorrelationId()
+    const mcpStartTime = Date.now()
+    mcpLogger.info('MCP tool request', {
+      cid: mcpCid,
+      tool: 'kit_semantic',
+      args: { query: args.query, path: args.path },
+    })
+
     // Validate inputs
     const validation = validateSemanticInputs({
       query: args.query,
@@ -211,6 +258,11 @@ To enable: uv tool install 'cased-kit[ml]'`,
     })
 
     if (!validation.valid) {
+      mcpLogger.warn('MCP validation failed', {
+        cid: mcpCid,
+        tool: 'kit_semantic',
+        errors: validation.errors,
+      })
       return {
         isError: true,
         content: [
@@ -239,6 +291,14 @@ To enable: uv tool install 'cased-kit[ml]'`,
         ? ResponseFormat.JSON
         : ResponseFormat.MARKDOWN
 
+    const mcpDuration = Date.now() - mcpStartTime
+    mcpLogger.info('MCP tool response', {
+      cid: mcpCid,
+      tool: 'kit_semantic',
+      success: !isError(result),
+      durationMs: mcpDuration,
+    })
+
     return {
       ...(isError(result) ? { isError: true } : {}),
       content: [
@@ -260,13 +320,21 @@ tool(
 Lists all defined symbols with their locations. Great for:
 - Getting an overview of code structure
 - Finding function and class definitions
-- Understanding module APIs`,
+- Understanding module APIs
+
+TIP: Use the 'file' parameter to extract symbols from a specific file (much faster than scanning entire repo).`,
     inputSchema: {
       path: z
         .string()
         .optional()
         .describe(
           'Repository path to analyze (default: current directory, or KIT_DEFAULT_PATH env var)',
+        ),
+      file: z
+        .string()
+        .optional()
+        .describe(
+          'Extract symbols from a specific file only (relative to repo root). Much faster than full repo scan.',
         ),
       pattern: z
         .string()
@@ -299,18 +367,33 @@ Lists all defined symbols with their locations. Great for:
   },
   async (args: {
     path?: string
+    file?: string
     pattern?: string
     symbol_type?: string
     response_format?: string
   }) => {
+    const mcpCid = createCorrelationId()
+    const mcpStartTime = Date.now()
+    mcpLogger.info('MCP tool request', {
+      cid: mcpCid,
+      tool: 'kit_symbols',
+      args: { path: args.path, file: args.file },
+    })
+
     // Validate inputs
     const validation = validateSymbolsInputs({
       path: args.path,
+      file: args.file,
       pattern: args.pattern,
       symbolType: args.symbol_type,
     })
 
     if (!validation.valid) {
+      mcpLogger.warn('MCP validation failed', {
+        cid: mcpCid,
+        tool: 'kit_symbols',
+        errors: validation.errors,
+      })
       return {
         isError: true,
         content: [
@@ -327,6 +410,7 @@ Lists all defined symbols with their locations. Great for:
     // Execute symbols extraction
     const result = executeKitSymbols({
       path: validated!.path,
+      file: validated!.file,
       pattern: validated!.pattern,
       symbolType: validated!.symbolType,
     })
@@ -337,10 +421,496 @@ Lists all defined symbols with their locations. Great for:
         ? ResponseFormat.JSON
         : ResponseFormat.MARKDOWN
 
+    const mcpDuration = Date.now() - mcpStartTime
+    mcpLogger.info('MCP tool response', {
+      cid: mcpCid,
+      tool: 'kit_symbols',
+      success: !isError(result),
+      durationMs: mcpDuration,
+    })
+
     return {
       ...(isError(result) ? { isError: true } : {}),
       content: [
         { type: 'text' as const, text: formatSymbolsResults(result, format) },
+      ],
+    }
+  },
+)
+
+// ============================================================================
+// Kit File Tree Tool
+// ============================================================================
+
+tool(
+  'kit_file_tree',
+  {
+    description: `Get the file tree structure of a repository.
+
+Returns all files and directories with their sizes. Great for:
+- Understanding repository structure
+- Finding files by location
+- Exploring unfamiliar codebases
+
+Use 'subpath' to focus on a specific directory.`,
+    inputSchema: {
+      path: z
+        .string()
+        .optional()
+        .describe(
+          'Repository path (default: current directory, or KIT_DEFAULT_PATH env var)',
+        ),
+      subpath: z
+        .string()
+        .optional()
+        .describe(
+          'Subdirectory to show tree for (relative to repo root). Example: "src/components"',
+        ),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  async (args: {
+    path?: string
+    subpath?: string
+    response_format?: string
+  }) => {
+    const mcpCid = createCorrelationId()
+    const mcpStartTime = Date.now()
+    mcpLogger.info('MCP tool request', {
+      cid: mcpCid,
+      tool: 'kit_file_tree',
+      args: { path: args.path },
+    })
+
+    // Validate inputs
+    const validation = validateFileTreeInputs({
+      path: args.path,
+      subpath: args.subpath,
+    })
+
+    if (!validation.valid) {
+      mcpLogger.warn('MCP validation failed', {
+        cid: mcpCid,
+        tool: 'kit_file_tree',
+        errors: validation.errors,
+      })
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text' as const,
+            text: `**Validation Error:**\n\n${validation.errors.join('\n')}`,
+          },
+        ],
+      }
+    }
+
+    const { validated } = validation
+
+    // Execute file tree
+    const result = executeKitFileTree({
+      path: validated!.path,
+      subpath: validated!.subpath,
+    })
+
+    // Format output
+    const format =
+      args.response_format === 'json'
+        ? ResponseFormat.JSON
+        : ResponseFormat.MARKDOWN
+
+    const mcpDuration = Date.now() - mcpStartTime
+    mcpLogger.info('MCP tool response', {
+      cid: mcpCid,
+      tool: 'kit_file_tree',
+      success: !isError(result),
+      durationMs: mcpDuration,
+    })
+
+    return {
+      ...(isError(result) ? { isError: true } : {}),
+      content: [
+        { type: 'text' as const, text: formatFileTreeResults(result, format) },
+      ],
+    }
+  },
+)
+
+// ============================================================================
+// Kit File Content Tool
+// ============================================================================
+
+tool(
+  'kit_file_content',
+  {
+    description: `Get the content of one or more files in the repository.
+
+Retrieves file contents with proper error handling for missing files. Great for:
+- Reading multiple related files at once
+- Examining implementation details
+- Code review workflows
+
+Supports up to 20 files per request.`,
+    inputSchema: {
+      path: z
+        .string()
+        .optional()
+        .describe(
+          'Repository path (default: current directory, or KIT_DEFAULT_PATH env var)',
+        ),
+      file_paths: z
+        .array(z.string())
+        .describe(
+          'File paths to retrieve (relative to repo root). Example: ["src/index.ts", "package.json"]',
+        ),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  async (args: {
+    path?: string
+    file_paths: string[]
+    response_format?: string
+  }) => {
+    const mcpCid = createCorrelationId()
+    const mcpStartTime = Date.now()
+    mcpLogger.info('MCP tool request', {
+      cid: mcpCid,
+      tool: 'kit_file_content',
+      args: { path: args.path },
+    })
+
+    // Validate inputs
+    const validation = validateFileContentInputs({
+      path: args.path,
+      filePaths: args.file_paths,
+    })
+
+    if (!validation.valid) {
+      mcpLogger.warn('MCP validation failed', {
+        cid: mcpCid,
+        tool: 'kit_file_content',
+        errors: validation.errors,
+      })
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text' as const,
+            text: `**Validation Error:**\n\n${validation.errors.join('\n')}`,
+          },
+        ],
+      }
+    }
+
+    const { validated } = validation
+
+    // Execute file content retrieval
+    const result = executeKitFileContent({
+      path: validated!.path,
+      filePaths: validated!.filePaths,
+    })
+
+    // Format output
+    const format =
+      args.response_format === 'json'
+        ? ResponseFormat.JSON
+        : ResponseFormat.MARKDOWN
+
+    const mcpDuration = Date.now() - mcpStartTime
+    mcpLogger.info('MCP tool response', {
+      cid: mcpCid,
+      tool: 'kit_file_content',
+      success: !isError(result),
+      durationMs: mcpDuration,
+    })
+
+    return {
+      ...(isError(result) ? { isError: true } : {}),
+      content: [
+        {
+          type: 'text' as const,
+          text: formatFileContentResults(result, format),
+        },
+      ],
+    }
+  },
+)
+
+// ============================================================================
+// Kit Usages Tool
+// ============================================================================
+
+tool(
+  'kit_usages',
+  {
+    description: `Find where a symbol is defined in the codebase (AST-powered).
+
+Uses tree-sitter AST parsing to locate symbol definitions. Great for:
+- Finding where a function/class is declared
+- Locating type definitions
+- Understanding code structure
+
+NOTE: This finds DEFINITIONS, not all references/usages.`,
+    inputSchema: {
+      path: z
+        .string()
+        .optional()
+        .describe(
+          'Repository path (default: current directory, or KIT_DEFAULT_PATH env var)',
+        ),
+      symbol_name: z
+        .string()
+        .describe(
+          'Name of the symbol to find definitions for. Example: "AuthService"',
+        ),
+      symbol_type: z
+        .enum([
+          'function',
+          'class',
+          'variable',
+          'type',
+          'interface',
+          'method',
+          'property',
+          'constant',
+        ])
+        .optional()
+        .describe('Filter by symbol type'),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  async (args: {
+    path?: string
+    symbol_name: string
+    symbol_type?: string
+    response_format?: string
+  }) => {
+    const mcpCid = createCorrelationId()
+    const mcpStartTime = Date.now()
+    mcpLogger.info('MCP tool request', {
+      cid: mcpCid,
+      tool: 'kit_usages',
+      args: { path: args.path },
+    })
+
+    // Validate inputs
+    const validation = validateUsagesInputs({
+      path: args.path,
+      symbolName: args.symbol_name,
+      symbolType: args.symbol_type,
+    })
+
+    if (!validation.valid) {
+      mcpLogger.warn('MCP validation failed', {
+        cid: mcpCid,
+        tool: 'kit_usages',
+        errors: validation.errors,
+      })
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text' as const,
+            text: `**Validation Error:**\n\n${validation.errors.join('\n')}`,
+          },
+        ],
+      }
+    }
+
+    const { validated } = validation
+
+    // Execute usages search
+    const result = executeKitUsages({
+      path: validated!.path,
+      symbolName: validated!.symbolName,
+      symbolType: validated!.symbolType,
+    })
+
+    // Format output
+    const format =
+      args.response_format === 'json'
+        ? ResponseFormat.JSON
+        : ResponseFormat.MARKDOWN
+
+    const mcpDuration = Date.now() - mcpStartTime
+    mcpLogger.info('MCP tool response', {
+      cid: mcpCid,
+      tool: 'kit_usages',
+      success: !isError(result),
+      durationMs: mcpDuration,
+    })
+
+    return {
+      ...(isError(result) ? { isError: true } : {}),
+      content: [
+        { type: 'text' as const, text: formatUsagesResults(result, format) },
+      ],
+    }
+  },
+)
+
+// ============================================================================
+// Kit AST Search Tool
+// ============================================================================
+
+tool(
+  'kit_ast_search',
+  {
+    description: `Search code using AST patterns (tree-sitter powered).
+
+Find code by structure rather than text. Supports two modes:
+
+**Simple mode** (default):
+- "async function" - Find async function declarations
+- "function" - Find all function declarations
+- "class" - Find class definitions
+- "try" - Find try statements
+- "import" - Find import statements
+- "export" - Find export statements
+
+**Pattern mode** (JSON criteria):
+- {"type": "function_declaration"} - Find by node type
+- {"type": "function_declaration", "async": true} - With modifiers
+- {"type": "class_declaration", "name": "MyClass"} - By name
+- {"textMatch": "TODO"} - Text within nodes
+
+Supports TypeScript, JavaScript, and Python files.
+
+Examples:
+- kit_ast_search("async function") - All async functions
+- kit_ast_search("class") - All class definitions
+- kit_ast_search('{"type": "arrow_function"}', mode="pattern")`,
+    inputSchema: {
+      pattern: z.string().describe('Search pattern (natural language or JSON)'),
+      mode: z
+        .enum(['simple', 'pattern'])
+        .optional()
+        .describe("Search mode: 'simple' (default) or 'pattern'"),
+      file_pattern: z
+        .string()
+        .optional()
+        .describe('File glob pattern (e.g., "*.ts", "**/*.tsx")'),
+      path: z
+        .string()
+        .optional()
+        .describe(
+          'Repository path (default: current directory, or KIT_DEFAULT_PATH env var)',
+        ),
+      max_results: z
+        .number()
+        .optional()
+        .describe('Maximum results to return (default: 100, max: 500)'),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  async (args: {
+    pattern: string
+    mode?: 'simple' | 'pattern'
+    file_pattern?: string
+    path?: string
+    max_results?: number
+    response_format?: string
+  }) => {
+    const mcpCid = createCorrelationId()
+    const mcpStartTime = Date.now()
+    mcpLogger.info('MCP tool request', {
+      cid: mcpCid,
+      tool: 'kit_ast_search',
+      args: { pattern: args.pattern, path: args.path },
+    })
+
+    // Validate inputs
+    const validation = validateAstSearchInputs({
+      pattern: args.pattern,
+      mode: args.mode,
+      filePattern: args.file_pattern,
+      path: args.path,
+      maxResults: args.max_results,
+    })
+
+    if (!validation.valid) {
+      mcpLogger.warn('MCP validation failed', {
+        cid: mcpCid,
+        tool: 'kit_ast_search',
+        errors: validation.errors,
+      })
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text' as const,
+            text: `**Validation Error:**\n\n${validation.errors.join('\n')}`,
+          },
+        ],
+      }
+    }
+
+    const { validated } = validation
+
+    // Execute AST search
+    const result = await executeAstSearch({
+      pattern: validated!.pattern,
+      mode:
+        validated!.mode === 'pattern' ? SearchMode.PATTERN : SearchMode.SIMPLE,
+      filePattern: validated!.filePattern,
+      path: validated!.path,
+      maxResults: validated!.maxResults,
+    })
+
+    // Format output
+    const format =
+      args.response_format === 'json'
+        ? ResponseFormat.JSON
+        : ResponseFormat.MARKDOWN
+
+    const mcpDuration = Date.now() - mcpStartTime
+    mcpLogger.info('MCP tool response', {
+      cid: mcpCid,
+      tool: 'kit_ast_search',
+      success: !isError(result),
+      durationMs: mcpDuration,
+    })
+
+    return {
+      ...(isError(result) ? { isError: true } : {}),
+      content: [
+        { type: 'text' as const, text: formatAstSearchResults(result, format) },
       ],
     }
   },

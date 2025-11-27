@@ -3,6 +3,12 @@
  *
  * JSONL logging with LogTape for observability and debugging.
  * Logs rotate at 1MB, keeping 5 files.
+ *
+ * Logging Level Convention:
+ * - DEBUG: Detailed diagnostic info (file counts, cache hits, parameter echo)
+ * - INFO: Normal operation events (start/complete, results summary)
+ * - WARN: Degraded operation (fallbacks, skipped files, soft failures)
+ * - ERROR: Operation failures (exceptions, command failures, parse errors)
  */
 
 import { existsSync, mkdirSync } from 'node:fs'
@@ -70,6 +76,15 @@ export async function initLogger(): Promise<void> {
     ],
   })
 
+  // Log initialization (using a fresh logger instance)
+  const startupLogger = getLogger(['kit'])
+  startupLogger.info('Kit logging initialized', {
+    logDir: LOG_DIR,
+    logFile: LOG_FILE,
+    maxSize: MAX_SIZE,
+    maxFiles: MAX_FILES,
+  })
+
   isInitialized = true
 }
 
@@ -121,6 +136,38 @@ export function getSymbolsLogger(): Logger {
   return getLogger(['kit', 'symbols'])
 }
 
+/**
+ * Get the file tree subsystem logger.
+ * @returns Logger instance for kit.fileTree
+ */
+export function getFileTreeLogger(): Logger {
+  return getLogger(['kit', 'fileTree'])
+}
+
+/**
+ * Get the file content subsystem logger.
+ * @returns Logger instance for kit.fileContent
+ */
+export function getFileContentLogger(): Logger {
+  return getLogger(['kit', 'fileContent'])
+}
+
+/**
+ * Get the usages subsystem logger.
+ * @returns Logger instance for kit.usages
+ */
+export function getUsagesLogger(): Logger {
+  return getLogger(['kit', 'usages'])
+}
+
+/**
+ * Get the AST search subsystem logger.
+ * @returns Logger instance for kit.ast
+ */
+export function getAstLogger(): Logger {
+  return getLogger(['kit', 'ast'])
+}
+
 // ============================================================================
 // Convenience Exports
 // ============================================================================
@@ -136,6 +183,18 @@ export const semanticLogger = getLogger(['kit', 'semantic'])
 
 /** Symbols subsystem logger */
 export const symbolsLogger = getLogger(['kit', 'symbols'])
+
+/** File tree subsystem logger */
+export const fileTreeLogger = getLogger(['kit', 'fileTree'])
+
+/** File content subsystem logger */
+export const fileContentLogger = getLogger(['kit', 'fileContent'])
+
+/** Usages subsystem logger */
+export const usagesLogger = getLogger(['kit', 'usages'])
+
+/** AST search subsystem logger */
+export const astLogger = getLogger(['kit', 'ast'])
 
 /** Log directory path */
 export const logDir = LOG_DIR
