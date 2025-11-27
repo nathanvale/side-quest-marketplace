@@ -160,6 +160,24 @@
       },
       "category": "configuration",
       "keywords": ["mcp", "mcp-server", "configuration", "management"]
+    },
+    {
+      "name": "kit",
+      "source": "./plugins/kit",
+      "description": "Kit CLI integration for intelligent code search. Provides fast grep, semantic vector search with automatic fallback, and symbol extraction for codebase navigation.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Vale"
+      },
+      "category": "development",
+      "keywords": [
+        "kit",
+        "grep",
+        "semantic-search",
+        "code-symbols",
+        "cased-kit",
+        "code-search"
+      ]
     }
   ]
 }

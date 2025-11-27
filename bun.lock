@@ -72,6 +72,25 @@
         "mcpez": "^1.2.1",
       },
     },
+    "plugins/kit": {
+      "name": "@sidequest/kit",
+      "version": "1.0.0",
+      "dependencies": {
+        "@logtape/file": "^0.11.0",
+        "@logtape/logtape": "^0.11.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+    },
+    "plugins/kit/mcp-servers/kit": {
+      "name": "@sidequest/mcp-kit",
+      "version": "1.0.0",
+      "dependencies": {
+        "mcpez": "^1.2.1",
+        "zod": "^3.23.8",
+      },
+    },
     "plugins/mcp-manager": {
       "name": "@sidequest/mcp-manager",
       "version": "1.0.0",
@@ -159,6 +178,10 @@
 
     "@commitlint/types": ["@commitlint/types@20.0.0", "", { "dependencies": { "@types/conventional-commits-parser": "^5.0.0", "chalk": "^5.3.0" } }, "sha512-bVUNBqG6aznYcYjTjnc3+Cat/iBgbgpflxbIBTnsHTX0YVpnmINPEkSRWymT2Q8aSH3Y7aKnEbunilkYe8TybA=="],
 
+    "@logtape/file": ["@logtape/file@0.11.1", "", { "dependencies": { "@logtape/logtape": "^0.11.0" } }, "sha512-DbQPhTqOQj84jGYOYgEUQ+zXojeNzfexOvo0zNA+/36ZGYXTiOXfrn9acx1oRoSxlbN5Hbwd6luddOfUKCPE+g=="],
+
+    "@logtape/logtape": ["@logtape/logtape@0.11.1", "", {}, "sha512-VsPgJ8QfTMeehDApdP8qLzay1YMSthGDdWDkK8efBmWYIPdKOID4gXqScWSxdEYP6h/rr445xjEpfzZeyCi5jg=="],
+
     "@mixmark-io/domino": ["@mixmark-io/domino@2.2.0", "", {}, "sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw=="],
 
     "@modelcontextprotocol/sdk": ["@modelcontextprotocol/sdk@1.22.0", "", { "dependencies": { "ajv": "^8.17.1", "ajv-formats": "^3.0.1", "content-type": "^1.0.5", "cors": "^2.8.5", "cross-spawn": "^7.0.5", "eventsource": "^3.0.2", "eventsource-parser": "^3.0.0", "express": "^5.0.1", "express-rate-limit": "^7.5.0", "pkce-challenge": "^5.0.0", "raw-body": "^3.0.0", "zod": "^3.23.8", "zod-to-json-schema": "^3.24.1" }, "peerDependencies": { "@cfworker/json-schema": "^4.1.1" }, "optionalPeers": ["@cfworker/json-schema"] }, "sha512-VUpl106XVTCpDmTBil2ehgJZjhyLY2QZikzF8NvTXtLRF1CvO5iEE2UNZdVIUer35vFOwMKYeUGbjJtvPWan3g=="],
@@ -175,9 +198,13 @@
 
     "@sidequest/git": ["@sidequest/git@workspace:plugins/git"],
 
+    "@sidequest/kit": ["@sidequest/kit@workspace:plugins/kit"],
+
     "@sidequest/mcp-bun-runner": ["@sidequest/mcp-bun-runner@workspace:plugins/bun-runner/mcp-servers/bun-runner"],
 
     "@sidequest/mcp-git-intelligence": ["@sidequest/mcp-git-intelligence@workspace:plugins/git/mcp-servers/git-intelligence"],
+
+    "@sidequest/mcp-kit": ["@sidequest/mcp-kit@workspace:plugins/kit/mcp-servers/kit"],
 
     "@sidequest/mcp-manager": ["@sidequest/mcp-manager@workspace:plugins/mcp-manager"],
 
