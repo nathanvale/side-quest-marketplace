@@ -15,6 +15,14 @@ import { startServer, tool, z } from 'mcpez'
 
 // Types
 
+/**
+ * Response format options for tool output
+ */
+enum ResponseFormat {
+  MARKDOWN = 'markdown',
+  JSON = 'json',
+}
+
 interface HistoryCommand {
   time: string
   exit_code: number | string
@@ -259,9 +267,18 @@ function searchByContext(options: {
 /**
  * Format context search results for display
  */
-function formatContextResults(results: ContextSearchResult): string {
+function formatContextResults(
+  results: ContextSearchResult,
+  format: ResponseFormat = ResponseFormat.MARKDOWN,
+): string {
   if (isError(results)) {
-    return `Error: ${results.error}`
+    return format === ResponseFormat.JSON
+      ? JSON.stringify({ error: results.error }, null, 2)
+      : `Error: ${results.error}`
+  }
+
+  if (format === ResponseFormat.JSON) {
+    return JSON.stringify(results, null, 2)
   }
 
   if (results.count === 0) {
@@ -381,9 +398,18 @@ function getHistoryInsights(
 /**
  * Format history insights for display
  */
-function formatInsights(results: InsightsResult): string {
+function formatInsights(
+  results: InsightsResult,
+  format: ResponseFormat = ResponseFormat.MARKDOWN,
+): string {
   if (isError(results)) {
-    return `Error: ${results.error}`
+    return format === ResponseFormat.JSON
+      ? JSON.stringify({ error: results.error }, null, 2)
+      : `Error: ${results.error}`
+  }
+
+  if (format === ResponseFormat.JSON) {
+    return JSON.stringify(results, null, 2)
   }
 
   let output = `## Command History Insights (${results.period})\n\n`
@@ -408,9 +434,18 @@ function formatInsights(results: InsightsResult): string {
 /**
  * Format search results for display
  */
-function formatResults(results: SearchResult): string {
+function formatResults(
+  results: SearchResult,
+  format: ResponseFormat = ResponseFormat.MARKDOWN,
+): string {
   if (isError(results)) {
-    return `Error: ${results.error}`
+    return format === ResponseFormat.JSON
+      ? JSON.stringify({ error: results.error }, null, 2)
+      : `Error: ${results.error}`
+  }
+
+  if (format === ResponseFormat.JSON) {
+    return JSON.stringify(results, null, 2)
   }
 
   if (results.count === 0) {
@@ -438,7 +473,7 @@ function formatResults(results: SearchResult): string {
 // Register tools using Zod schemas
 
 tool(
-  'search_history',
+  'atuin_search_history',
   {
     description:
       'Search command history using atuin. Returns matching commands with timestamps, exit codes, and full command text. Supports filtering by directory, time range, and search mode.',
@@ -476,19 +511,40 @@ tool(
         .describe(
           'Search mode: fuzzy (default), prefix (starts with), or full-text (exact match anywhere)',
         ),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
   async (args: Record<string, unknown>) => {
-    const { query, limit, include_failed, cwd, since, until, search_mode } =
-      args as {
-        query: string
-        limit?: number
-        include_failed?: boolean
-        cwd?: string
-        since?: string
-        until?: string
-        search_mode?: SearchMode
-      }
+    const {
+      query,
+      limit,
+      include_failed,
+      cwd,
+      since,
+      until,
+      search_mode,
+      response_format,
+    } = args as {
+      query: string
+      limit?: number
+      include_failed?: boolean
+      cwd?: string
+      since?: string
+      until?: string
+      search_mode?: SearchMode
+      response_format?: string
+    }
+    const format =
+      response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
     const results = searchHistory({
       query,
       limit: limit ?? 10,
@@ -499,13 +555,15 @@ tool(
       searchMode: search_mode ?? 'fuzzy',
     })
     return {
-      content: [{ type: 'text' as const, text: formatResults(results) }],
+      content: [
+        { type: 'text' as const, text: formatResults(results, format) },
+      ],
     }
   },
 )
 
 tool(
-  'get_recent_history',
+  'atuin_get_recent_history',
   {
     description:
       'Get recent command history from atuin with timestamps and exit codes.',
@@ -520,22 +578,37 @@ tool(
         .describe(
           'Include commands that failed (non-zero exit code). Default: false',
         ),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
   async (args: Record<string, unknown>) => {
-    const { limit, include_failed } = args as {
+    const { limit, include_failed, response_format } = args as {
       limit?: number
       include_failed?: boolean
+      response_format?: string
     }
+    const format =
+      response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
     const results = getRecentHistory(limit ?? 10, include_failed ?? false)
     return {
-      content: [{ type: 'text' as const, text: formatResults(results) }],
+      content: [
+        { type: 'text' as const, text: formatResults(results, format) },
+      ],
     }
   },
 )
 
 tool(
-  'search_by_context',
+  'atuin_search_by_context',
   {
     description:
       'Search command history by git branch or Claude session ID. Use this to find commands you ran on a specific branch or in a specific session.',
@@ -554,27 +627,42 @@ tool(
         .number()
         .optional()
         .describe('Maximum number of results to return (default: 20)'),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
   async (args: Record<string, unknown>) => {
-    const { branch, session_id, limit } = args as {
+    const { branch, session_id, limit, response_format } = args as {
       branch?: string
       session_id?: string
       limit?: number
+      response_format?: string
     }
+    const format =
+      response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
     const results = searchByContext({
       branch,
       sessionId: session_id,
       limit: limit ?? 20,
     })
     return {
-      content: [{ type: 'text' as const, text: formatContextResults(results) }],
+      content: [
+        { type: 'text' as const, text: formatContextResults(results, format) },
+      ],
     }
   },
 )
 
 tool(
-  'history_insights',
+  'atuin_history_insights',
   {
     description:
       'Get insights about command history: most frequent commands and failure patterns. Helps identify common workflows and recurring errors.',
@@ -589,16 +677,31 @@ tool(
         .describe(
           'What to focus on: frequent commands, failures, or all (default: all)',
         ),
+      response_format: z
+        .enum(['markdown', 'json'])
+        .optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
   async (args: Record<string, unknown>) => {
-    const { period, focus } = args as {
+    const { period, focus, response_format } = args as {
       period?: InsightPeriod
       focus?: InsightFocus
+      response_format?: string
     }
+    const format =
+      response_format === 'json' ? ResponseFormat.JSON : ResponseFormat.MARKDOWN
     const results = getHistoryInsights(period ?? 'today', focus ?? 'all')
     return {
-      content: [{ type: 'text' as const, text: formatInsights(results) }],
+      content: [
+        { type: 'text' as const, text: formatInsights(results, format) },
+      ],
     }
   },
 )
