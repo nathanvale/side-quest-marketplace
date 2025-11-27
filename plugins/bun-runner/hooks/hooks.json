@@ -1,5 +1,5 @@
 {
-  "description": "Auto-format and lint files on write/edit using Biome",
+  "description": "Auto-format, lint, and type-check files using Biome and TypeScript (git-aware)",
   "hooks": {
     "PostToolUse": [
       {
@@ -9,6 +9,38 @@
             "type": "command",
             "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/biome-check.ts",
             "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/tsc-check.ts",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/biome-ci.ts",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/tsc-ci.ts",
+            "timeout": 120
           }
         ]
       }

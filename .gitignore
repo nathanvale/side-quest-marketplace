@@ -17,3 +17,6 @@
 .claude-session-summary
 
 settings.local.json
+
+# Generated docs (regenerated on demand)
+plugins/claude-code-docs/docs/

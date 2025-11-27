@@ -4,6 +4,7 @@
  * PostToolUse hook that runs Biome check --write on edited files.
  * Automatically fixes formatting and lint issues after Write/Edit/MultiEdit.
  *
+ * Git-aware: Only processes files that are tracked by git or staged.
  * Uses the shared parseBiomeOutput function for structured, token-efficient output.
  *
  * Exit codes:
@@ -13,30 +14,9 @@
 
 import { spawn } from 'bun'
 import { parseBiomeOutput } from '../mcp-servers/bun-runner/index'
-
-interface HookInput {
-  tool_name: string
-  tool_input: {
-    file_path?: string
-    edits?: Array<{ file_path: string }>
-  }
-}
-
-const SUPPORTED_EXTENSIONS = [
-  '.js',
-  '.jsx',
-  '.ts',
-  '.tsx',
-  '.mjs',
-  '.cjs',
-  '.mts',
-  '.cts',
-  '.json',
-  '.jsonc',
-  '.css',
-  '.graphql',
-  '.gql',
-]
+import { BIOME_SUPPORTED_EXTENSIONS } from './shared/constants'
+import { isGitTracked } from './shared/git-utils'
+import { extractFilePaths, parseHookInput } from './shared/types'
 
 function formatDiagnostics(
   summary: ReturnType<typeof parseBiomeOutput>,
@@ -59,28 +39,13 @@ function formatDiagnostics(
 
 async function main() {
   const input = await Bun.stdin.text()
-  let hookInput: HookInput
+  const hookInput = parseHookInput(input)
 
-  try {
-    hookInput = JSON.parse(input)
-  } catch {
+  if (!hookInput) {
     process.exit(0)
   }
 
-  // Extract file paths
-  const filePaths: string[] = []
-
-  if (hookInput.tool_input.file_path) {
-    filePaths.push(hookInput.tool_input.file_path)
-  }
-
-  if (hookInput.tool_input.edits) {
-    for (const edit of hookInput.tool_input.edits) {
-      if (edit.file_path && !filePaths.includes(edit.file_path)) {
-        filePaths.push(edit.file_path)
-      }
-    }
-  }
+  const filePaths = extractFilePaths(hookInput)
 
   if (filePaths.length === 0) {
     process.exit(0)
@@ -91,7 +56,13 @@ async function main() {
 
   for (const filePath of filePaths) {
     // Skip unsupported files
-    if (!SUPPORTED_EXTENSIONS.some((ext) => filePath.endsWith(ext))) {
+    if (!BIOME_SUPPORTED_EXTENSIONS.some((ext) => filePath.endsWith(ext))) {
+      continue
+    }
+
+    // Git-aware: Skip files not tracked by git
+    const isTracked = await isGitTracked(filePath)
+    if (!isTracked) {
       continue
     }
 

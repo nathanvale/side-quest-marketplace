@@ -7,9 +7,9 @@
   "scripts": {
     "test": "echo 'No tests yet'",
     "typecheck": "echo 'No TypeScript files'",
-    "format": "echo 'Markdown files only'",
-    "format:check": "echo 'Markdown files only'",
-    "lint": "echo 'Markdown files only'",
-    "check": "echo 'Markdown files only'"
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint .",
+    "check": "biome check --write ."
   }
 }

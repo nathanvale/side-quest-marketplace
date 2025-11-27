@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { writeFile } from 'node:fs/promises'
-import { isAbsolute, join, relative, resolve } from 'node:path'
+import { isAbsolute, relative, resolve } from 'node:path'
 import { MarkdownConverter } from './markdown-converter'
 
 export class DocumentProcessor {
@@ -49,7 +49,7 @@ export class DocumentProcessor {
   }
 
   async saveDocument(
-    url: string,
+    _url: string,
     content: string,
     filename: string,
   ): Promise<void> {

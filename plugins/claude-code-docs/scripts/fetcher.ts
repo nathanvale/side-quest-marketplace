@@ -6,9 +6,8 @@ import { ManifestManager } from './lib/manifest-manager'
 import { SitemapParser } from './lib/sitemap-parser'
 import type {
   FetchError,
-  FetchResult,
   FetcherOptions,
-  Manifest,
+  FetchResult,
   ManifestEntry,
 } from './lib/types'
 
@@ -31,10 +30,7 @@ export class ClaudeDocsFetcher {
   private indexGenerator: IndexGenerator
   private sitemapParser: SitemapParser
 
-  constructor(
-    private outputDir: string,
-    options: FetcherOptions = {},
-  ) {
+  constructor(outputDir: string, options: FetcherOptions = {}) {
     this.options = {
       sitemapUrl: options.sitemapUrl || DEFAULT_OPTIONS.sitemapUrl,
       fetchOptions: {

@@ -13,7 +13,12 @@
     "test": "echo 'No tests yet'",
     "typecheck": "echo 'No typecheck yet'"
   },
-  "keywords": ["mcp", "git", "history", "commits"],
+  "keywords": [
+    "mcp",
+    "git",
+    "history",
+    "commits"
+  ],
   "license": "MIT",
   "dependencies": {
     "mcpez": "^1.2.1"

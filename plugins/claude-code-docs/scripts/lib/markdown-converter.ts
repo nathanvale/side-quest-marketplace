@@ -36,7 +36,7 @@ export class MarkdownConverter {
           node.firstChild?.nodeName === 'CODE'
         )
       },
-      replacement: (content, node) => {
+      replacement: (_content, node) => {
         const codeElement = node.firstChild as DOMElement
         const className = codeElement?.getAttribute?.('class') || ''
         const language = className.match(/language-(\w+)/)?.[1] || ''
@@ -97,7 +97,7 @@ export class MarkdownConverter {
     // Add custom rule for tables
     this.turndownService.addRule('table', {
       filter: 'table',
-      replacement: (content, node, options) => {
+      replacement: (_content, node, _options) => {
         const table = node as DOMElement
         const rows: string[][] = []
 
@@ -237,7 +237,7 @@ export class MarkdownConverter {
       }
 
       return trimmed
-    } catch (error) {
+    } catch (_error) {
       // Return empty string for invalid HTML
       return ''
     }
@@ -252,7 +252,7 @@ export class MarkdownConverter {
     try {
       const markdown = this.turndownService.turndown(html)
       return markdown.trim()
-    } catch (error) {
+    } catch (_error) {
       return ''
     }
   }
@@ -330,7 +330,7 @@ export class MarkdownConverter {
     // Use [ \t]* instead of \s* to avoid consuming newlines
     cleaned = cleaned.replace(
       /\[([^[\]]+)\(([^)\s]+)[ \t]*$/gm,
-      (match, text, url) => {
+      (_match, text, url) => {
         // Only fix if this looks like a broken link (no ] before ()
         return `[${text}](${url})`
       },

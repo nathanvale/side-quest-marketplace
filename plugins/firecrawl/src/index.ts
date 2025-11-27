@@ -1,22 +1,66 @@
 /**
  * Firecrawl Plugin
  *
- * Firecrawl plugin for Claude Code
+ * A token-efficient Firecrawl client for Claude Code.
+ * Provides scrape, map, search, and extract operations via REST API.
+ *
+ * @example
+ * ```ts
+ * import { createFirecrawlClient } from '@sidequest/firecrawl'
+ *
+ * const client = createFirecrawlClient()
+ * const result = await client.scrape({
+ *   url: 'https://example.com',
+ *   formats: ['markdown'],
+ * })
+ * ```
  */
 
-export interface FirecrawlResult {
-  success: boolean
-  message: string
-}
+export type { FirecrawlClient } from './client'
+// Client
+export { createFirecrawlClient } from './client'
 
-/**
- * Sample function demonstrating plugin functionality.
- * @param input - Input to process
- * @returns Result object with success status and message
- */
-export function processFirecrawl(input: string): FirecrawlResult {
-  return {
-    success: true,
-    message: `Processed: ${input}`,
-  }
-}
+// Formatters
+export {
+  formatExtractResponse,
+  formatMapResponse,
+  formatScrapeResponse,
+  formatSearchResponse,
+  formatUrlList,
+} from './formatters'
+
+// Types
+export type {
+  ExtractOptions,
+  ExtractRequest,
+  ExtractResponse,
+  ExtractStatusResponse,
+  FirecrawlConfig,
+  FirecrawlError,
+  FirecrawlResult,
+  ImageSearchResult,
+  LocationSettings,
+  MapLink,
+  MapOptions,
+  MapRequest,
+  MapResponse,
+  NewsSearchResult,
+  PageMetadata,
+  ProxyType,
+  ScrapeAction,
+  ScrapeData,
+  ScrapeFormat,
+  ScrapeOptions,
+  ScrapeRequest,
+  ScrapeResponse,
+  SearchCategory,
+  SearchData,
+  SearchOptions,
+  SearchRequest,
+  SearchResponse,
+  SearchSource,
+  SitemapMode,
+  WebSearchResult,
+} from './types'
+
+export { isFirecrawlError } from './types'

@@ -121,7 +121,7 @@ async function main() {
   }
   console.log('')
 
-  const startTime = Date.now()
+  const _startTime = Date.now()
 
   try {
     // Ensure output directory exists

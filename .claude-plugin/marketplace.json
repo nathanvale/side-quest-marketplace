@@ -149,6 +149,17 @@
       },
       "category": "development",
       "keywords": ["firecrawl"]
+    },
+    {
+      "name": "mcp-manager",
+      "source": "./plugins/mcp-manager",
+      "description": "Manage MCP servers - add, list, enable, and disable without removing configurations.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Vale"
+      },
+      "category": "configuration",
+      "keywords": ["mcp", "mcp-server", "configuration", "management"]
     }
   ]
 }

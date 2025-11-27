@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "bash-history": {
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-servers/bash-history/index.js"],
+      "command": "bun",
+      "args": ["run", "${CLAUDE_PLUGIN_ROOT}/src/index.ts"],
       "env": {}
     }
   }

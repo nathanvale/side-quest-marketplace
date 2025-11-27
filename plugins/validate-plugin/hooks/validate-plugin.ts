@@ -153,7 +153,7 @@ async function main() {
     // Process and output result
     const result = await processHook(input)
     console.log(JSON.stringify(result))
-  } catch (error) {
+  } catch (_error) {
     // On any error, pass through to avoid blocking the user
     console.log(JSON.stringify({ status: 'pass' }))
   }

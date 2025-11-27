@@ -5,11 +5,17 @@
   "description": "Atuin shell history integration plugin for Claude Code",
   "type": "module",
   "scripts": {
-    "test": "echo 'No tests yet'",
-    "typecheck": "echo 'No TypeScript files'",
-    "format": "bunx @biomejs/biome format --write .",
-    "format:check": "bunx @biomejs/biome format .",
-    "lint": "bunx @biomejs/biome lint .",
-    "check": "bunx @biomejs/biome check --write ."
+    "test": "bun test --recursive",
+    "typecheck": "tsc --noEmit",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint .",
+    "check": "biome check --write ."
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "dependencies": {
+    "mcpez": "^1.2.1"
   }
 }

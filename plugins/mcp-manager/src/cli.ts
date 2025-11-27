@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
 
 import {
-  type ClaudeConfig,
   type ProjectConfig,
   readClaudeConfig,
   writeClaudeConfig,
 } from './config'
+import { createEnableOptions, type Scope, selectMultiple } from './interactive'
 
 function createEmptyProject(): ProjectConfig {
   return {
@@ -28,6 +28,22 @@ function createEmptyProject(): ProjectConfig {
 async function main() {
   const args = process.argv.slice(2)
   const command = args[0]
+  const _isInteractive =
+    command === '-i' ||
+    command === '--interactive' ||
+    args.includes('-i') ||
+    args.includes('--interactive')
+
+  // Interactive mode: mcp -i [--global] (TTY only)
+  if (command === '-i' || command === '--interactive') {
+    if (!process.stdout.isTTY) {
+      console.error('Interactive mode requires a terminal (TTY)')
+      process.exit(1)
+    }
+    const scope: Scope = args.includes('--global') ? 'global' : 'project'
+    await interactiveMode(scope)
+    return
+  }
 
   if (
     !command ||
@@ -42,13 +58,22 @@ async function main() {
   try {
     switch (command) {
       case 'list':
-        await listServers()
+        await listServers(args.includes('--debug'))
         break
       case 'disable':
-        await disableServers(args.slice(1))
+        await disableServers(
+          args.slice(1).filter((a) => a !== '-i' && a !== '--interactive'),
+        )
         break
       case 'enable':
-        await enableServers(args.slice(1))
+        await enableServers(
+          args.slice(1).filter((a) => a !== '-i' && a !== '--interactive'),
+        )
+        break
+      case 'reset':
+        await resetConfig(
+          args.slice(1).filter((a) => a !== '-i' && a !== '--interactive'),
+        )
         break
       default:
         console.error(`Unknown command: ${command}`)
@@ -65,45 +90,110 @@ async function main() {
 }
 
 function showHelp() {
-  console.log(`
+  // Detect if running in terminal (TTY) vs Claude Code
+  const isTTY = process.stdout.isTTY
+  const cmd = isTTY ? 'claude-mcp' : 'mcp-manager'
+
+  if (isTTY) {
+    console.log(`
+claude-mcp - Manage MCP servers for Claude Code
+
+Enable or disable MCP servers in bulk. By default, changes only affect
+Claude Code when running in this directory. Use --global to apply
+changes everywhere.
+
+Usage:
+  ${cmd} -i                       Toggle servers interactively (project scope)
+  ${cmd} -i --global              Toggle servers interactively (global scope)
+  ${cmd} list                     Show all servers and their status
+  ${cmd} disable <name> [name...] Disable specific servers
+  ${cmd} enable <name> [name...]  Enable specific servers
+  ${cmd} disable all [--global]   Disable all servers
+  ${cmd} enable all [--global]    Enable all servers
+  ${cmd} reset                    Clear all project overrides (inherit from global)
+  ${cmd} reset --global           Clear global disabled list (enable all globally)
+
+Flags:
+  -i, --interactive   Visual multi-select UI (arrows, space, enter)
+  --global            Apply everywhere, not just this directory
+
+Scope:
+  Project (default): Changes apply only to the current directory.
+                     Creates a project-specific override.
+  Global (--global): Resets ALL projects to the same state.
+                     Use this for a clean slate everywhere.
+
+Examples:
+  ${cmd} -i                       Interactive toggle (this directory)
+  ${cmd} -i --global              Interactive toggle (everywhere)
+  ${cmd} disable filesystem       Disable filesystem in this project
+  ${cmd} disable all --global     Disable all servers everywhere
+
+Changes are saved to ~/.claude.json. Restart Claude Code to apply.
+`)
+  } else {
+    console.log(`
 MCP Manager CLI
 
 Usage:
-  mcp-manager <command> [options]
+  ${cmd} <command> [options]
 
 Commands:
   list                    List all MCP servers with their status
   disable <names...>      Disable one or more servers
   disable all             Disable all servers (current project)
-  disable all --global    Disable all servers (all projects)
+  disable all --global    Disable all servers (global default)
   enable <names...>       Enable one or more servers
   enable all              Enable all servers (current project)
-  enable all --global     Enable all servers (all projects)
+  enable all --global     Enable all servers (global default)
+  reset                   Clear all project overrides (inherit from global)
+  reset --global          Clear global disabled list (enable all globally)
 
 Examples:
-  mcp-manager list
-  mcp-manager disable filesystem tavily-mcp
-  mcp-manager disable all
-  mcp-manager disable all --global
-  mcp-manager enable filesystem
-  mcp-manager enable all
+  ${cmd} list
+  ${cmd} disable filesystem tavily-mcp
+  ${cmd} disable all
+  ${cmd} enable all
 
-Note: Use /mcp command in Claude Code to add/remove servers.
+Note: Use /mcp-manager:add in Claude Code to add new servers.
 `)
+  }
 }
 
-async function listServers() {
+async function listServers(showDebug = false) {
   const config = readClaudeConfig()
   const projectPath = process.cwd()
   const project = config.projects?.[projectPath]
-  const disabledServers = new Set(project?.disabledMcpjsonServers || [])
 
-  // Check if server is disabled in ANY project
-  const disabledInAnyProject = new Set<string>()
-  for (const proj of Object.values(config.projects || {})) {
-    for (const server of proj.disabledMcpjsonServers || []) {
-      disabledInAnyProject.add(server)
+  // Use disabledMcpServers - this is what Claude Code's UI uses
+  const effectiveDisabled = new Set(
+    project?.disabledMcpServers ?? config.disabledMcpServers ?? [],
+  )
+
+  const allServers = Object.keys(config.mcpServers || {})
+
+  if (showDebug) {
+    console.log('\n=== DEBUG: Raw Config State ===\n')
+    console.log(`Project path: ${projectPath}`)
+    console.log(`Project exists: ${project ? 'YES' : 'NO'}`)
+    console.log()
+    console.log('Global disabledMcpServers:')
+    console.log(`  ${JSON.stringify(config.disabledMcpServers || [])}`)
+    console.log()
+    if (project) {
+      console.log('Project disabledMcpjsonServers:')
+      console.log(
+        `  ${JSON.stringify(project.disabledMcpjsonServers ?? 'NOT SET')}`,
+      )
+      console.log('Project disabledMcpServers:')
+      console.log(
+        `  ${JSON.stringify(project.disabledMcpServers ?? 'NOT SET')}`,
+      )
     }
+    console.log()
+    console.log('Effective disabled (what Claude Code sees):')
+    console.log(`  ${JSON.stringify([...effectiveDisabled].sort())}`)
+    console.log('\n=== END DEBUG ===\n')
   }
 
   console.log('\nMCP Servers:\n')
@@ -111,22 +201,26 @@ async function listServers() {
   console.log('  ──────  ────')
 
   for (const [name, server] of Object.entries(config.mcpServers || {})) {
-    const disabledHere = disabledServers.has(name)
-    const disabledElsewhere = !disabledHere && disabledInAnyProject.has(name)
-    const status = disabledHere ? '✗' : disabledElsewhere ? '○' : '✓'
+    const isDisabled = effectiveDisabled.has(name)
+    const status = isDisabled ? '✗' : '✓'
     const command = server.command || 'unknown'
     const args = Array.isArray(server.args) ? server.args.join(' ') : ''
     console.log(`  ${status}       ${name.padEnd(25)} ${command} ${args}`)
   }
 
+  const enabledCount = allServers.filter(
+    (s) => !effectiveDisabled.has(s),
+  ).length
+  const disabledCount = effectiveDisabled.size
+
+  const cmd = process.stdout.isTTY ? 'claude-mcp' : 'mcp-manager'
   console.log(
-    '\n  ✓ = enabled    ✗ = disabled here    ○ = disabled in other projects\n',
+    `\n  ✓ = enabled (${enabledCount})    ✗ = disabled (${disabledCount})\n`,
   )
-  console.log('Use "mcp-manager disable all" to disable in current project')
-  console.log(
-    'Use "mcp-manager disable all --global" to disable in ALL projects',
-  )
-  console.log('Restart Claude Code for changes to take effect\n')
+  if (process.stdout.isTTY) {
+    console.log(`Tip: Use "${cmd} -i" for interactive toggle mode`)
+    console.log(`     Use "${cmd} list --debug" to see raw config state\n`)
+  }
 }
 
 async function disableServers(args: string[]) {
@@ -143,107 +237,49 @@ async function disableServers(args: string[]) {
   const isAll = serverNames.includes('all')
   const allServerNames = Object.keys(config.mcpServers || {})
 
-  // Helper to update top-level disabledMcpServers
-  const updateTopLevelDisabled = (servers: string[]) => {
+  // Validate server names
+  const validServers = isAll
+    ? allServerNames
+    : serverNames.filter((name) => {
+        if (!config.mcpServers?.[name]) {
+          console.warn(`Warning: Server "${name}" not found`)
+          return false
+        }
+        return true
+      })
+
+  if (isGlobal) {
+    // Global: Only update top-level (projects inherit unless they have overrides)
     const currentDisabled = new Set(config.disabledMcpServers || [])
-    for (const name of servers) {
-      currentDisabled.add(name)
-    }
+    for (const name of validServers) currentDisabled.add(name)
     config.disabledMcpServers = Array.from(currentDisabled).sort()
-  }
-
-  // Helper to update project-level disabledMcpServers (for user MCP servers)
-  const updateProjectDisabled = (projPath: string, servers: string[]) => {
-    if (!config.projects?.[projPath]) return
-    const currentDisabled = new Set(
-      config.projects[projPath].disabledMcpServers || [],
-    )
-    for (const name of servers) {
-      currentDisabled.add(name)
-    }
-    config.projects[projPath].disabledMcpServers =
-      Array.from(currentDisabled).sort()
-  }
-
-  if (isAll && isGlobal) {
-    // Disable in ALL projects (including current) AND top-level
-    if (!config.projects) config.projects = {}
-
-    // Ensure current project exists
-    if (!config.projects[projectPath]) {
-      config.projects[projectPath] = createEmptyProject()
-    }
-
-    // Update all existing projects
-    for (const projPath in config.projects) {
-      const project = config.projects[projPath]
-      if (!project) continue
-      // disabledMcpjsonServers (for .mcp.json servers)
-      if (!project.disabledMcpjsonServers) {
-        project.disabledMcpjsonServers = []
-      }
-      project.disabledMcpjsonServers = [...allServerNames]
-      // disabledMcpServers (for user MCP servers)
-      project.disabledMcpServers = [...allServerNames]
-    }
-
-    // Also update top-level disabledMcpServers
-    updateTopLevelDisabled(allServerNames)
 
     console.log(
-      `Disabled all ${allServerNames.length} servers in ${Object.keys(config.projects).length} projects + top-level`,
-    )
-  } else if (isAll) {
-    // Disable in current project only + top-level
-    if (!config.projects) config.projects = {}
-    if (!config.projects[projectPath]) {
-      config.projects[projectPath] = createEmptyProject()
-    }
-    config.projects[projectPath].disabledMcpjsonServers = [...allServerNames]
-    config.projects[projectPath].disabledMcpServers = [...allServerNames]
-
-    // Also update top-level disabledMcpServers
-    updateTopLevelDisabled(allServerNames)
-
-    console.log(
-      `Disabled all ${allServerNames.length} servers in current project + top-level`,
+      isAll
+        ? `Disabled all ${validServers.length} servers globally`
+        : `Disabled ${validServers.length} server(s) globally: ${validServers.join(', ')}`,
     )
   } else {
-    // Disable specific servers
+    // Project: Only update current project
     if (!config.projects) config.projects = {}
     if (!config.projects[projectPath]) {
       config.projects[projectPath] = createEmptyProject()
     }
-
-    const validServers: string[] = []
     const currentDisabled = new Set(
-      config.projects[projectPath].disabledMcpjsonServers || [],
+      config.projects[projectPath].disabledMcpServers || [],
     )
-    for (const name of serverNames) {
-      if (!config.mcpServers?.[name]) {
-        console.warn(`Warning: Server "${name}" not found`)
-        continue
-      }
-      currentDisabled.add(name)
-      validServers.push(name)
-    }
-    config.projects[projectPath].disabledMcpjsonServers =
-      Array.from(currentDisabled)
-
-    // Also update top-level disabledMcpServers
-    updateTopLevelDisabled(validServers)
-    // Also update project-level disabledMcpServers (for user MCP servers)
-    updateProjectDisabled(projectPath, validServers)
+    for (const name of validServers) currentDisabled.add(name)
+    config.projects[projectPath].disabledMcpServers =
+      Array.from(currentDisabled).sort()
 
     console.log(
-      `Disabled ${validServers.length} server(s): ${validServers.join(', ')}`,
+      isAll
+        ? `Disabled all ${validServers.length} servers in current project`
+        : `Disabled ${validServers.length} server(s): ${validServers.join(', ')}`,
     )
   }
 
   writeClaudeConfig(config)
-  console.log(
-    '\n✓ Changes saved. Restart Claude Code for changes to take effect.\n',
-  )
 }
 
 async function enableServers(args: string[]) {
@@ -259,74 +295,186 @@ async function enableServers(args: string[]) {
 
   const isAll = serverNames.includes('all')
 
-  // Helper to update top-level disabledMcpServers (remove from disabled)
-  const removeFromTopLevelDisabled = (servers: string[]) => {
-    if (!config.disabledMcpServers) return
-    const currentDisabled = new Set(config.disabledMcpServers)
-    for (const name of servers) {
-      currentDisabled.delete(name)
-    }
+  // Validate server names
+  const validServers = isAll
+    ? Object.keys(config.mcpServers || {})
+    : serverNames.filter((name) => {
+        if (!config.mcpServers?.[name]) {
+          console.warn(`Warning: Server "${name}" not found`)
+          return false
+        }
+        return true
+      })
+
+  if (isGlobal) {
+    // Global: Only update top-level (projects inherit unless they have overrides)
+    const currentDisabled = new Set(config.disabledMcpServers || [])
+    for (const name of validServers) currentDisabled.delete(name)
     config.disabledMcpServers = Array.from(currentDisabled).sort()
-  }
-
-  // Helper to remove from project-level disabledMcpServers
-  const removeFromProjectDisabled = (projPath: string, servers: string[]) => {
-    if (!config.projects?.[projPath]?.disabledMcpServers) return
-    const currentDisabled = new Set(
-      config.projects[projPath].disabledMcpServers,
-    )
-    for (const name of servers) {
-      currentDisabled.delete(name)
-    }
-    config.projects[projPath].disabledMcpServers =
-      Array.from(currentDisabled).sort()
-  }
-
-  if (isAll && isGlobal) {
-    // Enable in ALL projects + clear top-level
-    for (const projPath in config.projects) {
-      const project = config.projects[projPath]
-      if (!project) continue
-      project.disabledMcpjsonServers = []
-      project.disabledMcpServers = []
-    }
-    config.disabledMcpServers = []
-    console.log('Enabled all servers in ALL projects + top-level')
-  } else if (isAll) {
-    // Enable in current project only + clear top-level
-    if (config.projects?.[projectPath]) {
-      config.projects[projectPath].disabledMcpjsonServers = []
-      config.projects[projectPath].disabledMcpServers = []
-    }
-    config.disabledMcpServers = []
-    console.log('Enabled all servers in current project + top-level')
-  } else {
-    // Enable specific servers
-    if (config.projects?.[projectPath]) {
-      const currentDisabled = new Set(
-        config.projects[projectPath].disabledMcpjsonServers || [],
-      )
-      for (const name of serverNames) {
-        currentDisabled.delete(name)
-      }
-      config.projects[projectPath].disabledMcpjsonServers =
-        Array.from(currentDisabled)
-    }
-
-    // Also remove from top-level disabledMcpServers
-    removeFromTopLevelDisabled(serverNames)
-    // Also remove from project-level disabledMcpServers
-    removeFromProjectDisabled(projectPath, serverNames)
 
     console.log(
-      `Enabled ${serverNames.length} server(s): ${serverNames.join(', ')}`,
+      isAll
+        ? 'Enabled all servers globally'
+        : `Enabled ${validServers.length} server(s) globally: ${validServers.join(', ')}`,
+    )
+  } else {
+    // Project: Only update current project
+    if (config.projects?.[projectPath]) {
+      const currentDisabled = new Set(
+        config.projects[projectPath].disabledMcpServers || [],
+      )
+      for (const name of validServers) currentDisabled.delete(name)
+      // If empty, remove the override so project inherits from global
+      config.projects[projectPath].disabledMcpServers =
+        currentDisabled.size > 0
+          ? Array.from(currentDisabled).sort()
+          : (undefined as unknown as string[])
+    }
+
+    console.log(
+      isAll
+        ? 'Enabled all servers in current project'
+        : `Enabled ${validServers.length} server(s): ${validServers.join(', ')}`,
     )
   }
 
   writeClaudeConfig(config)
-  console.log(
-    '\n✓ Changes saved. Restart Claude Code for changes to take effect.\n',
+}
+
+/**
+ * Reset config based on scope.
+ * - Without --global: Removes MCP overrides from all project configs
+ *   (disabledMcpServers, enabledMcpjsonServers, disabledMcpjsonServers)
+ * - With --global: Clears the global disabledMcpServers array
+ */
+async function resetConfig(args: string[]) {
+  const config = readClaudeConfig()
+  const isGlobal = args.includes('--global')
+
+  if (isGlobal) {
+    // Reset global: clear the disabledMcpServers array
+    if (!config.disabledMcpServers || config.disabledMcpServers.length === 0) {
+      console.log('No global disabled servers to reset.')
+      return
+    }
+
+    config.disabledMcpServers = []
+    writeClaudeConfig(config)
+    console.log(
+      'Cleared global disabled servers list (all servers now enabled globally).',
+    )
+  } else {
+    // Reset projects: remove all MCP overrides from all project configs
+    let resetCount = 0
+    for (const projPath in config.projects) {
+      const project = config.projects[projPath]
+      if (!project) continue
+
+      let hadOverrides = false
+
+      // Clear disabledMcpServers
+      if (project.disabledMcpServers) {
+        project.disabledMcpServers = undefined as unknown as string[]
+        hadOverrides = true
+      }
+
+      // Clear enabledMcpjsonServers (servers from .mcp.json that were enabled)
+      if (project.enabledMcpjsonServers?.length > 0) {
+        project.enabledMcpjsonServers = []
+        hadOverrides = true
+      }
+
+      // Clear disabledMcpjsonServers (servers from .mcp.json that were disabled)
+      if (project.disabledMcpjsonServers?.length > 0) {
+        project.disabledMcpjsonServers = []
+        hadOverrides = true
+      }
+
+      if (hadOverrides) {
+        resetCount++
+      }
+    }
+
+    if (resetCount === 0) {
+      console.log('No project overrides to reset.')
+      return
+    }
+
+    writeClaudeConfig(config)
+    console.log(
+      `Reset ${resetCount} project(s) to inherit from global settings.`,
+    )
+  }
+}
+
+/**
+ * Unified interactive mode.
+ * Shows multi-select UI where checked = ENABLED (intuitive).
+ *
+ * @param scope - Whether to apply changes to 'project' (current directory) or 'global' (all directories)
+ */
+async function interactiveMode(scope: Scope = 'project') {
+  const config = readClaudeConfig()
+  const projectPath = process.cwd()
+
+  // Use disabledMcpServers - this is what Claude Code's UI uses
+  const project = config.projects?.[projectPath]
+  const disabled =
+    scope === 'global'
+      ? new Set(config.disabledMcpServers || [])
+      : new Set(project?.disabledMcpServers ?? config.disabledMcpServers ?? [])
+
+  const servers = config.mcpServers || {}
+  if (Object.keys(servers).length === 0) {
+    console.log('No MCP servers configured.')
+    return
+  }
+
+  // Use enable options: checked = enabled (more intuitive)
+  const options = createEnableOptions(servers, disabled)
+  const enabledServers = await selectMultiple(
+    options,
+    'Toggle MCP servers (checked = enabled):',
+    scope,
   )
+
+  // Calculate disabled = all servers minus enabled
+  const allServers = Object.keys(servers)
+  const newDisabled = allServers.filter((s) => !enabledServers.includes(s))
+
+  // Update config based on scope - only use disabledMcpServers
+  if (scope === 'global') {
+    // Global: Only update top-level (projects inherit unless they have overrides)
+    config.disabledMcpServers = newDisabled.sort()
+  } else {
+    // Project: Only update current project
+    if (!config.projects) config.projects = {}
+    if (!config.projects[projectPath]) {
+      config.projects[projectPath] = createEmptyProject()
+    }
+    // If empty, remove the override so project inherits from global
+    config.projects[projectPath].disabledMcpServers =
+      newDisabled.length > 0
+        ? newDisabled.sort()
+        : (undefined as unknown as string[])
+  }
+
+  writeClaudeConfig(config)
+  const disabledCount = newDisabled.length
+  const enabledCount = enabledServers.length
+  const scopeLabel = scope === 'global' ? 'GLOBAL' : 'PROJECT'
+
+  console.log(`\n✓ Saved (${scopeLabel})`)
+  console.log(
+    `  Enabled (${enabledCount}): ${enabledServers.length > 0 ? enabledServers.join(', ') : 'none'}`,
+  )
+  console.log(
+    `  Disabled (${disabledCount}): ${newDisabled.length > 0 ? newDisabled.join(', ') : 'none'}`,
+  )
+  if (scope === 'project') {
+    console.log(`\n  Location: ${projectPath}`)
+  }
+  console.log()
 }
 
 main()

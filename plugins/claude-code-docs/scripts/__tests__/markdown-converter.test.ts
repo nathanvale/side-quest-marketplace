@@ -2002,7 +2002,7 @@ async function createComponent() {
 
 > *"Claude Code has transformed our development workflow, reducing boilerplate time by 60%."*
 >
-> \- Engineering Team at TechCorp
+> - Engineering Team at TechCorp
 
 ## Next Steps
 
