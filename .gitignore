@@ -12,6 +12,9 @@
 *.local
 *.local.*
 
+# Personal config
+codemcp.toml
+
 # Logs
 *.log
 .claude-session-summary
