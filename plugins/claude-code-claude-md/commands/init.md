@@ -63,6 +63,16 @@ Gather comprehensive project context using MCP tools, with CI mode for automated
 
 ---
 
+## Why This Init is Different
+
+Standard `/init` just reads README.md. This command:
+
+1. **Interrogates the codebase** — Uses Kit for structure, Git for history
+2. **Asks targeted questions** — Only what can't be auto-detected (skipped in CI)
+3. **Detects patterns** — Commit style, test patterns, code conventions
+4. **Supports CI/cron** — Keep CLAUDE.md fresh automatically
+5. **Preserves customizations** — Update mode keeps your manual additions
+
 ## Phase 0: Mode Detection
 
 ```typescript
@@ -76,6 +86,20 @@ const isCI =
 
 const isUpdate = args.includes("--update");
 const isDryRun = args.includes("--diff");
+
+// Behavior adjustments
+if (isCI) {
+  // Skip all AskUserQuestion calls
+  // Use detected values or sensible defaults
+  // Minimal output, structured for logs
+}
+
+if (isUpdate) {
+  // Read existing CLAUDE.md first
+  // Parse into sections
+  // Only regenerate auto-detected sections
+  // Preserve <!-- custom --> blocks
+}
 ```
 
 **CI Output Format:**
@@ -328,34 +352,127 @@ bun lint               # Biome lint + format check
 
 ---
 
-## Phase 5: Delegate to /create
+## Phase 5: Generate CLAUDE.md
 
-Present the context and offer next steps:
+Using the context gathered, generate CLAUDE.md directly.
 
+### Template Reference
+
+Use the project template structure from:
+@../templates/project-template.md
+
+Follow best practices from:
+@../templates/best-practices.md
+
+Apply formatting guidelines from:
+@../templates/formatting-guide.md
+
+### Generation Logic
+
+1. **Check if file exists**:
+   ```typescript
+   if (exists("./CLAUDE.md") && !args.includes("--update")) {
+     // Stop and suggest /audit instead
+   }
+   ```
+
+2. **Populate template** with discovered context:
+   - Replace `[project-name]` with actual name
+   - Insert actual directory structure from Phase 1
+   - Fill in real commands from package.json
+   - Add detected tech stack
+   - Include detected conventions
+
+3. **Customize based on answers**:
+   - Team vs solo affects conventions section
+   - Testing approach affects testing section
+   - Special rules from Q6 go in Notes section
+
+4. **Write file** (or show diff if `--diff` flag)
+
+### Output Format
+
+**Interactive Mode:**
 ```markdown
-## Ready to Generate CLAUDE.md
+## ✅ CLAUDE.md Generated
 
-I've gathered the following context about your project:
+I've created ./CLAUDE.md with:
 
-[Show context block from Phase 4]
+**Auto-detected:**
+- Directory structure (X directories)
+- Y commands from package.json
+- Tech stack: [list]
+- Commit style: [conventional/other]
 
----
+**From your answers:**
+- [Answer 1]
+- [Answer 2]
 
-### Next Step
+**Next steps:**
+1. Review the file and customize as needed
+2. Add any project-specific gotchas to the Notes section
+3. Run `/audit` to check optimization
+4. Commit to version control
+```
 
-Run `/create project` to generate your CLAUDE.md.
+**CI Mode:**
+```
+[init] ✓ Created ./CLAUDE.md (145 lines)
+[init] Sections: Directory Structure, Commands, Tech Stack, Git Workflow
+[init] Exit code: 0
+```
 
-The context above will be used to populate the template with:
-- ✅ Accurate directory structure
-- ✅ Real commands from package.json
-- ✅ Detected conventions
-- ✅ Your workflow preferences
+### Update Mode (--update)
 
-**Or I can generate it directly now.** Would you like me to:
+When updating existing CLAUDE.md:
 
-1. **Run /create project** — Use standardized template (recommended)
-2. **Generate directly** — Create CLAUDE.md right now
-3. **Show context only** — Copy the context for manual use
+1. **Read existing file**
+2. **Parse sections**:
+   ```typescript
+   const CUSTOM_START = "<!-- custom -->";
+   const CUSTOM_END = "<!-- /custom -->";
+
+   const AUTO_SECTIONS = [
+     "Directory Structure",
+     "Commands",
+     "Tech Stack",
+     "Key Files"
+   ];
+
+   const PRESERVED_SECTIONS = [
+     "CRITICAL RULES",
+     "Special Rules",
+     "Notes"
+   ];
+   ```
+
+3. **Detect changes**:
+   - Compare new auto-generated sections with existing
+   - Preserve custom sections marked with `<!-- custom -->`
+   - Show diff of what changed
+
+4. **Merge and write**:
+   - Update auto-generated sections
+   - Keep preserved sections untouched
+   - Maintain custom content
+
+### Diff Mode (--diff)
+
+Show what would change without writing:
+
+```diff
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -15,6 +15,7 @@ project/
+ ├── src/
+ │   ├── components/
++│   ├── hooks/          # New directory
+ │   └── utils/
+
+@@ -25,6 +26,7 @@ Commands
+ bun dev               # Start dev server
+ bun build             # Production build
++bun typecheck         # Type checking
 ```
 
 ---
@@ -378,160 +495,6 @@ if (!hasGit) {
   // Skip commit style detection, ask instead
 }
 ```
-
----
-
-## Update Mode Logic
-
-When `--update` is passed:
-
-### 1. Parse Existing CLAUDE.md
-
-```typescript
-// Section markers for preservation
-const CUSTOM_START = "<!-- custom -->";
-const CUSTOM_END = "<!-- /custom -->";
-
-// Sections that get auto-updated
-const AUTO_SECTIONS = [
-  "Directory Structure",
-  "Commands",
-  "Tech Stack",
-  "Key Files"
-];
-
-// Sections preserved (never auto-updated)
-const PRESERVED_SECTIONS = [
-  "CRITICAL RULES",
-  "NEVER",
-  "Special Rules",
-  "Notes"
-];
-```
-
-### 2. Detect Changes
-
-```markdown
-## Update Diff
-
-**Changed sections:**
-- Directory Structure: +2 files, -1 file
-- Commands: +1 new script (bun run typecheck)
-
-**Unchanged sections:**
-- Tech Stack
-- Key Files
-- Code Conventions
-
-**Preserved (custom) sections:**
-- CRITICAL RULES (5 lines)
-- Notes (3 lines)
-```
-
-### 3. Custom Section Markers
-
-To protect custom content from auto-updates, wrap in markers:
-
-```markdown
-<!-- custom -->
-## Special Rules
-
-- Never modify src/legacy/ - deprecated
-- Always run migrations after model changes
-- Check with Nathan before major refactors
-
-<!-- /custom -->
-```
-
----
-
-## Cron Job Setup
-
-### GitHub Actions (Recommended)
-
-```yaml
-# .github/workflows/update-claude-md.yml
-name: Update CLAUDE.md
-
-on:
-  schedule:
-    # Run nightly at 2am UTC
-    - cron: '0 2 * * *'
-  workflow_dispatch: # Manual trigger
-
-jobs:
-  update:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Claude Code
-        run: npm install -g @anthropic-ai/claude-code
-
-      - name: Update CLAUDE.md
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: claude --print "/init --ci --update"
-
-      - name: Check for changes
-        id: changes
-        run: |
-          if git diff --quiet CLAUDE.md; then
-            echo "changed=false" >> $GITHUB_OUTPUT
-          else
-            echo "changed=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Commit changes
-        if: steps.changes.outputs.changed == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add CLAUDE.md
-          git commit -m "chore: auto-update CLAUDE.md [skip ci]"
-          git push
-```
-
-### Local Cron (macOS/Linux)
-
-```bash
-# Edit crontab
-crontab -e
-
-# Add nightly update at 2am
-0 2 * * * cd /path/to/project && claude --print "/init --ci --update" >> /tmp/claude-md-update.log 2>&1
-```
-
----
-
-## CI Defaults
-
-When in CI mode without interactive questions, use these sensible defaults:
-
-| Gap | CI Default |
-|-----|------------|
-| Project type not clear | Infer from structure (src/app → Web, src/cli → CLI) |
-| Team vs solo | Assume team (include conventions) |
-| Code style | Use detected linter config, or "Follow existing patterns" |
-| Testing approach | Infer from test files, or "Test after implementation" |
-| Git workflow | Infer from commits, or "Feature branches → PR → main" |
-| Special rules | Leave section empty with TODO marker |
-
----
-
-## Fallback Behavior
-
-If MCP tools unavailable:
-
-| Tool Missing | Fallback |
-|--------------|----------|
-| `kit_file_tree` | `ls -la` + `find . -type d -maxdepth 2` |
-| `kit_symbols` | Skip, rely on file structure |
-| `kit_grep` | `grep -r` via Bash |
-| `git_get_recent_commits` | `git log --oneline -20` via Bash |
-| `git_get_branch_info` | `git branch -a` via Bash |
-
-The command should work (with reduced intelligence) even without MCP tools.
 
 ---
 
@@ -571,6 +534,284 @@ User: generate
 Claude: [Creates CLAUDE.md with all gathered context]
 
 ✅ Created ./CLAUDE.md (145 lines)
+
+Key sections:
+- Directory structure with annotations
+- 6 commands from package.json
+- TypeScript strict + Biome conventions
+- Conventional commit workflow
+- Special rule: Don't modify src/legacy/
+```
+
+---
+
+## Fallback Behavior
+
+If MCP tools unavailable:
+
+| Tool Missing | Fallback |
+|--------------|----------|
+| `kit_file_tree` | `ls -la` + `find . -type d -maxdepth 2` |
+| `kit_symbols` | Skip, rely on file structure |
+| `kit_grep` | `grep -r` via Bash |
+| `git_get_recent_commits` | `git log --oneline -20` via Bash |
+| `git_get_branch_info` | `git branch -a` via Bash |
+
+The command should work (with reduced intelligence) even without MCP tools.
+
+---
+
+## Update Mode Logic
+
+When `--update` is passed:
+
+### 1. Parse Existing CLAUDE.md
+
+```typescript
+// Section markers for preservation
+const CUSTOM_START = "<!-- custom -->";
+const CUSTOM_END = "<!-- /custom -->";
+const AUTO_MARKER = "<!-- auto-generated -->";
+
+// Sections that get auto-updated
+const AUTO_SECTIONS = [
+  "Directory Structure",
+  "Commands",
+  "Tech Stack",
+  "Key Files"
+];
+
+// Sections preserved (never auto-updated)
+const PRESERVED_SECTIONS = [
+  "CRITICAL RULES",
+  "NEVER",
+  "Special Rules",
+  "Notes"
+];
+```
+
+### 2. Detect Changes
+
+```markdown
+## Update Diff
+
+**Changed sections:**
+- Directory Structure: +2 files, -1 file
+- Commands: +1 new script (bun run typecheck)
+
+**Unchanged sections:**
+- Tech Stack
+- Key Files
+- Code Conventions
+
+**Preserved (custom) sections:**
+- CRITICAL RULES (5 lines)
+- Notes (3 lines)
+```
+
+### 3. Merge Strategy
+
+```
+┌─────────────────────────────────────┐
+│ Existing CLAUDE.md                  │
+├─────────────────────────────────────┤
+│ # Project Name          ← update    │
+│ ## Directory Structure  ← update    │
+│ ## Commands             ← update    │
+│ ## CRITICAL RULES       ← preserve  │
+│ <!-- custom -->                     │
+│ ## My Custom Section    ← preserve  │
+│ <!-- /custom -->                    │
+│ ## Key Files            ← update    │
+└─────────────────────────────────────┘
+```
+
+### 4. Custom Section Markers
+
+To protect custom content from auto-updates, wrap in markers:
+
+```markdown
+<!-- custom -->
+## Special Rules
+
+- Never modify src/legacy/ - deprecated
+- Always run migrations after model changes
+- Check with Nathan before major refactors
+
+<!-- /custom -->
+```
+
+---
+
+## Cron Job Setup
+
+### GitHub Actions (Recommended)
+
+```yaml
+# .github/workflows/update-claude-md.yml
+name: Update CLAUDE.md
+
+on:
+  schedule:
+    # Run nightly at 2am UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Claude Code
+        run: |
+          npm install -g @anthropic-ai/claude-code
+
+      - name: Update CLAUDE.md
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude --print "/init --ci --update"
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet CLAUDE.md; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit changes
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CLAUDE.md
+          git commit -m "chore: auto-update CLAUDE.md [skip ci]"
+          git push
+```
+
+### Local Cron (macOS/Linux)
+
+```bash
+# Edit crontab
+crontab -e
+
+# Add nightly update at 2am
+0 2 * * * cd /path/to/project && claude --print "/init --ci --update" >> /tmp/claude-md-update.log 2>&1
+```
+
+### Pre-commit Hook
+
+```bash
+#!/bin/bash
+# .git/hooks/pre-commit
+
+# Quick check if CLAUDE.md might be stale
+if git diff --cached --name-only | grep -qE 'package\.json|tsconfig\.json|src/'; then
+  echo "Checking if CLAUDE.md needs update..."
+  claude --print "/init --ci --update --diff"
+fi
+```
+
+---
+
+## CI Defaults
+
+When in CI mode without interactive questions, use these sensible defaults:
+
+| Gap | CI Default |
+|-----|------------|
+| Project type not clear | Infer from structure (src/app → Web, src/cli → CLI) |
+| Team vs solo | Assume team (include conventions) |
+| Code style | Use detected linter config, or "Follow existing patterns" |
+| Testing approach | Infer from test files, or "Test after implementation" |
+| Git workflow | Infer from commits, or "Feature branches → PR → main" |
+| Special rules | Leave section empty with TODO marker |
+
+---
+
+## CI Output Examples
+
+### Successful Update
+
+```
+$ claude --print "/init --ci --update"
+
+[init] CI mode detected (GITHUB_ACTIONS=true)
+[init] Reading existing CLAUDE.md...
+[init] Detecting project context...
+[init]   ├─ kit_file_tree: 23 directories
+[init]   ├─ package.json: 8 scripts
+[init]   ├─ git_get_recent_commits: conventional commits
+[init]   └─ tsconfig.json: strict mode
+[init] Comparing with existing...
+[init] Changes detected:
+[init]   ├─ Directory Structure: +2 entries
+[init]   └─ Commands: +1 script (typecheck)
+[init] Writing CLAUDE.md...
+[init] ✓ Updated ./CLAUDE.md
+[init] Exit code: 0
+```
+
+### No Changes
+
+```
+$ claude --print "/init --ci --update"
+
+[init] CI mode detected
+[init] Detecting project context...
+[init] No changes detected
+[init] Exit code: 2
+```
+
+### Dry Run
+
+```
+$ claude --print "/init --ci --update --diff"
+
+[init] CI mode detected (dry run)
+[init] Detecting project context...
+[init] Changes that would be made:
+
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -15,6 +15,7 @@ project/
+ ├── src/
+ │   ├── components/
++│   ├── hooks/          # New directory
+ │   └── utils/
+
+@@ -25,6 +26,7 @@ bun dev               # Start dev server
+ bun build             # Production build
+ bun test              # Run tests
++bun typecheck         # Type checking
+
+[init] Would update 2 sections
+[init] Exit code: 0 (dry run, no changes written)
+```
+
+---
+
+## Scheduling Recommendations
+
+| Frequency | Use Case |
+|-----------|----------|
+| Nightly | Active development, frequent changes |
+| Weekly | Stable projects, occasional updates |
+| On PR merge | Keep in sync with main branch |
+| Manual | When you remember / before major work |
+
+**Tip:** Use `--diff` in PR checks to catch when CLAUDE.md is stale:
+
+```yaml
+- name: Check CLAUDE.md freshness
+  run: |
+    claude --print "/init --ci --update --diff" > /tmp/diff.txt
+    if grep -q "Changes that would be made" /tmp/diff.txt; then
+      echo "::warning::CLAUDE.md may be stale. Run '/init --update' to refresh."
+    fi
 ```
 
 ---

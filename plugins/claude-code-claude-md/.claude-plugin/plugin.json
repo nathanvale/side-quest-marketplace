@@ -5,12 +5,6 @@
 	"author": {
 		"name": "Nathan Vale"
 	},
-	"keywords": [
-		"claude-md",
-		"memory",
-		"documentation",
-		"optimization",
-		"skills"
-	],
+	"keywords": ["claude-md", "memory", "documentation", "optimization"],
 	"license": "MIT"
 }

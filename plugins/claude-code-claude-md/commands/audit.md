@@ -9,21 +9,10 @@ argument-hint: [level] - level: user|project|module (optional, auto-detects if o
 
 Analyze CLAUDE.md files against Anthropic's official best practices with level-specific requirements.
 
-## Background: Anthropic's Official Guidelines
+## Background
 
-CLAUDE.md files become part of Claude's prompt, consuming tokens every session. Key principles:
-
-1. **Keep concise** — Every line costs tokens
-2. **Tune like a prompt** — Use emphasis markers ("NEVER", "YOU MUST", "IMPORTANT")
-3. **Be specific** — "Use 2-space indentation" beats "Format code properly"
-4. **Use @imports** — Extract sections >50 lines to modular files
-5. **Front-load critical rules** — NEVER/MUST at the top
-
-### Memory Loading Hierarchy
-
-```
-Enterprise → ~/.claude/CLAUDE.md (user) → Project root → Nested subtrees
-```
+For Anthropic's official guidelines and best practices, see:
+@../templates/best-practices.md
 
 ## Instructions
 
@@ -39,119 +28,30 @@ Parse arguments or auto-detect:
 
 ### 2. Apply Level-Specific Requirements
 
----
+For detailed quality checks and requirements by level, see:
+@../templates/quality-checks.md
 
-## USER Level (~/.claude/CLAUDE.md)
+For formatting best practices, see:
+@../templates/formatting-guide.md
 
-**Budget:** 50-100 lines (max 150 before split)
+### 3. Quick Reference Summary
 
-### Required Content
-- [ ] Personal context (location, timezone, work style)
-- [ ] Communication preferences
-- [ ] Global NEVER/MUST rules
-- [ ] @imports to context files
+**Token Budgets:**
+- User: 50-100 lines (max 150)
+- Project: 100-200 lines (max 300)
+- Module: 30-50 lines (max 100)
 
-### Should NOT Contain
-- ❌ Project-specific conventions (move to project CLAUDE.md)
-- ❌ Directory structures / file trees
-- ❌ Build/test commands for specific projects
-- ❌ Team coding standards
+**Key Requirements:**
+- **User**: Personal prefs, global tools, @imports to context files
+- **Project**: Directory structure (required!), commands, coding standards
+- **Module**: One-line purpose, key files, module-specific conventions
 
-### Check For
-- [ ] Critical rules at TOP with emphasis markers
-- [ ] Tool references use arrow notation (`Tool → \`command\``)
-- [ ] Large sections extracted to `~/.claude/context/*.md`
-- [ ] No duplicate info that's also in project files
-
----
-
-## PROJECT Level (./CLAUDE.md)
-
-**Budget:** 100-200 lines (max 300 before split)
-
-### Required Content
-- [ ] **Directory structure / file tree** ← Claude needs this map!
-- [ ] Build, test, lint commands
-- [ ] Key files with descriptions
-- [ ] Coding standards for the team
-- [ ] Git workflow (branch naming, commit format)
-
-### Should NOT Contain
-- ❌ Personal preferences (move to user CLAUDE.md)
-- ❌ Individual communication style
-- ❌ Global tool configs that apply everywhere
-
-### Check For
-- [ ] File tree present and annotated with comments
-- [ ] Commands in bash code blocks
-- [ ] Architecture overview (brief, not exhaustive)
-- [ ] Module @imports for feature-specific context
-- [ ] Custom tools/MCP servers documented
-
-### File Tree Check
-
-**Required format:**
-```
-project-name/
-├── src/
-│   ├── components/     # Brief description
-│   ├── api/            # Brief description
-│   └── index.ts        # Entry point
-├── tests/              # Test location
-└── docs/               # Documentation
-```
-
-**Flags:**
-- 🔴 Missing file tree entirely
-- 🟡 File tree present but no annotations
-- 🟢 File tree with descriptions
-
----
-
-## MODULE Level (feature/CLAUDE.md)
-
-**Budget:** 30-50 lines (max 100 before split)
-
-### Required Content
-- [ ] One-line module purpose
-- [ ] Key files in this module
-- [ ] Module-specific conventions
-- [ ] Dependencies and consumers
-
-### Should NOT Contain
-- ❌ Project-wide standards (inherit from root)
-- ❌ Personal preferences
-- ❌ Full architecture docs
-
-### Check For
-- [ ] Focused scope (one feature/module only)
-- [ ] References parent conventions, doesn't duplicate
-- [ ] Test commands for this module specifically
-
----
-
-## 3. Common Quality Checks (All Levels)
-
-### Effectiveness Patterns (GOOD)
-
-| Pattern | Example |
-|---------|---------|
-| Emphasis markers | "**NEVER**", "**YOU MUST**", "**IMPORTANT**" |
-| Arrow notation | `Text → \`kit_grep\` \| Semantic → \`kit_semantic\`` |
-| Specific directives | "Use 2-space indentation" not "Format properly" |
-| Brief @import refs | `Full guide: @~/.claude/context/file.md` |
-| Tables for reference | Quick lookup, decision matrices |
-
-### Anti-Patterns (BAD)
-
-| Anti-Pattern | Fix |
-|--------------|-----|
-| Verbose paragraphs (>3 sentences) | Convert to bullets |
-| Vague instructions | Be specific with examples |
-| Critical rules without emphasis | Add "NEVER", "YOU MUST" |
-| Sections >50 lines inline | Extract to @import |
-| Orphan headings (empty) | Remove or add content |
-| Duplicate info across levels | Keep in one place, reference from others |
+**Common Anti-Patterns:**
+- Verbose paragraphs (>3 sentences) → Convert to bullets
+- Vague instructions → Be specific with examples
+- Critical rules without emphasis → Add **NEVER**, **YOU MUST**
+- Sections >50 lines inline → Extract to @import
+- Duplicate info across levels → Keep in one place
 
 ---
 
@@ -262,78 +162,7 @@ Content that belongs in parent:
 
 ## Example Issues by Level
 
-### USER Level Issue
-
-**Problem:** Project-specific content in user file
-```markdown
-# In ~/.claude/CLAUDE.md (BAD)
-## Build Commands
-npm run build
-npm test
-```
-
-**Fix:** Move to project CLAUDE.md, keep user file for personal prefs only.
-
-### PROJECT Level Issue
-
-**Problem:** Missing file tree
-```markdown
-# Current (BAD)
-## About
-This is a React app with TypeScript.
-
-# Should be (GOOD)
-## Directory Structure
-\`\`\`
-my-app/
-├── src/
-│   ├── components/    # React components
-│   ├── hooks/         # Custom hooks
-│   └── index.tsx      # Entry point
-├── tests/             # Jest tests
-└── package.json
-\`\`\`
-```
-
-### MODULE Level Issue
-
-**Problem:** Duplicating project-wide standards
-```markdown
-# In src/auth/CLAUDE.md (BAD)
-## Code Standards
-- Use TypeScript strict mode
-- Use Biome for formatting
-- Write tests for all functions
-
-# Should be (GOOD)
-# Auth Module
-
-Handles user authentication and session management.
-
-## Key Files
-- `auth.ts` — Main auth logic
-- `session.ts` — Session management
-- `types.ts` — Auth-related types
-
-## Module-Specific Notes
-- JWT tokens expire after 24h
-- Refresh tokens stored in httpOnly cookies
-```
-
-## Quick Reference: What Goes Where
-
-| Content Type | User | Project | Module |
-|--------------|------|---------|--------|
-| Personal preferences | ✅ | ❌ | ❌ |
-| Communication style | ✅ | ❌ | ❌ |
-| Global tool configs | ✅ | ❌ | ❌ |
-| Directory structure | ❌ | ✅ | ❌ |
-| Build/test commands | ❌ | ✅ | (module-specific only) |
-| Team coding standards | ❌ | ✅ | ❌ |
-| Git workflow | ❌ | ✅ | ❌ |
-| Architecture overview | ❌ | ✅ | ❌ |
-| Feature-specific conventions | ❌ | ❌ | ✅ |
-| Key files in module | ❌ | ❌ | ✅ |
-| Module dependencies | ❌ | ❌ | ✅ |
+For detailed examples of common issues and fixes, see:
+@../templates/quality-checks.md
 
 Now audit the CLAUDE.md file: $ARGUMENTS
