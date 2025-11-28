@@ -1,11 +1,11 @@
 {
-  "name": "atuin",
-  "description": "Atuin shell history integration - search, capture, and manage bash command history with AI",
-  "version": "1.0.0",
-  "author": {
-    "name": "Nathan Vale",
-    "email": "hi@nathanvale.com"
-  },
-  "keywords": ["atuin", "bash", "history", "shell", "mcp"],
-  "license": "MIT"
+	"name": "atuin",
+	"description": "Atuin shell history integration - search, capture, and manage bash command history with AI",
+	"version": "1.0.0",
+	"author": {
+		"name": "Nathan Vale",
+		"email": "hi@nathanvale.com"
+	},
+	"keywords": ["atuin", "bash", "history", "shell", "mcp"],
+	"license": "MIT"
 }

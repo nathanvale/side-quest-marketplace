@@ -15,11 +15,11 @@
  * - 2: Blocking error (any type errors found, shown to Claude for follow-up)
  */
 
-import { spawn } from 'bun'
-import { TSC_SUPPORTED_EXTENSIONS } from './shared/constants'
-import { hasChangedFiles } from './shared/git-utils'
-import type { TscParseResult } from './shared/types'
-import { parseTscOutput } from './tsc-check'
+import { spawn } from "bun";
+import { TSC_SUPPORTED_EXTENSIONS } from "./shared/constants";
+import { hasChangedFiles } from "./shared/git-utils";
+import type { TscParseResult } from "./shared/types";
+import { parseTscOutput } from "./tsc-check";
 
 /**
  * Format errors for Claude-friendly output.
@@ -28,53 +28,53 @@ import { parseTscOutput } from './tsc-check'
  * @returns Formatted error string
  */
 function formatErrors(parsed: TscParseResult): string {
-  if (parsed.errorCount === 0) return ''
+	if (parsed.errorCount === 0) return "";
 
-  const lines: string[] = [`${parsed.errorCount} type error(s) found:`]
+	const lines: string[] = [`${parsed.errorCount} type error(s) found:`];
 
-  for (const e of parsed.errors) {
-    lines.push(`  ${e.file}:${e.line}:${e.col} - ${e.message}`)
-  }
+	for (const e of parsed.errors) {
+		lines.push(`  ${e.file}:${e.line}:${e.col} - ${e.message}`);
+	}
 
-  return lines.join('\n')
+	return lines.join("\n");
 }
 
 async function main() {
-  // Only run if TypeScript files have changed
-  const hasChanges = await hasChangedFiles(TSC_SUPPORTED_EXTENSIONS)
+	// Only run if TypeScript files have changed
+	const hasChanges = await hasChangedFiles(TSC_SUPPORTED_EXTENSIONS);
 
-  if (!hasChanges) {
-    // No TypeScript files changed, nothing to check
-    process.exit(0)
-  }
+	if (!hasChanges) {
+		// No TypeScript files changed, nothing to check
+		process.exit(0);
+	}
 
-  // Run project-wide tsc --noEmit
-  const proc = spawn({
-    cmd: ['bunx', 'tsc', '--noEmit', '--pretty', 'false'],
-    stdout: 'pipe',
-    stderr: 'pipe',
-  })
+	// Run project-wide tsc --noEmit
+	const proc = spawn({
+		cmd: ["bunx", "tsc", "--noEmit", "--pretty", "false"],
+		stdout: "pipe",
+		stderr: "pipe",
+	});
 
-  const exitCode = await proc.exited
-  const stdout = await new Response(proc.stdout).text()
-  const stderr = await new Response(proc.stderr).text()
-  const output = `${stdout}\n${stderr}`
+	const exitCode = await proc.exited;
+	const stdout = await new Response(proc.stdout).text();
+	const stderr = await new Response(proc.stderr).text();
+	const output = `${stdout}\n${stderr}`;
 
-  if (exitCode === 0) {
-    // All type checks passed
-    process.exit(0)
-  }
+	if (exitCode === 0) {
+		// All type checks passed
+		process.exit(0);
+	}
 
-  // Parse and report ALL errors - TypeScript errors cascade across files
-  const parsed = parseTscOutput(output)
-  const formatted = formatErrors(parsed)
+	// Parse and report ALL errors - TypeScript errors cascade across files
+	const parsed = parseTscOutput(output);
+	const formatted = formatErrors(parsed);
 
-  if (formatted) {
-    console.error(`TypeScript project check:\n${formatted}`)
-    process.exit(2)
-  }
+	if (formatted) {
+		console.error(`TypeScript project check:\n${formatted}`);
+		process.exit(2);
+	}
 
-  process.exit(0)
+	process.exit(0);
 }
 
-main()
+main();

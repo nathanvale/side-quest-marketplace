@@ -1,26 +1,26 @@
 {
-  "name": "@sidequest/mcp-git-intelligence",
-  "version": "1.0.0",
-  "private": true,
-  "description": "MCP server for git intelligence - commit history, status, and context",
-  "type": "module",
-  "main": "index.ts",
-  "bin": {
-    "git-intelligence-mcp": "./index.ts"
-  },
-  "scripts": {
-    "start": "bun run index.ts",
-    "test": "echo 'No tests yet'",
-    "typecheck": "echo 'No typecheck yet'"
-  },
-  "keywords": [
-    "mcp",
-    "git",
-    "history",
-    "commits"
-  ],
-  "license": "MIT",
-  "dependencies": {
-    "mcpez": "^1.2.1"
-  }
+	"name": "@sidequest/mcp-git-intelligence",
+	"version": "1.0.0",
+	"private": true,
+	"description": "MCP server for git intelligence - commit history, status, and context",
+	"type": "module",
+	"main": "index.ts",
+	"bin": {
+		"git-intelligence-mcp": "./index.ts"
+	},
+	"scripts": {
+		"start": "bun run index.ts",
+		"test": "echo 'No tests yet'",
+		"typecheck": "echo 'No typecheck yet'"
+	},
+	"keywords": [
+		"mcp",
+		"git",
+		"history",
+		"commits"
+	],
+	"license": "MIT",
+	"dependencies": {
+		"mcpez": "^1.2.1"
+	}
 }

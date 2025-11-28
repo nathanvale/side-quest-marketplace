@@ -1,11 +1,11 @@
 {
-  "name": "plugin-template",
-  "description": "Generate new plugin scaffolds with configurable components. Commands: /plugin-template:create",
-  "version": "1.0.0",
-  "author": {
-    "name": "Nathan Vale",
-    "email": "hi@nathanvale.com"
-  },
-  "keywords": ["plugin", "template", "generator", "scaffold"],
-  "license": "MIT"
+	"name": "plugin-template",
+	"description": "Generate new plugin scaffolds with configurable components. Commands: /plugin-template:create",
+	"version": "1.0.0",
+	"author": {
+		"name": "Nathan Vale",
+		"email": "hi@nathanvale.com"
+	},
+	"keywords": ["plugin", "template", "generator", "scaffold"],
+	"license": "MIT"
 }

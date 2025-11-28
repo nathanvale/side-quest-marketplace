@@ -1,25 +1,25 @@
-import { describe, expect, it } from 'bun:test'
-import { parseBiomeOutput, parseBunTestOutput } from './index'
+import { describe, expect, it } from "bun:test";
+import { parseBiomeOutput, parseBunTestOutput } from "./index";
 
-describe('parseBunTestOutput', () => {
-  it('parses all passing tests', () => {
-    const output = `bun test v1.3.2
+describe("parseBunTestOutput", () => {
+	it("parses all passing tests", () => {
+		const output = `bun test v1.3.2
 
  3 pass
  0 fail
  5 expect() calls
-Ran 3 tests across 1 file. [50.00ms]`
+Ran 3 tests across 1 file. [50.00ms]`;
 
-    const result = parseBunTestOutput(output)
+		const result = parseBunTestOutput(output);
 
-    expect(result.passed).toBe(3)
-    expect(result.failed).toBe(0)
-    expect(result.total).toBe(3)
-    expect(result.failures).toHaveLength(0)
-  })
+		expect(result.passed).toBe(3);
+		expect(result.failed).toBe(0);
+		expect(result.total).toBe(3);
+		expect(result.failures).toHaveLength(0);
+	});
 
-  it('parses failing tests with pass/fail summary', () => {
-    const output = `bun test v1.3.2
+	it("parses failing tests with pass/fail summary", () => {
+		const output = `bun test v1.3.2
 
 ✗ should add numbers [1.23ms]
   error: expect(received).toBe(expected)
@@ -30,21 +30,21 @@ Ran 3 tests across 1 file. [50.00ms]`
  2 pass
  1 fail
  3 expect() calls
-Ran 3 tests across 1 file. [50.00ms]`
+Ran 3 tests across 1 file. [50.00ms]`;
 
-    const result = parseBunTestOutput(output)
+		const result = parseBunTestOutput(output);
 
-    expect(result.passed).toBe(2)
-    expect(result.failed).toBe(1)
-    expect(result.total).toBe(3)
-    expect(result.failures).toHaveLength(1)
-    expect(result.failures[0]?.file).toBe('/path/to/math.test.ts')
-    expect(result.failures[0]?.line).toBe(10)
-    expect(result.failures[0]?.message).toContain('✗ should add numbers')
-  })
+		expect(result.passed).toBe(2);
+		expect(result.failed).toBe(1);
+		expect(result.total).toBe(3);
+		expect(result.failures).toHaveLength(1);
+		expect(result.failures[0]?.file).toBe("/path/to/math.test.ts");
+		expect(result.failures[0]?.line).toBe(10);
+		expect(result.failures[0]?.message).toContain("✗ should add numbers");
+	});
 
-  it('parses multiple failures', () => {
-    const output = `bun test v1.3.2
+	it("parses multiple failures", () => {
+		const output = `bun test v1.3.2
 
 ✗ test one [1.00ms]
   error: first error
@@ -55,175 +55,177 @@ Ran 3 tests across 1 file. [50.00ms]`
       at /path/to/two.test.ts:15:7
 
  0 pass
- 2 fail`
+ 2 fail`;
 
-    const result = parseBunTestOutput(output)
+		const result = parseBunTestOutput(output);
 
-    expect(result.passed).toBe(0)
-    expect(result.failed).toBe(2)
-    expect(result.failures).toHaveLength(2)
-    expect(result.failures[0]?.file).toBe('/path/to/one.test.ts')
-    expect(result.failures[0]?.line).toBe(5)
-    expect(result.failures[1]?.file).toBe('/path/to/two.test.ts')
-    expect(result.failures[1]?.line).toBe(15)
-  })
+		expect(result.passed).toBe(0);
+		expect(result.failed).toBe(2);
+		expect(result.failures).toHaveLength(2);
+		expect(result.failures[0]?.file).toBe("/path/to/one.test.ts");
+		expect(result.failures[0]?.line).toBe(5);
+		expect(result.failures[1]?.file).toBe("/path/to/two.test.ts");
+		expect(result.failures[1]?.line).toBe(15);
+	});
 
-  it('handles FAIL keyword', () => {
-    const output = `FAIL src/index.test.ts
+	it("handles FAIL keyword", () => {
+		const output = `FAIL src/index.test.ts
   error: something went wrong
 
  0 pass
- 1 fail`
+ 1 fail`;
 
-    const result = parseBunTestOutput(output)
+		const result = parseBunTestOutput(output);
 
-    expect(result.failed).toBe(1)
-    expect(result.failures).toHaveLength(1)
-    expect(result.failures[0]?.message).toContain('FAIL')
-  })
+		expect(result.failed).toBe(1);
+		expect(result.failures).toHaveLength(1);
+		expect(result.failures[0]?.message).toContain("FAIL");
+	});
 
-  it('handles empty output', () => {
-    const result = parseBunTestOutput('')
+	it("handles empty output", () => {
+		const result = parseBunTestOutput("");
 
-    expect(result.passed).toBe(0)
-    expect(result.failed).toBe(0)
-    expect(result.total).toBe(0)
-    expect(result.failures).toHaveLength(0)
-  })
+		expect(result.passed).toBe(0);
+		expect(result.failed).toBe(0);
+		expect(result.total).toBe(0);
+		expect(result.failures).toHaveLength(0);
+	});
 
-  it('extracts stack traces', () => {
-    const output = `✗ my test
+	it("extracts stack traces", () => {
+		const output = `✗ my test
   error: oops
       at someFunc (/path/file.ts:10:5)
       at anotherFunc (/path/other.ts:20:10)
 
  0 pass
- 1 fail`
+ 1 fail`;
 
-    const result = parseBunTestOutput(output)
+		const result = parseBunTestOutput(output);
 
-    expect(result.failures[0]?.stack).toContain('at someFunc')
-    expect(result.failures[0]?.stack).toContain('at anotherFunc')
-  })
-})
+		expect(result.failures[0]?.stack).toContain("at someFunc");
+		expect(result.failures[0]?.stack).toContain("at anotherFunc");
+	});
+});
 
-describe('parseBiomeOutput', () => {
-  it('parses empty diagnostics', () => {
-    const output = JSON.stringify({
-      diagnostics: [],
-      summary: { errorCount: 0, warnCount: 0 },
-    })
+describe("parseBiomeOutput", () => {
+	it("parses empty diagnostics", () => {
+		const output = JSON.stringify({
+			diagnostics: [],
+			summary: { errorCount: 0, warnCount: 0 },
+		});
 
-    const result = parseBiomeOutput(output)
+		const result = parseBiomeOutput(output);
 
-    expect(result.error_count).toBe(0)
-    expect(result.warning_count).toBe(0)
-    expect(result.diagnostics).toHaveLength(0)
-  })
+		expect(result.error_count).toBe(0);
+		expect(result.warning_count).toBe(0);
+		expect(result.diagnostics).toHaveLength(0);
+	});
 
-  it('parses error diagnostics', () => {
-    const output = JSON.stringify({
-      diagnostics: [
-        {
-          severity: 'error',
-          category: 'lint/correctness/noUnusedVariables',
-          description: 'This variable is unused',
-          location: {
-            path: { file: 'src/index.ts' },
-            span: { start: { line: 10 } },
-          },
-        },
-      ],
-      summary: { errorCount: 1, warnCount: 0 },
-    })
+	it("parses error diagnostics", () => {
+		const output = JSON.stringify({
+			diagnostics: [
+				{
+					severity: "error",
+					category: "lint/correctness/noUnusedVariables",
+					description: "This variable is unused",
+					location: {
+						path: { file: "src/index.ts" },
+						span: { start: { line: 10 } },
+					},
+				},
+			],
+			summary: { errorCount: 1, warnCount: 0 },
+		});
 
-    const result = parseBiomeOutput(output)
+		const result = parseBiomeOutput(output);
 
-    expect(result.error_count).toBe(1)
-    expect(result.warning_count).toBe(0)
-    expect(result.diagnostics).toHaveLength(1)
-    expect(result.diagnostics[0]?.file).toBe('src/index.ts')
-    expect(result.diagnostics[0]?.line).toBe(10)
-    expect(result.diagnostics[0]?.code).toBe('lint/correctness/noUnusedVariables')
-    expect(result.diagnostics[0]?.severity).toBe('error')
-  })
+		expect(result.error_count).toBe(1);
+		expect(result.warning_count).toBe(0);
+		expect(result.diagnostics).toHaveLength(1);
+		expect(result.diagnostics[0]?.file).toBe("src/index.ts");
+		expect(result.diagnostics[0]?.line).toBe(10);
+		expect(result.diagnostics[0]?.code).toBe(
+			"lint/correctness/noUnusedVariables",
+		);
+		expect(result.diagnostics[0]?.severity).toBe("error");
+	});
 
-  it('parses warning diagnostics', () => {
-    const output = JSON.stringify({
-      diagnostics: [
-        {
-          severity: 'warning',
-          category: 'lint/style/useConst',
-          description: 'Use const instead of let',
-          location: {
-            path: { file: 'src/utils.ts' },
-            span: { start: { line: 5 } },
-          },
-        },
-      ],
-      summary: { errorCount: 0, warnCount: 1 },
-    })
+	it("parses warning diagnostics", () => {
+		const output = JSON.stringify({
+			diagnostics: [
+				{
+					severity: "warning",
+					category: "lint/style/useConst",
+					description: "Use const instead of let",
+					location: {
+						path: { file: "src/utils.ts" },
+						span: { start: { line: 5 } },
+					},
+				},
+			],
+			summary: { errorCount: 0, warnCount: 1 },
+		});
 
-    const result = parseBiomeOutput(output)
+		const result = parseBiomeOutput(output);
 
-    expect(result.error_count).toBe(0)
-    expect(result.warning_count).toBe(1)
-    expect(result.diagnostics).toHaveLength(1)
-    expect(result.diagnostics[0]?.severity).toBe('warning')
-  })
+		expect(result.error_count).toBe(0);
+		expect(result.warning_count).toBe(1);
+		expect(result.diagnostics).toHaveLength(1);
+		expect(result.diagnostics[0]?.severity).toBe("warning");
+	});
 
-  it('handles mixed errors and warnings', () => {
-    const output = JSON.stringify({
-      diagnostics: [
-        { severity: 'error', category: 'err1', location: {} },
-        { severity: 'warning', category: 'warn1', location: {} },
-        { severity: 'error', category: 'err2', location: {} },
-      ],
-      summary: { errorCount: 2, warnCount: 1 },
-    })
+	it("handles mixed errors and warnings", () => {
+		const output = JSON.stringify({
+			diagnostics: [
+				{ severity: "error", category: "err1", location: {} },
+				{ severity: "warning", category: "warn1", location: {} },
+				{ severity: "error", category: "err2", location: {} },
+			],
+			summary: { errorCount: 2, warnCount: 1 },
+		});
 
-    const result = parseBiomeOutput(output)
+		const result = parseBiomeOutput(output);
 
-    expect(result.error_count).toBe(2)
-    expect(result.warning_count).toBe(1)
-    expect(result.diagnostics).toHaveLength(3)
-  })
+		expect(result.error_count).toBe(2);
+		expect(result.warning_count).toBe(1);
+		expect(result.diagnostics).toHaveLength(3);
+	});
 
-  it('handles invalid JSON gracefully', () => {
-    const result = parseBiomeOutput('not valid json')
+	it("handles invalid JSON gracefully", () => {
+		const result = parseBiomeOutput("not valid json");
 
-    expect(result.error_count).toBe(1)
-    expect(result.diagnostics).toHaveLength(1)
-    expect(result.diagnostics[0]?.code).toBe('internal_error')
-    expect(result.diagnostics[0]?.message).toContain('Failed to parse')
-  })
+		expect(result.error_count).toBe(1);
+		expect(result.diagnostics).toHaveLength(1);
+		expect(result.diagnostics[0]?.code).toBe("internal_error");
+		expect(result.diagnostics[0]?.message).toContain("Failed to parse");
+	});
 
-  it('handles missing location data', () => {
-    const output = JSON.stringify({
-      diagnostics: [{ severity: 'error', category: 'test' }],
-    })
+	it("handles missing location data", () => {
+		const output = JSON.stringify({
+			diagnostics: [{ severity: "error", category: "test" }],
+		});
 
-    const result = parseBiomeOutput(output)
+		const result = parseBiomeOutput(output);
 
-    expect(result.diagnostics[0]?.file).toBe('unknown')
-    expect(result.diagnostics[0]?.line).toBe(0)
-  })
+		expect(result.diagnostics[0]?.file).toBe("unknown");
+		expect(result.diagnostics[0]?.line).toBe(0);
+	});
 
-  it('includes advice as suggestion', () => {
-    const output = JSON.stringify({
-      diagnostics: [
-        {
-          severity: 'error',
-          category: 'test',
-          location: {},
-          advice: [{ type: 'suggestion', text: 'Try this instead' }],
-        },
-      ],
-    })
+	it("includes advice as suggestion", () => {
+		const output = JSON.stringify({
+			diagnostics: [
+				{
+					severity: "error",
+					category: "test",
+					location: {},
+					advice: [{ type: "suggestion", text: "Try this instead" }],
+				},
+			],
+		});
 
-    const result = parseBiomeOutput(output)
+		const result = parseBiomeOutput(output);
 
-    expect(result.diagnostics[0]?.suggestion).toBeDefined()
-    expect(result.diagnostics[0]?.suggestion).toContain('suggestion')
-  })
-})
+		expect(result.diagnostics[0]?.suggestion).toBeDefined();
+		expect(result.diagnostics[0]?.suggestion).toContain("suggestion");
+	});
+});

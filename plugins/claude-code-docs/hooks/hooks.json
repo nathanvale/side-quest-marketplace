@@ -1,17 +1,17 @@
 {
-  "description": "Auto-update Claude Code documentation every 24 hours",
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/PreToolUse.sh",
-            "timeout": 30
-          }
-        ]
-      }
-    ]
-  }
+	"description": "Auto-update Claude Code documentation every 24 hours",
+	"hooks": {
+		"PreToolUse": [
+			{
+				"matcher": "*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/hooks/PreToolUse.sh",
+						"timeout": 30
+					}
+				]
+			}
+		]
+	}
 }

@@ -15,6 +15,7 @@
 # Logs
 *.log
 .claude-session-summary
+.codemcp.log
 
 settings.local.json
 
@@ -23,6 +24,9 @@ plugins/claude-code-docs/docs/
 
 # Dependencies
 node_modules/
+
+# Kit vector database cache
+.kit/
 
 # Untracked plugin
 plugins/nvcc/

@@ -1,21 +1,21 @@
 {
-  "name": "@sidequest/atuin",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Atuin shell history integration plugin for Claude Code",
-  "type": "module",
-  "scripts": {
-    "test": "bun test --recursive",
-    "typecheck": "tsc --noEmit",
-    "format": "biome format --write .",
-    "format:check": "biome format .",
-    "lint": "biome lint .",
-    "check": "biome check --write ."
-  },
-  "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "dependencies": {
-    "mcpez": "^1.2.1"
-  }
+	"name": "@sidequest/atuin",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Atuin shell history integration plugin for Claude Code",
+	"type": "module",
+	"scripts": {
+		"test": "bun test --recursive",
+		"typecheck": "tsc --noEmit",
+		"format": "biome format --write .",
+		"format:check": "biome format .",
+		"lint": "biome lint .",
+		"check": "biome check --write ."
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	},
+	"dependencies": {
+		"mcpez": "^1.2.1"
+	}
 }

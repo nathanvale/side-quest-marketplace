@@ -1,17 +1,17 @@
 {
-  "description": "Atuin shell history integration hooks",
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/atuin-post-tool.sh",
-            "timeout": 5
-          }
-        ]
-      }
-    ]
-  }
+	"description": "Atuin shell history integration hooks",
+	"hooks": {
+		"PostToolUse": [
+			{
+				"matcher": "Bash",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/hooks/atuin-post-tool.sh",
+						"timeout": 5
+					}
+				]
+			}
+		]
+	}
 }

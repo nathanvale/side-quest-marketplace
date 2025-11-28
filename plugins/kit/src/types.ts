@@ -12,8 +12,8 @@
  * Response format options for tool output.
  */
 export enum ResponseFormat {
-  MARKDOWN = 'markdown',
-  JSON = 'json',
+	MARKDOWN = "markdown",
+	JSON = "json",
 }
 
 // ============================================================================
@@ -24,46 +24,46 @@ export enum ResponseFormat {
  * A single grep match result.
  */
 export interface GrepMatch {
-  /** Relative file path from repository root */
-  file: string
-  /** Line number (1-indexed) */
-  line?: number
-  /** Matched line content */
-  content: string
+	/** Relative file path from repository root */
+	file: string;
+	/** Line number (1-indexed) */
+	line?: number;
+	/** Matched line content */
+	content: string;
 }
 
 /**
  * Result of a grep search operation.
  */
 export interface GrepResult {
-  /** Number of matches found */
-  count: number
-  /** Array of match objects */
-  matches: GrepMatch[]
-  /** Search pattern used */
-  pattern: string
-  /** Repository path searched */
-  path: string
+	/** Number of matches found */
+	count: number;
+	/** Array of match objects */
+	matches: GrepMatch[];
+	/** Search pattern used */
+	pattern: string;
+	/** Repository path searched */
+	path: string;
 }
 
 /**
  * Options for grep search.
  */
 export interface GrepOptions {
-  /** Search pattern (text or regex) */
-  pattern: string
-  /** Repository path to search */
-  path?: string
-  /** Case-sensitive search (default: true) */
-  caseSensitive?: boolean
-  /** File pattern to include (e.g., "*.py") */
-  include?: string
-  /** File pattern to exclude */
-  exclude?: string
-  /** Maximum results to return (default: 100) */
-  maxResults?: number
-  /** Subdirectory to search within */
-  directory?: string
+	/** Search pattern (text or regex) */
+	pattern: string;
+	/** Repository path to search */
+	path?: string;
+	/** Case-sensitive search (default: true) */
+	caseSensitive?: boolean;
+	/** File pattern to include (e.g., "*.py") */
+	include?: string;
+	/** File pattern to exclude */
+	exclude?: string;
+	/** Maximum results to return (default: 100) */
+	maxResults?: number;
+	/** Subdirectory to search within */
+	directory?: string;
 }
 
 // ============================================================================
@@ -74,50 +74,50 @@ export interface GrepOptions {
  * A single semantic search match.
  */
 export interface SemanticMatch {
-  /** Relative file path */
-  file: string
-  /** Code chunk that matched */
-  chunk: string
-  /** Relevance score (higher = more relevant) */
-  score: number
-  /** Start line of the chunk */
-  startLine?: number
-  /** End line of the chunk */
-  endLine?: number
+	/** Relative file path */
+	file: string;
+	/** Code chunk that matched */
+	chunk: string;
+	/** Relevance score (higher = more relevant) */
+	score: number;
+	/** Start line of the chunk */
+	startLine?: number;
+	/** End line of the chunk */
+	endLine?: number;
 }
 
 /**
  * Result of a semantic search operation.
  */
 export interface SemanticResult {
-  /** Number of matches found */
-  count: number
-  /** Array of semantic matches */
-  matches: SemanticMatch[]
-  /** Natural language query used */
-  query: string
-  /** Repository path searched */
-  path: string
-  /** Whether results came from fallback grep */
-  fallback?: boolean
-  /** Install hint if semantic search unavailable */
-  installHint?: string
+	/** Number of matches found */
+	count: number;
+	/** Array of semantic matches */
+	matches: SemanticMatch[];
+	/** Natural language query used */
+	query: string;
+	/** Repository path searched */
+	path: string;
+	/** Whether results came from fallback grep */
+	fallback?: boolean;
+	/** Install hint if semantic search unavailable */
+	installHint?: string;
 }
 
 /**
  * Options for semantic search.
  */
 export interface SemanticOptions {
-  /** Natural language query */
-  query: string
-  /** Repository path to search */
-  path?: string
-  /** Number of results to return (default: 5) */
-  topK?: number
-  /** Chunking strategy: 'symbols' or 'lines' */
-  chunkBy?: 'symbols' | 'lines'
-  /** Force rebuild of vector index */
-  buildIndex?: boolean
+	/** Natural language query */
+	query: string;
+	/** Repository path to search */
+	path?: string;
+	/** Number of results to return (default: 5) */
+	topK?: number;
+	/** Chunking strategy: 'symbols' or 'lines' */
+	chunkBy?: "symbols" | "lines";
+	/** Force rebuild of vector index */
+	buildIndex?: boolean;
 }
 
 // ============================================================================
@@ -128,44 +128,44 @@ export interface SemanticOptions {
  * A code symbol (function, class, variable, etc.).
  */
 export interface CodeSymbol {
-  /** Symbol name */
-  name: string
-  /** Symbol type (function, class, variable, type, etc.) */
-  type: string
-  /** File containing the symbol */
-  file: string
-  /** Start line number */
-  startLine: number
-  /** End line number (if available) */
-  endLine?: number
-  /** Symbol code/signature */
-  code?: string
+	/** Symbol name */
+	name: string;
+	/** Symbol type (function, class, variable, type, etc.) */
+	type: string;
+	/** File containing the symbol */
+	file: string;
+	/** Start line number */
+	startLine: number;
+	/** End line number (if available) */
+	endLine?: number;
+	/** Symbol code/signature */
+	code?: string;
 }
 
 /**
  * Result of symbol extraction.
  */
 export interface SymbolsResult {
-  /** Number of symbols found */
-  count: number
-  /** Array of code symbols */
-  symbols: CodeSymbol[]
-  /** Repository path searched */
-  path: string
+	/** Number of symbols found */
+	count: number;
+	/** Array of code symbols */
+	symbols: CodeSymbol[];
+	/** Repository path searched */
+	path: string;
 }
 
 /**
  * Options for symbol extraction.
  */
 export interface SymbolsOptions {
-  /** Repository path */
-  path?: string
-  /** File pattern filter (e.g., "*.py") */
-  pattern?: string
-  /** Filter by symbol type */
-  symbolType?: string
-  /** Extract symbols from a specific file only */
-  file?: string
+	/** Repository path */
+	path?: string;
+	/** File pattern filter (e.g., "*.py") */
+	pattern?: string;
+	/** Filter by symbol type */
+	symbolType?: string;
+	/** Extract symbols from a specific file only */
+	file?: string;
 }
 
 // ============================================================================
@@ -176,38 +176,38 @@ export interface SymbolsOptions {
  * A single file tree entry.
  */
 export interface FileTreeEntry {
-  /** Relative path from repository root */
-  path: string
-  /** Entry name (file or directory name) */
-  name: string
-  /** Whether this is a directory */
-  isDir: boolean
-  /** File size in bytes (0 for directories) */
-  size: number
+	/** Relative path from repository root */
+	path: string;
+	/** Entry name (file or directory name) */
+	name: string;
+	/** Whether this is a directory */
+	isDir: boolean;
+	/** File size in bytes (0 for directories) */
+	size: number;
 }
 
 /**
  * Result of a file tree operation.
  */
 export interface FileTreeResult {
-  /** Total number of entries */
-  count: number
-  /** Array of file tree entries */
-  entries: FileTreeEntry[]
-  /** Repository path */
-  path: string
-  /** Subdirectory filter if applied */
-  subpath?: string
+	/** Total number of entries */
+	count: number;
+	/** Array of file tree entries */
+	entries: FileTreeEntry[];
+	/** Repository path */
+	path: string;
+	/** Subdirectory filter if applied */
+	subpath?: string;
 }
 
 /**
  * Options for file tree retrieval.
  */
 export interface FileTreeOptions {
-  /** Repository path */
-  path?: string
-  /** Subdirectory to show tree for */
-  subpath?: string
+	/** Repository path */
+	path?: string;
+	/** Subdirectory to show tree for */
+	subpath?: string;
 }
 
 // ============================================================================
@@ -218,36 +218,36 @@ export interface FileTreeOptions {
  * Content of a single file.
  */
 export interface FileContent {
-  /** Relative file path */
-  file: string
-  /** File content */
-  content: string
-  /** Whether file was found */
-  found: boolean
-  /** Error message if not found */
-  error?: string
+	/** Relative file path */
+	file: string;
+	/** File content */
+	content: string;
+	/** Whether file was found */
+	found: boolean;
+	/** Error message if not found */
+	error?: string;
 }
 
 /**
  * Result of a file content operation.
  */
 export interface FileContentResult {
-  /** Number of files requested */
-  count: number
-  /** Array of file contents */
-  files: FileContent[]
-  /** Repository path */
-  path: string
+	/** Number of files requested */
+	count: number;
+	/** Array of file contents */
+	files: FileContent[];
+	/** Repository path */
+	path: string;
 }
 
 /**
  * Options for file content retrieval.
  */
 export interface FileContentOptions {
-  /** Repository path */
-  path?: string
-  /** File paths to retrieve (relative to repository root) */
-  filePaths: string[]
+	/** Repository path */
+	path?: string;
+	/** File paths to retrieve (relative to repository root) */
+	filePaths: string[];
 }
 
 // ============================================================================
@@ -258,42 +258,42 @@ export interface FileContentOptions {
  * A symbol usage/definition found by Kit.
  */
 export interface SymbolUsage {
-  /** File containing the symbol */
-  file: string
-  /** Symbol type (function, class, variable, etc.) */
-  type: string
-  /** Symbol name */
-  name: string
-  /** Line number (may be null in current Kit version) */
-  line: number | null
-  /** Context around the usage */
-  context: string | null
+	/** File containing the symbol */
+	file: string;
+	/** Symbol type (function, class, variable, etc.) */
+	type: string;
+	/** Symbol name */
+	name: string;
+	/** Line number (may be null in current Kit version) */
+	line: number | null;
+	/** Context around the usage */
+	context: string | null;
 }
 
 /**
  * Result of a symbol usages search.
  */
 export interface UsagesResult {
-  /** Number of usages found */
-  count: number
-  /** Array of symbol usages */
-  usages: SymbolUsage[]
-  /** Symbol name searched for */
-  symbolName: string
-  /** Repository path searched */
-  path: string
+	/** Number of usages found */
+	count: number;
+	/** Array of symbol usages */
+	usages: SymbolUsage[];
+	/** Symbol name searched for */
+	symbolName: string;
+	/** Repository path searched */
+	path: string;
 }
 
 /**
  * Options for symbol usages search.
  */
 export interface UsagesOptions {
-  /** Repository path */
-  path?: string
-  /** Symbol name to find usages for */
-  symbolName: string
-  /** Filter by symbol type (function, class, etc.) */
-  symbolType?: string
+	/** Repository path */
+	path?: string;
+	/** Symbol name to find usages for */
+	symbolName: string;
+	/** Filter by symbol type (function, class, etc.) */
+	symbolType?: string;
 }
 
 // ============================================================================
@@ -304,24 +304,24 @@ export interface UsagesOptions {
  * Error result type.
  */
 export interface ErrorResult {
-  /** Error message */
-  error: string
-  /** Optional recovery hint */
-  hint?: string
+	/** Error message */
+	error: string;
+	/** Optional recovery hint */
+	hint?: string;
 }
 
 /**
  * Generic result type that can be success or error.
  */
-export type KitResult<T> = T | ErrorResult
+export type KitResult<T> = T | ErrorResult;
 
 /**
  * Type guard for error results.
  */
 export function isError<T extends object>(
-  result: KitResult<T>,
+	result: KitResult<T>,
 ): result is ErrorResult {
-  return typeof result === 'object' && result !== null && 'error' in result
+	return typeof result === "object" && result !== null && "error" in result;
 }
 
 // ============================================================================
@@ -329,7 +329,7 @@ export function isError<T extends object>(
 // ============================================================================
 
 /** Environment variable name for configuring default path */
-export const KIT_DEFAULT_PATH_ENV = 'KIT_DEFAULT_PATH'
+export const KIT_DEFAULT_PATH_ENV = "KIT_DEFAULT_PATH";
 
 /**
  * Get the default path for Kit operations using cascading defaults:
@@ -339,29 +339,29 @@ export const KIT_DEFAULT_PATH_ENV = 'KIT_DEFAULT_PATH'
  * @returns Resolved default path for Kit operations
  */
 export function getDefaultKitPath(): string {
-  return process.env[KIT_DEFAULT_PATH_ENV] || process.cwd()
+	return process.env[KIT_DEFAULT_PATH_ENV] || process.cwd();
 }
 
 /** Default timeout for grep operations (ms) */
-export const GREP_TIMEOUT = 30000
+export const GREP_TIMEOUT = 30000;
 
 /** Default timeout for semantic operations (ms) */
-export const SEMANTIC_TIMEOUT = 60000
+export const SEMANTIC_TIMEOUT = 60000;
 
 /** Default timeout for symbol extraction (ms) */
-export const SYMBOLS_TIMEOUT = 45000
+export const SYMBOLS_TIMEOUT = 45000;
 
 /** Default timeout for file tree operations (ms) */
-export const FILE_TREE_TIMEOUT = 30000
+export const FILE_TREE_TIMEOUT = 30000;
 
 /** Default timeout for file content operations (ms) */
-export const FILE_CONTENT_TIMEOUT = 15000
+export const FILE_CONTENT_TIMEOUT = 15000;
 
 /** Default timeout for symbol usages operations (ms) */
-export const USAGES_TIMEOUT = 45000
+export const USAGES_TIMEOUT = 45000;
 
 /** Default max results for grep */
-export const DEFAULT_MAX_RESULTS = 100
+export const DEFAULT_MAX_RESULTS = 100;
 
 /** Default top-k for semantic search */
-export const DEFAULT_TOP_K = 5
+export const DEFAULT_TOP_K = 5;

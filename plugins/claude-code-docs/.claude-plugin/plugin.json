@@ -1,19 +1,19 @@
 {
-  "name": "claude-code-docs",
-  "description": "Claude Code documentation - auto-updating local docs with search skill",
-  "version": "1.2.0",
-  "author": {
-    "name": "Nathan Vale",
-    "email": "hi@nathanvale.com"
-  },
-  "keywords": [
-    "documentation",
-    "claude-code",
-    "anthropic",
-    "auto-update",
-    "markdown",
-    "skills"
-  ],
-  "license": "MIT",
-  "skills": "./skills"
+	"name": "claude-code-docs",
+	"description": "Claude Code documentation - auto-updating local docs with search skill",
+	"version": "1.2.0",
+	"author": {
+		"name": "Nathan Vale",
+		"email": "hi@nathanvale.com"
+	},
+	"keywords": [
+		"documentation",
+		"claude-code",
+		"anthropic",
+		"auto-update",
+		"markdown",
+		"skills"
+	],
+	"license": "MIT",
+	"skills": "./skills"
 }

@@ -5,69 +5,69 @@
  * lazy-loaded parser instances using WASM grammars.
  */
 
-import { createRequire } from 'node:module'
-import { Language, type Node, Parser } from 'web-tree-sitter'
-import { getAstLogger } from '../logger.js'
+import { createRequire } from "node:module";
+import { Language, type Node, Parser } from "web-tree-sitter";
+import { getAstLogger } from "../logger.js";
 
 // Create require for resolving WASM paths
-const require = createRequire(import.meta.url)
+const require = createRequire(import.meta.url);
 
 /**
  * File extension to tree-sitter language mapping.
  * Ported from Kit's LANGUAGES dict in tree_sitter_symbol_extractor.py
  */
 export const LANGUAGES: Record<string, string> = {
-  '.ts': 'typescript',
-  '.tsx': 'tsx',
-  '.mts': 'typescript',
-  '.cts': 'typescript',
-  '.js': 'javascript',
-  '.jsx': 'javascript',
-  '.mjs': 'javascript',
-  '.cjs': 'javascript',
-  '.py': 'python',
-}
+	".ts": "typescript",
+	".tsx": "tsx",
+	".mts": "typescript",
+	".cts": "typescript",
+	".js": "javascript",
+	".jsx": "javascript",
+	".mjs": "javascript",
+	".cjs": "javascript",
+	".py": "python",
+};
 
 /**
  * Languages we support for AST search.
  */
 export const SUPPORTED_LANGUAGES = [
-  'typescript',
-  'tsx',
-  'javascript',
-  'python',
-] as const
+	"typescript",
+	"tsx",
+	"javascript",
+	"python",
+] as const;
 
-export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
+export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
 // Cached language instances
-const languageCache = new Map<string, Language>()
+const languageCache = new Map<string, Language>();
 
 // Parser instances per language (avoids race condition when language is swapped)
-const parserCache = new Map<string, Parser>()
+const parserCache = new Map<string, Parser>();
 
-let initialized = false
+let initialized = false;
 
 /**
  * Initialize the tree-sitter parser.
  * Must be called before any parsing operations.
  */
 export async function initParser(): Promise<void> {
-  if (initialized) return
+	if (initialized) return;
 
-  const logger = getAstLogger()
-  logger.debug('Initializing tree-sitter parser')
+	const logger = getAstLogger();
+	logger.debug("Initializing tree-sitter parser");
 
-  try {
-    await Parser.init()
-    initialized = true
-    logger.debug('Tree-sitter parser initialized successfully')
-  } catch (error) {
-    logger.error('Failed to initialize tree-sitter parser', {
-      error: error instanceof Error ? error.message : String(error),
-    })
-    throw error
-  }
+	try {
+		await Parser.init();
+		initialized = true;
+		logger.debug("Tree-sitter parser initialized successfully");
+	} catch (error) {
+		logger.error("Failed to initialize tree-sitter parser", {
+			error: error instanceof Error ? error.message : String(error),
+		});
+		throw error;
+	}
 }
 
 /**
@@ -81,26 +81,26 @@ export async function initParser(): Promise<void> {
  * @returns Configured parser instance for this language
  */
 export async function getParser(language: SupportedLanguage): Promise<Parser> {
-  await initParser()
+	await initParser();
 
-  const logger = getAstLogger()
+	const logger = getAstLogger();
 
-  // Return cached parser if available
-  if (parserCache.has(language)) {
-    logger.debug('Using cached parser for language', { language })
-    return parserCache.get(language)!
-  }
+	// Return cached parser if available
+	if (parserCache.has(language)) {
+		logger.debug("Using cached parser for language", { language });
+		return parserCache.get(language)!;
+	}
 
-  logger.debug('Creating new parser for language', { language })
+	logger.debug("Creating new parser for language", { language });
 
-  // Create a new parser dedicated to this language
-  const parser = new Parser()
-  const lang = await loadLanguage(language)
-  parser.setLanguage(lang)
+	// Create a new parser dedicated to this language
+	const parser = new Parser();
+	const lang = await loadLanguage(language);
+	parser.setLanguage(lang);
 
-  // Cache and return
-  parserCache.set(language, parser)
-  return parser
+	// Cache and return
+	parserCache.set(language, parser);
+	return parser;
 }
 
 /**
@@ -110,30 +110,33 @@ export async function getParser(language: SupportedLanguage): Promise<Parser> {
  * @returns Loaded language instance
  */
 async function loadLanguage(language: SupportedLanguage): Promise<Language> {
-  const logger = getAstLogger()
+	const logger = getAstLogger();
 
-  if (languageCache.has(language)) {
-    logger.debug('Using cached language grammar', { language })
-    return languageCache.get(language)!
-  }
+	if (languageCache.has(language)) {
+		logger.debug("Using cached language grammar", { language });
+		return languageCache.get(language)!;
+	}
 
-  logger.debug('Loading language grammar from WASM', { language })
+	logger.debug("Loading language grammar from WASM", { language });
 
-  try {
-    const wasmPath = require.resolve(
-      `tree-sitter-wasms/out/tree-sitter-${language}.wasm`,
-    )
-    const lang = await Language.load(wasmPath)
-    languageCache.set(language, lang)
-    logger.debug('Language grammar loaded successfully', { language, wasmPath })
-    return lang
-  } catch (error) {
-    logger.error('Failed to load language grammar', {
-      language,
-      error: error instanceof Error ? error.message : String(error),
-    })
-    throw error
-  }
+	try {
+		const wasmPath = require.resolve(
+			`tree-sitter-wasms/out/tree-sitter-${language}.wasm`,
+		);
+		const lang = await Language.load(wasmPath);
+		languageCache.set(language, lang);
+		logger.debug("Language grammar loaded successfully", {
+			language,
+			wasmPath,
+		});
+		return lang;
+	} catch (error) {
+		logger.error("Failed to load language grammar", {
+			language,
+			error: error instanceof Error ? error.message : String(error),
+		});
+		throw error;
+	}
 }
 
 /**
@@ -143,17 +146,17 @@ async function loadLanguage(language: SupportedLanguage): Promise<Language> {
  * @returns Language name or null if unsupported
  */
 export function detectLanguage(filePath: string): SupportedLanguage | null {
-  const lastDot = filePath.lastIndexOf('.')
-  if (lastDot === -1) return null
+	const lastDot = filePath.lastIndexOf(".");
+	if (lastDot === -1) return null;
 
-  const ext = filePath.substring(lastDot).toLowerCase()
-  const language = LANGUAGES[ext]
+	const ext = filePath.substring(lastDot).toLowerCase();
+	const language = LANGUAGES[ext];
 
-  if (language && SUPPORTED_LANGUAGES.includes(language as SupportedLanguage)) {
-    return language as SupportedLanguage
-  }
+	if (language && SUPPORTED_LANGUAGES.includes(language as SupportedLanguage)) {
+		return language as SupportedLanguage;
+	}
 
-  return null
+	return null;
 }
 
 /**
@@ -163,7 +166,7 @@ export function detectLanguage(filePath: string): SupportedLanguage | null {
  * @returns True if the file can be parsed
  */
 export function isSupported(filePath: string): boolean {
-  return detectLanguage(filePath) !== null
+	return detectLanguage(filePath) !== null;
 }
 
 /**
@@ -172,10 +175,10 @@ export function isSupported(filePath: string): boolean {
  * @returns Glob pattern matching all supported files
  */
 export function getSupportedGlob(): string {
-  const extensions = Object.keys(LANGUAGES).map((ext) => ext.slice(1))
-  return `**/*.{${extensions.join(',')}}`
+	const extensions = Object.keys(LANGUAGES).map((ext) => ext.slice(1));
+	return `**/*.{${extensions.join(",")}}`;
 }
 
 // Re-export types from web-tree-sitter for convenience
 // Note: web-tree-sitter exports 'Node' not 'SyntaxNode'
-export type { Node as SyntaxNode }
+export type { Node as SyntaxNode };

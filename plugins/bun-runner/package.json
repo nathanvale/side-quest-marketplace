@@ -1,15 +1,15 @@
 {
-  "name": "@sidequest/bun-runner",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Bun runner plugin for Claude Code",
-  "type": "module",
-  "scripts": {
-    "test": "bun test --recursive",
-    "typecheck": "tsc --noEmit",
-    "format": "biome format --write .",
-    "format:check": "biome format .",
-    "lint": "biome lint .",
-    "check": "biome check --write ."
-  }
+	"name": "@sidequest/bun-runner",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Bun runner plugin for Claude Code",
+	"type": "module",
+	"scripts": {
+		"test": "bun test --recursive",
+		"typecheck": "tsc --noEmit",
+		"format": "biome format --write .",
+		"format:check": "biome format .",
+		"lint": "biome lint .",
+		"check": "biome check --write ."
+	}
 }

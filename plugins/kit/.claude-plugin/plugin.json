@@ -1,11 +1,11 @@
 {
-  "name": "kit",
-  "description": "Kit plugin for Claude Code",
-  "version": "1.0.0",
-  "author": {
-    "name": "Nathan Vale",
-    "email": "hi@nathanvale.com"
-  },
-  "keywords": ["kit"],
-  "license": "MIT"
+	"name": "kit",
+	"description": "Kit plugin for Claude Code",
+	"version": "1.0.0",
+	"author": {
+		"name": "Nathan Vale",
+		"email": "hi@nathanvale.com"
+	},
+	"keywords": ["kit"],
+	"license": "MIT"
 }

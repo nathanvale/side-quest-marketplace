@@ -1,16 +1,16 @@
 {
-  "name": "@sidequest/mcp-bun-runner",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Bun runner MCP server for Claude Code",
-  "type": "module",
-  "main": "index.ts",
-  "scripts": {
-    "start": "bun run index.ts",
-    "test": "echo 'No tests yet'",
-    "typecheck": "echo 'No typecheck yet'"
-  },
-  "dependencies": {
-    "mcpez": "^1.2.1"
-  }
+	"name": "@sidequest/mcp-bun-runner",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Bun runner MCP server for Claude Code",
+	"type": "module",
+	"main": "index.ts",
+	"scripts": {
+		"start": "bun run index.ts",
+		"test": "echo 'No tests yet'",
+		"typecheck": "echo 'No typecheck yet'"
+	},
+	"dependencies": {
+		"mcpez": "^1.2.1"
+	}
 }

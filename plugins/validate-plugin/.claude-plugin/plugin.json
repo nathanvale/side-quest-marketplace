@@ -1,11 +1,11 @@
 {
-  "name": "validate-plugin",
-  "description": "Automatically validates plugin files (marketplace.json, plugin.json, hooks.json) after edits using claude plugin validate",
-  "version": "1.0.0",
-  "author": {
-    "name": "Nathan Vale",
-    "email": "hi@nathanvale.com"
-  },
-  "keywords": ["validation", "plugin", "hooks", "marketplace", "linting"],
-  "license": "MIT"
+	"name": "validate-plugin",
+	"description": "Automatically validates plugin files (marketplace.json, plugin.json, hooks.json) after edits using claude plugin validate",
+	"version": "1.0.0",
+	"author": {
+		"name": "Nathan Vale",
+		"email": "hi@nathanvale.com"
+	},
+	"keywords": ["validation", "plugin", "hooks", "marketplace", "linting"],
+	"license": "MIT"
 }

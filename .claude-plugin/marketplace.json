@@ -1,183 +1,183 @@
 {
-  "name": "side-quest-marketplace",
-  "owner": {
-    "name": "Nathan Vale",
-    "email": "hi@nathanvale.com"
-  },
-  "metadata": {
-    "description": "SideQuest - ADHD-friendly Claude Code plugins for developers who thrive on hyperfocus. Tools that work with your brain, not against it.",
-    "version": "1.0.0"
-  },
-  "plugins": [
-    {
-      "name": "nvcc",
-      "source": "./plugins/nvcc",
-      "description": "Core productivity commands, specialized agents, and custom skills for dotfiles management, shell workflows, HyperFlow keyboard orchestration, and SuperWhisper voice dictation.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Nathan Vale"
-      },
-      "category": "productivity",
-      "keywords": ["productivity", "dotfiles", "workflows", "voice"]
-    },
-    {
-      "name": "atuin",
-      "source": "./plugins/atuin",
-      "description": "Atuin shell history integration - search, capture, and manage bash command history with AI. Never lose a command again.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Nathan Vale"
-      },
-      "category": "shell",
-      "keywords": ["shell", "history", "atuin", "bash"]
-    },
-    {
-      "name": "git",
-      "source": "./plugins/git",
-      "description": "Git intelligence for Claude Code - session context, commit history, smart commits with Conventional Commits. Includes MCP server, SessionStart/PreCompact hooks, and slash commands.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Nathan Vale"
-      },
-      "category": "git",
-      "keywords": ["git", "commits", "version-control", "conventional-commits"]
-    },
-    {
-      "name": "bun-runner",
-      "source": "./plugins/bun-runner",
-      "description": "Smart test runner and linter MCP server. Run tests and lint with structured, token-efficient output. Filters out passing tests and verbose logs, focusing agents on failures.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Nathan Vale"
-      },
-      "category": "testing",
-      "keywords": ["testing", "linting", "biome", "bun", "mcp"]
-    },
-    {
-      "name": "validate-plugin",
-      "source": "./plugins/validate-plugin",
-      "description": "Automatically validates plugin files after edits. Catches invalid marketplace.json, plugin.json, and hooks.json before they cause problems.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Nathan Vale"
-      },
-      "category": "development",
-      "keywords": ["validation", "plugin", "hooks", "linting", "quality"]
-    },
-    {
-      "name": "para-brain",
-      "source": "./plugins/para-brain",
-      "description": "Ultimate PARA method and Building a Second Brain plugin for Obsidian. Includes CODE methodology (Capture, Organize, Distill, Express), Progressive Summarization, and complete note management workflows with MCP Obsidian integration.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Nathan Vale"
-      },
-      "category": "productivity",
-      "keywords": [
-        "obsidian",
-        "para",
-        "second-brain",
-        "basb",
-        "pkm",
-        "knowledge-management",
-        "tiago-forte",
-        "code",
-        "progressive-summarization"
-      ]
-    },
-    {
-      "name": "claude-code-docs",
-      "source": "./plugins/claude-code-docs",
-      "description": "Claude Code documentation - auto-updating local docs with search skill. Provides offline access to official documentation with automated fetching, indexing, and intelligent search.",
-      "version": "1.2.0",
-      "author": {
-        "name": "Nathan Vale"
-      },
-      "category": "documentation",
-      "keywords": [
-        "documentation",
-        "claude-code",
-        "anthropic",
-        "auto-update",
-        "markdown",
-        "skills"
-      ]
-    },
-    {
-      "name": "claude-code-claude-md",
-      "source": "./plugins/claude-code-claude-md",
-      "description": "CLAUDE.md manager for creating and optimizing memory files across the hierarchical cascade system. Includes templates for user/project/module levels, token optimization strategies, and comprehensive best practices.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Nathan Vale"
-      },
-      "category": "documentation",
-      "keywords": [
-        "claude-md",
-        "memory",
-        "documentation",
-        "optimization",
-        "templates",
-        "skills"
-      ]
-    },
-    {
-      "name": "plugin-template",
-      "source": "./plugins/plugin-template",
-      "description": "Generate new plugin scaffolds with configurable components. Create commands, MCP servers, hooks, and skills following SideQuest marketplace patterns. TDD-tested generator with comprehensive templates.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Nathan Vale"
-      },
-      "category": "development",
-      "keywords": [
-        "plugin",
-        "template",
-        "generator",
-        "scaffold",
-        "development",
-        "tdd"
-      ]
-    },
-    {
-      "name": "firecrawl",
-      "source": "./plugins/firecrawl",
-      "description": "Firecrawl plugin for Claude Code",
-      "version": "1.0.0",
-      "author": {
-        "name": "Nathan Vale"
-      },
-      "category": "development",
-      "keywords": ["firecrawl"]
-    },
-    {
-      "name": "mcp-manager",
-      "source": "./plugins/mcp-manager",
-      "description": "Manage MCP servers - add, list, enable, and disable without removing configurations.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Nathan Vale"
-      },
-      "category": "configuration",
-      "keywords": ["mcp", "mcp-server", "configuration", "management"]
-    },
-    {
-      "name": "kit",
-      "source": "./plugins/kit",
-      "description": "Kit CLI integration for intelligent code search. Provides fast grep, semantic vector search with automatic fallback, and symbol extraction for codebase navigation.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Nathan Vale"
-      },
-      "category": "development",
-      "keywords": [
-        "kit",
-        "grep",
-        "semantic-search",
-        "code-symbols",
-        "cased-kit",
-        "code-search"
-      ]
-    }
-  ]
+	"name": "side-quest-marketplace",
+	"owner": {
+		"name": "Nathan Vale",
+		"email": "hi@nathanvale.com"
+	},
+	"metadata": {
+		"description": "SideQuest - ADHD-friendly Claude Code plugins for developers who thrive on hyperfocus. Tools that work with your brain, not against it.",
+		"version": "1.0.0"
+	},
+	"plugins": [
+		{
+			"name": "nvcc",
+			"source": "./plugins/nvcc",
+			"description": "Core productivity commands, specialized agents, and custom skills for dotfiles management, shell workflows, HyperFlow keyboard orchestration, and SuperWhisper voice dictation.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "productivity",
+			"keywords": ["productivity", "dotfiles", "workflows", "voice"]
+		},
+		{
+			"name": "atuin",
+			"source": "./plugins/atuin",
+			"description": "Atuin shell history integration - search, capture, and manage bash command history with AI. Never lose a command again.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "shell",
+			"keywords": ["shell", "history", "atuin", "bash"]
+		},
+		{
+			"name": "git",
+			"source": "./plugins/git",
+			"description": "Git intelligence for Claude Code - session context, commit history, smart commits with Conventional Commits. Includes MCP server, SessionStart/PreCompact hooks, and slash commands.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "git",
+			"keywords": ["git", "commits", "version-control", "conventional-commits"]
+		},
+		{
+			"name": "bun-runner",
+			"source": "./plugins/bun-runner",
+			"description": "Smart test runner and linter MCP server. Run tests and lint with structured, token-efficient output. Filters out passing tests and verbose logs, focusing agents on failures.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "testing",
+			"keywords": ["testing", "linting", "biome", "bun", "mcp"]
+		},
+		{
+			"name": "validate-plugin",
+			"source": "./plugins/validate-plugin",
+			"description": "Automatically validates plugin files after edits. Catches invalid marketplace.json, plugin.json, and hooks.json before they cause problems.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "development",
+			"keywords": ["validation", "plugin", "hooks", "linting", "quality"]
+		},
+		{
+			"name": "para-brain",
+			"source": "./plugins/para-brain",
+			"description": "Ultimate PARA method and Building a Second Brain plugin for Obsidian. Includes CODE methodology (Capture, Organize, Distill, Express), Progressive Summarization, and complete note management workflows with MCP Obsidian integration.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "productivity",
+			"keywords": [
+				"obsidian",
+				"para",
+				"second-brain",
+				"basb",
+				"pkm",
+				"knowledge-management",
+				"tiago-forte",
+				"code",
+				"progressive-summarization"
+			]
+		},
+		{
+			"name": "claude-code-docs",
+			"source": "./plugins/claude-code-docs",
+			"description": "Claude Code documentation - auto-updating local docs with search skill. Provides offline access to official documentation with automated fetching, indexing, and intelligent search.",
+			"version": "1.2.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "documentation",
+			"keywords": [
+				"documentation",
+				"claude-code",
+				"anthropic",
+				"auto-update",
+				"markdown",
+				"skills"
+			]
+		},
+		{
+			"name": "claude-code-claude-md",
+			"source": "./plugins/claude-code-claude-md",
+			"description": "CLAUDE.md manager for creating and optimizing memory files across the hierarchical cascade system. Includes templates for user/project/module levels, token optimization strategies, and comprehensive best practices.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "documentation",
+			"keywords": [
+				"claude-md",
+				"memory",
+				"documentation",
+				"optimization",
+				"templates",
+				"skills"
+			]
+		},
+		{
+			"name": "plugin-template",
+			"source": "./plugins/plugin-template",
+			"description": "Generate new plugin scaffolds with configurable components. Create commands, MCP servers, hooks, and skills following SideQuest marketplace patterns. TDD-tested generator with comprehensive templates.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "development",
+			"keywords": [
+				"plugin",
+				"template",
+				"generator",
+				"scaffold",
+				"development",
+				"tdd"
+			]
+		},
+		{
+			"name": "firecrawl",
+			"source": "./plugins/firecrawl",
+			"description": "Firecrawl plugin for Claude Code",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "development",
+			"keywords": ["firecrawl"]
+		},
+		{
+			"name": "mcp-manager",
+			"source": "./plugins/mcp-manager",
+			"description": "Manage MCP servers - add, list, enable, and disable without removing configurations.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "configuration",
+			"keywords": ["mcp", "mcp-server", "configuration", "management"]
+		},
+		{
+			"name": "kit",
+			"source": "./plugins/kit",
+			"description": "Kit CLI integration for intelligent code search. Provides fast grep, semantic vector search with automatic fallback, and symbol extraction for codebase navigation.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "development",
+			"keywords": [
+				"kit",
+				"grep",
+				"semantic-search",
+				"code-symbols",
+				"cased-kit",
+				"code-search"
+			]
+		}
+	]
 }

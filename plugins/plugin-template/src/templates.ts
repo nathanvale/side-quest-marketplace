@@ -1,121 +1,121 @@
-import type { ImplementationType, TemplateContext } from './types'
+import type { ImplementationType, TemplateContext } from "./types";
 
 /**
  * Convert string to kebab-case.
  */
 export function toKebabCase(str: string): string {
-  return str
-    .replace(/([a-z])([A-Z])/g, '$1-$2')
-    .replace(/[\s_]+/g, '-')
-    .toLowerCase()
+	return str
+		.replace(/([a-z])([A-Z])/g, "$1-$2")
+		.replace(/[\s_]+/g, "-")
+		.toLowerCase();
 }
 
 /**
  * Convert string to PascalCase.
  */
 export function toPascalCase(str: string): string {
-  return str
-    .replace(/[-_\s]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ''))
-    .replace(/^(.)/, (c) => c.toUpperCase())
+	return str
+		.replace(/[-_\s]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ""))
+		.replace(/^(.)/, (c) => c.toUpperCase());
 }
 
 /**
  * Convert string to snake_case.
  */
 export function toSnakeCase(str: string): string {
-  return str.replace(/[-\s]+/g, '_').toLowerCase()
+	return str.replace(/[-\s]+/g, "_").toLowerCase();
 }
 
 /**
  * Generate package.json content for TypeScript plugins.
  */
 export function packageJsonTemplate(ctx: TemplateContext): string {
-  const pkg = {
-    name: `@sidequest/${ctx.name}`,
-    version: '1.0.0',
-    private: true,
-    description: ctx.description,
-    type: 'module',
-    scripts: {
-      test: 'bun test --recursive',
-      typecheck: 'tsc --noEmit',
-      format: 'biome format --write .',
-      'format:check': 'biome format .',
-      lint: 'biome lint .',
-      check: 'biome check --write .',
-    },
-    devDependencies: {
-      '@types/bun': 'latest',
-    },
-  }
-  return JSON.stringify(pkg, null, 2)
+	const pkg = {
+		name: `@sidequest/${ctx.name}`,
+		version: "1.0.0",
+		private: true,
+		description: ctx.description,
+		type: "module",
+		scripts: {
+			test: "bun test --recursive",
+			typecheck: "tsc --noEmit",
+			format: "biome format --write .",
+			"format:check": "biome format .",
+			lint: "biome lint .",
+			check: "biome check --write .",
+		},
+		devDependencies: {
+			"@types/bun": "latest",
+		},
+	};
+	return JSON.stringify(pkg, null, 2);
 }
 
 /**
  * Generate package.json content for markdown-only plugins (stub scripts).
  */
 export function packageJsonMarkdownTemplate(ctx: TemplateContext): string {
-  const pkg = {
-    name: `@sidequest/${ctx.name}`,
-    version: '1.0.0',
-    private: true,
-    description: ctx.description,
-    type: 'module',
-    scripts: {
-      test: "echo 'No tests'",
-      typecheck: "echo 'No typecheck'",
-    },
-  }
-  return JSON.stringify(pkg, null, 2)
+	const pkg = {
+		name: `@sidequest/${ctx.name}`,
+		version: "1.0.0",
+		private: true,
+		description: ctx.description,
+		type: "module",
+		scripts: {
+			test: "echo 'No tests'",
+			typecheck: "echo 'No typecheck'",
+		},
+	};
+	return JSON.stringify(pkg, null, 2);
 }
 
 /**
  * Generate package.json based on implementation type.
  */
 export function packageJsonForType(
-  ctx: TemplateContext,
-  implementationType: ImplementationType,
+	ctx: TemplateContext,
+	implementationType: ImplementationType,
 ): string {
-  return implementationType === 'typescript'
-    ? packageJsonTemplate(ctx)
-    : packageJsonMarkdownTemplate(ctx)
+	return implementationType === "typescript"
+		? packageJsonTemplate(ctx)
+		: packageJsonMarkdownTemplate(ctx);
 }
 
 /**
  * Generate .claude-plugin/plugin.json content.
  */
 export function pluginJsonTemplate(ctx: TemplateContext): string {
-  const plugin: Record<string, unknown> = {
-    name: ctx.name,
-    description: ctx.description,
-    version: '1.0.0',
-    author: {
-      name: ctx.authorName,
-      ...(ctx.authorEmail && { email: ctx.authorEmail }),
-    },
-    keywords: [ctx.name],
-    license: 'MIT',
-  }
-  return JSON.stringify(plugin, null, 2)
+	const plugin: Record<string, unknown> = {
+		name: ctx.name,
+		description: ctx.description,
+		version: "1.0.0",
+		author: {
+			name: ctx.authorName,
+			...(ctx.authorEmail && { email: ctx.authorEmail }),
+		},
+		keywords: [ctx.name],
+		license: "MIT",
+	};
+	return JSON.stringify(plugin, null, 2);
 }
 
 /**
  * Generate tsconfig.json content.
  */
 export function tsconfigTemplate(): string {
-  const config = {
-    extends: '../../tsconfig.base.json',
-    include: ['src/**/*.ts'],
-    exclude: ['**/node_modules/**'],
-  }
-  return JSON.stringify(config, null, 2)
+	const config = {
+		extends: "../../tsconfig.base.json",
+		include: ["src/**/*.ts"],
+		exclude: ["**/node_modules/**"],
+	};
+	return JSON.stringify(config, null, 2);
 }
 
 /**
  * Generate sample command markdown.
  */
 export function sampleCommandTemplate(ctx: TemplateContext): string {
-  return `---
+	return `---
 description: Sample command for ${ctx.name}
 argument-hint: [arg1?]
 ---
@@ -135,14 +135,14 @@ This is a sample command for the ${ctx.name} plugin.
 \`\`\`
 /${ctx.name}:sample hello
 \`\`\`
-`
+`;
 }
 
 /**
  * Generate MCP server index.ts content.
  */
 export function mcpServerIndexTemplate(ctx: TemplateContext): string {
-  return `import { tool, serve } from 'mcpez'
+	return `import { tool, serve } from 'mcpez'
 import { z } from 'zod'
 
 /**
@@ -185,58 +185,58 @@ tool(
 
 // Start the server
 serve()
-`
+`;
 }
 
 /**
  * Generate .mcp.json content.
  */
 export function mcpJsonTemplate(ctx: TemplateContext): string {
-  const config = {
-    mcpServers: {
-      [ctx.name]: {
-        command: 'bun',
-        args: [
-          'run',
-          `\${CLAUDE_PLUGIN_ROOT}/mcp-servers/${ctx.name}/index.ts`,
-        ],
-        env: {},
-      },
-    },
-  }
-  return JSON.stringify(config, null, 2)
+	const config = {
+		mcpServers: {
+			[ctx.name]: {
+				command: "bun",
+				args: [
+					"run",
+					`\${CLAUDE_PLUGIN_ROOT}/mcp-servers/${ctx.name}/index.ts`,
+				],
+				env: {},
+			},
+		},
+	};
+	return JSON.stringify(config, null, 2);
 }
 
 /**
  * Generate hooks/hooks.json content.
  */
 export function hooksJsonTemplate(ctx: TemplateContext): string {
-  const config = {
-    description: `Hooks for ${ctx.name} plugin`,
-    hooks: {
-      // Example PostToolUse hook - uncomment and customize as needed
-      // PostToolUse: [
-      //   {
-      //     matcher: 'Write|Edit',
-      //     hooks: [
-      //       {
-      //         type: 'command',
-      //         command: '${CLAUDE_PLUGIN_ROOT}/hooks/on-file-change.ts',
-      //         timeout: 30,
-      //       },
-      //     ],
-      //   },
-      // ],
-    },
-  }
-  return JSON.stringify(config, null, 2)
+	const config = {
+		description: `Hooks for ${ctx.name} plugin`,
+		hooks: {
+			// Example PostToolUse hook - uncomment and customize as needed
+			// PostToolUse: [
+			//   {
+			//     matcher: 'Write|Edit',
+			//     hooks: [
+			//       {
+			//         type: 'command',
+			//         command: '${CLAUDE_PLUGIN_ROOT}/hooks/on-file-change.ts',
+			//         timeout: 30,
+			//       },
+			//     ],
+			//   },
+			// ],
+		},
+	};
+	return JSON.stringify(config, null, 2);
 }
 
 /**
  * Generate SKILL.md content.
  */
 export function skillMdTemplate(ctx: TemplateContext): string {
-  return `---
+	return `---
 name: ${ctx.name}
 description: ${ctx.description}. Use when working with ${ctx.name} functionality.
 ---
@@ -273,14 +273,14 @@ ${ctx.description}
 User: Help me with ${ctx.name}
 Assistant: [Describes how to help]
 \`\`\`
-`
+`;
 }
 
 /**
  * Generate src/index.ts for TypeScript plugins.
  */
 export function srcIndexTemplate(ctx: TemplateContext): string {
-  return `/**
+	return `/**
  * ${ctx.pascalName} Plugin
  *
  * ${ctx.description}
@@ -302,14 +302,14 @@ export function process${ctx.pascalName}(input: string): ${ctx.pascalName}Result
     message: \`Processed: \${input}\`,
   }
 }
-`
+`;
 }
 
 /**
  * Generate src/index.test.ts for TypeScript plugins.
  */
 export function srcIndexTestTemplate(ctx: TemplateContext): string {
-  return `import { describe, expect, test } from 'bun:test'
+	return `import { describe, expect, test } from 'bun:test'
 import { process${ctx.pascalName} } from './index'
 
 describe('process${ctx.pascalName}', () => {
@@ -319,5 +319,5 @@ describe('process${ctx.pascalName}', () => {
     expect(result.message).toBe('Processed: test input')
   })
 })
-`
+`;
 }

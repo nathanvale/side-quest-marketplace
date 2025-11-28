@@ -1,149 +1,286 @@
 ---
-description: Convert existing documentation (README, CONTRIBUTING) into CLAUDE.md format
+description: Extract documentation into structured context, then invoke /create to generate CLAUDE.md
 model: claude-sonnet-4-5-20250929
-allowed-tools: Read, Write, Glob, LS
+allowed-tools: Read, Glob, LS
 argument-hint: [source-file] - e.g., README.md, CONTRIBUTING.md
 ---
 
 # Import Documentation into CLAUDE.md
 
-Convert existing documentation into CLAUDE.md format, extracting the most relevant information.
+Extract relevant information from existing docs, then invoke `/create` with that context.
+
+## Why Composable?
+
+This command **extracts and structures** data, then delegates to `/create` which:
+- Has the official templates for each level (user/project/module)
+- Knows the token budgets and best practices
+- Handles file writing and next steps
+
+**Flow:**
+```
+/import-docs README.md
+  → Extract: commands, conventions, structure
+  → Output: structured context block
+  → User runs: /create project (with context pre-filled)
+```
 
 ## Instructions
 
-You are a documentation conversion specialist. Transform existing docs into optimized CLAUDE.md content.
+### 1. Locate Source Documentation
 
-### Arguments
+If argument provided:
+- Read the specified file
 
-- **Source file**: Path to the documentation file to import
-- If no argument: Search for common docs (README.md, CONTRIBUTING.md, docs/*)
+If no argument:
+- Search for: README.md, CONTRIBUTING.md, docs/*.md, DEVELOPMENT.md, package.json
+- List found files and ask which to convert
 
-Examples:
-- `/import-docs README.md` → Convert README.md
-- `/import-docs CONTRIBUTING.md` → Convert contribution guidelines
-- `/import-docs` → Find and offer to convert available docs
+### 2. Extract Relevant Information
 
-### Workflow
+**High Value (extract):**
+| Category | What to Look For |
+|----------|------------------|
+| Commands | Scripts in package.json, "Getting Started", "Development" sections |
+| Tech Stack | Dependencies, frameworks, language versions |
+| Structure | Directory explanations, architecture sections |
+| Conventions | Code style, linting, formatting rules |
+| Testing | Test commands, coverage requirements, test structure |
+| Git Workflow | Branch naming, commit format, PR process |
+| Environment | Required env vars, setup steps |
 
-1. **Locate source documentation**:
-   If argument provided:
-   - Read the specified file
+**Low Value (skip):**
+- Marketing content, badges, logos
+- License text (reference only)
+- Detailed API docs (use @import)
+- Screenshots, images
+- Changelog, release notes
+- Contributor lists
 
-   If no argument:
-   - Search for: README.md, CONTRIBUTING.md, docs/*.md, DEVELOPMENT.md
-   - List found files and ask which to convert
+### 3. Transform to Structured Context
 
-2. **Analyze the source document**:
-   Identify sections that are relevant for CLAUDE.md:
+Output the extracted data in this format:
 
-   **Extract** (high value for Claude):
-   - Project setup/installation commands
-   - Development commands (build, test, lint)
-   - Code conventions and style guides
-   - Architecture overview
-   - Testing instructions
-   - Common workflows
-   - Environment variables
-   - Key file locations
+```markdown
+## Extracted Context for /create
 
-   **Skip** (low value, keep in original doc):
-   - Marketing content / badges
-   - License text
-   - Detailed API documentation (use imports instead)
-   - Screenshots / images
-   - Long prose explanations
-   - Changelog / release notes
-   - Contributor lists
+### Project Info
+- **Name**: [from package.json or README title]
+- **Description**: [one-line from README]
+- **Tech Stack**: [detected languages, frameworks]
 
-3. **Transform content**:
+### Directory Structure
+```
+[extracted or generated tree]
+```
 
-   **Before** (verbose README style):
-   ```markdown
-   ## Getting Started
+### Commands
+```bash
+[extracted commands with comments]
+```
 
-   Welcome to our project! We're excited to have you here.
-   To get started with development, you'll need to follow
-   these steps carefully...
+### Key Files
+- `[file]` — [purpose]
 
-   First, make sure you have Node.js installed (version 18
-   or higher is recommended). Then, clone the repository
-   and run the following commands:
-   ```
+### Code Conventions
+- [extracted conventions]
 
-   **After** (concise CLAUDE.md style):
-   ```markdown
-   ## Setup
-   - Node.js 18+
-   ```bash
-   git clone <repo> && cd <project>
-   npm install
-   npm run dev
-   ```
-   ```
+### Git Workflow
+- Branch: [format]
+- Commit: [format]
 
-4. **Generate CLAUDE.md content**:
+### Testing
+- Command: `[test command]`
+- [other testing info]
 
-   Structure the output as:
-   ```markdown
-   # [Project Name]
+### Environment
+- [required env vars]
 
-   [One-line description extracted from README]
+### Source References
+- @./README.md — Full project documentation
+- @./CONTRIBUTING.md — Contribution guidelines
+- @./docs/architecture.md — Detailed architecture
+```
 
-   ## Tech Stack
-   [Extracted from README or package.json]
+### 4. Conversion Rules
 
-   ## Commands
-   ```bash
-   [Extracted commands]
-   ```
-
-   ## Code Conventions
-   [Extracted style guidelines]
-
-   ## Project Structure
-   [Extracted or summarized]
-
-   ## Testing
-   [Extracted testing info]
-
-   ## Detailed Docs
-   @./README.md
-   @./CONTRIBUTING.md
-   ```
-
-5. **Present the result**:
-   - Show the generated CLAUDE.md content
-   - Ask if user wants to:
-     a) Write to ./CLAUDE.md (new file)
-     b) Append to existing CLAUDE.md
-     c) Copy to clipboard (show content only)
-   - Warn if it exceeds recommended token budget
-
-### Conversion Rules
-
-| Source Pattern | CLAUDE.md Format |
-|---------------|------------------|
-| "You should..." / "We recommend..." | Direct imperative: "Use..." |
+| Source Pattern | Extracted Format |
+|----------------|------------------|
+| "You should..." / "We recommend..." | Direct: "Use X" |
 | Paragraphs of explanation | Bullet points |
-| Detailed API docs | Import reference: `@./docs/api.md` |
-| Multiple code examples | Single canonical example |
-| Optional/advanced content | Omit or import |
+| Multiple examples | Single canonical example |
+| `npm run X` in prose | Extracted to Commands section |
+| Directory explanations | File tree with annotations |
+| Long detailed sections | @import reference |
 
-### Important
+### 5. Present Results and Next Steps
 
-- NEVER lose critical setup information during conversion
-- Preserve exact command syntax (don't paraphrase shell commands)
-- Keep the original documentation files intact
-- Use imports (@path) for detailed sections rather than duplicating
-- Target 100-200 lines for the converted content
-- If source is very long, prioritize: commands > conventions > architecture
+Output format:
 
-### Output
+```markdown
+## Documentation Extracted
 
-After conversion, provide:
-1. The converted CLAUDE.md content
-2. Summary of what was extracted vs. skipped
-3. Recommendations for imports if content was too long
-4. Next steps (write file, review, customize)
+[Show the structured context block from step 3]
 
-Now import documentation from: $ARGUMENTS
+---
+
+## Extraction Summary
+
+| Category | Status | Lines |
+|----------|--------|-------|
+| Commands | ✅ Extracted | X |
+| Structure | ✅ Extracted | X |
+| Conventions | ⚠️ Not found | - |
+| Testing | ✅ Extracted | X |
+
+**Total extracted:** ~X lines
+**Recommended imports:** [list any sections that were too long]
+
+---
+
+## Next Step
+
+Run `/create project` and paste the extracted context above when prompted,
+or copy this ready-to-use command:
+
+\`\`\`
+/create project
+\`\`\`
+
+The create command will:
+1. Use the project-level template
+2. Incorporate your extracted context
+3. Generate a properly structured CLAUDE.md
+4. Apply token budget guidelines (100-200 lines)
+
+---
+
+## Manual Adjustments Needed
+
+After running /create, you may want to add:
+- [ ] [specific thing not found in docs]
+- [ ] [another gap identified]
+```
+
+### 6. Alternative: Direct Generation
+
+If user says "just generate it" or wants immediate output:
+
+```markdown
+I've extracted the context above. You have two options:
+
+**Option A: Use /create (recommended)**
+Run `/create project` — uses official templates, consistent structure
+
+**Option B: Direct output**
+I can generate CLAUDE.md directly, but it won't use the standardized templates.
+Want me to proceed with direct generation?
+```
+
+## Quick Extraction Templates
+
+### From package.json
+
+```javascript
+// Extract these fields:
+{
+  "name": "→ Project name",
+  "description": "→ One-liner",
+  "scripts": {
+    "dev": "→ Commands section",
+    "build": "→ Commands section",
+    "test": "→ Testing section",
+    "lint": "→ Commands section"
+  },
+  "dependencies": "→ Tech stack",
+  "devDependencies": "→ Tech stack (tooling)"
+}
+```
+
+### From README.md
+
+```markdown
+# Title → Project name
+First paragraph → Description
+
+## Installation / Getting Started → Commands
+## Development → Commands + Conventions
+## Testing → Testing section
+## Project Structure → Directory structure
+## Contributing → Git workflow (or @import)
+## Architecture → @import reference
+```
+
+### From CONTRIBUTING.md
+
+```markdown
+## Code Style → Conventions
+## Commit Messages → Git workflow
+## Pull Requests → Git workflow
+## Testing Requirements → Testing
+```
+
+## Example Output
+
+**Input:** README.md with 500 lines
+
+**Output:**
+```markdown
+## Extracted Context for /create
+
+### Project Info
+- **Name**: my-awesome-api
+- **Description**: REST API for user management with TypeScript and Express
+- **Tech Stack**: TypeScript, Express, PostgreSQL, Jest
+
+### Directory Structure
+```
+my-awesome-api/
+├── src/
+│   ├── controllers/    # Route handlers
+│   ├── models/         # Database models
+│   ├── middleware/     # Express middleware
+│   └── index.ts        # Entry point
+├── tests/              # Jest tests
+└── docs/               # API documentation
+```
+
+### Commands
+```bash
+npm install            # Install dependencies
+npm run dev            # Start dev server (port 3000)
+npm run build          # Production build
+npm test               # Run Jest tests
+npm run lint           # ESLint check
+```
+
+### Key Files
+- `src/index.ts` — Application entry point
+- `src/config.ts` — Environment configuration
+- `.env.example` — Required environment variables
+
+### Code Conventions
+- TypeScript strict mode
+- ESLint + Prettier
+- Functional style preferred
+
+### Git Workflow
+- Branch: `feature/[ticket]-[description]`
+- Commit: `type(scope): subject`
+
+### Testing
+- Command: `npm test`
+- Coverage minimum: 80%
+- Tests mirror src/ structure
+
+### Source References
+- @./README.md — Full documentation
+- @./docs/api.md — API reference
+
+---
+
+## Next Step
+
+Run `/create project` to generate CLAUDE.md with this context.
+```
+
+Now extract documentation from: $ARGUMENTS

@@ -4,10 +4,10 @@
  * Input validation and security utilities for safe Kit CLI operations.
  */
 
-import { existsSync, statSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { isAbsolute, normalize, resolve } from 'node:path'
-import { getDefaultKitPath } from './types.js'
+import { existsSync, statSync } from "node:fs";
+import { homedir } from "node:os";
+import { isAbsolute, normalize, resolve } from "node:path";
+import { getDefaultKitPath } from "./types.js";
 
 // ============================================================================
 // Path Utilities
@@ -23,13 +23,13 @@ import { getDefaultKitPath } from './types.js'
  * expandTilde('/absolute/path') // => '/absolute/path'
  */
 export function expandTilde(inputPath: string): string {
-  if (inputPath.startsWith('~/')) {
-    return inputPath.replace('~', homedir())
-  }
-  if (inputPath === '~') {
-    return homedir()
-  }
-  return inputPath
+	if (inputPath.startsWith("~/")) {
+		return inputPath.replace("~", homedir());
+	}
+	if (inputPath === "~") {
+		return homedir();
+	}
+	return inputPath;
 }
 
 /**
@@ -39,11 +39,11 @@ export function expandTilde(inputPath: string): string {
  * @returns Normalized absolute path
  */
 export function normalizePath(inputPath: string, basePath?: string): string {
-  const expanded = expandTilde(inputPath)
-  const resolved = isAbsolute(expanded)
-    ? expanded
-    : resolve(basePath ?? process.cwd(), expanded)
-  return normalize(resolved)
+	const expanded = expandTilde(inputPath);
+	const resolved = isAbsolute(expanded)
+		? expanded
+		: resolve(basePath ?? process.cwd(), expanded);
+	return normalize(resolved);
 }
 
 // ============================================================================
@@ -54,12 +54,12 @@ export function normalizePath(inputPath: string, basePath?: string): string {
  * Result of path validation.
  */
 export interface PathValidationResult {
-  /** Whether the path is valid */
-  valid: boolean
-  /** Normalized absolute path (only if valid) */
-  path?: string
-  /** Error message (only if invalid) */
-  error?: string
+	/** Whether the path is valid */
+	valid: boolean;
+	/** Normalized absolute path (only if valid) */
+	path?: string;
+	/** Error message (only if invalid) */
+	error?: string;
 }
 
 /**
@@ -75,58 +75,58 @@ export interface PathValidationResult {
  * @returns Validation result with normalized path or error
  */
 export function validatePath(
-  inputPath: string,
-  options: {
-    /** Base directory to restrict access within (optional) */
-    basePath?: string
-    /** Whether the path must be a directory (default: true) */
-    mustBeDirectory?: boolean
-    /** Whether the path must exist (default: true) */
-    mustExist?: boolean
-  } = {},
+	inputPath: string,
+	options: {
+		/** Base directory to restrict access within (optional) */
+		basePath?: string;
+		/** Whether the path must be a directory (default: true) */
+		mustBeDirectory?: boolean;
+		/** Whether the path must exist (default: true) */
+		mustExist?: boolean;
+	} = {},
 ): PathValidationResult {
-  const { basePath, mustBeDirectory = true, mustExist = true } = options
+	const { basePath, mustBeDirectory = true, mustExist = true } = options;
 
-  // Empty path check
-  if (!inputPath || inputPath.trim() === '') {
-    return { valid: false, error: 'Path cannot be empty' }
-  }
+	// Empty path check
+	if (!inputPath || inputPath.trim() === "") {
+		return { valid: false, error: "Path cannot be empty" };
+	}
 
-  // Normalize the path
-  const normalizedPath = normalizePath(inputPath, basePath)
+	// Normalize the path
+	const normalizedPath = normalizePath(inputPath, basePath);
 
-  // Path traversal check - if basePath is specified, ensure we stay within it
-  if (basePath) {
-    const normalizedBase = normalizePath(basePath)
-    if (!normalizedPath.startsWith(normalizedBase)) {
-      return {
-        valid: false,
-        error: 'Path traversal detected: path escapes base directory',
-      }
-    }
-  }
+	// Path traversal check - if basePath is specified, ensure we stay within it
+	if (basePath) {
+		const normalizedBase = normalizePath(basePath);
+		if (!normalizedPath.startsWith(normalizedBase)) {
+			return {
+				valid: false,
+				error: "Path traversal detected: path escapes base directory",
+			};
+		}
+	}
 
-  // Existence check
-  if (mustExist && !existsSync(normalizedPath)) {
-    return { valid: false, error: `Path does not exist: ${normalizedPath}` }
-  }
+	// Existence check
+	if (mustExist && !existsSync(normalizedPath)) {
+		return { valid: false, error: `Path does not exist: ${normalizedPath}` };
+	}
 
-  // Directory check
-  if (mustExist && mustBeDirectory) {
-    try {
-      const stats = statSync(normalizedPath)
-      if (!stats.isDirectory()) {
-        return {
-          valid: false,
-          error: `Path is not a directory: ${normalizedPath}`,
-        }
-      }
-    } catch {
-      return { valid: false, error: `Cannot access path: ${normalizedPath}` }
-    }
-  }
+	// Directory check
+	if (mustExist && mustBeDirectory) {
+		try {
+			const stats = statSync(normalizedPath);
+			if (!stats.isDirectory()) {
+				return {
+					valid: false,
+					error: `Path is not a directory: ${normalizedPath}`,
+				};
+			}
+		} catch {
+			return { valid: false, error: `Cannot access path: ${normalizedPath}` };
+		}
+	}
 
-  return { valid: true, path: normalizedPath }
+	return { valid: true, path: normalizedPath };
 }
 
 // ============================================================================
@@ -137,7 +137,7 @@ export function validatePath(
  * Characters that are valid in glob patterns.
  * Restricts to safe subset to prevent injection.
  */
-const SAFE_GLOB_CHARS = /^[a-zA-Z0-9_\-.*?[\]{}/\\,!]+$/
+const SAFE_GLOB_CHARS = /^[a-zA-Z0-9_\-.*?[\]{}/\\,!]+$/;
 
 /**
  * Validate a glob pattern for safety.
@@ -145,31 +145,31 @@ const SAFE_GLOB_CHARS = /^[a-zA-Z0-9_\-.*?[\]{}/\\,!]+$/
  * @returns True if pattern is safe
  */
 export function isValidGlob(pattern: string): boolean {
-  // Empty check
-  if (!pattern || pattern.trim() === '') {
-    return false
-  }
+	// Empty check
+	if (!pattern || pattern.trim() === "") {
+		return false;
+	}
 
-  // Trim before checking (allow leading/trailing whitespace)
-  const trimmed = pattern.trim()
+	// Trim before checking (allow leading/trailing whitespace)
+	const trimmed = pattern.trim();
 
-  // Check for safe characters only
-  if (!SAFE_GLOB_CHARS.test(trimmed)) {
-    return false
-  }
+	// Check for safe characters only
+	if (!SAFE_GLOB_CHARS.test(trimmed)) {
+		return false;
+	}
 
-  // Check for balanced brackets
-  let bracketDepth = 0
-  let braceDepth = 0
-  for (const char of trimmed) {
-    if (char === '[') bracketDepth++
-    if (char === ']') bracketDepth--
-    if (char === '{') braceDepth++
-    if (char === '}') braceDepth--
-    if (bracketDepth < 0 || braceDepth < 0) return false
-  }
+	// Check for balanced brackets
+	let bracketDepth = 0;
+	let braceDepth = 0;
+	for (const char of trimmed) {
+		if (char === "[") bracketDepth++;
+		if (char === "]") bracketDepth--;
+		if (char === "{") braceDepth++;
+		if (char === "}") braceDepth--;
+		if (bracketDepth < 0 || braceDepth < 0) return false;
+	}
 
-  return bracketDepth === 0 && braceDepth === 0
+	return bracketDepth === 0 && braceDepth === 0;
 }
 
 /**
@@ -178,18 +178,18 @@ export function isValidGlob(pattern: string): boolean {
  * @returns Validation result
  */
 export function validateGlob(pattern: string): {
-  valid: boolean
-  pattern?: string
-  error?: string
+	valid: boolean;
+	pattern?: string;
+	error?: string;
 } {
-  if (!isValidGlob(pattern)) {
-    return {
-      valid: false,
-      error: `Invalid glob pattern: ${pattern}. Use patterns like "*.py", "**/*.ts", or "src/**/*.js"`,
-    }
-  }
+	if (!isValidGlob(pattern)) {
+		return {
+			valid: false,
+			error: `Invalid glob pattern: ${pattern}. Use patterns like "*.py", "**/*.ts", or "src/**/*.js"`,
+		};
+	}
 
-  return { valid: true, pattern: pattern.trim() }
+	return { valid: true, pattern: pattern.trim() };
 }
 
 // ============================================================================
@@ -201,13 +201,13 @@ export function validateGlob(pattern: string): {
  * These are simplified heuristics - not exhaustive.
  */
 const REDOS_PATTERNS = [
-  // Nested quantifiers: (a+)+, (a*)*
-  /\([^)]*[+*][^)]*\)[+*]/,
-  // Overlapping alternation with quantifiers: (a|a)+
-  /\(([^|)]+)\|\1\)[+*]/,
-  // Long repeating groups: (.+.+)+
-  /\(\.[+*]\.[+*]\)[+*]/,
-]
+	// Nested quantifiers: (a+)+, (a*)*
+	/\([^)]*[+*][^)]*\)[+*]/,
+	// Overlapping alternation with quantifiers: (a|a)+
+	/\(([^|)]+)\|\1\)[+*]/,
+	// Long repeating groups: (.+.+)+
+	/\(\.[+*]\.[+*]\)[+*]/,
+];
 
 /**
  * Check if a regex pattern is potentially vulnerable to ReDoS.
@@ -215,25 +215,25 @@ const REDOS_PATTERNS = [
  * @returns True if pattern appears safe
  */
 export function isRegexSafe(pattern: string): boolean {
-  // Check for known dangerous patterns
-  for (const dangerous of REDOS_PATTERNS) {
-    if (dangerous.test(pattern)) {
-      return false
-    }
-  }
+	// Check for known dangerous patterns
+	for (const dangerous of REDOS_PATTERNS) {
+		if (dangerous.test(pattern)) {
+			return false;
+		}
+	}
 
-  // Check for excessive quantifier nesting
-  const quantifierNesting = (pattern.match(/[+*?]{2,}/g) || []).length
-  if (quantifierNesting > 2) {
-    return false
-  }
+	// Check for excessive quantifier nesting
+	const quantifierNesting = (pattern.match(/[+*?]{2,}/g) || []).length;
+	if (quantifierNesting > 2) {
+		return false;
+	}
 
-  // Check pattern length (very long patterns can be problematic)
-  if (pattern.length > 500) {
-    return false
-  }
+	// Check pattern length (very long patterns can be problematic)
+	if (pattern.length > 500) {
+		return false;
+	}
 
-  return true
+	return true;
 }
 
 /**
@@ -242,33 +242,33 @@ export function isRegexSafe(pattern: string): boolean {
  * @returns Validation result
  */
 export function validateRegex(pattern: string): {
-  valid: boolean
-  pattern?: string
-  error?: string
+	valid: boolean;
+	pattern?: string;
+	error?: string;
 } {
-  // Empty check
-  if (!pattern || pattern.trim() === '') {
-    return { valid: false, error: 'Search pattern cannot be empty' }
-  }
+	// Empty check
+	if (!pattern || pattern.trim() === "") {
+		return { valid: false, error: "Search pattern cannot be empty" };
+	}
 
-  // ReDoS safety check
-  if (!isRegexSafe(pattern)) {
-    return {
-      valid: false,
-      error:
-        'Pattern may cause performance issues. Simplify nested quantifiers.',
-    }
-  }
+	// ReDoS safety check
+	if (!isRegexSafe(pattern)) {
+		return {
+			valid: false,
+			error:
+				"Pattern may cause performance issues. Simplify nested quantifiers.",
+		};
+	}
 
-  // Try to compile the regex
-  try {
-    new RegExp(pattern)
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'Unknown error'
-    return { valid: false, error: `Invalid regex: ${message}` }
-  }
+	// Try to compile the regex
+	try {
+		new RegExp(pattern);
+	} catch (e) {
+		const message = e instanceof Error ? e.message : "Unknown error";
+		return { valid: false, error: `Invalid regex: ${message}` };
+	}
 
-  return { valid: true, pattern: pattern.trim() }
+	return { valid: true, pattern: pattern.trim() };
 }
 
 // ============================================================================
@@ -282,47 +282,47 @@ export function validateRegex(pattern: string): {
  * @returns Validation result
  */
 export function validatePositiveInt(
-  value: unknown,
-  options: {
-    /** Field name for error messages */
-    name: string
-    /** Minimum allowed value (default: 1) */
-    min?: number
-    /** Maximum allowed value (default: 10000) */
-    max?: number
-    /** Default value if undefined */
-    defaultValue?: number
-  },
+	value: unknown,
+	options: {
+		/** Field name for error messages */
+		name: string;
+		/** Minimum allowed value (default: 1) */
+		min?: number;
+		/** Maximum allowed value (default: 10000) */
+		max?: number;
+		/** Default value if undefined */
+		defaultValue?: number;
+	},
 ): { valid: boolean; value?: number; error?: string } {
-  const { name, min = 1, max = 10000, defaultValue } = options
+	const { name, min = 1, max = 10000, defaultValue } = options;
 
-  // Handle undefined with default
-  if (value === undefined || value === null) {
-    if (defaultValue !== undefined) {
-      return { valid: true, value: defaultValue }
-    }
-    return { valid: false, error: `${name} is required` }
-  }
+	// Handle undefined with default
+	if (value === undefined || value === null) {
+		if (defaultValue !== undefined) {
+			return { valid: true, value: defaultValue };
+		}
+		return { valid: false, error: `${name} is required` };
+	}
 
-  // Convert to number
-  const num = typeof value === 'string' ? Number.parseInt(value, 10) : value
+	// Convert to number
+	const num = typeof value === "string" ? Number.parseInt(value, 10) : value;
 
-  // Type check
-  if (typeof num !== 'number' || Number.isNaN(num)) {
-    return { valid: false, error: `${name} must be a number` }
-  }
+	// Type check
+	if (typeof num !== "number" || Number.isNaN(num)) {
+		return { valid: false, error: `${name} must be a number` };
+	}
 
-  // Integer check
-  if (!Number.isInteger(num)) {
-    return { valid: false, error: `${name} must be an integer` }
-  }
+	// Integer check
+	if (!Number.isInteger(num)) {
+		return { valid: false, error: `${name} must be an integer` };
+	}
 
-  // Range check
-  if (num < min || num > max) {
-    return { valid: false, error: `${name} must be between ${min} and ${max}` }
-  }
+	// Range check
+	if (num < min || num > max) {
+		return { valid: false, error: `${name} must be between ${min} and ${max}` };
+	}
 
-  return { valid: true, value: num }
+	return { valid: true, value: num };
 }
 
 // ============================================================================
@@ -335,84 +335,84 @@ export function validatePositiveInt(
  * @returns Combined validation result
  */
 export function validateGrepInputs(inputs: {
-  pattern: string
-  path?: string
-  include?: string
-  exclude?: string
-  maxResults?: number
+	pattern: string;
+	path?: string;
+	include?: string;
+	exclude?: string;
+	maxResults?: number;
 }): {
-  valid: boolean
-  errors: string[]
-  validated?: {
-    pattern: string
-    path: string
-    include?: string
-    exclude?: string
-    maxResults: number
-  }
+	valid: boolean;
+	errors: string[];
+	validated?: {
+		pattern: string;
+		path: string;
+		include?: string;
+		exclude?: string;
+		maxResults: number;
+	};
 } {
-  const errors: string[] = []
+	const errors: string[] = [];
 
-  // Validate pattern
-  const patternResult = validateRegex(inputs.pattern)
-  if (!patternResult.valid) {
-    errors.push(patternResult.error!)
-  }
+	// Validate pattern
+	const patternResult = validateRegex(inputs.pattern);
+	if (!patternResult.valid) {
+		errors.push(patternResult.error!);
+	}
 
-  // Validate path
-  const pathResult = validatePath(inputs.path || getDefaultKitPath())
-  if (!pathResult.valid) {
-    errors.push(pathResult.error!)
-  }
+	// Validate path
+	const pathResult = validatePath(inputs.path || getDefaultKitPath());
+	if (!pathResult.valid) {
+		errors.push(pathResult.error!);
+	}
 
-  // Validate include glob (optional)
-  let validatedInclude: string | undefined
-  if (inputs.include) {
-    const includeResult = validateGlob(inputs.include)
-    if (!includeResult.valid) {
-      errors.push(`Include pattern: ${includeResult.error}`)
-    } else {
-      validatedInclude = includeResult.pattern
-    }
-  }
+	// Validate include glob (optional)
+	let validatedInclude: string | undefined;
+	if (inputs.include) {
+		const includeResult = validateGlob(inputs.include);
+		if (!includeResult.valid) {
+			errors.push(`Include pattern: ${includeResult.error}`);
+		} else {
+			validatedInclude = includeResult.pattern;
+		}
+	}
 
-  // Validate exclude glob (optional)
-  let validatedExclude: string | undefined
-  if (inputs.exclude) {
-    const excludeResult = validateGlob(inputs.exclude)
-    if (!excludeResult.valid) {
-      errors.push(`Exclude pattern: ${excludeResult.error}`)
-    } else {
-      validatedExclude = excludeResult.pattern
-    }
-  }
+	// Validate exclude glob (optional)
+	let validatedExclude: string | undefined;
+	if (inputs.exclude) {
+		const excludeResult = validateGlob(inputs.exclude);
+		if (!excludeResult.valid) {
+			errors.push(`Exclude pattern: ${excludeResult.error}`);
+		} else {
+			validatedExclude = excludeResult.pattern;
+		}
+	}
 
-  // Validate maxResults
-  const maxResultsResult = validatePositiveInt(inputs.maxResults, {
-    name: 'maxResults',
-    min: 1,
-    max: 1000,
-    defaultValue: 100,
-  })
-  if (!maxResultsResult.valid) {
-    errors.push(maxResultsResult.error!)
-  }
+	// Validate maxResults
+	const maxResultsResult = validatePositiveInt(inputs.maxResults, {
+		name: "maxResults",
+		min: 1,
+		max: 1000,
+		defaultValue: 100,
+	});
+	if (!maxResultsResult.valid) {
+		errors.push(maxResultsResult.error!);
+	}
 
-  if (errors.length > 0) {
-    return { valid: false, errors }
-  }
+	if (errors.length > 0) {
+		return { valid: false, errors };
+	}
 
-  return {
-    valid: true,
-    errors: [],
-    validated: {
-      pattern: patternResult.pattern!,
-      path: pathResult.path!,
-      include: validatedInclude,
-      exclude: validatedExclude,
-      maxResults: maxResultsResult.value!,
-    },
-  }
+	return {
+		valid: true,
+		errors: [],
+		validated: {
+			pattern: patternResult.pattern!,
+			path: pathResult.path!,
+			include: validatedInclude,
+			exclude: validatedExclude,
+			maxResults: maxResultsResult.value!,
+		},
+	};
 }
 
 /**
@@ -421,55 +421,55 @@ export function validateGrepInputs(inputs: {
  * @returns Combined validation result
  */
 export function validateSemanticInputs(inputs: {
-  query: string
-  path?: string
-  topK?: number
+	query: string;
+	path?: string;
+	topK?: number;
 }): {
-  valid: boolean
-  errors: string[]
-  validated?: {
-    query: string
-    path: string
-    topK: number
-  }
+	valid: boolean;
+	errors: string[];
+	validated?: {
+		query: string;
+		path: string;
+		topK: number;
+	};
 } {
-  const errors: string[] = []
+	const errors: string[] = [];
 
-  // Validate query (not a regex, just non-empty)
-  if (!inputs.query || inputs.query.trim() === '') {
-    errors.push('Query cannot be empty')
-  }
+	// Validate query (not a regex, just non-empty)
+	if (!inputs.query || inputs.query.trim() === "") {
+		errors.push("Query cannot be empty");
+	}
 
-  // Validate path
-  const pathResult = validatePath(inputs.path || getDefaultKitPath())
-  if (!pathResult.valid) {
-    errors.push(pathResult.error!)
-  }
+	// Validate path
+	const pathResult = validatePath(inputs.path || getDefaultKitPath());
+	if (!pathResult.valid) {
+		errors.push(pathResult.error!);
+	}
 
-  // Validate topK
-  const topKResult = validatePositiveInt(inputs.topK, {
-    name: 'topK',
-    min: 1,
-    max: 50,
-    defaultValue: 5,
-  })
-  if (!topKResult.valid) {
-    errors.push(topKResult.error!)
-  }
+	// Validate topK
+	const topKResult = validatePositiveInt(inputs.topK, {
+		name: "topK",
+		min: 1,
+		max: 50,
+		defaultValue: 5,
+	});
+	if (!topKResult.valid) {
+		errors.push(topKResult.error!);
+	}
 
-  if (errors.length > 0) {
-    return { valid: false, errors }
-  }
+	if (errors.length > 0) {
+		return { valid: false, errors };
+	}
 
-  return {
-    valid: true,
-    errors: [],
-    validated: {
-      query: inputs.query.trim(),
-      path: pathResult.path!,
-      topK: topKResult.value!,
-    },
-  }
+	return {
+		valid: true,
+		errors: [],
+		validated: {
+			query: inputs.query.trim(),
+			path: pathResult.path!,
+			topK: topKResult.value!,
+		},
+	};
 }
 
 /**
@@ -478,88 +478,88 @@ export function validateSemanticInputs(inputs: {
  * @returns Combined validation result
  */
 export function validateSymbolsInputs(inputs: {
-  path?: string
-  pattern?: string
-  symbolType?: string
-  file?: string
+	path?: string;
+	pattern?: string;
+	symbolType?: string;
+	file?: string;
 }): {
-  valid: boolean
-  errors: string[]
-  validated?: {
-    path: string
-    pattern?: string
-    symbolType?: string
-    file?: string
-  }
+	valid: boolean;
+	errors: string[];
+	validated?: {
+		path: string;
+		pattern?: string;
+		symbolType?: string;
+		file?: string;
+	};
 } {
-  const errors: string[] = []
+	const errors: string[] = [];
 
-  // Validate path
-  const pathResult = validatePath(inputs.path || getDefaultKitPath())
-  if (!pathResult.valid) {
-    errors.push(pathResult.error!)
-  }
+	// Validate path
+	const pathResult = validatePath(inputs.path || getDefaultKitPath());
+	if (!pathResult.valid) {
+		errors.push(pathResult.error!);
+	}
 
-  // Validate file (specific file to extract symbols from)
-  let validatedFile: string | undefined
-  if (inputs.file) {
-    // File path is relative to repo, just sanitize
-    const trimmed = inputs.file.trim()
-    if (trimmed.includes('..')) {
-      errors.push('File path cannot contain path traversal sequences')
-    } else {
-      validatedFile = trimmed
-    }
-  }
+	// Validate file (specific file to extract symbols from)
+	let validatedFile: string | undefined;
+	if (inputs.file) {
+		// File path is relative to repo, just sanitize
+		const trimmed = inputs.file.trim();
+		if (trimmed.includes("..")) {
+			errors.push("File path cannot contain path traversal sequences");
+		} else {
+			validatedFile = trimmed;
+		}
+	}
 
-  // Validate file pattern (optional glob)
-  let validatedPattern: string | undefined
-  if (inputs.pattern) {
-    const patternResult = validateGlob(inputs.pattern)
-    if (!patternResult.valid) {
-      errors.push(`File pattern: ${patternResult.error}`)
-    } else {
-      validatedPattern = patternResult.pattern
-    }
-  }
+	// Validate file pattern (optional glob)
+	let validatedPattern: string | undefined;
+	if (inputs.pattern) {
+		const patternResult = validateGlob(inputs.pattern);
+		if (!patternResult.valid) {
+			errors.push(`File pattern: ${patternResult.error}`);
+		} else {
+			validatedPattern = patternResult.pattern;
+		}
+	}
 
-  // Validate symbol type (optional, just sanitize)
-  let validatedSymbolType: string | undefined
-  if (inputs.symbolType) {
-    const sanitized = inputs.symbolType.trim().toLowerCase()
-    const validTypes = [
-      'function',
-      'class',
-      'variable',
-      'type',
-      'interface',
-      'method',
-      'property',
-      'constant',
-    ]
-    if (sanitized && !validTypes.includes(sanitized)) {
-      errors.push(
-        `Invalid symbol type: ${inputs.symbolType}. Valid types: ${validTypes.join(', ')}`,
-      )
-    } else {
-      validatedSymbolType = sanitized || undefined
-    }
-  }
+	// Validate symbol type (optional, just sanitize)
+	let validatedSymbolType: string | undefined;
+	if (inputs.symbolType) {
+		const sanitized = inputs.symbolType.trim().toLowerCase();
+		const validTypes = [
+			"function",
+			"class",
+			"variable",
+			"type",
+			"interface",
+			"method",
+			"property",
+			"constant",
+		];
+		if (sanitized && !validTypes.includes(sanitized)) {
+			errors.push(
+				`Invalid symbol type: ${inputs.symbolType}. Valid types: ${validTypes.join(", ")}`,
+			);
+		} else {
+			validatedSymbolType = sanitized || undefined;
+		}
+	}
 
-  if (errors.length > 0) {
-    return { valid: false, errors }
-  }
+	if (errors.length > 0) {
+		return { valid: false, errors };
+	}
 
-  return {
-    valid: true,
-    errors: [],
-    validated: {
-      path: pathResult.path!,
-      pattern: validatedPattern,
-      symbolType: validatedSymbolType,
-      file: validatedFile,
-    },
-  }
+	return {
+		valid: true,
+		errors: [],
+		validated: {
+			path: pathResult.path!,
+			pattern: validatedPattern,
+			symbolType: validatedSymbolType,
+			file: validatedFile,
+		},
+	};
 }
 
 /**
@@ -568,47 +568,47 @@ export function validateSymbolsInputs(inputs: {
  * @returns Combined validation result
  */
 export function validateFileTreeInputs(inputs: {
-  path?: string
-  subpath?: string
+	path?: string;
+	subpath?: string;
 }): {
-  valid: boolean
-  errors: string[]
-  validated?: {
-    path: string
-    subpath?: string
-  }
+	valid: boolean;
+	errors: string[];
+	validated?: {
+		path: string;
+		subpath?: string;
+	};
 } {
-  const errors: string[] = []
+	const errors: string[] = [];
 
-  // Validate path
-  const pathResult = validatePath(inputs.path || getDefaultKitPath())
-  if (!pathResult.valid) {
-    errors.push(pathResult.error!)
-  }
+	// Validate path
+	const pathResult = validatePath(inputs.path || getDefaultKitPath());
+	if (!pathResult.valid) {
+		errors.push(pathResult.error!);
+	}
 
-  // Validate subpath (relative path within repo)
-  let validatedSubpath: string | undefined
-  if (inputs.subpath) {
-    const trimmed = inputs.subpath.trim()
-    if (trimmed.includes('..')) {
-      errors.push('Subpath cannot contain path traversal sequences')
-    } else {
-      validatedSubpath = trimmed
-    }
-  }
+	// Validate subpath (relative path within repo)
+	let validatedSubpath: string | undefined;
+	if (inputs.subpath) {
+		const trimmed = inputs.subpath.trim();
+		if (trimmed.includes("..")) {
+			errors.push("Subpath cannot contain path traversal sequences");
+		} else {
+			validatedSubpath = trimmed;
+		}
+	}
 
-  if (errors.length > 0) {
-    return { valid: false, errors }
-  }
+	if (errors.length > 0) {
+		return { valid: false, errors };
+	}
 
-  return {
-    valid: true,
-    errors: [],
-    validated: {
-      path: pathResult.path!,
-      subpath: validatedSubpath,
-    },
-  }
+	return {
+		valid: true,
+		errors: [],
+		validated: {
+			path: pathResult.path!,
+			subpath: validatedSubpath,
+		},
+	};
 }
 
 /**
@@ -617,60 +617,60 @@ export function validateFileTreeInputs(inputs: {
  * @returns Combined validation result
  */
 export function validateFileContentInputs(inputs: {
-  path?: string
-  filePaths: string[]
+	path?: string;
+	filePaths: string[];
 }): {
-  valid: boolean
-  errors: string[]
-  validated?: {
-    path: string
-    filePaths: string[]
-  }
+	valid: boolean;
+	errors: string[];
+	validated?: {
+		path: string;
+		filePaths: string[];
+	};
 } {
-  const errors: string[] = []
+	const errors: string[] = [];
 
-  // Validate path
-  const pathResult = validatePath(inputs.path || getDefaultKitPath())
-  if (!pathResult.valid) {
-    errors.push(pathResult.error!)
-  }
+	// Validate path
+	const pathResult = validatePath(inputs.path || getDefaultKitPath());
+	if (!pathResult.valid) {
+		errors.push(pathResult.error!);
+	}
 
-  // Validate file paths
-  if (!inputs.filePaths || inputs.filePaths.length === 0) {
-    errors.push('At least one file path is required')
-  } else {
-    const validatedPaths: string[] = []
-    for (const filePath of inputs.filePaths) {
-      const trimmed = filePath.trim()
-      if (!trimmed) {
-        errors.push('File paths cannot be empty')
-      } else if (trimmed.includes('..')) {
-        errors.push(
-          `File path "${trimmed}" cannot contain path traversal sequences`,
-        )
-      } else {
-        validatedPaths.push(trimmed)
-      }
-    }
+	// Validate file paths
+	if (!inputs.filePaths || inputs.filePaths.length === 0) {
+		errors.push("At least one file path is required");
+	} else {
+		const validatedPaths: string[] = [];
+		for (const filePath of inputs.filePaths) {
+			const trimmed = filePath.trim();
+			if (!trimmed) {
+				errors.push("File paths cannot be empty");
+			} else if (trimmed.includes("..")) {
+				errors.push(
+					`File path "${trimmed}" cannot contain path traversal sequences`,
+				);
+			} else {
+				validatedPaths.push(trimmed);
+			}
+		}
 
-    // Check for reasonable limit
-    if (validatedPaths.length > 20) {
-      errors.push('Cannot request more than 20 files at once')
-    }
-  }
+		// Check for reasonable limit
+		if (validatedPaths.length > 20) {
+			errors.push("Cannot request more than 20 files at once");
+		}
+	}
 
-  if (errors.length > 0) {
-    return { valid: false, errors }
-  }
+	if (errors.length > 0) {
+		return { valid: false, errors };
+	}
 
-  return {
-    valid: true,
-    errors: [],
-    validated: {
-      path: pathResult.path!,
-      filePaths: inputs.filePaths.map((p) => p.trim()),
-    },
-  }
+	return {
+		valid: true,
+		errors: [],
+		validated: {
+			path: pathResult.path!,
+			filePaths: inputs.filePaths.map((p) => p.trim()),
+		},
+	};
 }
 
 /**
@@ -679,67 +679,67 @@ export function validateFileContentInputs(inputs: {
  * @returns Combined validation result
  */
 export function validateUsagesInputs(inputs: {
-  path?: string
-  symbolName: string
-  symbolType?: string
+	path?: string;
+	symbolName: string;
+	symbolType?: string;
 }): {
-  valid: boolean
-  errors: string[]
-  validated?: {
-    path: string
-    symbolName: string
-    symbolType?: string
-  }
+	valid: boolean;
+	errors: string[];
+	validated?: {
+		path: string;
+		symbolName: string;
+		symbolType?: string;
+	};
 } {
-  const errors: string[] = []
+	const errors: string[] = [];
 
-  // Validate path
-  const pathResult = validatePath(inputs.path || getDefaultKitPath())
-  if (!pathResult.valid) {
-    errors.push(pathResult.error!)
-  }
+	// Validate path
+	const pathResult = validatePath(inputs.path || getDefaultKitPath());
+	if (!pathResult.valid) {
+		errors.push(pathResult.error!);
+	}
 
-  // Validate symbol name
-  if (!inputs.symbolName || inputs.symbolName.trim() === '') {
-    errors.push('Symbol name is required')
-  }
+	// Validate symbol name
+	if (!inputs.symbolName || inputs.symbolName.trim() === "") {
+		errors.push("Symbol name is required");
+	}
 
-  // Validate symbol type (optional)
-  let validatedSymbolType: string | undefined
-  if (inputs.symbolType) {
-    const sanitized = inputs.symbolType.trim().toLowerCase()
-    const validTypes = [
-      'function',
-      'class',
-      'variable',
-      'type',
-      'interface',
-      'method',
-      'property',
-      'constant',
-    ]
-    if (sanitized && !validTypes.includes(sanitized)) {
-      errors.push(
-        `Invalid symbol type: ${inputs.symbolType}. Valid types: ${validTypes.join(', ')}`,
-      )
-    } else {
-      validatedSymbolType = sanitized || undefined
-    }
-  }
+	// Validate symbol type (optional)
+	let validatedSymbolType: string | undefined;
+	if (inputs.symbolType) {
+		const sanitized = inputs.symbolType.trim().toLowerCase();
+		const validTypes = [
+			"function",
+			"class",
+			"variable",
+			"type",
+			"interface",
+			"method",
+			"property",
+			"constant",
+		];
+		if (sanitized && !validTypes.includes(sanitized)) {
+			errors.push(
+				`Invalid symbol type: ${inputs.symbolType}. Valid types: ${validTypes.join(", ")}`,
+			);
+		} else {
+			validatedSymbolType = sanitized || undefined;
+		}
+	}
 
-  if (errors.length > 0) {
-    return { valid: false, errors }
-  }
+	if (errors.length > 0) {
+		return { valid: false, errors };
+	}
 
-  return {
-    valid: true,
-    errors: [],
-    validated: {
-      path: pathResult.path!,
-      symbolName: inputs.symbolName.trim(),
-      symbolType: validatedSymbolType,
-    },
-  }
+	return {
+		valid: true,
+		errors: [],
+		validated: {
+			path: pathResult.path!,
+			symbolName: inputs.symbolName.trim(),
+			symbolType: validatedSymbolType,
+		},
+	};
 }
 
 /**
@@ -748,88 +748,88 @@ export function validateUsagesInputs(inputs: {
  * @returns Combined validation result
  */
 export function validateAstSearchInputs(inputs: {
-  pattern: string
-  mode?: string
-  filePattern?: string
-  path?: string
-  maxResults?: number
+	pattern: string;
+	mode?: string;
+	filePattern?: string;
+	path?: string;
+	maxResults?: number;
 }): {
-  valid: boolean
-  errors: string[]
-  validated?: {
-    pattern: string
-    mode: 'simple' | 'pattern'
-    filePattern?: string
-    path: string
-    maxResults: number
-  }
+	valid: boolean;
+	errors: string[];
+	validated?: {
+		pattern: string;
+		mode: "simple" | "pattern";
+		filePattern?: string;
+		path: string;
+		maxResults: number;
+	};
 } {
-  const errors: string[] = []
+	const errors: string[] = [];
 
-  // Validate pattern
-  if (!inputs.pattern || inputs.pattern.trim() === '') {
-    errors.push('Pattern cannot be empty')
-  }
+	// Validate pattern
+	if (!inputs.pattern || inputs.pattern.trim() === "") {
+		errors.push("Pattern cannot be empty");
+	}
 
-  // Validate mode
-  const validModes = ['simple', 'pattern']
-  const mode = (inputs.mode || 'simple').toLowerCase()
-  if (!validModes.includes(mode)) {
-    errors.push(
-      `Invalid mode: ${inputs.mode}. Valid modes: ${validModes.join(', ')}`,
-    )
-  }
+	// Validate mode
+	const validModes = ["simple", "pattern"];
+	const mode = (inputs.mode || "simple").toLowerCase();
+	if (!validModes.includes(mode)) {
+		errors.push(
+			`Invalid mode: ${inputs.mode}. Valid modes: ${validModes.join(", ")}`,
+		);
+	}
 
-  // Validate pattern mode JSON if mode is 'pattern'
-  if (mode === 'pattern' && inputs.pattern) {
-    try {
-      JSON.parse(inputs.pattern)
-    } catch {
-      // Allow non-JSON patterns - they'll be treated as textMatch
-    }
-  }
+	// Validate pattern mode JSON if mode is 'pattern'
+	if (mode === "pattern" && inputs.pattern) {
+		try {
+			JSON.parse(inputs.pattern);
+		} catch {
+			// Allow non-JSON patterns - they'll be treated as textMatch
+		}
+	}
 
-  // Validate file pattern (optional glob)
-  let validatedFilePattern: string | undefined
-  if (inputs.filePattern) {
-    const patternResult = validateGlob(inputs.filePattern)
-    if (!patternResult.valid) {
-      errors.push(`File pattern: ${patternResult.error}`)
-    } else {
-      validatedFilePattern = patternResult.pattern
-    }
-  }
+	// Validate file pattern (optional glob)
+	let validatedFilePattern: string | undefined;
+	if (inputs.filePattern) {
+		const patternResult = validateGlob(inputs.filePattern);
+		if (!patternResult.valid) {
+			errors.push(`File pattern: ${patternResult.error}`);
+		} else {
+			validatedFilePattern = patternResult.pattern;
+		}
+	}
 
-  // Validate path
-  const pathResult = validatePath(inputs.path || getDefaultKitPath())
-  if (!pathResult.valid) {
-    errors.push(pathResult.error!)
-  }
+	// Validate path
+	const pathResult = validatePath(inputs.path || getDefaultKitPath());
+	if (!pathResult.valid) {
+		errors.push(pathResult.error!);
+	}
 
-  // Validate maxResults
-  const maxResultsResult = validatePositiveInt(inputs.maxResults, {
-    name: 'maxResults',
-    min: 1,
-    max: 500,
-    defaultValue: 100,
-  })
-  if (!maxResultsResult.valid) {
-    errors.push(maxResultsResult.error!)
-  }
+	// Validate maxResults
+	const maxResultsResult = validatePositiveInt(inputs.maxResults, {
+		name: "maxResults",
+		min: 1,
+		max: 500,
+		defaultValue: 100,
+	});
+	if (!maxResultsResult.valid) {
+		errors.push(maxResultsResult.error!);
+	}
 
-  if (errors.length > 0) {
-    return { valid: false, errors }
-  }
+	if (errors.length > 0) {
+		return { valid: false, errors };
+	}
 
-  return {
-    valid: true,
-    errors: [],
-    validated: {
-      pattern: inputs.pattern.trim(),
-      mode: mode as 'simple' | 'pattern',
-      filePattern: validatedFilePattern,
-      path: pathResult.path!,
-      maxResults: maxResultsResult.value!,
-    },
-  }
+	return {
+		valid: true,
+		errors: [],
+		validated: {
+			pattern: inputs.pattern.trim(),
+			mode: mode as "simple" | "pattern",
+			filePattern: validatedFilePattern,
+			path: pathResult.path!,
+			maxResults: maxResultsResult.value!,
+		},
+	};
 }

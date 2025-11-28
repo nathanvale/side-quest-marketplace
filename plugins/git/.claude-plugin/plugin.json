@@ -1,18 +1,18 @@
 {
-  "name": "git",
-  "description": "Git intelligence for Claude Code - session context, commit history, and smart commits with Conventional Commits",
-  "version": "1.0.0",
-  "author": {
-    "name": "Nathan Vale",
-    "email": "hi@nathanvale.com"
-  },
-  "keywords": [
-    "git",
-    "commits",
-    "history",
-    "conventional-commits",
-    "mcp",
-    "session"
-  ],
-  "license": "MIT"
+	"name": "git",
+	"description": "Git intelligence for Claude Code - session context, commit history, and smart commits with Conventional Commits",
+	"version": "1.0.0",
+	"author": {
+		"name": "Nathan Vale",
+		"email": "hi@nathanvale.com"
+	},
+	"keywords": [
+		"git",
+		"commits",
+		"history",
+		"conventional-commits",
+		"mcp",
+		"session"
+	],
+	"license": "MIT"
 }

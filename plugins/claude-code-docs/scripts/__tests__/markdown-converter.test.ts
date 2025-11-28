@@ -1,11 +1,11 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from "bun:test";
 
-import { MarkdownConverter } from '../lib/markdown-converter'
+import { MarkdownConverter } from "../lib/markdown-converter";
 
-describe('MarkdownConverter', () => {
-  describe('extractMainContent', () => {
-    test('extracts content from main tag and removes navigation', () => {
-      const html = `
+describe("MarkdownConverter", () => {
+	describe("extractMainContent", () => {
+		test("extracts content from main tag and removes navigation", () => {
+			const html = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -55,41 +55,43 @@ describe('MarkdownConverter', () => {
     </script>
 </body>
 </html>
-      `
+      `;
 
-      const converter = new MarkdownConverter()
-      const result = converter.extractMainContent(html)
+			const converter = new MarkdownConverter();
+			const result = converter.extractMainContent(html);
 
-      // Should include main content
-      expect(result).toContain('Getting Started with Claude Code')
-      expect(result).toContain('Claude Code is a powerful CLI tool')
-      expect(result).toContain('npm install -g @anthropic-ai/claude-code')
-      expect(result).toContain('claude-code config set ANTHROPIC_API_KEY=your-key')
+			// Should include main content
+			expect(result).toContain("Getting Started with Claude Code");
+			expect(result).toContain("Claude Code is a powerful CLI tool");
+			expect(result).toContain("npm install -g @anthropic-ai/claude-code");
+			expect(result).toContain(
+				"claude-code config set ANTHROPIC_API_KEY=your-key",
+			);
 
-      // Should NOT include navigation
-      expect(result).not.toContain('<nav')
-      expect(result).not.toContain('top-nav')
+			// Should NOT include navigation
+			expect(result).not.toContain("<nav");
+			expect(result).not.toContain("top-nav");
 
-      // Should NOT include header
-      expect(result).not.toContain('<header')
-      expect(result).not.toContain('site-header')
-      expect(result).not.toContain('search-box')
+			// Should NOT include header
+			expect(result).not.toContain("<header");
+			expect(result).not.toContain("site-header");
+			expect(result).not.toContain("search-box");
 
-      // Should NOT include footer
-      expect(result).not.toContain('<footer')
-      expect(result).not.toContain('&copy; 2024 Anthropic')
-      expect(result).not.toContain('footer-nav')
+			// Should NOT include footer
+			expect(result).not.toContain("<footer");
+			expect(result).not.toContain("&copy; 2024 Anthropic");
+			expect(result).not.toContain("footer-nav");
 
-      // Should NOT include scripts or styles
-      expect(result).not.toContain('<script')
-      expect(result).not.toContain('window.analytics')
-      expect(result).not.toContain('app.init()')
-      expect(result).not.toContain('<style')
-      expect(result).not.toContain('.nav { display: flex; }')
-    })
+			// Should NOT include scripts or styles
+			expect(result).not.toContain("<script");
+			expect(result).not.toContain("window.analytics");
+			expect(result).not.toContain("app.init()");
+			expect(result).not.toContain("<style");
+			expect(result).not.toContain(".nav { display: flex; }");
+		});
 
-    test('extracts content from article tag when main is not present', () => {
-      const html = `
+		test("extracts content from article tag when main is not present", () => {
+			const html = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -114,25 +116,25 @@ describe('MarkdownConverter', () => {
     </footer>
 </body>
 </html>
-      `
+      `;
 
-      const converter = new MarkdownConverter()
-      const result = converter.extractMainContent(html)
+			const converter = new MarkdownConverter();
+			const result = converter.extractMainContent(html);
 
-      // Should include article content
-      expect(result).toContain('API Reference')
-      expect(result).toContain('This page describes the API endpoints')
-      expect(result).toContain('Authorization: Bearer YOUR_TOKEN')
+			// Should include article content
+			expect(result).toContain("API Reference");
+			expect(result).toContain("This page describes the API endpoints");
+			expect(result).toContain("Authorization: Bearer YOUR_TOKEN");
 
-      // Should NOT include nav or footer
-      expect(result).not.toContain('<nav')
-      expect(result).not.toContain('Guides')
-      expect(result).not.toContain('<footer')
-      expect(result).not.toContain('Contact us')
-    })
+			// Should NOT include nav or footer
+			expect(result).not.toContain("<nav");
+			expect(result).not.toContain("Guides");
+			expect(result).not.toContain("<footer");
+			expect(result).not.toContain("Contact us");
+		});
 
-    test('preserves code blocks with proper formatting', () => {
-      const html = `
+		test("preserves code blocks with proper formatting", () => {
+			const html = `
 <!DOCTYPE html>
 <html>
 <body>
@@ -167,36 +169,36 @@ claude-code run "explain this code" --file app.ts</code></pre>
     <footer>Footer content</footer>
 </body>
 </html>
-      `
+      `;
 
-      const converter = new MarkdownConverter()
-      const result = converter.extractMainContent(html)
+			const converter = new MarkdownConverter();
+			const result = converter.extractMainContent(html);
 
-      // Should preserve code blocks
-      expect(result).toContain('import { Claude } from')
-      expect(result).toContain('const client = new Claude')
-      expect(result).toContain('process.env.ANTHROPIC_API_KEY')
-      expect(result).toContain('claude-code chat')
-      expect(result).toContain('claude-code run')
-      expect(result).toContain('--file app.ts')
+			// Should preserve code blocks
+			expect(result).toContain("import { Claude } from");
+			expect(result).toContain("const client = new Claude");
+			expect(result).toContain("process.env.ANTHROPIC_API_KEY");
+			expect(result).toContain("claude-code chat");
+			expect(result).toContain("claude-code run");
+			expect(result).toContain("--file app.ts");
 
-      // Should preserve code structure (indentation matters)
-      expect(result).toContain('async function main()')
-      expect(result).toContain('console.log(response.content)')
+			// Should preserve code structure (indentation matters)
+			expect(result).toContain("async function main()");
+			expect(result).toContain("console.log(response.content)");
 
-      // Code block tags should be preserved
-      expect(result).toContain('<pre>')
-      expect(result).toContain('<code')
-      expect(result).toContain('</code>')
-      expect(result).toContain('</pre>')
+			// Code block tags should be preserved
+			expect(result).toContain("<pre>");
+			expect(result).toContain("<code");
+			expect(result).toContain("</code>");
+			expect(result).toContain("</pre>");
 
-      // Should NOT include nav or footer
-      expect(result).not.toContain('<nav')
-      expect(result).not.toContain('<footer')
-    })
+			// Should NOT include nav or footer
+			expect(result).not.toContain("<nav");
+			expect(result).not.toContain("<footer");
+		});
 
-    test('handles complex nested structure with multiple nav and sidebar elements', () => {
-      const html = `
+		test("handles complex nested structure with multiple nav and sidebar elements", () => {
+			const html = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -273,43 +275,45 @@ claude-code run "explain this code" --file app.ts</code></pre>
     </script>
 </body>
 </html>
-      `
+      `;
 
-      const converter = new MarkdownConverter()
-      const result = converter.extractMainContent(html)
+			const converter = new MarkdownConverter();
+			const result = converter.extractMainContent(html);
 
-      // Should include main content
-      expect(result).toContain('Introduction to Claude Code')
-      expect(result).toContain('Claude Code is an AI-powered development assistant')
-      expect(result).toContain('Intelligent code generation')
-      expect(result).toContain('Context-aware suggestions')
-      expect(result).toContain('npx @anthropic-ai/claude-code init')
+			// Should include main content
+			expect(result).toContain("Introduction to Claude Code");
+			expect(result).toContain(
+				"Claude Code is an AI-powered development assistant",
+			);
+			expect(result).toContain("Intelligent code generation");
+			expect(result).toContain("Context-aware suggestions");
+			expect(result).toContain("npx @anthropic-ai/claude-code init");
 
-      // Should NOT include any navigation elements
-      expect(result).not.toContain('top-nav')
-      expect(result).not.toContain('sidebar-nav')
-      expect(result).not.toContain('page-nav')
-      expect(result).not.toContain('table-of-contents')
-      expect(result).not.toContain('On this page')
+			// Should NOT include any navigation elements
+			expect(result).not.toContain("top-nav");
+			expect(result).not.toContain("sidebar-nav");
+			expect(result).not.toContain("page-nav");
+			expect(result).not.toContain("table-of-contents");
+			expect(result).not.toContain("On this page");
 
-      // Should NOT include header or footer
-      expect(result).not.toContain('<header')
-      expect(result).not.toContain('top-header')
-      expect(result).not.toContain('<footer')
-      expect(result).not.toContain('&copy; 2024 Anthropic')
-      expect(result).not.toContain('Privacy Policy')
+			// Should NOT include header or footer
+			expect(result).not.toContain("<header");
+			expect(result).not.toContain("top-header");
+			expect(result).not.toContain("<footer");
+			expect(result).not.toContain("&copy; 2024 Anthropic");
+			expect(result).not.toContain("Privacy Policy");
 
-      // Should NOT include scripts
-      expect(result).not.toContain('<script')
-      expect(result).not.toContain('initializeApp()')
-      expect(result).not.toContain('DOMContentLoaded')
+			// Should NOT include scripts
+			expect(result).not.toContain("<script");
+			expect(result).not.toContain("initializeApp()");
+			expect(result).not.toContain("DOMContentLoaded");
 
-      // Should NOT include aside elements
-      expect(result).not.toContain('<aside')
-    })
+			// Should NOT include aside elements
+			expect(result).not.toContain("<aside");
+		});
 
-    test('handles missing main tag gracefully and falls back to body', () => {
-      const html = `
+		test("handles missing main tag gracefully and falls back to body", () => {
+			const html = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -322,23 +326,23 @@ claude-code run "explain this code" --file app.ts</code></pre>
     <pre><code>console.log('Hello, World!')</code></pre>
 </body>
 </html>
-      `
+      `;
 
-      const converter = new MarkdownConverter()
-      const result = converter.extractMainContent(html)
+			const converter = new MarkdownConverter();
+			const result = converter.extractMainContent(html);
 
-      // Should still extract body content when no main/article tag exists
-      expect(result).toContain('Welcome to Claude Code')
-      expect(result).toContain('This page has no main tag')
-      expect(result).toContain('But it should still extract content')
-      expect(result).toContain("console.log('Hello, World!')")
+			// Should still extract body content when no main/article tag exists
+			expect(result).toContain("Welcome to Claude Code");
+			expect(result).toContain("This page has no main tag");
+			expect(result).toContain("But it should still extract content");
+			expect(result).toContain("console.log('Hello, World!')");
 
-      // Result should be a non-empty string
-      expect(result.length).toBeGreaterThan(0)
-    })
+			// Result should be a non-empty string
+			expect(result.length).toBeGreaterThan(0);
+		});
 
-    test('removes inline scripts and styles within main content', () => {
-      const html = `
+		test("removes inline scripts and styles within main content", () => {
+			const html = `
 <!DOCTYPE html>
 <html>
 <body>
@@ -380,42 +384,42 @@ function example() {
     </main>
 </body>
 </html>
-      `
+      `;
 
-      const converter = new MarkdownConverter()
-      const result = converter.extractMainContent(html)
+			const converter = new MarkdownConverter();
+			const result = converter.extractMainContent(html);
 
-      // Should include content paragraphs
-      expect(result).toContain('Documentation with Inline Scripts')
-      expect(result).toContain('This is the first paragraph')
-      expect(result).toContain('This is the second paragraph')
-      expect(result).toContain('Code Example')
+			// Should include content paragraphs
+			expect(result).toContain("Documentation with Inline Scripts");
+			expect(result).toContain("This is the first paragraph");
+			expect(result).toContain("This is the second paragraph");
+			expect(result).toContain("Code Example");
 
-      // Should preserve code blocks
-      expect(result).toContain('function example()')
-      expect(result).toContain("return 'Hello, World!'")
+			// Should preserve code blocks
+			expect(result).toContain("function example()");
+			expect(result).toContain("return 'Hello, World!'");
 
-      // Should NOT include inline scripts
-      expect(result).not.toContain('const tracking')
-      expect(result).not.toContain('tracking.pageView()')
-      expect(result).not.toContain('window.addEventListener')
-      expect(result).not.toContain('Page loaded')
+			// Should NOT include inline scripts
+			expect(result).not.toContain("const tracking");
+			expect(result).not.toContain("tracking.pageView()");
+			expect(result).not.toContain("window.addEventListener");
+			expect(result).not.toContain("Page loaded");
 
-      // Should NOT include inline styles
-      expect(result).not.toContain('.custom-style')
-      expect(result).not.toContain('color: red')
-      expect(result).not.toContain('font-size: 16px')
-      expect(result).not.toContain('font-weight: bold')
+			// Should NOT include inline styles
+			expect(result).not.toContain(".custom-style");
+			expect(result).not.toContain("color: red");
+			expect(result).not.toContain("font-size: 16px");
+			expect(result).not.toContain("font-weight: bold");
 
-      // Should not have script or style tags
-      expect(result).not.toContain('<script')
-      expect(result).not.toContain('</script>')
-      expect(result).not.toContain('<style')
-      expect(result).not.toContain('</style>')
-    })
+			// Should not have script or style tags
+			expect(result).not.toContain("<script");
+			expect(result).not.toContain("</script>");
+			expect(result).not.toContain("<style");
+			expect(result).not.toContain("</style>");
+		});
 
-    test('preserves links, images, and formatting elements', () => {
-      const html = `
+		test("preserves links, images, and formatting elements", () => {
+			const html = `
 <!DOCTYPE html>
 <html>
 <body>
@@ -449,62 +453,62 @@ function example() {
     <footer>Footer to remove</footer>
 </body>
 </html>
-      `
+      `;
 
-      const converter = new MarkdownConverter()
-      const result = converter.extractMainContent(html)
+			const converter = new MarkdownConverter();
+			const result = converter.extractMainContent(html);
 
-      // Should preserve text formatting
-      expect(result).toContain('<strong>multiple file operations</strong>')
-      expect(result).toContain('<em>context-aware suggestions</em>')
+			// Should preserve text formatting
+			expect(result).toContain("<strong>multiple file operations</strong>");
+			expect(result).toContain("<em>context-aware suggestions</em>");
 
-      // Should preserve links
-      expect(result).toContain('<a href="/docs/guides">')
-      expect(result).toContain('comprehensive guides')
-      expect(result).toContain('https://github.com/anthropics/claude-code')
-      expect(result).toContain('https://claude.ai')
+			// Should preserve links
+			expect(result).toContain('<a href="/docs/guides">');
+			expect(result).toContain("comprehensive guides");
+			expect(result).toContain("https://github.com/anthropics/claude-code");
+			expect(result).toContain("https://claude.ai");
 
-      // Should preserve images
-      expect(result).toContain('<img src="/images/architecture.png"')
-      expect(result).toContain('alt="Claude Code Architecture"')
+			// Should preserve images
+			expect(result).toContain('<img src="/images/architecture.png"');
+			expect(result).toContain('alt="Claude Code Architecture"');
 
-      // Should preserve list structure
-      expect(result).toContain('<ul>')
-      expect(result).toContain('<li>')
-      expect(result).toContain('Uses Claude 3.5 Sonnet')
-      expect(result).toContain('Optimized for performance')
+			// Should preserve list structure
+			expect(result).toContain("<ul>");
+			expect(result).toContain("<li>");
+			expect(result).toContain("Uses Claude 3.5 Sonnet");
+			expect(result).toContain("Optimized for performance");
 
-      // Should preserve blockquotes
-      expect(result).toContain('<blockquote>')
-      expect(result).toContain('Claude Code has transformed')
+			// Should preserve blockquotes
+			expect(result).toContain("<blockquote>");
+			expect(result).toContain("Claude Code has transformed");
 
-      // Should NOT include nav or footer
-      expect(result).not.toContain('Navigation to remove')
-      expect(result).not.toContain('Footer to remove')
-    })
+			// Should NOT include nav or footer
+			expect(result).not.toContain("Navigation to remove");
+			expect(result).not.toContain("Footer to remove");
+		});
 
-    test('returns empty string for completely empty or invalid HTML', () => {
-      const converter = new MarkdownConverter()
+		test("returns empty string for completely empty or invalid HTML", () => {
+			const converter = new MarkdownConverter();
 
-      // Empty string
-      expect(converter.extractMainContent('')).toBe('')
+			// Empty string
+			expect(converter.extractMainContent("")).toBe("");
 
-      // Whitespace only
-      expect(converter.extractMainContent('   \n  \t  ')).toBe('')
+			// Whitespace only
+			expect(converter.extractMainContent("   \n  \t  ")).toBe("");
 
-      // Invalid HTML
-      expect(converter.extractMainContent('<<>>')).toBe('')
+			// Invalid HTML
+			expect(converter.extractMainContent("<<>>")).toBe("");
 
-      // HTML with no body
-      expect(converter.extractMainContent('<html></html>')).toBe('')
-    })
-  })
+			// HTML with no body
+			expect(converter.extractMainContent("<html></html>")).toBe("");
+		});
+	});
 
-  describe('cleanupMarkdown()', () => {
-    test('rewrites internal /docs/en/ links to relative .md links', () => {
-      const converter = new MarkdownConverter()
+	describe("cleanupMarkdown()", () => {
+		test("rewrites internal /docs/en/ links to relative .md links", () => {
+			const converter = new MarkdownConverter();
 
-      const input = `# Plugins
+			const input = `# Plugins
 
 Plugins let you extend Claude Code with custom functionality. Install plugins from [marketplaces](/docs/en/plugin-marketplaces) to add pre-built commands.
 
@@ -512,9 +516,9 @@ See [hooks](/docs/en/hooks) and [skills](/docs/en/skills) for more info.
 
 Also check [hooks guide](/docs/en/hooks-guide#custom-hooks) with anchors.
 
-External links like [GitHub](https://github.com) should not change.`
+External links like [GitHub](https://github.com) should not change.`;
 
-      const expected = `# Plugins
+			const expected = `# Plugins
 
 Plugins let you extend Claude Code with custom functionality. Install plugins from [marketplaces](plugin-marketplaces.md) to add pre-built commands.
 
@@ -522,15 +526,15 @@ See [hooks](hooks.md) and [skills](skills.md) for more info.
 
 Also check [hooks guide](hooks-guide.md#custom-hooks) with anchors.
 
-External links like [GitHub](https://github.com) should not change.`
+External links like [GitHub](https://github.com) should not change.`;
 
-      expect(converter.cleanupMarkdown(input)).toBe(expected)
-    })
+			expect(converter.cleanupMarkdown(input)).toBe(expected);
+		});
 
-    test('removes excessive newlines (more than 2 consecutive → exactly 2)', () => {
-      const converter = new MarkdownConverter()
+		test("removes excessive newlines (more than 2 consecutive → exactly 2)", () => {
+			const converter = new MarkdownConverter();
 
-      const input = `# Title
+			const input = `# Title
 
 
 
@@ -542,23 +546,23 @@ This has too many blank lines.
 Between paragraphs.
 
 
-Should be normalized.`
+Should be normalized.`;
 
-      const expected = `# Title
+			const expected = `# Title
 
 This has too many blank lines.
 
 Between paragraphs.
 
-Should be normalized.`
+Should be normalized.`;
 
-      expect(converter.cleanupMarkdown(input)).toBe(expected)
-    })
+			expect(converter.cleanupMarkdown(input)).toBe(expected);
+		});
 
-    test('ensures proper spacing around headers (1 blank line before and after)', () => {
-      const converter = new MarkdownConverter()
+		test("ensures proper spacing around headers (1 blank line before and after)", () => {
+			const converter = new MarkdownConverter();
 
-      const input = `# Main Title
+			const input = `# Main Title
 
 Some content here.
 ## Section Header
@@ -567,9 +571,9 @@ This should have proper spacing.
 ### Subsection
 
 
-Another paragraph.`
+Another paragraph.`;
 
-      const expected = `# Main Title
+			const expected = `# Main Title
 
 Some content here.
 
@@ -579,15 +583,15 @@ This should have proper spacing.
 
 ### Subsection
 
-Another paragraph.`
+Another paragraph.`;
 
-      expect(converter.cleanupMarkdown(input)).toBe(expected)
-    })
+			expect(converter.cleanupMarkdown(input)).toBe(expected);
+		});
 
-    test('normalizes consistent list formatting', () => {
-      const converter = new MarkdownConverter()
+		test("normalizes consistent list formatting", () => {
+			const converter = new MarkdownConverter();
 
-      const input = `# List Examples
+			const input = `# List Examples
 
 -Item without space
 - Proper item
@@ -600,9 +604,9 @@ Another paragraph.`
 
 1.Numbered without space
 2. Proper numbered
-   3.  Extra spaces`
+   3.  Extra spaces`;
 
-      const expected = `# List Examples
+			const expected = `# List Examples
 
 - Item without space
 - Proper item
@@ -615,15 +619,15 @@ Another paragraph.`
 
 1. Numbered without space
 2. Proper numbered
-   3. Extra spaces`
+   3. Extra spaces`;
 
-      expect(converter.cleanupMarkdown(input).trim()).toBe(expected.trim())
-    })
+			expect(converter.cleanupMarkdown(input).trim()).toBe(expected.trim());
+		});
 
-    test('removes HTML artifacts (comments and stray tags)', () => {
-      const converter = new MarkdownConverter()
+		test("removes HTML artifacts (comments and stray tags)", () => {
+			const converter = new MarkdownConverter();
 
-      const input = `# Documentation
+			const input = `# Documentation
 
 <!-- This is a comment that should be removed -->
 
@@ -641,9 +645,9 @@ More content with <span>inline tags</span> to clean.
 
 <script>alert('bad')</script>
 
-Final paragraph.`
+Final paragraph.`;
 
-      const expected = `# Documentation
+			const expected = `# Documentation
 
 This is content with  text.
 
@@ -651,39 +655,27 @@ Some markdown content here.
 
 More content with inline tags to clean.
 
-Final paragraph.`
+Final paragraph.`;
 
-      expect(converter.cleanupMarkdown(input).trim()).toBe(expected.trim())
-    })
+			expect(converter.cleanupMarkdown(input).trim()).toBe(expected.trim());
+		});
 
-    test('normalizes line endings (CRLF → LF)', () => {
-      const converter = new MarkdownConverter()
+		test("normalizes line endings (CRLF → LF)", () => {
+			const converter = new MarkdownConverter();
 
-      const input = '# Title\r\n\r\nParagraph with CRLF.\r\n\r\n## Section\r\nMore content.\r\n'
+			const input =
+				"# Title\r\n\r\nParagraph with CRLF.\r\n\r\n## Section\r\nMore content.\r\n";
 
-      const expected = '# Title\n\nParagraph with CRLF.\n\n## Section\nMore content.'
+			const expected =
+				"# Title\n\nParagraph with CRLF.\n\n## Section\nMore content.";
 
-      expect(converter.cleanupMarkdown(input).trim()).toBe(expected.trim())
-    })
+			expect(converter.cleanupMarkdown(input).trim()).toBe(expected.trim());
+		});
 
-    test('trims trailing whitespace from each line', () => {
-      const converter = new MarkdownConverter()
+		test("trims trailing whitespace from each line", () => {
+			const converter = new MarkdownConverter();
 
-      const input = `# Title
-
-This line has trailing spaces.
-
-- List item with spaces
-- Another item
-
-Code example:
-\`\`\`js
-const x = 1;
-\`\`\`
-
-End paragraph.     `
-
-      const expected = `# Title
+			const input = `# Title
 
 This line has trailing spaces.
 
@@ -695,15 +687,29 @@ Code example:
 const x = 1;
 \`\`\`
 
-End paragraph.`
+End paragraph.     `;
 
-      expect(converter.cleanupMarkdown(input).trim()).toBe(expected.trim())
-    })
+			const expected = `# Title
 
-    test('fixes broken markdown syntax', () => {
-      const converter = new MarkdownConverter()
+This line has trailing spaces.
 
-      const input = `#Title without space
+- List item with spaces
+- Another item
+
+Code example:
+\`\`\`js
+const x = 1;
+\`\`\`
+
+End paragraph.`;
+
+			expect(converter.cleanupMarkdown(input).trim()).toBe(expected.trim());
+		});
+
+		test("fixes broken markdown syntax", () => {
+			const converter = new MarkdownConverter();
+
+			const input = `#Title without space
 
 ##Another header
 
@@ -727,9 +733,9 @@ Proper code block
 
 **Proper bold**
 
-*Proper italic*`
+*Proper italic*`;
 
-      const expected = `# Title without space
+			const expected = `# Title without space
 
 ## Another header
 
@@ -753,15 +759,15 @@ Proper code block
 
 **Proper bold**
 
-*Proper italic*`
+*Proper italic*`;
 
-      expect(converter.cleanupMarkdown(input).trim()).toBe(expected.trim())
-    })
+			expect(converter.cleanupMarkdown(input).trim()).toBe(expected.trim());
+		});
 
-    test('handles complex real-world messy markdown', () => {
-      const converter = new MarkdownConverter()
+		test("handles complex real-world messy markdown", () => {
+			const converter = new MarkdownConverter();
 
-      const input = `#Getting Started
+			const input = `#Getting Started
 
 
 <!-- Navigation breadcrumb -->
@@ -805,9 +811,9 @@ Edit your config file:
 
 
 
-<!-- End of doc -->`
+<!-- End of doc -->`;
 
-      const expected = `# Getting Started
+			const expected = `# Getting Started
 
 ## Overview
 
@@ -831,15 +837,15 @@ Edit your config file:
 {
   "setting": "value"
 }
-\`\`\``
+\`\`\``;
 
-      expect(converter.cleanupMarkdown(input).trim()).toBe(expected.trim())
-    })
+			expect(converter.cleanupMarkdown(input).trim()).toBe(expected.trim());
+		});
 
-    test('preserves intentional spacing in code blocks', () => {
-      const converter = new MarkdownConverter()
+		test("preserves intentional spacing in code blocks", () => {
+			const converter = new MarkdownConverter();
 
-      const input = `# Code Example
+			const input = `# Code Example
 
 
 
@@ -854,9 +860,9 @@ def example():
 
 
 
-Regular content.`
+Regular content.`;
 
-      const expected = `# Code Example
+			const expected = `# Code Example
 
 \`\`\`python
 def example():
@@ -867,38 +873,38 @@ def example():
         pass
 \`\`\`
 
-Regular content.`
+Regular content.`;
 
-      expect(converter.cleanupMarkdown(input).trim()).toBe(expected.trim())
-    })
+			expect(converter.cleanupMarkdown(input).trim()).toBe(expected.trim());
+		});
 
-    test('handles empty input gracefully', () => {
-      const converter = new MarkdownConverter()
+		test("handles empty input gracefully", () => {
+			const converter = new MarkdownConverter();
 
-      expect(converter.cleanupMarkdown('')).toBe('')
-    })
+			expect(converter.cleanupMarkdown("")).toBe("");
+		});
 
-    test('handles input with only whitespace', () => {
-      const converter = new MarkdownConverter()
+		test("handles input with only whitespace", () => {
+			const converter = new MarkdownConverter();
 
-      const input = '   \n\n   \n   \n\n\n   '
+			const input = "   \n\n   \n   \n\n\n   ";
 
-      expect(converter.cleanupMarkdown(input).trim()).toBe('')
-    })
-  })
+			expect(converter.cleanupMarkdown(input).trim()).toBe("");
+		});
+	});
 
-  describe('convertToMarkdown()', () => {
-    test('converts h1-h6 headings to markdown headers', () => {
-      const html = `
+	describe("convertToMarkdown()", () => {
+		test("converts h1-h6 headings to markdown headers", () => {
+			const html = `
         <h1>Main Title</h1>
         <h2>Subtitle</h2>
         <h3>Section</h3>
         <h4>Subsection</h4>
         <h5>Minor Heading</h5>
         <h6>Smallest Heading</h6>
-      `
+      `;
 
-      const expected = `Main Title
+			const expected = `Main Title
 ==========
 
 Subtitle
@@ -910,39 +916,39 @@ Subtitle
 
 ##### Minor Heading
 
-###### Smallest Heading`
+###### Smallest Heading`;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convertToMarkdown(html)
-      expect(result.trim()).toBe(expected)
-    })
+			const converter = new MarkdownConverter();
+			const result = converter.convertToMarkdown(html);
+			expect(result.trim()).toBe(expected);
+		});
 
-    test('converts anchor links to markdown links', () => {
-      const html = `
+		test("converts anchor links to markdown links", () => {
+			const html = `
         <p>Check out the <a href="https://docs.claude.com/guide">documentation guide</a> for more info.</p>
         <p>Visit <a href="/docs/api">API docs</a> or <a href="#section">jump to section</a>.</p>
-      `
+      `;
 
-      const expected = `Check out the [documentation guide](https://docs.claude.com/guide) for more info.
+			const expected = `Check out the [documentation guide](https://docs.claude.com/guide) for more info.
 
-Visit [API docs](/docs/api) or [jump to section](#section).`
+Visit [API docs](/docs/api) or [jump to section](#section).`;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convertToMarkdown(html)
-      expect(result.trim()).toBe(expected)
-    })
+			const converter = new MarkdownConverter();
+			const result = converter.convertToMarkdown(html);
+			expect(result.trim()).toBe(expected);
+		});
 
-    test('converts code blocks with language syntax', () => {
-      const html = `
+		test("converts code blocks with language syntax", () => {
+			const html = `
         <pre><code class="language-javascript">function hello() {
   console.log("Hello, world!");
 }</code></pre>
         <pre><code class="language-python">def greet():
     print("Hello, world!")
 </code></pre>
-      `
+      `;
 
-      const expected = `\`\`\`javascript
+			const expected = `\`\`\`javascript
 function hello() {
   console.log("Hello, world!");
 }
@@ -951,82 +957,82 @@ function hello() {
 \`\`\`python
 def greet():
     print("Hello, world!")
-\`\`\``
+\`\`\``;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convertToMarkdown(html)
-      expect(result.trim()).toBe(expected)
-    })
+			const converter = new MarkdownConverter();
+			const result = converter.convertToMarkdown(html);
+			expect(result.trim()).toBe(expected);
+		});
 
-    test('converts code blocks without language class', () => {
-      const html = `
+		test("converts code blocks without language class", () => {
+			const html = `
         <pre><code>npm install turndown
 bun add turndown</code></pre>
-      `
+      `;
 
-      const expected = `\`\`\`
+			const expected = `\`\`\`
 npm install turndown
 bun add turndown
-\`\`\``
+\`\`\``;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convertToMarkdown(html)
-      expect(result.trim()).toBe(expected)
-    })
+			const converter = new MarkdownConverter();
+			const result = converter.convertToMarkdown(html);
+			expect(result.trim()).toBe(expected);
+		});
 
-    test('converts inline code to backticks', () => {
-      const html = `
+		test("converts inline code to backticks", () => {
+			const html = `
         <p>Use the <code>convertToMarkdown()</code> method to convert HTML.</p>
         <p>Set <code>skipValidation: true</code> in the config object.</p>
-      `
+      `;
 
-      const expected = `Use the \`convertToMarkdown()\` method to convert HTML.
+			const expected = `Use the \`convertToMarkdown()\` method to convert HTML.
 
-Set \`skipValidation: true\` in the config object.`
+Set \`skipValidation: true\` in the config object.`;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convertToMarkdown(html)
-      expect(result.trim()).toBe(expected)
-    })
+			const converter = new MarkdownConverter();
+			const result = converter.convertToMarkdown(html);
+			expect(result.trim()).toBe(expected);
+		});
 
-    test('converts ordered lists to numbered markdown', () => {
-      const html = `
+		test("converts ordered lists to numbered markdown", () => {
+			const html = `
         <ol>
           <li>First step</li>
           <li>Second step</li>
           <li>Third step</li>
         </ol>
-      `
+      `;
 
-      const expected = `1.  First step
+			const expected = `1.  First step
 2.  Second step
-3.  Third step`
+3.  Third step`;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convertToMarkdown(html)
-      expect(result.trim()).toBe(expected)
-    })
+			const converter = new MarkdownConverter();
+			const result = converter.convertToMarkdown(html);
+			expect(result.trim()).toBe(expected);
+		});
 
-    test('converts unordered lists to dash markdown', () => {
-      const html = `
+		test("converts unordered lists to dash markdown", () => {
+			const html = `
         <ul>
           <li>First item</li>
           <li>Second item</li>
           <li>Third item</li>
         </ul>
-      `
+      `;
 
-      const expected = `-   First item
+			const expected = `-   First item
 -   Second item
--   Third item`
+-   Third item`;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convertToMarkdown(html)
-      expect(result.trim()).toBe(expected)
-    })
+			const converter = new MarkdownConverter();
+			const result = converter.convertToMarkdown(html);
+			expect(result.trim()).toBe(expected);
+		});
 
-    test('converts nested lists correctly', () => {
-      const html = `
+		test("converts nested lists correctly", () => {
+			const html = `
         <ul>
           <li>Parent item
             <ul>
@@ -1036,38 +1042,38 @@ Set \`skipValidation: true\` in the config object.`
           </li>
           <li>Another parent</li>
         </ul>
-      `
+      `;
 
-      const expected = `-   Parent item
+			const expected = `-   Parent item
     -   Child item 1
     -   Child item 2
--   Another parent`
+-   Another parent`;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convertToMarkdown(html)
-      expect(result.trim()).toBe(expected)
-    })
+			const converter = new MarkdownConverter();
+			const result = converter.convertToMarkdown(html);
+			expect(result.trim()).toBe(expected);
+		});
 
-    test('converts bold and italic text', () => {
-      const html = `
+		test("converts bold and italic text", () => {
+			const html = `
         <p>This is <strong>bold text</strong> and this is <em>italic text</em>.</p>
         <p>You can also use <b>b tags</b> and <i>i tags</i>.</p>
         <p>Even <strong><em>bold and italic</em></strong> together.</p>
-      `
+      `;
 
-      const expected = `This is **bold text** and this is *italic text*.
+			const expected = `This is **bold text** and this is *italic text*.
 
 You can also use **b tags** and *i tags*.
 
-Even ***bold and italic*** together.`
+Even ***bold and italic*** together.`;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convertToMarkdown(html)
-      expect(result.trim()).toBe(expected)
-    })
+			const converter = new MarkdownConverter();
+			const result = converter.convertToMarkdown(html);
+			expect(result.trim()).toBe(expected);
+		});
 
-    test('converts tables to markdown tables', () => {
-      const html = `
+		test("converts tables to markdown tables", () => {
+			const html = `
         <table>
           <thead>
             <tr>
@@ -1089,20 +1095,20 @@ Even ***bold and italic*** together.`
             </tr>
           </tbody>
         </table>
-      `
+      `;
 
-      const expected = `| Command | Description | Example |
+			const expected = `| Command | Description | Example |
 | --- | --- | --- |
 | \`fetch()\` | Fetches documentation | \`await fetcher.fetch()\` |
-| \`convert()\` | Converts HTML to Markdown | \`converter.convert(html)\` |`
+| \`convert()\` | Converts HTML to Markdown | \`converter.convert(html)\` |`;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convertToMarkdown(html)
-      expect(result.trim()).toBe(expected)
-    })
+			const converter = new MarkdownConverter();
+			const result = converter.convertToMarkdown(html);
+			expect(result.trim()).toBe(expected);
+		});
 
-    test('handles complex nested HTML structures', () => {
-      const html = `
+		test("handles complex nested HTML structures", () => {
+			const html = `
         <div class="documentation">
           <h1>Getting Started</h1>
           <p>Welcome to the <strong>Claude Code</strong> documentation.</p>
@@ -1119,9 +1125,9 @@ bun add @claude/code</code></pre>
           </ol>
           <p>See the <a href="/docs/api">API documentation</a> for details.</p>
         </div>
-      `
+      `;
 
-      const expected = `Getting Started
+			const expected = `Getting Started
 ===============
 
 Welcome to the **Claude Code** documentation.
@@ -1144,50 +1150,50 @@ Quick Start
 2.  Create an instance
 3.  Start coding!
 
-See the [API documentation](/docs/api) for details.`
+See the [API documentation](/docs/api) for details.`;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convertToMarkdown(html)
-      expect(result.trim()).toBe(expected)
-    })
+			const converter = new MarkdownConverter();
+			const result = converter.convertToMarkdown(html);
+			expect(result.trim()).toBe(expected);
+		});
 
-    test('handles blockquotes', () => {
-      const html = `
+		test("handles blockquotes", () => {
+			const html = `
         <blockquote>
           <p>This is a quote from the documentation.</p>
           <p>It can span multiple paragraphs.</p>
         </blockquote>
-      `
+      `;
 
-      const expected = `> This is a quote from the documentation.
+			const expected = `> This is a quote from the documentation.
 >
-> It can span multiple paragraphs.`
+> It can span multiple paragraphs.`;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convertToMarkdown(html)
-      expect(result.trim()).toBe(expected)
-    })
+			const converter = new MarkdownConverter();
+			const result = converter.convertToMarkdown(html);
+			expect(result.trim()).toBe(expected);
+		});
 
-    test('handles horizontal rules', () => {
-      const html = `
+		test("handles horizontal rules", () => {
+			const html = `
         <p>Section 1</p>
         <hr>
         <p>Section 2</p>
-      `
+      `;
 
-      const expected = `Section 1
+			const expected = `Section 1
 
 * * *
 
-Section 2`
+Section 2`;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convertToMarkdown(html)
-      expect(result.trim()).toBe(expected)
-    })
+			const converter = new MarkdownConverter();
+			const result = converter.convertToMarkdown(html);
+			expect(result.trim()).toBe(expected);
+		});
 
-    test('preserves line breaks in code blocks', () => {
-      const html = `
+		test("preserves line breaks in code blocks", () => {
+			const html = `
         <pre><code class="language-typescript">interface Config {
   baseUrl: string;
   timeout?: number;
@@ -1197,9 +1203,9 @@ const config: Config = {
   baseUrl: "https://api.example.com",
   timeout: 5000
 };</code></pre>
-      `
+      `;
 
-      const expected = `\`\`\`typescript
+			const expected = `\`\`\`typescript
 interface Config {
   baseUrl: string;
   timeout?: number;
@@ -1209,40 +1215,40 @@ const config: Config = {
   baseUrl: "https://api.example.com",
   timeout: 5000
 };
-\`\`\``
+\`\`\``;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convertToMarkdown(html)
-      expect(result.trim()).toBe(expected)
-    })
+			const converter = new MarkdownConverter();
+			const result = converter.convertToMarkdown(html);
+			expect(result.trim()).toBe(expected);
+		});
 
-    test('strips unwanted HTML attributes and classes', () => {
-      const html = `
+		test("strips unwanted HTML attributes and classes", () => {
+			const html = `
         <div class="container" id="main" data-test="value">
           <p class="text-lg font-bold" style="color: red;">Hello</p>
           <a href="/docs" class="link-primary" target="_blank">Link</a>
         </div>
-      `
+      `;
 
-      const expected = `Hello
+			const expected = `Hello
 
-[Link](/docs)`
+[Link](/docs)`;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convertToMarkdown(html)
-      expect(result.trim()).toBe(expected)
-    })
+			const converter = new MarkdownConverter();
+			const result = converter.convertToMarkdown(html);
+			expect(result.trim()).toBe(expected);
+		});
 
-    test('handles empty or whitespace-only content', () => {
-      const converter = new MarkdownConverter()
+		test("handles empty or whitespace-only content", () => {
+			const converter = new MarkdownConverter();
 
-      expect(converter.convertToMarkdown('')).toBe('')
-      expect(converter.convertToMarkdown('   ')).toBe('')
-      expect(converter.convertToMarkdown('\n\n\n')).toBe('')
-    })
+			expect(converter.convertToMarkdown("")).toBe("");
+			expect(converter.convertToMarkdown("   ")).toBe("");
+			expect(converter.convertToMarkdown("\n\n\n")).toBe("");
+		});
 
-    test('handles real-world documentation structure', () => {
-      const html = `
+		test("handles real-world documentation structure", () => {
+			const html = `
         <article>
           <h1>API Reference</h1>
           <p>The <code>ClaudeDocsFetcher</code> class provides methods for fetching documentation.</p>
@@ -1284,9 +1290,9 @@ const config: Config = {
 const result = await fetcher.fetch();
 console.log(\`Fetched \${result.fetched} documents\`);</code></pre>
         </article>
-      `
+      `;
 
-      const expected = `API Reference
+			const expected = `API Reference
 =============
 
 The \`ClaudeDocsFetcher\` class provides methods for fetching documentation.
@@ -1320,17 +1326,17 @@ Example usage:
 const fetcher = new ClaudeDocsFetcher('./docs');
 const result = await fetcher.fetch();
 console.log(\`Fetched \${result.fetched} documents\`);
-\`\`\``
+\`\`\``;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convertToMarkdown(html)
-      expect(result.trim()).toBe(expected)
-    })
-  })
+			const converter = new MarkdownConverter();
+			const result = converter.convertToMarkdown(html);
+			expect(result.trim()).toBe(expected);
+		});
+	});
 
-  describe('convert() - Full Pipeline Integration', () => {
-    test('converts simple documentation page with headers, paragraphs, and links', () => {
-      const html = `
+	describe("convert() - Full Pipeline Integration", () => {
+		test("converts simple documentation page with headers, paragraphs, and links", () => {
+			const html = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -1381,9 +1387,9 @@ console.log(\`Fetched \${result.fetched} documents\`);
     </script>
 </body>
 </html>
-      `
+      `;
 
-      const expected = `# Getting Started with Claude Code
+			const expected = `# Getting Started with Claude Code
 
 Claude Code is a powerful AI-assisted development tool that helps you write, refactor, and debug code efficiently.
 
@@ -1397,25 +1403,25 @@ Claude Code offers several key benefits:
 
 ## Next Steps
 
-Ready to get started? Check out our [installation guide](/docs/installation) or explore the [tutorials](/docs/tutorials).`
+Ready to get started? Check out our [installation guide](/docs/installation) or explore the [tutorials](/docs/tutorials).`;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convert(html)
+			const converter = new MarkdownConverter();
+			const result = converter.convert(html);
 
-      // Verify clean markdown output
-      expect(result.trim()).toBe(expected)
+			// Verify clean markdown output
+			expect(result.trim()).toBe(expected);
 
-      // Should NOT contain any HTML tags, scripts, or navigation
-      expect(result).not.toContain('<nav')
-      expect(result).not.toContain('<footer')
-      expect(result).not.toContain('<script')
-      expect(result).not.toContain('<style')
-      expect(result).not.toContain('site-header')
-      expect(result).not.toContain('&copy;')
-    })
+			// Should NOT contain any HTML tags, scripts, or navigation
+			expect(result).not.toContain("<nav");
+			expect(result).not.toContain("<footer");
+			expect(result).not.toContain("<script");
+			expect(result).not.toContain("<style");
+			expect(result).not.toContain("site-header");
+			expect(result).not.toContain("&copy;");
+		});
 
-    test('converts documentation with code examples and proper formatting', () => {
-      const html = `
+		test("converts documentation with code examples and proper formatting", () => {
+			const html = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -1478,9 +1484,9 @@ async function generateCode() {
     <script>window.init();</script>
 </body>
 </html>
-      `
+      `;
 
-      const expected = `# API Reference
+			const expected = `# API Reference
 
 The \`ClaudeCodeClient\` class provides the main interface for interacting with Claude Code.
 
@@ -1524,35 +1530,35 @@ Configure your environment with the following options:
 - **model** - The Claude model to use (optional, defaults to claude-3-5-sonnet)
 - **maxTokens** - Maximum tokens for responses (optional)
 
-For more details, see the [configuration guide](/docs/configuration).`
+For more details, see the [configuration guide](/docs/configuration).`;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convert(html)
+			const converter = new MarkdownConverter();
+			const result = converter.convert(html);
 
-      // Verify structure
-      expect(result.trim()).toBe(expected)
+			// Verify structure
+			expect(result.trim()).toBe(expected);
 
-      // Should preserve code blocks with proper language tags
-      expect(result).toContain('```bash')
-      expect(result).toContain('```typescript')
-      expect(result).toContain('npm install -g @anthropic-ai/claude-code')
-      expect(result).toContain('import { ClaudeCodeClient }')
-      expect(result).toContain('async function generateCode()')
+			// Should preserve code blocks with proper language tags
+			expect(result).toContain("```bash");
+			expect(result).toContain("```typescript");
+			expect(result).toContain("npm install -g @anthropic-ai/claude-code");
+			expect(result).toContain("import { ClaudeCodeClient }");
+			expect(result).toContain("async function generateCode()");
 
-      // Should preserve inline code
-      expect(result).toContain('`ClaudeCodeClient`')
-      expect(result).toContain('**apiKey**')
-      expect(result).toContain('**model**')
+			// Should preserve inline code
+			expect(result).toContain("`ClaudeCodeClient`");
+			expect(result).toContain("**apiKey**");
+			expect(result).toContain("**model**");
 
-      // Should NOT contain navigation or scripts
-      expect(result).not.toContain('<nav')
-      expect(result).not.toContain('<footer')
-      expect(result).not.toContain('window.analytics')
-      expect(result).not.toContain('window.init()')
-    })
+			// Should NOT contain navigation or scripts
+			expect(result).not.toContain("<nav");
+			expect(result).not.toContain("<footer");
+			expect(result).not.toContain("window.analytics");
+			expect(result).not.toContain("window.init()");
+		});
 
-    test('converts documentation with tables and lists', () => {
-      const html = `
+		test("converts documentation with tables and lists", () => {
+			const html = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -1628,9 +1634,9 @@ For more details, see the [configuration guide](/docs/configuration).`
     </footer>
 </body>
 </html>
-      `
+      `;
 
-      const expected = `# Command Reference
+			const expected = `# Command Reference
 
 Claude Code provides several commands for different tasks.
 
@@ -1659,32 +1665,32 @@ Here are some common usage patterns:
 1. Initialize a new TypeScript project
 2. Generate a React component
 3. Refactor a function with better error handling
-4. Update configuration settings`
+4. Update configuration settings`;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convert(html)
+			const converter = new MarkdownConverter();
+			const result = converter.convert(html);
 
-      // Verify structure
-      expect(result.trim()).toBe(expected)
+			// Verify structure
+			expect(result.trim()).toBe(expected);
 
-      // Should have properly formatted tables
-      expect(result).toContain('| Command | Description | Usage |')
-      expect(result).toContain('| --- | --- | --- |')
-      expect(result).toContain('`init`')
-      expect(result).toContain('`generate`')
+			// Should have properly formatted tables
+			expect(result).toContain("| Command | Description | Usage |");
+			expect(result).toContain("| --- | --- | --- |");
+			expect(result).toContain("`init`");
+			expect(result).toContain("`generate`");
 
-      // Should have properly formatted lists
-      expect(result).toContain('- `--help`')
-      expect(result).toContain('1. Initialize a new TypeScript project')
+			// Should have properly formatted lists
+			expect(result).toContain("- `--help`");
+			expect(result).toContain("1. Initialize a new TypeScript project");
 
-      // Should NOT contain navigation
-      expect(result).not.toContain('<nav')
-      expect(result).not.toContain('<footer')
-      expect(result).not.toContain('sidebar')
-    })
+			// Should NOT contain navigation
+			expect(result).not.toContain("<nav");
+			expect(result).not.toContain("<footer");
+			expect(result).not.toContain("sidebar");
+		});
 
-    test('converts complex page with all elements combined', () => {
-      const html = `
+		test("converts complex page with all elements combined", () => {
+			const html = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1912,9 +1918,9 @@ async function createComponent() {
     </script>
 </body>
 </html>
-      `
+      `;
 
-      const expected = `# Complete Guide to Claude Code
+			const expected = `# Complete Guide to Claude Code
 
 A comprehensive guide to using Claude Code for AI-assisted development. Learn everything from basic setup to advanced techniques.
 
@@ -2011,60 +2017,62 @@ Now that you understand the basics, explore these advanced topics:
 - [Advanced Usage Patterns](/docs/guides/advanced)
 - [Complete API Reference](/docs/api)
 - [Real-World Examples](/docs/examples)
-- [Troubleshooting Guide](/docs/troubleshooting)`
+- [Troubleshooting Guide](/docs/troubleshooting)`;
 
-      const converter = new MarkdownConverter()
-      const result = converter.convert(html)
+			const converter = new MarkdownConverter();
+			const result = converter.convert(html);
 
-      // Verify clean structure
-      expect(result.trim()).toBe(expected)
+			// Verify clean structure
+			expect(result.trim()).toBe(expected);
 
-      // Should have all markdown elements properly formatted
-      expect(result).toContain('# Complete Guide to Claude Code')
-      expect(result).toContain('## Overview')
-      expect(result).toContain('### Using npm')
-      expect(result).toContain('```bash')
-      expect(result).toContain('```typescript')
-      expect(result).toContain('| Feature | Description | Availability |')
-      expect(result).toContain('> **Note:**')
-      expect(result).toContain('* * *') // Horizontal rule
+			// Should have all markdown elements properly formatted
+			expect(result).toContain("# Complete Guide to Claude Code");
+			expect(result).toContain("## Overview");
+			expect(result).toContain("### Using npm");
+			expect(result).toContain("```bash");
+			expect(result).toContain("```typescript");
+			expect(result).toContain("| Feature | Description | Availability |");
+			expect(result).toContain("> **Note:**");
+			expect(result).toContain("* * *"); // Horizontal rule
 
-      // Should preserve formatting
-      expect(result).toContain('*intelligent development assistant*')
-      expect(result).toContain('**Claude 3.5 Sonnet**')
-      expect(result).toContain('**Provide Context**')
+			// Should preserve formatting
+			expect(result).toContain("*intelligent development assistant*");
+			expect(result).toContain("**Claude 3.5 Sonnet**");
+			expect(result).toContain("**Provide Context**");
 
-      // Should have working links
-      expect(result).toContain('[installed Claude Code](/docs/installation)')
-      expect(result).toContain('[Advanced Usage Patterns](/docs/guides/advanced)')
+			// Should have working links
+			expect(result).toContain("[installed Claude Code](/docs/installation)");
+			expect(result).toContain(
+				"[Advanced Usage Patterns](/docs/guides/advanced)",
+			);
 
-      // Should have lists
-      expect(result).toContain('- Write clean, maintainable code')
-      expect(result).toContain('1. **Provide Context**')
+			// Should have lists
+			expect(result).toContain("- Write clean, maintainable code");
+			expect(result).toContain("1. **Provide Context**");
 
-      // Should NOT contain any navigation, sidebars, headers, footers
-      expect(result).not.toContain('<nav')
-      expect(result).not.toContain('<aside')
-      expect(result).not.toContain('<header')
-      expect(result).not.toContain('<footer')
-      expect(result).not.toContain('sidebar')
-      expect(result).not.toContain('table-of-contents')
-      expect(result).not.toContain('site-header')
-      expect(result).not.toContain('site-footer')
+			// Should NOT contain any navigation, sidebars, headers, footers
+			expect(result).not.toContain("<nav");
+			expect(result).not.toContain("<aside");
+			expect(result).not.toContain("<header");
+			expect(result).not.toContain("<footer");
+			expect(result).not.toContain("sidebar");
+			expect(result).not.toContain("table-of-contents");
+			expect(result).not.toContain("site-header");
+			expect(result).not.toContain("site-footer");
 
-      // Should NOT contain scripts, styles, or metadata
-      expect(result).not.toContain('<script')
-      expect(result).not.toContain('<style')
-      expect(result).not.toContain('<meta')
-      expect(result).not.toContain('<link')
-      expect(result).not.toContain('gtag')
-      expect(result).not.toContain('dataLayer')
-      expect(result).not.toContain('bundle.js')
+			// Should NOT contain scripts, styles, or metadata
+			expect(result).not.toContain("<script");
+			expect(result).not.toContain("<style");
+			expect(result).not.toContain("<meta");
+			expect(result).not.toContain("<link");
+			expect(result).not.toContain("gtag");
+			expect(result).not.toContain("dataLayer");
+			expect(result).not.toContain("bundle.js");
 
-      // Should NOT contain HTML classes or IDs
-      expect(result).not.toContain('class=')
-      expect(result).not.toContain('id="app"')
-      expect(result).not.toContain('&copy;')
-    })
-  })
-})
+			// Should NOT contain HTML classes or IDs
+			expect(result).not.toContain("class=");
+			expect(result).not.toContain('id="app"');
+			expect(result).not.toContain("&copy;");
+		});
+	});
+});

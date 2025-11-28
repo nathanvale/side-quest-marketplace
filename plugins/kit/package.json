@@ -1,24 +1,24 @@
 {
-  "name": "@sidequest/kit",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Kit plugin for Claude Code",
-  "type": "module",
-  "scripts": {
-    "test": "bun test --recursive",
-    "typecheck": "tsc --noEmit",
-    "format": "biome format --write .",
-    "format:check": "biome format .",
-    "lint": "biome lint .",
-    "check": "biome check --write ."
-  },
-  "dependencies": {
-    "@logtape/file": "^0.11.0",
-    "@logtape/logtape": "^0.11.0",
-    "tree-sitter-wasms": "^0.1.13",
-    "web-tree-sitter": "^0.25.10"
-  },
-  "devDependencies": {
-    "@types/bun": "latest"
-  }
+	"name": "@sidequest/kit",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Kit plugin for Claude Code",
+	"type": "module",
+	"scripts": {
+		"test": "bun test --recursive",
+		"typecheck": "tsc --noEmit",
+		"format": "biome format --write .",
+		"format:check": "biome format .",
+		"lint": "biome lint .",
+		"check": "biome check --write ."
+	},
+	"dependencies": {
+		"@logtape/file": "^0.11.0",
+		"@logtape/logtape": "^0.11.0",
+		"tree-sitter-wasms": "^0.1.13",
+		"web-tree-sitter": "^0.25.10"
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	}
 }
