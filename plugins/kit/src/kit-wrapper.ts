@@ -10,8 +10,35 @@ import {
 	spawnSync,
 } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
+
+/**
+ * Get enhanced PATH that includes common tool installation directories.
+ * This ensures kit can be found even when running in non-interactive shells
+ * (like Claude Code's MCP servers) that don't source .zshrc/.bashrc.
+ */
+function getEnhancedPath(): string {
+	const currentPath = process.env.PATH || "";
+	const home = homedir();
+
+	// Common locations for uv/pipx installed tools
+	const additionalPaths = [
+		join(home, ".local", "bin"),
+		"/opt/homebrew/bin",
+		"/usr/local/bin",
+	];
+
+	// Add paths that aren't already in PATH
+	const pathsToAdd = additionalPaths.filter(
+		(p) => !currentPath.split(":").includes(p),
+	);
+
+	return pathsToAdd.length > 0
+		? `${pathsToAdd.join(":")}:${currentPath}`
+		: currentPath;
+}
+
 import {
 	ASTSearcher,
 	type ASTSearchOptions,
@@ -78,6 +105,10 @@ export function isKitInstalled(): boolean {
 		const result = spawnSync("kit", ["--version"], {
 			encoding: "utf8",
 			timeout: 5000,
+			env: {
+				...process.env,
+				PATH: getEnhancedPath(),
+			},
 		});
 		return result.status === 0;
 	} catch {
@@ -94,6 +125,10 @@ export function getKitVersion(): string | null {
 		const result = spawnSync("kit", ["--version"], {
 			encoding: "utf8",
 			timeout: 5000,
+			env: {
+				...process.env,
+				PATH: getEnhancedPath(),
+			},
 		});
 		if (result.status === 0 && result.stdout) {
 			return result.stdout.trim();
@@ -123,6 +158,10 @@ function executeKit(
 		encoding: "utf8",
 		timeout,
 		maxBuffer: 10 * 1024 * 1024, // 10MB
+		env: {
+			...process.env,
+			PATH: getEnhancedPath(),
+		},
 		...(cwd && { cwd }),
 	};
 
