@@ -47,6 +47,7 @@ import {
 import {
 	createErrorFromOutput,
 	isSemanticUnavailableError,
+	isTimeoutError,
 	KitError,
 	KitErrorType,
 	SEMANTIC_INSTALL_HINT,
@@ -541,6 +542,19 @@ export function executeKitSemantic(
 
 			// Fall back to grep search
 			return fallbackToGrep(query, path, topK, cid);
+		}
+
+		// Check for timeout - DO NOT fall back to grep as it would also timeout
+		if (result.exitCode !== 0 && isTimeoutError(combinedOutput)) {
+			semanticLogger.warn("Semantic search timed out on large repository", {
+				cid,
+				query,
+				durationMs: Date.now() - startTime,
+			});
+			return new KitError(
+				KitErrorType.Timeout,
+				`Semantic search timed out after ${SEMANTIC_TIMEOUT}ms. On first run, building the vector index may take longer. Try again to use the cached index.`,
+			).toJSON();
 		}
 
 		// Check for other errors

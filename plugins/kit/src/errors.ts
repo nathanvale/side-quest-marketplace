@@ -70,8 +70,9 @@ export const ERROR_MESSAGES: Record<
 		hint: "This may be a bug. Check logs for details.",
 	},
 	[KitErrorType.Timeout]: {
-		message: "Operation timed out.",
-		hint: "Try searching a smaller directory or use more specific filters.",
+		message:
+			"Operation timed out (this may take longer on large repositories).",
+		hint: "Try again—the vector index will be cached. If it times out again, clear .kit/vector_db and rebuild with build_index: true.",
 	},
 };
 
@@ -163,6 +164,19 @@ export function isSemanticUnavailableError(stderr: string): boolean {
 	];
 	const lowerStderr = stderr.toLowerCase();
 	return patterns.some((p) => lowerStderr.includes(p));
+}
+
+/**
+ * Check if an error indicates a timeout occurred.
+ * @param stderr - Standard error output
+ */
+export function isTimeoutError(stderr: string): boolean {
+	const lowerStderr = stderr.toLowerCase();
+	return (
+		lowerStderr.includes("timeout") ||
+		lowerStderr.includes("timed out") ||
+		lowerStderr.includes("etimedout")
+	);
 }
 
 // ============================================================================
