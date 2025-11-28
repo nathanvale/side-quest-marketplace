@@ -134,7 +134,7 @@ Extract: Top-level folders, depth-2 structure
 | File | Extract |
 |------|---------|
 | `package.json` | name, description, scripts, dependencies, devDependencies |
-| `tsconfig.json` | strict mode, target, paths |
+| `tsconfig.*.json` | strict mode, target, paths |
 | `biome.json` / `.eslintrc` | linting rules |
 | `pyproject.toml` | Python project config |
 | `Cargo.toml` | Rust project config |
