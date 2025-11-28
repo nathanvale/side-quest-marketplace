@@ -14,6 +14,7 @@
 import { spawn } from "bun";
 import { TSC_SUPPORTED_EXTENSIONS } from "./shared/constants";
 import { isFileInRepo } from "./shared/git-utils";
+import { hasTscConfig, logMissingTscConfigHint } from "./shared/tsc-config";
 import {
 	extractFilePaths,
 	parseHookInput,
@@ -76,6 +77,13 @@ function formatErrors(parsed: TscParseResult, filePath: string): string {
 }
 
 async function main() {
+	// Check for TypeScript config before doing anything else
+	const configResult = await hasTscConfig();
+	if (!configResult.found) {
+		logMissingTscConfigHint(configResult.searchPath);
+		process.exit(0);
+	}
+
 	const input = await Bun.stdin.text();
 	const hookInput = parseHookInput(input);
 

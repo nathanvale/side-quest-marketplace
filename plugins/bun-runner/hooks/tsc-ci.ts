@@ -18,6 +18,7 @@
 import { spawn } from "bun";
 import { TSC_SUPPORTED_EXTENSIONS } from "./shared/constants";
 import { hasChangedFiles } from "./shared/git-utils";
+import { hasTscConfig, logMissingTscConfigHint } from "./shared/tsc-config";
 import type { TscParseResult } from "./shared/types";
 import { parseTscOutput } from "./tsc-check";
 
@@ -40,6 +41,13 @@ function formatErrors(parsed: TscParseResult): string {
 }
 
 async function main() {
+	// Check for TypeScript config before doing anything else
+	const configResult = await hasTscConfig();
+	if (!configResult.found) {
+		logMissingTscConfigHint(configResult.searchPath);
+		process.exit(0);
+	}
+
 	// Only run if TypeScript files have changed
 	const hasChanges = await hasChangedFiles(TSC_SUPPORTED_EXTENSIONS);
 

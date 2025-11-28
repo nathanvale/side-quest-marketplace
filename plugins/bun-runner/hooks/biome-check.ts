@@ -14,6 +14,7 @@
 
 import { spawn } from "bun";
 import { parseBiomeOutput } from "../mcp-servers/bun-runner/index";
+import { hasBiomeConfig, logMissingConfigHint } from "./shared/biome-config";
 import { BIOME_SUPPORTED_EXTENSIONS } from "./shared/constants";
 import { isFileInRepo } from "./shared/git-utils";
 import { extractFilePaths, parseHookInput } from "./shared/types";
@@ -38,6 +39,13 @@ function formatDiagnostics(
 }
 
 async function main() {
+	// Check for Biome config before doing anything else
+	const configResult = await hasBiomeConfig();
+	if (!configResult.found) {
+		logMissingConfigHint(configResult.searchPath);
+		process.exit(0);
+	}
+
 	const input = await Bun.stdin.text();
 	const hookInput = parseHookInput(input);
 

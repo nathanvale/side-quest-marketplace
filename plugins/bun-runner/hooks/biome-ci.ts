@@ -14,6 +14,7 @@
 
 import { spawn } from "bun";
 import { parseBiomeOutput } from "../mcp-servers/bun-runner/index";
+import { hasBiomeConfig, logMissingConfigHint } from "./shared/biome-config";
 import { BIOME_SUPPORTED_EXTENSIONS } from "./shared/constants";
 import { getChangedFiles } from "./shared/git-utils";
 
@@ -37,6 +38,13 @@ function formatDiagnostics(
 }
 
 async function main() {
+	// Check for Biome config before doing anything else
+	const configResult = await hasBiomeConfig();
+	if (!configResult.found) {
+		logMissingConfigHint(configResult.searchPath);
+		process.exit(0);
+	}
+
 	// Get changed files filtered by Biome-supported extensions
 	const filesToCheck = await getChangedFiles(BIOME_SUPPORTED_EXTENSIONS);
 
