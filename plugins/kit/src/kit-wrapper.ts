@@ -497,6 +497,21 @@ export function executeKitSemantic(
 		buildIndex = false,
 	} = options;
 
+	// Pre-flight check: if index not built and not forcing build, tell user to build it first
+	if (!buildIndex && !isSemanticIndexBuilt(path)) {
+		semanticLogger.info("Semantic index not built, instructing user to build", {
+			cid,
+			path,
+		});
+
+		const buildCommand = `kit search-semantic "${path}" "${query}" --build-index`;
+		const error = new KitError(
+			KitErrorType.SemanticIndexNotBuilt,
+			`To use semantic search, build the vector index with:\n\n  ${buildCommand}\n\nAfter building (one-time), semantic search will be fast and cached.`,
+		);
+		return error.toJSON();
+	}
+
 	// Get global cache directory for this repo's vector index
 	const persistDir = getSemanticCacheDir(path);
 
@@ -1135,4 +1150,27 @@ export function getSemanticCacheDir(repoPath: string): string {
 	}
 
 	return cacheDir;
+}
+
+/**
+ * Check if semantic search vector index has been built for a repository.
+ * @param repoPath - Path to the repository
+ * @returns True if vector index exists and has been built
+ */
+export function isSemanticIndexBuilt(repoPath: string): boolean {
+	const cacheDir = join(repoPath, ".kit", "vector_db");
+
+	// If cache directory doesn't exist, index hasn't been built
+	if (!existsSync(cacheDir)) {
+		return false;
+	}
+
+	// Check if there are files in the cache directory (indicating a built index)
+	// Kit creates metadata and index files when building
+	try {
+		const files = require("node:fs").readdirSync(cacheDir);
+		return files.length > 0;
+	} catch {
+		return false;
+	}
 }

@@ -20,6 +20,8 @@ export enum KitErrorType {
 	InvalidInput = "InvalidInput",
 	/** Semantic search not available (missing ML deps) */
 	SemanticNotAvailable = "SemanticNotAvailable",
+	/** Semantic search index not yet built for repository */
+	SemanticIndexNotBuilt = "SemanticIndexNotBuilt",
 	/** Too many results returned */
 	TooManyResults = "TooManyResults",
 	/** Kit command failed */
@@ -56,6 +58,10 @@ export const ERROR_MESSAGES: Record<
 	[KitErrorType.SemanticNotAvailable]: {
 		message: "Semantic search is not available.",
 		hint: `Install ML dependencies: pip install 'cased-kit[ml]' or uv tool install 'cased-kit[ml]'`,
+	},
+	[KitErrorType.SemanticIndexNotBuilt]: {
+		message: "Vector index has not been built for this repository yet.",
+		hint: "Build it by running the CLI command provided in the error details. After building (one-time), semantic search will be fast and cached.",
 	},
 	[KitErrorType.TooManyResults]: {
 		message: "Query returned too many results.",
