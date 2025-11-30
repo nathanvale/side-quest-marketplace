@@ -30,6 +30,14 @@
 					}
 				}
 			}
+		},
+		{
+			"includes": [
+				"plugins/the-cinema-bandit/classic-cinemas-email-template.html"
+			],
+			"linter": {
+				"enabled": false
+			}
 		}
 	]
 }

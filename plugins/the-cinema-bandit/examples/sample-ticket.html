@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Classic Cinemas - Booking Confirmation</title>
+	<style>
+		body {
+			margin: 0;
+			padding: 0;
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+			background-color: #f5f5f5;
+		}
+		.container {
+			max-width: 600px;
+			margin: 0 auto;
+			background-color: #ffffff;
+		}
+		.header {
+			background-color: #1a1a1a;
+			padding: 20px;
+			text-align: center;
+		}
+		.logo {
+			color: #ffffff;
+			font-size: 24px;
+			font-weight: bold;
+			letter-spacing: 2px;
+		}
+		.ticket-content {
+			padding: 30px 20px;
+		}
+		.movie-poster {
+			width: 100%;
+			max-width: 400px;
+			height: auto;
+			display: block;
+			margin: 0 auto 20px;
+			border-radius: 8px;
+		}
+		.movie-title {
+			font-size: 28px;
+			font-weight: bold;
+			color: #1a1a1a;
+			text-align: center;
+			margin: 0 0 20px 0;
+		}
+		.ticket-details {
+			background-color: #f8f8f8;
+			border-radius: 8px;
+			padding: 20px;
+			margin-bottom: 20px;
+		}
+		.detail-row {
+			display: flex;
+			justify-content: space-between;
+			padding: 12px 0;
+			border-bottom: 1px solid #e0e0e0;
+		}
+		.detail-row:last-child {
+			border-bottom: none;
+		}
+		.detail-label {
+			font-weight: 600;
+			color: #666;
+		}
+		.detail-value {
+			color: #1a1a1a;
+			text-align: right;
+		}
+		.barcode-section {
+			text-align: center;
+			padding: 20px;
+			background-color: #ffffff;
+			border-top: 2px dashed #ccc;
+			margin-top: 20px;
+		}
+		.barcode-img {
+			max-width: 300px;
+			height: auto;
+		}
+		.footer {
+			background-color: #1a1a1a;
+			color: #ffffff;
+			text-align: center;
+			padding: 20px;
+			font-size: 12px;
+		}
+		.greeting {
+			font-size: 18px;
+			margin-bottom: 20px;
+			color: #333;
+		}
+	</style>
+</head>
+<body>
+	<div class="container">
+		<!-- Header -->
+		<div class="header">
+			<div class="logo">CLASSIC CINEMAS</div>
+		</div>
+
+		<!-- Ticket Content -->
+		<div class="ticket-content">
+			<p class="greeting">Hello Nathan Vale,</p>
+
+			<img src="https://movingstory-prod.imgix.net/movies/thumbnails/1733103746-Wicked-PosterJPG.jpg" alt="WICKED: FOR GOOD" class="movie-poster">
+
+			<h1 class="movie-title">WICKED: FOR GOOD</h1>
+
+			<div class="ticket-details">
+				<div class="detail-row">
+					<span class="detail-label">Date & Time:</span>
+					<span class="detail-value">29 Nov 2025, 4:15pm-6:52pm</span>
+				</div>
+				<div class="detail-row">
+					<span class="detail-label">Location:</span>
+					<span class="detail-value">Screen 1</span>
+				</div>
+				<div class="detail-row">
+					<span class="detail-label">Seats:</span>
+					<span class="detail-value">F9, F10</span>
+				</div>
+			</div>
+
+			<div class="barcode-section">
+				<img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='60'%3E%3Crect width='200' height='60' fill='%23fff'/%3E%3Cg fill='%23000'%3E%3Crect x='10' y='10' width='2' height='40'/%3E%3Crect x='15' y='10' width='4' height='40'/%3E%3Crect x='22' y='10' width='2' height='40'/%3E%3Crect x='27' y='10' width='6' height='40'/%3E%3Crect x='36' y='10' width='2' height='40'/%3E%3Crect x='41' y='10' width='4' height='40'/%3E%3Crect x='48' y='10' width='2' height='40'/%3E%3Crect x='53' y='10' width='6' height='40'/%3E%3Crect x='62' y='10' width='2' height='40'/%3E%3Crect x='67' y='10' width='4' height='40'/%3E%3Crect x='74' y='10' width='2' height='40'/%3E%3Crect x='79' y='10' width='6' height='40'/%3E%3Crect x='88' y='10' width='2' height='40'/%3E%3Crect x='93' y='10' width='4' height='40'/%3E%3Crect x='100' y='10' width='2' height='40'/%3E%3Crect x='105' y='10' width='6' height='40'/%3E%3Crect x='114' y='10' width='2' height='40'/%3E%3Crect x='119' y='10' width='4' height='40'/%3E%3Crect x='126' y='10' width='2' height='40'/%3E%3Crect x='131' y='10' width='6' height='40'/%3E%3Crect x='140' y='10' width='2' height='40'/%3E%3Crect x='145' y='10' width='4' height='40'/%3E%3Crect x='152' y='10' width='2' height='40'/%3E%3Crect x='157' y='10' width='6' height='40'/%3E%3Crect x='166' y='10' width='2' height='40'/%3E%3Crect x='171' y='10' width='4' height='40'/%3E%3Crect x='178' y='10' width='2' height='40'/%3E%3Crect x='183' y='10' width='6' height='40'/%3E%3C/g%3E%3C/svg%3E" alt="Ticket Barcode" class="barcode-img">
+				<p style="margin-top: 10px; color: #999; font-size: 11px;">For display purposes only</p>
+			</div>
+		</div>
+
+		<!-- Footer -->
+		<div class="footer">
+			<p>Classic Cinemas</p>
+			<p style="margin-top: 5px; opacity: 0.8;">Thank you for choosing Classic Cinemas</p>
+		</div>
+	</div>
+</body>
+</html>

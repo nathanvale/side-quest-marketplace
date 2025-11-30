@@ -178,6 +178,25 @@
 				"cased-kit",
 				"code-search"
 			]
+		},
+		{
+			"name": "the-cinema-bandit",
+			"source": "./plugins/the-cinema-bandit",
+			"description": "Generate Classic Cinemas booking confirmation emails with automated pricing and Gmail integration. Includes Playwright-based CLI scraper with selector-first fallback hierarchy, live pricing extraction, and beautiful HTML email templates.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "productivity",
+			"keywords": [
+				"cinema",
+				"email",
+				"scraping",
+				"playwright",
+				"gmail",
+				"classic-cinemas",
+				"automation"
+			]
 		}
 	]
 }

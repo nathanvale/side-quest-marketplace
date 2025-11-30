@@ -162,11 +162,44 @@ export function parseBiomeOutput(stdout: string): LintSummary {
 // --- Helpers ---
 
 /**
+ * Detect if the current directory is a Bun/npm workspace root.
+ *
+ * In workspaces, we need to use `bun --filter '*' test` instead of `bun test`
+ * because each package may have its own bunfig.toml with test preloads/setup.
+ * Running `bun test` from root ignores package-level configs, causing failures
+ * when tests depend on setup files (e.g., happy-dom globals).
+ */
+export async function isWorkspaceProject(): Promise<boolean> {
+	try {
+		const pkg = await Bun.file("package.json").json();
+		return Array.isArray(pkg.workspaces) && pkg.workspaces.length > 0;
+	} catch {
+		return false;
+	}
+}
+
+/**
  * Run Bun tests and parse output using native Bun.spawn()
  * Uses AbortController for timeout instead of spawn's buggy timeout option
+ *
+ * Workspace-aware: Uses `bun --filter '*' test` for workspace projects
+ * to ensure each package's bunfig.toml (with test preloads) is respected.
  */
 async function runBunTests(pattern?: string): Promise<TestSummary> {
-	const cmd = pattern ? ["bun", "test", pattern] : ["bun", "test"];
+	const isWorkspace = await isWorkspaceProject();
+
+	// Build command based on workspace detection
+	let cmd: string[];
+	if (isWorkspace) {
+		// Workspace: run test script in each package
+		// Pattern filtering works differently - passed to each package's test run
+		cmd = pattern
+			? ["bun", "--filter", "*", "test", pattern]
+			: ["bun", "--filter", "*", "test"];
+	} else {
+		// Non-workspace: direct bun test
+		cmd = pattern ? ["bun", "test", pattern] : ["bun", "test"];
+	}
 	const TIMEOUT_MS = 30000;
 
 	// Use AbortController for timeout - Bun's timeout option is buggy
@@ -326,19 +359,28 @@ async function runBiomeFormatCheck(
 /**
  * Run Bun tests with coverage and parse output
  * Uses AbortController for timeout instead of spawn's buggy timeout option
+ *
+ * Workspace-aware: Uses `bun --filter '*' test --coverage` for workspace projects.
+ * Note: Coverage aggregation across workspaces may vary by Bun version.
  */
 async function runBunTestCoverage(): Promise<{
 	summary: TestSummary;
 	coverage: { percent: number; uncovered: string[] };
 }> {
+	const isWorkspace = await isWorkspaceProject();
 	const TIMEOUT_MS = 60000;
+
+	// Build command based on workspace detection
+	const cmd = isWorkspace
+		? ["bun", "--filter", "*", "test", "--coverage"]
+		: ["bun", "test", "--coverage"];
 
 	// Use AbortController for timeout - Bun's timeout option is buggy
 	const controller = new AbortController();
 	const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
 	const proc = spawn({
-		cmd: ["bun", "test", "--coverage"],
+		cmd,
 		env: { ...process.env, CI: "true" },
 		stdout: "pipe",
 		stderr: "pipe",

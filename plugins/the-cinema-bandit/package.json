@@ -1,0 +1,24 @@
+{
+	"name": "@sidequest/the-cinema-bandit",
+	"version": "1.0.0",
+	"description": "Cinema booking email template extractor and manager",
+	"type": "module",
+	"scripts": {
+		"test": "bun test --recursive",
+		"typecheck": "tsc --noEmit",
+		"format": "biome format --write .",
+		"lint": "biome lint .",
+		"check": "biome check --write ."
+	},
+	"dependencies": {
+		"@logtape/file": "^0.11.0",
+		"@logtape/logtape": "^0.11.0",
+		"googleapis": "^144.0.0",
+		"playwright": "^1.57.0"
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	},
+	"author": "Nathan Vale <hi@nathanvale.com>",
+	"license": "MIT"
+}
