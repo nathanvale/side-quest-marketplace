@@ -7,5 +7,7 @@
 		"email": "hi@nathanvale.com"
 	},
 	"keywords": ["scraper", "playwright", "web-scraping", "best-practices"],
-	"license": "MIT"
+	"license": "MIT",
+	"skills": ["./skills/playwright-scraper"],
+	"commands": ["./commands/scrape.md"]
 }

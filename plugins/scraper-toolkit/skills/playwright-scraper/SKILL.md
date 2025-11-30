@@ -1,8 +1,15 @@
+---
+name: playwright-scraper
+description: |
+  Production-proven Playwright web scraping patterns with selector-first approach and robust error handling.
+  Use when users need to build web scrapers, extract data from websites, automate browser interactions,
+  or ask about Playwright selectors, text extraction (innerText vs textContent), regex patterns for HTML,
+  fallback hierarchies, or scraping best practices.
+---
+
 # Playwright Web Scraper
 
 Production-proven web scraping patterns using Playwright with selector-first approach and robust error handling.
-
-Use this skill when users need to build web scrapers, extract data from websites, or automate browser interactions.
 
 ---
 
