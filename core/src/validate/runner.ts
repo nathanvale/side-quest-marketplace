@@ -7,10 +7,14 @@ import { basename } from "node:path";
 import { spawn } from "bun";
 import type { ValidationResult } from "./types.ts";
 import {
+	validateAgentsMd,
 	validateBootstrapHook,
+	validateCommandsMd,
 	validateHooksJson,
+	validateMarketplaceJson,
 	validateMcpJson,
 	validateMcpToolNaming,
+	validatePluginJson,
 	validatePluginStructure,
 	validateSkillMd,
 } from "./validators/index.ts";
@@ -131,28 +135,40 @@ export async function validatePlugin(
 
 		// Run all validators in parallel
 		const [
+			agentsMdIssues,
 			bootstrapHookIssues,
+			commandsMdIssues,
 			hooksJsonIssues,
 			skillMdIssues,
+			marketplaceJsonIssues,
 			mcpJsonIssues,
 			mcpToolNamingIssues,
+			pluginJsonIssues,
 			pluginStructureIssues,
 		] = await Promise.all([
+			validateAgentsMd(validatorOptions),
 			validateBootstrapHook(validatorOptions),
+			validateCommandsMd(validatorOptions),
 			validateHooksJson(validatorOptions),
 			validateSkillMd(validatorOptions),
+			validateMarketplaceJson(validatorOptions),
 			validateMcpJson(validatorOptions),
 			validateMcpToolNaming(validatorOptions),
+			validatePluginJson(validatorOptions),
 			validatePluginStructure(validatorOptions),
 		]);
 
 		// 3. Aggregate all issues
 		allIssues.push(
+			...agentsMdIssues,
 			...bootstrapHookIssues,
+			...commandsMdIssues,
 			...hooksJsonIssues,
 			...skillMdIssues,
+			...marketplaceJsonIssues,
 			...mcpJsonIssues,
 			...mcpToolNamingIssues,
+			...pluginJsonIssues,
 			...pluginStructureIssues,
 		);
 

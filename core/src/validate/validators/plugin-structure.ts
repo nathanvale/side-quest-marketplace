@@ -3,6 +3,7 @@
  *
  * Validates that plugins follow the standard folder structure conventions:
  * - .claude-plugin/plugin.json (required)
+ * - agents/ for agent markdown files
  * - hooks/ for hook scripts
  * - mcp-servers/ for MCP server implementations
  * - skills/ for agent skills
@@ -22,6 +23,7 @@ import type { ValidationIssue, ValidatorOptions } from "../types.ts";
  */
 const STANDARD_FOLDERS = new Set([
 	".claude-plugin",
+	"agents",
 	"commands",
 	"hooks",
 	"mcp-servers",

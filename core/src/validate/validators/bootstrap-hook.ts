@@ -14,8 +14,8 @@ import type { ValidationIssue, ValidatorOptions } from "../types.ts";
 /**
  * Expected bootstrap hook configuration
  */
-// biome-ignore lint/suspicious/noTemplateCurlyInString: This is the actual template string used in hooks.json, not a JS template literal
 const EXPECTED_BOOTSTRAP_COMMAND =
+	// biome-ignore lint/suspicious/noTemplateCurlyInString: This is the actual template string used in hooks.json, not a JS template literal
 	"${CLAUDE_PLUGIN_ROOT}/../../core/bootstrap.sh";
 const EXPECTED_TIMEOUT = 60;
 const EXPECTED_MATCHER = "*";
