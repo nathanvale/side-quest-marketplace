@@ -1,11 +1,19 @@
 {
 	"name": "plugin-template",
-	"description": "Generate new plugin scaffolds with configurable components. Commands: /plugin-template:create",
+	"description": "Generate new plugin scaffolds with configurable components. Create commands, MCP servers, hooks, and skills following SideQuest marketplace patterns. TDD-tested generator with comprehensive templates.",
 	"version": "1.0.0",
 	"author": {
 		"name": "Nathan Vale",
 		"email": "hi@nathanvale.com"
 	},
+	"repository": "https://github.com/nathanvale/side-quest-marketplace",
 	"keywords": ["plugin", "template", "generator", "scaffold"],
-	"license": "MIT"
+	"license": "MIT",
+	"commands": [
+		"./commands/create.md",
+		"./commands/strip.md",
+		"./commands/upgrade.md"
+	],
+	"skills": ["./skills/plugin-creator", "./skills/logging"],
+	"hooks": ["./hooks/hooks.json"]
 }

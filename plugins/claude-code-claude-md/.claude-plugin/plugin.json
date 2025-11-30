@@ -5,6 +5,13 @@
 	"author": {
 		"name": "Nathan Vale"
 	},
+	"repository": "https://github.com/nathanvale/side-quest-marketplace",
 	"keywords": ["claude-md", "memory", "documentation", "optimization"],
-	"license": "MIT"
+	"license": "MIT",
+	"commands": [
+		"./commands/audit.md",
+		"./commands/import-docs.md",
+		"./commands/init.md"
+	],
+	"hooks": ["./hooks/hooks.json"]
 }

@@ -1,11 +1,16 @@
 {
 	"name": "atuin",
-	"description": "Atuin shell history integration - search, capture, and manage bash command history with AI",
+	"description": "Atuin shell history integration - search, capture, and manage bash command history with AI. Never lose a command again.",
 	"version": "1.0.0",
 	"author": {
 		"name": "Nathan Vale",
 		"email": "hi@nathanvale.com"
 	},
+	"repository": "https://github.com/nathanvale/side-quest-marketplace",
 	"keywords": ["atuin", "bash", "history", "shell", "mcp"],
-	"license": "MIT"
+	"license": "MIT",
+	"skills": ["./skills/bash-history"],
+	"commands": ["./commands/history.md"],
+	"hooks": ["./hooks/hooks.json"],
+	"mcpServers": ["./.mcp.json"]
 }

@@ -1,11 +1,15 @@
 {
 	"name": "kit",
-	"description": "Kit plugin for Claude Code",
+	"description": "Kit CLI integration for intelligent code search. Provides fast grep, semantic vector search with automatic fallback, and symbol extraction for codebase navigation.",
 	"version": "1.0.0",
 	"author": {
 		"name": "Nathan Vale",
 		"email": "hi@nathanvale.com"
 	},
+	"repository": "https://github.com/nathanvale/side-quest-marketplace",
 	"keywords": ["kit"],
-	"license": "MIT"
+	"license": "MIT",
+	"commands": ["./commands/logs.md"],
+	"hooks": ["./hooks/hooks.json"],
+	"mcpServers": ["./.mcp.json"]
 }

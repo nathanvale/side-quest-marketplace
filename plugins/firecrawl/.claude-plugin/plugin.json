@@ -1,11 +1,20 @@
 {
 	"name": "firecrawl",
-	"description": "Firecrawl plugin for Claude Code",
+	"description": "Firecrawl plugin for web scraping, search, and data extraction using Firecrawl API. Use when users need to fetch web content, discover URLs on sites, search the web, or extract structured data from pages.",
 	"version": "1.0.0",
 	"author": {
 		"name": "Nathan Vale",
 		"email": "hi@nathanvale.com"
 	},
 	"keywords": ["firecrawl"],
-	"license": "MIT"
+	"license": "MIT",
+	"repository": "https://github.com/nathanvale/side-quest-marketplace",
+	"commands": [
+		"./commands/extract.md",
+		"./commands/map.md",
+		"./commands/scrape.md",
+		"./commands/search.md"
+	],
+	"skills": ["./skills/firecrawl"],
+	"hooks": ["./hooks/hooks.json"]
 }

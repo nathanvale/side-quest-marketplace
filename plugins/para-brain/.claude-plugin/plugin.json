@@ -22,5 +22,19 @@
 		"progressive-summarization",
 		"productivity"
 	],
-	"repository": "https://github.com/nathanvale/side-quest-marketplace"
+	"repository": "https://github.com/nathanvale/side-quest-marketplace",
+	"commands": [
+		"./commands/capture.md",
+		"./commands/create-area.md",
+		"./commands/create-project.md",
+		"./commands/create-resource.md",
+		"./commands/process.md",
+		"./commands/review.md",
+		"./commands/search.md",
+		"./commands/task.md",
+		"./commands/task-quick.md"
+	],
+	"skills": ["./skills/second-brain"],
+	"hooks": ["./hooks/hooks.json"],
+	"mcpServers": []
 }
