@@ -1,0 +1,11 @@
+{
+	"name": "scraper-toolkit",
+	"version": "1.0.0",
+	"description": "Playwright web scraping best practices and patterns learned from production scraping",
+	"author": {
+		"name": "Nathan Vale",
+		"email": "hi@nathanvale.com"
+	},
+	"keywords": ["scraper", "playwright", "web-scraping", "best-practices"],
+	"license": "MIT"
+}
