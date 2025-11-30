@@ -337,7 +337,7 @@ export async function createScraperClient(): Promise<ScraperClient> {
 
 			// Get visible page text once (innerText excludes hidden elements like iframes)
 			// This is more reliable than textContent which includes script/iframe content
-			const pageText = await page.innerText("body");
+			let pageText = await page.innerText("body");
 
 			// Extract Adult price - format: "ADULT\n$26.50" (newline separated)
 			let adultPrice: string | null = null;
@@ -359,13 +359,34 @@ export async function createScraperClient(): Promise<ScraperClient> {
 				selectorsUsed.childPrice = "none";
 			}
 
-			// Extract Booking Fee - visible in totals section
+			// Booking fee only appears after adding a ticket to cart
+			// Click "ADD TICKET" button for Adult to reveal the fee
 			let bookingFee: string | null = null;
-			const feeMatch = pageText.match(/BOOKING FEE[\s\S]{0,10}(\$\d+\.\d{2})/);
-			if (feeMatch?.[1]) {
-				bookingFee = feeMatch[1];
-				selectorsUsed.bookingFee = "innerText-regex";
-			} else {
+			try {
+				// Find and click the ADD TICKET button for adult tickets
+				const addTicketButton = page.getByText("ADD TICKET").first();
+				await addTicketButton.click();
+
+				// Wait for booking fee to update (it changes from $0.00 to actual fee)
+				await page.waitForTimeout(500); // Brief wait for UI update
+
+				// Re-fetch page text after adding ticket
+				pageText = await page.innerText("body");
+
+				// Extract Booking Fee - now visible in totals section
+				const feeMatch = pageText.match(
+					/BOOKING FEE[\s\S]{0,10}(\$\d+\.\d{2})/,
+				);
+				if (feeMatch?.[1]) {
+					bookingFee = feeMatch[1];
+					selectorsUsed.bookingFee = "innerText-regex (after-add-ticket)";
+				} else {
+					selectorsUsed.bookingFee = "none";
+				}
+			} catch (error) {
+				scraperLogger.warn("Failed to add ticket for booking fee extraction", {
+					error: error instanceof Error ? error.message : String(error),
+				});
 				selectorsUsed.bookingFee = "none";
 			}
 

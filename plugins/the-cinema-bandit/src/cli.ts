@@ -21,6 +21,11 @@ import {
 	formatPricingResponse,
 	formatSessionResponse,
 } from "./formatters.ts";
+import { sendTicketEmail } from "./gmail/index.ts";
+import {
+	calculatePricingFromScraped,
+	validateScrapedPricing,
+} from "./price-scraper.ts";
 import { createScraperClient } from "./scraper-client.ts";
 import { generateTicketHtml, type TicketData } from "./template.ts";
 import { parseArgs } from "./utils/args.ts";
@@ -57,6 +62,7 @@ Usage:
   bun run src/cli.ts pricing --session-id <id>
   bun run src/cli.ts movie --movie-url <slug>
   bun run src/cli.ts ticket [--session-id <id>]
+  bun run src/cli.ts send --session-id <id> --seats <seats> --adults <n> [--children <n>]
 
 Commands:
   movies     Scrape today's movies from homepage
@@ -77,6 +83,10 @@ Commands:
              With --session-id: scrapes real session/pricing data
              Outputs to: examples/sample-ticket.html
 
+  send       Scrape session data, generate ticket, and email to hi@nathanvale.com
+             Requires: --session-id, --seats, --adults
+             Optional: --children (defaults to 0)
+
 Options:
   --session-id <id>    Session ID from ticket URL
                        Required for: session, pricing
@@ -87,8 +97,14 @@ Options:
                        Example: "wicked-for-good"
                        Also accepts: "/movies/wicked-for-good" or full URL
 
-  --seats <seats>      Comma-separated seat numbers (optional for ticket)
+  --seats <seats>      Comma-separated seat numbers (optional for ticket, required for send)
                        Example: "H1,H2" or "J7,J8"
+
+  --adults <n>         Number of adult tickets (required for send)
+                       Example: 1
+
+  --children <n>       Number of child/concession tickets (optional for send, defaults to 0)
+                       Example: 1
 
   --help               Show this help message
 
@@ -113,6 +129,10 @@ Examples:
 
   # Generate ticket with seats
   bun run src/cli.ts ticket --session-id 116001 --seats H1,H2
+
+  # Send ticket email (scrapes data, generates ticket, emails)
+  bun run src/cli.ts send --session-id 116135 --seats D5 --adults 1
+  bun run src/cli.ts send --session-id 116135 --seats "H1,H2" --adults 1 --children 1
 
 Output:
   All commands output JSON to stdout for easy parsing by slash commands.
@@ -363,6 +383,121 @@ async function main(): Promise<void> {
 				console.log("\n✅ Generated ticket HTML with live data");
 				console.log(`📄 Saved to: ${outputPath}`);
 				console.log("\nOpen the file in a browser to preview the ticket.");
+				break;
+			}
+
+			case "send": {
+				const sessionId = flags["session-id"];
+				const seats = flags.seats;
+				const adultsStr = flags.adults;
+				const childrenStr = flags.children;
+
+				if (!sessionId) {
+					console.error("Error: --session-id required for send command");
+					process.exit(1);
+				}
+				if (!seats) {
+					console.error("Error: --seats required for send command");
+					process.exit(1);
+				}
+				if (!adultsStr) {
+					console.error("Error: --adults required for send command");
+					process.exit(1);
+				}
+
+				const adults = Number.parseInt(adultsStr, 10);
+				const children = childrenStr ? Number.parseInt(childrenStr, 10) : 0;
+
+				if (Number.isNaN(adults) || adults < 0) {
+					console.error(
+						"Error: --adults must be a valid number (0 or greater)",
+					);
+					process.exit(1);
+				}
+				if (Number.isNaN(children) || children < 0) {
+					console.error(
+						"Error: --children must be a valid number (0 or greater)",
+					);
+					process.exit(1);
+				}
+				if (adults === 0 && children === 0) {
+					console.error(
+						"Error: Must have at least one ticket (adult or child)",
+					);
+					process.exit(1);
+				}
+
+				// Scrape movies to find the one matching this sessionId
+				const moviesResult = await client.scrapeMovies();
+				const movie = moviesResult.movies.find((m) =>
+					m.sessionTimes.some((s) => s.sessionId === sessionId),
+				);
+
+				// Scrape session details (screen number, date/time)
+				const sessionResult = await client.scrapeSession(sessionId);
+
+				// Scrape pricing
+				const pricingResult = await client.scrapePricing(sessionId);
+
+				// Validate and calculate pricing
+				const scrapedPricing = validateScrapedPricing({
+					adultPrice: pricingResult.adultPrice ?? "$0.00",
+					childPrice: pricingResult.childPrice ?? "$0.00",
+					bookingFee: pricingResult.bookingFee ?? "$0.00",
+					selectorUsed: {
+						adultPrice: pricingResult.selectorsUsed.adultPrice ?? "none",
+						childPrice: pricingResult.selectorsUsed.childPrice ?? "none",
+						bookingFee: pricingResult.selectorsUsed.bookingFee ?? "none",
+					},
+				});
+
+				const pricing = calculatePricingFromScraped(scrapedPricing, {
+					adults,
+					children,
+				});
+
+				// Build ticket data
+				const ticketData: TicketData = {
+					customerName: "Nathan",
+					movieTitle: movie?.title ?? "Unknown Movie",
+					moviePoster:
+						movie?.thumbnail ??
+						"https://placehold.co/600x900/1a1a2e/eee?text=Movie+Poster",
+					sessionDateTime: sessionResult.dateTime ?? "Unknown",
+					screenNumber: sessionResult.screenNumber ?? "Unknown",
+					seats,
+					tickets: pricing.ticketLines,
+					invoiceLines: pricing.invoiceLines,
+					bookingFee: pricing.bookingFee,
+					totalAmount: pricing.totalAmount,
+				};
+
+				// Generate and send email
+				const html = generateTicketHtml(ticketData);
+				const messageId = await sendTicketEmail(
+					"hi@nathanvale.com",
+					ticketData.movieTitle,
+					html,
+				);
+
+				// Output JSON response
+				console.log(
+					JSON.stringify({
+						success: true,
+						messageId,
+						movieTitle: ticketData.movieTitle,
+						sessionDateTime: ticketData.sessionDateTime,
+						screenNumber: ticketData.screenNumber,
+						seats: ticketData.seats,
+						pricing: {
+							adults,
+							children,
+							ticketSubtotal: pricing.ticketSubtotal,
+							bookingFee: pricing.bookingFeeAmount,
+							totalAmount: pricing.totalAmountNumber,
+						},
+					}),
+				);
 				break;
 			}
 

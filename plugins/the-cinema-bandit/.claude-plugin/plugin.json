@@ -8,7 +8,7 @@
 	},
 	"repository": "https://github.com/nathanvale/side-quest-marketplace",
 	"commands": ["./commands/ticket.md"],
-	"skills": [],
+	"skills": ["./skills/ticket-booking"],
 	"hooks": ["./hooks/hooks.json"],
 	"mcpServers": []
 }
