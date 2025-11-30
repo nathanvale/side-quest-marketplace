@@ -1,7 +1,7 @@
 ---
 name: cinema-ticket-booking
 description: Conversational workflow for booking cinema tickets at Classic Cinemas Elsternwick with live pricing scraping and email delivery. Use when Nathan asks to book cinema tickets, get tickets for a movie, see what movies are showing, or book seats at Classic Cinemas.
-allowed-tools: Bash(bun:*), Bash(cd:*), Read
+allowed-tools: Bash(bun:*), Bash(cd:*), Read, AskUserQuestion
 model: claude-3-5-haiku-20241022
 ---
 
@@ -51,20 +51,46 @@ When Nathan picks a movie and time:
 ```
 Great choice! [Movie Title] at [Time].
 
-Would you be interested in booking tickets for this session?
+Would you like to book tickets for this session?
 ```
 
-If no → offer alternatives or end. If yes → continue.
+Wait for confirmation. If yes, proceed to step 3. If no, offer to show other movies or times.
 
 ### 3. Get Ticket Quantities
 
-Ask for ticket counts:
+Use AskUserQuestion tool to gather ticket quantities interactively:
 
+```typescript
+AskUserQuestion({
+  questions: [
+    {
+      question: "How many adult tickets do you need?",
+      header: "Adults",
+      multiSelect: false,
+      options: [
+        { label: "0", description: "No adult tickets" },
+        { label: "1", description: "One adult ticket" },
+        { label: "2", description: "Two adult tickets" },
+        { label: "3", description: "Three adult tickets" },
+        { label: "4", description: "Four adult tickets" }
+      ]
+    },
+    {
+      question: "How many children/concession tickets do you need?",
+      header: "Children",
+      multiSelect: false,
+      options: [
+        { label: "0", description: "No children tickets" },
+        { label: "1", description: "One child ticket" },
+        { label: "2", description: "Two child tickets" },
+        { label: "3", description: "Three child tickets" }
+      ]
+    }
+  ]
+})
 ```
-How many tickets do you need?
-- Adults:
-- Children/Concession:
-```
+
+This provides a structured UI for ticket selection.
 
 ### 4. Calculate and Show Pricing
 

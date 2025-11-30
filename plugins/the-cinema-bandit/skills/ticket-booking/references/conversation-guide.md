@@ -34,9 +34,18 @@ Which movie would you like to see?
 
 ## Important Behaviors
 
-### Do NOT Use AskUserQuestion Tool
+### When to Use AskUserQuestion Tool
 
-Present the movie list and wait for Nathan's natural response. The conversational flow works better with organic interaction.
+**Use it for:** Ticket quantity selection (structured options work well)
+
+**Don't use it for:** Movie selection - present the list and wait for Nathan's natural response
+
+### Interactive Ticket Gathering
+
+Use AskUserQuestion tool with both adult and children ticket questions:
+- Provides clear options (0, 1, 2, 3, 4...)
+- Better UX than free-form text input
+- Prevents input errors
 
 ### Provide Seat Selection Link
 
