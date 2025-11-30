@@ -6,19 +6,24 @@
  * 2. Fallback Selectors (fast, ~50ms each)
  * 3. Text Pattern (slow, ~500ms - requires full page text)
  * 4. Returns null (manual input required)
+ *
+ * PLAYWRIGHT BEST PRACTICES APPLIED:
+ * - Uses waitUntil: 'load' for scraping (DOM ready is sufficient)
+ * - Explicit state: 'visible' on all waitForSelector calls
+ * - 5-10s timeouts for real-world reliability (not 1-2s)
+ * - Removes manual isVisible() checks (click() has built-in actionability)
+ * - Auto-waiting locators preferred over manual waits
+ *
+ * TODO: Replace CSS class selectors (.Markup.Movie, .Title, etc.) with:
+ * - data-testid attributes (requires website changes)
+ * - Role-based locators (getByRole, getByText) where applicable
+ * - This would make scraping more resilient to CSS class name changes
  */
 
-import { type Browser, chromium, type Page } from "playwright";
+import { type Browser, chromium } from "playwright";
 import { createCorrelationId, initLogger, scraperLogger } from "./logger.ts";
-import { findWithFallback } from "./price-scraper.ts";
 import type { Movie, SessionTime } from "./scraper.ts";
-import {
-	buildTicketUrl,
-	PRICING_SELECTORS,
-	SESSION_SELECTORS,
-	type SelectorConfig,
-	URLS,
-} from "./selectors.ts";
+import { buildTicketUrl, MOVIE_DETAIL_SELECTORS, URLS } from "./selectors.ts";
 
 /**
  * Extracts the movie slug from a URL or path
@@ -39,16 +44,6 @@ function extractSlug(urlOrPath: string): string {
 
 	// If no /movies/ prefix, assume it's already a slug
 	return path.replace(/^\/+/, "");
-}
-
-/**
- * Result of scraping with selector tracking
- */
-export interface ScrapeResult {
-	/** The scraped value, or null if all fallbacks failed */
-	value: string | null;
-	/** Which selector worked (for debugging) */
-	selectorUsed: string;
 }
 
 /**
@@ -95,92 +90,6 @@ export interface ScraperClient {
 }
 
 /**
- * Core fallback hierarchy implementation
- *
- * TIER 1: Try primary CSS selector (fastest)
- * TIER 2: Try fallback CSS selectors
- * TIER 3: Try text pattern matching (slowest)
- * TIER 4: Return null (manual fallback)
- *
- * @param page - Playwright page object
- * @param config - Selector configuration
- * @returns Scrape result with value and selector used
- */
-async function scrapeWithFallback(
-	page: Page,
-	config: SelectorConfig,
-): Promise<ScrapeResult> {
-	// TIER 1: Try primary CSS selector
-	try {
-		const element = await page.locator(config.primary).first();
-		const value = await element.textContent({ timeout: 1000 });
-		if (value?.trim()) {
-			scraperLogger.debug("Selector succeeded", {
-				tier: "primary",
-				field: config.description,
-			});
-			return { value: value.trim(), selectorUsed: "primary" };
-		}
-	} catch {
-		scraperLogger.debug("Selector failed", {
-			tier: "primary",
-			field: config.description,
-		});
-	}
-
-	// TIER 2: Try fallback CSS selectors
-	if (config.fallbacks) {
-		for (let i = 0; i < config.fallbacks.length; i++) {
-			const fallbackSelector = config.fallbacks[i];
-			if (!fallbackSelector) continue;
-
-			try {
-				const element = await page.locator(fallbackSelector).first();
-				const value = await element.textContent({ timeout: 1000 });
-				if (value?.trim()) {
-					scraperLogger.debug("Selector succeeded", {
-						tier: `fallback[${i}]`,
-						field: config.description,
-					});
-					return { value: value.trim(), selectorUsed: `fallback[${i}]` };
-				}
-			} catch {
-				scraperLogger.debug("Selector failed", {
-					tier: `fallback[${i}]`,
-					field: config.description,
-				});
-			}
-		}
-	}
-
-	// TIER 3: Text pattern fallback (slow - requires full page text)
-	if (config.textPattern) {
-		try {
-			const pageText = await page.textContent("body");
-			if (pageText) {
-				const value = findWithFallback(pageText, config);
-				if (value) {
-					scraperLogger.debug("Selector succeeded", {
-						tier: "textPattern",
-						field: config.description,
-					});
-					return { value, selectorUsed: "textPattern" };
-				}
-			}
-		} catch {
-			scraperLogger.debug("Selector fallback failed", {
-				tier: "textPattern",
-				field: config.description,
-			});
-		}
-	}
-
-	// TIER 4: All automation failed
-	scraperLogger.warn("All selectors failed", { field: config.description });
-	return { value: null, selectorUsed: "none" };
-}
-
-/**
  * Creates a new scraper client with Playwright browser
  *
  * @returns Scraper client interface
@@ -205,8 +114,13 @@ export async function createScraperClient(): Promise<ScraperClient> {
 			const _start = Date.now();
 
 			scraperLogger.info("Scraping movies", { cid: opCid, url: URLS.homepage });
-			await page.goto(URLS.homepage, { waitUntil: "domcontentloaded" });
-			await page.waitForTimeout(3000); // Wait for React/JS to render
+			// Use 'load' - we only need DOM ready for scraping, not all network activity
+			await page.goto(URLS.homepage, { waitUntil: "load" });
+			// Wait for movie containers to be visible
+			await page.waitForSelector(".Markup.Movie", {
+				state: "visible",
+				timeout: 10000,
+			});
 
 			const selectorsUsed: Record<string, string> = {};
 
@@ -328,25 +242,72 @@ export async function createScraperClient(): Promise<ScraperClient> {
 						: `${URLS.homepage}${sessionIdOrUrl}`
 					: buildTicketUrl(sessionIdOrUrl);
 
-			await page.goto(url, { waitUntil: "domcontentloaded" });
-			await page.waitForTimeout(3000); // Wait for React/JS to render
+			await page.goto(url, { waitUntil: "load" });
 
-			const screenResult = await scrapeWithFallback(
-				page,
-				SESSION_SELECTORS.screenNumber,
-			);
-			const dateTimeResult = await scrapeWithFallback(
-				page,
-				SESSION_SELECTORS.dateTime,
-			);
+			// Wait for the movie title heading to confirm page loaded
+			try {
+				await page.getByRole("heading", { level: 1 }).waitFor({
+					state: "visible",
+					timeout: 10000,
+				});
+			} catch {
+				scraperLogger.warn("Page load timeout - heading not found");
+			}
+
+			const selectorsUsed: Record<string, string> = {};
+
+			// Extract screen number using getByText with regex pattern "Screen N"
+			let screenNumber: string | null = null;
+			try {
+				const screenText = await page
+					.getByText(/^Screen \d+$/)
+					.first()
+					.textContent({ timeout: 5000 });
+				if (screenText?.trim()) {
+					screenNumber = screenText.trim();
+					selectorsUsed.screenNumber = "getByText-regex";
+				}
+			} catch {
+				// Fallback: search page text with regex
+				const pageText = await page.textContent("body");
+				const match = pageText?.match(/Screen\s+(\d+)/i);
+				if (match) {
+					screenNumber = `Screen ${match[1]}`;
+					selectorsUsed.screenNumber = "textPattern";
+				} else {
+					selectorsUsed.screenNumber = "none";
+				}
+			}
+
+			// Extract date/time - format: "30 Nov 2025, 2:50pm-5:27pm"
+			let dateTime: string | null = null;
+			try {
+				const dateTimeText = await page
+					.getByText(/\d{1,2} [A-Z][a-z]{2} \d{4}, \d{1,2}:\d{2}[ap]m/)
+					.first()
+					.textContent({ timeout: 5000 });
+				if (dateTimeText?.trim()) {
+					dateTime = dateTimeText.trim();
+					selectorsUsed.dateTime = "getByText-regex";
+				}
+			} catch {
+				// Fallback: search page text with regex
+				const pageText = await page.textContent("body");
+				const match = pageText?.match(
+					/(\d{1,2}\s+[A-Za-z]{3}\s+\d{4},\s+\d{1,2}:\d{2}[ap]m.*?\d{1,2}:\d{2}[ap]m)/i,
+				);
+				if (match?.[1]) {
+					dateTime = match[1];
+					selectorsUsed.dateTime = "textPattern";
+				} else {
+					selectorsUsed.dateTime = "none";
+				}
+			}
 
 			return {
-				screenNumber: screenResult.value,
-				dateTime: dateTimeResult.value,
-				selectorsUsed: {
-					screenNumber: screenResult.selectorUsed,
-					dateTime: dateTimeResult.selectorUsed,
-				},
+				screenNumber,
+				dateTime,
+				selectorsUsed,
 			};
 		},
 
@@ -360,49 +321,59 @@ export async function createScraperClient(): Promise<ScraperClient> {
 						: `${URLS.homepage}${sessionIdOrUrl}`
 					: buildTicketUrl(sessionIdOrUrl);
 
-			await page.goto(url, { waitUntil: "domcontentloaded" });
-			await page.waitForTimeout(3000); // Wait for React/JS to render
+			await page.goto(url, { waitUntil: "load" });
 
-			// Scrape ticket prices (visible before adding to cart)
-			const adultResult = await scrapeWithFallback(
-				page,
-				PRICING_SELECTORS.adultPrice,
-			);
-			const childResult = await scrapeWithFallback(
-				page,
-				PRICING_SELECTORS.childPrice,
-			);
-
-			// Click "Add Ticket" to reveal the booking fee
-			// Booking fee is only displayed after adding a ticket to cart
-			let feeResult: ScrapeResult = { value: null, selectorUsed: "none" };
+			// Wait for ADULT text to confirm pricing section loaded
 			try {
-				const addTicketButton = await page
-					.locator('a.btn-primary:has-text("Add Ticket")')
-					.first();
-				if (await addTicketButton.isVisible({ timeout: 1000 })) {
-					await addTicketButton.click();
-					await page.waitForTimeout(1000); // Wait for fee to update
-
-					// Now scrape the booking fee
-					feeResult = await scrapeWithFallback(
-						page,
-						PRICING_SELECTORS.bookingFee,
-					);
-				}
+				await page.getByText("ADULT", { exact: true }).waitFor({
+					state: "visible",
+					timeout: 10000,
+				});
 			} catch {
-				// Could not click button, booking fee remains null
+				scraperLogger.warn("Pricing section not found");
+			}
+
+			const selectorsUsed: Record<string, string> = {};
+
+			// Get visible page text once (innerText excludes hidden elements like iframes)
+			// This is more reliable than textContent which includes script/iframe content
+			const pageText = await page.innerText("body");
+
+			// Extract Adult price - format: "ADULT\n$26.50" (newline separated)
+			let adultPrice: string | null = null;
+			const adultMatch = pageText.match(/ADULT[\s\S]{0,10}(\$\d+\.\d{2})/);
+			if (adultMatch?.[1]) {
+				adultPrice = adultMatch[1];
+				selectorsUsed.adultPrice = "innerText-regex";
+			} else {
+				selectorsUsed.adultPrice = "none";
+			}
+
+			// Extract Child price
+			let childPrice: string | null = null;
+			const childMatch = pageText.match(/CHILD[\s\S]{0,10}(\$\d+\.\d{2})/);
+			if (childMatch?.[1]) {
+				childPrice = childMatch[1];
+				selectorsUsed.childPrice = "innerText-regex";
+			} else {
+				selectorsUsed.childPrice = "none";
+			}
+
+			// Extract Booking Fee - visible in totals section
+			let bookingFee: string | null = null;
+			const feeMatch = pageText.match(/BOOKING FEE[\s\S]{0,10}(\$\d+\.\d{2})/);
+			if (feeMatch?.[1]) {
+				bookingFee = feeMatch[1];
+				selectorsUsed.bookingFee = "innerText-regex";
+			} else {
+				selectorsUsed.bookingFee = "none";
 			}
 
 			return {
-				adultPrice: adultResult.value,
-				childPrice: childResult.value,
-				bookingFee: feeResult.value,
-				selectorsUsed: {
-					adultPrice: adultResult.selectorUsed,
-					childPrice: childResult.selectorUsed,
-					bookingFee: feeResult.selectorUsed,
-				},
+				adultPrice,
+				childPrice,
+				bookingFee,
+				selectorsUsed,
 			};
 		},
 
@@ -416,8 +387,12 @@ export async function createScraperClient(): Promise<ScraperClient> {
 					: `${URLS.homepage}/movies/${movieUrlOrSlug}`;
 
 			try {
-				await page.goto(url, { timeout: 30000, waitUntil: "domcontentloaded" });
-				await page.waitForTimeout(3000); // Wait for React/JS to render
+				await page.goto(url, { timeout: 30000, waitUntil: "load" });
+				// Wait for movie content to be visible
+				await page.waitForSelector(
+					MOVIE_DETAIL_SELECTORS.descriptionContainer.primary,
+					{ state: "visible", timeout: 10000 },
+				);
 			} catch (error) {
 				// Page failed to load - return minimal data with error
 				return {
@@ -442,25 +417,32 @@ export async function createScraperClient(): Promise<ScraperClient> {
 			let title = "";
 			let description = "";
 			try {
-				const descWysiwyg = await page
-					.locator('.Wysiwyg[itemprop="description"]')
-					.first();
-				const html = await descWysiwyg.innerHTML({ timeout: 2000 });
-
-				// Extract title from first h2
-				const h2Match = html.match(/<h2[^>]*>([^<]+)<\/h2>/);
-				if (h2Match?.[1]) {
-					title = h2Match[1].trim();
-					selectorsUsed.title = "h2-in-description";
+				const descWysiwyg = await page.locator(
+					MOVIE_DETAIL_SELECTORS.descriptionContainer.primary,
+				);
+				// Extract title from first h2 using locator
+				try {
+					const h2Element = descWysiwyg.locator("h2").first();
+					const h2Text = await h2Element.textContent({ timeout: 5000 });
+					if (h2Text?.trim()) {
+						title = h2Text.trim();
+						selectorsUsed.title = "h2-locator";
+					}
+				} catch {
+					selectorsUsed.title = "none";
 				}
 
-				// Extract description (all paragraphs after h2)
-				const descText = await descWysiwyg.textContent({ timeout: 2000 });
-				if (descText) {
-					// Remove the title and get the rest
-					const descWithoutTitle = descText.replace(title, "").trim();
-					description = descWithoutTitle;
-					selectorsUsed.description = "wysiwyg-description";
+				// Extract description (all text after h2)
+				try {
+					const descText = await descWysiwyg.textContent({ timeout: 5000 });
+					if (descText) {
+						// Remove the title and get the rest
+						const descWithoutTitle = descText.replace(title, "").trim();
+						description = descWithoutTitle;
+						selectorsUsed.description = "wysiwyg-description";
+					}
+				} catch {
+					selectorsUsed.description = "none";
 				}
 			} catch {
 				selectorsUsed.title = "none";
@@ -470,13 +452,13 @@ export async function createScraperClient(): Promise<ScraperClient> {
 			// Extract trailer URL
 			let trailerUrl: string | null = null;
 			try {
-				const youtubeLink = await page
-					.locator('a[href*="youtube"], a[href*="youtu.be"]')
+				const youtubeLink = page
+					.locator(MOVIE_DETAIL_SELECTORS.trailerLink.primary)
 					.first();
-				const href = await youtubeLink.getAttribute("href", { timeout: 2000 });
+				const href = await youtubeLink.getAttribute("href", { timeout: 5000 });
 				if (href) {
 					trailerUrl = href;
-					selectorsUsed.trailerUrl = "youtube-link";
+					selectorsUsed.trailerUrl = "locator-trailer";
 				}
 			} catch {
 				selectorsUsed.trailerUrl = "none";
@@ -490,50 +472,78 @@ export async function createScraperClient(): Promise<ScraperClient> {
 			let director: string | null = null;
 
 			try {
-				const metaWysiwyg = await page.locator(".Wysiwyg").nth(4);
-				const metaHtml = await metaWysiwyg.innerHTML({ timeout: 2000 });
-
-				// Extract rating
-				const ratingMatch = metaHtml.match(
-					/<h3>Rating<\/h3>\s*<p>([^<]+)<\/p>/,
+				const metaWysiwyg = await page.locator(
+					MOVIE_DETAIL_SELECTORS.metadataContainer.primary,
 				);
-				if (ratingMatch?.[1]) {
-					rating = ratingMatch[1].trim();
-					selectorsUsed.rating = "metadata-wysiwyg";
+
+				// Extract rating using locator
+				try {
+					const ratingP = metaWysiwyg
+						.locator(MOVIE_DETAIL_SELECTORS.rating.primary)
+						.first();
+					const ratingText = await ratingP.textContent({ timeout: 5000 });
+					if (ratingText?.trim()) {
+						rating = ratingText.trim();
+						selectorsUsed.rating = "locator-rating";
+					}
+				} catch {
+					selectorsUsed.rating = "none";
 				}
 
-				// Extract duration
-				const durationMatch = metaHtml.match(
-					/<h3>Duration<\/h3>\s*<p>([^<]+)<\/p>/,
-				);
-				if (durationMatch?.[1]) {
-					duration = durationMatch[1].trim();
-					selectorsUsed.duration = "metadata-wysiwyg";
+				// Extract duration using locator
+				try {
+					const durationP = metaWysiwyg
+						.locator(MOVIE_DETAIL_SELECTORS.duration.primary)
+						.first();
+					const durationText = await durationP.textContent({ timeout: 5000 });
+					if (durationText?.trim()) {
+						duration = durationText.trim();
+						selectorsUsed.duration = "locator-duration";
+					}
+				} catch {
+					selectorsUsed.duration = "none";
 				}
 
-				// Extract country
-				const countryMatch = metaHtml.match(
-					/<h3>Country<\/h3>\s*<p>([^<]+)<\/p>/,
-				);
-				if (countryMatch?.[1]) {
-					country = countryMatch[1].trim();
-					selectorsUsed.country = "metadata-wysiwyg";
+				// Extract country using locator
+				try {
+					const countryP = metaWysiwyg
+						.locator(MOVIE_DETAIL_SELECTORS.country.primary)
+						.first();
+					const countryText = await countryP.textContent({ timeout: 5000 });
+					if (countryText?.trim()) {
+						country = countryText.trim();
+						selectorsUsed.country = "locator-country";
+					}
+				} catch {
+					selectorsUsed.country = "none";
 				}
 
-				// Extract cast
-				const castMatch = metaHtml.match(/<h3>Cast<\/h3>\s*<p>([^<]+)<\/p>/);
-				if (castMatch?.[1]) {
-					cast = castMatch[1].trim();
-					selectorsUsed.cast = "metadata-wysiwyg";
+				// Extract cast using locator
+				try {
+					const castP = metaWysiwyg
+						.locator(MOVIE_DETAIL_SELECTORS.cast.primary)
+						.first();
+					const castText = await castP.textContent({ timeout: 5000 });
+					if (castText?.trim()) {
+						cast = castText.trim();
+						selectorsUsed.cast = "locator-cast";
+					}
+				} catch {
+					selectorsUsed.cast = "none";
 				}
 
-				// Extract director
-				const directorMatch = metaHtml.match(
-					/<h3>Director<\/h3>\s*<p>([^<]+)<\/p>/,
-				);
-				if (directorMatch?.[1]) {
-					director = directorMatch[1].trim();
-					selectorsUsed.director = "metadata-wysiwyg";
+				// Extract director using locator
+				try {
+					const directorP = metaWysiwyg
+						.locator(MOVIE_DETAIL_SELECTORS.director.primary)
+						.first();
+					const directorText = await directorP.textContent({ timeout: 5000 });
+					if (directorText?.trim()) {
+						director = directorText.trim();
+						selectorsUsed.director = "locator-director";
+					}
+				} catch {
+					selectorsUsed.director = "none";
 				}
 			} catch {
 				selectorsUsed.metadata = "none";
@@ -542,9 +552,10 @@ export async function createScraperClient(): Promise<ScraperClient> {
 			// Extract event links
 			const eventLinks: Array<{ name: string; url: string }> = [];
 			try {
-				const eventContainer = await page.locator(".movie-event-links").first();
+				const eventContainer = await page
+					.locator(MOVIE_DETAIL_SELECTORS.eventLinks.primary)
+					.first();
 				const links = await eventContainer.locator("a").all();
-
 				for (const link of links) {
 					const name = await link.textContent();
 					const href = await link.getAttribute("href");

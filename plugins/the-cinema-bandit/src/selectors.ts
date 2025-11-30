@@ -17,6 +17,7 @@
  *
  * - **PRICING_SELECTORS** - Ticket prices (adult, child, booking fee, total)
  * - **SESSION_SELECTORS** - Booking page details (screen, date/time, session ID, duration, seats)
+ * - **MOVIE_DETAIL_SELECTORS** - Movie detail page metadata (title, description, rating, duration, cast, director, trailer)
  *
  * ## Removed Selectors
  *
@@ -25,7 +26,7 @@
  * - `PAGE_SELECTORS` - Page structure (navigation, loading, errors - not needed for automation)
  * - `SELECTOR_METADATA` - Version tracking (managed in git history instead)
  *
- * Last verified: 29 November 2024
+ * Last updated: 30 November 2025
  *
  * @see src/scraper-client.ts for fallback hierarchy implementation
  */
@@ -57,51 +58,45 @@ export interface SelectorConfig {
 
 /**
  * Pricing selectors - for scraping current ticket prices
+ *
+ * The Classic Cinemas ticket page shows prices as:
+ *   ADULT
+ *   $26.50
+ *   [ADD TICKET button]
+ *
+ * Each ticket type is a row with the type name, price, and button as siblings.
  */
 export const PRICING_SELECTORS = {
 	/**
 	 * Adult ticket price
-	 * Example: "$27.00"
+	 * Example: "$26.50"
 	 */
 	adultPrice: {
-		primary: '[data-ticket-type="adult"] .price',
-		fallbacks: [
-			".ticket-type-adult .price",
-			'[aria-label*="Adult"] .price',
-			".adult-ticket .price",
-		],
-		textPattern: /Adult.*?\$(\d+\.\d{2})/i,
+		primary: "text=/\\$\\d+\\.\\d{2}/ >> nth=0",
+		fallbacks: ['text="ADULT" + text=/\\$\\d+/', ".ticket-type-adult .price"],
+		textPattern: /ADULT[^$]*\$(\d+\.\d{2})/i,
 		description: "Adult guest ticket price",
 	} as SelectorConfig,
 
 	/**
-	 * Child/Concession ticket price
-	 * Example: "$21.00"
+	 * Child ticket price
+	 * Example: "$17.00"
 	 */
 	childPrice: {
-		primary: '[data-ticket-type="concession"] .price',
-		fallbacks: [
-			".ticket-type-concession .price",
-			'[aria-label*="Concession"] .price',
-			".concession-ticket .price",
-			".child-ticket .price",
-		],
-		textPattern: /Concession.*?\$(\d+\.\d{2})/i,
-		description: "Child/Concession guest ticket price",
+		primary: "text=/\\$\\d+\\.\\d{2}/ >> nth=1",
+		fallbacks: ['text="CHILD" + text=/\\$\\d+/', ".ticket-type-child .price"],
+		textPattern: /CHILD[^$]*\$(\d+\.\d{2})/i,
+		description: "Child ticket price",
 	} as SelectorConfig,
 
 	/**
 	 * Booking fee per ticket
-	 * Example: "$1.95"
+	 * Example: "$1.95" (shows $0.00 until tickets added)
 	 */
 	bookingFee: {
-		primary: ".booking-fee .amount",
-		fallbacks: [
-			'[data-fee-type="booking"] .amount',
-			".fee-booking",
-			'[aria-label*="Booking fee"]',
-		],
-		textPattern: /Booking fee.*?\$(\d+\.\d{2})/i,
+		primary: 'text="BOOKING FEE" >> .. >> text=/\\$\\d+\\.\\d{2}/',
+		fallbacks: ["text=/BOOKING FEE/ + text=/\\$\\d+/"],
+		textPattern: /BOOKING FEE[^$]*\$(\d+\.\d{2})/i,
 		description: "Booking fee per ticket",
 	} as SelectorConfig,
 
@@ -109,46 +104,160 @@ export const PRICING_SELECTORS = {
 	 * Total amount display (for verification)
 	 */
 	total: {
-		primary: ".total-amount",
-		fallbacks: [".grand-total", "[data-total]", ".checkout-total"],
-		textPattern: /Total.*?\$(\d+\.\d{2})/i,
+		primary: 'text="TOTAL" >> .. >> text=/\\$\\d+\\.\\d{2}/ >> nth=-1',
+		fallbacks: ["text=/^TOTAL$/ + text=/\\$\\d+/"],
+		textPattern: /^TOTAL[^$]*\$(\d+\.\d{2})/im,
 		description: "Total amount including fees",
 	} as SelectorConfig,
 } as const;
 
 /**
+ * Movie details selectors - for movie detail page metadata
+ */
+export const MOVIE_DETAIL_SELECTORS = {
+	/**
+	 * Movie description container
+	 */
+	descriptionContainer: {
+		primary: '.Wysiwyg[itemprop="description"]',
+		fallbacks: [
+			".movie-description",
+			".film-synopsis",
+			"[itemprop='description']",
+		],
+		description: "Movie description container",
+	} as SelectorConfig,
+
+	/**
+	 * Movie title (h2 in description)
+	 */
+	title: {
+		primary: '.Wysiwyg[itemprop="description"] h2',
+		fallbacks: [".movie-title h2", "h1.film-title", "[itemprop='name']"],
+		description: "Movie title",
+	} as SelectorConfig,
+
+	/**
+	 * Metadata container (4th Wysiwyg section)
+	 */
+	metadataContainer: {
+		primary: ".Wysiwyg:nth-of-type(5)", // CSS nth-of-type is 1-indexed
+		fallbacks: [".movie-metadata", ".film-details", ".movie-info-section"],
+		description: "Movie metadata container",
+	} as SelectorConfig,
+
+	/**
+	 * Rating (e.g., "PG", "M", "MA15+")
+	 */
+	rating: {
+		primary: 'h3:has-text("Rating") + p',
+		fallbacks: [
+			".movie-rating",
+			"[itemprop='contentRating']",
+			".classification",
+		],
+		textPattern: /Rating[:\s]+([A-Z0-9+]+)/i,
+		description: "Movie rating/classification",
+	} as SelectorConfig,
+
+	/**
+	 * Duration (e.g., "137 min")
+	 */
+	duration: {
+		primary: 'h3:has-text("Duration") + p',
+		fallbacks: [".movie-duration", "[itemprop='duration']", ".runtime"],
+		textPattern: /Duration[:\s]+(\d+\s*min)/i,
+		description: "Movie duration",
+	} as SelectorConfig,
+
+	/**
+	 * Country (e.g., "USA")
+	 */
+	country: {
+		primary: 'h3:has-text("Country") + p',
+		fallbacks: [
+			".movie-country",
+			"[itemprop='countryOfOrigin']",
+			".film-country",
+		],
+		textPattern: /Country[:\s]+([A-Z]{2,})/i,
+		description: "Country of origin",
+	} as SelectorConfig,
+
+	/**
+	 * Cast (comma-separated)
+	 */
+	cast: {
+		primary: 'h3:has-text("Cast") + p',
+		fallbacks: [".movie-cast", "[itemprop='actor']", ".cast-list"],
+		textPattern: /Cast[:\s]+(.+)/i,
+		description: "Cast members",
+	} as SelectorConfig,
+
+	/**
+	 * Director
+	 */
+	director: {
+		primary: 'h3:has-text("Director") + p',
+		fallbacks: [".movie-director", "[itemprop='director']", ".film-director"],
+		textPattern: /Director[:\s]+(.+)/i,
+		description: "Movie director",
+	} as SelectorConfig,
+
+	/**
+	 * Trailer link (YouTube)
+	 */
+	trailerLink: {
+		primary: 'a[href*="youtube"], a[href*="youtu.be"]',
+		fallbacks: [".trailer-link", "[data-video-url]", ".watch-trailer"],
+		description: "Trailer video link",
+	} as SelectorConfig,
+
+	/**
+	 * Event links container
+	 */
+	eventLinks: {
+		primary: ".movie-event-links",
+		fallbacks: [".event-links", ".related-events", ".film-events"],
+		description: "Related event links",
+	} as SelectorConfig,
+} as const;
+
+/**
  * Session details selectors - for ticket booking page
+ *
+ * The Classic Cinemas ticket page displays session info in a hero section
+ * without semantic data attributes. We use text-based matching.
  */
 export const SESSION_SELECTORS = {
 	/**
-	 * Screen number (e.g., "Screen 3")
+	 * Screen number (e.g., "Screen 9")
+	 * On the page, this appears as plain text below the date/time
 	 */
 	screenNumber: {
-		primary: "[data-screen]",
+		primary: "text=/Screen \\d+/",
 		fallbacks: [
+			"h1 + * + *", // Third element after h1 in hero
 			".screen-number",
-			".cinema-screen",
 			'[aria-label*="Screen"]',
-			".venue-info .screen",
-			".session-venue",
 		],
 		textPattern: /Screen\s+(\d+)/i,
 		description: "Cinema screen number",
 	} as SelectorConfig,
 
 	/**
-	 * Full session date and time (e.g., "30 Nov 2025, 11:00am-12:56pm")
+	 * Full session date and time (e.g., "30 Nov 2025, 2:50pm-5:27pm")
+	 * On the page, this appears below the movie title h1
 	 */
 	dateTime: {
-		primary: "[data-session-time]",
+		primary: "text=/\\d{1,2} [A-Z][a-z]{2} \\d{4}, \\d{1,2}:\\d{2}[ap]m/",
 		fallbacks: [
+			"h1 + *", // Element right after h1 in hero
 			".session-datetime",
-			".showtime-full",
-			".session-info time",
 			"[datetime]",
-			".session-date",
 		],
-		textPattern: /(\d{1,2}\s+[A-Za-z]{3}\s+\d{4},\s+\d{1,2}:\d{2}[ap]m)/i,
+		textPattern:
+			/(\d{1,2}\s+[A-Za-z]{3}\s+\d{4},\s+\d{1,2}:\d{2}[ap]m.*\d{1,2}:\d{2}[ap]m)/i,
 		description: "Session date and time",
 	} as SelectorConfig,
 

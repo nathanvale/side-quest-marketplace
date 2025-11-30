@@ -125,7 +125,6 @@ the-cinema-bandit/
 │   │   └── types.ts           # Gmail types
 │   ├── logger.ts              # Structured logging (LogTape + subsystem loggers)
 │   ├── scraper.ts             # Scraper types (movies, sessions)
-│   ├── scraper-client.ts      # Playwright scraper client
 │   └── index.ts               # Public API exports
 ├── scripts/                    # Executable scripts (runnable)
 │   ├── test-pricing.ts        # Test pricing calculations
@@ -368,7 +367,7 @@ bun run src/cli.ts pricing --session-id "/tickets?c=0000000002&s=116141"
 
 **Notes:**
 - All prices in dollars (no $ symbol)
-- Booking fee is $1.95 flat per transaction (CLI clicks "Add Ticket" to reveal it)
+- Booking fee is $1.95 per ticket (CLI clicks "Add Ticket" to reveal it)
 - Prices are current as of the scrape time
 
 #### `movie` - Get Full Movie Details (Lazy Load)
@@ -622,9 +621,9 @@ bun test src/calculator.test.ts
 |---------|--------------|-------------|-------|
 | 1 Adult | $27.00 | $1.95 | $28.95 |
 | 2 Adults | $54.00 | $3.90 | $57.90 |
-| 1 Adult + 1 Child | $48.00 | $3.90 | $51.90 |
-| 2 Adults + 1 Child | $75.00 | $5.85 | $80.85 |
-| 2 Adults + 2 Children | $96.00 | $7.80 | $103.80 |
+| 1 Adult + 1 Concession | $48.00 | $3.90 | $51.90 |
+| 2 Adults + 1 Concession | $75.00 | $5.85 | $80.85 |
+| 2 Adults + 2 Concessions | $96.00 | $7.80 | $103.80 |
 
 ## Notes
 

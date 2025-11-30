@@ -115,7 +115,7 @@ Would you like to proceed with booking?
 ```
 
 **Example calculation:**
-- 1 Adult ($26.50) + 1 Child ($22.00) + Booking Fee (2 × $1.95) = $52.40
+- 1 Adult ($27.00) + 1 Concession ($21.00) + Booking Fee (2 × $1.95) = $51.90
 
 ### Step 5: Confirm and Get Seats
 
