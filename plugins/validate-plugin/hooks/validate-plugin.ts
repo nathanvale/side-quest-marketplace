@@ -10,7 +10,8 @@
 
 import { existsSync } from "node:fs";
 import { basename, dirname } from "node:path";
-import { spawn } from "bun";
+import { formatMarkdown } from "@sidequest/core/validate/reporter";
+import { validatePlugin } from "@sidequest/core/validate/runner";
 
 // --- Types ---
 
@@ -66,32 +67,6 @@ export function findPluginRoot(filePath: string): string | null {
 }
 
 /**
- * Run claude plugin validate on a directory
- * Returns the validation output, whether it passed, and whether there are warnings
- */
-export async function runValidation(
-	pluginRoot: string,
-): Promise<{ passed: boolean; hasWarnings: boolean; output: string }> {
-	const proc = spawn({
-		cmd: ["claude", "plugin", "validate", pluginRoot],
-		stdout: "pipe",
-		stderr: "pipe",
-	});
-
-	const exitCode = await proc.exited;
-	const stdout = await new Response(proc.stdout).text();
-	const stderr = await new Response(proc.stderr).text();
-	const output = `${stdout}${stderr}`.trim();
-
-	// Check if validation passed (exit code 0 or output contains "Validation passed")
-	const passed = exitCode === 0 || output.includes("Validation passed");
-	// Check if there are warnings
-	const hasWarnings = output.includes("warning");
-
-	return { passed, hasWarnings, output };
-}
-
-/**
  * Process the hook input and return the result
  */
 export async function processHook(input: HookInput): Promise<HookResult> {
@@ -123,23 +98,25 @@ export async function processHook(input: HookInput): Promise<HookResult> {
 	}
 
 	// Run validation
-	const { passed, hasWarnings, output } = await runValidation(pluginRoot);
+	const result = await validatePlugin(pluginRoot);
 
-	if (passed) {
-		// Fail on warnings to ensure user sees them (Claude Code ignores messages on pass)
-		if (hasWarnings) {
-			return {
-				status: "fail",
-				message: `Plugin validation has warnings:\n\n${output}\n\nFix warnings or ignore to continue.`,
-			};
-		}
-		return { status: "pass" };
+	// Only fail on errors, not warnings
+	if (result.summary.errors > 0) {
+		return {
+			status: "fail",
+			message: `Plugin validation failed:\n\n${formatMarkdown(result)}\n\nPlease fix the issues before continuing.`,
+		};
 	}
 
-	return {
-		status: "fail",
-		message: `Plugin validation failed:\n\n${output}\n\nPlease fix the issues before continuing.`,
-	};
+	// Show warnings but pass
+	if (result.summary.warnings > 0) {
+		return {
+			status: "pass",
+			message: `Plugin validation passed with warnings:\n\n${formatMarkdown(result)}`,
+		};
+	}
+
+	return { status: "pass" };
 }
 
 // --- Main ---
