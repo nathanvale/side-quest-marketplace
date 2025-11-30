@@ -5,10 +5,10 @@
 # It's idempotent - if node_modules exists, it exits immediately.
 #
 # Usage: Called from plugin SessionStart hooks via:
-#   ${CLAUDE_PLUGIN_ROOT}/../core/bootstrap.sh
-#
-# Or from nested MCP server directories:
 #   ${CLAUDE_PLUGIN_ROOT}/../../core/bootstrap.sh
+#
+# Path explanation: Plugins are at plugins/<name>/, so we need to go
+# up two levels (../../) to reach the marketplace root where core/ lives.
 
 set -e
 
