@@ -5,6 +5,12 @@
 		"clientKind": "git",
 		"useIgnoreFile": true
 	},
+	"files": {
+		"includes": [
+			"**",
+			"!!plugins/the-cinema-bandit/classic-cinemas-email-template.html"
+		]
+	},
 	"linter": {
 		"enabled": true,
 		"rules": {
@@ -29,14 +35,6 @@
 						"noUnusedFunctionParameters": "off"
 					}
 				}
-			}
-		},
-		{
-			"includes": [
-				"plugins/the-cinema-bandit/classic-cinemas-email-template.html"
-			],
-			"linter": {
-				"enabled": false
 			}
 		}
 	]

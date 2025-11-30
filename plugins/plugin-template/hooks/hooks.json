@@ -1,5 +1,5 @@
 {
-	"description": "Hooks for kit plugin",
+	"description": "Plugin template generator hooks",
 	"hooks": {
 		"SessionStart": [
 			{

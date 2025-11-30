@@ -1,0 +1,26 @@
+{
+	"name": "@sidequest/core",
+	"version": "1.0.0",
+	"description": "Shared utilities for SideQuest marketplace plugins",
+	"type": "module",
+	"exports": {
+		"./logging": "./src/logging/index.ts",
+		"./validate": "./src/validate/session-start-hook.ts"
+	},
+	"bin": {
+		"validate-hooks": "./src/validate/session-start-hook.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit",
+		"test": "bun test",
+		"validate:hooks": "bun run src/validate/session-start-hook.ts"
+	},
+	"dependencies": {
+		"@logtape/file": "^0.12.0",
+		"@logtape/logtape": "^0.12.0"
+	},
+	"devDependencies": {
+		"bun-types": "^1.3.3",
+		"typescript": "^5.7.2"
+	}
+}

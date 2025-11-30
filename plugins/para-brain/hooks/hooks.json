@@ -1,5 +1,5 @@
 {
-	"description": "Hooks for kit plugin",
+	"description": "PARA Brain Obsidian integration hooks",
 	"hooks": {
 		"SessionStart": [
 			{

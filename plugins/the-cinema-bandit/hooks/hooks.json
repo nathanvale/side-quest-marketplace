@@ -1,5 +1,5 @@
 {
-	"description": "Hooks for kit plugin",
+	"description": "The Cinema Bandit ticket email hooks",
 	"hooks": {
 		"SessionStart": [
 			{

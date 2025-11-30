@@ -3,11 +3,12 @@
 	"hooks": {
 		"SessionStart": [
 			{
+				"matcher": "*",
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/hooks/install-deps.sh",
-						"timeout": 30
+						"command": "${CLAUDE_PLUGIN_ROOT}/../core/bootstrap.sh",
+						"timeout": 60
 					},
 					{
 						"type": "command",

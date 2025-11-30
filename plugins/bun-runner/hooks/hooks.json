@@ -1,6 +1,18 @@
 {
 	"description": "Auto-format, lint, and type-check files using Biome and TypeScript (git-aware)",
 	"hooks": {
+		"SessionStart": [
+			{
+				"matcher": "*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/../core/bootstrap.sh",
+						"timeout": 60
+					}
+				]
+			}
+		],
 		"PostToolUse": [
 			{
 				"matcher": "Write|Edit|MultiEdit",

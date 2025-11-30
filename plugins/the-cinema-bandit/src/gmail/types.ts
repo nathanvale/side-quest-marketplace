@@ -38,7 +38,11 @@ export interface GmailToken {
 export class GmailAuthError extends Error {
 	constructor(
 		message: string,
-		public code: "INVALID_CREDENTIALS" | "TOKEN_EXPIRED" | "AUTH_FAILED",
+		public code:
+			| "INVALID_CREDENTIALS"
+			| "TOKEN_EXPIRED"
+			| "AUTH_FAILED"
+			| "INVALID_TOKEN",
 	) {
 		super(message);
 		this.name = "GmailAuthError";

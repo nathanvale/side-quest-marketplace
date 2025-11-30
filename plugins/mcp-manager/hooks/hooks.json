@@ -1,5 +1,5 @@
 {
-	"description": "Hooks for kit plugin",
+	"description": "MCP manager hooks",
 	"hooks": {
 		"SessionStart": [
 			{

@@ -1,6 +1,18 @@
 {
 	"description": "Auto-update Claude Code documentation every 24 hours",
 	"hooks": {
+		"SessionStart": [
+			{
+				"matcher": "*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/../core/bootstrap.sh",
+						"timeout": 60
+					}
+				]
+			}
+		],
 		"PreToolUse": [
 			{
 				"matcher": "*",

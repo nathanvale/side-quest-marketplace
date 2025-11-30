@@ -1,5 +1,5 @@
 {
-	"description": "Hooks for kit plugin",
+	"description": "Firecrawl web scraping hooks",
 	"hooks": {
 		"SessionStart": [
 			{

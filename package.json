@@ -4,6 +4,7 @@
 	"private": true,
 	"description": "SideQuest - ADHD-friendly Claude Code plugin marketplace",
 	"workspaces": [
+		"core",
 		"plugins/*",
 		"plugins/*/mcp-servers/*"
 	],
@@ -16,7 +17,8 @@
 		"check": "bun run biome check --write .",
 		"ci": "bun --filter '*' typecheck && bun run check && bun --filter '*' test",
 		"validate": "claude plugin validate .",
-		"ci:full": "bun run ci && bun run validate",
+		"validate:hooks": "bun run --cwd core validate:hooks",
+		"ci:full": "bun run ci && bun run validate && bun run validate:hooks",
 		"prepare": "husky"
 	},
 	"devDependencies": {

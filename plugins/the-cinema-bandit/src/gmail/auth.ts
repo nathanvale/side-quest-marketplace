@@ -297,6 +297,18 @@ export async function refreshToken(
 ): Promise<GmailToken> {
 	authLogger.debug("Refreshing access token");
 
+	// Guard: ensure refresh_token exists before attempting refresh
+	if (!token.refresh_token) {
+		authLogger.error("No refresh_token available for token refresh", {
+			hasAccessToken: !!token.access_token,
+		});
+		throw new GmailAuthError(
+			"Cannot refresh token: refresh_token is missing. " +
+				"Delete ~/.config/the-cinema-bandit/gmail-token.json and re-authorize.",
+			"INVALID_TOKEN",
+		);
+	}
+
 	const oauth2Client = new google.auth.OAuth2(
 		credentials.client_id,
 		credentials.client_secret,
@@ -363,6 +375,7 @@ export async function authorizeNewToken(
 
 	const authUrl = oauth2Client.generateAuthUrl({
 		access_type: "offline",
+		prompt: "consent", // Force consent screen every time to ensure refresh_token
 		scope: ["https://www.googleapis.com/auth/gmail.send"],
 		state, // Include state parameter
 	});
@@ -393,9 +406,22 @@ export async function authorizeNewToken(
 	try {
 		const { tokens } = await oauth2Client.getToken(code);
 
+		// Guard: ensure refresh_token is present (required for offline access)
+		if (!tokens.refresh_token) {
+			authLogger.error("No refresh_token in authorization response", {
+				availableKeys: Object.keys(tokens),
+			});
+			throw new GmailAuthError(
+				"Authorization failed: no refresh_token returned. " +
+					"This usually means you already approved the app on this account. " +
+					"To fix: revoke the app in Google account settings and try again.",
+				"INVALID_TOKEN",
+			);
+		}
+
 		const newToken: GmailToken = {
 			access_token: tokens.access_token!,
-			refresh_token: tokens.refresh_token!,
+			refresh_token: tokens.refresh_token,
 			scope: tokens.scope!,
 			token_type: tokens.token_type!,
 			expiry_date: tokens.expiry_date!,
