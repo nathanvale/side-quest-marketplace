@@ -8,7 +8,8 @@
 	"files": {
 		"includes": [
 			"**",
-			"!!plugins/the-cinema-bandit/classic-cinemas-email-template.html"
+			"!!plugins/the-cinema-bandit/classic-cinemas-email-template.html",
+			"!!plugins/the-cinema-bandit/examples/*.html"
 		]
 	},
 	"linter": {

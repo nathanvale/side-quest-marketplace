@@ -197,6 +197,17 @@
 				"classic-cinemas",
 				"automation"
 			]
+		},
+		{
+			"name": "scraper-toolkit",
+			"source": "./plugins/scraper-toolkit",
+			"description": "Playwright web scraping best practices and patterns learned from production scraping",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "development",
+			"keywords": ["scraper", "playwright", "web-scraping", "best-practices"]
 		}
 	]
 }
