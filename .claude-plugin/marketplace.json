@@ -225,6 +225,23 @@
 				"best-practices",
 				"progressive-disclosure"
 			]
+		},
+		{
+			"name": "melanie",
+			"source": "./plugins/melanie",
+			"description": "Communication and relationship assistant for Nathan & Melanie - message drafting in authentic voice, meme creation, date research, and relationship pattern analysis. Self-contained with comprehensive style guides and personality profiles.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "personal",
+			"keywords": [
+				"communication",
+				"relationship",
+				"meme",
+				"personal",
+				"voice-matching"
+			]
 		}
 	]
 }

@@ -33,3 +33,4 @@ node_modules/
 
 # Untracked plugin
 plugins/nvcc/
+plugins/melanie/
