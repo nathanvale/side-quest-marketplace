@@ -1,0 +1,14 @@
+{
+	"name": "clipboard",
+	"version": "1.0.0",
+	"description": "Cross-platform clipboard operations - copy and paste text with structured error handling",
+	"author": {
+		"name": "Nathan Vale",
+		"email": "hi@nathanvale.com"
+	},
+	"license": "MIT",
+	"keywords": ["clipboard", "copy", "paste", "pbcopy", "productivity"],
+	"repository": "https://github.com/nathanvale/side-quest-marketplace",
+	"commands": ["./commands/copy.md", "./commands/paste.md"],
+	"mcpServers": ["clipboard"]
+}

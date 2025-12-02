@@ -66,6 +66,21 @@
         "@types/xml2js": "^0.4.14",
       },
     },
+    "plugins/claude-code-skill-expert": {
+      "name": "@sidequest/claude-code-skill-expert",
+      "version": "1.0.0",
+    },
+    "plugins/clipboard": {
+      "name": "@sidequest/clipboard",
+      "version": "1.0.0",
+      "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.0.4",
+        "mcpez": "^1.2.1",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+    },
     "plugins/firecrawl": {
       "name": "@sidequest/firecrawl",
       "version": "1.0.0",
@@ -117,6 +132,10 @@
       "devDependencies": {
         "@types/bun": "latest",
       },
+    },
+    "plugins/melanie": {
+      "name": "@sidequest/melanie",
+      "version": "1.0.0",
     },
     "plugins/nvcc": {
       "name": "@sidequest/nvcc",
@@ -229,6 +248,10 @@
 
     "@sidequest/claude-code": ["@sidequest/claude-code@workspace:plugins/claude-code-docs"],
 
+    "@sidequest/claude-code-skill-expert": ["@sidequest/claude-code-skill-expert@workspace:plugins/claude-code-skill-expert"],
+
+    "@sidequest/clipboard": ["@sidequest/clipboard@workspace:plugins/clipboard"],
+
     "@sidequest/core": ["@sidequest/core@workspace:core"],
 
     "@sidequest/firecrawl": ["@sidequest/firecrawl@workspace:plugins/firecrawl"],
@@ -244,6 +267,8 @@
     "@sidequest/mcp-kit": ["@sidequest/mcp-kit@workspace:plugins/kit/mcp-servers/kit"],
 
     "@sidequest/mcp-manager": ["@sidequest/mcp-manager@workspace:plugins/mcp-manager"],
+
+    "@sidequest/melanie": ["@sidequest/melanie@workspace:plugins/melanie"],
 
     "@sidequest/nvcc": ["@sidequest/nvcc@workspace:plugins/nvcc"],
 

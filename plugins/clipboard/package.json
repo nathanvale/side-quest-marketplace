@@ -1,0 +1,20 @@
+{
+	"name": "@sidequest/clipboard",
+	"version": "1.0.0",
+	"description": "Cross-platform clipboard operations - copy and paste text with structured error handling",
+	"type": "module",
+	"scripts": {
+		"test": "bun test --recursive",
+		"typecheck": "tsc --noEmit",
+		"format": "biome format --write .",
+		"lint": "biome lint .",
+		"check": "biome check --write ."
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	},
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.0.4",
+		"mcpez": "^1.2.1"
+	}
+}

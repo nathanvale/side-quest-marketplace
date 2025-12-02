@@ -242,6 +242,17 @@
 				"personal",
 				"voice-matching"
 			]
+		},
+		{
+			"name": "clipboard",
+			"source": "./plugins/clipboard",
+			"description": "Cross-platform clipboard operations - copy and paste text with structured error handling",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "productivity",
+			"keywords": ["clipboard", "copy", "paste", "pbcopy", "productivity"]
 		}
 	]
 }
