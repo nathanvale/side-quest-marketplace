@@ -1,6 +1,6 @@
 ---
 description: Book cinema tickets at Classic Cinemas Elsternwick
-model: claude-3-5-haiku-20241022
+model:  claude-sonnet-4-5
 ---
 
 # Cinema Ticket Booking

@@ -9,18 +9,28 @@ import { pricingLogger } from "./logger.ts";
 import type { SelectorConfig } from "./selectors.ts";
 
 /**
+ * Individual ticket type with price
+ */
+export interface TicketTypePrice {
+	/**
+	 * Ticket type name (e.g., "ADULT", "SENIOR")
+	 */
+	name: string;
+
+	/**
+	 * Price in dollars (numeric)
+	 */
+	price: number;
+}
+
+/**
  * Scraped pricing data from Classic Cinemas
  */
 export interface ScrapedPricing {
 	/**
-	 * Adult ticket price in dollars
+	 * All available ticket types with their prices
 	 */
-	adultPrice: number;
-
-	/**
-	 * Child/Concession ticket price in dollars
-	 */
-	childPrice: number;
+	ticketTypes: TicketTypePrice[];
 
 	/**
 	 * Booking fee per ticket in dollars
@@ -36,8 +46,7 @@ export interface ScrapedPricing {
 	 * Which selectors worked (for debugging)
 	 */
 	selectorsUsed: {
-		adultPrice: string;
-		childPrice: string;
+		ticketTypes: string;
 		bookingFee: string;
 	};
 }
@@ -110,38 +119,53 @@ export function findWithFallback(
  * This helper validates and structures the scraped pricing
  */
 export function validateScrapedPricing(data: {
-	adultPrice: string;
-	childPrice: string;
+	ticketTypes: Array<{ name: string; price: string }>;
 	bookingFee: string;
-	selectorUsed: {
-		adultPrice: string;
-		childPrice: string;
+	selectorsUsed: {
+		ticketTypes: string;
 		bookingFee: string;
 	};
 }): ScrapedPricing {
 	pricingLogger.debug("Validating scraped pricing", {
-		selectorUsed: data.selectorUsed,
+		selectorsUsed: data.selectorsUsed,
+		ticketTypeCount: data.ticketTypes.length,
 	});
 
-	const adultPrice = parsePrice(data.adultPrice);
-	const childPrice = parsePrice(data.childPrice);
+	// Validate we have at least one ticket type
+	if (data.ticketTypes.length === 0) {
+		pricingLogger.error("No ticket types found");
+		throw new Error("No ticket types found in scraped data");
+	}
+
+	// Parse and validate each ticket type price
+	const ticketTypes: TicketTypePrice[] = data.ticketTypes.map((ticketType) => {
+		const price = parsePrice(ticketType.price);
+
+		// Validation: ticket prices should be reasonable
+		if (price < 5 || price > 100) {
+			pricingLogger.error("Ticket price out of range", {
+				name: ticketType.name,
+				price,
+			});
+			throw new Error(
+				`${ticketType.name} price ${price} seems unreasonable (expected $5-$100)`,
+			);
+		}
+
+		pricingLogger.debug("Ticket type validated", {
+			name: ticketType.name,
+			price,
+		});
+
+		return {
+			name: ticketType.name,
+			price,
+		};
+	});
+
 	const bookingFeePerTicket = parsePrice(data.bookingFee);
 
-	// Validation: prices should be reasonable
-	if (adultPrice < 10 || adultPrice > 100) {
-		pricingLogger.error("Adult price out of range", { adultPrice });
-		throw new Error(
-			`Adult price ${adultPrice} seems unreasonable (expected $10-$100)`,
-		);
-	}
-
-	if (childPrice < 5 || childPrice > 100) {
-		pricingLogger.error("Child price out of range", { childPrice });
-		throw new Error(
-			`Child price ${childPrice} seems unreasonable (expected $5-$100)`,
-		);
-	}
-
+	// Validate booking fee
 	if (bookingFeePerTicket < 0 || bookingFeePerTicket > 10) {
 		pricingLogger.error("Booking fee out of range", { bookingFeePerTicket });
 		throw new Error(
@@ -149,78 +173,92 @@ export function validateScrapedPricing(data: {
 		);
 	}
 
-	// Child tickets should be cheaper than or equal to adult tickets
-	if (childPrice > adultPrice) {
-		pricingLogger.error("Child price higher than adult", {
-			childPrice,
-			adultPrice,
-		});
-		throw new Error(
-			`Child price ($${childPrice}) is higher than adult price ($${adultPrice}) - this seems wrong`,
-		);
-	}
-
 	pricingLogger.info("Pricing validated successfully", {
-		adultPrice,
-		childPrice,
+		ticketTypesCount: ticketTypes.length,
+		ticketTypes: ticketTypes.map((t) => ({ name: t.name, price: t.price })),
 		bookingFeePerTicket,
 	});
 
 	return {
-		adultPrice,
-		childPrice,
+		ticketTypes,
 		bookingFeePerTicket,
 		scrapedAt: new Date(),
-		selectorsUsed: data.selectorUsed,
+		selectorsUsed: data.selectorsUsed,
 	};
 }
 
 /**
- * Calculate pricing using scraped prices
- * This replaces the hardcoded GUEST_PRICES with live-scraped data
+ * Ticket selection (type and quantity)
+ */
+export interface TicketSelection {
+	/** Ticket type name (must match a scraped ticket type) */
+	type: string;
+	/** Number of tickets */
+	quantity: number;
+}
+
+/**
+ * Calculate pricing using scraped prices and dynamic ticket selections
+ * This replaces the hardcoded adult/child counts with flexible ticket type selections
  */
 export function calculatePricingFromScraped(
 	scraped: ScrapedPricing,
-	counts: { adults: number; children: number },
+	selections: TicketSelection[],
 ) {
-	pricingLogger.debug("Calculating pricing from scraped data", { counts });
+	pricingLogger.debug("Calculating pricing from scraped data", {
+		selections,
+	});
 
-	const adultTotal = counts.adults * scraped.adultPrice;
-	const childTotal = counts.children * scraped.childPrice;
-	const ticketSubtotal = adultTotal + childTotal;
+	// Validate all selected ticket types exist in scraped data
+	for (const selection of selections) {
+		const ticketType = scraped.ticketTypes.find(
+			(t) => t.name === selection.type,
+		);
+		if (!ticketType) {
+			pricingLogger.error("Selected ticket type not found", {
+				selectedType: selection.type,
+				availableTypes: scraped.ticketTypes.map((t) => t.name),
+			});
+			throw new Error(
+				`Ticket type "${selection.type}" not found in scraped pricing data`,
+			);
+		}
+	}
 
-	const totalTickets = counts.adults + counts.children;
+	// Calculate ticket subtotal
+	let ticketSubtotal = 0;
+	const ticketLines = [];
+	const invoiceLines = [];
+
+	for (const selection of selections) {
+		if (selection.quantity === 0) continue;
+
+		const ticketType = scraped.ticketTypes.find(
+			(t) => t.name === selection.type,
+		)!;
+		const lineTotal = selection.quantity * ticketType.price;
+		ticketSubtotal += lineTotal;
+
+		ticketLines.push({
+			type: selection.type,
+			quantity: selection.quantity,
+		});
+
+		invoiceLines.push({
+			description: `${selection.type} x ${selection.quantity}`,
+			price: `$${lineTotal.toFixed(2)}`,
+		});
+	}
+
+	// Calculate booking fee (per ticket)
+	const totalTickets = selections.reduce((sum, s) => sum + s.quantity, 0);
 	const bookingFeeAmount = totalTickets * scraped.bookingFeePerTicket;
 
 	const totalAmountNumber = ticketSubtotal + bookingFeeAmount;
 
-	// Build ticket lines
-	const ticketLines = [];
-	if (counts.adults > 0) {
-		ticketLines.push({ type: "Adult", quantity: counts.adults });
-	}
-	if (counts.children > 0) {
-		ticketLines.push({ type: "Child", quantity: counts.children });
-	}
-
-	// Build invoice lines
-	const invoiceLines = [];
-	if (counts.adults > 0) {
-		invoiceLines.push({
-			description: `Adult x ${counts.adults}`,
-			price: `$${adultTotal.toFixed(2)}`,
-		});
-	}
-	if (counts.children > 0) {
-		invoiceLines.push({
-			description: `Child x ${counts.children}`,
-			price: `$${childTotal.toFixed(2)}`,
-		});
-	}
-
 	pricingLogger.info("Pricing calculated", {
-		adults: counts.adults,
-		children: counts.children,
+		selections,
+		totalTickets,
 		totalAmount: totalAmountNumber,
 	});
 

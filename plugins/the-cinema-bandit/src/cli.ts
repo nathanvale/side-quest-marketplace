@@ -19,7 +19,9 @@ import {
 	formatMovieDetailsResponse,
 	formatMoviesResponse,
 	formatPricingResponse,
+	formatSeatsResponse,
 	formatSessionResponse,
+	renderSeatMap,
 } from "./formatters.ts";
 import { sendTicketEmail } from "./gmail/index.ts";
 import {
@@ -28,6 +30,16 @@ import {
 } from "./price-scraper.ts";
 import { createScraperClient } from "./scraper-client.ts";
 import { generateTicketHtml, type TicketData } from "./template.ts";
+import {
+	OutputFormat,
+	parseOutputFormat,
+	renderMovieDetailsMarkdown,
+	renderMoviesMarkdown,
+	renderPricingMarkdown,
+	renderSeatsMarkdown,
+	renderSendConfirmationMarkdown,
+	renderSessionMarkdown,
+} from "./templates/index.ts";
 import { parseArgs } from "./utils/args.ts";
 
 /**
@@ -60,9 +72,10 @@ Usage:
   bun run src/cli.ts movies
   bun run src/cli.ts session --session-id <id>
   bun run src/cli.ts pricing --session-id <id>
+  bun run src/cli.ts seats --session-id <id>
   bun run src/cli.ts movie --movie-url <slug>
   bun run src/cli.ts ticket [--session-id <id>]
-  bun run src/cli.ts send --session-id <id> --seats <seats> --adults <n> [--children <n>]
+  bun run src/cli.ts send --session-id <id> --seats <seats> --tickets <spec>
 
 Commands:
   movies     Scrape today's movies from homepage
@@ -74,6 +87,10 @@ Commands:
   pricing    Scrape ticket prices for a specific session
              Returns: adultPrice, childPrice, bookingFee
 
+  seats      Scrape seat map for a specific session
+             Returns: seatMap with rows, availableCount, totalSeats
+             Shows available/taken seats and wheelchair accessibility
+
   movie      Scrape full movie metadata (lazy load - only when requested)
              Returns: title, description, trailerUrl, rating, duration,
                      country, cast, director, eventLinks[]
@@ -84,12 +101,16 @@ Commands:
              Outputs to: examples/sample-ticket.html
 
   send       Scrape session data, generate ticket, and email to hi@nathanvale.com
-             Requires: --session-id, --seats, --adults
-             Optional: --children (defaults to 0)
+             Requires: --session-id, --seats, --tickets
+             Example: --tickets "ADULT:1,SENIOR:2"
 
 Options:
+  --format <type>      Output format: "json" (default) or "markdown"
+                       JSON is machine-readable, markdown is human-readable
+                       Shorthand: "md" is accepted for markdown
+
   --session-id <id>    Session ID from ticket URL
-                       Required for: session, pricing
+                       Required for: session, pricing, seats
                        Optional for: ticket (enables live scraping)
                        Example: 116001
 
@@ -100,11 +121,9 @@ Options:
   --seats <seats>      Comma-separated seat numbers (optional for ticket, required for send)
                        Example: "H1,H2" or "J7,J8"
 
-  --adults <n>         Number of adult tickets (required for send)
-                       Example: 1
-
-  --children <n>       Number of child/concession tickets (optional for send, defaults to 0)
-                       Example: 1
+  --tickets <spec>     Ticket selections in format "TYPE:quantity,TYPE:quantity"
+                       Required for: send
+                       Example: "ADULT:1,SENIOR:2"
 
   --help               Show this help message
 
@@ -117,6 +136,9 @@ Examples:
 
   # Get ticket prices
   bun run src/cli.ts pricing --session-id 116001
+
+  # Get seat map
+  bun run src/cli.ts seats --session-id 116001
 
   # Get full movie metadata (using slug from movies command)
   bun run src/cli.ts movie --movie-url "wicked-for-good"
@@ -131,12 +153,13 @@ Examples:
   bun run src/cli.ts ticket --session-id 116001 --seats H1,H2
 
   # Send ticket email (scrapes data, generates ticket, emails)
-  bun run src/cli.ts send --session-id 116135 --seats D5 --adults 1
-  bun run src/cli.ts send --session-id 116135 --seats "H1,H2" --adults 1 --children 1
+  bun run src/cli.ts send --session-id 116135 --seats D5 --tickets "ADULT:1"
+  bun run src/cli.ts send --session-id 116135 --seats "H1,H2" --tickets "ADULT:1,CHILD:1"
 
 Output:
-  All commands output JSON to stdout for easy parsing by slash commands.
-  Each response includes a 'selectorsUsed' field for debugging.
+  Default: JSON to stdout for easy parsing by slash commands.
+  Use --format markdown for human-readable output (reduces LLM tokens).
+  JSON responses include a 'selectorsUsed' field for debugging.
 `);
 	process.exit(1);
 }
@@ -196,8 +219,10 @@ async function generateScrapedTicket(
 	// Step 3: Scrape pricing
 	console.log("💰 Scraping pricing...");
 	const pricingResult = await client.scrapePricing(sessionId);
-	console.log(`   Adult: ${pricingResult.adultPrice ?? "Unknown"}`);
-	console.log(`   Child: ${pricingResult.childPrice ?? "Unknown"}`);
+	const adultTicket = pricingResult.ticketTypes.find((t) => t.name === "ADULT");
+	const childTicket = pricingResult.ticketTypes.find((t) => t.name === "CHILD");
+	console.log(`   Adult: ${adultTicket?.price ?? "Unknown"}`);
+	console.log(`   Child: ${childTicket?.price ?? "Unknown"}`);
 	console.log(`   Booking Fee: ${pricingResult.bookingFee ?? "Unknown"}`);
 
 	// Build ticket data from scraped info
@@ -217,22 +242,22 @@ async function generateScrapedTicket(
 		invoiceLines: [
 			{
 				description: "Adult x 1",
-				price: pricingResult.adultPrice ?? "$0.00",
+				price: adultTicket?.price ?? "$0.00",
 			},
 			{
 				description: "Child x 1",
-				price: pricingResult.childPrice ?? "$0.00",
+				price: childTicket?.price ?? "$0.00",
 			},
 		],
 		bookingFee: pricingResult.bookingFee ?? "$0.00",
 	};
 
 	// Calculate total if we have prices
-	if (pricingResult.adultPrice && pricingResult.childPrice) {
+	if (adultTicket && childTicket) {
 		const parsePrice = (p: string) =>
 			Number.parseFloat(p.replace(/[^0-9.]/g, "")) || 0;
-		const adult = parsePrice(pricingResult.adultPrice);
-		const child = parsePrice(pricingResult.childPrice);
+		const adult = parsePrice(adultTicket.price);
+		const child = parsePrice(childTicket.price);
 
 		// Booking fee is per ticket - website shows $0.00 until tickets added
 		// Classic Cinemas charges $1.95 per ticket
@@ -270,6 +295,7 @@ async function main(): Promise<void> {
 	}
 
 	const { command, flags } = parseArgs(args);
+	const format = parseOutputFormat(flags.format);
 
 	// Handle ticket command without session-id (no scraping needed)
 	if (command === "ticket" && !flags["session-id"]) {
@@ -290,11 +316,16 @@ async function main(): Promise<void> {
 		switch (command) {
 			case "movies": {
 				const result = await client.scrapeMovies();
-				const response = formatMoviesResponse(
-					result.movies,
-					result.selectorsUsed,
-				);
-				console.log(JSON.stringify(response, null, 2));
+
+				if (format === OutputFormat.MARKDOWN) {
+					console.log(renderMoviesMarkdown(result.movies));
+				} else {
+					const response = formatMoviesResponse(
+						result.movies,
+						result.selectorsUsed,
+					);
+					console.log(JSON.stringify(response, null, 2));
+				}
 				break;
 			}
 
@@ -306,14 +337,21 @@ async function main(): Promise<void> {
 				}
 
 				const result = await client.scrapeSession(sessionId);
-				const response = formatSessionResponse(
-					{
-						screenNumber: result.screenNumber,
-						dateTime: result.dateTime,
-					},
-					result.selectorsUsed,
-				);
-				console.log(JSON.stringify(response, null, 2));
+
+				if (format === OutputFormat.MARKDOWN) {
+					console.log(
+						renderSessionMarkdown(result.screenNumber, result.dateTime),
+					);
+				} else {
+					const response = formatSessionResponse(
+						{
+							screenNumber: result.screenNumber,
+							dateTime: result.dateTime,
+						},
+						result.selectorsUsed,
+					);
+					console.log(JSON.stringify(response, null, 2));
+				}
 				break;
 			}
 
@@ -325,15 +363,48 @@ async function main(): Promise<void> {
 				}
 
 				const result = await client.scrapePricing(sessionId);
-				const response = formatPricingResponse(
-					{
-						adultPrice: result.adultPrice,
-						childPrice: result.childPrice,
-						bookingFee: result.bookingFee,
-					},
-					result.selectorsUsed,
-				);
-				console.log(JSON.stringify(response, null, 2));
+
+				if (format === OutputFormat.MARKDOWN) {
+					console.log(
+						renderPricingMarkdown(result.ticketTypes, result.bookingFee),
+					);
+				} else {
+					const response = formatPricingResponse(
+						{
+							ticketTypes: result.ticketTypes,
+							bookingFee: result.bookingFee,
+						},
+						result.selectorsUsed,
+					);
+					console.log(JSON.stringify(response, null, 2));
+				}
+				break;
+			}
+
+			case "seats": {
+				const sessionId = flags["session-id"];
+				if (!sessionId) {
+					console.error("Error: --session-id required for seats command");
+					process.exit(1);
+				}
+
+				const result = await client.scrapeSeats(sessionId);
+
+				if (format === OutputFormat.MARKDOWN) {
+					console.log(renderSeatsMarkdown(result.seatMap));
+				} else {
+					// Render ASCII art seat map to stderr (doesn't interfere with JSON)
+					const asciiMap = renderSeatMap(result.seatMap);
+					console.error(asciiMap);
+					console.error(""); // Blank line
+
+					// Output JSON to stdout for parsing
+					const response = formatSeatsResponse(
+						result.seatMap,
+						result.selectorsUsed,
+					);
+					console.log(JSON.stringify(response, null, 2));
+				}
 				break;
 			}
 
@@ -359,7 +430,12 @@ async function main(): Promise<void> {
 					},
 					result.selectorsUsed,
 				);
-				console.log(JSON.stringify(response, null, 2));
+
+				if (format === OutputFormat.MARKDOWN) {
+					console.log(renderMovieDetailsMarkdown(response));
+				} else {
+					console.log(JSON.stringify(response, null, 2));
+				}
 				break;
 			}
 
@@ -389,8 +465,7 @@ async function main(): Promise<void> {
 			case "send": {
 				const sessionId = flags["session-id"];
 				const seats = flags.seats;
-				const adultsStr = flags.adults;
-				const childrenStr = flags.children;
+				const ticketsStr = flags.tickets;
 
 				if (!sessionId) {
 					console.error("Error: --session-id required for send command");
@@ -400,30 +475,33 @@ async function main(): Promise<void> {
 					console.error("Error: --seats required for send command");
 					process.exit(1);
 				}
-				if (!adultsStr) {
-					console.error("Error: --adults required for send command");
+				if (!ticketsStr) {
+					console.error("Error: --tickets required for send command");
+					console.error('Example: --tickets "ADULT:1,SENIOR:2"');
 					process.exit(1);
 				}
 
-				const adults = Number.parseInt(adultsStr, 10);
-				const children = childrenStr ? Number.parseInt(childrenStr, 10) : 0;
+				// Parse ticket selections from format "ADULT:1,SENIOR:2"
+				const ticketSelections = ticketsStr.split(",").map((part) => {
+					const [type, quantityStr] = part.split(":");
+					const quantity = Number.parseInt(quantityStr ?? "", 10);
 
-				if (Number.isNaN(adults) || adults < 0) {
-					console.error(
-						"Error: --adults must be a valid number (0 or greater)",
-					);
-					process.exit(1);
-				}
-				if (Number.isNaN(children) || children < 0) {
-					console.error(
-						"Error: --children must be a valid number (0 or greater)",
-					);
-					process.exit(1);
-				}
-				if (adults === 0 && children === 0) {
-					console.error(
-						"Error: Must have at least one ticket (adult or child)",
-					);
+					if (!type || Number.isNaN(quantity) || quantity < 0) {
+						console.error(`Error: Invalid ticket format: "${part}"`);
+						console.error('Expected format: --tickets "ADULT:1,SENIOR:2"');
+						process.exit(1);
+					}
+
+					return { type: type.trim(), quantity };
+				});
+
+				// Validate at least one ticket
+				const totalTickets = ticketSelections.reduce(
+					(sum, t) => sum + t.quantity,
+					0,
+				);
+				if (totalTickets === 0) {
+					console.error("Error: Must have at least one ticket");
 					process.exit(1);
 				}
 
@@ -441,20 +519,18 @@ async function main(): Promise<void> {
 
 				// Validate and calculate pricing
 				const scrapedPricing = validateScrapedPricing({
-					adultPrice: pricingResult.adultPrice ?? "$0.00",
-					childPrice: pricingResult.childPrice ?? "$0.00",
+					ticketTypes: pricingResult.ticketTypes,
 					bookingFee: pricingResult.bookingFee ?? "$0.00",
-					selectorUsed: {
-						adultPrice: pricingResult.selectorsUsed.adultPrice ?? "none",
-						childPrice: pricingResult.selectorsUsed.childPrice ?? "none",
-						bookingFee: pricingResult.selectorsUsed.bookingFee ?? "none",
+					selectorsUsed: {
+						ticketTypes: pricingResult.selectorsUsed.ticketTypes ?? "unknown",
+						bookingFee: pricingResult.selectorsUsed.bookingFee ?? "unknown",
 					},
 				});
 
-				const pricing = calculatePricingFromScraped(scrapedPricing, {
-					adults,
-					children,
-				});
+				const pricing = calculatePricingFromScraped(
+					scrapedPricing,
+					ticketSelections,
+				);
 
 				// Build ticket data
 				const ticketData: TicketData = {
@@ -480,24 +556,35 @@ async function main(): Promise<void> {
 					html,
 				);
 
-				// Output JSON response
-				console.log(
-					JSON.stringify({
-						success: true,
-						messageId,
-						movieTitle: ticketData.movieTitle,
-						sessionDateTime: ticketData.sessionDateTime,
-						screenNumber: ticketData.screenNumber,
-						seats: ticketData.seats,
-						pricing: {
-							adults,
-							children,
-							ticketSubtotal: pricing.ticketSubtotal,
-							bookingFee: pricing.bookingFeeAmount,
-							totalAmount: pricing.totalAmountNumber,
-						},
-					}),
-				);
+				// Output response
+				if (format === OutputFormat.MARKDOWN) {
+					console.log(
+						renderSendConfirmationMarkdown({
+							movieTitle: ticketData.movieTitle,
+							sessionDateTime: ticketData.sessionDateTime ?? "Unknown",
+							screenNumber: ticketData.screenNumber ?? "Unknown",
+							seats: ticketData.seats,
+							totalAmount: pricing.totalAmount,
+						}),
+					);
+				} else {
+					console.log(
+						JSON.stringify({
+							success: true,
+							messageId,
+							movieTitle: ticketData.movieTitle,
+							sessionDateTime: ticketData.sessionDateTime,
+							screenNumber: ticketData.screenNumber,
+							seats: ticketData.seats,
+							pricing: {
+								tickets: ticketSelections,
+								ticketSubtotal: pricing.ticketSubtotal,
+								bookingFee: pricing.bookingFeeAmount,
+								totalAmount: pricing.totalAmountNumber,
+							},
+						}),
+					);
+				}
 				break;
 			}
 

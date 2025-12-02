@@ -22,7 +22,7 @@
 
 import { type Browser, chromium } from "playwright";
 import { createCorrelationId, initLogger, scraperLogger } from "./logger.ts";
-import type { Movie, SessionTime } from "./scraper.ts";
+import type { Movie, Seat, SeatMap, SessionTime } from "./scraper.ts";
 import { buildTicketUrl, MOVIE_DETAIL_SELECTORS, URLS } from "./selectors.ts";
 
 /**
@@ -65,8 +65,7 @@ export interface ScraperClient {
 
 	/** Scrape current pricing */
 	scrapePricing(sessionId: string): Promise<{
-		adultPrice: string | null;
-		childPrice: string | null;
+		ticketTypes: Array<{ name: string; price: string }>;
 		bookingFee: string | null;
 		selectorsUsed: Record<string, string>;
 	}>;
@@ -82,6 +81,12 @@ export interface ScraperClient {
 		cast: string | null;
 		director: string | null;
 		eventLinks: Array<{ name: string; url: string }>;
+		selectorsUsed: Record<string, string>;
+	}>;
+
+	/** Scrape seat map for a session */
+	scrapeSeats(sessionId: string): Promise<{
+		seatMap: SeatMap;
 		selectorsUsed: Record<string, string>;
 	}>;
 
@@ -323,9 +328,10 @@ export async function createScraperClient(): Promise<ScraperClient> {
 
 			await page.goto(url, { waitUntil: "load" });
 
-			// Wait for ADULT text to confirm pricing section loaded
+			// Wait for pricing section to load (look for any ticket type text)
 			try {
-				await page.getByText("ADULT", { exact: true }).waitFor({
+				// Wait for "ADD TICKET" button which indicates pricing loaded
+				await page.getByText("ADD TICKET").first().waitFor({
 					state: "visible",
 					timeout: 10000,
 				});
@@ -339,24 +345,47 @@ export async function createScraperClient(): Promise<ScraperClient> {
 			// This is more reliable than textContent which includes script/iframe content
 			let pageText = await page.innerText("body");
 
-			// Extract Adult price - format: "ADULT\n$26.50" (newline separated)
-			let adultPrice: string | null = null;
-			const adultMatch = pageText.match(/ADULT[\s\S]{0,10}(\$\d+\.\d{2})/);
-			if (adultMatch?.[1]) {
-				adultPrice = adultMatch[1];
-				selectorsUsed.adultPrice = "innerText-regex";
-			} else {
-				selectorsUsed.adultPrice = "none";
+			// Extract all ticket types dynamically
+			// Pattern: Known ticket type name followed by price within 15 characters
+			// Format matches original working regex: "ADULT[\s\S]{0,10}(\$\d+\.\d{2})"
+			const ticketTypes: Array<{ name: string; price: string }> = [];
+
+			// Common ticket types to search for
+			const knownTicketTypes = [
+				"ADULT",
+				"CHILD",
+				"SENIOR",
+				"STUDENT",
+				"CONCESSION",
+				"PENSION",
+			];
+
+			for (const ticketTypeName of knownTicketTypes) {
+				// Use same pattern as original code: ticket type + any chars + price
+				const pattern = new RegExp(
+					`${ticketTypeName}[\\s\\S]{0,15}(\\$\\d+\\.\\d{2})`,
+				);
+				const match = pageText.match(pattern);
+
+				if (match?.[1]) {
+					const price = match[1];
+					// Avoid duplicates (shouldn't happen, but be safe)
+					const exists = ticketTypes.some((t) => t.name === ticketTypeName);
+					if (!exists) {
+						ticketTypes.push({ name: ticketTypeName, price });
+						scraperLogger.debug("Found ticket type", {
+							name: ticketTypeName,
+							price,
+						});
+					}
+				}
 			}
 
-			// Extract Child price
-			let childPrice: string | null = null;
-			const childMatch = pageText.match(/CHILD[\s\S]{0,10}(\$\d+\.\d{2})/);
-			if (childMatch?.[1]) {
-				childPrice = childMatch[1];
-				selectorsUsed.childPrice = "innerText-regex";
+			if (ticketTypes.length > 0) {
+				selectorsUsed.ticketTypes = `innerText-regex (found ${ticketTypes.length} types)`;
 			} else {
-				selectorsUsed.childPrice = "none";
+				selectorsUsed.ticketTypes = "none";
+				scraperLogger.warn("No ticket types found in page text");
 			}
 
 			// Booking fee only appears after adding a ticket to cart
@@ -391,8 +420,7 @@ export async function createScraperClient(): Promise<ScraperClient> {
 			}
 
 			return {
-				adultPrice,
-				childPrice,
+				ticketTypes,
 				bookingFee,
 				selectorsUsed,
 			};
@@ -604,6 +632,176 @@ export async function createScraperClient(): Promise<ScraperClient> {
 				cast,
 				director,
 				eventLinks,
+				selectorsUsed,
+			};
+		},
+
+		async scrapeSeats(sessionIdOrUrl: string) {
+			// Accept either full URL or just session ID
+			const url =
+				sessionIdOrUrl.startsWith("/tickets") ||
+				sessionIdOrUrl.startsWith("http")
+					? sessionIdOrUrl.startsWith("http")
+						? sessionIdOrUrl
+						: `${URLS.homepage}${sessionIdOrUrl}`
+					: buildTicketUrl(sessionIdOrUrl);
+
+			await page.goto(url, { waitUntil: "load" });
+
+			const selectorsUsed: Record<string, string> = {};
+
+			// Wait for ADULT text to confirm page loaded
+			try {
+				await page.getByText("ADULT", { exact: true }).waitFor({
+					state: "visible",
+					timeout: 10000,
+				});
+			} catch {
+				scraperLogger.warn("Ticket page not loaded properly");
+			}
+
+			// Click ADD TICKET to enable SELECT SEATS button
+			try {
+				const addTicketButton = page.getByText("ADD TICKET").first();
+				await addTicketButton.click();
+				selectorsUsed.addTicket = "getByText-ADD-TICKET";
+
+				// Wait briefly for UI update
+				await page.waitForTimeout(500);
+			} catch (error) {
+				scraperLogger.error("Failed to add ticket", {
+					error: error instanceof Error ? error.message : String(error),
+				});
+				throw new Error("Could not add ticket to enable seat selection");
+			}
+
+			// Click SELECT SEATS to reveal seat map
+			try {
+				const selectSeatsButton = page.getByRole("button", {
+					name: "SELECT SEATS",
+				});
+				await selectSeatsButton.click();
+				selectorsUsed.selectSeatsButton = "getByRole-button-SELECT-SEATS";
+
+				// Wait for seat map to load
+				await page.waitForTimeout(1000);
+			} catch (error) {
+				scraperLogger.error("Failed to open seat map", {
+					error: error instanceof Error ? error.message : String(error),
+				});
+				throw new Error("Could not open seat selection map");
+			}
+
+			// Extract screen number
+			let screenNumber = "Unknown";
+			try {
+				const screenText = await page
+					.getByText(/^SCREEN \d+$/)
+					.first()
+					.textContent({ timeout: 5000 });
+				if (screenText?.trim()) {
+					screenNumber = screenText.trim();
+					selectorsUsed.screenNumber = "getByText-regex-SCREEN";
+				}
+			} catch {
+				// Fallback: search page text
+				const pageText = await page.innerText("body");
+				const match = pageText.match(/SCREEN\s+(\d+)/i);
+				if (match) {
+					screenNumber = `Screen ${match[1]}`;
+					selectorsUsed.screenNumber = "textPattern";
+				}
+			}
+
+			// Find all seat buttons using CSS class selector
+			// Each button has class "seating-map__button"
+			// Seat ID is stored in <svg title="A11"> attribute
+			const seatButtons = await page
+				.locator("button.seating-map__button")
+				.all();
+
+			selectorsUsed.seatButtons = "locator-button.seating-map__button";
+
+			// Parse seats from buttons
+			const rows: { [rowLetter: string]: Seat[] } = {};
+			let availableCount = 0;
+			let totalSeats = 0;
+
+			for (const button of seatButtons) {
+				try {
+					// Get seat ID from SVG title attribute
+					const svg = button.locator("svg");
+					const seatId = await svg.getAttribute("title");
+
+					if (!seatId) {
+						scraperLogger.debug("Button missing SVG title attribute", {});
+						continue;
+					}
+
+					// Extract row and number from seatId (e.g., "A11" -> row "A", number 11)
+					const match = seatId.match(/^([A-Z])(\d+)$/);
+					if (!match || !match[1] || !match[2]) {
+						scraperLogger.debug("Invalid seat ID format", { seatId });
+						continue;
+					}
+
+					const row = match[1];
+					const number = Number.parseInt(match[2], 10);
+
+					// Check availability (disabled = taken)
+					const isDisabled = await button.isDisabled();
+
+					// Check if wheelchair accessible
+					// Wheelchair seats have icon-seat-wheelchair in the use element
+					const use = button.locator("use");
+					const iconHref = await use.getAttribute("xlink:href");
+					const wheelchair =
+						iconHref?.includes("icon-seat-wheelchair") ?? false;
+
+					// Check if companion seat (has is-companion class)
+					const className = await button.getAttribute("class");
+					const isCompanion = className?.includes("is-companion") ?? false;
+
+					const seat: Seat = {
+						id: seatId,
+						row,
+						number,
+						available: !isDisabled,
+						wheelchair: wheelchair || isCompanion,
+					};
+
+					// Add to rows
+					if (!rows[row]) {
+						rows[row] = [];
+					}
+					rows[row].push(seat);
+
+					totalSeats++;
+					if (seat.available) {
+						availableCount++;
+					}
+				} catch (error) {
+					// Skip seats that fail to parse
+					scraperLogger.debug("Failed to parse seat button", {
+						error: error instanceof Error ? error.message : String(error),
+					});
+				}
+			}
+
+			// Sort seats within each row by number
+			for (const row of Object.values(rows)) {
+				row.sort((a, b) => a.number - b.number);
+			}
+
+			const seatMap: SeatMap = {
+				screenNumber,
+				rows,
+				availableCount,
+				totalSeats,
+			};
+
+			return {
+				seatMap,
 				selectorsUsed,
 			};
 		},

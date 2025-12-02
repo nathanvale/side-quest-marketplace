@@ -4,7 +4,7 @@
  * Formats scraping responses into consistent JSON structures for machine parsing.
  */
 
-import type { Movie } from "./scraper.ts";
+import type { Movie, SeatMap, TicketType } from "./scraper.ts";
 
 /**
  * Selector usage tracking for debugging
@@ -39,10 +39,8 @@ export interface SessionResponse {
  * Pricing scraping response format
  */
 export interface PricingResponse {
-	/** Adult ticket price in dollars (e.g., "27.00") */
-	adultPrice: string | null;
-	/** Child/concession ticket price in dollars (e.g., "21.00") */
-	childPrice: string | null;
+	/** All available ticket types with prices */
+	ticketTypes: TicketType[];
 	/** Booking fee per ticket in dollars (e.g., "1.95") */
 	bookingFee: string | null;
 	/** Which selectors worked for debugging */
@@ -122,15 +120,13 @@ export function formatSessionResponse(
  */
 export function formatPricingResponse(
 	pricing: {
-		adultPrice: string | null;
-		childPrice: string | null;
+		ticketTypes: TicketType[];
 		bookingFee: string | null;
 	},
 	selectorsUsed: SelectorsUsed,
 ): PricingResponse {
 	return {
-		adultPrice: pricing.adultPrice,
-		childPrice: pricing.childPrice,
+		ticketTypes: pricing.ticketTypes,
 		bookingFee: pricing.bookingFee,
 		selectorsUsed,
 	};
@@ -169,4 +165,104 @@ export function formatMovieDetailsResponse(
 		eventLinks: details.eventLinks,
 		selectorsUsed,
 	};
+}
+
+/**
+ * Seat map scraping response format
+ */
+export interface SeatMapResponse {
+	/** Seat map with organized rows */
+	seatMap: SeatMap;
+	/** Which selectors worked for debugging */
+	selectorsUsed: SelectorsUsed;
+}
+
+/**
+ * Formats seat map scraping data for JSON output
+ *
+ * @param seatMap - Scraped seat map data
+ * @param selectorsUsed - Which selectors worked for each field
+ * @returns Formatted response ready for JSON.stringify()
+ */
+export function formatSeatsResponse(
+	seatMap: SeatMap,
+	selectorsUsed: SelectorsUsed,
+): SeatMapResponse {
+	return {
+		seatMap,
+		selectorsUsed,
+	};
+}
+
+/**
+ * Renders seat map as ASCII art for visual display
+ *
+ * @param seatMap - Seat map data to visualize
+ * @returns ASCII art string representation of the theater
+ *
+ * @example
+ * ```
+ * SCREEN 9
+ * ═══════════════════════════════════════════
+ *
+ * A  [ 1] [ 2] [ 3] [ 4] [ 5] [ 6] [ 7] [ 8] [ 9] [10] [11]
+ * B  [ 1] [ 2] [ 3] [ 4] [ 5] [ 6] [ 7] [ 8] [ 9] [10] [11]
+ * ...
+ * F  [ 1] [ 2] [ 3] [ 4] [W5] [W6] [W7]
+ *
+ * Legend: [ ] Available  [X] Taken  [W] Wheelchair
+ * Available: 68 / 70 seats
+ * ```
+ */
+export function renderSeatMap(seatMap: SeatMap): string {
+	const lines: string[] = [];
+
+	// Header
+	lines.push(seatMap.screenNumber.toUpperCase());
+	lines.push("═".repeat(50));
+	lines.push("");
+
+	// Get all row letters sorted
+	const rowLetters = Object.keys(seatMap.rows).sort();
+
+	// Render each row
+	for (const rowLetter of rowLetters) {
+		const seats = seatMap.rows[rowLetter];
+		if (!seats || seats.length === 0) continue;
+
+		// Build row string
+		const rowParts: string[] = [rowLetter.padEnd(2)];
+
+		// Sort seats by number
+		const sortedSeats = [...seats].sort((a, b) => a.number - b.number);
+
+		for (const seat of sortedSeats) {
+			let symbol: string;
+			const paddedNumber = seat.number.toString().padStart(2, "0");
+
+			if (!seat.available) {
+				// Taken seat
+				symbol = `[XX]`;
+			} else if (seat.wheelchair) {
+				// Wheelchair accessible
+				symbol = `[W${paddedNumber}]`;
+			} else {
+				// Available seat
+				symbol = `[${paddedNumber}]`;
+			}
+
+			rowParts.push(symbol);
+		}
+
+		lines.push(rowParts.join(" "));
+	}
+
+	// Legend and stats
+	lines.push("");
+	lines.push("Legend: [ ] Available  [X] Taken  [W] Wheelchair");
+	lines.push(
+		`Available: ${seatMap.availableCount} / ${seatMap.totalSeats} seats`,
+	);
+
+	return lines.join("\n");
 }

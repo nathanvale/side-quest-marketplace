@@ -48,6 +48,16 @@ export interface SessionDetails {
 }
 
 /**
+ * Individual ticket type and price
+ */
+export interface TicketType {
+	/** Ticket type name (e.g., "ADULT", "CHILD", "SENIOR", "STUDENT") */
+	name: string;
+	/** Price in dollars (e.g., "$27.00") */
+	price: string;
+}
+
+/**
  * Event link associated with a movie
  */
 export interface MovieEventLink {
@@ -79,6 +89,38 @@ export interface MovieDetails {
 	director: string | null;
 	/** Associated event links */
 	eventLinks: MovieEventLink[];
+}
+
+/**
+ * Individual seat information
+ */
+export interface Seat {
+	/** Seat ID (e.g., "A5", "F7") */
+	id: string;
+	/** Row letter (e.g., "A", "B", "F") */
+	row: string;
+	/** Seat number within row (e.g., 1, 5, 11) */
+	number: number;
+	/** Whether seat is available for booking */
+	available: boolean;
+	/** Whether seat is wheelchair accessible */
+	wheelchair: boolean;
+}
+
+/**
+ * Complete seat map for a cinema screen
+ */
+export interface SeatMap {
+	/** Screen number (e.g., "Screen 9") */
+	screenNumber: string;
+	/** Seats organized by row letter */
+	rows: {
+		[rowLetter: string]: Seat[];
+	};
+	/** Total number of available seats */
+	availableCount: number;
+	/** Total number of seats in theater */
+	totalSeats: number;
 }
 
 /**
