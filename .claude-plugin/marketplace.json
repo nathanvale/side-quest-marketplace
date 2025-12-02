@@ -208,6 +208,23 @@
 			},
 			"category": "development",
 			"keywords": ["scraper", "playwright", "web-scraping", "best-practices"]
+		},
+		{
+			"name": "claude-code-skill-expert",
+			"source": "./plugins/claude-code-skill-expert",
+			"description": "Expert guidance for creating high-quality Claude Code skills following Anthropic's best practices",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "development",
+			"keywords": [
+				"skills",
+				"prompt-engineering",
+				"anthropic",
+				"best-practices",
+				"progressive-disclosure"
+			]
 		}
 	]
 }

@@ -1,0 +1,7 @@
+{
+	"name": "claude-code-skill-expert",
+	"version": "1.0.0",
+	"description": "Expert guidance for creating high-quality Claude Code skills following Anthropic's best practices",
+	"author": "Nathan Vale <hi@nathanvale.com>",
+	"skills": ["claude-code-skill-expert"]
+}
