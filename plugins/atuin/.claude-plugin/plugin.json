@@ -11,6 +11,5 @@
 	"license": "MIT",
 	"skills": ["./skills/bash-history"],
 	"commands": ["./commands/history.md"],
-	"hooks": ["./hooks/hooks.json"],
 	"mcpServers": ["./.mcp.json"]
 }

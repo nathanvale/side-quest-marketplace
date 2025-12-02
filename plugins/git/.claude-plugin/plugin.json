@@ -24,6 +24,5 @@
 		"./commands/history.md",
 		"./commands/session-log.md"
 	],
-	"hooks": ["./hooks/hooks.json"],
 	"mcpServers": ["./.mcp.json"]
 }

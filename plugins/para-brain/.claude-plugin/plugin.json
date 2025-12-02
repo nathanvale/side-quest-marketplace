@@ -35,6 +35,5 @@
 		"./commands/task-quick.md"
 	],
 	"skills": ["./skills/second-brain"],
-	"hooks": ["./hooks/hooks.json"],
 	"mcpServers": []
 }

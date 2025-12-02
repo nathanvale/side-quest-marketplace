@@ -15,6 +15,5 @@
 		"./commands/scrape.md",
 		"./commands/search.md"
 	],
-	"skills": ["./skills/firecrawl"],
-	"hooks": ["./hooks/hooks.json"]
+	"skills": ["./skills/firecrawl"]
 }

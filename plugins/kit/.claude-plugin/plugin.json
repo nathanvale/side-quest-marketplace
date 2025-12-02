@@ -10,6 +10,5 @@
 	"keywords": ["kit"],
 	"license": "MIT",
 	"commands": ["./commands/logs.md"],
-	"hooks": ["./hooks/hooks.json"],
 	"mcpServers": ["./.mcp.json"]
 }

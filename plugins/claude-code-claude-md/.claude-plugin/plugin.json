@@ -12,6 +12,5 @@
 		"./commands/audit.md",
 		"./commands/import-docs.md",
 		"./commands/init.md"
-	],
-	"hooks": ["./hooks/hooks.json"]
+	]
 }

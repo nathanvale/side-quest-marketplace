@@ -201,6 +201,40 @@ function validateReferencedFiles(
 			continue;
 		}
 
+		// Special validation for hooks field - warn if referencing the standard hooks/hooks.json
+		if (fieldName === "hooks" && path === "./hooks/hooks.json") {
+			issues.push({
+				ruleId: "plugin/duplicate-hooks-file",
+				severity: "error",
+				message: `Standard hooks file './hooks/hooks.json' is loaded automatically and should not be referenced in the 'hooks' field`,
+				file: pluginJsonPath,
+				suggestion:
+					"Remove './hooks/hooks.json' from the hooks array. The standard hooks/hooks.json is loaded automatically. Only reference additional hook files.",
+			});
+			continue;
+		}
+
+		// Validate file extension based on field type
+		if (fieldName === "commands" && !path.endsWith(".md")) {
+			issues.push({
+				ruleId: "plugin/invalid-command-extension",
+				severity: "error",
+				message: `Command file must have .md extension: "${path}"`,
+				file: pluginJsonPath,
+				suggestion: `Rename to "${path.replace(/\.[^.]+$/, "")}.md" or add .md extension`,
+			});
+		}
+
+		if (fieldName === "mcpServers" && !path.endsWith(".json")) {
+			issues.push({
+				ruleId: "plugin/invalid-mcp-server-extension",
+				severity: "error",
+				message: `MCP server configuration must have .json extension: "${path}"`,
+				file: pluginJsonPath,
+				suggestion: `Use a .json file (typically './.mcp.json')`,
+			});
+		}
+
 		// Resolve path relative to plugin root
 		const resolvedPath = join(pluginRoot, path.slice(2)); // Remove './'
 

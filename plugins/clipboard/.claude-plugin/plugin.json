@@ -10,5 +10,5 @@
 	"keywords": ["clipboard", "copy", "paste", "pbcopy", "productivity"],
 	"repository": "https://github.com/nathanvale/side-quest-marketplace",
 	"commands": ["./commands/copy.md", "./commands/paste.md"],
-	"mcpServers": ["clipboard"]
+	"mcpServers": ["./.mcp.json"]
 }

@@ -9,6 +9,5 @@
 	"keywords": ["testing", "linting", "biome", "bun", "mcp"],
 	"license": "MIT",
 	"repository": "https://github.com/nathanvale/side-quest-marketplace",
-	"hooks": ["./hooks/hooks.json"],
 	"mcpServers": ["./.mcp.json"]
 }

@@ -14,6 +14,5 @@
 		"./commands/strip.md",
 		"./commands/upgrade.md"
 	],
-	"skills": ["./skills/plugin-creator", "./skills/logging"],
-	"hooks": ["./hooks/hooks.json"]
+	"skills": ["./skills/plugin-creator", "./skills/logging"]
 }

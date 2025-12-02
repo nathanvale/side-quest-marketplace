@@ -9,6 +9,5 @@
 	"keywords": ["scraper", "playwright", "web-scraping", "best-practices"],
 	"license": "MIT",
 	"skills": ["./skills/playwright-scraper"],
-	"commands": ["./commands/scrape.md"],
-	"hooks": ["./hooks/hooks.json"]
+	"commands": ["./commands/scrape.md"]
 }

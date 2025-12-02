@@ -773,10 +773,10 @@ describe("validatePluginJson", () => {
 			cleanup();
 		});
 
-		test("should validate hooks path exists", async () => {
+		test("should validate hooks path exists (non-standard hooks file)", async () => {
 			const pluginRoot = createTestPlugin("hooks-missing", {
 				name: "my-plugin",
-				hooks: ["./hooks/hooks.json"],
+				hooks: ["./hooks/custom-hooks.json"],
 			});
 
 			const issues = await validatePluginJson({ pluginRoot });
@@ -895,6 +895,87 @@ describe("validatePluginJson", () => {
 		});
 	});
 
+	describe("file extension validation", () => {
+		test("should error if command file doesn't have .md extension", async () => {
+			const pluginRoot = createTestPlugin("invalid-command-extension", {
+				name: "my-plugin",
+				commands: ["./commands/test.txt"],
+			});
+			createReferencedFile(pluginRoot, "commands/test.txt");
+
+			const issues = await validatePluginJson({ pluginRoot });
+
+			const extIssue = issues.find(
+				(i) => i.ruleId === "plugin/invalid-command-extension",
+			);
+			expect(extIssue).toBeDefined();
+			expect(extIssue?.severity).toBe("error");
+			expect(extIssue?.message).toContain(".md");
+
+			cleanup();
+		});
+
+		test("should error if mcpServer file doesn't have .json extension", async () => {
+			const pluginRoot = createTestPlugin("invalid-mcp-extension", {
+				name: "my-plugin",
+				mcpServers: ["./mcp-config.txt"],
+			});
+			createReferencedFile(pluginRoot, "mcp-config.txt");
+
+			const issues = await validatePluginJson({ pluginRoot });
+
+			const extIssue = issues.find(
+				(i) => i.ruleId === "plugin/invalid-mcp-server-extension",
+			);
+			expect(extIssue).toBeDefined();
+			expect(extIssue?.severity).toBe("error");
+			expect(extIssue?.message).toContain(".json");
+
+			cleanup();
+		});
+	});
+
+	describe("hooks validation", () => {
+		test("should error if referencing standard hooks/hooks.json file", async () => {
+			const pluginRoot = createTestPlugin("duplicate-hooks", {
+				name: "my-plugin",
+				hooks: ["./hooks/hooks.json"],
+			});
+			createReferencedFile(pluginRoot, "hooks/hooks.json");
+
+			const issues = await validatePluginJson({ pluginRoot });
+
+			const hooksIssue = issues.find(
+				(i) => i.ruleId === "plugin/duplicate-hooks-file",
+			);
+			expect(hooksIssue).toBeDefined();
+			expect(hooksIssue?.severity).toBe("error");
+			expect(hooksIssue?.message).toContain("loaded automatically");
+			expect(hooksIssue?.suggestion).toContain(
+				"Remove './hooks/hooks.json' from the hooks array",
+			);
+
+			cleanup();
+		});
+
+		test("should allow referencing additional hooks files", async () => {
+			const pluginRoot = createTestPlugin("additional-hooks", {
+				name: "my-plugin",
+				hooks: ["./hooks/custom-hooks.json"],
+			});
+			createReferencedFile(pluginRoot, "hooks/custom-hooks.json");
+
+			const issues = await validatePluginJson({ pluginRoot });
+
+			const hooksIssues = issues.filter(
+				(i) => i.ruleId === "plugin/duplicate-hooks-file",
+			);
+			expect(hooksIssues).toHaveLength(0);
+
+			cleanup();
+		});
+	});
+
 	describe("complete valid plugin", () => {
 		test("should pass validation for complete plugin.json", async () => {
 			const pluginRoot = createTestPlugin("complete-plugin", {
@@ -910,20 +991,19 @@ describe("validatePluginJson", () => {
 				keywords: ["test", "plugin"],
 				commands: ["./commands/test.md"],
 				skills: ["./skills/my-skill"],
-				hooks: ["./hooks/hooks.json"],
 				mcpServers: ["./.mcp.json"],
 			});
 
 			// Create referenced files
 			createReferencedFile(pluginRoot, "commands/test.md");
 			createReferencedFile(pluginRoot, "skills/my-skill");
-			createReferencedFile(pluginRoot, "hooks/hooks.json");
 			createReferencedFile(pluginRoot, ".mcp.json");
 
 			const issues = await validatePluginJson({ pluginRoot });
 
-			// Should have no errors or warnings
-			expect(issues).toHaveLength(0);
+			// Should have no errors or warnings (only recommended field warnings)
+			const errors = issues.filter((i) => i.severity === "error");
+			expect(errors).toHaveLength(0);
 
 			cleanup();
 		});

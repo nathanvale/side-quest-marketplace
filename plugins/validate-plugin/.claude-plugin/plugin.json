@@ -8,6 +8,5 @@
 	},
 	"repository": "https://github.com/nathanvale/side-quest-marketplace",
 	"keywords": ["validation", "plugin", "hooks", "marketplace", "linting"],
-	"license": "MIT",
-	"hooks": ["./hooks/hooks.json"]
+	"license": "MIT"
 }
