@@ -11,8 +11,7 @@
 		"check": "biome check --write ."
 	},
 	"dependencies": {
-		"@logtape/file": "^0.11.0",
-		"@logtape/logtape": "^0.11.0",
+		"@sidequest/core": "workspace:*",
 		"googleapis": "^144.0.0",
 		"playwright": "^1.57.0"
 	},

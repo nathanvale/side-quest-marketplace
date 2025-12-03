@@ -318,9 +318,10 @@ describe("logger", () => {
 	});
 
 	describe("log paths", () => {
-		test("logDir is in home directory", () => {
-			expect(logDir).toContain(".kit");
+		test("logDir is in centralized claude logs directory", () => {
+			expect(logDir).toContain(".claude");
 			expect(logDir).toContain("logs");
+			expect(logDir).toContain("kit");
 		});
 
 		test("logFile has .jsonl extension", () => {

@@ -109,8 +109,7 @@
       "name": "@sidequest/kit",
       "version": "1.0.0",
       "dependencies": {
-        "@logtape/file": "^0.11.0",
-        "@logtape/logtape": "^0.11.0",
+        "@sidequest/core": "workspace:*",
         "tree-sitter-wasms": "^0.1.13",
         "web-tree-sitter": "^0.25.10",
       },
@@ -163,8 +162,7 @@
       "name": "@sidequest/the-cinema-bandit",
       "version": "1.0.0",
       "dependencies": {
-        "@logtape/file": "^0.11.0",
-        "@logtape/logtape": "^0.11.0",
+        "@sidequest/core": "workspace:*",
         "googleapis": "^144.0.0",
         "playwright": "^1.57.0",
       },
@@ -726,14 +724,6 @@
     "zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
 
     "zod-to-json-schema": ["zod-to-json-schema@3.25.0", "", { "peerDependencies": { "zod": "^3.25 || ^4" } }, "sha512-HvWtU2UG41LALjajJrML6uQejQhNJx+JBO9IflpSja4R03iNWfKXrj6W2h7ljuLyc1nKS+9yDyL/9tD1U/yBnQ=="],
-
-    "@sidequest/kit/@logtape/file": ["@logtape/file@0.11.1", "", { "dependencies": { "@logtape/logtape": "^0.11.0" } }, "sha512-DbQPhTqOQj84jGYOYgEUQ+zXojeNzfexOvo0zNA+/36ZGYXTiOXfrn9acx1oRoSxlbN5Hbwd6luddOfUKCPE+g=="],
-
-    "@sidequest/kit/@logtape/logtape": ["@logtape/logtape@0.11.1", "", {}, "sha512-VsPgJ8QfTMeehDApdP8qLzay1YMSthGDdWDkK8efBmWYIPdKOID4gXqScWSxdEYP6h/rr445xjEpfzZeyCi5jg=="],
-
-    "@sidequest/the-cinema-bandit/@logtape/file": ["@logtape/file@0.11.1", "", { "dependencies": { "@logtape/logtape": "^0.11.0" } }, "sha512-DbQPhTqOQj84jGYOYgEUQ+zXojeNzfexOvo0zNA+/36ZGYXTiOXfrn9acx1oRoSxlbN5Hbwd6luddOfUKCPE+g=="],
-
-    "@sidequest/the-cinema-bandit/@logtape/logtape": ["@logtape/logtape@0.11.1", "", {}, "sha512-VsPgJ8QfTMeehDApdP8qLzay1YMSthGDdWDkK8efBmWYIPdKOID4gXqScWSxdEYP6h/rr445xjEpfzZeyCi5jg=="],
 
     "body-parser/iconv-lite": ["iconv-lite@0.7.0", "", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3.0.0" } }, "sha512-cf6L2Ds3h57VVmkZe+Pn+5APsT7FpqJtEhhieDCvrE2MK5Qk9MyffgQyuxQTm6BChfeZNtcOLHp9IcWRVcIcBQ=="],
 
