@@ -10,10 +10,18 @@
 # Path explanation: Plugins are at plugins/<name>/, so we need to go
 # up two levels (../../) to reach the marketplace root where core/ lives.
 
-set -e
+# Exit gracefully (non-blocking) on any error
+set +e
 
 # Find marketplace root (core is at marketplace root level)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+
+# If we can't find our own directory, we're not in the expected structure
+# (probably installed standalone). Exit silently.
+if [ -z "$SCRIPT_DIR" ]; then
+  exit 0
+fi
+
 MARKETPLACE_ROOT="$SCRIPT_DIR/.."
 
 # Quick check: if node_modules exists, we're done
@@ -21,8 +29,8 @@ if [ -d "$MARKETPLACE_ROOT/node_modules" ]; then
   exit 0
 fi
 
-# Install dependencies
-cd "$MARKETPLACE_ROOT"
-bun install --frozen-lockfile 2>/dev/null || bun install
+# Try to install dependencies, but don't block if it fails
+cd "$MARKETPLACE_ROOT" 2>/dev/null || exit 0
+bun install --frozen-lockfile 2>/dev/null || bun install 2>/dev/null || true
 
 exit 0
