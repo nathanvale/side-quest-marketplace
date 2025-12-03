@@ -6,6 +6,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { formatTicketTypeName } from "./price-scraper.ts";
 
 /**
  * Ticket line item for invoice
@@ -214,7 +215,7 @@ export function generateTicketHtml(data: TicketData): string {
 	html = html.replaceAll("{{BOOKING_FEE}}", escapeHtml(bookingFee));
 	html = html.replaceAll("{{TOTAL_AMOUNT}}", escapeHtml(totalAmount));
 
-	// Generate ticket lines HTML
+	// Generate ticket lines HTML (format to match invoice style)
 	const ticketLinesHtml = data.tickets
 		.map(
 			(
@@ -222,7 +223,7 @@ export function generateTicketHtml(data: TicketData): string {
 			) => `                                                                <tr>
                                                                     <td
                                                                             style="font-family: antwerp, sans-serif; font-size: 16px; line-height: 24px; color: #000000;">
-                                                                    <span class="outlook-body-font">${escapeHtml(ticket.type)} x ${ticket.quantity}</span>
+                                                                    <span class="outlook-body-font">${escapeHtml(formatTicketTypeName(ticket.type))} x ${ticket.quantity}</span>
                                                                     </td>
                                                                 </tr>`,
 		)

@@ -225,6 +225,23 @@ async function generateScrapedTicket(
 	console.log(`   Child: ${childTicket?.price ?? "Unknown"}`);
 	console.log(`   Booking Fee: ${pricingResult.bookingFee ?? "Unknown"}`);
 
+	// Validate and calculate pricing using price-scraper
+	const scrapedPricing = validateScrapedPricing({
+		ticketTypes: pricingResult.ticketTypes,
+		bookingFee: pricingResult.bookingFee ?? "$0.00",
+		selectorsUsed: {
+			ticketTypes: pricingResult.selectorsUsed.ticketTypes ?? "unknown",
+			bookingFee: pricingResult.selectorsUsed.bookingFee ?? "unknown",
+		},
+	});
+
+	const ticketSelections = [
+		{ type: "ADULT", quantity: 2 },
+		{ type: "CHILD", quantity: 2 },
+	];
+
+	const pricing = calculatePricingFromScraped(scrapedPricing, ticketSelections);
+
 	// Build ticket data from scraped info
 	const ticketData: TicketData = {
 		customerName: "Preview Customer",
@@ -235,47 +252,11 @@ async function generateScrapedTicket(
 		sessionDateTime: sessionResult.dateTime ?? "Unknown",
 		screenNumber: sessionResult.screenNumber ?? "Unknown",
 		seats: seats ?? "TBD",
-		tickets: [
-			{ type: "Adult", quantity: 1 },
-			{ type: "Child", quantity: 1 },
-		],
-		invoiceLines: [
-			{
-				description: "Adult x 1",
-				price: adultTicket?.price ?? "$0.00",
-			},
-			{
-				description: "Child x 1",
-				price: childTicket?.price ?? "$0.00",
-			},
-		],
-		bookingFee: pricingResult.bookingFee ?? "$0.00",
+		tickets: pricing.ticketLines,
+		invoiceLines: pricing.invoiceLines,
+		bookingFee: pricing.bookingFee,
+		totalAmount: pricing.totalAmount,
 	};
-
-	// Calculate total if we have prices
-	if (adultTicket && childTicket) {
-		const parsePrice = (p: string) =>
-			Number.parseFloat(p.replace(/[^0-9.]/g, "")) || 0;
-		const adult = parsePrice(adultTicket.price);
-		const child = parsePrice(childTicket.price);
-
-		// Booking fee is per ticket - website shows $0.00 until tickets added
-		// Classic Cinemas charges $1.95 per ticket
-		const BOOKING_FEE_PER_TICKET = 1.95;
-		const scrapedFee = parsePrice(pricingResult.bookingFee ?? "$0");
-		const feePerTicket = scrapedFee > 0 ? scrapedFee : BOOKING_FEE_PER_TICKET;
-
-		const ticketCount = ticketData.tickets.reduce(
-			(sum, t) => sum + t.quantity,
-			0,
-		);
-		const totalFee = feePerTicket * ticketCount;
-		const total = adult + child + totalFee;
-
-		// Update booking fee to show total (fee × tickets)
-		ticketData.bookingFee = `$${totalFee.toFixed(2)}`;
-		ticketData.totalAmount = `$${total.toFixed(2)}`;
-	}
 
 	const outputPath = getTicketOutputPath();
 	const ticketHtml = generateTicketHtml(ticketData);
@@ -564,6 +545,8 @@ async function main(): Promise<void> {
 							sessionDateTime: ticketData.sessionDateTime ?? "Unknown",
 							screenNumber: ticketData.screenNumber ?? "Unknown",
 							seats: ticketData.seats,
+							invoiceLines: pricing.invoiceLines,
+							bookingFee: pricing.bookingFee,
 							totalAmount: pricing.totalAmount,
 						}),
 					);

@@ -52,6 +52,26 @@ export interface ScrapedPricing {
 }
 
 /**
+ * Format ticket type name for display in invoice
+ * Converts uppercase names to title case with "Ticket" suffix
+ *
+ * @param type - Raw ticket type name (e.g., "ADULT", "CHILD", "SENIOR")
+ * @returns Formatted name (e.g., "Adult Ticket", "Child Ticket", "Senior Ticket")
+ *
+ * @example
+ * ```typescript
+ * formatTicketTypeName("ADULT")     // "Adult Ticket"
+ * formatTicketTypeName("CHILD")     // "Child Ticket"
+ * formatTicketTypeName("CONCESSION") // "Concession Ticket"
+ * ```
+ */
+export function formatTicketTypeName(type: string): string {
+	// Convert to title case: "ADULT" -> "Adult"
+	const titleCase = type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+	return `${titleCase} Ticket`;
+}
+
+/**
  * Parse a price string to a number
  * Handles formats: "$27.00", "$27", "27.00", "27"
  */
@@ -244,8 +264,11 @@ export function calculatePricingFromScraped(
 			quantity: selection.quantity,
 		});
 
+		// Format ticket type name: "ADULT" -> "Adult Ticket"
+		const formattedType = formatTicketTypeName(selection.type);
+
 		invoiceLines.push({
-			description: `${selection.type} x ${selection.quantity}`,
+			description: `${formattedType} x ${selection.quantity}`,
 			price: `$${lineTotal.toFixed(2)}`,
 		});
 	}
