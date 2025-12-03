@@ -117,7 +117,12 @@ async function main() {
 	}
 
 	if (allErrors.length > 0) {
-		console.error(`Biome found unfixable issues:\n${allErrors.join("\n\n")}`);
+		console.error(
+			`Biome found unfixable issues:\n${allErrors.join("\n\n")}\n\n` +
+				"To fix these issues:\n" +
+				"1. Use MCP tool: mcp__plugin_bun-runner_bun-runner__bun_lintFix\n" +
+				"2. Or run directly: bun run biome check --write .",
+		);
 		process.exit(2);
 	}
 

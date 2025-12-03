@@ -83,9 +83,11 @@ async function main() {
 		if (summary.error_count > 0 || summary.warning_count > 0) {
 			const diagnostics = formatDiagnostics(summary);
 			console.error(
-				`Biome CI found issues in ${filesToCheck.length} changed file(s):\n${diagnostics}`,
+				`Biome CI found issues in ${filesToCheck.length} changed file(s):\n${diagnostics}\n\n` +
+					"To fix these issues:\n" +
+					"1. Use MCP tool: mcp__plugin_bun-runner_bun-runner__bun_lintFix\n" +
+					"2. Or run directly: bun run biome check --write .",
 			);
-			console.error('\nRun "biome check --write" to auto-fix safe issues.');
 			process.exit(2);
 		}
 	}

@@ -78,7 +78,11 @@ async function main() {
 	const formatted = formatErrors(parsed);
 
 	if (formatted) {
-		console.error(`TypeScript project check:\n${formatted}`);
+		console.error(
+			`TypeScript project check:\n${formatted}\n\n` +
+				"These type errors must be fixed manually.\n" +
+				"To see detailed errors, run: bun typecheck",
+		);
 		process.exit(2);
 	}
 

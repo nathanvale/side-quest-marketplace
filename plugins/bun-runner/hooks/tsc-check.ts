@@ -134,7 +134,11 @@ async function main() {
 	}
 
 	if (allErrors.length > 0) {
-		console.error(`TypeScript type errors:\n${allErrors.join("\n\n")}`);
+		console.error(
+			`TypeScript type errors:\n${allErrors.join("\n\n")}\n\n` +
+				"These type errors must be fixed manually.\n" +
+				"To see all project type errors, run: bun typecheck",
+		);
 		process.exit(2);
 	}
 
