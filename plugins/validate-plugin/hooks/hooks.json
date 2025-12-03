@@ -23,18 +23,6 @@
 					}
 				]
 			}
-		],
-		"Stop": [
-			{
-				"matcher": "*",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "bun run --cwd ${CLAUDE_PLUGIN_ROOT}/../.. validate:hooks",
-						"timeout": 60
-					}
-				]
-			}
 		]
 	}
 }

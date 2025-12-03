@@ -8,5 +8,5 @@
 	},
 	"keywords": ["terminal", "say", "quarantine", "downloads", "tts", "macos"],
 	"license": "MIT",
-	"skills": ["say", "quarantine", "downloads"]
+	"skills": ["./skills/say", "./skills/quarantine", "./skills/downloads"]
 }

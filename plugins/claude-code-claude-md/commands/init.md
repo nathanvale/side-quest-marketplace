@@ -1,7 +1,7 @@
 ---
 description: Smart CLAUDE.md initialization with CI mode for automated updates
 model: claude-sonnet-4-5-20250929
-allowed-tools: Read, Write, Glob, LS, Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(git:*), AskUserQuestion, mcp__kit__*, mcp__git-intelligence__*, mcp__bun-runner__*
+allowed-tools: Read, Write, Glob, LS, Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(git:*), AskUserQuestion, mcp__kit__(...), mcp__git-intelligence__(...), mcp__bun-runner__(...)
 argument-hint: [--ci] [--update] [path]
 ---
 
