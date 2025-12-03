@@ -41,6 +41,9 @@
     "plugins/bun-runner": {
       "name": "@sidequest/bun-runner",
       "version": "1.0.0",
+      "dependencies": {
+        "@sidequest/core": "workspace:*",
+      },
     },
     "plugins/bun-runner/mcp-servers/bun-runner": {
       "name": "@sidequest/mcp-bun-runner",

@@ -11,9 +11,10 @@
  * - 2: Blocking error (type errors found, shown to Claude)
  */
 
-import { spawn } from "bun";
 import { TSC_SUPPORTED_EXTENSIONS } from "./shared/constants";
 import { isFileInRepo } from "./shared/git-utils";
+import { createCorrelationId, initLogger, tscLogger } from "./shared/logger";
+import { spawnWithTimeout } from "./shared/spawn-utils";
 import { hasTscConfig, logMissingTscConfigHint } from "./shared/tsc-config";
 import {
 	extractFilePaths,
@@ -21,6 +22,9 @@ import {
 	type TscError,
 	type TscParseResult,
 } from "./shared/types";
+
+/** Timeout for single-file TypeScript checks (10 seconds) */
+const TSC_TIMEOUT_MS = 10_000;
 
 /**
  * Parse TypeScript compiler output into structured format.
@@ -77,9 +81,23 @@ function formatErrors(parsed: TscParseResult, filePath: string): string {
 }
 
 async function main() {
+	await initLogger();
+	const cid = createCorrelationId();
+	const startTime = Date.now();
+
+	tscLogger.info("Hook started", {
+		cid,
+		hook: "tsc-check",
+		event: "PostToolUse",
+	});
+
 	// Check for TypeScript config before doing anything else
 	const configResult = await hasTscConfig();
 	if (!configResult.found) {
+		tscLogger.debug("Config not found, skipping", {
+			cid,
+			searchPath: configResult.searchPath,
+		});
 		logMissingTscConfigHint(configResult.searchPath);
 		process.exit(0);
 	}
@@ -88,60 +106,127 @@ async function main() {
 	const hookInput = parseHookInput(input);
 
 	if (!hookInput) {
+		tscLogger.debug("No hook input, skipping", { cid });
 		process.exit(0);
 	}
 
 	const filePaths = extractFilePaths(hookInput);
+	tscLogger.debug("Files extracted", {
+		cid,
+		count: filePaths.length,
+		files: filePaths,
+	});
 
 	if (filePaths.length === 0) {
+		tscLogger.info("Hook completed", {
+			cid,
+			exitCode: 0,
+			filesProcessed: 0,
+			durationMs: Date.now() - startTime,
+		});
 		process.exit(0);
 	}
 
 	// Process each file
 	const allErrors: string[] = [];
+	let filesProcessed = 0;
+	let filesSkipped = 0;
 
 	for (const filePath of filePaths) {
 		// Skip non-TypeScript files
 		if (!TSC_SUPPORTED_EXTENSIONS.some((ext) => filePath.endsWith(ext))) {
+			tscLogger.debug("File filtered", {
+				cid,
+				file: filePath,
+				reason: "unsupported extension",
+			});
+			filesSkipped++;
 			continue;
 		}
 
 		// Git-aware: Skip files outside the git repository
 		const inRepo = await isFileInRepo(filePath);
 		if (!inRepo) {
+			tscLogger.debug("File filtered", {
+				cid,
+				file: filePath,
+				reason: "not in repo",
+			});
+			filesSkipped++;
 			continue;
 		}
 
-		// Run tsc --noEmit on the single file
-		const proc = spawn({
-			cmd: ["bunx", "tsc", "--noEmit", "--pretty", "false", filePath],
-			stdout: "pipe",
-			stderr: "pipe",
-		});
+		filesProcessed++;
+		tscLogger.debug("Checking file", { cid, file: filePath });
+		const fileStartTime = Date.now();
 
-		const exitCode = await proc.exited;
-		const stdout = await new Response(proc.stdout).text();
-		const stderr = await new Response(proc.stderr).text();
+		// Run tsc --noEmit on the single file with timeout protection
+		const { stdout, stderr, exitCode, timedOut } = await spawnWithTimeout(
+			["bunx", "tsc", "--noEmit", "--pretty", "false", filePath],
+			TSC_TIMEOUT_MS,
+		);
+
+		if (timedOut) {
+			tscLogger.warn("TSC timed out", {
+				cid,
+				file: filePath,
+				timeoutMs: TSC_TIMEOUT_MS,
+			});
+			allErrors.push(
+				`TypeScript check timed out for ${filePath} (${TSC_TIMEOUT_MS / 1000}s limit). ` +
+					"File may contain complex types or circular references.",
+			);
+			continue;
+		}
+
 		const output = `${stdout}\n${stderr}`;
 
 		if (exitCode !== 0) {
 			const parsed = parseTscOutput(output);
+			tscLogger.debug("TSC completed", {
+				cid,
+				file: filePath,
+				errorCount: parsed.errorCount,
+				durationMs: Date.now() - fileStartTime,
+			});
 			const formatted = formatErrors(parsed, filePath);
 			if (formatted) {
 				allErrors.push(formatted);
 			}
+		} else {
+			tscLogger.debug("TSC completed", {
+				cid,
+				file: filePath,
+				errorCount: 0,
+				durationMs: Date.now() - fileStartTime,
+			});
 		}
 	}
 
 	if (allErrors.length > 0) {
+		tscLogger.warn("Type errors found", { cid, errorCount: allErrors.length });
 		console.error(
 			`TypeScript type errors:\n${allErrors.join("\n\n")}\n\n` +
-				"These type errors must be fixed manually.\n" +
-				"To see all project type errors, run: bun typecheck",
+				"Fix these type errors manually.\n" +
+				"Full project check: bun typecheck",
 		);
+		tscLogger.info("Hook completed", {
+			cid,
+			exitCode: 2,
+			filesProcessed,
+			filesSkipped,
+			durationMs: Date.now() - startTime,
+		});
 		process.exit(2);
 	}
 
+	tscLogger.info("Hook completed", {
+		cid,
+		exitCode: 0,
+		filesProcessed,
+		filesSkipped,
+		durationMs: Date.now() - startTime,
+	});
 	process.exit(0);
 }
 

@@ -4,29 +4,34 @@
  */
 
 import { resolve } from "node:path";
-import { spawn } from "bun";
+import { spawnAndCollect } from "./spawn-utils";
 
 /**
  * Get the root directory of the current git repository.
  *
+ * Why: We need the git root to determine if files are inside the repository
+ * and to locate configuration files (biome.json, tsconfig.json).
+ *
  * @returns The absolute path to the git root, or null if not in a git repo
  */
 export async function getGitRoot(): Promise<string | null> {
-	const proc = spawn({
-		cmd: ["git", "rev-parse", "--show-toplevel"],
-		stdout: "pipe",
-		stderr: "pipe",
-	});
-	const exitCode = await proc.exited;
-	if (exitCode !== 0) return null;
+	const { stdout, exitCode } = await spawnAndCollect([
+		"git",
+		"rev-parse",
+		"--show-toplevel",
+	]);
 
-	const output = await new Response(proc.stdout).text();
-	return output.trim() || null;
+	if (exitCode !== 0) return null;
+	return stdout.trim() || null;
 }
 
 /**
  * Check if a file path is inside the current git repository.
  * Returns true for any file inside the repo directory, including untracked files.
+ *
+ * Why: We use path-based checking instead of `git ls-files --error-unmatch` because
+ * the latter fails on untracked files. This approach handles both tracked and
+ * newly created files that haven't been staged yet.
  *
  * @param filePath - Path to the file to check
  * @returns true if file is inside the git repo, false otherwise
@@ -43,10 +48,12 @@ export async function isFileInRepo(filePath: string): Promise<boolean> {
  * Get list of files that have been modified, staged, or are untracked in git.
  * Used by Stop hooks for end-of-turn validation.
  *
- * Includes:
- * - Staged files (git diff --cached)
- * - Unstaged modified files (git diff)
- * - Untracked files (git ls-files --others --exclude-standard)
+ * Why: We run three git commands in parallel to collect all changed files:
+ * - Staged files that will be committed
+ * - Unstaged modifications to tracked files
+ * - Untracked new files (not yet added to git)
+ *
+ * This ensures CI hooks validate ALL changes, not just committed ones.
  *
  * @param extensions - Optional array of file extensions to filter by
  * @returns Array of changed file paths
@@ -54,41 +61,27 @@ export async function isFileInRepo(filePath: string): Promise<boolean> {
 export async function getChangedFiles(
 	extensions?: string[],
 ): Promise<string[]> {
+	// Run all three git commands in parallel for efficiency
+	const [stagedResult, modifiedResult, untrackedResult] = await Promise.all([
+		spawnAndCollect(["git", "diff", "--cached", "--name-only"]),
+		spawnAndCollect(["git", "diff", "--name-only"]),
+		spawnAndCollect(["git", "ls-files", "--others", "--exclude-standard"]),
+	]);
+
 	const files = new Set<string>();
 
-	// Get staged files
-	const stagedProc = spawn({
-		cmd: ["git", "diff", "--cached", "--name-only"],
-		stdout: "pipe",
-		stderr: "pipe",
-	});
-	await stagedProc.exited;
-	const stagedOutput = await new Response(stagedProc.stdout).text();
-	for (const file of stagedOutput.trim().split("\n")) {
+	// Collect staged files
+	for (const file of stagedResult.stdout.trim().split("\n")) {
 		if (file) files.add(file);
 	}
 
-	// Get unstaged modified files
-	const modifiedProc = spawn({
-		cmd: ["git", "diff", "--name-only"],
-		stdout: "pipe",
-		stderr: "pipe",
-	});
-	await modifiedProc.exited;
-	const modifiedOutput = await new Response(modifiedProc.stdout).text();
-	for (const file of modifiedOutput.trim().split("\n")) {
+	// Collect unstaged modified files
+	for (const file of modifiedResult.stdout.trim().split("\n")) {
 		if (file) files.add(file);
 	}
 
-	// Get untracked files (newly created files not yet added to git)
-	const untrackedProc = spawn({
-		cmd: ["git", "ls-files", "--others", "--exclude-standard"],
-		stdout: "pipe",
-		stderr: "pipe",
-	});
-	await untrackedProc.exited;
-	const untrackedOutput = await new Response(untrackedProc.stdout).text();
-	for (const file of untrackedOutput.trim().split("\n")) {
+	// Collect untracked files
+	for (const file of untrackedResult.stdout.trim().split("\n")) {
 		if (file) files.add(file);
 	}
 
@@ -107,6 +100,9 @@ export async function getChangedFiles(
 /**
  * Check if any files with given extensions have been modified or staged.
  * Used by Stop hooks to decide whether to run project-wide checks.
+ *
+ * Why: Running full project checks (tsc, biome ci) is expensive. This function
+ * allows hooks to skip validation when no relevant files have changed.
  *
  * @param extensions - Array of file extensions to check for
  * @returns true if any matching files have changed

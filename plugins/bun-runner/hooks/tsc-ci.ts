@@ -15,12 +15,16 @@
  * - 2: Blocking error (any type errors found, shown to Claude for follow-up)
  */
 
-import { spawn } from "bun";
 import { TSC_SUPPORTED_EXTENSIONS } from "./shared/constants";
 import { hasChangedFiles } from "./shared/git-utils";
+import { createCorrelationId, initLogger, tscLogger } from "./shared/logger";
+import { spawnWithTimeout } from "./shared/spawn-utils";
 import { hasTscConfig, logMissingTscConfigHint } from "./shared/tsc-config";
 import type { TscParseResult } from "./shared/types";
 import { parseTscOutput } from "./tsc-check";
+
+/** Timeout for project-wide TypeScript checks (2 minutes) */
+const TSC_PROJECT_TIMEOUT_MS = 120_000;
 
 /**
  * Format errors for Claude-friendly output.
@@ -41,51 +45,110 @@ function formatErrors(parsed: TscParseResult): string {
 }
 
 async function main() {
+	await initLogger();
+	const cid = createCorrelationId();
+	const startTime = Date.now();
+
+	tscLogger.info("Hook started", { cid, hook: "tsc-ci", event: "Stop" });
+
 	// Check for TypeScript config before doing anything else
 	const configResult = await hasTscConfig();
 	if (!configResult.found) {
+		tscLogger.debug("Config not found, skipping", {
+			cid,
+			searchPath: configResult.searchPath,
+		});
 		logMissingTscConfigHint(configResult.searchPath);
 		process.exit(0);
 	}
 
 	// Only run if TypeScript files have changed
 	const hasChanges = await hasChangedFiles(TSC_SUPPORTED_EXTENSIONS);
+	tscLogger.debug("TypeScript files changed", { cid, hasChanges });
 
 	if (!hasChanges) {
 		// No TypeScript files changed, nothing to check
+		tscLogger.info("Hook completed", {
+			cid,
+			exitCode: 0,
+			reason: "no changes",
+			durationMs: Date.now() - startTime,
+		});
 		process.exit(0);
 	}
 
-	// Run project-wide tsc --noEmit
-	const proc = spawn({
-		cmd: ["bunx", "tsc", "--noEmit", "--pretty", "false"],
-		stdout: "pipe",
-		stderr: "pipe",
+	// Run project-wide tsc --noEmit with timeout protection
+	tscLogger.debug("Running project-wide TSC", {
+		cid,
+		timeoutMs: TSC_PROJECT_TIMEOUT_MS,
 	});
+	const tscStartTime = Date.now();
+	const { stdout, stderr, exitCode, timedOut } = await spawnWithTimeout(
+		["bunx", "tsc", "--noEmit", "--pretty", "false"],
+		TSC_PROJECT_TIMEOUT_MS,
+	);
 
-	const exitCode = await proc.exited;
-	const stdout = await new Response(proc.stdout).text();
-	const stderr = await new Response(proc.stderr).text();
+	if (timedOut) {
+		tscLogger.warn("TSC project timed out", {
+			cid,
+			timeoutMs: TSC_PROJECT_TIMEOUT_MS,
+		});
+		console.error(
+			`TypeScript project check timed out (${TSC_PROJECT_TIMEOUT_MS / 1000}s limit).\n` +
+				"Project may have complex types or circular references.\n" +
+				"To debug, run: bun typecheck",
+		);
+		tscLogger.info("Hook completed", {
+			cid,
+			exitCode: 2,
+			reason: "timeout",
+			durationMs: Date.now() - startTime,
+		});
+		process.exit(2);
+	}
+
 	const output = `${stdout}\n${stderr}`;
 
 	if (exitCode === 0) {
 		// All type checks passed
+		tscLogger.info("Hook completed", {
+			cid,
+			exitCode: 0,
+			durationMs: Date.now() - startTime,
+		});
 		process.exit(0);
 	}
 
 	// Parse and report ALL errors - TypeScript errors cascade across files
 	const parsed = parseTscOutput(output);
+	tscLogger.debug("TSC project check completed", {
+		cid,
+		errorCount: parsed.errorCount,
+		durationMs: Date.now() - tscStartTime,
+	});
 	const formatted = formatErrors(parsed);
 
 	if (formatted) {
+		tscLogger.warn("Type errors found", { cid, errorCount: parsed.errorCount });
 		console.error(
 			`TypeScript project check:\n${formatted}\n\n` +
-				"These type errors must be fixed manually.\n" +
-				"To see detailed errors, run: bun typecheck",
+				"Fix these type errors manually.\n" +
+				"Full project check: bun typecheck",
 		);
+		tscLogger.info("Hook completed", {
+			cid,
+			exitCode: 2,
+			errorCount: parsed.errorCount,
+			durationMs: Date.now() - startTime,
+		});
 		process.exit(2);
 	}
 
+	tscLogger.info("Hook completed", {
+		cid,
+		exitCode: 0,
+		durationMs: Date.now() - startTime,
+	});
 	process.exit(0);
 }
 

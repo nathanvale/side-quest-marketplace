@@ -17,6 +17,7 @@ import { parseBiomeOutput } from "../mcp-servers/bun-runner/index";
 import { hasBiomeConfig, logMissingConfigHint } from "./shared/biome-config";
 import { BIOME_SUPPORTED_EXTENSIONS } from "./shared/constants";
 import { isFileInRepo } from "./shared/git-utils";
+import { biomeLogger, createCorrelationId, initLogger } from "./shared/logger";
 import { extractFilePaths, parseHookInput } from "./shared/types";
 
 function formatDiagnostics(
@@ -39,9 +40,23 @@ function formatDiagnostics(
 }
 
 async function main() {
+	await initLogger();
+	const cid = createCorrelationId();
+	const startTime = Date.now();
+
+	biomeLogger.info("Hook started", {
+		cid,
+		hook: "biome-check",
+		event: "PostToolUse",
+	});
+
 	// Check for Biome config before doing anything else
 	const configResult = await hasBiomeConfig();
 	if (!configResult.found) {
+		biomeLogger.debug("Config not found, skipping", {
+			cid,
+			searchPath: configResult.searchPath,
+		});
 		logMissingConfigHint(configResult.searchPath);
 		process.exit(0);
 	}
@@ -50,29 +65,58 @@ async function main() {
 	const hookInput = parseHookInput(input);
 
 	if (!hookInput) {
+		biomeLogger.debug("No hook input, skipping", { cid });
 		process.exit(0);
 	}
 
 	const filePaths = extractFilePaths(hookInput);
+	biomeLogger.debug("Files extracted", {
+		cid,
+		count: filePaths.length,
+		files: filePaths,
+	});
 
 	if (filePaths.length === 0) {
+		biomeLogger.info("Hook completed", {
+			cid,
+			exitCode: 0,
+			filesProcessed: 0,
+			durationMs: Date.now() - startTime,
+		});
 		process.exit(0);
 	}
 
 	// Process each file
 	const allErrors: string[] = [];
+	let filesProcessed = 0;
+	let filesSkipped = 0;
 
 	for (const filePath of filePaths) {
 		// Skip unsupported files
 		if (!BIOME_SUPPORTED_EXTENSIONS.some((ext) => filePath.endsWith(ext))) {
+			biomeLogger.debug("File filtered", {
+				cid,
+				file: filePath,
+				reason: "unsupported extension",
+			});
+			filesSkipped++;
 			continue;
 		}
 
 		// Git-aware: Skip files outside the git repository
 		const inRepo = await isFileInRepo(filePath);
 		if (!inRepo) {
+			biomeLogger.debug("File filtered", {
+				cid,
+				file: filePath,
+				reason: "not in repo",
+			});
+			filesSkipped++;
 			continue;
 		}
+
+		filesProcessed++;
+		const fileStartTime = Date.now();
 
 		// First, run biome check --write to fix what can be fixed
 		const fixProc = spawn({
@@ -88,8 +132,14 @@ async function main() {
 			stderr: "pipe",
 		});
 		await fixProc.exited;
+		biomeLogger.debug("Biome fix completed", {
+			cid,
+			file: filePath,
+			durationMs: Date.now() - fileStartTime,
+		});
 
 		// Then check if there are remaining issues using JSON reporter
+		const checkStartTime = Date.now();
 		const checkProc = spawn({
 			cmd: [
 				"bunx",
@@ -110,6 +160,13 @@ async function main() {
 
 		if (exitCode !== 0 && stdout.trim()) {
 			const summary = parseBiomeOutput(stdout);
+			biomeLogger.debug("Biome check completed", {
+				cid,
+				file: filePath,
+				errors: summary.error_count,
+				warnings: summary.warning_count,
+				durationMs: Date.now() - checkStartTime,
+			});
 			if (summary.error_count > 0) {
 				allErrors.push(formatDiagnostics(summary));
 			}
@@ -117,15 +174,32 @@ async function main() {
 	}
 
 	if (allErrors.length > 0) {
+		biomeLogger.warn("Unfixable errors found", {
+			cid,
+			errorCount: allErrors.length,
+		});
 		console.error(
 			`Biome found unfixable issues:\n${allErrors.join("\n\n")}\n\n` +
-				"To fix these issues:\n" +
-				"1. Use MCP tool: mcp__plugin_bun-runner_bun-runner__bun_lintFix\n" +
-				"2. Or run directly: bun run biome check --write .",
+				"Fix with MCP tool: bun_lintFix\n" +
+				"Fallback CLI: bun run biome check --write .",
 		);
+		biomeLogger.info("Hook completed", {
+			cid,
+			exitCode: 2,
+			filesProcessed,
+			filesSkipped,
+			durationMs: Date.now() - startTime,
+		});
 		process.exit(2);
 	}
 
+	biomeLogger.info("Hook completed", {
+		cid,
+		exitCode: 0,
+		filesProcessed,
+		filesSkipped,
+		durationMs: Date.now() - startTime,
+	});
 	process.exit(0);
 }
 

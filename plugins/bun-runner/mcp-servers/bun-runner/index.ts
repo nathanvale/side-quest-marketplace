@@ -13,6 +13,20 @@
 
 import { spawn } from "bun";
 import { startServer, tool, z } from "mcpez";
+import {
+	createCorrelationId,
+	initLogger,
+	mcpLogger,
+} from "../../hooks/shared/logger";
+import { spawnAndCollect } from "../../hooks/shared/spawn-utils";
+import {
+	validatePath,
+	validatePathOrDefault,
+	validatePattern,
+} from "./path-validator";
+
+// Initialize logger on server startup
+initLogger().catch(console.error);
 
 // --- Types ---
 
@@ -261,17 +275,19 @@ async function runBunTests(pattern?: string): Promise<TestSummary> {
 }
 
 /**
- * Run Biome check and parse JSON output using native Bun.spawn()
+ * Run Biome check and parse JSON output.
+ *
+ * Why: Uses spawnAndCollect to ensure streams are consumed in parallel with
+ * waiting for exit, avoiding race conditions that could lose output.
  */
 async function runBiomeCheck(path = "."): Promise<LintSummary> {
-	const proc = spawn({
-		cmd: ["bunx", "@biomejs/biome", "check", "--reporter=json", path],
-		stdout: "pipe",
-		stderr: "pipe",
-	});
-
-	const exitCode = await proc.exited;
-	const stdout = await new Response(proc.stdout).text();
+	const { stdout, exitCode } = await spawnAndCollect([
+		"bunx",
+		"@biomejs/biome",
+		"check",
+		"--reporter=json",
+		path,
+	]);
 
 	if (exitCode === 0) {
 		return { error_count: 0, warning_count: 0, diagnostics: [] };
@@ -281,27 +297,23 @@ async function runBiomeCheck(path = "."): Promise<LintSummary> {
 }
 
 /**
- * Run Biome check --write and return what was fixed
+ * Run Biome check --write and return what was fixed.
+ *
+ * Why: Uses spawnAndCollect to ensure streams are consumed in parallel with
+ * waiting for exit, avoiding race conditions that could lose output.
  */
 async function runBiomeFix(
 	path = ".",
 ): Promise<{ fixed: number; remaining: LintSummary }> {
 	// First run with --write to fix issues
-	const fixProc = spawn({
-		cmd: [
-			"bunx",
-			"@biomejs/biome",
-			"check",
-			"--write",
-			"--reporter=json",
-			path,
-		],
-		stdout: "pipe",
-		stderr: "pipe",
-	});
-
-	await fixProc.exited;
-	const fixStdout = await new Response(fixProc.stdout).text();
+	const { stdout: fixStdout } = await spawnAndCollect([
+		"bunx",
+		"@biomejs/biome",
+		"check",
+		"--write",
+		"--reporter=json",
+		path,
+	]);
 
 	// Count fixed issues from the output
 	let fixed = 0;
@@ -319,19 +331,21 @@ async function runBiomeFix(
 }
 
 /**
- * Run Biome format check (no write) using native Bun.spawn()
+ * Run Biome format check (no write).
+ *
+ * Why: Uses spawnAndCollect to ensure streams are consumed in parallel with
+ * waiting for exit, avoiding race conditions that could lose output.
  */
 async function runBiomeFormatCheck(
 	path = ".",
 ): Promise<{ formatted: boolean; files: string[] }> {
-	const proc = spawn({
-		cmd: ["bunx", "@biomejs/biome", "format", "--reporter=json", path],
-		stdout: "pipe",
-		stderr: "pipe",
-	});
-
-	const exitCode = await proc.exited;
-	const stdout = await new Response(proc.stdout).text();
+	const { stdout, exitCode } = await spawnAndCollect([
+		"bunx",
+		"@biomejs/biome",
+		"format",
+		"--reporter=json",
+		path,
+	]);
 
 	if (exitCode === 0) {
 		return { formatted: true, files: [] };
@@ -604,6 +618,24 @@ function formatFormatCheckResult(
 	return output.trim();
 }
 
+/**
+ * Create an error response for MCP tools.
+ *
+ * Why: MCP tools should return structured error responses with isError flag
+ * so Claude knows the operation failed and can take corrective action.
+ */
+function errorResponse(message: string) {
+	return {
+		content: [
+			{
+				type: "text" as const,
+				text: JSON.stringify({ error: message, isError: true }),
+			},
+		],
+		isError: true,
+	};
+}
+
 // --- Tools ---
 
 tool(
@@ -631,11 +663,46 @@ tool(
 		},
 	},
 	async (args: { pattern?: string; response_format?: string }) => {
+		const cid = createCorrelationId();
+		const startTime = Date.now();
+		mcpLogger.info("Tool request", {
+			cid,
+			tool: "bun_runTests",
+			pattern: args.pattern,
+		});
+
+		// Validate pattern for security
+		if (args.pattern) {
+			try {
+				validatePattern(args.pattern);
+				// If pattern looks like a path, validate it stays in repo
+				if (args.pattern.includes("/") || args.pattern.includes("..")) {
+					await validatePath(args.pattern);
+				}
+			} catch (error) {
+				mcpLogger.warn("Validation failed", {
+					cid,
+					tool: "bun_runTests",
+					error: error instanceof Error ? error.message : "Unknown",
+				});
+				return errorResponse(
+					error instanceof Error ? error.message : "Invalid pattern",
+				);
+			}
+		}
+
 		const format =
 			args.response_format === "json"
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
 		const summary = await runBunTests(args.pattern);
+		mcpLogger.info("Tool response", {
+			cid,
+			tool: "bun_runTests",
+			passed: summary.passed,
+			failed: summary.failed,
+			durationMs: Date.now() - startTime,
+		});
 		return {
 			content: [
 				{ type: "text" as const, text: formatTestSummary(summary, format) },
@@ -670,11 +737,37 @@ tool(
 			file: string;
 			response_format?: string;
 		};
+		const cid = createCorrelationId();
+		const startTime = Date.now();
+		mcpLogger.info("Tool request", { cid, tool: "bun_testFile", file });
+
+		// Validate file path for security
+		try {
+			await validatePath(file);
+		} catch (error) {
+			mcpLogger.warn("Validation failed", {
+				cid,
+				tool: "bun_testFile",
+				error: error instanceof Error ? error.message : "Unknown",
+			});
+			return errorResponse(
+				error instanceof Error ? error.message : "Invalid file path",
+			);
+		}
+
 		const format =
 			response_format === "json"
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
 		const summary = await runBunTests(file);
+		mcpLogger.info("Tool response", {
+			cid,
+			tool: "bun_testFile",
+			file,
+			passed: summary.passed,
+			failed: summary.failed,
+			durationMs: Date.now() - startTime,
+		});
 		return {
 			content: [
 				{
@@ -705,11 +798,23 @@ tool(
 		},
 	},
 	async (args: { response_format?: string }) => {
+		const cid = createCorrelationId();
+		const startTime = Date.now();
+		mcpLogger.info("Tool request", { cid, tool: "bun_testCoverage" });
+
 		const format =
 			args.response_format === "json"
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
 		const { summary, coverage } = await runBunTestCoverage();
+		mcpLogger.info("Tool response", {
+			cid,
+			tool: "bun_testCoverage",
+			coveragePercent: coverage.percent,
+			passed: summary.passed,
+			failed: summary.failed,
+			durationMs: Date.now() - startTime,
+		});
 		return {
 			content: [
 				{
@@ -746,11 +851,41 @@ tool(
 		},
 	},
 	async (args: { path?: string; response_format?: string }) => {
+		const cid = createCorrelationId();
+		const startTime = Date.now();
+		mcpLogger.info("Tool request", {
+			cid,
+			tool: "bun_lintCheck",
+			path: args.path,
+		});
+
+		// Validate path for security
+		let validatedPath: string;
+		try {
+			validatedPath = await validatePathOrDefault(args.path);
+		} catch (error) {
+			mcpLogger.warn("Validation failed", {
+				cid,
+				tool: "bun_lintCheck",
+				error: error instanceof Error ? error.message : "Unknown",
+			});
+			return errorResponse(
+				error instanceof Error ? error.message : "Invalid path",
+			);
+		}
+
 		const format =
 			args.response_format === "json"
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
-		const summary = await runBiomeCheck(args.path);
+		const summary = await runBiomeCheck(validatedPath);
+		mcpLogger.info("Tool response", {
+			cid,
+			tool: "bun_lintCheck",
+			errors: summary.error_count,
+			warnings: summary.warning_count,
+			durationMs: Date.now() - startTime,
+		});
 		return {
 			content: [
 				{ type: "text" as const, text: formatLintSummary(summary, format) },
@@ -784,11 +919,42 @@ tool(
 		},
 	},
 	async (args: { path?: string; response_format?: string }) => {
+		const cid = createCorrelationId();
+		const startTime = Date.now();
+		mcpLogger.info("Tool request", {
+			cid,
+			tool: "bun_lintFix",
+			path: args.path,
+		});
+
+		// Validate path for security - especially critical since this tool writes files
+		let validatedPath: string;
+		try {
+			validatedPath = await validatePathOrDefault(args.path);
+		} catch (error) {
+			mcpLogger.warn("Validation failed", {
+				cid,
+				tool: "bun_lintFix",
+				error: error instanceof Error ? error.message : "Unknown",
+			});
+			return errorResponse(
+				error instanceof Error ? error.message : "Invalid path",
+			);
+		}
+
 		const format =
 			args.response_format === "json"
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
-		const { fixed, remaining } = await runBiomeFix(args.path);
+		const { fixed, remaining } = await runBiomeFix(validatedPath);
+		mcpLogger.info("Tool response", {
+			cid,
+			tool: "bun_lintFix",
+			fixed,
+			remainingErrors: remaining.error_count,
+			remainingWarnings: remaining.warning_count,
+			durationMs: Date.now() - startTime,
+		});
 		return {
 			content: [
 				{
@@ -825,11 +991,41 @@ tool(
 		},
 	},
 	async (args: { path?: string; response_format?: string }) => {
+		const cid = createCorrelationId();
+		const startTime = Date.now();
+		mcpLogger.info("Tool request", {
+			cid,
+			tool: "bun_formatCheck",
+			path: args.path,
+		});
+
+		// Validate path for security
+		let validatedPath: string;
+		try {
+			validatedPath = await validatePathOrDefault(args.path);
+		} catch (error) {
+			mcpLogger.warn("Validation failed", {
+				cid,
+				tool: "bun_formatCheck",
+				error: error instanceof Error ? error.message : "Unknown",
+			});
+			return errorResponse(
+				error instanceof Error ? error.message : "Invalid path",
+			);
+		}
+
 		const format =
 			args.response_format === "json"
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
-		const { formatted, files } = await runBiomeFormatCheck(args.path);
+		const { formatted, files } = await runBiomeFormatCheck(validatedPath);
+		mcpLogger.info("Tool response", {
+			cid,
+			tool: "bun_formatCheck",
+			formatted,
+			unformattedCount: files.length,
+			durationMs: Date.now() - startTime,
+		});
 		return {
 			content: [
 				{

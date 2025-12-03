@@ -12,11 +12,12 @@
  * - 2: Blocking error (lint/format errors found, shown to Claude for follow-up)
  */
 
-import { spawn } from "bun";
 import { parseBiomeOutput } from "../mcp-servers/bun-runner/index";
 import { hasBiomeConfig, logMissingConfigHint } from "./shared/biome-config";
 import { BIOME_SUPPORTED_EXTENSIONS } from "./shared/constants";
 import { getChangedFiles } from "./shared/git-utils";
+import { biomeLogger, createCorrelationId, initLogger } from "./shared/logger";
+import { spawnAndCollect } from "./shared/spawn-utils";
 
 function formatDiagnostics(
 	summary: ReturnType<typeof parseBiomeOutput>,
@@ -38,24 +39,46 @@ function formatDiagnostics(
 }
 
 async function main() {
+	await initLogger();
+	const cid = createCorrelationId();
+	const startTime = Date.now();
+
+	biomeLogger.info("Hook started", { cid, hook: "biome-ci", event: "Stop" });
+
 	// Check for Biome config before doing anything else
 	const configResult = await hasBiomeConfig();
 	if (!configResult.found) {
+		biomeLogger.debug("Config not found, skipping", {
+			cid,
+			searchPath: configResult.searchPath,
+		});
 		logMissingConfigHint(configResult.searchPath);
 		process.exit(0);
 	}
 
 	// Get changed files filtered by Biome-supported extensions
 	const filesToCheck = await getChangedFiles(BIOME_SUPPORTED_EXTENSIONS);
+	biomeLogger.debug("Changed files found", {
+		cid,
+		count: filesToCheck.length,
+		files: filesToCheck,
+	});
 
 	if (filesToCheck.length === 0) {
 		// No relevant files changed, nothing to check
+		biomeLogger.info("Hook completed", {
+			cid,
+			exitCode: 0,
+			filesChecked: 0,
+			durationMs: Date.now() - startTime,
+		});
 		process.exit(0);
 	}
 
 	// Run biome ci (strict, read-only) on changed files
-	const proc = spawn({
-		cmd: [
+	const ciStartTime = Date.now();
+	const { stdout, exitCode } = await spawnAndCollect(
+		[
 			"bunx",
 			"@biomejs/biome",
 			"ci",
@@ -64,34 +87,58 @@ async function main() {
 			"--colors=off", // Explicitly disable colors for clean JSON
 			...filesToCheck,
 		],
-		stdout: "pipe",
-		stderr: "pipe",
-		env: { ...process.env, NO_COLOR: "1", FORCE_COLOR: "0" }, // Also set fallback env vars
-	});
-
-	const exitCode = await proc.exited;
-	const stdout = await new Response(proc.stdout).text();
+		{ env: { NO_COLOR: "1", FORCE_COLOR: "0" } },
+	);
 
 	if (exitCode === 0) {
 		// All checks passed
+		biomeLogger.info("Hook completed", {
+			cid,
+			exitCode: 0,
+			filesChecked: filesToCheck.length,
+			durationMs: Date.now() - startTime,
+		});
 		process.exit(0);
 	}
 
 	// Parse and report errors
 	if (stdout.trim()) {
 		const summary = parseBiomeOutput(stdout);
+		biomeLogger.debug("Biome CI completed", {
+			cid,
+			errors: summary.error_count,
+			warnings: summary.warning_count,
+			durationMs: Date.now() - ciStartTime,
+		});
+
 		if (summary.error_count > 0 || summary.warning_count > 0) {
 			const diagnostics = formatDiagnostics(summary);
+			biomeLogger.warn("Issues found", {
+				cid,
+				errors: summary.error_count,
+				warnings: summary.warning_count,
+			});
 			console.error(
 				`Biome CI found issues in ${filesToCheck.length} changed file(s):\n${diagnostics}\n\n` +
-					"To fix these issues:\n" +
-					"1. Use MCP tool: mcp__plugin_bun-runner_bun-runner__bun_lintFix\n" +
-					"2. Or run directly: bun run biome check --write .",
+					"Fix with MCP tool: bun_lintFix\n" +
+					"Fallback CLI: bun run biome check --write .",
 			);
+			biomeLogger.info("Hook completed", {
+				cid,
+				exitCode: 2,
+				filesChecked: filesToCheck.length,
+				durationMs: Date.now() - startTime,
+			});
 			process.exit(2);
 		}
 	}
 
+	biomeLogger.info("Hook completed", {
+		cid,
+		exitCode: 0,
+		filesChecked: filesToCheck.length,
+		durationMs: Date.now() - startTime,
+	});
 	process.exit(0);
 }
 
