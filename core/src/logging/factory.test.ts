@@ -42,14 +42,14 @@ describe("createPluginLogger", () => {
 		expect(ids.size).toBe(100);
 	});
 
-	test("returns log directory path based on plugin name", () => {
+	test("returns centralized log directory path", () => {
 		const logger = createPluginLogger({
 			name: "my-plugin",
 			subsystems: [],
 		});
 
-		expect(logger.logDir).toContain(".my-plugin");
-		expect(logger.logDir).toContain("logs");
+		expect(logger.logDir).toContain(".claude");
+		expect(logger.logDir).toEndWith("logs");
 	});
 
 	test("returns log file path with correct extension", () => {

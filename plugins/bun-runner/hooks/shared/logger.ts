@@ -9,18 +9,13 @@
  * - tsc: TypeScript hooks (tsc-check.ts, tsc-ci.ts)
  * - mcp: MCP server tools
  *
- * Log location: ~/.claude/logs/bun-runner/bun-runner.jsonl
+ * Log location: ~/.claude/logs/bun-runner.jsonl
  */
 
-import { homedir } from "node:os";
-import { join } from "node:path";
 import {
 	createCorrelationId,
 	createPluginLogger,
 } from "@sidequest/core/logging";
-
-// Centralized log location for all Claude Code plugins
-const LOG_DIR = join(homedir(), ".claude", "logs", "bun-runner");
 
 const {
 	initLogger,
@@ -31,7 +26,6 @@ const {
 } = createPluginLogger({
 	name: "bun-runner",
 	subsystems: ["biome", "tsc", "mcp"],
-	logDir: LOG_DIR,
 });
 
 // Re-export core utilities

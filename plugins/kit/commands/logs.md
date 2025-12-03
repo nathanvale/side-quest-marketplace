@@ -9,7 +9,7 @@ View and filter JSONL logs from the Kit MCP server.
 
 ## Instructions
 
-1. Log file location: `~/.kit/logs/kit.jsonl`
+1. Log file location: `~/.claude/logs/kit.jsonl`
 2. Default: Show last 20 log entries
 3. With `lines` argument: Show last N entries
 4. With `correlation-id`: Filter by specific operation
@@ -50,13 +50,13 @@ Read the log file and format entries:
 
 ```bash
 # Default: last 20 lines
-tail -20 ~/.kit/logs/kit.jsonl | jq '.'
+tail -20 ~/.claude/logs/kit.jsonl | jq '.'
 
 # Filter by correlation ID
-jq 'select(.cid == "CORRELATION_ID")' ~/.kit/logs/kit.jsonl
+jq 'select(.cid == "CORRELATION_ID")' ~/.claude/logs/kit.jsonl
 
 # Show only errors
-jq 'select(.["@level"] == "error")' ~/.kit/logs/kit.jsonl
+jq 'select(.["@level"] == "error")' ~/.claude/logs/kit.jsonl
 ```
 
 Present logs in a readable table or formatted list showing:

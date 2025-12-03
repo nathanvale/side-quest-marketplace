@@ -318,15 +318,14 @@ describe("logger", () => {
 	});
 
 	describe("log paths", () => {
-		test("logDir is in centralized claude logs directory", () => {
+		test("logDir is centralized claude logs directory", () => {
 			expect(logDir).toContain(".claude");
-			expect(logDir).toContain("logs");
-			expect(logDir).toContain("kit");
+			expect(logDir).toEndWith("logs");
 		});
 
-		test("logFile has .jsonl extension", () => {
-			expect(logFile).toContain(".jsonl");
-			expect(logFile).toContain(logDir);
+		test("logFile is flat in logs directory", () => {
+			expect(logFile).toEndWith("kit.jsonl");
+			expect(logFile).toContain(".claude/logs/");
 		});
 	});
 });

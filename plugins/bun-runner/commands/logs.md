@@ -23,7 +23,7 @@ View recent bun-runner log entries or filter by correlation ID.
 
 ---
 
-Read the bun-runner log file at `~/.claude/logs/bun-runner/bun-runner.jsonl`.
+Read the bun-runner log file at `~/.claude/logs/bun-runner.jsonl`.
 
 Parse the argument: $ARGUMENTS
 

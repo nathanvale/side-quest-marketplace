@@ -4,7 +4,7 @@
  * JSONL logging with LogTape for observability and debugging.
  * Uses @sidequest/core logging factory for consistent log location.
  *
- * Log location: ~/.claude/logs/kit/kit.jsonl
+ * Log location: ~/.claude/logs/kit.jsonl
  *
  * Logging Level Convention:
  * - DEBUG: Detailed diagnostic info (file counts, cache hits, parameter echo)
@@ -13,15 +13,10 @@
  * - ERROR: Operation failures (exceptions, command failures, parse errors)
  */
 
-import { homedir } from "node:os";
-import { join } from "node:path";
 import {
 	createCorrelationId,
 	createPluginLogger,
 } from "@sidequest/core/logging";
-
-/** Centralized log location following ~/.claude/logs/<plugin>/ convention */
-const LOG_DIR = join(homedir(), ".claude", "logs", "kit");
 
 const {
 	initLogger,
@@ -40,7 +35,6 @@ const {
 		"usages",
 		"ast",
 	],
-	logDir: LOG_DIR,
 });
 
 // ============================================================================

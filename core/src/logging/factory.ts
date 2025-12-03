@@ -4,7 +4,7 @@
  * Creates configured LogTape loggers for SideQuest plugins with:
  * - JSONL file output with rotation
  * - Hierarchical categories for subsystem filtering
- * - Consistent log directory structure (~/.plugin-name/logs/)
+ * - Centralized log location (~/.claude/logs/<plugin>.jsonl)
  */
 
 import { existsSync, mkdirSync } from "node:fs";
@@ -26,11 +26,14 @@ import {
 } from "./config.ts";
 import { createCorrelationId } from "./correlation.ts";
 
+/** Default centralized log directory for all plugins */
+const DEFAULT_LOG_DIR = join(homedir(), ".claude", "logs");
+
 /**
  * Options for creating a plugin logger.
  */
 export interface PluginLoggerOptions {
-	/** Plugin name (used for log directory and category). Should be kebab-case. */
+	/** Plugin name (used for log file name and category). Should be kebab-case. */
 	name: string;
 
 	/**
@@ -42,12 +45,14 @@ export interface PluginLoggerOptions {
 	subsystems?: string[];
 
 	/**
-	 * Custom log directory. Defaults to ~/.{name}/logs/
+	 * Log directory. Defaults to ~/.claude/logs/
+	 * All plugin logs are stored flat in this directory.
 	 */
 	logDir?: string;
 
 	/**
 	 * Log file name (without extension). Defaults to plugin name.
+	 * Results in: <logDir>/<logFileName>.jsonl
 	 */
 	logFileName?: string;
 
@@ -142,7 +147,7 @@ export function createPluginLogger(options: PluginLoggerOptions): PluginLogger {
 	const {
 		name,
 		subsystems = [],
-		logDir = join(homedir(), `.${name}`, "logs"),
+		logDir = DEFAULT_LOG_DIR,
 		logFileName = name,
 		maxSize = DEFAULT_MAX_SIZE,
 		maxFiles = DEFAULT_MAX_FILES,
