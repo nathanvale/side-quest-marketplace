@@ -1,0 +1,21 @@
+{
+	"name": "@sidequest/terminal",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Terminal plugin for Claude Code",
+	"type": "module",
+	"scripts": {
+		"test": "bun test --recursive",
+		"typecheck": "tsc --noEmit",
+		"format": "biome format --write .",
+		"format:check": "biome format .",
+		"lint": "biome lint .",
+		"check": "biome check --write ."
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	},
+	"dependencies": {
+		"@sidequest/core": "workspace:*"
+	}
+}

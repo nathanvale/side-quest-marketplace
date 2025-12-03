@@ -1,15 +1,14 @@
 /**
- * Bun-Runner Plugin Logger
+ * Biome-Runner Plugin Logger
  *
  * Uses the shared @sidequest/core logging infrastructure for consistent
  * JSONL logging across all SideQuest plugins.
  *
  * Subsystems:
  * - biome: Biome hooks (biome-check.ts, biome-ci.ts)
- * - tsc: TypeScript hooks (tsc-check.ts, tsc-ci.ts)
  * - mcp: MCP server tools
  *
- * Log location: ~/.claude/logs/bun-runner.jsonl
+ * Log location: ~/.claude/logs/biome-runner.jsonl
  */
 
 import {
@@ -24,8 +23,8 @@ const {
 	logDir,
 	logFile,
 } = createPluginLogger({
-	name: "bun-runner",
-	subsystems: ["biome", "tsc", "mcp"],
+	name: "biome-runner",
+	subsystems: ["biome", "mcp"],
 });
 
 // Re-export core utilities
@@ -33,5 +32,4 @@ export { createCorrelationId, initLogger, logDir, logFile, logger };
 
 // Export subsystem loggers (using getSubsystemLogger for non-nullable types)
 export const biomeLogger = getSubsystemLogger("biome");
-export const tscLogger = getSubsystemLogger("tsc");
 export const mcpLogger = getSubsystemLogger("mcp");

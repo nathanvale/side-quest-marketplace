@@ -1,25 +1,18 @@
 # Bun-Runner Plugin for Claude Code
 
-Smart test runner and linter integration for Bun and Biome with automatic code quality enforcement via hooks and token-efficient MCP tools.
+Test runner for Bun with token-efficient MCP tools that focus on test failures and coverage.
 
 ## Directory Structure
 
 ```
 bun-runner/
-├── mcp-servers/bun-runner/    # MCP server with 6 tools
-│   ├── index.ts               # Test/lint tools (19KB)
+├── mcp-servers/bun-runner/    # MCP server with 3 tools
+│   ├── index.ts               # Test runner tools
 │   ├── index.test.ts          # MCP tool tests
+│   ├── path-validator.ts      # Path validation for security
 │   └── package.json           # MCP dependencies (mcpez)
-├── hooks/                     # PostToolUse & Stop hooks
-│   ├── biome-check.ts         # Auto-fix on Write/Edit (PostToolUse)
-│   ├── biome-ci.ts            # Full lint check on Stop
-│   ├── tsc-check.ts           # Single-file type check (PostToolUse)
-│   ├── tsc-ci.ts              # Full type check on Stop
-│   ├── hooks.json             # Hook configuration & matchers
-│   └── shared/                # Shared utilities
-│       ├── types.ts           # Hook input parsing
-│       ├── constants.ts       # Supported file extensions
-│       └── git-utils.ts       # Git-aware filtering
+├── hooks/                     # SessionStart bootstrap hook
+│   ├── hooks.json             # Hook configuration
 ├── .claude-plugin/            # Plugin metadata
 ├── .mcp.json                  # MCP server config
 └── package.json               # Dependencies
@@ -28,60 +21,41 @@ bun-runner/
 ## Commands
 
 ```bash
-bun test --recursive       # Run tests
-tsc --noEmit              # Type checking
-biome format --write .    # Format code
-biome lint .              # Lint code
-biome check --write .     # Lint and format
+bun test --recursive       # Run all tests
+bun test --filter '*'      # Run tests in all workspace packages
 ```
 
 ## Key Files
 
-- `mcp-servers/bun-runner/index.ts` — MCP server with 6 tools for testing/linting
-- `hooks/biome-check.ts` — PostToolUse hook: auto-fix on every file edit
-- `hooks/tsc-check.ts` — PostToolUse hook: fast single-file type checking
-- `hooks/*-ci.ts` — Stop hooks: full project validation before session end
-- `hooks/shared/git-utils.ts` — Git-aware file filtering (3.3KB)
+- `mcp-servers/bun-runner/index.ts` — MCP server with 3 test runner tools
+- `hooks/hooks.json` — SessionStart bootstrap hook
+- `path-validator.ts` — Security validation for file paths
 
-## MCP Tools (6 Total)
+## MCP Tools (3 Total)
 
 | Tool | Purpose | Output Format |
 |------|---------|---------------|
 | `bun_runTests` | Run tests with pattern filtering | Failures only (token-efficient) |
 | `bun_testFile` | Run tests for specific file | Failures only |
 | `bun_testCoverage` | Run tests with coverage report | Summary + low-coverage files |
-| `bun_lintCheck` | Check for lint/format issues (read-only) | Structured errors |
-| `bun_lintFix` | Auto-fix lint/format issues (--write) | Fixed count + remaining errors |
-| `bun_formatCheck` | Check formatting without fixing | List of unformatted files |
 
 ## Architecture
 
-**Dual enforcement strategy:**
-1. **Immediate feedback (PostToolUse hooks)** — After Write/Edit, auto-fix with Biome and type-check with tsc
-2. **Session validation (Stop hooks)** — Before session ends, run full project checks
+**Test runner design:**
+- 3 MCP tools for running Bun tests with structured output
+- Workspace-aware: Uses `bun --filter '*' test` for workspace projects
+- Token-efficient: Shows only test failures and coverage
 
-**Hook Flow (PostToolUse):**
+**Workspace Detection:**
+```typescript
+// Detects if package.json has workspaces array
+// In workspaces, uses `bun --filter '*' test` to respect package-level configs
+// Otherwise uses direct `bun test`
 ```
-Claude writes file → biome-check.ts runs
-  ↓ (git-aware filtering)
-  ↓ (auto-fix with --write)
-  ↓ (check for remaining errors)
-  ↓ Exit 0 (success) or Exit 2 (block with errors)
-
-In parallel → tsc-check.ts runs
-  ↓ (single-file type check)
-  ↓ Exit 0 or Exit 2
-```
-
-**Git-Aware Processing:**
-- All hooks check `isFileInRepo()` before processing
-- Skips files outside git repository (e.g., temp files, external paths)
-- Uses `git ls-files` for efficient filtering
 
 **Token-Efficient Output:**
 - **Tests**: Show only failures, suppress passing tests and verbose logs
-- **Lint**: Structured diagnostics with file:line, error code, message
-- **Format**: Markdown or JSON output modes
+- **Coverage**: Show coverage percentage and files with low coverage (<50%)
 
 ## Code Standards
 
@@ -89,67 +63,36 @@ In parallel → tsc-check.ts runs
 - **TypeScript strict mode** — Full type safety
 - **AbortController for timeouts** — Avoids Bun's buggy timeout option
 - **Parallel stream consumption** — Read stdout/stderr concurrently with `proc.exited`
-- **Biome for linting** — Opinionated formatter/linter (tab indentation)
 
 ## Key Features
 
-### Smart Hook Execution
-```json
-// hooks.json
-"PostToolUse": [
-  { "matcher": "Write|Edit|MultiEdit", "hooks": ["biome-check", "tsc-check"] }
-],
-"Stop": [
-  { "matcher": "*", "hooks": ["biome-ci", "tsc-ci"] }
-]
-```
+### Workspace-Aware Testing
+- Detects workspace structure from package.json
+- Runs tests in all packages using `--filter '*'`
+- Respects package-level bunfig.toml configurations
 
-- **PostToolUse** hooks run after file edits (fast, single-file)
-- **Stop** hooks run when session ends (comprehensive, full project)
+### Pattern Filtering
+- Run specific tests with pattern: `bun_runTests(pattern: "auth")`
+- Supports test file names and glob patterns
+- Security-validated paths prevent directory traversal
 
-### Supported File Extensions
-```typescript
-// Biome: JS, TS, JSON, CSS, GraphQL
-BIOME_SUPPORTED_EXTENSIONS = [".js", ".ts", ".tsx", ".json", ".css", ".graphql", ...]
-
-// TypeScript: TS only
-TSC_SUPPORTED_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts"]
-```
-
-### Exit Code Contract
-- **0** — Success (no errors, or unsupported file type)
-- **2** — Blocking error (shown to Claude, prevents further actions)
-
-### Timeout Handling
-```typescript
-// AbortController pattern (Bun's timeout option is buggy)
-const controller = new AbortController();
-setTimeout(() => controller.abort(), 30000);
-spawn({ signal: controller.signal });
-```
+### Coverage Reports
+- Runs tests with coverage tracking
+- Shows overall coverage percentage
+- Highlights files with low coverage (<50%)
 
 ## Testing
 
 ```bash
-bun test --recursive              # All tests
-bun test mcp-servers/             # MCP tool tests
-bun test hooks/                   # Hook tests
+bun test --recursive              # All tests for this plugin
+bun test mcp-servers/             # MCP tool tests only
 ```
 
 **Test Coverage:**
-- Hook input parsing (extractFilePaths, parseHookInput)
-- Output parsers (Biome JSON, TSC errors, Bun test output)
-- Git utilities (isFileInRepo, getChangedFiles)
+- Output parsers (Bun test output)
+- Workspace detection logic
+- Path validation for security
 - MCP tool integration
-
-## Git Workflow
-
-Commits: `type(scope): subject`
-
-Examples:
-- `feat(bun-runner): add coverage tool`
-- `fix(hooks): handle missing git repo gracefully`
-- `perf(tsc): use single-file mode for faster feedback`
 
 ## Notable Patterns
 
@@ -167,40 +110,32 @@ const [stdout, stderr, exitCode] = await Promise.all([
 ]);
 ```
 
-**Hook Input Parsing** — Handles both single and multi-file edits:
+**Workspace Detection** — Check for workspace configuration:
 ```typescript
-extractFilePaths(hookInput)
-  → [file_path] for Write
-  → [...edits.map(e => e.file_path)] for MultiEdit
+export async function isWorkspaceProject(): Promise<boolean> {
+  try {
+    const pkg = await Bun.file("package.json").json();
+    return Array.isArray(pkg.workspaces) && pkg.workspaces.length > 0;
+  } catch {
+    return false;
+  }
+}
 ```
-
-**Two-Pass Linting** — Fix then check:
-```typescript
-// 1. Auto-fix what can be fixed
-spawn(["biome", "check", "--write", filePath]);
-// 2. Check for remaining issues
-spawn(["biome", "check", "--reporter=json", filePath]);
-```
-
-**Graceful Degradation** — If parsing fails, exit 0 (don't block Claude)
 
 ## Dependencies
 
 - `mcpez` — MCP framework for tool registration
-- `@biomejs/biome` — Linter and formatter (peer dependency)
-- `typescript` — Type checking (peer dependency)
+- Bun runtime — Native test runner
 
 ## Environment Variables
 
-- `CI=true` — Set by hooks to ensure non-interactive test output
+- `CI=true` — Set during test runs to ensure non-interactive output
 - `CLAUDE_PLUGIN_ROOT` — Injected by Claude Code, used in hooks.json
 
 ## Notes
 
-- **PostToolUse hooks run on every file edit** — Keep them fast (single-file checks)
-- **Stop hooks can be slower** — Full project validation is acceptable
-- **Exit code 2 is blocking** — Claude sees the error and must address it
-- **Biome auto-fixes** — Most formatting/lint issues are fixed automatically
-- **TypeScript errors cannot auto-fix** — Always require manual intervention
-- **Git-aware by default** — Prevents processing external or temp files
+- **30-second timeout** — Test runs abort after 30 seconds to prevent hanging
+- **60-second timeout** — Coverage runs allow 60 seconds for instrumentation
+- **Workspace-aware** — Automatically detects and respects workspace structure
+- **Pattern validation** — Prevents directory traversal attacks
 - **Bun.spawn() preferred** — Faster than Node.js child_process, native to Bun runtime

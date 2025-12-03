@@ -72,14 +72,14 @@ export async function hasBiomeConfig(): Promise<BiomeConfigResult> {
 
 /**
  * Log a message suggesting the user add a Biome config.
- * Uses a consistent format for all bun-runner hooks.
+ * Uses a consistent format for all biome-runner hooks.
  *
  * @param searchPath - Where we looked for the config (for context)
  */
 export function logMissingConfigHint(searchPath?: string): void {
 	const location = searchPath ? ` in ${searchPath}` : "";
 	console.log(
-		`[bun-runner] No biome.json found${location}. Skipping Biome checks.`,
+		`[biome-runner] No biome.json found${location}. Skipping Biome checks.`,
 	);
-	console.log("[bun-runner] To enable: bunx @biomejs/biome init");
+	console.log("[biome-runner] To enable: bunx @biomejs/biome init");
 }

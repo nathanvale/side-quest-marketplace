@@ -1,0 +1,24 @@
+{
+	"name": "validate-plugin",
+	"owner": {
+		"name": "Nathan Vale",
+		"email": "hi@nathanvale.com"
+	},
+	"metadata": {
+		"description": "Project-specific validation plugin for side-quest-marketplace development",
+		"version": "1.0.0"
+	},
+	"plugins": [
+		{
+			"name": "validate-plugin",
+			"source": "./",
+			"description": "Automatically validates plugin files after edits. Catches invalid marketplace.json, plugin.json, and hooks.json before they cause problems.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "development",
+			"keywords": ["validation", "plugin", "hooks", "linting", "quality"]
+		}
+	]
+}

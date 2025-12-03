@@ -1,0 +1,6 @@
+{
+  "name": "test-plugin",
+  "dependencies": {
+    "pkg": "^1.0.0"
+  }
+}

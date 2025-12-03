@@ -1,0 +1,8 @@
+{
+	"marketplaces": [
+		{
+			"source": "./plugins/validate-plugin"
+		}
+	],
+	"plugins": ["validate-plugin@validate-plugin"]
+}

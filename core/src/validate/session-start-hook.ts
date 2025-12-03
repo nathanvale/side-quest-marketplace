@@ -1,44 +1,28 @@
 #!/usr/bin/env bun
 
 /**
- * Validates that all plugins have a SessionStart hook that bootstraps dependencies.
+ * Validates that all plugins with dependencies have a SessionStart hook
+ * that bootstraps dependencies.
  *
- * This ensures the self-healing dependency installation pattern is consistently
- * applied across all plugins in the marketplace.
+ * This CLI tool reuses the smart validateBootstrapHook validator which
+ * only requires hooks for plugins that have dependencies in package.json.
  *
  * Exit codes:
- * - 0: All plugins have valid SessionStart hooks
- * - 1: One or more plugins missing SessionStart hook
+ * - 0: All plugins pass validation
+ * - 1: One or more plugins fail validation
  */
 
-import { existsSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { Glob } from "bun";
+import { validateBootstrapHook } from "./validators/bootstrap-hook.ts";
 
 // --- Types ---
 
-interface HooksJson {
-	hooks?: {
-		SessionStart?: Array<{
-			matcher?: string;
-			hooks?: Array<{
-				type?: string;
-				command?: string;
-			}>;
-		}>;
-	};
-}
-
 interface ValidationResult {
 	plugin: string;
-	hasSessionStartHook: boolean;
-	hasBootstrapCommand: boolean;
+	passed: boolean;
 	error?: string;
 }
-
-// --- Constants ---
-
-const BOOTSTRAP_PATTERN = /core\/bootstrap\.sh/;
 
 // --- Functions ---
 
@@ -60,72 +44,29 @@ async function findPlugins(marketplaceRoot: string): Promise<string[]> {
 }
 
 /**
- * Validate a single plugin's SessionStart hook
+ * Validate a single plugin using the smart bootstrap validator.
+ * Only plugins with dependencies require SessionStart hooks.
  */
 async function validatePlugin(pluginPath: string): Promise<ValidationResult> {
 	const pluginName = basename(pluginPath);
-	const hooksJsonPath = join(pluginPath, "hooks", "hooks.json");
 
-	// Check if hooks.json exists
-	if (!existsSync(hooksJsonPath)) {
+	// Use the smart validator that checks if plugin has dependencies
+	const issues = await validateBootstrapHook({ pluginRoot: pluginPath });
+
+	// Filter to only error severity issues
+	const errors = issues.filter((i) => i.severity === "error");
+
+	if (errors.length > 0) {
 		return {
 			plugin: pluginName,
-			hasSessionStartHook: false,
-			hasBootstrapCommand: false,
-			error: "Missing hooks/hooks.json",
-		};
-	}
-
-	// Parse hooks.json
-	let hooksJson: HooksJson;
-	try {
-		const content = await Bun.file(hooksJsonPath).text();
-		hooksJson = JSON.parse(content);
-	} catch {
-		return {
-			plugin: pluginName,
-			hasSessionStartHook: false,
-			hasBootstrapCommand: false,
-			error: "Invalid JSON in hooks/hooks.json",
-		};
-	}
-
-	// Check for SessionStart hook
-	const sessionStartHooks = hooksJson.hooks?.SessionStart;
-	if (!sessionStartHooks || sessionStartHooks.length === 0) {
-		return {
-			plugin: pluginName,
-			hasSessionStartHook: false,
-			hasBootstrapCommand: false,
-			error: "No SessionStart hook defined",
-		};
-	}
-
-	// Check if any hook command contains the bootstrap pattern
-	let hasBootstrapCommand = false;
-	for (const hookEntry of sessionStartHooks) {
-		for (const hook of hookEntry.hooks || []) {
-			if (hook.command && BOOTSTRAP_PATTERN.test(hook.command)) {
-				hasBootstrapCommand = true;
-				break;
-			}
-		}
-		if (hasBootstrapCommand) break;
-	}
-
-	if (!hasBootstrapCommand) {
-		return {
-			plugin: pluginName,
-			hasSessionStartHook: true,
-			hasBootstrapCommand: false,
-			error: "SessionStart hook does not call core/bootstrap.sh",
+			passed: false,
+			error: errors[0]?.message,
 		};
 	}
 
 	return {
 		plugin: pluginName,
-		hasSessionStartHook: true,
-		hasBootstrapCommand: true,
+		passed: true,
 	};
 }
 
@@ -142,7 +83,7 @@ export async function validateSessionStartHooks(
 		results.push(await validatePlugin(pluginPath));
 	}
 
-	const passed = results.every((r) => r.hasBootstrapCommand);
+	const passed = results.every((r) => r.passed);
 	return { passed, results };
 }
 
@@ -157,13 +98,13 @@ async function main() {
 		marketplaceRoot = process.argv[2];
 	}
 
-	console.log(`Validating SessionStart hooks in: ${marketplaceRoot}\n`);
+	console.log(`Validating bootstrap hooks in: ${marketplaceRoot}\n`);
 
 	const { passed, results } = await validateSessionStartHooks(marketplaceRoot);
 
 	// Print results
-	const failing = results.filter((r) => !r.hasBootstrapCommand);
-	const passing = results.filter((r) => r.hasBootstrapCommand);
+	const failing = results.filter((r) => !r.passed);
+	const passing = results.filter((r) => r.passed);
 
 	if (passing.length > 0) {
 		console.log(`Passing (${passing.length}):`);
@@ -182,11 +123,11 @@ async function main() {
 	}
 
 	if (passed) {
-		console.log("All plugins have valid SessionStart hooks.");
+		console.log("All plugins pass bootstrap validation.");
 		process.exit(0);
 	} else {
 		console.log(
-			"Some plugins are missing SessionStart hooks. See PLUGIN_DEV_GUIDE.md for requirements.",
+			"Some plugins with dependencies are missing SessionStart hooks. See PLUGIN_DEV_GUIDE.md for requirements.",
 		);
 		process.exit(1);
 	}

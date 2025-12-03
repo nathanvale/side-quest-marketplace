@@ -4,8 +4,9 @@
  * CLI for validating Claude Code plugins.
  *
  * Usage:
- *   bun run core/src/validate/cli.ts plugins/git
- *   bun run core/src/validate/cli.ts --all
+ *   bun run core/src/validate/cli.ts plugins/git        # Validate single plugin
+ *   bun run core/src/validate/cli.ts .                  # Validate marketplace root
+ *   bun run core/src/validate/cli.ts --all              # Validate marketplace + all plugins
  *   bun run core/src/validate/cli.ts plugins/git --format json
  */
 
@@ -142,9 +143,13 @@ async function main() {
 	const marketplaceRoot = resolve(import.meta.dir, "../../..");
 
 	// Determine which plugins to validate
-	const pathsToValidate = validateAll
-		? getAllPlugins(marketplaceRoot)
-		: pluginPaths.map((p) => resolve(p));
+	let pathsToValidate: string[];
+	if (validateAll) {
+		// When --all is used, validate marketplace root + all individual plugins
+		pathsToValidate = [marketplaceRoot, ...getAllPlugins(marketplaceRoot)];
+	} else {
+		pathsToValidate = pluginPaths.map((p) => resolve(p));
+	}
 
 	if (pathsToValidate.length === 0) {
 		console.error("No plugins specified. Use --all or provide plugin paths.");

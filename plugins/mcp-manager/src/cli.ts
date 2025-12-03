@@ -1,11 +1,109 @@
 #!/usr/bin/env bun
 
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
 	type ProjectConfig,
 	readClaudeConfig,
 	writeClaudeConfig,
 } from "./config";
 import { createEnableOptions, type Scope, selectMultiple } from "./interactive";
+
+interface McpJsonConfig {
+	mcpServers?: Record<string, unknown>;
+}
+
+interface InstalledPlugins {
+	plugins?: Record<string, { installPath: string }>;
+}
+
+/**
+ * Read project .mcp.json if it exists
+ */
+function readProjectMcpJson(projectPath: string): McpJsonConfig | null {
+	const mcpJsonPath = join(projectPath, ".mcp.json");
+	if (!existsSync(mcpJsonPath)) return null;
+	try {
+		return JSON.parse(readFileSync(mcpJsonPath, "utf-8"));
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Read MCP servers from installed plugins (via mcp.json files)
+ */
+function readPluginMcpServers(): Record<
+	string,
+	{ path: string; servers: Record<string, unknown> }
+> {
+	const pluginsJsonPath = join(
+		process.env.HOME || "",
+		".claude/plugins/installed_plugins.json",
+	);
+	if (!existsSync(pluginsJsonPath)) return {};
+
+	try {
+		const installed: InstalledPlugins = JSON.parse(
+			readFileSync(pluginsJsonPath, "utf-8"),
+		);
+		const result: Record<
+			string,
+			{ path: string; servers: Record<string, unknown> }
+		> = {};
+
+		for (const [name, plugin] of Object.entries(installed.plugins || {})) {
+			// Check for .mcp.json in plugin directory (note: dotfile)
+			const mcpJsonPath = join(plugin.installPath, ".mcp.json");
+			if (existsSync(mcpJsonPath)) {
+				try {
+					const mcpConfig = JSON.parse(readFileSync(mcpJsonPath, "utf-8"));
+					if (
+						mcpConfig.mcpServers &&
+						Object.keys(mcpConfig.mcpServers).length > 0
+					) {
+						result[name] = { path: mcpJsonPath, servers: mcpConfig.mcpServers };
+					}
+				} catch {
+					// Skip invalid JSON
+				}
+			}
+		}
+		return result;
+	} catch {
+		return {};
+	}
+}
+
+interface ClaudeSettings {
+	enabledPlugins?: Record<string, boolean>;
+	disabledMcpjsonServers?: string[];
+}
+
+/**
+ * Read Claude settings.json for enabled plugins
+ */
+function readClaudeSettings(): ClaudeSettings | null {
+	const settingsPath = join(process.env.HOME || "", ".claude/settings.json");
+	if (!existsSync(settingsPath)) return null;
+	try {
+		return JSON.parse(readFileSync(settingsPath, "utf-8"));
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Get list of enabled plugins that provide MCP tools
+ */
+function _getEnabledPluginMcpServers(): string[] {
+	const settings = readClaudeSettings();
+	if (!settings?.enabledPlugins) return [];
+
+	return Object.entries(settings.enabledPlugins)
+		.filter(([_, enabled]) => enabled)
+		.map(([name]) => `plugin:${name.split("@")[0]}`);
+}
 
 function createEmptyProject(): ProjectConfig {
 	return {
@@ -172,30 +270,131 @@ async function listServers(showDebug = false) {
 
 	const allServers = Object.keys(config.mcpServers || {});
 
-	if (showDebug) {
-		console.log("\n=== DEBUG: Raw Config State ===\n");
-		console.log(`Project path: ${projectPath}`);
-		console.log(`Project exists: ${project ? "YES" : "NO"}`);
-		console.log();
-		console.log("Global disabledMcpServers:");
-		console.log(`  ${JSON.stringify(config.disabledMcpServers || [])}`);
-		console.log();
-		if (project) {
-			console.log("Project disabledMcpjsonServers:");
-			console.log(
-				`  ${JSON.stringify(project.disabledMcpjsonServers ?? "NOT SET")}`,
-			);
-			console.log("Project disabledMcpServers:");
-			console.log(
-				`  ${JSON.stringify(project.disabledMcpServers ?? "NOT SET")}`,
-			);
-		}
-		console.log();
-		console.log("Effective disabled (what Claude Code sees):");
-		console.log(`  ${JSON.stringify([...effectiveDisabled].sort())}`);
-		console.log("\n=== END DEBUG ===\n");
+	if (allServers.length === 0) {
+		console.log("\nNo MCP servers configured in ~/.claude.json\n");
+		return;
 	}
 
+	if (showDebug) {
+		const configPath = `${process.env.HOME}/.claude.json`;
+		const projectMcpJson = readProjectMcpJson(projectPath);
+		const pluginMcpServers = readPluginMcpServers();
+
+		console.log("\n=== MCP Debug Info ===\n");
+		console.log(`Project path:    ${projectPath}`);
+		console.log(
+			`Project config:  ${project ? "YES (has overrides)" : "NO (inherits global)"}`,
+		);
+		console.log();
+
+		// Show disabled arrays
+		console.log("Disabled servers:");
+		console.log(
+			`  Global:    ${JSON.stringify(config.disabledMcpServers || [])}`,
+		);
+		if (project) {
+			console.log(
+				`  Project:   ${JSON.stringify(project.disabledMcpServers ?? [])}`,
+			);
+		}
+		console.log(
+			`  Effective: ${JSON.stringify([...effectiveDisabled].sort())}`,
+		);
+
+		// 1. Global mcpServers from ~/.claude.json
+		console.log("\n────────────────────────────────────────");
+		console.log(`Source: ${configPath}`);
+		console.log("────────────────────────────────────────");
+		if (Object.keys(config.mcpServers || {}).length > 0) {
+			console.log(JSON.stringify({ mcpServers: config.mcpServers }, null, 2));
+		} else {
+			console.log("(no servers configured)");
+		}
+
+		// 2. Project .mcp.json
+		const projectMcpJsonPath = join(projectPath, ".mcp.json");
+		console.log("\n────────────────────────────────────────");
+		console.log(`Source: ${projectMcpJsonPath}`);
+		console.log("────────────────────────────────────────");
+		if (
+			projectMcpJson?.mcpServers &&
+			Object.keys(projectMcpJson.mcpServers).length > 0
+		) {
+			console.log(
+				JSON.stringify({ mcpServers: projectMcpJson.mcpServers }, null, 2),
+			);
+		} else {
+			console.log("(not found or no servers)");
+		}
+
+		// 3. Plugin MCP servers (from mcp.json files)
+		console.log("\n────────────────────────────────────────");
+		console.log("Source: Plugin mcp.json files");
+		console.log("────────────────────────────────────────");
+		if (Object.keys(pluginMcpServers).length > 0) {
+			for (const [pluginName, { path, servers }] of Object.entries(
+				pluginMcpServers,
+			)) {
+				console.log(`\n# ${pluginName}`);
+				console.log(`# ${path}`);
+				console.log(JSON.stringify({ mcpServers: servers }, null, 2));
+			}
+		} else {
+			console.log("(no plugins with mcp.json found)");
+		}
+
+		// 4. Enabled plugins (provide MCP tools dynamically)
+		const settingsPath = join(process.env.HOME || "", ".claude/settings.json");
+		const installedPluginsPath = join(
+			process.env.HOME || "",
+			".claude/plugins/installed_plugins.json",
+		);
+		const settings = readClaudeSettings();
+
+		// Load installed plugins for paths
+		let installedPlugins: InstalledPlugins = { plugins: {} };
+		try {
+			if (existsSync(installedPluginsPath)) {
+				installedPlugins = JSON.parse(
+					readFileSync(installedPluginsPath, "utf-8"),
+				);
+			}
+		} catch {
+			// ignore
+		}
+
+		console.log("\n────────────────────────────────────────");
+		console.log(`Source: ${settingsPath}`);
+		console.log(`        ${installedPluginsPath}`);
+		console.log("────────────────────────────────────────");
+		if (settings?.enabledPlugins) {
+			const enabled = Object.entries(settings.enabledPlugins)
+				.filter(([_, isEnabled]) => isEnabled)
+				.map(([name]) => name)
+				.sort();
+
+			console.log(
+				"\nEnabled plugins (provide MCP tools as plugin:NAME:SERVER):",
+			);
+			if (enabled.length > 0) {
+				for (const name of enabled) {
+					const pluginInfo = installedPlugins.plugins?.[name];
+					const path = pluginInfo?.installPath || "(path unknown)";
+					console.log(`  ✓ ${name}`);
+					console.log(`    ${path}`);
+				}
+			} else {
+				console.log("  (none)");
+			}
+		} else {
+			console.log("(no plugins configured)");
+		}
+
+		console.log();
+		return;
+	}
+
+	// Normal list output
 	console.log("\nMCP Servers:\n");
 	console.log("  Status  Name");
 	console.log("  ──────  ────");
@@ -219,7 +418,7 @@ async function listServers(showDebug = false) {
 	);
 	if (process.stdout.isTTY) {
 		console.log(`Tip: Use "${cmd} -i" for interactive toggle mode`);
-		console.log(`     Use "${cmd} list --debug" to see raw config state\n`);
+		console.log(`     Use "${cmd} list --debug" for full config details\n`);
 	}
 }
 

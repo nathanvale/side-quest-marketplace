@@ -13,7 +13,7 @@
  */
 
 import { spawn } from "bun";
-import { parseBiomeOutput } from "../mcp-servers/bun-runner/index";
+import { parseBiomeOutput } from "../mcp-servers/biome-runner/index";
 import { hasBiomeConfig, logMissingConfigHint } from "./shared/biome-config";
 import { BIOME_SUPPORTED_EXTENSIONS } from "./shared/constants";
 import { isFileInRepo } from "./shared/git-utils";
@@ -180,7 +180,7 @@ async function main() {
 		});
 		console.error(
 			`Biome found unfixable issues:\n${allErrors.join("\n\n")}\n\n` +
-				"Fix with MCP tool: bun_lintFix\n" +
+				"Fix with MCP tool: biome_lintFix\n" +
 				"Fallback CLI: bun run biome check --write .",
 		);
 		biomeLogger.info("Hook completed", {

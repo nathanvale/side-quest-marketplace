@@ -15,10 +15,10 @@
  * - 2: Blocking error (any type errors found, shown to Claude for follow-up)
  */
 
+import { hasChangedFiles } from "@sidequest/core/git";
+import { spawnWithTimeout } from "@sidequest/core/spawn";
 import { TSC_SUPPORTED_EXTENSIONS } from "./shared/constants";
-import { hasChangedFiles } from "./shared/git-utils";
 import { createCorrelationId, initLogger, tscLogger } from "./shared/logger";
-import { spawnWithTimeout } from "./shared/spawn-utils";
 import { hasTscConfig, logMissingTscConfigHint } from "./shared/tsc-config";
 import type { TscParseResult } from "./shared/types";
 import { parseTscOutput } from "./tsc-check";

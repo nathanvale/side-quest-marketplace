@@ -1,0 +1,19 @@
+{
+	"name": "@sidequest/biome-runner",
+	"version": "1.0.0",
+	"type": "module",
+	"scripts": {
+		"test": "bun test --recursive",
+		"typecheck": "tsc --noEmit",
+		"format": "biome format --write .",
+		"lint": "biome lint .",
+		"check": "biome check --write ."
+	},
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.0.4",
+		"@sidequest/core": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	}
+}

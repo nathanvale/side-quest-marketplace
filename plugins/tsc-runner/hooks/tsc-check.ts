@@ -11,10 +11,10 @@
  * - 2: Blocking error (type errors found, shown to Claude)
  */
 
+import { isFileInRepo } from "@sidequest/core/git";
+import { spawnWithTimeout } from "@sidequest/core/spawn";
 import { TSC_SUPPORTED_EXTENSIONS } from "./shared/constants";
-import { isFileInRepo } from "./shared/git-utils";
 import { createCorrelationId, initLogger, tscLogger } from "./shared/logger";
-import { spawnWithTimeout } from "./shared/spawn-utils";
 import { hasTscConfig, logMissingTscConfigHint } from "./shared/tsc-config";
 import {
 	extractFilePaths,

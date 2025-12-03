@@ -12,27 +12,7 @@
  */
 
 import { resolve } from "node:path";
-
-/**
- * Check if a file is within the git repository
- */
-async function isFileInRepo(filePath: string): Promise<boolean> {
-	try {
-		// Use git ls-files to check if file is tracked
-		// This also verifies we're in a git repo
-		const proc = Bun.spawnSync([
-			"git",
-			"ls-files",
-			"--cached",
-			"--others",
-			"--exclude-standard",
-			filePath,
-		]);
-		return proc.success;
-	} catch {
-		return false;
-	}
-}
+import { isFileInRepo } from "../../hooks/shared/git-utils";
 
 /**
  * Shell metacharacters that could be dangerous in command arguments.

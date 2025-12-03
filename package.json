@@ -16,9 +16,8 @@
 		"lint": "bun run biome lint .",
 		"check": "bun run biome check --write .",
 		"ci": "bun --filter '*' typecheck && bun run check && bun --filter '*' test",
-		"validate": "claude plugin validate .",
-		"validate:hooks": "bun run --cwd core validate:hooks",
-		"ci:full": "bun run ci && bun run validate && bun run validate:hooks",
+		"validate": "bun run core/src/validate/cli.ts --all",
+		"ci:full": "bun run ci && bun run validate",
 		"prepare": "husky"
 	},
 	"devDependencies": {

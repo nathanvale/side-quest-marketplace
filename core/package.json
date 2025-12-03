@@ -5,6 +5,9 @@
 	"type": "module",
 	"exports": {
 		"./logging": "./src/logging/index.ts",
+		"./spawn": "./src/spawn/index.ts",
+		"./git": "./src/git/index.ts",
+		"./hooks": "./src/hooks/index.ts",
 		"./validate": "./src/validate/session-start-hook.ts",
 		"./validate/types": "./src/validate/types.ts",
 		"./validate/runner": "./src/validate/runner.ts",
@@ -16,8 +19,7 @@
 	},
 	"scripts": {
 		"typecheck": "tsc --noEmit",
-		"test": "bun test",
-		"validate:hooks": "bun run src/validate/session-start-hook.ts"
+		"test": "bun test"
 	},
 	"dependencies": {
 		"@logtape/file": "^0.12.0",

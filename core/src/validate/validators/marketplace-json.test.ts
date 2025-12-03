@@ -843,4 +843,130 @@ describe("validateMarketplaceJson", () => {
 			cleanup();
 		});
 	});
+
+	describe("unregistered plugin validation", () => {
+		test("should error if plugin directory exists but is not registered", async () => {
+			const pluginRoot = createTestMarketplace("unregistered-plugin", {
+				name: "my-marketplace",
+				owner: { name: "Test", email: "test@example.com" },
+				plugins: [{ name: "plugin-one", source: "./plugins/plugin-one" }],
+			});
+
+			// Create plugin directories - one registered, one not
+			createPluginSource(pluginRoot, "plugins/plugin-one");
+			createPluginSource(pluginRoot, "plugins/plugin-two");
+
+			const issues = await validateMarketplaceJson({ pluginRoot });
+
+			const unregisteredIssue = issues.find(
+				(i) => i.ruleId === "marketplace/unregistered-plugin",
+			);
+			expect(unregisteredIssue).toBeDefined();
+			expect(unregisteredIssue?.severity).toBe("error");
+			expect(unregisteredIssue?.message).toContain("plugin-two");
+			expect(unregisteredIssue?.suggestion).toContain("./plugins/plugin-two");
+
+			cleanup();
+		});
+
+		test("should error for multiple unregistered plugins", async () => {
+			const pluginRoot = createTestMarketplace("multiple-unregistered", {
+				name: "my-marketplace",
+				owner: { name: "Test", email: "test@example.com" },
+				plugins: [{ name: "plugin-one", source: "./plugins/plugin-one" }],
+			});
+
+			// Create multiple unregistered plugins
+			createPluginSource(pluginRoot, "plugins/plugin-one");
+			createPluginSource(pluginRoot, "plugins/plugin-two");
+			createPluginSource(pluginRoot, "plugins/plugin-three");
+
+			const issues = await validateMarketplaceJson({ pluginRoot });
+
+			const unregisteredIssues = issues.filter(
+				(i) => i.ruleId === "marketplace/unregistered-plugin",
+			);
+			expect(unregisteredIssues).toHaveLength(2);
+			expect(
+				unregisteredIssues.some((i) => i.message.includes("plugin-two")),
+			).toBe(true);
+			expect(
+				unregisteredIssues.some((i) => i.message.includes("plugin-three")),
+			).toBe(true);
+
+			cleanup();
+		});
+
+		test("should pass if all plugin directories are registered", async () => {
+			const pluginRoot = createTestMarketplace("all-registered", {
+				name: "my-marketplace",
+				owner: { name: "Test", email: "test@example.com" },
+				plugins: [
+					{ name: "plugin-one", source: "./plugins/plugin-one" },
+					{ name: "plugin-two", source: "./plugins/plugin-two" },
+				],
+			});
+
+			// Create all registered plugin directories
+			createPluginSource(pluginRoot, "plugins/plugin-one");
+			createPluginSource(pluginRoot, "plugins/plugin-two");
+
+			const issues = await validateMarketplaceJson({ pluginRoot });
+
+			const unregisteredIssues = issues.filter(
+				(i) => i.ruleId === "marketplace/unregistered-plugin",
+			);
+			expect(unregisteredIssues).toHaveLength(0);
+
+			cleanup();
+		});
+
+		test("should pass if no plugins directory exists", async () => {
+			const pluginRoot = createTestMarketplace("no-plugins-dir", {
+				name: "my-marketplace",
+				owner: { name: "Test", email: "test@example.com" },
+				plugins: [],
+			});
+
+			// Don't create plugins directory at all
+			const issues = await validateMarketplaceJson({ pluginRoot });
+
+			const unregisteredIssues = issues.filter(
+				(i) => i.ruleId === "marketplace/unregistered-plugin",
+			);
+			expect(unregisteredIssues).toHaveLength(0);
+
+			cleanup();
+		});
+
+		test("should ignore non-local plugin sources", async () => {
+			const pluginRoot = createTestMarketplace("non-local-sources", {
+				name: "my-marketplace",
+				owner: { name: "Test", email: "test@example.com" },
+				plugins: [
+					{ name: "plugin-one", source: "./plugins/plugin-one" },
+					{
+						name: "plugin-github",
+						source: { source: "github", repo: "owner/repo" },
+					},
+					{
+						name: "plugin-url",
+						source: { source: "url", url: "https://github.com/owner/repo.git" },
+					},
+				],
+			});
+
+			// Create local plugin directory
+			createPluginSource(pluginRoot, "plugins/plugin-one");
+
+			const issues = await validateMarketplaceJson({ pluginRoot });
+
+			const unregisteredIssues = issues.filter(
+				(i) => i.ruleId === "marketplace/unregistered-plugin",
+			);
+			expect(unregisteredIssues).toHaveLength(0);
+
+			cleanup();
+		});
+	});
 });

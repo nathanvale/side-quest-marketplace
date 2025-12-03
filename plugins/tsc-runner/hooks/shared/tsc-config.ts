@@ -5,7 +5,7 @@
 
 import { exists } from "node:fs/promises";
 import { join } from "node:path";
-import { getGitRoot } from "./git-utils";
+import { getGitRoot } from "@sidequest/core/git";
 
 /**
  * Valid TypeScript configuration file names.
@@ -73,14 +73,14 @@ export async function hasTscConfig(): Promise<TscConfigResult> {
 
 /**
  * Log a message suggesting the user add a TypeScript config.
- * Uses a consistent format for all bun-runner hooks.
+ * Uses a consistent format for all tsc-runner hooks.
  *
  * @param searchPath - Where we looked for the config (for context)
  */
 export function logMissingTscConfigHint(searchPath?: string): void {
 	const location = searchPath ? ` in ${searchPath}` : "";
 	console.log(
-		`[bun-runner] No tsconfig.json found${location}. Skipping TypeScript checks.`,
+		`[tsc-runner] No tsconfig.json found${location}. Skipping TypeScript checks.`,
 	);
-	console.log("[bun-runner] To enable: bunx tsc --init");
+	console.log("[tsc-runner] To enable: bunx tsc --init");
 }

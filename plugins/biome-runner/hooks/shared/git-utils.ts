@@ -1,5 +1,5 @@
 /**
- * Shared git utilities for bun-runner hooks.
+ * Shared git utilities for biome-runner hooks.
  * Provides git-aware file tracking and change detection.
  */
 
@@ -101,7 +101,7 @@ export async function getChangedFiles(
  * Check if any files with given extensions have been modified or staged.
  * Used by Stop hooks to decide whether to run project-wide checks.
  *
- * Why: Running full project checks (tsc, biome ci) is expensive. This function
+ * Why: Running full project checks (biome ci) is expensive. This function
  * allows hooks to skip validation when no relevant files have changed.
  *
  * @param extensions - Array of file extensions to check for

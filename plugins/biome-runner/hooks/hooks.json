@@ -1,4 +1,5 @@
 {
+	"description": "Auto-format and lint files using Biome (git-aware)",
 	"hooks": {
 		"SessionStart": [
 			{
@@ -14,11 +15,11 @@
 		],
 		"PostToolUse": [
 			{
-				"matcher": "Read|Write|Edit|MultiEdit",
+				"matcher": "Write|Edit|MultiEdit",
 				"hooks": [
 					{
 						"type": "command",
-						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/validate-plugin.ts",
+						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/biome-check.ts",
 						"timeout": 30
 					}
 				]
@@ -30,7 +31,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "bun run --cwd ${CLAUDE_PLUGIN_ROOT}/../.. validate:hooks",
+						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/biome-ci.ts",
 						"timeout": 60
 					}
 				]

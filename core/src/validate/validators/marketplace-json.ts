@@ -7,11 +7,12 @@
  * - Each plugin must have name and source
  * - Source can be relative path, GitHub object, or Git URL object
  * - Optional metadata: description, version, pluginRoot
+ * - All local plugin directories must be registered in marketplace.json
  *
  * @see https://docs.anthropic.com/claude/docs/claude-code/plugins-reference
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { ValidationIssue, ValidatorOptions } from "../types.ts";
 
@@ -370,6 +371,58 @@ function validatePluginEntry(
 }
 
 /**
+ * Validates that all local plugin directories are registered in marketplace.json
+ */
+function validateAllPluginsRegistered(
+	plugins: PluginEntry[],
+	pluginRoot: string,
+	marketplaceJsonPath: string,
+): ValidationIssue[] {
+	const issues: ValidationIssue[] = [];
+
+	// Get the plugins directory path (should be sibling to .claude-plugin)
+	const pluginsDir = join(pluginRoot, "plugins");
+
+	// If plugins directory doesn't exist, skip validation
+	if (!existsSync(pluginsDir)) {
+		return issues;
+	}
+
+	// Get all directories in the plugins folder
+	const pluginDirs = readdirSync(pluginsDir).filter((item) => {
+		const fullPath = join(pluginsDir, item);
+		return statSync(fullPath).isDirectory();
+	});
+
+	// Get list of registered plugin names from relative path sources
+	const registeredPlugins = new Set<string>();
+	for (const plugin of plugins) {
+		if (
+			typeof plugin.source === "string" &&
+			plugin.source.startsWith("./plugins/")
+		) {
+			const pluginName = plugin.source.replace("./plugins/", "");
+			registeredPlugins.add(pluginName);
+		}
+	}
+
+	// Check if any directories are not registered
+	for (const dir of pluginDirs) {
+		if (!registeredPlugins.has(dir)) {
+			issues.push({
+				ruleId: "marketplace/unregistered-plugin",
+				severity: "error",
+				message: `Plugin directory 'plugins/${dir}' exists but is not registered in marketplace.json`,
+				file: marketplaceJsonPath,
+				suggestion: `Add an entry for '${dir}' to the plugins array with source: "./plugins/${dir}"`,
+			});
+		}
+	}
+
+	return issues;
+}
+
+/**
  * Validates .claude-plugin/marketplace.json structure and references
  */
 export async function validateMarketplaceJson(
@@ -503,6 +556,15 @@ export async function validateMarketplaceJson(
 					suggestion: "Ensure all plugin names are unique in the marketplace",
 				});
 			}
+
+			// Check that all local plugin directories are registered
+			issues.push(
+				...validateAllPluginsRegistered(
+					config.plugins,
+					options.pluginRoot,
+					marketplaceJsonPath,
+				),
+			);
 		}
 	} catch (error) {
 		issues.push({

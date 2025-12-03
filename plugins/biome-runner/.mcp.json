@@ -1,0 +1,8 @@
+{
+	"mcpServers": {
+		"biome-runner": {
+			"command": "bun",
+			"args": ["run", "mcp-servers/biome-runner/index.ts"]
+		}
+	}
+}

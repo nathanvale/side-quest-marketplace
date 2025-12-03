@@ -1,12 +1,12 @@
 {
 	"name": "bun-runner",
-	"description": "Smart test runner and linter MCP server. Run tests and lint with structured, token-efficient output. Filters out passing tests and verbose logs, focusing agents on failures.",
+	"description": "Test runner for Bun - run tests with pattern filters and coverage",
 	"version": "1.0.0",
 	"author": {
 		"name": "Nathan Vale",
 		"email": "hi@nathanvale.com"
 	},
-	"keywords": ["testing", "linting", "biome", "bun", "mcp"],
+	"keywords": ["testing", "bun", "mcp"],
 	"license": "MIT",
 	"repository": "https://github.com/nathanvale/side-quest-marketplace",
 	"mcpServers": ["./.mcp.json"],

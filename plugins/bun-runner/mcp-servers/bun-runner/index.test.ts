@@ -1,11 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import {
-	isWorkspaceProject,
-	parseBiomeOutput,
-	parseBunTestOutput,
-} from "./index";
+import { isWorkspaceProject, parseBunTestOutput } from "./index";
 
 describe("parseBunTestOutput", () => {
 	it("parses all passing tests", () => {
@@ -110,129 +106,6 @@ Ran 3 tests across 1 file. [50.00ms]`;
 
 		expect(result.failures[0]?.stack).toContain("at someFunc");
 		expect(result.failures[0]?.stack).toContain("at anotherFunc");
-	});
-});
-
-describe("parseBiomeOutput", () => {
-	it("parses empty diagnostics", () => {
-		const output = JSON.stringify({
-			diagnostics: [],
-			summary: { errorCount: 0, warnCount: 0 },
-		});
-
-		const result = parseBiomeOutput(output);
-
-		expect(result.error_count).toBe(0);
-		expect(result.warning_count).toBe(0);
-		expect(result.diagnostics).toHaveLength(0);
-	});
-
-	it("parses error diagnostics", () => {
-		const output = JSON.stringify({
-			diagnostics: [
-				{
-					severity: "error",
-					category: "lint/correctness/noUnusedVariables",
-					description: "This variable is unused",
-					location: {
-						path: { file: "src/index.ts" },
-						span: { start: { line: 10 } },
-					},
-				},
-			],
-			summary: { errorCount: 1, warnCount: 0 },
-		});
-
-		const result = parseBiomeOutput(output);
-
-		expect(result.error_count).toBe(1);
-		expect(result.warning_count).toBe(0);
-		expect(result.diagnostics).toHaveLength(1);
-		expect(result.diagnostics[0]?.file).toBe("src/index.ts");
-		expect(result.diagnostics[0]?.line).toBe(10);
-		expect(result.diagnostics[0]?.code).toBe(
-			"lint/correctness/noUnusedVariables",
-		);
-		expect(result.diagnostics[0]?.severity).toBe("error");
-	});
-
-	it("parses warning diagnostics", () => {
-		const output = JSON.stringify({
-			diagnostics: [
-				{
-					severity: "warning",
-					category: "lint/style/useConst",
-					description: "Use const instead of let",
-					location: {
-						path: { file: "src/utils.ts" },
-						span: { start: { line: 5 } },
-					},
-				},
-			],
-			summary: { errorCount: 0, warnCount: 1 },
-		});
-
-		const result = parseBiomeOutput(output);
-
-		expect(result.error_count).toBe(0);
-		expect(result.warning_count).toBe(1);
-		expect(result.diagnostics).toHaveLength(1);
-		expect(result.diagnostics[0]?.severity).toBe("warning");
-	});
-
-	it("handles mixed errors and warnings", () => {
-		const output = JSON.stringify({
-			diagnostics: [
-				{ severity: "error", category: "err1", location: {} },
-				{ severity: "warning", category: "warn1", location: {} },
-				{ severity: "error", category: "err2", location: {} },
-			],
-			summary: { errorCount: 2, warnCount: 1 },
-		});
-
-		const result = parseBiomeOutput(output);
-
-		expect(result.error_count).toBe(2);
-		expect(result.warning_count).toBe(1);
-		expect(result.diagnostics).toHaveLength(3);
-	});
-
-	it("handles invalid JSON gracefully", () => {
-		const result = parseBiomeOutput("not valid json");
-
-		expect(result.error_count).toBe(1);
-		expect(result.diagnostics).toHaveLength(1);
-		expect(result.diagnostics[0]?.code).toBe("internal_error");
-		expect(result.diagnostics[0]?.message).toContain("Failed to parse");
-	});
-
-	it("handles missing location data", () => {
-		const output = JSON.stringify({
-			diagnostics: [{ severity: "error", category: "test" }],
-		});
-
-		const result = parseBiomeOutput(output);
-
-		expect(result.diagnostics[0]?.file).toBe("unknown");
-		expect(result.diagnostics[0]?.line).toBe(0);
-	});
-
-	it("includes advice as suggestion", () => {
-		const output = JSON.stringify({
-			diagnostics: [
-				{
-					severity: "error",
-					category: "test",
-					location: {},
-					advice: [{ type: "suggestion", text: "Try this instead" }],
-				},
-			],
-		});
-
-		const result = parseBiomeOutput(output);
-
-		expect(result.diagnostics[0]?.suggestion).toBeDefined();
-		expect(result.diagnostics[0]?.suggestion).toContain("suggestion");
 	});
 });
 

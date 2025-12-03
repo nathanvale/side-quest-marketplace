@@ -54,6 +54,28 @@
 			"keywords": ["testing", "linting", "biome", "bun", "mcp"]
 		},
 		{
+			"name": "tsc-runner",
+			"source": "./plugins/tsc-runner",
+			"description": "TypeScript type checking hooks for Claude Code",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "development",
+			"keywords": ["typescript", "tsc", "type-checking"]
+		},
+		{
+			"name": "biome-runner",
+			"source": "./plugins/biome-runner",
+			"description": "Biome linter and formatter with auto-fix hooks",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "development",
+			"keywords": ["biome", "linting", "formatting"]
+		},
+		{
 			"name": "validate-plugin",
 			"source": "./plugins/validate-plugin",
 			"description": "Automatically validates plugin files after edits. Catches invalid marketplace.json, plugin.json, and hooks.json before they cause problems.",
@@ -253,6 +275,17 @@
 			},
 			"category": "productivity",
 			"keywords": ["clipboard", "copy", "paste", "pbcopy", "productivity"]
+		},
+		{
+			"name": "terminal",
+			"source": "./plugins/terminal",
+			"description": "Terminal plugin for Claude Code",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "development",
+			"keywords": ["terminal"]
 		}
 	]
 }
