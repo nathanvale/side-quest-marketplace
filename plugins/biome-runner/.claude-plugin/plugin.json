@@ -2,7 +2,10 @@
 	"name": "biome-runner",
 	"description": "Biome linter and formatter with auto-fix hooks and MCP server",
 	"version": "1.0.0",
-	"author": { "name": "Nathan Vale", "email": "hi@nathanvale.com" },
+	"author": {
+		"name": "Nathan Vale",
+		"email": "hi@nathanvale.com"
+	},
 	"keywords": ["biome", "linting", "formatting", "mcp"],
 	"license": "MIT",
 	"repository": "https://github.com/nathanvale/side-quest-marketplace",
