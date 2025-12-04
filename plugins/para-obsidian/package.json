@@ -1,0 +1,21 @@
+{
+	"name": "@sidequest/para-obsidian",
+	"version": "0.1.0",
+	"private": true,
+	"description": "CLI + MCP server for PARA-style Obsidian vault management",
+	"type": "module",
+	"bin": {
+		"para-obsidian": "./src/cli.ts"
+	},
+	"scripts": {
+		"test": "bun test --recursive",
+		"typecheck": "tsc --noEmit",
+		"format": "biome format --write .",
+		"format:check": "biome format .",
+		"lint": "biome lint .",
+		"check": "biome check --write ."
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	}
+}

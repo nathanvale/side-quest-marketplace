@@ -155,8 +155,8 @@ async function runBiomeFix(
 	let formatFixed = 0;
 	try {
 		const report = JSON.parse(formatStdout);
-		// Biome format reports number of formatted files
-		formatFixed = report.summary?.formattedFiles || 0;
+		// Biome format reports number of changed files in summary.changed
+		formatFixed = report.summary?.changed || 0;
 	} catch (error) {
 		mcpLogger.warn("Failed to parse Biome format output", {
 			cid,
@@ -180,7 +180,8 @@ async function runBiomeFix(
 	let lintFixed = 0;
 	try {
 		const report = JSON.parse(checkStdout);
-		lintFixed = report.summary?.fixedCount || 0;
+		// Biome check reports number of changed files in summary.changed
+		lintFixed = report.summary?.changed || 0;
 	} catch (error) {
 		mcpLogger.warn("Failed to parse Biome check output", {
 			cid,

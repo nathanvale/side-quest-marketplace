@@ -31,6 +31,11 @@
 - MCP servers are available for automation: `plugins/biome-runner` (lint/format), `plugins/tsc-runner` (typecheck), `plugins/bun-runner` (tests). Use their `.mcp.json` definitions to wire into agents/CI.
 - When adding new MCP servers or hooks, mirror existing `hooks.json` and `path-validator` patterns and run `bun run validate`.
 
+## Kit / Context7 Parity
+- The `kit` MCP server exposes Kit’s search/symbol/file-tree capabilities; prefer it over shelling out to reduce token cost. Pass refs or cache options through MCP where needed (Kit CLI supports `--ref` and cache commands).
+- If you must use the Kit CLI directly, install via `uv tool install cased-kit[all]` and ensure `kit` is on PATH; keep usage consistent with MCP responses to avoid drift.
+- For git insights, use the MCP `git` server for reads (status/branch/diff) and standard git CLI for writes.
+
 ## Commit & Pull Request Guidelines
 - Commit messages: follow Conventional Commits (`commitlint.config.js` + Husky hook). Examples: `feat: add git context loader`, `fix: correct bun path validation`, `chore: update docs`.
 - PRs: include summary, linked issue/task, testing notes (`bun run ci`), and screenshots or logs for user-facing or tooling changes. Keep plugin/docs updates scoped and cross-reference impacted MCP server if relevant.
