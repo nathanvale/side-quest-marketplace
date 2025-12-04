@@ -34,7 +34,7 @@ target_completion: 2025-12-31
 area: "[[Health]]"
 reviewed: 2025-01-01
 review_period: 7d
-template_version: 1
+template_version: 2
 tags: [project]
 ---
 Body`,

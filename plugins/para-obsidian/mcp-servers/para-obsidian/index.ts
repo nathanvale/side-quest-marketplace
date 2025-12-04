@@ -1,14 +1,22 @@
 #!/usr/bin/env bun
 
-import { startServer, tool, z } from "mcpez";
+if (!process.env.MCPEZ_AUTO_START) {
+	process.env.MCPEZ_AUTO_START = "false";
+}
 
-import { loadConfig } from "../../src/config";
+import { startServer, tool, z } from "mcpez";
+import { discoverAttachments } from "../../src/attachments";
+import { listTemplateVersions, loadConfig } from "../../src/config";
 import { createFromTemplate } from "../../src/create";
 import { deleteFile } from "../../src/delete";
 import {
+	applyVersionPlan,
 	migrateAllTemplateVersions,
 	migrateTemplateVersion,
+	planTemplateVersionBump,
 	readFrontmatterFile,
+	updateFrontmatterFile,
+	type VersionPlanStatus,
 	validateFrontmatterFile,
 } from "../../src/frontmatter";
 import { listDir, readFile } from "../../src/fs";
@@ -16,11 +24,70 @@ import { autoCommitChanges } from "../../src/git";
 import { buildIndex, loadIndex, saveIndex } from "../../src/indexer";
 import { insertIntoNote } from "../../src/insert";
 import { renameWithLinkRewrite } from "../../src/links";
+import { MIGRATIONS } from "../../src/migrations";
 import { filterByFrontmatter, searchText } from "../../src/search";
 import { semanticSearch } from "../../src/semantic";
 
 function parseAttachments(input?: ReadonlyArray<string>) {
 	return input?.filter(Boolean) ?? [];
+}
+
+function withAutoDiscoveredAttachments(
+	vault: string,
+	note: string,
+	explicit: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+	if (explicit.length > 0) return explicit;
+	return discoverAttachments(vault, note);
+}
+
+function parseDirs(input?: string): ReadonlyArray<string> | undefined {
+	if (!input) return undefined;
+	const dirs = input
+		.split(",")
+		.map((dir) => dir.trim())
+		.filter(Boolean);
+	return dirs.length > 0 ? dirs : undefined;
+}
+
+function normalizePathFragment(input: string): string {
+	return input.replace(/\\/g, "/").replace(/\/+$/, "");
+}
+
+function matchesDir(file: string, dirs?: ReadonlyArray<string>): boolean {
+	if (!dirs || dirs.length === 0) return true;
+	const normalizedFile = normalizePathFragment(file);
+	return dirs.some((dir) => {
+		const normalizedDir = normalizePathFragment(dir);
+		return (
+			normalizedFile === normalizedDir ||
+			normalizedFile.startsWith(`${normalizedDir}/`)
+		);
+	});
+}
+
+function coerceValue(raw: string): unknown {
+	const trimmed = raw.trim();
+	if (trimmed === "true") return true;
+	if (trimmed === "false") return false;
+	if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed);
+	if (
+		(trimmed.startsWith("[") && trimmed.endsWith("]")) ||
+		(trimmed.startsWith("{") && trimmed.endsWith("}"))
+	) {
+		try {
+			return JSON.parse(trimmed);
+		} catch {
+			// fall through to comma/identity parsing
+		}
+	}
+	if (trimmed.includes(",")) {
+		return trimmed
+			.split(",")
+			.map((s) => s.trim())
+			.filter(Boolean);
+	}
+	return trimmed;
 }
 
 const configTool = tool({
@@ -29,6 +96,19 @@ const configTool = tool({
 		"Load para-obsidian resolved configuration (requires PARA_VAULT)",
 	parameters: z.object({}),
 	execute: async () => loadConfig(),
+});
+
+const templatesTool = tool({
+	name: "templates",
+	description: "List configured template versions",
+	parameters: z.object({}),
+	execute: async () => {
+		const cfg = loadConfig();
+		return {
+			templates: listTemplateVersions(cfg),
+			defaultSearchDirs: cfg.defaultSearchDirs,
+		};
+	},
 });
 
 const listTool = tool({
@@ -64,18 +144,20 @@ const searchTool = tool({
 	}),
 	execute: async ({ query, tag, dir, regex, frontmatter, maxResults }) => {
 		const cfg = loadConfig();
+		const dirs = parseDirs(dir) ?? cfg.defaultSearchDirs;
+		const fmFilters = frontmatter ?? {};
 		const hits = searchText(cfg, {
 			query,
-			dir,
+			dir: dirs,
 			regex: regex === true,
 			maxResults,
 		});
 		const fmMatches =
-			frontmatter || tag
+			Object.keys(fmFilters).length > 0 || tag
 				? filterByFrontmatter(cfg, {
-						frontmatter: frontmatter ?? {},
+						frontmatter: fmFilters,
 						tag,
-						dir,
+						dir: dirs,
 					})
 				: [];
 		return { hits, frontmatter: fmMatches };
@@ -100,7 +182,11 @@ const createTool = tool({
 			dest,
 			args: args ?? {},
 		});
-		const attach = parseAttachments(attachments);
+		const attach = withAutoDiscoveredAttachments(
+			cfg.vault,
+			result.filePath,
+			parseAttachments(attachments),
+		);
 		if (cfg.autoCommit) {
 			await autoCommitChanges(
 				cfg,
@@ -108,7 +194,7 @@ const createTool = tool({
 				`create ${result.filePath}`,
 			);
 		}
-		return result;
+		return { ...result, attachmentsUsed: attach };
 	},
 });
 
@@ -125,7 +211,11 @@ const insertTool = tool({
 	execute: async ({ file, heading, content, mode, attachments }) => {
 		const cfg = loadConfig();
 		const result = insertIntoNote(cfg, { file, heading, content, mode });
-		const attach = parseAttachments(attachments);
+		const attach = withAutoDiscoveredAttachments(
+			cfg.vault,
+			file,
+			parseAttachments(attachments),
+		);
 		if (cfg.autoCommit) {
 			await autoCommitChanges(
 				cfg,
@@ -133,7 +223,7 @@ const insertTool = tool({
 				`insert ${file}`,
 			);
 		}
-		return result;
+		return { ...result, attachmentsUsed: attach };
 	},
 });
 
@@ -153,15 +243,26 @@ const renameTool = tool({
 			to,
 			dryRun: dryRun === true,
 		});
-		const attach = parseAttachments(attachments);
+		const attach = withAutoDiscoveredAttachments(
+			cfg.vault,
+			to,
+			parseAttachments(attachments),
+		);
 		if (cfg.autoCommit && !dryRun) {
 			await autoCommitChanges(
 				cfg,
-				[from, to, ...result.rewrites.map((r) => r.file), ...attach],
+				[
+					...new Set([
+						from,
+						to,
+						...result.rewrites.map((r) => r.file),
+						...attach,
+					]),
+				],
 				`rename ${from} → ${to}`,
 			);
 		}
-		return result;
+		return { ...result, attachmentsUsed: attach };
 	},
 });
 
@@ -177,7 +278,11 @@ const deleteTool = tool({
 	execute: async ({ file, confirm, dryRun, attachments }) => {
 		const cfg = loadConfig();
 		const result = deleteFile(cfg, { file, confirm, dryRun: dryRun === true });
-		const attach = parseAttachments(attachments);
+		const attach = withAutoDiscoveredAttachments(
+			cfg.vault,
+			file,
+			parseAttachments(attachments),
+		);
 		if (cfg.autoCommit && !dryRun) {
 			await autoCommitChanges(
 				cfg,
@@ -185,7 +290,7 @@ const deleteTool = tool({
 				`delete ${file}`,
 			);
 		}
-		return result;
+		return { ...result, attachmentsUsed: attach };
 	},
 });
 
@@ -209,6 +314,97 @@ const frontmatterValidateTool = tool({
 	},
 });
 
+const frontmatterPlanTool = tool({
+	name: "frontmatter_plan",
+	description: "Plan template version bump for a given type",
+	parameters: z.object({
+		type: z.string(),
+		toVersion: z.number(),
+		dir: z.string().optional(),
+	}),
+	execute: async ({ type, toVersion, dir }) => {
+		const cfg = loadConfig();
+		const dirs = parseDirs(dir) ?? cfg.defaultSearchDirs;
+		return planTemplateVersionBump(cfg, { type, toVersion, dir: dirs });
+	},
+});
+
+const frontmatterApplyPlanTool = tool({
+	name: "frontmatter_apply_plan",
+	description: "Apply a version plan to migrate only selected files",
+	parameters: z.object({
+		plan: z.object({
+			entries: z.array(
+				z.object({
+					file: z.string(),
+					status: z.string(),
+					current: z.number().optional(),
+					target: z.number(),
+					type: z.string().optional(),
+				}),
+			),
+			type: z.string(),
+			targetVersion: z.number(),
+			dirs: z.array(z.string()).optional(),
+		}),
+		statuses: z.array(z.string()).optional(),
+		dryRun: z.boolean().optional(),
+		dir: z.string().optional(),
+	}),
+	execute: async ({ plan, statuses, dryRun, dir }) => {
+		const cfg = loadConfig();
+		const dirs = parseDirs(dir);
+		const chosen =
+			statuses?.length && statuses.length > 0
+				? (statuses as VersionPlanStatus[])
+				: (["outdated", "missing-version", "current"] as VersionPlanStatus[]);
+		return applyVersionPlan(cfg, {
+			plan,
+			dryRun,
+			dirs,
+			statuses: chosen,
+			migrate: MIGRATIONS,
+		});
+	},
+});
+
+const frontmatterSetTool = tool({
+	name: "frontmatter_set",
+	description: "Set or unset frontmatter keys on a note",
+	parameters: z.object({
+		file: z.string(),
+		set: z.record(z.string(), z.string()).optional(),
+		unset: z.array(z.string()).optional(),
+		dryRun: z.boolean().optional(),
+		attachments: z.array(z.string()).optional(),
+	}),
+	execute: async ({ file, set, unset, dryRun, attachments }) => {
+		const cfg = loadConfig();
+		const typed: Record<string, unknown> = {};
+		for (const [k, v] of Object.entries(set ?? {})) {
+			typed[k] = coerceValue(v);
+		}
+		const result = updateFrontmatterFile(cfg, file, {
+			set: typed,
+			unset,
+			dryRun,
+		});
+		const attach = withAutoDiscoveredAttachments(
+			cfg.vault,
+			file,
+			parseAttachments(attachments),
+		);
+		if (cfg.autoCommit && !dryRun && result.updated) {
+			await autoCommitChanges(
+				cfg,
+				[result.relative, ...attach],
+				`frontmatter set ${file}`,
+			);
+		}
+		return { ...result, attachmentsUsed: attach };
+	},
+});
+
 const frontmatterMigrateTool = tool({
 	name: "frontmatter_migrate",
 	description: "Migrate a note's template_version",
@@ -223,8 +419,13 @@ const frontmatterMigrateTool = tool({
 		const result = migrateTemplateVersion(cfg, file, {
 			forceVersion,
 			dryRun,
+			migrate: MIGRATIONS,
 		});
-		const attach = parseAttachments(attachments);
+		const attach = withAutoDiscoveredAttachments(
+			cfg.vault,
+			file,
+			parseAttachments(attachments),
+		);
 		if (cfg.autoCommit && !dryRun) {
 			await autoCommitChanges(
 				cfg,
@@ -232,7 +433,7 @@ const frontmatterMigrateTool = tool({
 				`migrate ${file} to v${result.toVersion}`,
 			);
 		}
-		return result;
+		return { ...result, attachmentsUsed: attach };
 	},
 });
 
@@ -243,24 +444,45 @@ const frontmatterMigrateAllTool = tool({
 		dir: z.string().optional(),
 		dryRun: z.boolean().optional(),
 		attachments: z.array(z.string()).optional(),
+		forceVersion: z.number().optional(),
+		type: z.string().optional(),
 	}),
-	execute: async ({ dir, dryRun, attachments }) => {
+	execute: async ({ dir, dryRun, attachments, forceVersion, type }) => {
 		const cfg = loadConfig();
-		const result = migrateAllTemplateVersions(cfg, { dir, dryRun });
+		const dirs = parseDirs(dir) ?? cfg.defaultSearchDirs;
+		const result = migrateAllTemplateVersions(cfg, {
+			dir: dirs,
+			dryRun,
+			forceVersion,
+			type,
+			migrate: MIGRATIONS,
+		});
 		const attach = parseAttachments(attachments);
 		if (cfg.autoCommit && !dryRun && result.updated > 0) {
 			const changed = result.results
 				.filter((r) => r.updated)
 				.map((r) => r.relative);
 			if (changed.length > 0) {
+				const auto =
+					attach.length > 0
+						? attach
+						: changed.flatMap((filePath) =>
+								withAutoDiscoveredAttachments(cfg.vault, filePath, []),
+							);
 				await autoCommitChanges(
 					cfg,
-					[...changed, ...attach],
+					[...changed, ...auto],
 					`migrate ${changed.length} note(s)`,
 				);
 			}
 		}
-		return result;
+		const attachmentsUsed =
+			attach.length > 0
+				? attach
+				: result.results.flatMap((r) =>
+						withAutoDiscoveredAttachments(cfg.vault, r.relative, []),
+					);
+		return { ...result, attachmentsUsed };
 	},
 });
 
@@ -270,7 +492,8 @@ const indexPrimeTool = tool({
 	parameters: z.object({ dir: z.string().optional() }),
 	execute: async ({ dir }) => {
 		const cfg = loadConfig();
-		const index = buildIndex(cfg, dir);
+		const dirs = parseDirs(dir);
+		const index = buildIndex(cfg, dirs);
 		const path = saveIndex(cfg, index);
 		return { indexPath: path, count: index.entries.length };
 	},
@@ -282,12 +505,15 @@ const indexQueryTool = tool({
 	parameters: z.object({
 		tag: z.string().optional(),
 		frontmatter: z.record(z.string(), z.string()).optional(),
+		dir: z.string().optional(),
 	}),
-	execute: async ({ tag, frontmatter }) => {
+	execute: async ({ tag, frontmatter, dir }) => {
 		const cfg = loadConfig();
 		const index = loadIndex(cfg);
 		if (!index) throw new Error("Index not found. Run index_prime first.");
+		const dirs = parseDirs(dir) ?? cfg.defaultSearchDirs;
 		const results = index.entries.filter((entry) => {
+			if (!matchesDir(entry.file, dirs)) return false;
 			if (tag && !entry.tags.includes(tag)) return false;
 			for (const [k, v] of Object.entries(frontmatter ?? {})) {
 				if (entry.frontmatter[k] !== v) return false;
@@ -308,29 +534,38 @@ const semanticTool = tool({
 	}),
 	execute: async ({ query, dir, limit }) => {
 		const cfg = loadConfig();
-		const hits = await semanticSearch(cfg, { query, dir, limit });
+		const dirs = parseDirs(dir) ?? cfg.defaultSearchDirs;
+		const hits = await semanticSearch(cfg, { query, dir: dirs, limit });
 		return { query, hits };
 	},
 });
 
-startServer({
-	name: "para-obsidian",
-	version: "0.1.0",
-	tools: [
-		configTool,
-		listTool,
-		readTool,
-		searchTool,
-		indexPrimeTool,
-		indexQueryTool,
-		createTool,
-		insertTool,
-		renameTool,
-		deleteTool,
-		frontmatterGetTool,
-		frontmatterValidateTool,
-		frontmatterMigrateTool,
-		frontmatterMigrateAllTool,
-		semanticTool,
-	],
-});
+export const tools = [
+	configTool,
+	templatesTool,
+	listTool,
+	readTool,
+	searchTool,
+	indexPrimeTool,
+	indexQueryTool,
+	createTool,
+	insertTool,
+	renameTool,
+	deleteTool,
+	frontmatterGetTool,
+	frontmatterValidateTool,
+	frontmatterPlanTool,
+	frontmatterSetTool,
+	frontmatterMigrateTool,
+	frontmatterMigrateAllTool,
+	frontmatterApplyPlanTool,
+	semanticTool,
+];
+
+if (import.meta.main) {
+	startServer({
+		name: "para-obsidian",
+		version: "0.1.0",
+		tools,
+	});
+}

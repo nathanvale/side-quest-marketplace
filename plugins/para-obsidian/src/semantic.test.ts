@@ -11,7 +11,8 @@ describe("semanticSearch", () => {
 		];
 		const runner = async () => hits;
 		const result = await semanticSearch(cfg, { query: "test" }, runner);
-		expect(result).toEqual(hits);
+		expect(result[0]?.file).toBe("note.md");
+		expect(result[0]?.dir).toBe(".");
 	});
 
 	it("throws on empty query", async () => {

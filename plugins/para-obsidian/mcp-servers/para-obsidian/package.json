@@ -11,6 +11,6 @@
 		"typecheck": "echo 'No typecheck yet'"
 	},
 	"dependencies": {
-		"mcpez": "^1.2.1"
+		"mcpez": "1.2.1"
 	}
 }

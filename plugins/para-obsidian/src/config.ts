@@ -1,3 +1,15 @@
+/**
+ * Configuration loader for para-obsidian.
+ *
+ * This module handles loading and merging configuration from multiple sources:
+ * - Environment variables (PARA_VAULT, PARA_OBSIDIAN_CONFIG)
+ * - User-level config (~/.config/para-obsidian/config.json)
+ * - Project-level config (.para-obsidianrc in cwd)
+ *
+ * Configuration is merged with later sources taking precedence.
+ *
+ * @module config
+ */
 import fs from "node:fs";
 import path from "node:path";
 
@@ -7,31 +19,82 @@ import {
 	DEFAULT_TEMPLATE_VERSIONS,
 } from "./defaults";
 
+/**
+ * Defines validation rules for frontmatter fields by note type.
+ * Each type (e.g., "project", "area") can specify required fields
+ * and their expected types/constraints.
+ */
 export interface FrontmatterRules {
+	/** Map of field names to their validation rules. */
 	readonly required?: Record<string, FieldRule>;
 }
 
+/**
+ * Describes a validation rule for a single frontmatter field.
+ *
+ * Used to enforce type constraints and value requirements
+ * during frontmatter validation.
+ */
 export interface FieldRule {
+	/** The expected data type for this field. */
 	readonly type: "string" | "date" | "array" | "wikilink" | "enum";
+	/** For enum types, the allowed values. */
 	readonly enum?: ReadonlyArray<string>;
+	/** For array types, values that must be present in the array. */
 	readonly includes?: ReadonlyArray<string>;
+	/** Default value to use if field is missing. */
 	readonly defaultValue?: string | ReadonlyArray<string>;
+	/** Human-readable description of the field's purpose. */
 	readonly description?: string;
+	/** If true, the field is not required (validation won't fail if missing). */
 	readonly optional?: boolean;
 }
 
+/**
+ * Main configuration object for para-obsidian operations.
+ *
+ * This configuration controls vault location, template handling,
+ * search behavior, git integration, and frontmatter validation.
+ */
 export interface ParaObsidianConfig {
+	/** Absolute path to the Obsidian vault root directory. */
 	readonly vault: string;
+	/** Directory containing note templates. Defaults to vault/06_Metadata/Templates. */
 	readonly templatesDir?: string;
+	/** Path to the cached vault index file. Defaults to vault/.para-obsidian-index.json. */
 	readonly indexPath?: string;
+	/** Default directories to scope search and index operations. */
 	readonly defaultSearchDirs?: ReadonlyArray<string>;
+	/** If true, automatically commit changes after write operations. */
 	readonly autoCommit?: boolean;
+	/** Template for git commit messages. Supports {summary} and {files} placeholders. */
 	readonly gitCommitMessageTemplate?: string;
+	/** List of suggested tags for autocompletion and validation. */
 	readonly suggestedTags?: ReadonlyArray<string>;
+	/** Validation rules keyed by note type (e.g., "project", "area"). */
 	readonly frontmatterRules?: Record<string, FrontmatterRules>;
+	/** Expected template_version for each note type. Used for migration tracking. */
 	readonly templateVersions?: Record<string, number>;
 }
 
+/**
+ * Describes a configured template with its version.
+ * Used when listing available templates and their current versions.
+ */
+export interface TemplateInfo {
+	/** Template name (matches filename without .md extension). */
+	readonly name: string;
+	/** Current template version number. */
+	readonly version: number;
+}
+
+/**
+ * Attempts to load and parse a JSON config file.
+ *
+ * @param filePath - Absolute path to the JSON file
+ * @returns Parsed config object, or undefined if file doesn't exist
+ * @throws Error if file exists but cannot be parsed as JSON
+ */
 function loadJsonIfExists<T>(filePath: string): Partial<T> | undefined {
 	if (!fs.existsSync(filePath)) return undefined;
 	try {
@@ -61,10 +124,33 @@ function resolveProjectRc(cwd: string): string | undefined {
 	return fs.existsSync(candidate) ? candidate : undefined;
 }
 
+/**
+ * Options for the loadConfig function.
+ */
 export interface LoadConfigOptions {
+	/** Working directory for resolving project-level .para-obsidianrc. Defaults to process.cwd(). */
 	readonly cwd?: string;
 }
 
+/**
+ * Loads and merges configuration from all sources.
+ *
+ * Configuration sources (in order of precedence, later wins):
+ * 1. Project-level: .para-obsidianrc in cwd
+ * 2. User-level: ~/.config/para-obsidian/config.json
+ * 3. Explicit: path from PARA_OBSIDIAN_CONFIG env var
+ * 4. Required: PARA_VAULT env var (always required)
+ *
+ * @param options - Configuration loading options
+ * @returns Fully resolved configuration object
+ * @throws Error if PARA_VAULT is not set or doesn't point to a valid directory
+ *
+ * @example
+ * ```typescript
+ * const config = loadConfig({ cwd: '/my/project' });
+ * console.log(config.vault); // Absolute path to vault
+ * ```
+ */
 export function loadConfig(
 	options: LoadConfigOptions = {},
 ): ParaObsidianConfig {
@@ -108,4 +194,29 @@ export function loadConfig(
 		frontmatterRules: merged.frontmatterRules ?? DEFAULT_FRONTMATTER_RULES,
 		templateVersions: merged.templateVersions ?? DEFAULT_TEMPLATE_VERSIONS,
 	};
+}
+
+/**
+ * Returns all configured template types with their expected versions.
+ *
+ * Useful for displaying a catalog of available templates and
+ * their current version numbers for migration planning.
+ *
+ * @param config - The loaded para-obsidian configuration
+ * @returns Array of template info objects with name and version
+ *
+ * @example
+ * ```typescript
+ * const templates = listTemplateVersions(config);
+ * // [{ name: 'project', version: 2 }, { name: 'area', version: 2 }, ...]
+ * ```
+ */
+export function listTemplateVersions(
+	config: ParaObsidianConfig,
+): ReadonlyArray<TemplateInfo> {
+	const versions = config.templateVersions ?? DEFAULT_TEMPLATE_VERSIONS;
+	return Object.entries(versions).map(([name, version]) => ({
+		name,
+		version,
+	}));
 }

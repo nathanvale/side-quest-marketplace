@@ -6,6 +6,7 @@ import type { ParaObsidianConfig } from "./config";
 import {
 	parseFrontmatter,
 	serializeFrontmatter,
+	updateFrontmatterFile,
 	validateFrontmatter,
 	validateFrontmatterFile,
 } from "./frontmatter";
@@ -104,5 +105,43 @@ Body`,
 		expect(result.issues.some((i) => i.field === "template_version")).toBe(
 			true,
 		);
+	});
+});
+
+describe("frontmatter update", () => {
+	const makeVault = () =>
+		fs.mkdtempSync(path.join(os.tmpdir(), "para-fm-update-"));
+
+	it("sets and unsets keys while preserving body", () => {
+		const vault = makeVault();
+		const notePath = path.join(vault, "note.md");
+		fs.writeFileSync(
+			notePath,
+			"---\ntitle: Start\nstatus: draft\nold: keep\n---\n\nBody text",
+			"utf8",
+		);
+
+		const config: ParaObsidianConfig = { vault };
+
+		const dryRun = updateFrontmatterFile(config, "note.md", {
+			set: { status: "active" },
+			unset: ["old"],
+			dryRun: true,
+		});
+
+		expect(dryRun.wouldChange).toBe(true);
+		expect(dryRun.updated).toBe(false);
+
+		const result = updateFrontmatterFile(config, "note.md", {
+			set: { status: "active" },
+			unset: ["old"],
+		});
+
+		expect(result.updated).toBe(true);
+		expect(result.changes.length).toBeGreaterThan(0);
+		const content = fs.readFileSync(notePath, "utf8");
+		expect(content).toContain("status: active");
+		expect(content).not.toContain("old:");
+		expect(content.trim().endsWith("Body text")).toBe(true);
 	});
 });

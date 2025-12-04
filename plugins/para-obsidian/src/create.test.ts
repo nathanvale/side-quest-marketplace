@@ -45,7 +45,7 @@ Body`,
 		expect(result.filePath.endsWith(".md")).toBe(true);
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		expect(written.includes("My Project")).toBe(true);
-		expect(written).toContain("template_version: 1");
+		expect(written).toContain("template_version: 2");
 	});
 
 	it("throws if template missing", () => {

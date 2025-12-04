@@ -1,5 +1,21 @@
+/**
+ * Default configuration values.
+ *
+ * This module defines default values for:
+ * - Suggested tags for autocompletion
+ * - Frontmatter validation rules per note type
+ * - Template version numbers
+ *
+ * These defaults are used when not overridden by user configuration.
+ *
+ * @module defaults
+ */
 import type { ParaObsidianConfig } from "./config";
 
+/**
+ * Default suggested tags for autocompletion and validation.
+ * Covers common PARA categories and organizational concepts.
+ */
 export const DEFAULT_SUGGESTED_TAGS = [
 	"project",
 	"area",
@@ -173,15 +189,15 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 };
 
 export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
-	project: 1,
-	area: 1,
-	resource: 1,
-	task: 1,
-	daily: 1,
-	"weekly-review": 1,
-	capture: 1,
-	checklist: 1,
-	booking: 1,
-	itinerary: 1,
-	research: 1,
+	project: 2,
+	area: 2,
+	resource: 2,
+	task: 2,
+	daily: 2,
+	"weekly-review": 2,
+	capture: 2,
+	checklist: 2,
+	booking: 2,
+	itinerary: 2,
+	research: 2,
 };

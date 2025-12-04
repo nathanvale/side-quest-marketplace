@@ -184,6 +184,13 @@
         "@types/bun": "latest",
       },
     },
+    "plugins/para-obsidian/mcp-servers/para-obsidian": {
+      "name": "@sidequest/mcp-para-obsidian",
+      "version": "1.0.0",
+      "dependencies": {
+        "mcpez": "1.2.1",
+      },
+    },
     "plugins/plugin-template": {
       "name": "@sidequest/plugin-template",
       "version": "1.0.0",
@@ -341,6 +348,8 @@
     "@sidequest/mcp-kit": ["@sidequest/mcp-kit@workspace:plugins/kit/mcp-servers/kit"],
 
     "@sidequest/mcp-manager": ["@sidequest/mcp-manager@workspace:plugins/mcp-manager"],
+
+    "@sidequest/mcp-para-obsidian": ["@sidequest/mcp-para-obsidian@workspace:plugins/para-obsidian/mcp-servers/para-obsidian"],
 
     "@sidequest/mcp-tsc-runner": ["@sidequest/mcp-tsc-runner@workspace:plugins/tsc-runner/mcp-servers/tsc-runner"],
 
