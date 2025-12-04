@@ -1,6 +1,7 @@
 ---
 argument-hint: [count=N] [level=LEVEL] [cwd=PATH] [cid=ID] [errors]
 description: View biome-runner logs with filtering (lint errors, format issues, project-specific)
+model: claude-3-5-haiku-20241022
 ---
 
 # Biome-Runner Logs

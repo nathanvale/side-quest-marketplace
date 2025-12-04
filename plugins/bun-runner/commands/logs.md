@@ -1,6 +1,7 @@
 ---
 argument-hint: [count=N] [level=LEVEL] [cwd=PATH] [cid=ID] [errors]
 description: View bun-runner logs with filtering (test failures, project-specific)
+model: claude-3-5-haiku-20241022
 ---
 
 # Bun-Runner Logs

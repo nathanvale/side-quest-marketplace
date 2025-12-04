@@ -1,6 +1,7 @@
 ---
 argument-hint: [count=N] [level=LEVEL] [cwd=PATH] [cid=ID] [errors]
 description: View tsc-runner logs with filtering (errors, warnings, project-specific)
+model: claude-3-5-haiku-20241022
 ---
 
 # TSC-Runner Logs
