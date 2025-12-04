@@ -126,37 +126,81 @@ async function runBiomeCheck(path = "."): Promise<LintSummary> {
 }
 
 /**
- * Run Biome check --write and return what was fixed.
+ * Run Biome format --write and check --write to fix all issues.
  *
- * Why: Uses spawnAndCollect to ensure streams are consumed in parallel with
+ * Why: Biome has two separate concerns:
+ * 1. Formatting (whitespace, indentation) - handled by `biome format`
+ * 2. Linting (code quality rules) - handled by `biome check`
+ *
+ * We need to run BOTH to fix all auto-fixable issues.
+ *
+ * Uses spawnAndCollect to ensure streams are consumed in parallel with
  * waiting for exit, avoiding race conditions that could lose output.
  */
 async function runBiomeFix(
 	path = ".",
-): Promise<{ fixed: number; remaining: LintSummary }> {
-	// First run with --write to fix issues
-	const { stdout: fixStdout } = await spawnAndCollect([
-		"bunx",
-		"@biomejs/biome",
-		"check",
-		"--write",
-		"--reporter=json",
-		path,
-	]);
+	cid?: string,
+): Promise<{ formatFixed: number; lintFixed: number; remaining: LintSummary }> {
+	// Step 1: Fix formatting issues
+	const { stdout: formatStdout, exitCode: formatExitCode } =
+		await spawnAndCollect([
+			"bunx",
+			"@biomejs/biome",
+			"format",
+			"--write",
+			"--reporter=json",
+			path,
+		]);
 
-	// Count fixed issues from the output
-	let fixed = 0;
+	let formatFixed = 0;
 	try {
-		const report = JSON.parse(fixStdout);
-		fixed = report.summary?.fixedCount || 0;
-	} catch {
-		// Ignore parse errors for fix count
+		const report = JSON.parse(formatStdout);
+		// Biome format reports number of formatted files
+		formatFixed = report.summary?.formattedFiles || 0;
+	} catch (error) {
+		mcpLogger.warn("Failed to parse Biome format output", {
+			cid,
+			error: error instanceof Error ? error.message : "Unknown",
+			stdout: formatStdout.substring(0, 200),
+			exitCode: formatExitCode,
+		});
 	}
 
-	// Then check for remaining issues
+	// Step 2: Fix linting issues
+	const { stdout: checkStdout, exitCode: checkExitCode } =
+		await spawnAndCollect([
+			"bunx",
+			"@biomejs/biome",
+			"check",
+			"--write",
+			"--reporter=json",
+			path,
+		]);
+
+	let lintFixed = 0;
+	try {
+		const report = JSON.parse(checkStdout);
+		lintFixed = report.summary?.fixedCount || 0;
+	} catch (error) {
+		mcpLogger.warn("Failed to parse Biome check output", {
+			cid,
+			error: error instanceof Error ? error.message : "Unknown",
+			stdout: checkStdout.substring(0, 200),
+			exitCode: checkExitCode,
+		});
+	}
+
+	mcpLogger.debug("Biome fix completed", {
+		cid,
+		formatFixed,
+		lintFixed,
+		totalFixed: formatFixed + lintFixed,
+	});
+
+	// Step 3: Check for remaining issues
 	const remaining = await runBiomeCheck(path);
 
-	return { fixed, remaining };
+	return { formatFixed, lintFixed, remaining };
 }
 
 /**
@@ -432,11 +476,17 @@ tool(
 			args.response_format === "json"
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
-		const { fixed, remaining } = await runBiomeFix(validatedPath);
+		const { formatFixed, lintFixed, remaining } = await runBiomeFix(
+			validatedPath,
+			cid,
+		);
+		const totalFixed = formatFixed + lintFixed;
 		mcpLogger.info("Tool response", {
 			cid,
 			tool: "biome_lintFix",
-			fixed,
+			formatFixed,
+			lintFixed,
+			totalFixed,
 			remainingErrors: remaining.error_count,
 			remainingWarnings: remaining.warning_count,
 			durationMs: Date.now() - startTime,
@@ -445,7 +495,7 @@ tool(
 			content: [
 				{
 					type: "text" as const,
-					text: formatLintFixResult(fixed, remaining, format),
+					text: formatLintFixResult(totalFixed, remaining, format),
 				},
 			],
 		};
