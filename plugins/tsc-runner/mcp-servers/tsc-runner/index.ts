@@ -1,0 +1,188 @@
+#!/usr/bin/env bun
+
+/// <reference types="bun-types" />
+
+/**
+ * TypeScript checker MCP server.
+ *
+ * Runs `bunx tsc --noEmit --pretty false` from the nearest tsconfig/jsconfig
+ * and reports errors in a Claude-friendly format.
+ */
+
+import fs from "node:fs";
+import path from "node:path";
+import { spawnWithTimeout } from "@sidequest/core/spawn";
+import { startServer, tool, z } from "mcpez";
+import {
+	findNearestTsConfig,
+	TSC_CONFIG_FILES,
+} from "../../hooks/shared/tsc-config";
+import { parseTscOutput } from "../../hooks/tsc-check";
+
+enum ResponseFormat {
+	MARKDOWN = "markdown",
+	JSON = "json",
+}
+
+const TSC_TIMEOUT_MS = 30_000;
+
+interface TscRunResult {
+	exitCode: number;
+	timedOut: boolean;
+	output: string;
+	cwd: string;
+	configPath: string;
+}
+
+function formatMarkdown(result: TscRunResult) {
+	const parsed = parseTscOutput(result.output);
+	if (result.timedOut) {
+		return `⏱️ TypeScript check timed out after ${TSC_TIMEOUT_MS / 1000}s in ${result.cwd}.`;
+	}
+
+	if (result.exitCode === 0 || parsed.errorCount === 0) {
+		return `✅ TypeScript passed (cwd: ${result.cwd})`;
+	}
+
+	const lines: string[] = [
+		`❌ ${parsed.errorCount} type error(s) (cwd: ${result.cwd})`,
+		`Config: ${result.configPath}`,
+	];
+
+	for (const error of parsed.errors) {
+		lines.push(`- ${error.file}:${error.line}:${error.col} — ${error.message}`);
+	}
+
+	return lines.join("\n");
+}
+
+function formatJson(result: TscRunResult) {
+	const parsed = parseTscOutput(result.output);
+	return JSON.stringify(
+		{
+			cwd: result.cwd,
+			configPath: result.configPath,
+			timedOut: result.timedOut,
+			exitCode: result.exitCode,
+			errors: parsed.errors,
+			errorCount: parsed.errorCount,
+		},
+		null,
+		2,
+	);
+}
+
+async function resolveWorkdir(targetPath?: string): Promise<{
+	cwd: string;
+	configPath: string;
+}> {
+	const resolved = targetPath ? path.resolve(targetPath) : process.cwd();
+
+	if (!fs.existsSync(resolved)) {
+		throw new Error(`Path not found: ${resolved}`);
+	}
+
+	const stat = fs.statSync(resolved);
+
+	// If a directory is provided, prefer a config in that directory
+	if (stat.isDirectory()) {
+		for (const candidate of TSC_CONFIG_FILES) {
+			const candidatePath = path.join(resolved, candidate);
+			if (fs.existsSync(candidatePath)) {
+				return { cwd: resolved, configPath: candidatePath };
+			}
+		}
+
+		// Fall back to searching upwards from the directory
+		const nearest = await findNearestTsConfig(path.join(resolved, "index.ts"));
+		if (nearest.found && nearest.configDir && nearest.configPath) {
+			return { cwd: nearest.configDir, configPath: nearest.configPath };
+		}
+
+		throw new Error(
+			`No tsconfig.json or jsconfig.json found for directory ${resolved}`,
+		);
+	}
+
+	// If a file is provided, walk up to find the nearest config
+	const nearest = await findNearestTsConfig(resolved);
+	if (nearest.found && nearest.configDir && nearest.configPath) {
+		return { cwd: nearest.configDir, configPath: nearest.configPath };
+	}
+
+	throw new Error(
+		`No tsconfig.json or jsconfig.json found for file ${resolved}`,
+	);
+}
+
+async function runTsc(cwd: string, configPath: string): Promise<TscRunResult> {
+	const { stdout, stderr, exitCode, timedOut } = await spawnWithTimeout(
+		["bunx", "tsc", "--noEmit", "--pretty", "false"],
+		TSC_TIMEOUT_MS,
+		{
+			cwd,
+			env: { ...process.env, CI: "true" },
+		},
+	);
+
+	return {
+		exitCode,
+		timedOut,
+		output: `${stdout}${stderr}`,
+		cwd,
+		configPath,
+	};
+}
+
+tool(
+	"tsc_check",
+	{
+		description:
+			"Run TypeScript type checking (tsc --noEmit) using the nearest tsconfig/jsconfig.",
+		inputSchema: z.object({
+			path: z
+				.string()
+				.describe(
+					"Optional file or directory to determine which tsconfig to use.",
+				)
+				.optional(),
+			response_format: z
+				.enum([ResponseFormat.MARKDOWN, ResponseFormat.JSON])
+				.describe("Choose markdown or json output.")
+				.optional(),
+		}),
+	},
+	async ({ path: targetPath, response_format }) => {
+		try {
+			const { cwd, configPath } = await resolveWorkdir(targetPath);
+			const result = await runTsc(cwd, configPath);
+			const format =
+				response_format === ResponseFormat.JSON
+					? ResponseFormat.JSON
+					: ResponseFormat.MARKDOWN;
+
+			const text =
+				format === ResponseFormat.JSON
+					? formatJson(result)
+					: formatMarkdown(result);
+
+			return {
+				content: [{ type: "text" as const, text }],
+			};
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : "Unknown tsc runner error";
+			return {
+				content: [
+					{
+						type: "text" as const,
+						text: `tsc runner error: ${message}`,
+					},
+				],
+				isError: true,
+			};
+		}
+	},
+);
+
+startServer("tsc-runner", { version: "1.0.0" });

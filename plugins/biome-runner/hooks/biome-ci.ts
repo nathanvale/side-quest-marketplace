@@ -114,21 +114,23 @@ async function main() {
 			});
 
 			// Output token-efficient JSON for Claude
-			console.error(JSON.stringify({
-				tool: "biome",
-				status: "error",
-				file_count: filesToCheck.length,
-				error_count: summary.error_count,
-				warning_count: summary.warning_count,
-				diagnostics: summary.diagnostics.map(d => ({
-					file: d.file,
-					line: d.line,
-					code: d.code,
-					severity: d.severity,
-					message: d.message,
-				})),
-				hint: "MUST use biome_lintFix MCP tool to fix these errors"
-			}));
+			console.error(
+				JSON.stringify({
+					tool: "biome",
+					status: "error",
+					file_count: filesToCheck.length,
+					error_count: summary.error_count,
+					warning_count: summary.warning_count,
+					diagnostics: summary.diagnostics.map((d) => ({
+						file: d.file,
+						line: d.line,
+						code: d.code,
+						severity: d.severity,
+						message: d.message,
+					})),
+					hint: "MUST use biome_lintFix MCP tool to fix these errors",
+				}),
+			);
 
 			biomeLogger.info("Hook completed", {
 				cid,

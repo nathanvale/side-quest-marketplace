@@ -21,12 +21,10 @@ import { spawnWithTimeout } from "@sidequest/core/spawn";
 import { TSC_SUPPORTED_EXTENSIONS } from "./shared/constants";
 import { createCorrelationId, initLogger, tscLogger } from "./shared/logger";
 import { hasTscConfig, logMissingTscConfigHint } from "./shared/tsc-config";
-import type { TscParseResult } from "./shared/types";
 import { parseTscOutput } from "./tsc-check";
 
 /** Timeout for project-wide TypeScript checks (2 minutes) */
 const TSC_PROJECT_TIMEOUT_MS = 120_000;
-
 
 async function main() {
 	await initLogger();
@@ -90,12 +88,14 @@ async function main() {
 		});
 
 		// Output token-efficient JSON for Claude
-		console.error(JSON.stringify({
-			tool: "tsc",
-			status: "timeout",
-			timeout_ms: TSC_PROJECT_TIMEOUT_MS,
-			hint: "TypeScript check timed out - project may have complex types or circular references"
-		}));
+		console.error(
+			JSON.stringify({
+				tool: "tsc",
+				status: "timeout",
+				timeout_ms: TSC_PROJECT_TIMEOUT_MS,
+				hint: "TypeScript check timed out - project may have complex types or circular references",
+			}),
+		);
 
 		tscLogger.info("Hook completed", {
 			cid,
@@ -141,18 +141,20 @@ async function main() {
 		tscLogger.warn("Type errors found", { cid, errorCount: parsed.errorCount });
 
 		// Output token-efficient JSON for Claude
-		console.error(JSON.stringify({
-			tool: "tsc",
-			status: "error",
-			error_count: parsed.errorCount,
-			errors: parsed.errors.map(e => ({
-				file: e.file,
-				line: e.line,
-				col: e.col,
-				message: e.message,
-			})),
-			hint: "Fix the TypeScript type errors in the affected files"
-		}));
+		console.error(
+			JSON.stringify({
+				tool: "tsc",
+				status: "error",
+				error_count: parsed.errorCount,
+				errors: parsed.errors.map((e) => ({
+					file: e.file,
+					line: e.line,
+					col: e.col,
+					message: e.message,
+				})),
+				hint: "Fix the TypeScript type errors in the affected files",
+			}),
+		);
 
 		tscLogger.info("Hook completed", {
 			cid,

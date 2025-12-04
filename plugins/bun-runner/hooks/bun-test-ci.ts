@@ -20,7 +20,7 @@ import {
 	initLogger,
 	testLogger,
 } from "./shared/logger.js";
-import { formatTestOutput, runChangedTests } from "./shared/test-runner.js";
+import { runChangedTests } from "./shared/test-runner.js";
 
 async function main() {
 	await initLogger();
@@ -83,25 +83,29 @@ async function main() {
 
 	// Output results - JSON if failures, simple text if passed
 	if (result.failed > 0 || result.timedOut) {
-		console.error(JSON.stringify({
-			tool: "bun-test",
-			file_count: changedTestFiles.length,
-			status: result.timedOut ? "timeout" : "failed",
-			passed: result.passed,
-			failed: result.failed,
-			failures: result.failures.slice(0, 10).map(f => ({ // Limit to 10 for token efficiency
-				file: f.file,
-				line: f.line,
-				message: f.message.split('\n')[0], // First line only
-			})),
-			hint: result.timedOut
-				? "Tests timed out - check for hanging async operations"
-				: "Fix the failing test assertions. Use bun_testFile MCP tool to debug individual files"
-		}));
+		console.error(
+			JSON.stringify({
+				tool: "bun-test",
+				file_count: changedTestFiles.length,
+				status: result.timedOut ? "timeout" : "failed",
+				passed: result.passed,
+				failed: result.failed,
+				failures: result.failures.slice(0, 10).map((f) => ({
+					// Limit to 10 for token efficiency
+					file: f.file,
+					line: f.line,
+					message: f.message.split("\n")[0], // First line only
+				})),
+				hint: result.timedOut
+					? "Tests timed out - check for hanging async operations"
+					: "Fix the failing test assertions. Use bun_testFile MCP tool to debug individual files",
+			}),
+		);
 	} else {
-		const context = changedTestFiles.length === 1
-			? changedTestFiles[0]!
-			: `${changedTestFiles.length} test files`;
+		const context =
+			changedTestFiles.length === 1
+				? changedTestFiles[0]!
+				: `${changedTestFiles.length} test files`;
 		console.error(`✓ ${result.passed} test(s) passed in ${context}`);
 	}
 

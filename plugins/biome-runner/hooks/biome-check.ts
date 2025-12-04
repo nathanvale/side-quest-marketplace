@@ -20,25 +20,6 @@ import { isFileInRepo } from "./shared/git-utils";
 import { biomeLogger, createCorrelationId, initLogger } from "./shared/logger";
 import { extractFilePaths, parseHookInput } from "./shared/types";
 
-function formatDiagnostics(
-	summary: ReturnType<typeof parseBiomeOutput>,
-): string {
-	if (summary.error_count === 0 && summary.warning_count === 0) {
-		return "";
-	}
-
-	const lines: string[] = [];
-	lines.push(
-		`${summary.error_count} error(s), ${summary.warning_count} warning(s):`,
-	);
-
-	for (const d of summary.diagnostics) {
-		lines.push(`  ${d.file}:${d.line} [${d.code}] ${d.message}`);
-	}
-
-	return lines.join("\n");
-}
-
 async function main() {
 	await initLogger();
 	const cid = createCorrelationId();
@@ -87,7 +68,12 @@ async function main() {
 	}
 
 	// Process each file
-	const allDiagnostics: Array<{ file: string; line: number; code: string; message: string }> = [];
+	const allDiagnostics: Array<{
+		file: string;
+		line: number;
+		code: string;
+		message: string;
+	}> = [];
 	let filesProcessed = 0;
 	let filesSkipped = 0;
 
@@ -205,13 +191,15 @@ async function main() {
 		});
 
 		// Output token-efficient JSON for Claude
-		console.error(JSON.stringify({
-			tool: "biome",
-			status: "error",
-			files_processed: filesProcessed,
-			diagnostics: allDiagnostics,
-			hint: "MUST use biome_lintFix MCP tool to fix these errors"
-		}));
+		console.error(
+			JSON.stringify({
+				tool: "biome",
+				status: "error",
+				files_processed: filesProcessed,
+				diagnostics: allDiagnostics,
+				hint: "MUST use biome_lintFix MCP tool to fix these errors",
+			}),
+		);
 
 		biomeLogger.info("Hook completed", {
 			cid,

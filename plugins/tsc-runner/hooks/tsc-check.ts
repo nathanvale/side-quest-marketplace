@@ -141,7 +141,12 @@ async function main() {
 	}
 
 	// Run tsc once per package (not per file - tsc needs full project context)
-	const allErrors: Array<{ file: string; line: number; col: number; message: string }> = [];
+	const allErrors: Array<{
+		file: string;
+		line: number;
+		col: number;
+		message: string;
+	}> = [];
 	let filesProcessed = 0;
 
 	for (const [configDir, files] of packageFiles) {
@@ -227,13 +232,15 @@ async function main() {
 		tscLogger.warn("Type errors found", { cid, errorCount: allErrors.length });
 
 		// Output token-efficient JSON for Claude
-		console.error(JSON.stringify({
-			tool: "tsc",
-			status: "error",
-			error_count: allErrors.length,
-			errors: allErrors,
-			hint: "Fix the TypeScript type errors in the affected files"
-		}));
+		console.error(
+			JSON.stringify({
+				tool: "tsc",
+				status: "error",
+				error_count: allErrors.length,
+				errors: allErrors,
+				hint: "Fix the TypeScript type errors in the affected files",
+			}),
+		);
 
 		tscLogger.info("Hook completed", {
 			cid,
