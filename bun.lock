@@ -207,6 +207,7 @@
       "name": "@sidequest/tsc-runner",
       "version": "1.0.0",
       "dependencies": {
+        "@sidequest/bun-runner": "workspace:*",
         "@sidequest/core": "workspace:*",
       },
       "devDependencies": {

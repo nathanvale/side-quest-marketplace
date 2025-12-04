@@ -15,6 +15,7 @@
  * - 2: Blocking error (any type errors found, shown to Claude for follow-up)
  */
 
+import { isWorkspaceProject } from "@sidequest/bun-runner/mcp-servers/bun-runner/index.js";
 import { hasChangedFiles } from "@sidequest/core/git";
 import { spawnWithTimeout } from "@sidequest/core/spawn";
 import { TSC_SUPPORTED_EXTENSIONS } from "./shared/constants";
@@ -77,14 +78,25 @@ async function main() {
 		process.exit(0);
 	}
 
+	// Check if we're in a Bun workspace
+	const isWorkspace = await isWorkspaceProject();
+
 	// Run project-wide tsc --noEmit with timeout protection
+	// In workspaces, run typecheck in all packages
+	// Otherwise, run from git root
+	const cmd = isWorkspace
+		? ["bun", "--filter", "*", "typecheck"]
+		: ["bunx", "tsc", "--noEmit", "--pretty", "false"];
+
 	tscLogger.debug("Running project-wide TSC", {
 		cid,
+		isWorkspace,
+		command: cmd.join(" "),
 		timeoutMs: TSC_PROJECT_TIMEOUT_MS,
 	});
 	const tscStartTime = Date.now();
 	const { stdout, stderr, exitCode, timedOut } = await spawnWithTimeout(
-		["bunx", "tsc", "--noEmit", "--pretty", "false"],
+		cmd,
 		TSC_PROJECT_TIMEOUT_MS,
 	);
 

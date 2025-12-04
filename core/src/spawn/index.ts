@@ -48,6 +48,7 @@ export async function spawnAndCollect(
 	options?: {
 		env?: Record<string, string | undefined>;
 		signal?: AbortSignal;
+		cwd?: string;
 	},
 ): Promise<SpawnResult> {
 	const proc = spawn({
@@ -56,6 +57,7 @@ export async function spawnAndCollect(
 		stderr: "pipe",
 		env: options?.env ? { ...process.env, ...options.env } : process.env,
 		signal: options?.signal,
+		cwd: options?.cwd,
 	});
 
 	// CRITICAL: Consume streams in parallel with waiting for exit.
@@ -97,6 +99,7 @@ export async function spawnWithTimeout(
 	timeoutMs: number,
 	options?: {
 		env?: Record<string, string | undefined>;
+		cwd?: string;
 	},
 ): Promise<SpawnResult & { timedOut: boolean }> {
 	const controller = new AbortController();

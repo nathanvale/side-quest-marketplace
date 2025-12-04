@@ -15,7 +15,7 @@ import { isFileInRepo } from "@sidequest/core/git";
 import { spawnWithTimeout } from "@sidequest/core/spawn";
 import { TSC_SUPPORTED_EXTENSIONS } from "./shared/constants";
 import { createCorrelationId, initLogger, tscLogger } from "./shared/logger";
-import { hasTscConfig, logMissingTscConfigHint } from "./shared/tsc-config";
+import { findNearestTsConfig } from "./shared/tsc-config";
 import {
 	extractFilePaths,
 	parseHookInput,
@@ -92,16 +92,9 @@ async function main() {
 		event: "PostToolUse",
 	});
 
-	// Check for TypeScript config before doing anything else
-	const configResult = await hasTscConfig();
-	if (!configResult.found) {
-		tscLogger.debug("Config not found, skipping", {
-			cid,
-			searchPath: configResult.searchPath,
-		});
-		logMissingTscConfigHint(configResult.searchPath);
-		process.exit(0);
-	}
+	// Note: We no longer check for tsconfig at git root here.
+	// Instead, we find the nearest tsconfig.json for each edited file,
+	// which works correctly in monorepos where each package has its own config.
 
 	const input = await Bun.stdin.text();
 	const hookInput = parseHookInput(input);
@@ -128,9 +121,8 @@ async function main() {
 		process.exit(0);
 	}
 
-	// Process each file
-	const allErrors: string[] = [];
-	let filesProcessed = 0;
+	// Group files by their package (nearest tsconfig.json directory)
+	const packageFiles = new Map<string, string[]>();
 	let filesSkipped = 0;
 
 	for (const filePath of filePaths) {
@@ -157,25 +149,54 @@ async function main() {
 			continue;
 		}
 
-		filesProcessed++;
-		tscLogger.debug("Checking file", { cid, file: filePath });
-		const fileStartTime = Date.now();
+		// Find nearest tsconfig.json from the edited file
+		const nearestConfig = await findNearestTsConfig(filePath);
+		if (!nearestConfig.found || !nearestConfig.configDir) {
+			tscLogger.debug("File filtered", {
+				cid,
+				file: filePath,
+				reason: "no tsconfig found",
+			});
+			filesSkipped++;
+			continue;
+		}
 
-		// Run tsc --noEmit on the single file with timeout protection
+		// Group by package directory
+		const existing = packageFiles.get(nearestConfig.configDir) ?? [];
+		existing.push(filePath);
+		packageFiles.set(nearestConfig.configDir, existing);
+	}
+
+	// Run tsc once per package (not per file - tsc needs full project context)
+	const allErrors: string[] = [];
+	let filesProcessed = 0;
+
+	for (const [configDir, files] of packageFiles) {
+		filesProcessed += files.length;
+		tscLogger.debug("Checking package", {
+			cid,
+			configDir,
+			fileCount: files.length,
+			files,
+		});
+		const packageStartTime = Date.now();
+
+		// Run tsc --noEmit from the package directory (checks all files in package)
+		// Note: We don't pass specific files because tsc ignores tsconfig.json when files are specified
 		const { stdout, stderr, exitCode, timedOut } = await spawnWithTimeout(
-			["bunx", "tsc", "--noEmit", "--pretty", "false", filePath],
+			["bunx", "tsc", "--noEmit", "--pretty", "false"],
 			TSC_TIMEOUT_MS,
+			{ cwd: configDir },
 		);
 
 		if (timedOut) {
 			tscLogger.warn("TSC timed out", {
 				cid,
-				file: filePath,
+				configDir,
 				timeoutMs: TSC_TIMEOUT_MS,
 			});
 			allErrors.push(
-				`TypeScript check timed out for ${filePath} (${TSC_TIMEOUT_MS / 1000}s limit). ` +
-					"File may contain complex types or circular references.",
+				`TypeScript check timed out for ${configDir} (${TSC_TIMEOUT_MS / 1000}s limit).`,
 			);
 			continue;
 		}
@@ -186,20 +207,24 @@ async function main() {
 			const parsed = parseTscOutput(output);
 			tscLogger.debug("TSC completed", {
 				cid,
-				file: filePath,
+				configDir,
 				errorCount: parsed.errorCount,
-				durationMs: Date.now() - fileStartTime,
+				durationMs: Date.now() - packageStartTime,
 			});
-			const formatted = formatErrors(parsed, filePath);
-			if (formatted) {
-				allErrors.push(formatted);
+
+			// Filter errors to only those in edited files
+			for (const file of files) {
+				const formatted = formatErrors(parsed, file);
+				if (formatted) {
+					allErrors.push(formatted);
+				}
 			}
 		} else {
 			tscLogger.debug("TSC completed", {
 				cid,
-				file: filePath,
+				configDir,
 				errorCount: 0,
-				durationMs: Date.now() - fileStartTime,
+				durationMs: Date.now() - packageStartTime,
 			});
 		}
 	}

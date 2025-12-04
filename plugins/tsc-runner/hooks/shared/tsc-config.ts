@@ -12,13 +12,10 @@ import { getGitRoot } from "@sidequest/core/git";
  * TypeScript looks for tsconfig.json by default.
  * We also check for:
  * - jsconfig.json (used by JS projects with TS tooling)
- * - tsconfig.base.json (used by monorepos with shared config)
+ *
+ * Note: tsconfig.base.json is NOT included - it's for extending, not running tsc.
  */
-export const TSC_CONFIG_FILES = [
-	"tsconfig.json",
-	"jsconfig.json",
-	"tsconfig.base.json",
-] as const;
+export const TSC_CONFIG_FILES = ["tsconfig.json", "jsconfig.json"] as const;
 
 /**
  * Result of checking for TypeScript configuration.
@@ -75,6 +72,76 @@ export async function hasTscConfig(): Promise<TscConfigResult> {
 		found: false,
 		searchPath: gitRoot,
 	};
+}
+
+/**
+ * Result of finding the nearest TypeScript configuration file.
+ */
+export interface NearestTsConfigResult {
+	/** Whether a valid TSC config file was found */
+	found: boolean;
+	/** Path to the config file if found */
+	configPath?: string;
+	/** Directory containing the tsconfig (for running tsc from) */
+	configDir?: string;
+}
+
+/**
+ * Find the nearest TypeScript configuration file by walking up from a file path.
+ *
+ * Searches for tsconfig.json or jsconfig.json starting from the file's directory
+ * and walking up to the git root. This allows running tsc from the correct directory
+ * for proper module resolution in monorepos and multi-package projects.
+ *
+ * @param filePath - Path to the file to start searching from
+ * @returns NearestTsConfigResult with found status and paths
+ *
+ * @example
+ * ```ts
+ * const result = await findNearestTsConfig("/path/to/package/src/index.ts");
+ * if (result.found) {
+ *   // Run tsc from result.configDir
+ *   await spawn(["bunx", "tsc", "--noEmit"], { cwd: result.configDir });
+ * }
+ * ```
+ */
+export async function findNearestTsConfig(
+	filePath: string,
+): Promise<NearestTsConfigResult> {
+	const gitRoot = await getGitRoot();
+	if (!gitRoot) {
+		return { found: false };
+	}
+
+	// Start at file's directory
+	let currentDir = join(filePath, "..");
+
+	// Walk up until we find a config or hit git root
+	while (currentDir.startsWith(gitRoot)) {
+		// Check for each possible config file
+		for (const configFile of TSC_CONFIG_FILES) {
+			const configPath = join(currentDir, configFile);
+			if (await exists(configPath)) {
+				return {
+					found: true,
+					configPath,
+					configDir: currentDir,
+				};
+			}
+		}
+
+		// Move up one directory
+		const parentDir = join(currentDir, "..");
+
+		// If we haven't moved up (reached root), stop
+		if (parentDir === currentDir) {
+			break;
+		}
+
+		currentDir = parentDir;
+	}
+
+	return { found: false };
 }
 
 /**
