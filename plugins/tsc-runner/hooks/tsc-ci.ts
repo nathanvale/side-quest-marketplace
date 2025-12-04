@@ -138,6 +138,18 @@ async function main() {
 		errorCount: parsed.errorCount,
 		durationMs: Date.now() - tscStartTime,
 	});
+
+	// Log each TypeScript error for LLM training
+	for (const error of parsed.errors) {
+		tscLogger.error("TypeScript error", {
+			cid,
+			file: error.file,
+			line: error.line,
+			col: error.col,
+			message: error.message,
+		});
+	}
+
 	const formatted = formatErrors(parsed);
 
 	if (formatted) {

@@ -212,6 +212,17 @@ async function main() {
 				durationMs: Date.now() - packageStartTime,
 			});
 
+			// Log each TypeScript error for LLM training
+			for (const error of parsed.errors) {
+				tscLogger.error("TypeScript error", {
+					cid,
+					file: error.file,
+					line: error.line,
+					col: error.col,
+					message: error.message,
+				});
+			}
+
 			// Filter errors to only those in edited files
 			for (const file of files) {
 				const formatted = formatErrors(parsed, file);

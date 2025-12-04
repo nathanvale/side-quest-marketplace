@@ -70,6 +70,17 @@ async function main() {
 		durationMs: Date.now() - testStartTime,
 	});
 
+	// Log each test failure for LLM training
+	for (const failure of result.failures) {
+		testLogger.error("Test failure", {
+			cid,
+			file: failure.file,
+			line: failure.line,
+			message: failure.message,
+			stack: failure.stack,
+		});
+	}
+
 	// Output results (informational)
 	const context =
 		changedTestFiles.length === 1

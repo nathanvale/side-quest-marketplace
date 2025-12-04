@@ -170,9 +170,13 @@ export function createPluginLogger(options: PluginLoggerOptions): PluginLogger {
 			mkdirSync(logDir, { recursive: true });
 		}
 
+		// Use unique sink name per plugin to avoid LogTape configuration conflicts
+		// Multiple plugins calling configure() will merge their configs
+		const sinkName = `file_${name}`;
+
 		await configure({
 			sinks: {
-				file: getRotatingFileSink(logFile, {
+				[sinkName]: getRotatingFileSink(logFile, {
 					formatter: jsonLinesFormatter,
 					maxSize,
 					maxFiles,
@@ -183,7 +187,7 @@ export function createPluginLogger(options: PluginLoggerOptions): PluginLogger {
 			loggers: [
 				{
 					category: [name],
-					sinks: ["file"],
+					sinks: [sinkName],
 					lowestLevel,
 				},
 			],

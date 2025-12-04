@@ -108,6 +108,17 @@ async function main() {
 			durationMs: Date.now() - fileStartTime,
 		});
 
+		// Log each test failure for LLM training
+		for (const failure of result.failures) {
+			testLogger.error("Test failure", {
+				cid,
+				file: failure.file,
+				line: failure.line,
+				message: failure.message,
+				stack: failure.stack,
+			});
+		}
+
 		// Always output results (informational)
 		const output = formatTestOutput(result, filePath);
 		console.error(`\nTest results for ${filePath}:\n${output}\n`);

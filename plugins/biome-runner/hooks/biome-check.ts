@@ -167,6 +167,21 @@ async function main() {
 				warnings: summary.warning_count,
 				durationMs: Date.now() - checkStartTime,
 			});
+
+			// Log each diagnostic for LLM training
+			for (const diagnostic of summary.diagnostics) {
+				const logLevel = diagnostic.severity === "error" ? "error" : "warn";
+				biomeLogger[logLevel]("Biome diagnostic", {
+					cid,
+					file: diagnostic.file,
+					line: diagnostic.line,
+					code: diagnostic.code,
+					severity: diagnostic.severity,
+					message: diagnostic.message,
+					suggestion: diagnostic.suggestion,
+				});
+			}
+
 			if (summary.error_count > 0) {
 				allErrors.push(formatDiagnostics(summary));
 			}
