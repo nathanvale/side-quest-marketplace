@@ -97,7 +97,9 @@ export function parseBunTestOutput(output: string): TestSummary {
 		if (currentFailure) {
 			// Stack trace line - extract file/line info
 			if (line.trim().startsWith("at ")) {
-				const match = line.match(/\((.+):(\d+):(\d+)\)/) || line.match(/at (.+):(\d+):(\d+)/);
+				const match =
+					line.match(/\((.+):(\d+):(\d+)\)/) ||
+					line.match(/at (.+):(\d+):(\d+)/);
 				if (match?.[1] && match[2]) {
 					currentFailure.file = match[1];
 					currentFailure.line = Number.parseInt(match[2], 10);

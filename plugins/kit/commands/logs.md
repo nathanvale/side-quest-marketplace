@@ -8,63 +8,28 @@ model: claude-haiku-4-5-20251001
 
 View and filter JSONL logs from the Kit MCP server.
 
-## Instructions
+## Your Task
 
-1. Log file location: `~/.claude/logs/kit.jsonl`
-2. Default: Show last 20 log entries
-3. With `lines` argument: Show last N entries
-4. With `correlation-id`: Filter by specific operation
+View Kit MCP server logs with optional filtering: $ARGUMENTS
 
-## Usage Examples
+Log file location: `~/.claude/logs/kit.jsonl`
 
-### View recent logs
-```
-/kit:logs
-```
-Shows the last 20 log entries formatted for readability.
+### Parse Arguments:
+- No arguments → Show last 20 entries
+- Number (e.g., `50`) → Show last N entries
+- String (e.g., `a1b2c3d4`) → Filter by correlation ID
 
-### View more logs
-```
-/kit:logs 50
-```
-Shows the last 50 log entries.
-
-### Filter by correlation ID
-```
-/kit:logs a1b2c3d4
-```
-Shows all log entries for a specific operation (useful for tracing failures).
-
-## Log Format
-
-Each log entry contains:
-- `@timestamp` - When the event occurred
-- `@category` - Log category (kit, kit.grep, kit.semantic, kit.symbols)
-- `@level` - Log level (debug, info, warn, error)
-- `@message` - Human-readable message
-- `cid` - Correlation ID for tracing operations
-- Additional context fields (query, pattern, matchCount, durationMs, etc.)
-
-## Implementation
-
-Read the log file and format entries:
+### Commands to use:
 
 ```bash
 # Default: last 20 lines
-tail -20 ~/.claude/logs/kit.jsonl | jq '.'
+tail -20 ~/.claude/logs/kit.jsonl | jq -r '.["@timestamp"] + " [" + .["@level"] + "] " + .["@category"] + ": " + .["@message"]'
+
+# Last N lines
+tail -N ~/.claude/logs/kit.jsonl | jq -r '.["@timestamp"] + " [" + .["@level"] + "] " + .["@category"] + ": " + .["@message"]'
 
 # Filter by correlation ID
-jq 'select(.cid == "CORRELATION_ID")' ~/.claude/logs/kit.jsonl
-
-# Show only errors
-jq 'select(.["@level"] == "error")' ~/.claude/logs/kit.jsonl
+jq -r 'select(.cid == "CORRELATION_ID") | .["@timestamp"] + " [" + .["@level"] + "] " + .["@category"] + ": " + .["@message"]' ~/.claude/logs/kit.jsonl
 ```
 
-Present logs in a readable table or formatted list showing:
-- Timestamp
-- Level (with appropriate indicator)
-- Category
-- Message
-- Key context (cid, matchCount, durationMs if present)
-
-If the log file doesn't exist, inform the user that no logs have been generated yet.
+Present logs showing timestamp, level, category, and message. If the file doesn't exist, inform the user no logs have been generated yet.

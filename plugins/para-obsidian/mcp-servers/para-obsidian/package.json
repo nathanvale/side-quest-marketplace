@@ -1,0 +1,16 @@
+{
+	"name": "@sidequest/mcp-para-obsidian",
+	"version": "1.0.0",
+	"private": true,
+	"description": "PARA Obsidian MCP server mirroring CLI commands",
+	"type": "module",
+	"main": "index.ts",
+	"scripts": {
+		"start": "bun run index.ts",
+		"test": "echo 'No tests yet'",
+		"typecheck": "echo 'No typecheck yet'"
+	},
+	"dependencies": {
+		"mcpez": "^1.2.1"
+	}
+}

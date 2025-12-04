@@ -43,23 +43,56 @@ biome check --write .     # Lint and format
 
 ## Key Files
 
-- `mcp-servers/kit/index.ts` — MCP server with 8 tools (grep, semantic, AST, symbols, etc.)
+- `mcp-servers/kit/index.ts` — MCP server with 18 tools (search, index, analysis, file ops)
 - `src/kit-wrapper.ts` — Pure CLI wrappers for all Kit commands (25KB, core logic)
 - `src/ast/searcher.ts` — Parallel AST search using tree-sitter (TS/JS/Python)
 - `src/logger.ts` — LogTape logger with correlation IDs for request tracing
 - `src/validators.ts` — Comprehensive input validation (19KB)
 
-## MCP Tools (8 Total)
+## MCP Tools (18 Total)
 
-| Tool | Purpose | Speed | Fallback |
-|------|---------|-------|----------|
-| `kit_grep` | Text/regex search across files | ~30ms | — |
-| `kit_semantic` | Natural language vector search | ~500ms | → grep if ML unavailable |
-| `kit_symbols` | Extract functions/classes/types | ~200ms | — |
-| `kit_usages` | Find where symbols are used | ~300ms | — |
-| `kit_ast_search` | Structural code patterns (tree-sitter) | ~400ms | — |
-| `kit_file_tree` | Repository directory structure | ~50ms | — |
-| `kit_file_content` | Batch read multiple files | ~100ms | — |
+### Search Tools
+
+| Tool | Purpose | Speed | Notes |
+|------|---------|-------|-------|
+| `kit_grep` | Text/regex search across files | ~30ms | Fastest for literal matches |
+| `kit_semantic` | Natural language vector search | ~500ms | Fallback to grep if ML unavailable |
+| `kit_ast_search` | Structural code patterns (tree-sitter) | ~400ms | TS/JS/Python support |
+
+### Index Tools (PROJECT_INDEX.json)
+
+| Tool | Purpose | Speed | Notes |
+|------|---------|-------|-------|
+| `kit_index_prime` | Generate/refresh PROJECT_INDEX.json | ~2s | Required before other index tools |
+| `kit_index_find` | Find symbol definitions | ~10ms | Fast symbol lookup |
+| `kit_index_stats` | Codebase statistics | ~10ms | Symbol counts, hotspots |
+| `kit_index_overview` | File symbol listing | ~10ms | All symbols in a file |
+
+### Code Analysis Tools
+
+| Tool | Purpose | Speed | Notes |
+|------|---------|-------|-------|
+| `kit_usages` | Find all usages of a symbol | ~300ms | Where is this used? |
+| `kit_callers` | Find function call sites | ~200ms | Who calls this function? |
+| `kit_calls` | Find function dependencies | ~200ms | What does this call? |
+| `kit_deps` | Import/export relationships | ~150ms | Python/Terraform only |
+| `kit_dead` | Dead code detection | ~500ms | Find unused exports |
+| `kit_blast` | Blast radius analysis | ~300ms | Impact of changes |
+| `kit_api` | Module public API listing | ~200ms | All exports from directory |
+
+### File Operations
+
+| Tool | Purpose | Speed | Notes |
+|------|---------|-------|-------|
+| `kit_file_tree` | Repository directory structure | ~50ms | Annotated tree view |
+| `kit_file_content` | Batch read multiple files | ~100ms | Reduces round trips |
+
+### Git/AI Tools
+
+| Tool | Purpose | Speed | Notes |
+|------|---------|-------|-------|
+| `kit_commit` | AI-generated commit messages | ~2s | dry_run=true by default |
+| `kit_summarize` | GitHub PR summary | ~3s | Can update PR body |
 
 ## Architecture
 

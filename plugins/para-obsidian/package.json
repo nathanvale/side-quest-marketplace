@@ -7,6 +7,10 @@
 	"bin": {
 		"para-obsidian": "./src/cli.ts"
 	},
+	"dependencies": {
+		"@sidequest/core": "workspace:*",
+		"yaml": "^2.6.0"
+	},
 	"scripts": {
 		"test": "bun test --recursive",
 		"typecheck": "tsc --noEmit",

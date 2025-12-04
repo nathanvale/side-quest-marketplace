@@ -11,10 +11,14 @@ import { startServer, tool, z } from "mcpez";
 
 import {
 	createCorrelationId,
+	executeAstSearch,
 	executeIndexFind,
 	executeIndexOverview,
 	executeIndexPrime,
 	executeIndexStats,
+	executeKitFileContent,
+	executeKitFileTree,
+	executeKitUsages,
 	formatIndexFindResults,
 	formatIndexOverviewResults,
 	formatIndexPrimeResults,
@@ -22,6 +26,7 @@ import {
 	getKitLogger,
 	initLogger,
 	ResponseFormat,
+	SearchMode,
 } from "../../src/index.js";
 
 // Initialize logging
@@ -1277,6 +1282,514 @@ IMPORTANT: Default update_pr_body=false for safety.`,
 		};
 	},
 );
+
+// ============================================================================
+// Kit AST Search Tool
+// ============================================================================
+
+tool(
+	"kit_ast_search",
+	{
+		description: `AST pattern search using tree-sitter for structural code matching.
+
+Find code by structure rather than text. More precise than grep for:
+- "async function" - Find all async functions
+- "try catch" - Find try-catch blocks
+- "React hooks" - Find useState/useEffect calls
+- "class extends" - Find class inheritance
+
+Supports TypeScript, JavaScript, and Python.
+
+Two modes:
+- simple (default): Natural language patterns like "async function"
+- pattern: JSON criteria like {"type": "function_declaration", "async": true}`,
+		inputSchema: {
+			pattern: z
+				.string()
+				.describe(
+					'Search pattern. Simple mode: "async function", "try catch". Pattern mode: {"type": "function_declaration"}',
+				),
+			mode: z
+				.enum(["simple", "pattern"])
+				.optional()
+				.describe(
+					"Search mode: 'simple' (default) for natural language, 'pattern' for JSON criteria",
+				),
+			file_pattern: z
+				.string()
+				.optional()
+				.describe(
+					'File glob pattern to search (default: all supported files). Example: "*.ts"',
+				),
+			path: z
+				.string()
+				.optional()
+				.describe("Repository path to search (default: current directory)"),
+			max_results: z
+				.number()
+				.optional()
+				.describe("Maximum results to return (default: 100)"),
+			response_format: z
+				.enum(["markdown", "json"])
+				.optional()
+				.describe("Output format: 'markdown' (default) or 'json'"),
+		},
+		annotations: {
+			readOnlyHint: true,
+			destructiveHint: false,
+			idempotentHint: true,
+			openWorldHint: false,
+		},
+	},
+	async (args: {
+		pattern: string;
+		mode?: "simple" | "pattern";
+		file_pattern?: string;
+		path?: string;
+		max_results?: number;
+		response_format?: string;
+	}) => {
+		const mcpCid = createCorrelationId();
+		const mcpStartTime = Date.now();
+		mcpLogger.info("MCP tool request", {
+			cid: mcpCid,
+			tool: "kit_ast_search",
+			args: { pattern: args.pattern, mode: args.mode },
+		});
+
+		const result = await executeAstSearch({
+			pattern: args.pattern,
+			mode: args.mode === "pattern" ? SearchMode.PATTERN : SearchMode.SIMPLE,
+			filePattern: args.file_pattern,
+			path: args.path,
+			maxResults: args.max_results,
+		});
+
+		const mcpDuration = Date.now() - mcpStartTime;
+		mcpLogger.info("MCP tool response", {
+			cid: mcpCid,
+			tool: "kit_ast_search",
+			success: !("error" in result),
+			durationMs: mcpDuration,
+		});
+
+		// Format output
+		const format = args.response_format === "json" ? "json" : "markdown";
+
+		if ("error" in result) {
+			return {
+				isError: true,
+				content: [
+					{
+						type: "text" as const,
+						text:
+							format === "json"
+								? JSON.stringify(result, null, 2)
+								: `**Error:** ${result.error}${result.hint ? `\n\n*Hint:* ${result.hint}` : ""}`,
+					},
+				],
+			};
+		}
+
+		if (format === "json") {
+			return {
+				content: [
+					{ type: "text" as const, text: JSON.stringify(result, null, 2) },
+				],
+			};
+		}
+
+		// Format as markdown
+		let markdown = `## AST Search Results\n\n`;
+		markdown += `**Pattern:** \`${result.pattern}\`\n`;
+		markdown += `**Mode:** ${result.mode}\n`;
+		markdown += `**Matches:** ${result.count}\n\n`;
+
+		if (result.matches.length === 0) {
+			markdown += "_No matches found_\n";
+		} else {
+			for (const match of result.matches) {
+				markdown += `### ${match.file}:${match.line}\n`;
+				markdown += `**Node type:** \`${match.nodeType}\`\n`;
+				if (match.context.parentFunction) {
+					markdown += `**In function:** \`${match.context.parentFunction}\`\n`;
+				}
+				if (match.context.parentClass) {
+					markdown += `**In class:** \`${match.context.parentClass}\`\n`;
+				}
+				markdown += `\`\`\`\n${match.text.slice(0, 300)}${match.text.length > 300 ? "..." : ""}\n\`\`\`\n\n`;
+			}
+		}
+
+		return {
+			content: [{ type: "text" as const, text: markdown }],
+		};
+	},
+);
+
+// ============================================================================
+// Kit Usages Tool
+// ============================================================================
+
+tool(
+	"kit_usages",
+	{
+		description: `Find all usages of a symbol (function, class, type, constant).
+
+Shows where a symbol is defined and referenced across the codebase. Great for:
+- Understanding where a function/class/type is used
+- Impact analysis before refactoring
+- Finding all references to a constant or variable
+
+Requires Kit CLI: uv tool install cased-kit`,
+		inputSchema: {
+			symbol: z
+				.string()
+				.describe('Symbol name to find usages of. Example: "UserService"'),
+			symbol_type: z
+				.string()
+				.optional()
+				.describe('Filter by symbol type: "function", "class", "type", etc.'),
+			path: z
+				.string()
+				.optional()
+				.describe("Repository path to search (default: current directory)"),
+			response_format: z
+				.enum(["markdown", "json"])
+				.optional()
+				.describe("Output format: 'markdown' (default) or 'json'"),
+		},
+		annotations: {
+			readOnlyHint: true,
+			destructiveHint: false,
+			idempotentHint: true,
+			openWorldHint: false,
+		},
+	},
+	async (args: {
+		symbol: string;
+		symbol_type?: string;
+		path?: string;
+		response_format?: string;
+	}) => {
+		const mcpCid = createCorrelationId();
+		const mcpStartTime = Date.now();
+		mcpLogger.info("MCP tool request", {
+			cid: mcpCid,
+			tool: "kit_usages",
+			args: { symbol: args.symbol },
+		});
+
+		const result = executeKitUsages({
+			symbolName: args.symbol,
+			symbolType: args.symbol_type,
+			path: args.path,
+		});
+
+		const mcpDuration = Date.now() - mcpStartTime;
+		mcpLogger.info("MCP tool response", {
+			cid: mcpCid,
+			tool: "kit_usages",
+			success: !("error" in result),
+			durationMs: mcpDuration,
+		});
+
+		// Format output
+		const format = args.response_format === "json" ? "json" : "markdown";
+
+		if ("error" in result) {
+			return {
+				isError: true,
+				content: [
+					{
+						type: "text" as const,
+						text:
+							format === "json"
+								? JSON.stringify(result, null, 2)
+								: `**Error:** ${result.error}${result.hint ? `\n\n*Hint:* ${result.hint}` : ""}`,
+					},
+				],
+			};
+		}
+
+		if (format === "json") {
+			return {
+				content: [
+					{ type: "text" as const, text: JSON.stringify(result, null, 2) },
+				],
+			};
+		}
+
+		// Format as markdown
+		let markdown = `## Symbol Usages\n\n`;
+		markdown += `**Symbol:** \`${result.symbolName}\`\n`;
+		markdown += `**Usages found:** ${result.count}\n\n`;
+
+		if (result.usages.length === 0) {
+			markdown += "_No usages found_\n";
+		} else {
+			for (const usage of result.usages) {
+				markdown += `### ${usage.file}${usage.line ? `:${usage.line}` : ""}\n`;
+				markdown += `**Type:** \`${usage.type}\` | **Name:** \`${usage.name}\`\n`;
+				if (usage.context) {
+					markdown += `\`\`\`\n${usage.context}\n\`\`\`\n`;
+				}
+				markdown += "\n";
+			}
+		}
+
+		return {
+			content: [{ type: "text" as const, text: markdown }],
+		};
+	},
+);
+
+// ============================================================================
+// Kit File Tree Tool
+// ============================================================================
+
+tool(
+	"kit_file_tree",
+	{
+		description: `Get repository file tree structure (~50ms).
+
+Fast way to understand codebase layout without reading files. Returns:
+- File and directory paths
+- File sizes
+- Directory structure
+
+Useful for exploration and navigation.
+
+Requires Kit CLI: uv tool install cased-kit`,
+		inputSchema: {
+			path: z
+				.string()
+				.optional()
+				.describe("Repository path (default: current directory)"),
+			subpath: z
+				.string()
+				.optional()
+				.describe('Subdirectory to show tree for. Example: "src/components"'),
+			response_format: z
+				.enum(["markdown", "json"])
+				.optional()
+				.describe("Output format: 'markdown' (default) or 'json'"),
+		},
+		annotations: {
+			readOnlyHint: true,
+			destructiveHint: false,
+			idempotentHint: true,
+			openWorldHint: false,
+		},
+	},
+	async (args: {
+		path?: string;
+		subpath?: string;
+		response_format?: string;
+	}) => {
+		const mcpCid = createCorrelationId();
+		const mcpStartTime = Date.now();
+		mcpLogger.info("MCP tool request", {
+			cid: mcpCid,
+			tool: "kit_file_tree",
+			args: { path: args.path, subpath: args.subpath },
+		});
+
+		const result = executeKitFileTree({
+			path: args.path,
+			subpath: args.subpath,
+		});
+
+		const mcpDuration = Date.now() - mcpStartTime;
+		mcpLogger.info("MCP tool response", {
+			cid: mcpCid,
+			tool: "kit_file_tree",
+			success: !("error" in result),
+			durationMs: mcpDuration,
+		});
+
+		// Format output
+		const format = args.response_format === "json" ? "json" : "markdown";
+
+		if ("error" in result) {
+			return {
+				isError: true,
+				content: [
+					{
+						type: "text" as const,
+						text:
+							format === "json"
+								? JSON.stringify(result, null, 2)
+								: `**Error:** ${result.error}${result.hint ? `\n\n*Hint:* ${result.hint}` : ""}`,
+					},
+				],
+			};
+		}
+
+		if (format === "json") {
+			return {
+				content: [
+					{ type: "text" as const, text: JSON.stringify(result, null, 2) },
+				],
+			};
+		}
+
+		// Format as markdown tree
+		let markdown = `## File Tree\n\n`;
+		markdown += `**Path:** \`${result.path}\`${result.subpath ? ` (subpath: \`${result.subpath}\`)` : ""}\n`;
+		markdown += `**Entries:** ${result.count}\n\n`;
+
+		if (result.entries.length === 0) {
+			markdown += "_No entries found_\n";
+		} else {
+			markdown += "```\n";
+			for (const entry of result.entries) {
+				const icon = entry.isDir ? "📁" : "📄";
+				const size = entry.isDir ? "" : ` (${formatBytes(entry.size)})`;
+				markdown += `${icon} ${entry.path}${size}\n`;
+			}
+			markdown += "```\n";
+		}
+
+		return {
+			content: [{ type: "text" as const, text: markdown }],
+		};
+	},
+);
+
+// ============================================================================
+// Kit File Content Tool
+// ============================================================================
+
+tool(
+	"kit_file_content",
+	{
+		description: `Batch read multiple files efficiently.
+
+Read content of one or more files in a single request. Reduces round trips compared to individual file reads.
+
+Returns content for each file with success/failure status.
+
+Requires Kit CLI: uv tool install cased-kit`,
+		inputSchema: {
+			files: z
+				.array(z.string())
+				.describe(
+					'File paths to read (relative to repo root). Example: ["src/index.ts", "package.json"]',
+				),
+			path: z
+				.string()
+				.optional()
+				.describe("Repository path (default: current directory)"),
+			response_format: z
+				.enum(["markdown", "json"])
+				.optional()
+				.describe("Output format: 'markdown' (default) or 'json'"),
+		},
+		annotations: {
+			readOnlyHint: true,
+			destructiveHint: false,
+			idempotentHint: true,
+			openWorldHint: false,
+		},
+	},
+	async (args: {
+		files: string[];
+		path?: string;
+		response_format?: string;
+	}) => {
+		const mcpCid = createCorrelationId();
+		const mcpStartTime = Date.now();
+		mcpLogger.info("MCP tool request", {
+			cid: mcpCid,
+			tool: "kit_file_content",
+			args: { fileCount: args.files.length },
+		});
+
+		const result = executeKitFileContent({
+			filePaths: args.files,
+			path: args.path,
+		});
+
+		const mcpDuration = Date.now() - mcpStartTime;
+		mcpLogger.info("MCP tool response", {
+			cid: mcpCid,
+			tool: "kit_file_content",
+			success: !("error" in result),
+			durationMs: mcpDuration,
+		});
+
+		// Format output
+		const format = args.response_format === "json" ? "json" : "markdown";
+
+		if ("error" in result) {
+			return {
+				isError: true,
+				content: [
+					{
+						type: "text" as const,
+						text:
+							format === "json"
+								? JSON.stringify(result, null, 2)
+								: `**Error:** ${result.error}${result.hint ? `\n\n*Hint:* ${result.hint}` : ""}`,
+					},
+				],
+			};
+		}
+
+		if (format === "json") {
+			return {
+				content: [
+					{ type: "text" as const, text: JSON.stringify(result, null, 2) },
+				],
+			};
+		}
+
+		// Format as markdown
+		let markdown = `## File Contents\n\n`;
+		markdown += `**Files requested:** ${result.count}\n`;
+		markdown += `**Found:** ${result.files.filter((f) => f.found).length}\n\n`;
+
+		for (const file of result.files) {
+			markdown += `### ${file.file}\n`;
+			if (file.found) {
+				// Detect language for syntax highlighting
+				const ext = file.file.split(".").pop() || "";
+				const lang =
+					{
+						ts: "typescript",
+						js: "javascript",
+						py: "python",
+						json: "json",
+						md: "markdown",
+					}[ext] || "";
+				markdown += `\`\`\`${lang}\n${file.content}\n\`\`\`\n`;
+			} else {
+				markdown += `_Not found: ${file.error || "File does not exist"}_\n`;
+			}
+			markdown += "\n";
+		}
+
+		return {
+			content: [{ type: "text" as const, text: markdown }],
+		};
+	},
+);
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Format bytes to human readable string.
+ */
+function formatBytes(bytes: number): string {
+	if (bytes === 0) return "0 B";
+	const k = 1024;
+	const sizes = ["B", "KB", "MB", "GB"];
+	const i = Math.floor(Math.log(bytes) / Math.log(k));
+	return `${Number.parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
+}
 
 // ============================================================================
 // Start Server

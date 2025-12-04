@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { loadConfig } from "./config";
+import { DEFAULT_FRONTMATTER_RULES, DEFAULT_SUGGESTED_TAGS } from "./defaults";
 
 const originalEnv = { ...process.env };
 
@@ -36,6 +37,8 @@ describe("loadConfig", () => {
 		const cfg = loadConfig();
 		expect(cfg.vault).toBe(path.resolve(vault));
 		expect(cfg.templatesDir).toBe(path.join(vault, "06_Metadata", "Templates"));
+		expect(cfg.suggestedTags).toEqual([...DEFAULT_SUGGESTED_TAGS]);
+		expect(cfg.frontmatterRules).toEqual(DEFAULT_FRONTMATTER_RULES);
 	});
 
 	it("applies user config overrides", () => {

@@ -9,47 +9,23 @@ model: claude-haiku-4-5-20251001
 
 Generate PROJECT_INDEX.json to enable token-efficient codebase queries with colorized output.
 
-## Instructions
+## Your Task
 
-Run the kit-index CLI prime command from anywhere - it automatically finds and indexes the git repository root:
+Execute the kit prime command with any provided arguments: $ARGUMENTS
 
+Use the Bash tool to run:
 ```bash
-bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts prime --format json
+bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts prime $ARGUMENTS
 ```
 
-The command will:
-1. Auto-detect git repository root (or use CWD if not in a git repo)
-2. Check for existing index and report age/stats if fresh (<24h)
-3. Generate new index if missing, stale, or `--force` flag passed
-4. Output colorized stats with ADHD-friendly visual hierarchy
-5. Suggest installation if kit CLI is not found
-
-## Arguments
-
-- `[path]` - Optional directory to index (defaults to git root, then CWD)
+If no arguments are provided, run without additional flags. Common arguments:
 - `--force` - Regenerate index even if less than 24 hours old
 - `--format json` - Output JSON instead of colorized markdown
 
-## Examples
+What happens:
+- Auto-detects git repository root
+- Checks for existing index (warns if fresh < 24h)
+- Generates new index if missing, stale, or `--force` used
+- Reports file count, symbol count, and index size
 
-```bash
-# Generate index at git root (auto-detected) with JSON output
-bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts prime --format json
-
-# Generate index for specific directory
-bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts prime /path/to/project --format json
-
-# Force regenerate at git root
-bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts prime --force --format json
-
-# Human-readable markdown output
-bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts prime
-```
-
-## Output Features
-
-- 🟢 Green checkmarks for success
-- 🔵 Blue numbers for stats
-- 📊 Clear visual hierarchy with colors
-- ⚠️ Warnings for fresh index
-- ❌ Error messages with installation hints
+After execution, display the output to the user showing the index status.

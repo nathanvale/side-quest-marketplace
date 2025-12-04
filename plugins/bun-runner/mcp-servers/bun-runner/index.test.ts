@@ -140,7 +140,9 @@ error: expect(received).toEqual(expected)
 		expect(result.failures[0]?.file).toBe("/path/to/fail.test.ts");
 		expect(result.failures[0]?.line).toBe(4);
 		expect(result.failures[0]?.message).toContain("should fail");
-		expect(result.failures[0]?.message).toContain("expect(received).toEqual(expected)");
+		expect(result.failures[0]?.message).toContain(
+			"expect(received).toEqual(expected)",
+		);
 		expect(result.failures[0]?.message).toContain('"name": "Alice"');
 	});
 

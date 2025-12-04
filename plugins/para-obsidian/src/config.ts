@@ -1,6 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import {
+	DEFAULT_FRONTMATTER_RULES,
+	DEFAULT_SUGGESTED_TAGS,
+	DEFAULT_TEMPLATE_VERSIONS,
+} from "./defaults";
+
 export interface FrontmatterRules {
 	readonly required?: Record<string, FieldRule>;
 }
@@ -23,6 +29,7 @@ export interface ParaObsidianConfig {
 	readonly gitCommitMessageTemplate?: string;
 	readonly suggestedTags?: ReadonlyArray<string>;
 	readonly frontmatterRules?: Record<string, FrontmatterRules>;
+	readonly templateVersions?: Record<string, number>;
 }
 
 function loadJsonIfExists<T>(filePath: string): Partial<T> | undefined {
@@ -97,5 +104,8 @@ export function loadConfig(
 		...merged,
 		vault,
 		templatesDir,
+		suggestedTags: merged.suggestedTags ?? [...DEFAULT_SUGGESTED_TAGS],
+		frontmatterRules: merged.frontmatterRules ?? DEFAULT_FRONTMATTER_RULES,
+		templateVersions: merged.templateVersions ?? DEFAULT_TEMPLATE_VERSIONS,
 	};
 }
