@@ -108,6 +108,24 @@
 			]
 		},
 		{
+			"name": "para-obsidian",
+			"source": "./plugins/para-obsidian",
+			"description": "PARA-compliant Obsidian vault management CLI. Creates notes with proper frontmatter, templates, and file organization following the PARA method.",
+			"version": "0.1.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "productivity",
+			"keywords": [
+				"obsidian",
+				"para",
+				"cli",
+				"vault",
+				"templates",
+				"frontmatter"
+			]
+		},
+		{
 			"name": "claude-code-docs",
 			"source": "./plugins/claude-code-docs",
 			"description": "Claude Code documentation - auto-updating local docs with search skill. Provides offline access to official documentation with automated fetching, indexing, and intelligent search.",
