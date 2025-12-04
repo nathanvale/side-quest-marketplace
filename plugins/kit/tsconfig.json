@@ -1,5 +1,11 @@
 {
 	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"paths": {
+			"@sidequest/core/*": ["../../core/src/*"],
+			"@sidequest/core": ["../../core/src/index"]
+		}
+	},
 	"include": ["src/**/*.ts"],
 	"exclude": ["**/node_modules/**"]
 }

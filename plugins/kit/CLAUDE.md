@@ -1,6 +1,19 @@
-# Kit Plugin for Claude Code
+# Kit Plugin
 
-Integrates the Kit CLI (cased-kit) with Claude Code via MCP server, providing intelligent code search through text, semantic, and AST-based pattern matching.
+Intelligent code search via Kit CLI with text, semantic, and AST-based patterns.
+
+---
+
+## CRITICAL RULES
+
+**YOU MUST** install Kit CLI before using this plugin:
+```bash
+uv tool install cased-kit
+```
+
+**ALWAYS** call `kit_index_prime` before using index tools (`kit_index_find`, `kit_index_overview`, `kit_index_stats`).
+
+---
 
 ## Directory Structure
 
@@ -8,220 +21,86 @@ Integrates the Kit CLI (cased-kit) with Claude Code via MCP server, providing in
 kit/
 ├── src/                       # Core library code
 │   ├── ast/                   # Tree-sitter AST search engine
-│   │   ├── languages.ts       # Language detection & parser init
-│   │   ├── pattern.ts         # AST pattern matching logic
-│   │   ├── searcher.ts        # Parallel AST search implementation
-│   │   └── types.ts           # AST search types
-│   ├── kit-wrapper.ts         # Pure functions for Kit CLI execution
-│   ├── errors.ts              # KitError types & detection
-│   ├── types.ts               # Shared type definitions
-│   ├── validators.ts          # Input validation for all tools
-│   ├── formatters.ts          # Output formatting (markdown/JSON)
-│   ├── logger.ts              # LogTape-based logging with correlation IDs
-│   └── index.ts               # Public exports
-├── mcp-servers/kit/           # MCP server implementation
-│   ├── index.ts               # 8 MCP tools exposing Kit functionality
-│   └── package.json           # MCP server dependencies
-├── hooks/                     # Plugin hooks
-│   └── hooks.json             # Hook configuration
-├── commands/                  # Slash commands
-│   └── logs.md                # /kit:logs command
-├── .claude-plugin/            # Plugin metadata
-├── .mcp.json                  # MCP server config
-└── package.json               # Dependencies
+│   ├── kit-wrapper.ts         # Pure CLI wrappers (25KB, core logic)
+│   ├── validators.ts          # Input validation (19KB)
+│   ├── formatters.ts          # Output formatting
+│   └── logger.ts              # LogTape correlation IDs
+├── mcp-servers/kit/           # MCP server (18 tools)
+├── commands/                  # Slash commands (/kit:logs, /kit:prime, etc.)
+└── docs/                      # Architecture & contributing guides
 ```
+
+---
 
 ## Commands
 
 ```bash
 bun test --recursive       # Run tests
 tsc --noEmit              # Type checking
-biome format --write .    # Format code
-biome lint .              # Lint code
 biome check --write .     # Lint and format
 ```
 
+---
+
 ## Key Files
 
-- `mcp-servers/kit/index.ts` — MCP server with 18 tools (search, index, analysis, file ops)
-- `src/kit-wrapper.ts` — Pure CLI wrappers for all Kit commands (25KB, core logic)
-- `src/ast/searcher.ts` — Parallel AST search using tree-sitter (TS/JS/Python)
-- `src/logger.ts` — LogTape logger with correlation IDs for request tracing
-- `src/validators.ts` — Comprehensive input validation (19KB)
+- `mcp-servers/kit/index.ts:kit-plugin` — 18 MCP tools (search, index, analysis, file ops)
+- `src/kit-wrapper.ts:30` — Pure CLI wrappers for all Kit commands (core logic)
+- `src/validators.ts:1` — Comprehensive input validation (27KB of tests!)
+- `src/ast/searcher.ts:1` — Parallel AST search using tree-sitter
 
-## MCP Tools (18 Total)
+---
 
-### Search Tools
+## Prerequisites
 
-| Tool | Purpose | Speed | Notes |
-|------|---------|-------|-------|
-| `kit_grep` | Text/regex search across files | ~30ms | Fastest for literal matches |
-| `kit_semantic` | Natural language vector search | ~500ms | Fallback to grep if ML unavailable |
-| `kit_ast_search` | Structural code patterns (tree-sitter) | ~400ms | TS/JS/Python support |
+```bash
+# Required
+uv tool install cased-kit
 
-### Index Tools (PROJECT_INDEX.json)
-
-| Tool | Purpose | Speed | Notes |
-|------|---------|-------|-------|
-| `kit_index_prime` | Generate/refresh PROJECT_INDEX.json | ~2s | Required before other index tools |
-| `kit_index_find` | Find symbol definitions | ~10ms | Fast symbol lookup |
-| `kit_index_stats` | Codebase statistics | ~10ms | Symbol counts, hotspots |
-| `kit_index_overview` | File symbol listing | ~10ms | All symbols in a file |
-
-### Code Analysis Tools
-
-| Tool | Purpose | Speed | Notes |
-|------|---------|-------|-------|
-| `kit_usages` | Find all usages of a symbol | ~300ms | Where is this used? |
-| `kit_callers` | Find function call sites | ~200ms | Who calls this function? |
-| `kit_calls` | Find function dependencies | ~200ms | What does this call? |
-| `kit_deps` | Import/export relationships | ~150ms | Python/Terraform only |
-| `kit_dead` | Dead code detection | ~500ms | Find unused exports |
-| `kit_blast` | Blast radius analysis | ~300ms | Impact of changes |
-| `kit_api` | Module public API listing | ~200ms | All exports from directory |
-
-### File Operations
-
-| Tool | Purpose | Speed | Notes |
-|------|---------|-------|-------|
-| `kit_file_tree` | Repository directory structure | ~50ms | Annotated tree view |
-| `kit_file_content` | Batch read multiple files | ~100ms | Reduces round trips |
-
-### Git/AI Tools
-
-| Tool | Purpose | Speed | Notes |
-|------|---------|-------|-------|
-| `kit_commit` | AI-generated commit messages | ~2s | dry_run=true by default |
-| `kit_summarize` | GitHub PR summary | ~3s | Can update PR body |
-
-## Architecture
-
-**MCP Layer** → Validates inputs, calls kit-wrapper functions, formats output
-
-**Kit Wrapper** → Executes Kit CLI via `spawnSync`, parses JSON, handles errors
-
-**Kit CLI** → Rust tool (cased-kit) doing actual file I/O, parsing, indexing
-
-**Semantic Search Flow:**
-1. Check if ML dependencies installed (`search-semantic` command)
-2. Create/use cached vector index in `~/.cache/kit/vector_db/<repo-hash>/`
-3. Execute Kit CLI with `--persist-dir` pointing to cache
-4. If ML unavailable → fallback to grep with keyword extraction
-5. Return semantic matches with relevance scores
-
-**AST Search (Tree-sitter):**
-- Supports TypeScript, JavaScript, Python
-- Two modes: **simple** (natural language like "async function") or **pattern** (JSON criteria)
-- Parallel file processing using async fs operations
-- Direct tree-sitter WASM parsing (no Kit CLI dependency)
-
-## Code Standards
-
-- **TypeScript strict mode** — Full type safety
-- **Functional core** — Pure functions in kit-wrapper.ts, side effects in MCP layer
-- **Error types** — Custom `KitError` enum with 8 error types
-- **Correlation IDs** — Every operation gets unique ID for log tracing
-- **Biome formatting** — Tab indentation, consistent style
-
-## Key Features
-
-### Semantic Search Cache Management
-```typescript
-// Per-repo cache: Each repository gets its own .kit/vector_db/
-getSemanticCacheDir("/path/to/repo")
-  → /path/to/repo/.kit/vector_db/
+# Optional (for semantic search)
+uv tool install 'cased-kit[ml]'
 ```
 
-- **Per-repo isolation** — Each repo's cache is scoped to `.kit/vector_db/` (gitignored)
-- **Context-aware** — Cache travels with the repo you're currently working in
-- **No cross-contamination** — Different repos have separate vector indexes
-- **Easy cleanup** — Delete `.kit/` directory when done with project
-- **Persistent indexes** — Vector DB survives across Claude Code sessions
-- **Rebuild option** — `buildIndex: true` forces index recreation
+**Graceful degradation:** If ML unavailable, semantic search automatically falls back to grep.
 
-### Graceful Degradation
-- Semantic search requires ML dependencies (`uv tool install 'cased-kit[ml]'`)
-- If unavailable → automatic fallback to grep with keyword extraction
-- Clear error messages with installation hints
-
-### Comprehensive Logging
-```typescript
-// Subsystem loggers for targeted debugging
-grepLogger, semanticLogger, symbolsLogger, astLogger, etc.
-
-// Correlation IDs link related log entries
-{ cid: "abc123", tool: "semantic", query: "auth flow", durationMs: 450 }
-```
+---
 
 ## Testing
 
 ```bash
 bun test --recursive              # All tests
-bun test src/validators.test.ts   # Validation logic (27KB of tests!)
+bun test src/validators.test.ts   # Validation edge cases (27KB!)
 bun test src/index.test.ts        # Integration tests
 ```
 
-**Test Coverage:**
-- Input validation edge cases
-- Error detection (semantic unavailable, output parsing)
-- Kit CLI execution with mocked `spawnSync`
-- Format conversion (grep → semantic fallback)
+---
 
-## Environment Variables
+## MCP Tools (18 Total)
 
-- `KIT_DEFAULT_PATH` — Default repository path for searches (falls back to CWD)
+Kit provides 18 tools across 5 categories. See @../../../docs/MCP_TOOLS.md for complete reference.
 
-## Git Workflow
+**Most used:**
+- `kit_grep` — Text/regex search (~30ms, fastest for literals)
+- `kit_index_find` — Symbol lookup (~10ms, requires `kit_index_prime`)
+- `kit_semantic` — Natural language search (~500ms, ML-powered)
+- `kit_callers` — Find who calls a function (~200ms)
+- `kit_file_tree` — Repository structure (~50ms)
 
-Commits: `type(scope): subject`
+**Tool priority:** Index-based (~10ms) → Graph+analysis (~200-300ms) → Direct search (~30-500ms)
 
-Examples:
-- `feat(kit): add AST search with tree-sitter`
-- `fix(semantic): handle ML dependencies gracefully`
-- `perf(ast): parallelize file processing`
+---
 
-## Notable Patterns
+## Learn More
 
-**Timeout Hierarchy** — Different timeouts per operation:
-```typescript
-GREP_TIMEOUT = 30s
-SEMANTIC_TIMEOUT = 60s (building index takes time)
-AST_SEARCH_TIMEOUT = 30s
-SYMBOLS_TIMEOUT = 20s
-```
+- **MCP Tools Reference:** @../../../docs/MCP_TOOLS.md (complete tool catalog with usage patterns)
+- **Architecture:** @./docs/ARCHITECTURE.md (MCP layer, semantic cache, AST search flow)
+- **Contributing:** @./docs/CONTRIBUTING.md (implementation patterns, debugging tips)
 
-**Temp File Strategy** — Grep uses temp files for JSON output (Kit CLI limitation)
-
-**Error Detection** — String matching for semantic unavailable errors in stdout/stderr:
-```typescript
-isSemanticUnavailableError(output) // Checks for "semantic search" + "not available"
-```
-
-**Fallback Conversion** — Grep results transformed to semantic format during fallback:
-```typescript
-// GrepMatch → SemanticMatch with score=1.0, chunk=line content
-```
-
-**Path Hashing** — SHA256 hash (first 12 chars) for unique cache directories
-
-## Dependencies
-
-- `@logtape/logtape` + `@logtape/file` — Structured logging framework
-- `tree-sitter-wasms` + `web-tree-sitter` — AST parsing for TS/JS/Python
-- `@types/bun` — TypeScript definitions
-
-## Prerequisites
-
-- Kit CLI installed: `uv tool install cased-kit`
-- Optional ML deps for semantic: `uv tool install 'cased-kit[ml]'`
+---
 
 ## Notes
 
-- **AST search is local** — Tree-sitter runs in-process, no Kit CLI needed
-- **Semantic search requires Python ML stack** — Transformers, sentence-transformers
-- **Cache location** — Semantic vector DB stored in `<repo>/.kit/vector_db/` (per-repo)
-- **Architecture for distributed plugin** — Each Claude Code session searches the repo it has open
-- **Cache in .gitignore** — `.kit/` already excluded from version control
-- **Cache cleanup** — Simply delete `.kit/` directory to remove all cached indexes
-- **Parallel AST** — Recent perf optimization (commit 04b89f4) parallelizes file processing
-- **Validators are extensive** — 27KB of validation tests ensure robust input handling
+- **Per-repo semantic cache** — Vector DB stored in `<repo>/.kit/vector_db/` (gitignored)
+- **AST search is local** — Tree-sitter runs in-process, no Kit CLI subprocess
+- **Parallel AST processing** — Recent perf optimization (commit 04b89f4)
+- **Extensive validation** — 27KB of edge case tests ensure robust input handling
