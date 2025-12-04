@@ -2,7 +2,6 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import readline from "node:readline";
 
 /**
  * PARA Obsidian CLI
@@ -220,24 +219,6 @@ function matchesDir(file: string, dirs?: ReadonlyArray<string>): boolean {
 			normalizedFile === normalizedDir ||
 			normalizedFile.startsWith(`${normalizedDir}/`)
 		);
-	});
-}
-
-function isInteractive(): boolean {
-	return Boolean(process.stdin.isTTY && process.stdout.isTTY);
-}
-
-async function promptYesNo(message: string): Promise<boolean> {
-	if (!isInteractive()) return false;
-	return new Promise((resolve) => {
-		const rl = readline.createInterface({
-			input: process.stdin,
-			output: process.stdout,
-		});
-		rl.question(`${message} [y/N] `, (answer) => {
-			rl.close();
-			resolve(/^y(es)?$/i.test(answer.trim()));
-		});
 	});
 }
 
