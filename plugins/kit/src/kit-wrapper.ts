@@ -54,16 +54,20 @@ import {
 } from "./errors.js";
 import {
 	astLogger,
+	commitLogger,
 	createCorrelationId,
 	fileContentLogger,
 	fileTreeLogger,
 	grepLogger,
 	semanticLogger,
+	summarizeLogger,
 	symbolsLogger,
 	usagesLogger,
 } from "./logger.js";
 import type {
 	CodeSymbol,
+	CommitOptions,
+	CommitResult,
 	FileContent,
 	FileContentOptions,
 	FileContentResult,
@@ -77,6 +81,8 @@ import type {
 	SemanticMatch,
 	SemanticOptions,
 	SemanticResult,
+	SummarizeOptions,
+	SummarizeResult,
 	SymbolsOptions,
 	SymbolsResult,
 	SymbolUsage,
@@ -84,11 +90,13 @@ import type {
 	UsagesResult,
 } from "./types.js";
 import {
+	COMMIT_TIMEOUT,
 	FILE_CONTENT_TIMEOUT,
 	FILE_TREE_TIMEOUT,
 	GREP_TIMEOUT,
 	getDefaultKitPath,
 	SEMANTIC_TIMEOUT,
+	SUMMARIZE_TIMEOUT,
 	SYMBOLS_TIMEOUT,
 	USAGES_TIMEOUT,
 } from "./types.js";
@@ -1044,6 +1052,84 @@ export function executeKitUsages(
 }
 
 // ============================================================================
+// Commit Execution
+// ============================================================================
+
+/**
+ * Execute kit commit command to generate AI-powered commit messages.
+ * @param options - Commit options
+ * @returns Commit result or error
+ */
+export function executeKitCommit(
+	options: CommitOptions,
+): KitResult<CommitResult> {
+	const cid = createCorrelationId();
+	const startTime = Date.now();
+
+	// Check if Kit is installed
+	if (!isKitInstalled()) {
+		commitLogger.error("Kit not installed", { cid });
+		return new KitError(KitErrorType.KitNotInstalled).toJSON();
+	}
+
+	const { dryRun = true, model, cwd } = options;
+
+	// Build command arguments
+	const args: string[] = ["commit"];
+
+	if (dryRun) {
+		args.push("--dry-run");
+	}
+
+	if (model) {
+		args.push("--model", model);
+	}
+
+	commitLogger.info("Executing kit commit", {
+		cid,
+		dryRun,
+		model,
+		cwd,
+		args,
+	});
+
+	try {
+		const result = executeKit(args, { timeout: COMMIT_TIMEOUT, cwd });
+
+		// Check for errors
+		if (result.exitCode !== 0) {
+			commitLogger.error("Commit failed", {
+				cid,
+				exitCode: result.exitCode,
+				stderr: result.stderr,
+				durationMs: Date.now() - startTime,
+			});
+			return createErrorFromOutput(result.stderr, result.exitCode).toJSON();
+		}
+
+		// Parse output - kit commit writes to stdout
+		const output = result.stdout.trim();
+
+		commitLogger.info("Commit completed", {
+			cid,
+			dryRun,
+			committed: !dryRun,
+			durationMs: Date.now() - startTime,
+		});
+
+		return {
+			message: output,
+			committed: !dryRun,
+			model,
+		};
+	} catch (error) {
+		const message = error instanceof Error ? error.message : "Unknown error";
+		commitLogger.error("Commit threw exception", { cid, error: message });
+		return new KitError(KitErrorType.KitCommandFailed, message).toJSON();
+	}
+}
+
+// ============================================================================
 // AST Search Execution (tree-sitter powered)
 // ============================================================================
 
@@ -1103,6 +1189,110 @@ export async function executeAstSearch(
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "Unknown error";
 		astLogger.error("AST search failed", { cid, error: message });
+		return new KitError(KitErrorType.KitCommandFailed, message).toJSON();
+	}
+}
+
+// ============================================================================
+// Summarize Execution
+// ============================================================================
+
+/**
+ * Execute kit summarize command to generate PR summary.
+ * @param options - Summarize options
+ * @returns Summarize result or error
+ */
+export function executeKitSummarize(
+	options: SummarizeOptions,
+): KitResult<SummarizeResult> {
+	const cid = createCorrelationId();
+	const startTime = Date.now();
+
+	// Check if Kit is installed
+	if (!isKitInstalled()) {
+		summarizeLogger.error("Kit not installed", { cid });
+		return new KitError(KitErrorType.KitNotInstalled).toJSON();
+	}
+
+	const {
+		prUrl,
+		updatePrBody = false, // Default to false for safety
+		model,
+		repoPath,
+	} = options;
+
+	// Build command arguments
+	const args: string[] = ["summarize", prUrl];
+
+	// Add flags
+	if (updatePrBody) {
+		args.push("--update-pr-body");
+	}
+
+	if (model) {
+		args.push("--model", model);
+	}
+
+	if (repoPath) {
+		args.push("--repo-path", repoPath);
+	}
+
+	// Use --plain for consistent output (no formatting)
+	args.push("--plain");
+
+	summarizeLogger.info("Executing kit summarize", {
+		cid,
+		prUrl,
+		updatePrBody,
+		model,
+		repoPath,
+	});
+
+	try {
+		const result = executeKit(args, { timeout: SUMMARIZE_TIMEOUT });
+
+		// Check for errors
+		if (result.exitCode !== 0) {
+			summarizeLogger.error("Summarize failed", {
+				cid,
+				exitCode: result.exitCode,
+				stderr: result.stderr,
+				durationMs: Date.now() - startTime,
+			});
+			return createErrorFromOutput(result.stderr, result.exitCode).toJSON();
+		}
+
+		// Extract summary from stdout
+		const summary = result.stdout.trim();
+
+		if (!summary) {
+			summarizeLogger.error("Empty summary returned", { cid });
+			return new KitError(
+				KitErrorType.OutputParseError,
+				"Summarize completed but returned empty output",
+			).toJSON();
+		}
+
+		summarizeLogger.info("Summarize completed", {
+			cid,
+			prUrl,
+			updated: updatePrBody,
+			summaryLength: summary.length,
+			durationMs: Date.now() - startTime,
+		});
+
+		return {
+			prUrl,
+			summary,
+			updated: updatePrBody,
+			...(model && { model }),
+		};
+	} catch (error) {
+		const message = error instanceof Error ? error.message : "Unknown error";
+		summarizeLogger.error("Summarize threw exception", {
+			cid,
+			error: message,
+		});
 		return new KitError(KitErrorType.KitCommandFailed, message).toJSON();
 	}
 }

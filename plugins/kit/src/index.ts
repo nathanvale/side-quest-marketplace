@@ -13,6 +13,7 @@
 export * from "./ast/index.js";
 export * from "./errors.js";
 export * from "./formatters.js";
+export * from "./index-tools.js";
 export * from "./kit-wrapper.js";
 export {
 	astLogger,

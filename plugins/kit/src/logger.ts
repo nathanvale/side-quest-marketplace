@@ -34,6 +34,8 @@ const {
 		"fileContent",
 		"usages",
 		"ast",
+		"commit",
+		"summarize",
 	],
 });
 
@@ -63,6 +65,12 @@ export const usagesLogger = getSubsystemLogger("usages");
 
 /** AST search subsystem logger */
 export const astLogger = getSubsystemLogger("ast");
+
+/** Commit subsystem logger */
+export const commitLogger = getSubsystemLogger("commit");
+
+/** Summarize subsystem logger */
+export const summarizeLogger = getSubsystemLogger("summarize");
 
 // ============================================================================
 // Legacy getter functions (for backwards compatibility)

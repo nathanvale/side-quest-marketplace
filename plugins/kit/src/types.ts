@@ -360,8 +360,74 @@ export const FILE_CONTENT_TIMEOUT = 15000;
 /** Default timeout for symbol usages operations (ms) */
 export const USAGES_TIMEOUT = 45000;
 
+/** Default timeout for commit operations (ms) */
+export const COMMIT_TIMEOUT = 60000;
+
+/** Default timeout for summarize operations (ms) */
+export const SUMMARIZE_TIMEOUT = 60000;
+
 /** Default max results for grep */
 export const DEFAULT_MAX_RESULTS = 100;
 
 /** Default top-k for semantic search */
 export const DEFAULT_TOP_K = 5;
+
+// ============================================================================
+// Commit Types
+// ============================================================================
+
+/**
+ * Commit options for kit commit command
+ */
+export interface CommitOptions {
+	/** Show generated message without committing (default: true for safety) */
+	dryRun?: boolean;
+	/** Optional LLM model override */
+	model?: string;
+	/** Working directory */
+	cwd?: string;
+}
+
+/**
+ * Commit result structure
+ */
+export interface CommitResult {
+	/** Generated commit message or commit confirmation */
+	message: string;
+	/** Whether commit was actually made */
+	committed: boolean;
+	/** Model used (if specified) */
+	model?: string;
+}
+
+// ============================================================================
+// Summarize Types
+// ============================================================================
+
+/**
+ * Options for PR summarize operation.
+ */
+export interface SummarizeOptions {
+	/** GitHub PR URL */
+	prUrl: string;
+	/** Update PR description with summary (default: false for safety) */
+	updatePrBody?: boolean;
+	/** Override LLM model */
+	model?: string;
+	/** Path to existing repository */
+	repoPath?: string;
+}
+
+/**
+ * Result of a summarize operation.
+ */
+export interface SummarizeResult {
+	/** GitHub PR URL */
+	prUrl: string;
+	/** Generated summary text */
+	summary: string;
+	/** Whether PR body was updated */
+	updated: boolean;
+	/** Model used (if specified) */
+	model?: string;
+}

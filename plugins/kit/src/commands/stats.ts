@@ -41,7 +41,7 @@ export async function executeStats(format: OutputFormat): Promise<void> {
 				);
 			}
 
-			console.log("\n" + color("magenta", "Complexity Hotspots:"));
+			console.log(`\n${color("magenta", "Complexity Hotspots:")}`);
 			for (const { directory, symbolCount } of hotspots) {
 				console.log(
 					`  ${color("dim", "•")} ${directory}: ${color("blue", symbolCount.toString())} symbols`,

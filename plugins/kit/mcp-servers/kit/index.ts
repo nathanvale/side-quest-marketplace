@@ -3,7 +3,7 @@
 /**
  * Kit MCP Server
  *
- * Provides grep, semantic search, and symbol extraction tools
+ * Provides PROJECT_INDEX.json-based tools for token-efficient codebase navigation
  * using the Kit CLI (cased-kit).
  */
 
@@ -11,32 +11,17 @@ import { startServer, tool, z } from "mcpez";
 
 import {
 	createCorrelationId,
-	executeAstSearch,
-	executeKitFileContent,
-	executeKitFileTree,
-	executeKitGrep,
-	executeKitSemantic,
-	executeKitSymbols,
-	executeKitUsages,
-	formatAstSearchResults,
-	formatFileContentResults,
-	formatFileTreeResults,
-	formatGrepResults,
-	formatSemanticResults,
-	formatSymbolsResults,
-	formatUsagesResults,
+	executeIndexFind,
+	executeIndexOverview,
+	executeIndexPrime,
+	executeIndexStats,
+	formatIndexFindResults,
+	formatIndexOverviewResults,
+	formatIndexPrimeResults,
+	formatIndexStatsResults,
 	getKitLogger,
 	initLogger,
-	isError,
 	ResponseFormat,
-	SearchMode,
-	validateAstSearchInputs,
-	validateFileContentInputs,
-	validateFileTreeInputs,
-	validateGrepInputs,
-	validateSemanticInputs,
-	validateSymbolsInputs,
-	validateUsagesInputs,
 } from "../../src/index.js";
 
 // Initialize logging
@@ -46,50 +31,32 @@ initLogger().catch(console.error);
 const mcpLogger = getKitLogger();
 
 // ============================================================================
-// Kit Grep Tool
+// Kit Index Find Tool
 // ============================================================================
 
 tool(
-	"kit_grep",
+	"kit_index_find",
 	{
-		description: `Fast text search across repository files using Kit CLI.
+		description: `Find symbol definitions from PROJECT_INDEX.json (token-efficient).
 
-Searches for literal patterns with optional regex support. Great for:
-- Finding function definitions
-- Locating error messages
-- Searching for specific strings
+Searches the pre-built index instead of scanning files. Great for:
+- Finding where a function/class/type is defined
+- Quick symbol lookup without reading source files
+- Understanding code structure with minimal tokens
 
-Results include file paths, line numbers, and matched content.`,
+Falls back to fuzzy matching if no exact match found.
+
+NOTE: Requires PROJECT_INDEX.json. Run kit_index_prime first if not present.`,
 		inputSchema: {
-			pattern: z
+			symbol_name: z
 				.string()
-				.describe('Search pattern (text or regex). Example: "function auth"'),
-			path: z
+				.describe('Symbol name to search for. Example: "executeKitGrep"'),
+			index_path: z
 				.string()
 				.optional()
 				.describe(
-					"Repository path to search (default: current directory, or KIT_DEFAULT_PATH env var)",
+					"Path to PROJECT_INDEX.json or directory containing it (default: walks up to find it)",
 				),
-			case_sensitive: z
-				.boolean()
-				.optional()
-				.describe("Case sensitive search (default: true)"),
-			include: z
-				.string()
-				.optional()
-				.describe('Include files matching pattern. Example: "*.ts"'),
-			exclude: z
-				.string()
-				.optional()
-				.describe('Exclude files matching pattern. Example: "*.test.ts"'),
-			max_results: z
-				.number()
-				.optional()
-				.describe("Maximum results to return (default: 100, max: 1000)"),
-			directory: z
-				.string()
-				.optional()
-				.describe("Limit search to specific subdirectory"),
 			response_format: z
 				.enum(["markdown", "json"])
 				.optional()
@@ -103,61 +70,20 @@ Results include file paths, line numbers, and matched content.`,
 		},
 	},
 	async (args: {
-		pattern: string;
-		path?: string;
-		case_sensitive?: boolean;
-		include?: string;
-		exclude?: string;
-		max_results?: number;
-		directory?: string;
+		symbol_name: string;
+		index_path?: string;
 		response_format?: string;
 	}) => {
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
 		mcpLogger.info("MCP tool request", {
 			cid: mcpCid,
-			tool: "kit_grep",
-			args: { pattern: args.pattern, path: args.path },
+			tool: "kit_index_find",
+			args: { symbol_name: args.symbol_name },
 		});
 
-		// Validate inputs
-		const validation = validateGrepInputs({
-			pattern: args.pattern,
-			path: args.path,
-			include: args.include,
-			exclude: args.exclude,
-			maxResults: args.max_results,
-		});
-
-		if (!validation.valid) {
-			mcpLogger.warn("MCP validation failed", {
-				cid: mcpCid,
-				tool: "kit_grep",
-				errors: validation.errors,
-			});
-			return {
-				isError: true,
-				content: [
-					{
-						type: "text" as const,
-						text: `**Validation Error:**\n\n${validation.errors.join("\n")}`,
-					},
-				],
-			};
-		}
-
-		const { validated } = validation;
-
-		// Execute grep
-		const result = executeKitGrep({
-			pattern: validated!.pattern,
-			path: validated!.path,
-			caseSensitive: args.case_sensitive,
-			include: validated!.include,
-			exclude: validated!.exclude,
-			maxResults: validated!.maxResults,
-			directory: args.directory,
-		});
+		// Execute index find
+		const result = await executeIndexFind(args.symbol_name, args.index_path);
 
 		// Format output
 		const format =
@@ -168,15 +94,258 @@ Results include file paths, line numbers, and matched content.`,
 		const mcpDuration = Date.now() - mcpStartTime;
 		mcpLogger.info("MCP tool response", {
 			cid: mcpCid,
-			tool: "kit_grep",
-			success: !isError(result),
+			tool: "kit_index_find",
+			success: !("isError" in result),
 			durationMs: mcpDuration,
 		});
 
 		return {
-			...(isError(result) ? { isError: true } : {}),
+			...("isError" in result ? { isError: true } : {}),
 			content: [
-				{ type: "text" as const, text: formatGrepResults(result, format) },
+				{ type: "text" as const, text: formatIndexFindResults(result, format) },
+			],
+		};
+	},
+);
+
+// ============================================================================
+// Kit Index Stats Tool
+// ============================================================================
+
+tool(
+	"kit_index_stats",
+	{
+		description: `Get codebase statistics from PROJECT_INDEX.json (token-efficient).
+
+Quick snapshot of codebase health without scanning files:
+- Total files and symbols count
+- Symbol type distribution (functions, classes, types, etc.)
+- Complexity hotspots (directories with most symbols)
+
+NOTE: Requires PROJECT_INDEX.json. Run kit_index_prime first if not present.`,
+		inputSchema: {
+			index_path: z
+				.string()
+				.optional()
+				.describe(
+					"Path to PROJECT_INDEX.json or directory containing it (default: walks up to find it)",
+				),
+			top_n: z
+				.number()
+				.optional()
+				.describe("Number of top complexity hotspots to return (default: 5)"),
+			response_format: z
+				.enum(["markdown", "json"])
+				.optional()
+				.describe("Output format: 'markdown' (default) or 'json'"),
+		},
+		annotations: {
+			readOnlyHint: true,
+			destructiveHint: false,
+			idempotentHint: true,
+			openWorldHint: false,
+		},
+	},
+	async (args: {
+		index_path?: string;
+		top_n?: number;
+		response_format?: string;
+	}) => {
+		const mcpCid = createCorrelationId();
+		const mcpStartTime = Date.now();
+		mcpLogger.info("MCP tool request", {
+			cid: mcpCid,
+			tool: "kit_index_stats",
+			args: { index_path: args.index_path },
+		});
+
+		// Execute index stats
+		const result = await executeIndexStats(args.index_path, args.top_n);
+
+		// Format output
+		const format =
+			args.response_format === "json"
+				? ResponseFormat.JSON
+				: ResponseFormat.MARKDOWN;
+
+		const mcpDuration = Date.now() - mcpStartTime;
+		mcpLogger.info("MCP tool response", {
+			cid: mcpCid,
+			tool: "kit_index_stats",
+			success: !("isError" in result),
+			durationMs: mcpDuration,
+		});
+
+		return {
+			...("isError" in result ? { isError: true } : {}),
+			content: [
+				{
+					type: "text" as const,
+					text: formatIndexStatsResults(result, format),
+				},
+			],
+		};
+	},
+);
+
+// ============================================================================
+// Kit Index Overview Tool
+// ============================================================================
+
+tool(
+	"kit_index_overview",
+	{
+		description: `Get all symbols in a file from PROJECT_INDEX.json (token-efficient).
+
+See file structure without reading source code:
+- All functions, classes, types, interfaces defined in the file
+- Line numbers for each symbol
+- Grouped by symbol type
+
+~50x token savings compared to reading the full file.
+
+NOTE: Requires PROJECT_INDEX.json. Run kit_index_prime first if not present.`,
+		inputSchema: {
+			file_path: z
+				.string()
+				.describe(
+					'File path to get symbols for (relative to repo root). Example: "src/kit-wrapper.ts"',
+				),
+			index_path: z
+				.string()
+				.optional()
+				.describe(
+					"Path to PROJECT_INDEX.json or directory containing it (default: walks up to find it)",
+				),
+			response_format: z
+				.enum(["markdown", "json"])
+				.optional()
+				.describe("Output format: 'markdown' (default) or 'json'"),
+		},
+		annotations: {
+			readOnlyHint: true,
+			destructiveHint: false,
+			idempotentHint: true,
+			openWorldHint: false,
+		},
+	},
+	async (args: {
+		file_path: string;
+		index_path?: string;
+		response_format?: string;
+	}) => {
+		const mcpCid = createCorrelationId();
+		const mcpStartTime = Date.now();
+		mcpLogger.info("MCP tool request", {
+			cid: mcpCid,
+			tool: "kit_index_overview",
+			args: { file_path: args.file_path },
+		});
+
+		// Execute index overview
+		const result = await executeIndexOverview(args.file_path, args.index_path);
+
+		// Format output
+		const format =
+			args.response_format === "json"
+				? ResponseFormat.JSON
+				: ResponseFormat.MARKDOWN;
+
+		const mcpDuration = Date.now() - mcpStartTime;
+		mcpLogger.info("MCP tool response", {
+			cid: mcpCid,
+			tool: "kit_index_overview",
+			success: !("isError" in result),
+			durationMs: mcpDuration,
+		});
+
+		return {
+			...("isError" in result ? { isError: true } : {}),
+			content: [
+				{
+					type: "text" as const,
+					text: formatIndexOverviewResults(result, format),
+				},
+			],
+		};
+	},
+);
+
+// ============================================================================
+// Kit Index Prime Tool
+// ============================================================================
+
+tool(
+	"kit_index_prime",
+	{
+		description: `Generate or refresh PROJECT_INDEX.json for the codebase.
+
+Creates a pre-built index enabling token-efficient queries:
+- Indexes all symbols (functions, classes, types, etc.)
+- Enables fast symbol lookup without scanning files
+- Auto-detects git repository root
+
+The index is valid for 24 hours. Use force=true to regenerate.
+
+Requires Kit CLI: uv tool install cased-kit`,
+		inputSchema: {
+			path: z
+				.string()
+				.optional()
+				.describe("Directory to index (default: git root, then CWD)"),
+			force: z
+				.boolean()
+				.optional()
+				.describe("Force regenerate even if index is less than 24 hours old"),
+			response_format: z
+				.enum(["markdown", "json"])
+				.optional()
+				.describe("Output format: 'markdown' (default) or 'json'"),
+		},
+		annotations: {
+			readOnlyHint: false,
+			destructiveHint: false,
+			idempotentHint: true,
+			openWorldHint: false,
+		},
+	},
+	async (args: {
+		path?: string;
+		force?: boolean;
+		response_format?: string;
+	}) => {
+		const mcpCid = createCorrelationId();
+		const mcpStartTime = Date.now();
+		mcpLogger.info("MCP tool request", {
+			cid: mcpCid,
+			tool: "kit_index_prime",
+			args: { path: args.path, force: args.force },
+		});
+
+		// Execute index prime
+		const result = await executeIndexPrime(args.force, args.path);
+
+		// Format output
+		const format =
+			args.response_format === "json"
+				? ResponseFormat.JSON
+				: ResponseFormat.MARKDOWN;
+
+		const mcpDuration = Date.now() - mcpStartTime;
+		mcpLogger.info("MCP tool response", {
+			cid: mcpCid,
+			tool: "kit_index_prime",
+			success: !("isError" in result),
+			durationMs: mcpDuration,
+		});
+
+		return {
+			...("isError" in result ? { isError: true } : {}),
+			content: [
+				{
+					type: "text" as const,
+					text: formatIndexPrimeResults(result, format),
+				},
 			],
 		};
 	},
@@ -247,407 +416,54 @@ To enable: uv tool install 'cased-kit[ml]'`,
 		mcpLogger.info("MCP tool request", {
 			cid: mcpCid,
 			tool: "kit_semantic",
-			args: { query: args.query, path: args.path },
+			args: { query: args.query },
 		});
 
-		// Validate inputs
-		const validation = validateSemanticInputs({
-			query: args.query,
-			path: args.path,
-			topK: args.top_k,
-		});
+		const { spawnSync } = await import("node:child_process");
+		const format = args.response_format === "json" ? "json" : "markdown";
+		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
-		if (!validation.valid) {
-			mcpLogger.warn("MCP validation failed", {
-				cid: mcpCid,
-				tool: "kit_semantic",
-				errors: validation.errors,
-			});
-			return {
-				isError: true,
-				content: [
-					{
-						type: "text" as const,
-						text: `**Validation Error:**\n\n${validation.errors.join("\n")}`,
-					},
-				],
-			};
+		const cmd = [
+			"run",
+			`${pluginRoot}/src/cli.ts`,
+			"search",
+			args.query,
+			"--format",
+			format,
+		];
+
+		if (args.path) {
+			cmd.push("--path", args.path);
+		}
+		if (args.top_k !== undefined) {
+			cmd.push("--top-k", String(args.top_k));
+		}
+		if (args.chunk_by) {
+			cmd.push("--chunk-by", args.chunk_by);
+		}
+		if (args.build_index) {
+			cmd.push("--build-index");
 		}
 
-		const { validated } = validation;
-
-		// Execute semantic search
-		const result = executeKitSemantic({
-			query: validated!.query,
-			path: validated!.path,
-			topK: validated!.topK,
-			chunkBy: args.chunk_by,
-			buildIndex: args.build_index,
+		const result = spawnSync("bun", cmd, {
+			encoding: "utf-8",
+			maxBuffer: 10 * 1024 * 1024,
 		});
-
-		// Format output
-		const format =
-			args.response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
 
 		const mcpDuration = Date.now() - mcpStartTime;
 		mcpLogger.info("MCP tool response", {
 			cid: mcpCid,
 			tool: "kit_semantic",
-			success: !isError(result),
+			success: result.status === 0,
 			durationMs: mcpDuration,
 		});
 
 		return {
-			...(isError(result) ? { isError: true } : {}),
-			content: [
-				{ type: "text" as const, text: formatSemanticResults(result, format) },
-			],
-		};
-	},
-);
-
-// ============================================================================
-// Kit Symbols Tool
-// ============================================================================
-
-tool(
-	"kit_symbols",
-	{
-		description: `Extract code symbols (functions, classes, etc.) from the repository.
-
-Lists all defined symbols with their locations. Great for:
-- Getting an overview of code structure
-- Finding function and class definitions
-- Understanding module APIs
-
-TIP: Use the 'file' parameter to extract symbols from a specific file (much faster than scanning entire repo).`,
-		inputSchema: {
-			path: z
-				.string()
-				.optional()
-				.describe(
-					"Repository path to analyze (default: current directory, or KIT_DEFAULT_PATH env var)",
-				),
-			file: z
-				.string()
-				.optional()
-				.describe(
-					"Extract symbols from a specific file only (relative to repo root). Much faster than full repo scan.",
-				),
-			pattern: z
-				.string()
-				.optional()
-				.describe('Filter files by pattern. Example: "*.ts"'),
-			symbol_type: z
-				.enum([
-					"function",
-					"class",
-					"variable",
-					"type",
-					"interface",
-					"method",
-					"property",
-					"constant",
-				])
-				.optional()
-				.describe("Filter by symbol type"),
-			response_format: z
-				.enum(["markdown", "json"])
-				.optional()
-				.describe("Output format: 'markdown' (default) or 'json'"),
-		},
-		annotations: {
-			readOnlyHint: true,
-			destructiveHint: false,
-			idempotentHint: true,
-			openWorldHint: false,
-		},
-	},
-	async (args: {
-		path?: string;
-		file?: string;
-		pattern?: string;
-		symbol_type?: string;
-		response_format?: string;
-	}) => {
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_symbols",
-			args: { path: args.path, file: args.file },
-		});
-
-		// Validate inputs
-		const validation = validateSymbolsInputs({
-			path: args.path,
-			file: args.file,
-			pattern: args.pattern,
-			symbolType: args.symbol_type,
-		});
-
-		if (!validation.valid) {
-			mcpLogger.warn("MCP validation failed", {
-				cid: mcpCid,
-				tool: "kit_symbols",
-				errors: validation.errors,
-			});
-			return {
-				isError: true,
-				content: [
-					{
-						type: "text" as const,
-						text: `**Validation Error:**\n\n${validation.errors.join("\n")}`,
-					},
-				],
-			};
-		}
-
-		const { validated } = validation;
-
-		// Execute symbols extraction
-		const result = executeKitSymbols({
-			path: validated!.path,
-			file: validated!.file,
-			pattern: validated!.pattern,
-			symbolType: validated!.symbolType,
-		});
-
-		// Format output
-		const format =
-			args.response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_symbols",
-			success: !isError(result),
-			durationMs: mcpDuration,
-		});
-
-		return {
-			...(isError(result) ? { isError: true } : {}),
-			content: [
-				{ type: "text" as const, text: formatSymbolsResults(result, format) },
-			],
-		};
-	},
-);
-
-// ============================================================================
-// Kit File Tree Tool
-// ============================================================================
-
-tool(
-	"kit_file_tree",
-	{
-		description: `Get the file tree structure of a repository.
-
-Returns all files and directories with their sizes. Great for:
-- Understanding repository structure
-- Finding files by location
-- Exploring unfamiliar codebases
-
-Use 'subpath' to focus on a specific directory.`,
-		inputSchema: {
-			path: z
-				.string()
-				.optional()
-				.describe(
-					"Repository path (default: current directory, or KIT_DEFAULT_PATH env var)",
-				),
-			subpath: z
-				.string()
-				.optional()
-				.describe(
-					'Subdirectory to show tree for (relative to repo root). Example: "src/components"',
-				),
-			response_format: z
-				.enum(["markdown", "json"])
-				.optional()
-				.describe("Output format: 'markdown' (default) or 'json'"),
-		},
-		annotations: {
-			readOnlyHint: true,
-			destructiveHint: false,
-			idempotentHint: true,
-			openWorldHint: false,
-		},
-	},
-	async (args: {
-		path?: string;
-		subpath?: string;
-		response_format?: string;
-	}) => {
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_file_tree",
-			args: { path: args.path },
-		});
-
-		// Validate inputs
-		const validation = validateFileTreeInputs({
-			path: args.path,
-			subpath: args.subpath,
-		});
-
-		if (!validation.valid) {
-			mcpLogger.warn("MCP validation failed", {
-				cid: mcpCid,
-				tool: "kit_file_tree",
-				errors: validation.errors,
-			});
-			return {
-				isError: true,
-				content: [
-					{
-						type: "text" as const,
-						text: `**Validation Error:**\n\n${validation.errors.join("\n")}`,
-					},
-				],
-			};
-		}
-
-		const { validated } = validation;
-
-		// Execute file tree
-		const result = executeKitFileTree({
-			path: validated!.path,
-			subpath: validated!.subpath,
-		});
-
-		// Format output
-		const format =
-			args.response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_file_tree",
-			success: !isError(result),
-			durationMs: mcpDuration,
-		});
-
-		return {
-			...(isError(result) ? { isError: true } : {}),
-			content: [
-				{ type: "text" as const, text: formatFileTreeResults(result, format) },
-			],
-		};
-	},
-);
-
-// ============================================================================
-// Kit File Content Tool
-// ============================================================================
-
-tool(
-	"kit_file_content",
-	{
-		description: `Get the content of one or more files in the repository.
-
-Retrieves file contents with proper error handling for missing files. Great for:
-- Reading multiple related files at once
-- Examining implementation details
-- Code review workflows
-
-Supports up to 20 files per request.`,
-		inputSchema: {
-			path: z
-				.string()
-				.optional()
-				.describe(
-					"Repository path (default: current directory, or KIT_DEFAULT_PATH env var)",
-				),
-			file_paths: z
-				.array(z.string())
-				.describe(
-					'File paths to retrieve (relative to repo root). Example: ["src/index.ts", "package.json"]',
-				),
-			response_format: z
-				.enum(["markdown", "json"])
-				.optional()
-				.describe("Output format: 'markdown' (default) or 'json'"),
-		},
-		annotations: {
-			readOnlyHint: true,
-			destructiveHint: false,
-			idempotentHint: true,
-			openWorldHint: false,
-		},
-	},
-	async (args: {
-		path?: string;
-		file_paths: string[];
-		response_format?: string;
-	}) => {
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_file_content",
-			args: { path: args.path },
-		});
-
-		// Validate inputs
-		const validation = validateFileContentInputs({
-			path: args.path,
-			filePaths: args.file_paths,
-		});
-
-		if (!validation.valid) {
-			mcpLogger.warn("MCP validation failed", {
-				cid: mcpCid,
-				tool: "kit_file_content",
-				errors: validation.errors,
-			});
-			return {
-				isError: true,
-				content: [
-					{
-						type: "text" as const,
-						text: `**Validation Error:**\n\n${validation.errors.join("\n")}`,
-					},
-				],
-			};
-		}
-
-		const { validated } = validation;
-
-		// Execute file content retrieval
-		const result = executeKitFileContent({
-			path: validated!.path,
-			filePaths: validated!.filePaths,
-		});
-
-		// Format output
-		const format =
-			args.response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_file_content",
-			success: !isError(result),
-			durationMs: mcpDuration,
-		});
-
-		return {
-			...(isError(result) ? { isError: true } : {}),
+			...(result.status !== 0 ? { isError: true } : {}),
 			content: [
 				{
 					type: "text" as const,
-					text: formatFileContentResults(result, format),
+					text: result.status === 0 ? result.stdout : result.stderr,
 				},
 			],
 		};
@@ -655,45 +471,24 @@ Supports up to 20 files per request.`,
 );
 
 // ============================================================================
-// Kit Usages Tool
+// Kit CLI Commands - Callers Tool
 // ============================================================================
 
 tool(
-	"kit_usages",
+	"kit_callers",
 	{
-		description: `Find where a symbol is defined in the codebase (AST-powered).
+		description: `Find all call sites of a function (who calls this function).
 
-Uses tree-sitter AST parsing to locate symbol definitions. Great for:
-- Finding where a function/class is declared
-- Locating type definitions
-- Understanding code structure
+Uses PROJECT_INDEX.json + grep to locate where a function is called. Great for:
+- Understanding function impact and dependencies
+- Finding all places that call a specific function
+- Impact analysis before refactoring
 
-NOTE: This finds DEFINITIONS, not all references/usages.`,
+Filters out the function definition to show only actual call sites.`,
 		inputSchema: {
-			path: z
+			function_name: z
 				.string()
-				.optional()
-				.describe(
-					"Repository path (default: current directory, or KIT_DEFAULT_PATH env var)",
-				),
-			symbol_name: z
-				.string()
-				.describe(
-					'Name of the symbol to find definitions for. Example: "AuthService"',
-				),
-			symbol_type: z
-				.enum([
-					"function",
-					"class",
-					"variable",
-					"type",
-					"interface",
-					"method",
-					"property",
-					"constant",
-				])
-				.optional()
-				.describe("Filter by symbol type"),
+				.describe('Function name to find callers for. Example: "executeFind"'),
 			response_format: z
 				.enum(["markdown", "json"])
 				.optional()
@@ -706,127 +501,496 @@ NOTE: This finds DEFINITIONS, not all references/usages.`,
 			openWorldHint: false,
 		},
 	},
-	async (args: {
-		path?: string;
-		symbol_name: string;
-		symbol_type?: string;
-		response_format?: string;
-	}) => {
+	async (args: { function_name: string; response_format?: string }) => {
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
 		mcpLogger.info("MCP tool request", {
 			cid: mcpCid,
-			tool: "kit_usages",
-			args: { path: args.path },
+			tool: "kit_callers",
+			args: { function_name: args.function_name },
 		});
 
-		// Validate inputs
-		const validation = validateUsagesInputs({
-			path: args.path,
-			symbolName: args.symbol_name,
-			symbolType: args.symbol_type,
-		});
+		const { spawnSync } = await import("node:child_process");
+		const format = args.response_format === "json" ? "json" : "markdown";
+		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
-		if (!validation.valid) {
-			mcpLogger.warn("MCP validation failed", {
-				cid: mcpCid,
-				tool: "kit_usages",
-				errors: validation.errors,
-			});
-			return {
-				isError: true,
-				content: [
-					{
-						type: "text" as const,
-						text: `**Validation Error:**\n\n${validation.errors.join("\n")}`,
-					},
-				],
-			};
-		}
-
-		const { validated } = validation;
-
-		// Execute usages search
-		const result = executeKitUsages({
-			path: validated!.path,
-			symbolName: validated!.symbolName,
-			symbolType: validated!.symbolType,
-		});
-
-		// Format output
-		const format =
-			args.response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
+		const result = spawnSync(
+			"bun",
+			[
+				"run",
+				`${pluginRoot}/src/cli.ts`,
+				"callers",
+				args.function_name,
+				"--format",
+				format,
+			],
+			{ encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 },
+		);
 
 		const mcpDuration = Date.now() - mcpStartTime;
 		mcpLogger.info("MCP tool response", {
 			cid: mcpCid,
-			tool: "kit_usages",
-			success: !isError(result),
+			tool: "kit_callers",
+			success: result.status === 0,
 			durationMs: mcpDuration,
 		});
 
 		return {
-			...(isError(result) ? { isError: true } : {}),
+			...(result.status !== 0 ? { isError: true } : {}),
 			content: [
-				{ type: "text" as const, text: formatUsagesResults(result, format) },
+				{
+					type: "text" as const,
+					text: result.status === 0 ? result.stdout : result.stderr,
+				},
 			],
 		};
 	},
 );
 
 // ============================================================================
-// Kit AST Search Tool
+// Kit CLI Commands - Calls Tool
 // ============================================================================
 
 tool(
-	"kit_ast_search",
+	"kit_calls",
 	{
-		description: `Search code using AST patterns (tree-sitter powered).
+		description: `Find what a function calls (function's dependencies).
 
-Find code by structure rather than text. Supports two modes:
+Analyzes what functions/modules are called by a target function. Great for:
+- Understanding function dependencies
+- Impact of changing called functions
+- Tracing execution flow
 
-**Simple mode** (default):
-- "async function" - Find async function declarations
-- "function" - Find all function declarations
-- "class" - Find class definitions
-- "try" - Find try statements
-- "import" - Find import statements
-- "export" - Find export statements
-
-**Pattern mode** (JSON criteria):
-- {"type": "function_declaration"} - Find by node type
-- {"type": "function_declaration", "async": true} - With modifiers
-- {"type": "class_declaration", "name": "MyClass"} - By name
-- {"textMatch": "TODO"} - Text within nodes
-
-Supports TypeScript, JavaScript, and Python files.
-
-Examples:
-- kit_ast_search("async function") - All async functions
-- kit_ast_search("class") - All class definitions
-- kit_ast_search('{"type": "arrow_function"}', mode="pattern")`,
+Note: Currently returns helpful error message for TypeScript/JavaScript (kit only supports Python/Terraform for call graph analysis).`,
 		inputSchema: {
-			pattern: z.string().describe("Search pattern (natural language or JSON)"),
-			mode: z
-				.enum(["simple", "pattern"])
-				.optional()
-				.describe("Search mode: 'simple' (default) or 'pattern'"),
-			file_pattern: z
+			function_name: z
 				.string()
+				.describe('Function name to analyze. Example: "executeFind"'),
+			response_format: z
+				.enum(["markdown", "json"])
 				.optional()
-				.describe('File glob pattern (e.g., "*.ts", "**/*.tsx")'),
+				.describe("Output format: 'markdown' (default) or 'json'"),
+		},
+		annotations: {
+			readOnlyHint: true,
+			destructiveHint: false,
+			idempotentHint: true,
+			openWorldHint: false,
+		},
+	},
+	async (args: { function_name: string; response_format?: string }) => {
+		const mcpCid = createCorrelationId();
+		const mcpStartTime = Date.now();
+		mcpLogger.info("MCP tool request", {
+			cid: mcpCid,
+			tool: "kit_calls",
+			args: { function_name: args.function_name },
+		});
+
+		const { spawnSync } = await import("node:child_process");
+		const format = args.response_format === "json" ? "json" : "markdown";
+		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
+
+		const result = spawnSync(
+			"bun",
+			[
+				"run",
+				`${pluginRoot}/src/cli.ts`,
+				"calls",
+				args.function_name,
+				"--format",
+				format,
+			],
+			{ encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 },
+		);
+
+		const mcpDuration = Date.now() - mcpStartTime;
+		mcpLogger.info("MCP tool response", {
+			cid: mcpCid,
+			tool: "kit_calls",
+			success: result.status === 0,
+			durationMs: mcpDuration,
+		});
+
+		return {
+			...(result.status !== 0 ? { isError: true } : {}),
+			content: [
+				{
+					type: "text" as const,
+					text: result.status === 0 ? result.stdout : result.stderr,
+				},
+			],
+		};
+	},
+);
+
+// ============================================================================
+// Kit CLI Commands - Deps Tool
+// ============================================================================
+
+tool(
+	"kit_deps",
+	{
+		description: `Show import/export relationships for a file.
+
+Analyzes imports and exports from a specific file. Great for:
+- Understanding file dependencies
+- Tracing import chains
+- Circular dependency detection
+
+Note: Currently returns helpful error message for TypeScript/JavaScript (kit only supports Python/Terraform for dependency analysis).`,
+		inputSchema: {
+			file_path: z
+				.string()
+				.describe(
+					'File path to analyze (relative to repo root). Example: "src/index.ts"',
+				),
+			response_format: z
+				.enum(["markdown", "json"])
+				.optional()
+				.describe("Output format: 'markdown' (default) or 'json'"),
+		},
+		annotations: {
+			readOnlyHint: true,
+			destructiveHint: false,
+			idempotentHint: true,
+			openWorldHint: false,
+		},
+	},
+	async (args: { file_path: string; response_format?: string }) => {
+		const mcpCid = createCorrelationId();
+		const mcpStartTime = Date.now();
+		mcpLogger.info("MCP tool request", {
+			cid: mcpCid,
+			tool: "kit_deps",
+			args: { file_path: args.file_path },
+		});
+
+		const { spawnSync } = await import("node:child_process");
+		const format = args.response_format === "json" ? "json" : "markdown";
+		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
+
+		const result = spawnSync(
+			"bun",
+			[
+				"run",
+				`${pluginRoot}/src/cli.ts`,
+				"deps",
+				args.file_path,
+				"--format",
+				format,
+			],
+			{ encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 },
+		);
+
+		const mcpDuration = Date.now() - mcpStartTime;
+		mcpLogger.info("MCP tool response", {
+			cid: mcpCid,
+			tool: "kit_deps",
+			success: result.status === 0,
+			durationMs: mcpDuration,
+		});
+
+		return {
+			...(result.status !== 0 ? { isError: true } : {}),
+			content: [
+				{
+					type: "text" as const,
+					text: result.status === 0 ? result.stdout : result.stderr,
+				},
+			],
+		};
+	},
+);
+
+// ============================================================================
+// Kit CLI Commands - Dead Code Tool
+// ============================================================================
+
+tool(
+	"kit_dead",
+	{
+		description: `Find unused exports (dead code detection).
+
+Identifies exported symbols that have no external references. Great for:
+- Cleaning up dead code
+- Finding unused exports
+- Code maintenance and refactoring
+
+Requires PROJECT_INDEX.json. Run kit_index_prime first if not present.`,
+		inputSchema: {
 			path: z
 				.string()
 				.optional()
 				.describe(
-					"Repository path (default: current directory, or KIT_DEFAULT_PATH env var)",
+					"Directory to scope search (optional, defaults to entire repo). Example: 'src/lib'",
 				),
+			response_format: z
+				.enum(["markdown", "json"])
+				.optional()
+				.describe("Output format: 'markdown' (default) or 'json'"),
+		},
+		annotations: {
+			readOnlyHint: true,
+			destructiveHint: false,
+			idempotentHint: true,
+			openWorldHint: false,
+		},
+	},
+	async (args: { path?: string; response_format?: string }) => {
+		const mcpCid = createCorrelationId();
+		const mcpStartTime = Date.now();
+		mcpLogger.info("MCP tool request", {
+			cid: mcpCid,
+			tool: "kit_dead",
+			args: { path: args.path },
+		});
+
+		const { spawnSync } = await import("node:child_process");
+		const format = args.response_format === "json" ? "json" : "markdown";
+		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
+
+		const cmd = args.path
+			? [
+					"run",
+					`${pluginRoot}/src/cli.ts`,
+					"dead",
+					args.path,
+					"--format",
+					format,
+				]
+			: ["run", `${pluginRoot}/src/cli.ts`, "dead", "--format", format];
+
+		const result = spawnSync("bun", cmd, {
+			encoding: "utf-8",
+			maxBuffer: 10 * 1024 * 1024,
+		});
+
+		const mcpDuration = Date.now() - mcpStartTime;
+		mcpLogger.info("MCP tool response", {
+			cid: mcpCid,
+			tool: "kit_dead",
+			success: result.status === 0,
+			durationMs: mcpDuration,
+		});
+
+		return {
+			...(result.status !== 0 ? { isError: true } : {}),
+			content: [
+				{
+					type: "text" as const,
+					text: result.status === 0 ? result.stdout : result.stderr,
+				},
+			],
+		};
+	},
+);
+
+// ============================================================================
+// Kit CLI Commands - Blast Radius Tool
+// ============================================================================
+
+tool(
+	"kit_blast",
+	{
+		description: `Blast radius analysis: what gets affected by changing something.
+
+Shows all code that depends on a specific file or symbol. Great for:
+- Understanding change impact
+- Refactoring safety analysis
+- Dependency tracing
+
+Accepts target as either:
+- Symbol name (e.g., "executeFind")
+- File location (e.g., "src/index.ts:42")`,
+		inputSchema: {
+			target: z
+				.string()
+				.describe(
+					'Target to analyze (symbol name or file:line). Examples: "executeFind", "src/index.ts:42"',
+				),
+			response_format: z
+				.enum(["markdown", "json"])
+				.optional()
+				.describe("Output format: 'markdown' (default) or 'json'"),
+		},
+		annotations: {
+			readOnlyHint: true,
+			destructiveHint: false,
+			idempotentHint: true,
+			openWorldHint: false,
+		},
+	},
+	async (args: { target: string; response_format?: string }) => {
+		const mcpCid = createCorrelationId();
+		const mcpStartTime = Date.now();
+		mcpLogger.info("MCP tool request", {
+			cid: mcpCid,
+			tool: "kit_blast",
+			args: { target: args.target },
+		});
+
+		const { spawnSync } = await import("node:child_process");
+		const format = args.response_format === "json" ? "json" : "markdown";
+		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
+
+		const result = spawnSync(
+			"bun",
+			[
+				"run",
+				`${pluginRoot}/src/cli.ts`,
+				"blast",
+				args.target,
+				"--format",
+				format,
+			],
+			{ encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 },
+		);
+
+		const mcpDuration = Date.now() - mcpStartTime;
+		mcpLogger.info("MCP tool response", {
+			cid: mcpCid,
+			tool: "kit_blast",
+			success: result.status === 0,
+			durationMs: mcpDuration,
+		});
+
+		return {
+			...(result.status !== 0 ? { isError: true } : {}),
+			content: [
+				{
+					type: "text" as const,
+					text: result.status === 0 ? result.stdout : result.stderr,
+				},
+			],
+		};
+	},
+);
+
+// ============================================================================
+// Kit CLI Commands - API Tool
+// ============================================================================
+
+tool(
+	"kit_api",
+	{
+		description: `List module public API (all exports from a directory).
+
+Extracts and displays all exported symbols from a directory. Great for:
+- Understanding module interfaces
+- API surface documentation
+- Finding what a module exposes
+
+Uses heuristics to identify likely exported symbols (PascalCase, UPPER_CASE, common patterns).`,
+		inputSchema: {
+			directory: z
+				.string()
+				.describe(
+					'Directory to analyze (relative to repo root). Example: "src/commands"',
+				),
+			response_format: z
+				.enum(["markdown", "json"])
+				.optional()
+				.describe("Output format: 'markdown' (default) or 'json'"),
+		},
+		annotations: {
+			readOnlyHint: true,
+			destructiveHint: false,
+			idempotentHint: true,
+			openWorldHint: false,
+		},
+	},
+	async (args: { directory: string; response_format?: string }) => {
+		const mcpCid = createCorrelationId();
+		const mcpStartTime = Date.now();
+		mcpLogger.info("MCP tool request", {
+			cid: mcpCid,
+			tool: "kit_api",
+			args: { directory: args.directory },
+		});
+
+		const { spawnSync } = await import("node:child_process");
+		const format = args.response_format === "json" ? "json" : "markdown";
+		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
+
+		const result = spawnSync(
+			"bun",
+			[
+				"run",
+				`${pluginRoot}/src/cli.ts`,
+				"api",
+				args.directory,
+				"--format",
+				format,
+			],
+			{ encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 },
+		);
+
+		const mcpDuration = Date.now() - mcpStartTime;
+		mcpLogger.info("MCP tool response", {
+			cid: mcpCid,
+			tool: "kit_api",
+			success: result.status === 0,
+			durationMs: mcpDuration,
+		});
+
+		return {
+			...(result.status !== 0 ? { isError: true } : {}),
+			content: [
+				{
+					type: "text" as const,
+					text: result.status === 0 ? result.stdout : result.stderr,
+				},
+			],
+		};
+	},
+);
+
+// ============================================================================
+// Kit Grep Tool
+// ============================================================================
+
+tool(
+	"kit_grep",
+	{
+		description: `Fast text search across repository files using Kit CLI.
+
+Searches for literal patterns with optional regex support. Great for:
+- Finding function definitions
+- Locating error messages
+- Searching for specific strings
+
+Results include file paths, line numbers, and matched content.`,
+		inputSchema: {
+			pattern: z
+				.string()
+				.describe('Search pattern (text or regex). Example: "function auth"'),
+			path: z
+				.string()
+				.optional()
+				.describe(
+					"Repository path to search (default: current directory, or KIT_DEFAULT_PATH env var)",
+				),
+			include: z
+				.string()
+				.optional()
+				.describe('Include files matching pattern. Example: "*.ts"'),
+			exclude: z
+				.string()
+				.optional()
+				.describe('Exclude files matching pattern. Example: "*.test.ts"'),
+			case_sensitive: z
+				.boolean()
+				.optional()
+				.describe("Case sensitive search (default: true)"),
 			max_results: z
 				.number()
 				.optional()
-				.describe("Maximum results to return (default: 100, max: 500)"),
+				.describe("Maximum results to return (default: 100, max: 1000)"),
+			directory: z
+				.string()
+				.optional()
+				.describe("Limit search to specific subdirectory"),
 			response_format: z
 				.enum(["markdown", "json"])
 				.optional()
@@ -841,76 +1005,274 @@ Examples:
 	},
 	async (args: {
 		pattern: string;
-		mode?: "simple" | "pattern";
-		file_pattern?: string;
 		path?: string;
+		include?: string;
+		exclude?: string;
+		case_sensitive?: boolean;
 		max_results?: number;
+		directory?: string;
 		response_format?: string;
 	}) => {
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
 		mcpLogger.info("MCP tool request", {
 			cid: mcpCid,
-			tool: "kit_ast_search",
-			args: { pattern: args.pattern, path: args.path },
+			tool: "kit_grep",
+			args: { pattern: args.pattern },
 		});
 
-		// Validate inputs
-		const validation = validateAstSearchInputs({
-			pattern: args.pattern,
-			mode: args.mode,
-			filePattern: args.file_pattern,
-			path: args.path,
-			maxResults: args.max_results,
+		const { spawnSync } = await import("node:child_process");
+		const format = args.response_format === "json" ? "json" : "markdown";
+		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
+
+		// Build command arguments
+		const cmd = [
+			"run",
+			`${pluginRoot}/src/cli.ts`,
+			"grep",
+			args.pattern,
+			"--format",
+			format,
+		];
+
+		// Add optional flags
+		if (args.path) cmd.push("--path", args.path);
+		if (args.include) cmd.push("--include", args.include);
+		if (args.exclude) cmd.push("--exclude", args.exclude);
+		if (args.case_sensitive === false) cmd.push("--case-insensitive", "true");
+		if (args.max_results) cmd.push("--max-results", String(args.max_results));
+		if (args.directory) cmd.push("--directory", args.directory);
+
+		const result = spawnSync("bun", cmd, {
+			encoding: "utf-8",
+			maxBuffer: 10 * 1024 * 1024,
 		});
-
-		if (!validation.valid) {
-			mcpLogger.warn("MCP validation failed", {
-				cid: mcpCid,
-				tool: "kit_ast_search",
-				errors: validation.errors,
-			});
-			return {
-				isError: true,
-				content: [
-					{
-						type: "text" as const,
-						text: `**Validation Error:**\n\n${validation.errors.join("\n")}`,
-					},
-				],
-			};
-		}
-
-		const { validated } = validation;
-
-		// Execute AST search
-		const result = await executeAstSearch({
-			pattern: validated!.pattern,
-			mode:
-				validated!.mode === "pattern" ? SearchMode.PATTERN : SearchMode.SIMPLE,
-			filePattern: validated!.filePattern,
-			path: validated!.path,
-			maxResults: validated!.maxResults,
-		});
-
-		// Format output
-		const format =
-			args.response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
 
 		const mcpDuration = Date.now() - mcpStartTime;
 		mcpLogger.info("MCP tool response", {
 			cid: mcpCid,
-			tool: "kit_ast_search",
-			success: !isError(result),
+			tool: "kit_grep",
+			success: result.status === 0,
 			durationMs: mcpDuration,
 		});
 
 		return {
-			...(isError(result) ? { isError: true } : {}),
+			...(result.status !== 0 ? { isError: true } : {}),
 			content: [
-				{ type: "text" as const, text: formatAstSearchResults(result, format) },
+				{
+					type: "text" as const,
+					text: result.status === 0 ? result.stdout : result.stderr,
+				},
+			],
+		};
+	},
+);
+
+// ============================================================================
+// Kit Commit Tool
+// ============================================================================
+
+tool(
+	"kit_commit",
+	{
+		description: `Generate AI-powered commit messages from staged changes.
+
+Uses kit CLI to analyze git diff and generate intelligent, conventional commit messages.
+Great for:
+- Creating descriptive commit messages automatically
+- Following commit message conventions
+- Saving time on commit message writing
+
+IMPORTANT: Default dry_run=true for safety. Set to false to actually commit.
+
+Requires Kit CLI: uv tool install cased-kit`,
+		inputSchema: {
+			dry_run: z
+				.boolean()
+				.optional()
+				.describe(
+					"Show generated message without committing (default: true for safety)",
+				),
+			model: z
+				.string()
+				.optional()
+				.describe(
+					'Override LLM model. Examples: "gpt-4.1-nano", "claude-sonnet-4-20250514"',
+				),
+			response_format: z
+				.enum(["markdown", "json"])
+				.optional()
+				.describe("Output format: 'markdown' (default) or 'json'"),
+		},
+		annotations: {
+			readOnlyHint: false, // Can modify git state
+			destructiveHint: false, // Not destructive (can be dry run)
+			idempotentHint: false, // Each commit is unique
+			openWorldHint: false,
+		},
+	},
+	async (args: {
+		dry_run?: boolean;
+		model?: string;
+		response_format?: string;
+	}) => {
+		const mcpCid = createCorrelationId();
+		const mcpStartTime = Date.now();
+		mcpLogger.info("MCP tool request", {
+			cid: mcpCid,
+			tool: "kit_commit",
+			args: { dry_run: args.dry_run, model: args.model },
+		});
+
+		const { spawnSync } = await import("node:child_process");
+		const format = args.response_format === "json" ? "json" : "markdown";
+		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
+
+		// Default dry_run to true for safety
+		const dryRun = args.dry_run !== false;
+
+		const cmdArgs = [
+			"run",
+			`${pluginRoot}/src/cli.ts`,
+			"commit",
+			"--format",
+			format,
+		];
+
+		if (dryRun) {
+			cmdArgs.push("--dry-run", "true");
+		} else {
+			cmdArgs.push("--dry-run", "false");
+		}
+
+		if (args.model) {
+			cmdArgs.push("--model", args.model);
+		}
+
+		const result = spawnSync("bun", cmdArgs, {
+			encoding: "utf-8",
+			maxBuffer: 10 * 1024 * 1024,
+			timeout: 60000,
+		});
+
+		const mcpDuration = Date.now() - mcpStartTime;
+		mcpLogger.info("MCP tool response", {
+			cid: mcpCid,
+			tool: "kit_commit",
+			success: result.status === 0,
+			durationMs: mcpDuration,
+		});
+
+		return {
+			...(result.status !== 0 ? { isError: true } : {}),
+			content: [
+				{
+					type: "text" as const,
+					text: result.status === 0 ? result.stdout : result.stderr,
+				},
+			],
+		};
+	},
+);
+
+// ============================================================================
+// Kit CLI Commands - Summarize Tool
+// ============================================================================
+
+tool(
+	"kit_summarize",
+	{
+		description: `Generate a concise summary of a GitHub PR.
+
+Uses Kit CLI to analyze PR changes and generate summary. Great for:
+- Quick PR understanding
+- PR review preparation
+- Documentation of changes
+
+Can optionally update the PR description with the generated summary.
+
+IMPORTANT: Default update_pr_body=false for safety.`,
+		inputSchema: {
+			pr_url: z
+				.string()
+				.describe(
+					'GitHub PR URL. Example: "https://github.com/owner/repo/pull/123"',
+				),
+			update_pr_body: z
+				.boolean()
+				.optional()
+				.describe("Update PR description with summary (default: false)"),
+			model: z
+				.string()
+				.optional()
+				.describe('Override LLM model. Example: "claude-sonnet-4-20250514"'),
+			response_format: z
+				.enum(["markdown", "json"])
+				.optional()
+				.describe("Output format: 'markdown' (default) or 'json'"),
+		},
+		annotations: {
+			readOnlyHint: false, // Can update PR body
+			destructiveHint: false,
+			idempotentHint: true,
+			openWorldHint: true, // Makes API calls to GitHub
+		},
+	},
+	async (args: {
+		pr_url: string;
+		update_pr_body?: boolean;
+		model?: string;
+		response_format?: string;
+	}) => {
+		const mcpCid = createCorrelationId();
+		const mcpStartTime = Date.now();
+		mcpLogger.info("MCP tool request", {
+			cid: mcpCid,
+			tool: "kit_summarize",
+			args: { pr_url: args.pr_url, update_pr_body: args.update_pr_body },
+		});
+
+		const { spawnSync } = await import("node:child_process");
+		const format = args.response_format === "json" ? "json" : "markdown";
+		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
+
+		const cmd = [
+			"run",
+			`${pluginRoot}/src/cli.ts`,
+			"summarize",
+			args.pr_url,
+			"--format",
+			format,
+		];
+
+		if (args.update_pr_body) {
+			cmd.push("--update-pr-body", "true");
+		}
+
+		if (args.model) {
+			cmd.push("--model", args.model);
+		}
+
+		const result = spawnSync("bun", cmd, {
+			encoding: "utf-8",
+			maxBuffer: 10 * 1024 * 1024,
+		});
+
+		const mcpDuration = Date.now() - mcpStartTime;
+		mcpLogger.info("MCP tool response", {
+			cid: mcpCid,
+			tool: "kit_summarize",
+			success: result.status === 0,
+			durationMs: mcpDuration,
+		});
+
+		return {
+			...(result.status !== 0 ? { isError: true } : {}),
+			content: [
+				{
+					type: "text" as const,
+					text: result.status === 0 ? result.stdout : result.stderr,
+				},
 			],
 		};
 	},

@@ -23,6 +23,7 @@ Usage:
   bun run src/cli.ts prime [path] [--force] [--format md|json]
   bun run src/cli.ts find <symbol> [--format md|json]
   bun run src/cli.ts overview <file> [--format md|json]
+  bun run src/cli.ts search <query> [--path <dir>] [--top-k N] [--chunk-by symbols|lines] [--build-index] [--format md|json]
   bun run src/cli.ts callers <function> [--format md|json]
   bun run src/cli.ts calls <function> [--format md|json]
   bun run src/cli.ts deps <file> [--format md|json]
@@ -30,6 +31,8 @@ Usage:
   bun run src/cli.ts blast <file:line|symbol> [--format md|json]
   bun run src/cli.ts api <directory> [--format md|json]
   bun run src/cli.ts stats [--format md|json]
+  bun run src/cli.ts commit [--dry-run] [--model <model>] [--format md|json]
+  bun run src/cli.ts summarize <pr-url> [--update-pr-body] [--model <model>] [--format md|json]
 
 Commands:
   prime       Generate/refresh PROJECT_INDEX.json
@@ -41,6 +44,14 @@ Commands:
 
   overview    List all symbols in a file
               Args: <file> - File path (relative or absolute)
+
+  search      Semantic search using natural language
+              Args: <query> - Natural language search query
+              Options:
+                --path <dir> - Directory to search (default: git root)
+                --top-k <N> - Number of results (default: 5)
+                --chunk-by <mode> - Chunking strategy: symbols|lines (default: symbols)
+                --build-index - Force rebuild vector index
 
   callers     Find who calls a function (call sites)
               Args: <function> - Function name to analyze
@@ -61,6 +72,17 @@ Commands:
               Args: <directory> - Directory path to analyze
 
   stats       Codebase health metrics and overview
+
+  grep        Fast text search across repository files
+              Args: <pattern> - Text or regex pattern to search for
+              Options: --path, --include, --exclude, --case-insensitive, --max-results, --directory
+
+  commit      Generate AI commit message from staged changes
+              Options: --dry-run (default: true), --model <model>
+
+  summarize   Generate PR summary using Kit CLI
+              Args: <pr-url> - GitHub PR URL (https://github.com/owner/repo/pull/123)
+              Options: --update-pr-body (update PR description), --model <model> (override LLM)
 
 Options:
   --format <type>   Output format: "md" (default) or "json"
@@ -91,6 +113,21 @@ Examples:
 
   # Check codebase stats
   bun run src/cli.ts stats
+
+  # Generate commit message (dry run)
+  bun run src/cli.ts commit
+
+  # Actually commit
+  bun run src/cli.ts commit --dry-run=false
+
+  # Use specific model
+  bun run src/cli.ts commit --model claude-sonnet-4-20250514
+
+  # Generate PR summary
+  bun run src/cli.ts summarize https://github.com/owner/repo/pull/123
+
+  # Update PR body with summary
+  bun run src/cli.ts summarize https://github.com/owner/repo/pull/123 --update-pr-body true
 `);
 }
 
@@ -136,6 +173,28 @@ async function main(): Promise<void> {
 				}
 				const { executeOverview } = await import("./commands/overview");
 				await executeOverview(file, format);
+				break;
+			}
+
+			case "search": {
+				const query = positional[0];
+				if (!query) {
+					console.error("Error: <query> required for search command");
+					console.error("Usage: bun run src/cli.ts search <query> [options]");
+					process.exit(1);
+				}
+
+				const { executeSearch } = await import("./commands/search");
+
+				// Parse options
+				const options = {
+					path: flags.path,
+					topK: flags["top-k"] ? Number(flags["top-k"]) : undefined,
+					chunkBy: flags["chunk-by"] as "symbols" | "lines" | undefined,
+					buildIndex: flags["build-index"] === "true",
+				};
+
+				await executeSearch(query, options, format);
 				break;
 			}
 
@@ -209,6 +268,55 @@ async function main(): Promise<void> {
 			case "stats": {
 				const { executeStats } = await import("./commands/stats");
 				await executeStats(format);
+				break;
+			}
+
+			case "commit": {
+				const dryRun = flags["dry-run"] !== "false"; // Default to true (safe)
+				const model = flags.model as string | undefined;
+				const { executeCommit } = await import("./commands/commit");
+				await executeCommit(dryRun, model, format);
+				break;
+			}
+
+			case "grep": {
+				const pattern = positional[0];
+				if (!pattern) {
+					console.error("Error: <pattern> required for grep command");
+					console.error("Usage: bun run src/cli.ts grep <pattern> [options]");
+					process.exit(1);
+				}
+				const { executeGrep } = await import("./commands/grep");
+
+				// Parse options from flags
+				const options = {
+					path: flags.path,
+					include: flags.include,
+					exclude: flags.exclude,
+					caseSensitive: flags["case-insensitive"] !== "true",
+					maxResults: flags["max-results"]
+						? Number.parseInt(flags["max-results"], 10)
+						: undefined,
+					directory: flags.directory,
+				};
+
+				await executeGrep(pattern, format, options);
+				break;
+			}
+
+			case "summarize": {
+				const prUrl = positional[0];
+				if (!prUrl) {
+					console.error("Error: <pr-url> required for summarize command");
+					console.error(
+						"Usage: bun run src/cli.ts summarize <pr-url> [--update-pr-body] [--model <model>]",
+					);
+					process.exit(1);
+				}
+				const updatePrBody = flags["update-pr-body"] === "true";
+				const model = flags.model;
+				const { executeSummarize } = await import("./commands/summarize");
+				await executeSummarize(prUrl, updatePrBody, model, format);
 				break;
 			}
 
