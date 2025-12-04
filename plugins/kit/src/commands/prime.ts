@@ -7,6 +7,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { color, OutputFormat } from "../formatters/output";
 
 interface IndexStats {
@@ -19,14 +20,46 @@ const INDEX_FILE = "PROJECT_INDEX.json";
 const MAX_AGE_HOURS = 24;
 
 /**
+ * Find git repository root by walking up directory tree
+ */
+function findGitRoot(): string | null {
+	const result = spawnSync("git", ["rev-parse", "--show-toplevel"], {
+		encoding: "utf-8",
+	});
+
+	if (result.status === 0 && result.stdout) {
+		return result.stdout.trim();
+	}
+
+	return null;
+}
+
+/**
+ * Get the target directory for indexing
+ * Priority: custom path > git root > CWD
+ */
+function getTargetDir(customPath?: string): string {
+	if (customPath) {
+		return resolve(customPath);
+	}
+
+	const gitRoot = findGitRoot();
+	if (gitRoot) {
+		return gitRoot;
+	}
+
+	return process.cwd();
+}
+
+/**
  * Check if index exists and return its age in hours
  */
-function getIndexAge(): number | null {
-	if (!existsSync(INDEX_FILE)) {
+function getIndexAge(indexPath: string): number | null {
+	if (!existsSync(indexPath)) {
 		return null;
 	}
 
-	const stats = statSync(INDEX_FILE);
+	const stats = statSync(indexPath);
 	const ageMs = Date.now() - stats.mtimeMs;
 	return ageMs / (1000 * 60 * 60); // Convert to hours
 }
@@ -34,8 +67,8 @@ function getIndexAge(): number | null {
 /**
  * Get human-readable file size
  */
-function getFileSize(): string {
-	const stats = statSync(INDEX_FILE);
+function getFileSize(indexPath: string): string {
+	const stats = statSync(indexPath);
 	const mb = stats.size / (1024 * 1024);
 	return `${mb.toFixed(2)} MB`;
 }
@@ -43,8 +76,8 @@ function getFileSize(): string {
 /**
  * Parse index stats from PROJECT_INDEX.json
  */
-async function parseIndexStats(): Promise<IndexStats> {
-	const file = Bun.file(INDEX_FILE);
+async function parseIndexStats(indexPath: string): Promise<IndexStats> {
+	const file = Bun.file(indexPath);
 	const json = (await file.json()) as {
 		files: unknown[];
 		symbols: Record<string, unknown[]>;
@@ -66,9 +99,12 @@ async function parseIndexStats(): Promise<IndexStats> {
 /**
  * Generate the index using kit CLI
  */
-function generateIndex(): { durationSec: number } {
+function generateIndex(
+	targetDir: string,
+	indexPath: string,
+): { durationSec: number } {
 	const startTime = Date.now();
-	const result = spawnSync("kit", ["index", ".", "-o", INDEX_FILE], {
+	const result = spawnSync("kit", ["index", targetDir, "-o", indexPath], {
 		encoding: "utf-8",
 	});
 
@@ -83,11 +119,16 @@ function generateIndex(): { durationSec: number } {
 /**
  * Report existing index (markdown format)
  */
-async function reportExistingMarkdown(ageHours: number): Promise<void> {
-	const stats = await parseIndexStats();
-	const size = getFileSize();
+async function reportExistingMarkdown(
+	ageHours: number,
+	indexPath: string,
+	targetDir: string,
+): Promise<void> {
+	const stats = await parseIndexStats(indexPath);
+	const size = getFileSize(indexPath);
 
 	console.log(color("cyan", "\n📊 PROJECT_INDEX.json exists\n"));
+	console.log(color("dim", `Location: ${targetDir}`));
 	console.log(color("dim", `Age: ${ageHours.toFixed(1)} hours`));
 	console.log(color("dim", `Files: ${stats.files}`));
 	console.log(color("dim", `Symbols: ${stats.symbols}`));
@@ -103,14 +144,19 @@ async function reportExistingMarkdown(ageHours: number): Promise<void> {
 /**
  * Report existing index (JSON format)
  */
-async function reportExistingJSON(ageHours: number): Promise<void> {
-	const stats = await parseIndexStats();
-	const size = getFileSize();
+async function reportExistingJSON(
+	ageHours: number,
+	indexPath: string,
+	targetDir: string,
+): Promise<void> {
+	const stats = await parseIndexStats(indexPath);
+	const size = getFileSize(indexPath);
 
 	console.log(
 		JSON.stringify(
 			{
 				status: "exists",
+				location: targetDir,
 				ageHours: Number.parseFloat(ageHours.toFixed(1)),
 				files: stats.files,
 				symbols: stats.symbols,
@@ -126,15 +172,20 @@ async function reportExistingJSON(ageHours: number): Promise<void> {
 /**
  * Report successful generation (markdown format)
  */
-async function reportSuccessMarkdown(durationSec: number): Promise<void> {
-	const stats = await parseIndexStats();
-	const size = getFileSize();
+async function reportSuccessMarkdown(
+	durationSec: number,
+	indexPath: string,
+	targetDir: string,
+): Promise<void> {
+	const stats = await parseIndexStats(indexPath);
+	const size = getFileSize(indexPath);
 
 	console.log(
 		color("green", "\n✅ PROJECT_INDEX.json generated successfully\n"),
 	);
 
 	console.log(color("cyan", "Stats:"));
+	console.log(`  ${color("dim", "•")} Location: ${color("blue", targetDir)}`);
 	console.log(
 		`  ${color("dim", "•")} Files indexed: ${color("blue", stats.files.toString())}`,
 	);
@@ -164,14 +215,19 @@ async function reportSuccessMarkdown(durationSec: number): Promise<void> {
 /**
  * Report successful generation (JSON format)
  */
-async function reportSuccessJSON(durationSec: number): Promise<void> {
-	const stats = await parseIndexStats();
-	const size = getFileSize();
+async function reportSuccessJSON(
+	durationSec: number,
+	indexPath: string,
+	targetDir: string,
+): Promise<void> {
+	const stats = await parseIndexStats(indexPath);
+	const size = getFileSize(indexPath);
 
 	console.log(
 		JSON.stringify(
 			{
 				success: true,
+				location: targetDir,
 				stats: {
 					files: stats.files,
 					symbols: stats.symbols,
@@ -191,20 +247,26 @@ async function reportSuccessJSON(durationSec: number): Promise<void> {
  *
  * @param force - Force regenerate even if index is fresh
  * @param format - Output format (markdown or JSON)
+ * @param customPath - Optional custom path to index (defaults to git root or CWD)
  */
 export async function executePrime(
 	force: boolean,
 	format: OutputFormat,
+	customPath?: string,
 ): Promise<void> {
 	try {
-		const ageHours = getIndexAge();
+		// Determine target directory and index path
+		const targetDir = getTargetDir(customPath);
+		const indexPath = join(targetDir, INDEX_FILE);
+
+		const ageHours = getIndexAge(indexPath);
 
 		// Check if index exists and is fresh
 		if (ageHours !== null && ageHours < MAX_AGE_HOURS && !force) {
 			if (format === OutputFormat.JSON) {
-				await reportExistingJSON(ageHours);
+				await reportExistingJSON(ageHours, indexPath, targetDir);
 			} else {
-				await reportExistingMarkdown(ageHours);
+				await reportExistingMarkdown(ageHours, indexPath, targetDir);
 			}
 			return;
 		}
@@ -215,13 +277,13 @@ export async function executePrime(
 		}
 
 		// Generate new index
-		const { durationSec } = generateIndex();
+		const { durationSec } = generateIndex(targetDir, indexPath);
 
 		// Report success
 		if (format === OutputFormat.JSON) {
-			await reportSuccessJSON(durationSec);
+			await reportSuccessJSON(durationSec, indexPath, targetDir);
 		} else {
-			await reportSuccessMarkdown(durationSec);
+			await reportSuccessMarkdown(durationSec, indexPath, targetDir);
 		}
 	} catch (error) {
 		if (format === OutputFormat.JSON) {

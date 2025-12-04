@@ -20,7 +20,7 @@ function printUsage() {
 Kit Index CLI - PROJECT_INDEX.json Management
 
 Usage:
-  bun run src/cli.ts prime [--force]
+  bun run src/cli.ts prime [path] [--force] [--format md|json]
   bun run src/cli.ts find <symbol> [--format md|json]
   bun run src/cli.ts overview <file> [--format md|json]
   bun run src/cli.ts callers <function> [--format md|json]
@@ -33,6 +33,7 @@ Usage:
 
 Commands:
   prime       Generate/refresh PROJECT_INDEX.json
+              Args: [path] - Optional directory to index (defaults to git root or CWD)
               Options: --force (regenerate even if < 24h old)
 
   find        Find symbol definitions by name
@@ -70,8 +71,14 @@ Options:
   --help            Show this help message
 
 Examples:
-  # Generate index
+  # Generate index at git root
   bun run src/cli.ts prime
+
+  # Generate index for specific directory
+  bun run src/cli.ts prime /path/to/project
+
+  # Force regenerate
+  bun run src/cli.ts prime --force
 
   # Find symbol
   bun run src/cli.ts find MyFunction
@@ -102,8 +109,9 @@ async function main(): Promise<void> {
 	try {
 		switch (command) {
 			case "prime": {
+				const path = positional[0]; // Optional path argument
 				const { executePrime } = await import("./commands/prime");
-				await executePrime(flags.force === "true", format);
+				await executePrime(flags.force === "true", format, path);
 				break;
 			}
 

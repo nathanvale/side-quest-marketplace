@@ -73,13 +73,55 @@ export async function findProjectIndex(
 }
 
 /**
+ * Resolve explicit path to PROJECT_INDEX.json
+ *
+ * Handles three cases:
+ * 1. Path to PROJECT_INDEX.json file directly
+ * 2. Path to directory containing PROJECT_INDEX.json
+ * 3. Relative path that needs resolution
+ *
+ * @param explicitPath - Explicit path provided by user
+ * @returns Absolute path to PROJECT_INDEX.json
+ * @throws Error if index not found at specified path
+ */
+export function resolveExplicitIndexPath(explicitPath: string): string {
+	const resolved = resolve(explicitPath);
+
+	// Case 1: Direct path to PROJECT_INDEX.json
+	if (resolved.endsWith("PROJECT_INDEX.json")) {
+		if (existsSync(resolved)) {
+			return resolved;
+		}
+		throw new Error(`PROJECT_INDEX.json not found at: ${resolved}`);
+	}
+
+	// Case 2: Directory containing PROJECT_INDEX.json
+	const indexInDir = join(resolved, "PROJECT_INDEX.json");
+	if (existsSync(indexInDir)) {
+		return indexInDir;
+	}
+
+	throw new Error(
+		`PROJECT_INDEX.json not found at: ${indexInDir}\n` +
+			"Specify either:\n" +
+			"  - Path to PROJECT_INDEX.json file\n" +
+			"  - Directory containing PROJECT_INDEX.json",
+	);
+}
+
+/**
  * Load and parse PROJECT_INDEX.json
  *
+ * @param explicitPath - Optional explicit path to index file or directory
  * @returns Parsed project index
  * @throws Error if index not found or invalid JSON
  */
-export async function loadProjectIndex(): Promise<ProjectIndex> {
-	const indexPath = await findProjectIndex();
+export async function loadProjectIndex(
+	explicitPath?: string,
+): Promise<ProjectIndex> {
+	const indexPath = explicitPath
+		? resolveExplicitIndexPath(explicitPath)
+		: await findProjectIndex();
 	const file = Bun.file(indexPath);
 	return (await file.json()) as ProjectIndex;
 }
