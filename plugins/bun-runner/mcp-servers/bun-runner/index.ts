@@ -123,16 +123,23 @@ export async function isWorkspaceProject(): Promise<boolean> {
 async function runBunTests(pattern?: string): Promise<TestSummary> {
 	const isWorkspace = await isWorkspaceProject();
 
+	// Detect if pattern is a specific file path (contains / or is absolute)
+	// vs a test name pattern (like "auth" or "login")
+	const isFilePath =
+		pattern && (pattern.includes("/") || pattern.startsWith("/"));
+
 	// Build command based on workspace detection
 	let cmd: string[];
-	if (isWorkspace) {
-		// Workspace: run test script in each package
+	if (isWorkspace && !isFilePath) {
+		// Workspace with pattern: run test script in each package
 		// Pattern filtering works differently - passed to each package's test run
 		cmd = pattern
 			? ["bun", "--filter", "*", "test", pattern]
 			: ["bun", "--filter", "*", "test"];
 	} else {
-		// Non-workspace: direct bun test
+		// Non-workspace OR specific file path: direct bun test
+		// File paths don't work with --filter '*' because each package
+		// would interpret the path relative to its own directory
 		cmd = pattern ? ["bun", "test", pattern] : ["bun", "test"];
 	}
 	const TIMEOUT_MS = 30000;
@@ -452,9 +459,10 @@ tool(
 			response_format?: string;
 		};
 
-		// Validate file path for security
+		// Validate file path for security and get absolute path
+		let validatedFile: string;
 		try {
-			await validatePath(file);
+			validatedFile = await validatePath(file);
 		} catch (error) {
 			return errorResponse(
 				error instanceof Error ? error.message : "Invalid file path",
@@ -465,7 +473,7 @@ tool(
 			response_format === "json"
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
-		const summary = await runBunTests(file);
+		const summary = await runBunTests(validatedFile);
 		return {
 			content: [
 				{
