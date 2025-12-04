@@ -37,3 +37,4 @@ plugins/melanie/
 
 
 tmp/
+.test-scratch/

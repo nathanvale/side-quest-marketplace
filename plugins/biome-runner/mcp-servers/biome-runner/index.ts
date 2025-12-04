@@ -77,10 +77,10 @@ export function parseBiomeOutput(stdout: string): LintSummary {
 
 		return {
 			error_count:
-				summary.errorCount ||
+				summary.errors ??
 				diagnostics.filter((d) => d.severity === "error").length,
 			warning_count:
-				summary.warnCount ||
+				summary.warnings ??
 				diagnostics.filter((d) => d.severity === "warning").length,
 			diagnostics,
 		};
@@ -108,9 +108,13 @@ export function parseBiomeOutput(stdout: string): LintSummary {
  *
  * Why: Uses spawnAndCollect to ensure streams are consumed in parallel with
  * waiting for exit, avoiding race conditions that could lose output.
+ *
+ * Note: Always parse JSON output regardless of exit code because Biome exits
+ * with 0 for warnings (only errors cause non-zero exit). This ensures we
+ * report warnings to the user.
  */
 async function runBiomeCheck(path = "."): Promise<LintSummary> {
-	const { stdout, exitCode } = await spawnAndCollect([
+	const { stdout } = await spawnAndCollect([
 		"bunx",
 		"@biomejs/biome",
 		"check",
@@ -118,10 +122,7 @@ async function runBiomeCheck(path = "."): Promise<LintSummary> {
 		path,
 	]);
 
-	if (exitCode === 0) {
-		return { error_count: 0, warning_count: 0, diagnostics: [] };
-	}
-
+	// Always parse output - Biome exits 0 for warnings, only errors cause non-zero
 	return parseBiomeOutput(stdout);
 }
 
