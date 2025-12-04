@@ -156,19 +156,53 @@ bun install                                 # After adding deps (from root)
 
 ## MCP Tools Available
 
-The marketplace provides 70+ MCP tools across plugins:
+The marketplace provides 70+ MCP tools across plugins.
 
-**Kit (25 tools)** → Use in priority order: Index-based (~10ms) → Graph+analysis (~200-300ms) → Direct search (~30-500ms)
-Git (7 tools) → Commits, status, branches, diff, file history
-Atuin (4 tools) → Bash history search, insights, context filtering
-Bun Runner (3 tools) → Test execution, file tests, coverage
-Biome Runner (3 tools) → Lint check/fix, format check
-TSC Runner (1 tool) → TypeScript type checking
+**CRITICAL for Agents:** All MCP tools are machine-to-machine interfaces. **ALWAYS use `response_format: "json"`** for token-efficient, structured responses. Never use `"markdown"` format.
+
+### Kit Search Tool Speed Hierarchy (CRITICAL - Use in Priority Order)
+
+**YOU MUST** follow this hierarchy for maximum token efficiency:
+
+#### Priority 1: Index-Based Navigation (~10ms - Use First)
+- **Setup:** `kit_index_prime({ response_format: "json" })` — Run once per session (~2s)
+- **Query index:**
+  - `kit_index_find({ symbol_name: "...", response_format: "json" })` — Fastest symbol lookup
+  - `kit_index_overview({ file_path: "...", response_format: "json" })` — All symbols in file
+  - `kit_index_stats({ response_format: "json" })` — Codebase statistics
+  - `kit_file_tree({ response_format: "json" })` — Repository structure (~50ms)
+
+#### Priority 2: Graph + Analysis (~200-300ms - Targeted Operations)
+Use index + targeted grep:
+- `kit_callers({ function_name: "...", response_format: "json" })` — Who calls this function?
+- `kit_usages({ symbol: "...", response_format: "json" })` — All usages of symbol
+- `kit_blast({ target: "...", response_format: "json" })` — Change impact analysis
+- `kit_api({ directory: "...", response_format: "json" })` — Module exports
+- `kit_dead({ response_format: "json" })` — Dead code detection (~500ms)
+
+#### Priority 3: Direct Search (~30-500ms - When Index Insufficient)
+Full codebase scan (last resort):
+- `kit_grep({ pattern: "...", response_format: "json" })` — Text/regex search (~30ms)
+- `kit_ast_search({ pattern: "...", response_format: "json" })` — Structural patterns (~400ms)
+- `kit_semantic({ query: "...", response_format: "json" })` — ML-powered (~500ms, requires `cased-kit[ml]`)
+
+**Rule:** Index tools are 30-50x faster. Always try Priority 1 first, then Priority 2, only fall back to Priority 3 when index tools don't have the needed information.
+
+### Other MCP Tools
+
+Git (7 tools) → Commits, status, branches, diff, file history (always JSON format)
+Atuin (4 tools) → Bash history search, insights, context filtering (always JSON format)
+Bun Runner (3 tools) → Test execution, file tests, coverage (always JSON format)
+Biome Runner (3 tools) → Lint check/fix, format check (always JSON format)
+TSC Runner (1 tool) → TypeScript type checking (always JSON format)
 Clipboard (2 tools) → Copy/paste
 
-**Efficiency Tip:** Kit's index-based tools (kit_index_find, kit_index_overview) query PROJECT_INDEX.json and are 30-50x faster than grep-based search.
+**Token Efficiency:**
+- Index-based tools: 30-50x faster than grep
+- JSON format: 40-60% fewer tokens vs markdown
+- Compound savings: These tools run constantly in hooks/background
 
-Full reference with priority ordering: @./docs/MCP_TOOLS.md
+Full reference with examples: @./docs/MCP_TOOLS.md
 
 ---
 
@@ -200,7 +234,7 @@ From PROJECT_INDEX.json (as of latest prime):
 
 ## Development Workflow
 
-1. **Make changes:** Work in plugin directory, write tests alongside code
+1. **Make changes:** Work in plugin directory, write tests first (TDD) alongside code
 2. **Validate locally:** `bun typecheck && bun test && bun run check && bun run validate`
 3. **Commit:** `git add . && git commit -m "feat(my-plugin): add feature"` (or use `/git:commit`)
 4. **Push & PR:** `git push origin main && /git:create-pr`
