@@ -190,6 +190,12 @@ export function createPluginLogger(options: PluginLoggerOptions): PluginLogger {
 					sinks: [sinkName],
 					lowestLevel,
 				},
+				// Configure LogTape meta logger to reduce MCP server noise
+				{
+					category: ["logtape", "meta"],
+					sinks: [sinkName],
+					lowestLevel: "error",
+				},
 			],
 		});
 

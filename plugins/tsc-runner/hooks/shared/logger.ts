@@ -6,6 +6,7 @@
  *
  * Subsystems:
  * - tsc: TypeScript hooks (tsc-check.ts, tsc-ci.ts)
+ * - mcp: MCP server tools
  *
  * Log location: ~/.claude/logs/tsc-runner.jsonl
  */
@@ -23,11 +24,12 @@ const {
 	logFile,
 } = createPluginLogger({
 	name: "tsc-runner",
-	subsystems: ["tsc"],
+	subsystems: ["tsc", "mcp"],
 });
 
 // Re-export core utilities
 export { createCorrelationId, initLogger, logDir, logFile, logger };
 
-// Export subsystem logger
+// Export subsystem loggers
 export const tscLogger = getSubsystemLogger("tsc");
+export const mcpLogger = getSubsystemLogger("mcp");

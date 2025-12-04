@@ -156,11 +156,14 @@ Register via `.mcp.json` in the plugin root:
   "mcpServers": {
     "my-server": {
       "command": "bun",
-      "args": ["run", "mcp-servers/my-server/index.ts"]
+      "args": ["run", "${CLAUDE_PLUGIN_ROOT}/mcp-servers/my-server/index.ts"],
+      "env": {}
     }
   }
 }
 ```
+
+**IMPORTANT:** Always use `${CLAUDE_PLUGIN_ROOT}` to reference plugin files. Claude Code sets this environment variable to the absolute path of your plugin directory. Without it, the server will fail to start because it can't find the file.
 
 ### Tool Design Principles
 
