@@ -9,6 +9,7 @@
 		"./git": "./src/git/index.ts",
 		"./workspace": "./src/workspace/index.ts",
 		"./hooks": "./src/hooks/index.ts",
+		"./formatters": "./src/formatters/output.ts",
 		"./validate": "./src/validate/session-start-hook.ts",
 		"./validate/types": "./src/validate/types.ts",
 		"./validate/runner": "./src/validate/runner.ts",

@@ -1,5 +1,9 @@
 #!/usr/bin/env bun
 
+import fs from "node:fs";
+import path from "node:path";
+import readline from "node:readline";
+
 /**
  * PARA Obsidian CLI
  *
@@ -7,13 +11,29 @@
  * Mirrors Kit CLI style: subcommands with minimal flags, JSON/MD output.
  */
 
-import { loadConfig } from "./config";
+import {
+	color,
+	emphasize,
+	OutputFormat,
+	parseOutputFormat,
+} from "@sidequest/core/formatters";
+import { discoverAttachments } from "./attachments";
+import {
+	listTemplateVersions,
+	loadConfig,
+	type ParaObsidianConfig,
+} from "./config";
 import { createFromTemplate } from "./create";
 import { deleteFile } from "./delete";
 import {
+	applyVersionPlan,
 	migrateAllTemplateVersions,
 	migrateTemplateVersion,
+	planTemplateVersionBump,
 	readFrontmatterFile,
+	updateFrontmatterFile,
+	type VersionPlanStatus,
+	validateFrontmatter,
 	validateFrontmatterFile,
 } from "./frontmatter";
 import { listDir, readFile } from "./fs";
@@ -26,40 +46,46 @@ import { filterByFrontmatter, searchText } from "./search";
 import { semanticSearch } from "./semantic";
 
 function printUsage(): void {
-	console.log(`
-PARA Obsidian CLI
-
-Usage:
-  bun run src/cli.ts config [--format md|json]
-  bun run src/cli.ts list [path] [--format md|json]
-  bun run src/cli.ts read <file> [--format md|json]
-  bun run src/cli.ts search <query> [--tag TAG] [--frontmatter key=val] [--regex] [--dir path] [--format md|json]
-  bun run src/cli.ts index prime [--dir path] [--format md|json]
-  bun run src/cli.ts index query [--tag TAG] [--frontmatter key=val] [--format md|json]
-  bun run src/cli.ts create --template <name> --title "<Title>" [--dest path] [--arg key=value ...] [--attachments paths] [--format md|json]
-  bun run src/cli.ts insert <file> --heading "<Heading>" --content "<Content>" [--before|--after|--append|--prepend] [--attachments paths] [--format md|json]
-  bun run src/cli.ts rename <from> <to> [--dry-run] [--attachments paths] [--format md|json]
-  bun run src/cli.ts delete <file> --confirm [--dry-run] [--attachments paths] [--format md|json]
-  bun run src/cli.ts semantic <query> [--dir path] [--limit N] [--format md|json]
-  bun run src/cli.ts frontmatter get <file> [--format md|json]
-  bun run src/cli.ts frontmatter validate <file> [--format md|json]
-  bun run src/cli.ts frontmatter migrate <file> [--force <version>] [--dry-run] [--attachments paths] [--format md|json]
-  bun run src/cli.ts frontmatter migrate-all [--dir path] [--dry-run] [--attachments paths] [--format md|json]
-  bun run src/cli.ts git guard [--format md|json]
-
-Options:
-  --format md|json  Output format (default: md)
-  --force           Force reindex (index prime)
-  --dry-run         Preview changes without writing
-  --confirm         Required for delete
-  --attachments     Comma-separated vault-relative files to include in auto-commit
-
-Examples:
-  bun run src/cli.ts config --format json
-  bun run src/cli.ts list 01_Projects
-  bun run src/cli.ts create --template project --title "New Project" --area "[[Health]]" --target_completion 2025-12-31
-  bun run src/cli.ts rename "01_Projects/Old.md" "01_Projects/New.md" --dry-run
-`);
+	const lines = [
+		color("cyan", "PARA Obsidian CLI"),
+		"",
+		"Usage:",
+		"  bun run src/cli.ts config [--format md|json]",
+		"  bun run src/cli.ts templates [--format md|json]",
+		"  bun run src/cli.ts list [path] [--format md|json]",
+		"  bun run src/cli.ts read <file> [--format md|json]",
+		"  bun run src/cli.ts search <query> [--tag TAG] [--frontmatter key=val|--frontmatter.key val] [--regex] [--dir path[,path2]] [--format md|json]",
+		"  bun run src/cli.ts index prime [--dir path[,path2]] [--format md|json]",
+		"  bun run src/cli.ts index query [--tag TAG] [--frontmatter key=val|--frontmatter.key val] [--dir path[,path2]] [--format md|json]",
+		'  bun run src/cli.ts create --template <name> --title "<Title>" [--dest path] [--arg key=value ...] [--attachments paths] [--format md|json]',
+		'  bun run src/cli.ts insert <file> --heading "<Heading>" --content "<Content>" [--before|--after|--append|--prepend] [--attachments paths] [--format md|json]',
+		"  bun run src/cli.ts rename <from> <to> [--dry-run] [--attachments paths] [--format md|json]",
+		"  bun run src/cli.ts delete <file> --confirm [--dry-run] [--attachments paths] [--format md|json]",
+		"  bun run src/cli.ts semantic <query> [--dir path[,path2]] [--limit N] [--format md|json]",
+		"  bun run src/cli.ts frontmatter get <file> [--format md|json]",
+		"  bun run src/cli.ts frontmatter validate <file> [--format md|json]",
+		"  bun run src/cli.ts frontmatter set <file> key=value [...] [--unset key1,key2] [--dry-run] [--attachments paths] [--format md|json]",
+		"  bun run src/cli.ts frontmatter migrate <file> [--force <version>] [--dry-run] [--attachments paths] [--format md|json]",
+		"  bun run src/cli.ts frontmatter migrate-all [--dir path[,path2]] [--force <version>] [--type <type>] [--dry-run] [--attachments paths] [--format md|json]",
+		"  bun run src/cli.ts frontmatter plan <type> --to <version> [--dir path[,path2]] [--save plan.json] [--format md|json]",
+		"  bun run src/cli.ts frontmatter apply-plan <plan.json> [--statuses s1,s2] [--dir path[,path2]] [--emit-plan filtered.json] [--dry-run] [--attachments paths] [--format md|json]",
+		"  bun run src/cli.ts frontmatter plan --interactive (prints summary/plan and exits non-interactively)",
+		"  bun run src/cli.ts git guard [--format md|json]",
+		"",
+		"Options:",
+		"  --format md|json  Output format (default: md)",
+		"  --force           Force reindex (index prime)",
+		"  --dry-run         Preview changes without writing",
+		"  --confirm         Required for delete",
+		"  --attachments     Comma-separated vault-relative files to include in auto-commit",
+		"",
+		"Examples:",
+		"  bun run src/cli.ts config --format json",
+		"  bun run src/cli.ts list 01_Projects",
+		'  bun run src/cli.ts create --template project --title "New Project" --area "[[Health]]" --target_completion 2025-12-31',
+		'  bun run src/cli.ts rename "01_Projects/Old.md" "01_Projects/New.md" --dry-run',
+	];
+	console.log(lines.map((line) => color("cyan", line)).join("\n"));
 }
 
 function parseArgs(argv: string[]): {
@@ -96,11 +122,6 @@ function parseArgs(argv: string[]): {
 	return { command: command ?? "", subcommand, positional: rest, flags };
 }
 
-function parseFormat(value: string | boolean | undefined): "md" | "json" {
-	if (value === "json") return "json";
-	return "md";
-}
-
 function parseAttachments(flags: Record<string, string | boolean>): string[] {
 	const raw = flags.attachments;
 	if (typeof raw !== "string") return [];
@@ -108,6 +129,216 @@ function parseAttachments(flags: Record<string, string | boolean>): string[] {
 		.split(",")
 		.map((s) => s.trim())
 		.filter(Boolean);
+}
+
+function parseUnset(input: string | boolean | undefined): string[] {
+	if (typeof input !== "string") return [];
+	return input
+		.split(",")
+		.map((s) => s.trim())
+		.filter(Boolean);
+}
+
+function parseKeyValuePairs(
+	inputs: ReadonlyArray<string>,
+): Record<string, string> {
+	const entries: Record<string, string> = {};
+	for (const input of inputs) {
+		const [rawKey, ...rest] = input.split("=");
+		if (!rawKey || rest.length === 0) continue;
+		const key = rawKey.trim();
+		const value = rest.join("=").trim();
+		if (!key || !value) continue;
+		entries[key] = value;
+	}
+	return entries;
+}
+
+function parseFrontmatterFilters(
+	flags: Record<string, string | boolean>,
+	additional: ReadonlyArray<string> = [],
+): Record<string, string> {
+	const filters: Record<string, string> = {};
+	const collect = (input: string) => {
+		const [rawKey, ...rest] = input.split("=");
+		if (!rawKey || rest.length === 0) return;
+		const key = rawKey.replace(/^frontmatter[._]/, "").trim();
+		const value = rest.join("=").trim();
+		if (!key || !value) return;
+		filters[key] = value;
+	};
+
+	if (typeof flags.frontmatter === "string") {
+		for (const part of flags.frontmatter.split(",")) {
+			if (part.trim().length > 0) collect(part);
+		}
+	}
+
+	for (const [k, v] of Object.entries(flags)) {
+		if (k.startsWith("frontmatter.") && typeof v === "string") {
+			collect(`${k.replace("frontmatter.", "")}=${v}`);
+		}
+	}
+
+	for (const part of additional) collect(part);
+	return filters;
+}
+
+function parseDirs(
+	value: string | boolean | undefined,
+	defaults?: ReadonlyArray<string>,
+): ReadonlyArray<string> | undefined {
+	if (typeof value !== "string") return defaults;
+	return value
+		.split(",")
+		.map((s) => s.trim())
+		.filter(Boolean);
+}
+
+function parseStatuses(
+	value: string | boolean | undefined,
+	defaults: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+	if (typeof value !== "string") return defaults;
+	const parts = value
+		.split(",")
+		.map((s) => s.trim())
+		.filter(Boolean);
+	return parts.length > 0 ? parts : defaults;
+}
+
+function normalizePathFragment(input: string): string {
+	return input.replace(/\\/g, "/").replace(/\/+$/, "");
+}
+
+function matchesDir(file: string, dirs?: ReadonlyArray<string>): boolean {
+	if (!dirs || dirs.length === 0) return true;
+	const normalizedFile = normalizePathFragment(file);
+	return dirs.some((dir) => {
+		const normalizedDir = normalizePathFragment(dir);
+		return (
+			normalizedFile === normalizedDir ||
+			normalizedFile.startsWith(`${normalizedDir}/`)
+		);
+	});
+}
+
+function isInteractive(): boolean {
+	return Boolean(process.stdin.isTTY && process.stdout.isTTY);
+}
+
+async function promptYesNo(message: string): Promise<boolean> {
+	if (!isInteractive()) return false;
+	return new Promise((resolve) => {
+		const rl = readline.createInterface({
+			input: process.stdin,
+			output: process.stdout,
+		});
+		rl.question(`${message} [y/N] `, (answer) => {
+			rl.close();
+			resolve(/^y(es)?$/i.test(answer.trim()));
+		});
+	});
+}
+
+export function suggestFieldsForType(
+	config: ParaObsidianConfig,
+	type?: string,
+): { allowed: string[]; enums: Record<string, ReadonlyArray<string>> } {
+	const rules = type ? config.frontmatterRules?.[type] : undefined;
+	const allowed = rules?.required ? Object.keys(rules.required).sort() : [];
+	const enums: Record<string, ReadonlyArray<string>> = {};
+	if (rules?.required) {
+		for (const [field, rule] of Object.entries(rules.required)) {
+			if (rule.type === "enum" && rule.enum) {
+				enums[field] = rule.enum;
+			}
+		}
+	}
+	return { allowed, enums };
+}
+
+export function computeFrontmatterHints(
+	config: ParaObsidianConfig,
+	noteType: string | undefined,
+	setPairs: Record<string, string>,
+	attributes: Record<string, unknown>,
+) {
+	const suggestions = suggestFieldsForType(config, noteType);
+	const warnings: string[] = [];
+	const fixHints: string[] = [];
+
+	// Unknown fields
+	if (suggestions.allowed.length > 0) {
+		for (const key of Object.keys(setPairs)) {
+			if (!suggestions.allowed.includes(key)) {
+				warnings.push(`Unknown field for type ${noteType}: ${key}`);
+				fixHints.push(
+					`Remove or rename "${key}" to a known field for type ${noteType}`,
+				);
+			}
+		}
+		if (warnings.length > 0) {
+			fixHints.push(
+				`Allowed fields for type ${noteType}: ${suggestions.allowed.join(", ")}`,
+			);
+		}
+	}
+
+	// Enum mismatches
+	if (noteType) {
+		const rules = config.frontmatterRules?.[noteType]?.required ?? {};
+		for (const [field, rule] of Object.entries(rules)) {
+			if (rule.type === "enum" && rule.enum && field in attributes) {
+				const val = attributes[field];
+				if (typeof val === "string" && !rule.enum.includes(val)) {
+					warnings.push(
+						`Invalid value for ${field}: ${val} (allowed: ${rule.enum.join(", ")})`,
+					);
+					fixHints.push(
+						`Field "${field}" allowed values: ${rule.enum.join(", ")}`,
+					);
+				}
+			}
+		}
+	}
+
+	return { warnings, fixHints, suggestions };
+}
+
+function coerceValue(raw: string): unknown {
+	const trimmed = raw.trim();
+	if (trimmed.length === 0) return trimmed;
+	if (trimmed === "true") return true;
+	if (trimmed === "false") return false;
+	if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed);
+	if (
+		(trimmed.startsWith("[") && trimmed.endsWith("]")) ||
+		(trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+		(trimmed.startsWith('"') && trimmed.endsWith('"'))
+	) {
+		try {
+			return JSON.parse(trimmed);
+		} catch {
+			// fall through to comma/identity parsing
+		}
+	}
+	if (trimmed.includes(",")) {
+		return trimmed
+			.split(",")
+			.map((s) => s.trim())
+			.filter(Boolean);
+	}
+	return trimmed;
+}
+
+function withAutoDiscoveredAttachments(
+	config: ParaObsidianConfig,
+	note: string,
+	explicit: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+	if (explicit.length > 0) return explicit;
+	return discoverAttachments(config.vault, note);
 }
 
 async function main(): Promise<void> {
@@ -118,7 +349,10 @@ async function main(): Promise<void> {
 	}
 
 	const { command, subcommand, positional, flags } = parseArgs(args);
-	const format = parseFormat(flags.format);
+	const format = parseOutputFormat(
+		typeof flags.format === "string" ? flags.format : undefined,
+	);
+	const isJson = format === OutputFormat.JSON;
 
 	try {
 		// Always load config early to ensure vault/env are valid.
@@ -126,14 +360,40 @@ async function main(): Promise<void> {
 
 		switch (command) {
 			case "config": {
-				if (format === "json") {
+				if (isJson) {
 					console.log(JSON.stringify(config, null, 2));
 				} else {
-					console.log(`Vault: ${config.vault}`);
-					console.log(`Templates: ${config.templatesDir}`);
-					if (config.indexPath) console.log(`Index: ${config.indexPath}`);
+					console.log(emphasize.info(`Vault: ${config.vault}`));
+					console.log(emphasize.info(`Templates: ${config.templatesDir}`));
+					if (config.indexPath)
+						console.log(emphasize.info(`Index: ${config.indexPath}`));
 					if (config.autoCommit !== undefined) {
-						console.log(`Auto-commit: ${config.autoCommit}`);
+						console.log(emphasize.info(`Auto-commit: ${config.autoCommit}`));
+						if (config.gitCommitMessageTemplate) {
+							console.log(
+								emphasize.info(
+									`Commit template: ${config.gitCommitMessageTemplate}`,
+								),
+							);
+						}
+					}
+				}
+				break;
+			}
+
+			case "templates": {
+				const templates = listTemplateVersions(config);
+				if (isJson) {
+					console.log(
+						JSON.stringify(
+							{ templates, defaultSearchDirs: config.defaultSearchDirs },
+							null,
+							2,
+						),
+					);
+				} else {
+					for (const tpl of templates) {
+						console.log(emphasize.info(`${tpl.name}: v${tpl.version}`));
 					}
 				}
 				break;
@@ -158,11 +418,13 @@ async function main(): Promise<void> {
 					];
 					await autoCommitChanges(config, paths, `rename ${from} → ${to}`);
 				}
-				if (format === "json") {
+				if (isJson) {
 					console.log(JSON.stringify(result, null, 2));
 				} else {
 					console.log(
-						`${dryRun ? "Would rename" : "Renamed"} ${from} → ${to} (rewrites: ${result.rewrites.length})`,
+						emphasize.info(
+							`${dryRun ? "Would rename" : "Renamed"} ${from} → ${to} (rewrites: ${result.rewrites.length})`,
+						),
 					);
 				}
 				break;
@@ -181,15 +443,17 @@ async function main(): Promise<void> {
 				if (config.autoCommit && !dryRun) {
 					await autoCommitChanges(
 						config,
-						[result.relative, ...attachments],
+						[file, ...withAutoDiscoveredAttachments(config, file, attachments)],
 						`delete ${file}`,
 					);
 				}
-				if (format === "json") {
+				if (isJson) {
 					console.log(JSON.stringify(result, null, 2));
 				} else {
 					console.log(
-						`${dryRun ? "Would delete" : "Deleted"} ${result.relative}`,
+						emphasize.warn(
+							`${dryRun ? "Would delete" : "Deleted"} ${result.relative}`,
+						),
 					);
 				}
 				break;
@@ -198,7 +462,7 @@ async function main(): Promise<void> {
 			case "list": {
 				const dir = subcommand ?? ".";
 				const entries = listDir(config.vault, dir);
-				if (format === "json") {
+				if (isJson) {
 					console.log(JSON.stringify({ dir, entries }, null, 2));
 				} else {
 					console.log(entries.join("\n"));
@@ -213,7 +477,7 @@ async function main(): Promise<void> {
 					process.exit(1);
 				}
 				const content = readFile(config.vault, file);
-				if (format === "json") {
+				if (isJson) {
 					console.log(JSON.stringify({ file, content }, null, 2));
 				} else {
 					console.log(content);
@@ -229,10 +493,10 @@ async function main(): Promise<void> {
 				}
 
 				if (action === "prime") {
-					const dir = positional[0];
-					const index = buildIndex(config, dir);
+					const dirs = parseDirs(positional[0]);
+					const index = buildIndex(config, dirs);
 					const path = saveIndex(config, index);
-					if (format === "json") {
+					if (isJson) {
 						console.log(
 							JSON.stringify(
 								{ indexPath: path, count: index.entries.length },
@@ -241,32 +505,33 @@ async function main(): Promise<void> {
 							),
 						);
 					} else {
-						console.log(`Indexed ${index.entries.length} files → ${path}`);
+						console.log(
+							emphasize.success(
+								`Indexed ${index.entries.length} files → ${path}`,
+							),
+						);
 					}
 					break;
 				}
 
 				if (action === "query") {
 					const tag = typeof flags.tag === "string" ? flags.tag : undefined;
-					const frontmatter: Record<string, string> = {};
-					for (const [k, v] of Object.entries(flags)) {
-						if (k.startsWith("frontmatter.") && typeof v === "string") {
-							frontmatter[k.replace("frontmatter.", "")] = v;
-						}
-					}
+					const dirs = parseDirs(flags.dir, config.defaultSearchDirs);
+					const frontmatter = parseFrontmatterFilters(flags);
 					const index = loadIndex(config);
 					if (!index) {
 						console.error("Index not found. Run index prime first.");
 						process.exit(1);
 					}
 					const results = index.entries.filter((entry) => {
+						if (!matchesDir(entry.file, dirs)) return false;
 						if (tag && !entry.tags.includes(tag)) return false;
 						for (const [k, v] of Object.entries(frontmatter)) {
 							if (entry.frontmatter[k] !== v) return false;
 						}
 						return true;
 					});
-					if (format === "json") {
+					if (isJson) {
 						console.log(
 							JSON.stringify({ count: results.length, results }, null, 2),
 						);
@@ -288,17 +553,12 @@ async function main(): Promise<void> {
 					process.exit(1);
 				}
 				const tag = typeof flags.tag === "string" ? flags.tag : undefined;
-				const dir = typeof flags.dir === "string" ? flags.dir : undefined;
-				const frontmatter: Record<string, string> = {};
-				for (const [k, v] of Object.entries(flags)) {
-					if (k.startsWith("frontmatter.") && typeof v === "string") {
-						frontmatter[k.replace("frontmatter.", "")] = v;
-					}
-				}
+				const dirs = parseDirs(flags.dir, config.defaultSearchDirs);
+				const frontmatter = parseFrontmatterFilters(flags);
 
 				const hits = searchText(config, {
 					query,
-					dir,
+					dir: dirs,
 					regex: flags.regex === true || flags.regex === "true",
 					maxResults:
 						typeof flags["max-results"] === "string"
@@ -308,20 +568,22 @@ async function main(): Promise<void> {
 
 				const fmMatches =
 					Object.keys(frontmatter).length > 0 || tag
-						? filterByFrontmatter(config, { frontmatter, tag, dir })
+						? filterByFrontmatter(config, { frontmatter, tag, dir: dirs })
 						: [];
 
-				if (format === "json") {
+				if (isJson) {
 					console.log(
 						JSON.stringify({ query, hits, frontmatter: fmMatches }, null, 2),
 					);
 				} else {
 					for (const hit of hits) {
-						console.log(`${hit.file}:${hit.line}: ${hit.snippet}`);
+						console.log(
+							emphasize.info(`${hit.file}:${hit.line}: ${hit.snippet}`),
+						);
 					}
 					if (fmMatches.length > 0) {
 						console.log("\nFrontmatter matches:");
-						for (const f of fmMatches) console.log(f);
+						for (const f of fmMatches) console.log(emphasize.info(f));
 					}
 				}
 				break;
@@ -333,21 +595,25 @@ async function main(): Promise<void> {
 					console.error("semantic requires <query>");
 					process.exit(1);
 				}
-				const dir = typeof flags.dir === "string" ? flags.dir : undefined;
+				const dir = parseDirs(flags.dir, config.defaultSearchDirs);
 				const limit =
 					typeof flags.limit === "string"
 						? Number.parseInt(flags.limit, 10)
 						: undefined;
 				try {
 					const hits = await semanticSearch(config, { query, dir, limit });
-					if (format === "json") {
+					if (isJson) {
 						console.log(JSON.stringify({ query, hits }, null, 2));
 					} else {
 						for (const hit of hits) {
 							const line = hit.line ? `:${hit.line}` : "";
 							const score = hit.score.toFixed(3);
+							const dirLabel =
+								hit.dir && hit.dir !== "." ? `[${hit.dir}] ` : "";
 							console.log(
-								`${hit.file}${line} (${score}) ${hit.snippet ?? ""}`.trim(),
+								emphasize.info(
+									`${dirLabel}${hit.file}${line} (${score}) ${hit.snippet ?? ""}`.trim(),
+								),
 							);
 						}
 					}
@@ -382,7 +648,11 @@ async function main(): Promise<void> {
 					dest,
 					args: argsForTemplate,
 				});
-				const attachments = parseAttachments(flags);
+				const attachments = withAutoDiscoveredAttachments(
+					config,
+					result.filePath,
+					parseAttachments(flags),
+				);
 				if (config.autoCommit) {
 					await autoCommitChanges(
 						config,
@@ -390,10 +660,10 @@ async function main(): Promise<void> {
 						`create ${result.filePath}`,
 					);
 				}
-				if (format === "json") {
+				if (isJson) {
 					console.log(JSON.stringify(result, null, 2));
 				} else {
-					console.log(`Created ${result.filePath}`);
+					console.log(emphasize.success(`Created ${result.filePath}`));
 				}
 				break;
 			}
@@ -408,7 +678,7 @@ async function main(): Promise<void> {
 
 				if (action === "get") {
 					const { attributes } = readFrontmatterFile(config, target);
-					if (format === "json") {
+					if (isJson) {
 						console.log(
 							JSON.stringify(
 								{ file: target, frontmatter: attributes },
@@ -424,7 +694,7 @@ async function main(): Promise<void> {
 
 				if (action === "validate") {
 					const result = validateFrontmatterFile(config, target);
-					if (format === "json") {
+					if (isJson) {
 						console.log(
 							JSON.stringify(
 								{
@@ -438,14 +708,168 @@ async function main(): Promise<void> {
 						);
 					} else {
 						if (result.valid) {
-							console.log(`✅ ${result.relative} frontmatter ok`);
+							console.log(
+								emphasize.success(`${result.relative} frontmatter ok`),
+							);
 						} else {
-							console.log(`⚠️  ${result.relative} has issues:`);
+							console.log(emphasize.warn(`${result.relative} has issues:`));
 							for (const issue of result.issues) {
 								console.log(`- ${issue.field}: ${issue.message}`);
 							}
 						}
 					}
+					break;
+				}
+
+				if (action === "set" || action === "edit") {
+					const dryRun =
+						flags["dry-run"] === true || flags["dry-run"] === "true";
+					const strict = flags.strict === true || flags.strict === "true";
+					const suggestOnly =
+						flags.suggest === true || flags.suggest === "true";
+					const attachments = parseAttachments(flags);
+					const unset = parseUnset(flags.unset);
+					const additionalPairs = positional.slice(1);
+					const setPairs = {
+						...parseFrontmatterFilters(flags, []),
+						...parseKeyValuePairs(additionalPairs),
+						...(typeof flags.set === "string"
+							? parseKeyValuePairs([flags.set])
+							: {}),
+					};
+					if (Object.keys(setPairs).length === 0 && unset.length === 0) {
+						console.error(
+							"frontmatter set|edit requires key=value pairs or --unset keys",
+						);
+						process.exit(1);
+					}
+
+					const typed: Record<string, unknown> = {};
+					for (const [k, v] of Object.entries(setPairs)) {
+						typed[k] = coerceValue(v);
+					}
+
+					const result = updateFrontmatterFile(config, target, {
+						set: typed,
+						unset,
+						dryRun,
+					});
+					const attachmentsUsed = withAutoDiscoveredAttachments(
+						config,
+						target,
+						attachments,
+					);
+
+					const after = result.attributes.after;
+					const noteType =
+						typeof after.type === "string" ? (after.type as string) : undefined;
+					const rules = noteType
+						? config.frontmatterRules?.[noteType]
+						: undefined;
+					const validation = validateFrontmatter(after, rules);
+					const { warnings, fixHints, suggestions } = computeFrontmatterHints(
+						config,
+						noteType,
+						setPairs,
+						after,
+					);
+					if (!validation.valid) {
+						for (const issue of validation.issues) {
+							warnings.push(`${issue.field}: ${issue.message}`);
+							if (
+								issue.message.includes("one of") &&
+								noteType &&
+								suggestions.enums[issue.field]
+							) {
+								const enumValues = suggestions.enums[issue.field];
+								if (enumValues) {
+									fixHints.push(
+										`Field "${issue.field}" allowed values: ${enumValues.join(", ")}`,
+									);
+								}
+							}
+							fixHints.push(`Fix ${issue.field}: ${issue.message}`);
+						}
+					}
+
+					if (suggestOnly) {
+						if (isJson) {
+							console.log(
+								JSON.stringify(
+									{ suggest: suggestions, file: target, type: noteType },
+									null,
+									2,
+								),
+							);
+						} else {
+							console.log(
+								emphasize.info(
+									`Fields for type ${noteType ?? "unknown"}${suggestions.allowed.length === 0 ? "" : ":"}`,
+								),
+							);
+							if (suggestions.allowed.length > 0) {
+								console.log(`Allowed: ${suggestions.allowed.join(", ")}`);
+							}
+							if (Object.keys(suggestions.enums).length > 0) {
+								console.log("Enums:");
+								for (const [field, vals] of Object.entries(suggestions.enums)) {
+									console.log(`- ${field}: ${vals.join(", ")}`);
+								}
+							}
+						}
+						break;
+					}
+
+					const strictFailed = strict && warnings.length > 0;
+
+					if (config.autoCommit && !dryRun && result.updated && !strictFailed) {
+						await autoCommitChanges(
+							config,
+							[result.relative, ...attachmentsUsed],
+							`frontmatter ${action} ${target}`,
+						);
+					}
+
+					if (isJson) {
+						console.log(
+							JSON.stringify(
+								{
+									...result,
+									attachmentsUsed,
+									action,
+									warnings,
+									fixHints,
+									strictFailed,
+									suggest: suggestions,
+								},
+								null,
+								2,
+							),
+						);
+						if (strictFailed) process.exit(1);
+					} else {
+						if (!result.wouldChange) {
+							console.log(emphasize.info(`${result.relative} unchanged`));
+						} else {
+							const verb = dryRun ? "Would update" : "Updated";
+							console.log(
+								emphasize.success(
+									`${verb} ${result.relative} (${result.changes.length} change(s))`,
+								),
+							);
+							for (const change of result.changes) {
+								console.log(`- ${change}`);
+							}
+						}
+						if (warnings.length > 0) {
+							console.log(emphasize.warn("Warnings:"));
+							for (const w of warnings) console.log(`- ${w}`);
+						}
+						if (strictFailed) {
+							process.exit(1);
+						}
+					}
+
 					break;
 				}
 
@@ -462,19 +886,29 @@ async function main(): Promise<void> {
 						dryRun,
 						migrate: MIGRATIONS,
 					});
+					const attachmentsUsed = withAutoDiscoveredAttachments(
+						config,
+						target,
+						attachments,
+					);
 					if (config.autoCommit && !dryRun) {
 						await autoCommitChanges(
 							config,
-							[result.relative, ...attachments],
+							[target, ...attachmentsUsed],
 							`migrate ${target} to v${result.toVersion}`,
 						);
 					}
-					if (format === "json") {
-						console.log(JSON.stringify(result, null, 2));
+					if (isJson) {
+						console.log(JSON.stringify({ ...result, attachmentsUsed }));
 					} else {
-						console.log(
-							`${dryRun ? "Would migrate" : "Migrated"} ${result.relative} to template_version ${result.toVersion}`,
-						);
+						const changeNote =
+							result.changes && result.changes.length > 0
+								? `\nChanges:\n- ${result.changes.join("\n- ")}`
+								: "";
+						const status = result.wouldChange
+							? `${dryRun ? "Would migrate" : "Migrated"} ${result.relative} to template_version ${result.toVersion}`
+							: `${result.relative} already at template_version ${result.toVersion}`;
+						console.log(status + changeNote);
 					}
 					break;
 				}
@@ -482,13 +916,29 @@ async function main(): Promise<void> {
 				if (action === "migrate-all") {
 					const dryRun =
 						flags["dry-run"] === true || flags["dry-run"] === "true";
-					const dir = typeof flags.dir === "string" ? flags.dir : undefined;
+					const dir = parseDirs(flags.dir, config.defaultSearchDirs);
+					const forceVersion =
+						typeof flags.force === "string"
+							? Number.parseInt(flags.force, 10)
+							: undefined;
+					const type =
+						typeof flags.type === "string" && flags.type.trim().length > 0
+							? flags.type.trim()
+							: undefined;
 					const attachments = parseAttachments(flags);
 					const result = migrateAllTemplateVersions(config, {
 						dir,
 						dryRun,
+						forceVersion,
+						type,
 						migrate: MIGRATIONS,
 					});
+					const autoAttachments =
+						attachments.length > 0
+							? attachments
+							: result.results.flatMap((r) =>
+									withAutoDiscoveredAttachments(config, r.relative, []),
+								);
 					if (config.autoCommit && !dryRun && result.updated > 0) {
 						const changed = result.results
 							.filter(
@@ -498,17 +948,293 @@ async function main(): Promise<void> {
 						if (changed.length > 0) {
 							await autoCommitChanges(
 								config,
-								[...changed, ...attachments],
+								[...changed, ...autoAttachments],
 								`migrate ${changed.length} note(s)`,
 							);
 						}
 					}
-					if (format === "json") {
-						console.log(JSON.stringify(result, null, 2));
+					if (isJson) {
+						console.log(
+							JSON.stringify({
+								...result,
+								attachmentsUsed: autoAttachments,
+								changes: result.changes,
+								errors: result.results
+									.filter((r) => r.error)
+									.map((r) => ({ file: r.relative, error: r.error })),
+							}),
+						);
+					} else {
+						const changeCount = result.changes.length;
+						const summary = `${dryRun ? "Would migrate" : "Migrated"}: updated ${result.updated} (${result.wouldUpdate} would update), skipped ${result.skipped}, errors ${result.errors}, changes ${changeCount}`;
+						console.log(emphasize.info(summary));
+						if (changeCount > 0) {
+							console.log("Changes:");
+							for (const change of result.changes) {
+								console.log(`- ${change.file}: ${change.changes.join("; ")}`);
+							}
+						}
+						if (result.errors > 0) {
+							for (const err of result.results.filter((r) => r.error)) {
+								console.log(
+									emphasize.warn(
+										`- ${err.relative}: ${err.error ?? "unknown error"}`,
+									),
+								);
+							}
+						}
+					}
+					break;
+				}
+
+				if (action === "apply-plan") {
+					const planPath =
+						typeof target === "string" && target.trim().length > 0
+							? target
+							: typeof flags.plan === "string"
+								? flags.plan
+								: undefined;
+					if (!planPath) {
+						console.error(
+							"frontmatter apply-plan requires <plan file> or --plan <file>",
+						);
+						process.exit(1);
+					}
+					const dryRun =
+						flags["dry-run"] === true || flags["dry-run"] === "true";
+					const statuses = parseStatuses(flags.statuses, [
+						"outdated",
+						"missing-version",
+						"current",
+					]) as VersionPlanStatus[];
+					const dirs = parseDirs(flags.dir, config.defaultSearchDirs);
+					const emitPlan =
+						typeof flags["emit-plan"] === "string"
+							? path.resolve(flags["emit-plan"])
+							: undefined;
+					const planAbs = path.resolve(planPath);
+					if (!fs.existsSync(planAbs)) {
+						console.error(`Plan file not found: ${planAbs}`);
+						process.exit(1);
+					}
+					const plan = JSON.parse(fs.readFileSync(planAbs, "utf8"));
+					if (!plan?.entries || !Array.isArray(plan.entries)) {
+						console.error("Plan file must contain entries[]");
+						process.exit(1);
+					}
+					if (typeof plan.targetVersion !== "number" || !plan.type) {
+						console.error("Plan file must include targetVersion and type");
+						process.exit(1);
+					}
+
+					const attachments = parseAttachments(flags);
+					const result = applyVersionPlan(config, {
+						plan,
+						dryRun,
+						statuses,
+						dirs: dirs ?? [],
+						migrate: MIGRATIONS,
+					});
+					const filteredPlan =
+						emitPlan || isJson
+							? {
+									type: plan.type,
+									targetVersion: plan.targetVersion,
+									dirs: dirs ?? plan.dirs ?? [],
+									entries: result.selected,
+									stats: {
+										total: result.selected.length,
+										outdated: result.selected.filter(
+											(e) => e.status === "outdated",
+										).length,
+										missingVersion: result.selected.filter(
+											(e) => e.status === "missing-version",
+										).length,
+										current: result.selected.filter(
+											(e) => e.status === "current",
+										).length,
+										ahead: result.selected.filter((e) => e.status === "ahead")
+											.length,
+										typeMismatch: result.selected.filter(
+											(e) => e.status === "type-mismatch",
+										).length,
+										missingType: result.selected.filter(
+											(e) => e.status === "missing-type",
+										).length,
+									},
+								}
+							: undefined;
+					if (emitPlan && filteredPlan) {
+						fs.writeFileSync(
+							emitPlan,
+							JSON.stringify(filteredPlan, null, 2),
+							"utf8",
+						);
+					}
+					const updatedFiles = result.results
+						.filter((r) => r.updated)
+						.map((r) => r.relative);
+					const autoAttachments =
+						attachments.length > 0
+							? attachments
+							: updatedFiles.flatMap((file) =>
+									withAutoDiscoveredAttachments(config, file, []),
+								);
+
+					if (config.autoCommit && !dryRun && updatedFiles.length > 0) {
+						await autoCommitChanges(
+							config,
+							[...new Set([...updatedFiles, ...autoAttachments])],
+							`apply plan (${updatedFiles.length} file(s))`,
+						);
+					}
+
+					if (isJson) {
+						console.log(
+							JSON.stringify(
+								{
+									...result,
+									attachmentsUsed: autoAttachments,
+									statuses,
+									dirs,
+									planFile: planAbs,
+									filteredPlan,
+									savedPlan: emitPlan,
+								},
+								null,
+								2,
+							),
+						);
 					} else {
 						console.log(
-							`${dryRun ? "Would migrate" : "Migrated"}: updated ${result.updated} (${result.wouldUpdate} would update), skipped ${result.skipped}, errors ${result.errors}`,
+							emphasize.info(
+								`${dryRun ? "Would apply" : "Applied"} plan from ${planAbs}: updated ${result.updated}, would update ${result.wouldUpdate}, skipped ${result.skipped}, errors ${result.errors}`,
+							),
 						);
+						if (filteredPlan) {
+							console.log(
+								emphasize.info(
+									`Selected entries: ${filteredPlan.entries.length} (outdated ${filteredPlan.stats.outdated}, missing-version ${filteredPlan.stats.missingVersion}, current ${filteredPlan.stats.current})`,
+								),
+							);
+						}
+						if (emitPlan && filteredPlan) {
+							console.log(
+								emphasize.success(`Saved filtered plan to ${emitPlan}`),
+							);
+						}
+						if (result.selected.length > 0) {
+							console.log("Selected:");
+							for (const entry of result.selected) {
+								const cur = entry.current ?? "none";
+								console.log(
+									`- ${entry.file} (${entry.status}) ${cur} -> ${entry.target}`,
+								);
+							}
+						}
+						if (result.changes.length > 0) {
+							console.log("Changes:");
+							for (const change of result.changes) {
+								console.log(`- ${change.file}: ${change.changes.join("; ")}`);
+							}
+						}
+						if (result.errors > 0) {
+							for (const err of result.results.filter((r) => r.error)) {
+								console.log(
+									emphasize.warn(
+										`- ${err.relative}: ${err.error ?? "unknown error"}`,
+									),
+								);
+							}
+						}
+					}
+
+					break;
+				}
+
+				if (action === "plan") {
+					const type =
+						typeof target === "string" && target.trim().length > 0
+							? target.trim()
+							: undefined;
+					const to =
+						typeof flags.to === "string"
+							? Number.parseInt(flags.to, 10)
+							: undefined;
+					if (!type || !to) {
+						console.error(
+							"frontmatter plan requires <type> and --to <version>",
+						);
+						process.exit(1);
+					}
+					const dir = parseDirs(flags.dir, config.defaultSearchDirs);
+					if (flags.interactive === true || flags.interactive === "true") {
+						const plan = planTemplateVersionBump(config, {
+							type,
+							toVersion: to,
+							dir,
+						});
+						console.log(
+							emphasize.info(
+								`Plan summary (interactive stub): type=${type}, target=${to}, dirs=${plan.dirs.join(", ")}`,
+							),
+						);
+						console.log(
+							emphasize.info(
+								`Outdated ${plan.outdated}, missing ${plan.missingVersion}, current ${plan.current}, ahead ${plan.ahead}`,
+							),
+						);
+						console.log(
+							emphasize.info(
+								`Per-type: ${Object.entries(plan.perType)
+									.map(
+										([t, s]) =>
+											`${t}: total ${s.total}, outdated ${s.outdated}, missing ${s.missingVersion}, current ${s.current}, ahead ${s.ahead}`,
+									)
+									.join(" | ")}`,
+							),
+						);
+						console.log(
+							"To proceed, rerun without --interactive and use --save/--dir as needed.",
+						);
+						break;
+					}
+
+					const plan = planTemplateVersionBump(config, {
+						type,
+						toVersion: to,
+						dir,
+					});
+					const savePath =
+						typeof flags.save === "string" && flags.save.trim().length > 0
+							? path.resolve(flags.save)
+							: undefined;
+					if (savePath) {
+						fs.writeFileSync(savePath, JSON.stringify(plan, null, 2), "utf8");
+					}
+					if (isJson) {
+						console.log(
+							JSON.stringify({ ...plan, savedPath: savePath }, null, 2),
+						);
+					} else {
+						console.log(
+							emphasize.info(
+								`Plan for type=${type} → v${to} (dirs: ${plan.dirs.join(", ")}): ${plan.outdated} outdated, ${plan.missingVersion} missing, ${plan.current} current, ${plan.ahead} ahead, ${plan.typeMismatch} mismatched`,
+							),
+						);
+						console.log(
+							emphasize.info(
+								`Per-type summary: ${Object.entries(plan.perType)
+									.map(
+										([t, s]) =>
+											`${t}: total ${s.total}, outdated ${s.outdated}, missing ${s.missingVersion}, current ${s.current}, ahead ${s.ahead}`,
+									)
+									.join(" | ")}`,
+							),
+						);
+						if (savePath) {
+							console.log(emphasize.success(`Saved plan to ${savePath}`));
+						}
 					}
 					break;
 				}
@@ -551,15 +1277,18 @@ async function main(): Promise<void> {
 				if (config.autoCommit) {
 					await autoCommitChanges(
 						config,
-						[result.relative, ...attachments],
+						[file, ...withAutoDiscoveredAttachments(config, file, attachments)],
 						`insert ${file}`,
 					);
 				}
-				if (format === "json") {
+				if (isJson) {
 					console.log(JSON.stringify(result, null, 2));
 				} else {
 					console.log(
-						`Inserted into ${result.relative} (${mode}) under "${heading}"`,
+						color(
+							"green",
+							`Inserted into ${result.relative} (${mode}) under "${heading}"`,
+						),
 					);
 				}
 				break;
@@ -574,17 +1303,17 @@ async function main(): Promise<void> {
 				try {
 					await assertGitRepo(config.vault);
 					const status = await gitStatus(config.vault);
-					if (format === "json") {
+					if (isJson) {
 						console.log(
 							JSON.stringify({ git: "ok", clean: status.clean }, null, 2),
 						);
 					} else {
-						console.log(`Git OK (clean=${status.clean})`);
+						console.log(color("cyan", `Git OK (clean=${status.clean})`));
 					}
 				} catch (error) {
 					const message =
 						error instanceof Error ? error.message : "Git guard failed";
-					if (format === "json") {
+					if (isJson) {
 						console.log(JSON.stringify({ git: "error", message }, null, 2));
 					} else {
 						console.error(message);
