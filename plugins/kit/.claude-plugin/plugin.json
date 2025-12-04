@@ -9,6 +9,18 @@
 	"repository": "https://github.com/nathanvale/side-quest-marketplace",
 	"keywords": ["kit"],
 	"license": "MIT",
-	"commands": ["./commands/logs.md"],
+	"commands": [
+		"./commands/logs.md",
+		"./commands/prime.md",
+		"./commands/find.md",
+		"./commands/overview.md",
+		"./commands/calls.md",
+		"./commands/callers.md",
+		"./commands/deps.md",
+		"./commands/dead.md",
+		"./commands/blast.md",
+		"./commands/api.md",
+		"./commands/stats.md"
+	],
 	"mcpServers": ["./.mcp.json"]
 }
