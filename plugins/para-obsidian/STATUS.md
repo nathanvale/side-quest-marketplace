@@ -14,8 +14,9 @@
 - Git auto-commit flag (add/commit after writes if vault git) and template_version tracking on create/validate/migrate.
 - Template version migration helper (`frontmatter migrate`) with optional force + dry-run.
 - Bulk template migration (`frontmatter migrate-all`) and attachment inclusion flag for auto-commit.
-- MCP server wiring: para-obsidian MCP with config/list/read/search/index prime/query/create/insert/rename/delete/frontmatter get/validate/migrate/migrate-all.
-- Tests: 40 pass in `plugins/para-obsidian/src`.
+- Semantic search via kit (CLI `semantic`, MCP tool `semantic_search`).
+- MCP server wiring: para-obsidian MCP with config/list/read/search/semantic/index prime/query/create/insert/rename/delete/frontmatter get/validate/migrate/migrate-all.
+- Tests: 42 pass in `plugins/para-obsidian/src`.
 
 ## Remaining / Next Work
 - Template migration scaffolding (version bumps, helper commands).

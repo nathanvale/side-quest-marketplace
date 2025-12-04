@@ -21,7 +21,9 @@ import { assertGitRepo, autoCommitChanges, gitStatus } from "./git";
 import { buildIndex, loadIndex, saveIndex } from "./indexer";
 import { type InsertMode, insertIntoNote } from "./insert";
 import { renameWithLinkRewrite } from "./links";
+import { MIGRATIONS } from "./migrations";
 import { filterByFrontmatter, searchText } from "./search";
+import { semanticSearch } from "./semantic";
 
 function printUsage(): void {
 	console.log(`
@@ -38,6 +40,7 @@ Usage:
   bun run src/cli.ts insert <file> --heading "<Heading>" --content "<Content>" [--before|--after|--append|--prepend] [--attachments paths] [--format md|json]
   bun run src/cli.ts rename <from> <to> [--dry-run] [--attachments paths] [--format md|json]
   bun run src/cli.ts delete <file> --confirm [--dry-run] [--attachments paths] [--format md|json]
+  bun run src/cli.ts semantic <query> [--dir path] [--limit N] [--format md|json]
   bun run src/cli.ts frontmatter get <file> [--format md|json]
   bun run src/cli.ts frontmatter validate <file> [--format md|json]
   bun run src/cli.ts frontmatter migrate <file> [--force <version>] [--dry-run] [--attachments paths] [--format md|json]
@@ -324,6 +327,39 @@ async function main(): Promise<void> {
 				break;
 			}
 
+			case "semantic": {
+				const query = subcommand;
+				if (!query) {
+					console.error("semantic requires <query>");
+					process.exit(1);
+				}
+				const dir = typeof flags.dir === "string" ? flags.dir : undefined;
+				const limit =
+					typeof flags.limit === "string"
+						? Number.parseInt(flags.limit, 10)
+						: undefined;
+				try {
+					const hits = await semanticSearch(config, { query, dir, limit });
+					if (format === "json") {
+						console.log(JSON.stringify({ query, hits }, null, 2));
+					} else {
+						for (const hit of hits) {
+							const line = hit.line ? `:${hit.line}` : "";
+							const score = hit.score.toFixed(3);
+							console.log(
+								`${hit.file}${line} (${score}) ${hit.snippet ?? ""}`.trim(),
+							);
+						}
+					}
+				} catch (error) {
+					const message =
+						error instanceof Error ? error.message : "semantic search failed";
+					console.error(message);
+					process.exit(1);
+				}
+				break;
+			}
+
 			case "create": {
 				const template =
 					typeof flags.template === "string" ? flags.template : undefined;
@@ -424,6 +460,7 @@ async function main(): Promise<void> {
 					const result = migrateTemplateVersion(config, target, {
 						forceVersion,
 						dryRun,
+						migrate: MIGRATIONS,
 					});
 					if (config.autoCommit && !dryRun) {
 						await autoCommitChanges(
@@ -447,7 +484,11 @@ async function main(): Promise<void> {
 						flags["dry-run"] === true || flags["dry-run"] === "true";
 					const dir = typeof flags.dir === "string" ? flags.dir : undefined;
 					const attachments = parseAttachments(flags);
-					const result = migrateAllTemplateVersions(config, { dir, dryRun });
+					const result = migrateAllTemplateVersions(config, {
+						dir,
+						dryRun,
+						migrate: MIGRATIONS,
+					});
 					if (config.autoCommit && !dryRun && result.updated > 0) {
 						const changed = result.results
 							.filter(

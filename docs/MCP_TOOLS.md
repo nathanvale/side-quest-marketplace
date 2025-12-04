@@ -6,32 +6,44 @@ Complete reference of 70+ MCP tools available across SideQuest Marketplace plugi
 
 ## Kit Plugin (25 tools)
 
-### Search Tools
-- Text/semantic/AST search
-- Text → `kit_grep` (~30ms, fastest for literal matches)
-- Semantic → `kit_semantic` (~500ms, natural language queries)
-- Structure → `kit_ast_search` (~400ms, tree-sitter patterns)
+**Efficiency Guide:** Tools listed in priority order. Index-based tools query PROJECT_INDEX.json (~10ms) and should be used first. Graph+analysis tools (~200-300ms) leverage the index for targeted operations. Direct search tools (~30-500ms) scan the entire codebase and should be used when index tools don't have the needed information.
 
-### Index Operations (PROJECT_INDEX.json)
-- `kit_index_prime` — Generate/refresh index (~2s)
-- `kit_index_find` — Find symbol definitions (~10ms)
-- `kit_index_stats` — Codebase statistics (~10ms)
-- `kit_index_overview` — File symbol listing (~10ms)
+### Priority 1: Index-Based Navigation (Fastest - Use First)
 
-### Code Analysis
-- `kit_usages` — Find all usages of a symbol (~300ms)
-- `kit_callers` — Find function call sites (~200ms)
-- `kit_calls` — Find function dependencies (~200ms)
-- `kit_deps` — Import/export relationships (~150ms, Python/Terraform only)
-- `kit_dead` — Dead code detection (~500ms)
-- `kit_blast` — Blast radius analysis (~300ms)
-- `kit_api` — Module public API listing (~200ms)
+**Setup:**
+- `kit_index_prime` — Generate/refresh PROJECT_INDEX.json (~2s, run once per session or after major changes)
 
-### File Operations
+**Query index:**
+- `kit_index_find` — Find symbol definitions (~10ms, fastest way to locate functions/classes/types)
+- `kit_index_overview` — List all symbols in a file (~10ms, see file structure without reading)
+- `kit_index_stats` — Codebase statistics (~10ms, total files/symbols/complexity hotspots)
+
+**File operations:**
 - `kit_file_tree` — Repository directory structure (~50ms)
 - `kit_file_content` — Batch read multiple files (~100ms)
 
-### Git/AI Tools
+### Priority 2: Graph + Analysis (Fast - Targeted Operations)
+
+**Call graph analysis (uses index + targeted grep):**
+- `kit_callers` — Find function call sites (~200ms, who calls this function?)
+- `kit_usages` — Find all usages of a symbol (~300ms, comprehensive usage tracking)
+- `kit_calls` — Find function dependencies (~200ms, what does this function call?)
+- `kit_api` — Module public API listing (~200ms, all exported symbols)
+- `kit_blast` — Blast radius analysis (~300ms, change impact)
+- `kit_dead` — Dead code detection (~500ms, unused exports)
+
+**Dependency analysis:**
+- `kit_deps` — Import/export relationships (~150ms, Python/Terraform only)
+
+### Priority 3: Direct Search (Slower - When Index Insufficient)
+
+**Full codebase search:**
+- `kit_grep` — Text/regex search (~30ms, literal pattern matching)
+- `kit_ast_search` — Structural patterns (~400ms, tree-sitter AST queries)
+- `kit_semantic` — Natural language queries (~500ms, ML-powered semantic search)
+
+### Priority 4: Git/AI Automation
+
 - `kit_commit` — AI-generated commit messages (~2s, dry_run=true by default)
 - `kit_summarize` — GitHub PR summary (~3s, can update PR body)
 

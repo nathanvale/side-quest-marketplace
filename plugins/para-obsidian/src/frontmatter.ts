@@ -197,6 +197,7 @@ export function validateFrontmatterFile(
 export interface MigrateTemplateOptions {
 	readonly forceVersion?: number;
 	readonly dryRun?: boolean;
+	readonly migrate?: MigrationHooks;
 }
 
 export function migrateTemplateVersion(
@@ -210,6 +211,7 @@ export function migrateTemplateVersion(
 	updated: boolean;
 	wouldChange: boolean;
 	dryRun: boolean;
+	changes?: ReadonlyArray<string>;
 } {
 	const { attributes, body, relative } = readFrontmatterFile(config, filePath);
 	const type = attributes.type as string | undefined;
@@ -229,6 +231,7 @@ export function migrateTemplateVersion(
 
 	const dryRun = options.dryRun ?? false;
 	const wouldChange = current !== expected;
+	const changes: string[] = [];
 
 	if (!wouldChange) {
 		return {
@@ -241,8 +244,19 @@ export function migrateTemplateVersion(
 		};
 	}
 
-	attributes.template_version = expected;
-	const content = serializeFrontmatter(attributes, body);
+	const migrateHooks = options.migrate ?? {};
+	const hook = type ? migrateHooks[type]?.[current ?? 0]?.[expected] : undefined;
+	let nextAttributes = attributes;
+	let nextBody = body;
+	if (hook) {
+		const transformed = hook({ attributes, body, from: current, to: expected });
+		nextAttributes = transformed.attributes;
+		nextBody = transformed.body;
+		if (transformed.changes?.length) changes.push(...transformed.changes);
+	}
+
+	nextAttributes.template_version = expected;
+	const content = serializeFrontmatter(nextAttributes, nextBody);
 	if (!dryRun) {
 		const { absolute } = resolveVaultPath(config.vault, relative);
 		fs.writeFileSync(absolute, content, "utf8");
@@ -255,6 +269,7 @@ export function migrateTemplateVersion(
 		updated: !dryRun,
 		wouldChange: true,
 		dryRun,
+		changes,
 	};
 }
 
@@ -283,6 +298,7 @@ function listFilesRecursive(root: string, options: ListOptions = {}): string[] {
 export interface MigrateAllOptions {
 	readonly dir?: string;
 	readonly dryRun?: boolean;
+	readonly migrate?: MigrationHooks;
 }
 
 export function migrateAllTemplateVersions(
@@ -298,6 +314,7 @@ export function migrateAllTemplateVersions(
 	errors: number;
 	dir: string;
 	dryRun: boolean;
+	changes: Array<{ file: string; changes: ReadonlyArray<string> }>;
 } {
 	const targetDir = options.dir
 		? resolveVaultPath(config.vault, options.dir).absolute
@@ -312,15 +329,24 @@ export function migrateAllTemplateVersions(
 	let wouldUpdate = 0;
 	let skipped = 0;
 	let errors = 0;
+	const changes: Array<{ file: string; changes: ReadonlyArray<string> }> = [];
 
 	for (const file of files) {
 		const relative = path.relative(config.vault, file);
 		try {
-			const result = migrateTemplateVersion(config, relative, { dryRun });
+			const result = migrateTemplateVersion(config, relative, {
+				dryRun,
+				migrate: options.migrate,
+			});
 			results.push(result);
 			if (result.wouldChange) {
 				wouldUpdate++;
-				if (result.updated) updated++;
+				if (result.updated) {
+					updated++;
+					if (result.changes && result.changes.length > 0) {
+						changes.push({ file: relative, changes: result.changes });
+					}
+				}
 			} else {
 				skipped++;
 			}
@@ -346,5 +372,26 @@ export function migrateAllTemplateVersions(
 		errors,
 		dir: targetDir,
 		dryRun,
+		changes,
 	};
 }
+
+export interface MigrationContext {
+	readonly attributes: Record<string, unknown>;
+	readonly body: string;
+	readonly from?: number;
+	readonly to: number;
+}
+
+export interface MigrationResult {
+	readonly attributes: Record<string, unknown>;
+	readonly body: string;
+	readonly changes?: ReadonlyArray<string>;
+}
+
+export type MigrationFn = (ctx: MigrationContext) => MigrationResult;
+
+export type MigrationHooks = Record<
+	string,
+	Partial<Record<number, Partial<Record<number, MigrationFn>>>>
+>;

@@ -8,6 +8,7 @@ import {
 	migrateAllTemplateVersions,
 	migrateTemplateVersion,
 } from "./frontmatter";
+import { MIGRATIONS } from "./migrations";
 
 function makeVault(): string {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "para-migrate-"));
@@ -37,7 +38,9 @@ Body`,
 			templateVersions: { project: 2 },
 		};
 
-		const result = migrateTemplateVersion(config, "note.md");
+		const result = migrateTemplateVersion(config, "note.md", {
+			migrate: MIGRATIONS,
+		});
 		expect(result.updated).toBe(true);
 		expect(result.toVersion).toBe(2);
 		expect(result.wouldChange).toBe(true);
@@ -73,7 +76,7 @@ Body`,
 			templateVersions: { project: 3, area: 2 },
 		};
 
-		const summary = migrateAllTemplateVersions(config);
+		const summary = migrateAllTemplateVersions(config, { migrate: MIGRATIONS });
 		expect(summary.wouldUpdate).toBe(1);
 		expect(summary.updated).toBe(1);
 		expect(summary.skipped).toBe(1);
@@ -99,7 +102,9 @@ Body`,
 			templateVersions: { project: 3 },
 		};
 
-		const result = migrateTemplateVersion(config, "note.md");
+		const result = migrateTemplateVersion(config, "note.md", {
+			migrate: MIGRATIONS,
+		});
 		expect(result.fromVersion).toBe(1);
 		expect(result.toVersion).toBe(3);
 		expect(result.wouldChange).toBe(true);

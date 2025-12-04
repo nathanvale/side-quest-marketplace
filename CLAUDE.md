@@ -158,7 +158,7 @@ bun install                                 # After adding deps (from root)
 
 The marketplace provides 70+ MCP tools across plugins:
 
-Kit (25 tools) → Text/semantic/AST search, index ops, code analysis, file ops, git/AI tools
+**Kit (25 tools)** → Use in priority order: Index-based (~10ms) → Graph+analysis (~200-300ms) → Direct search (~30-500ms)
 Git (7 tools) → Commits, status, branches, diff, file history
 Atuin (4 tools) → Bash history search, insights, context filtering
 Bun Runner (3 tools) → Test execution, file tests, coverage
@@ -166,7 +166,9 @@ Biome Runner (3 tools) → Lint check/fix, format check
 TSC Runner (1 tool) → TypeScript type checking
 Clipboard (2 tools) → Copy/paste
 
-Full reference: @./docs/MCP_TOOLS.md
+**Efficiency Tip:** Kit's index-based tools (kit_index_find, kit_index_overview) query PROJECT_INDEX.json and are 30-50x faster than grep-based search.
+
+Full reference with priority ordering: @./docs/MCP_TOOLS.md
 
 ---
 

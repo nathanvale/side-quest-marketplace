@@ -17,6 +17,7 @@ import { buildIndex, loadIndex, saveIndex } from "../../src/indexer";
 import { insertIntoNote } from "../../src/insert";
 import { renameWithLinkRewrite } from "../../src/links";
 import { filterByFrontmatter, searchText } from "../../src/search";
+import { semanticSearch } from "../../src/semantic";
 
 function parseAttachments(input?: ReadonlyArray<string>) {
 	return input?.filter(Boolean) ?? [];
@@ -297,6 +298,21 @@ const indexQueryTool = tool({
 	},
 });
 
+const semanticTool = tool({
+	name: "semantic_search",
+	description: "Semantic search using kit (requires kit CLI)",
+	parameters: z.object({
+		query: z.string(),
+		dir: z.string().optional(),
+		limit: z.number().optional(),
+	}),
+	execute: async ({ query, dir, limit }) => {
+		const cfg = loadConfig();
+		const hits = await semanticSearch(cfg, { query, dir, limit });
+		return { query, hits };
+	},
+});
+
 startServer({
 	name: "para-obsidian",
 	version: "0.1.0",
@@ -315,5 +331,6 @@ startServer({
 		frontmatterValidateTool,
 		frontmatterMigrateTool,
 		frontmatterMigrateAllTool,
+		semanticTool,
 	],
 });
