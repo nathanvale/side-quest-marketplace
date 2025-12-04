@@ -119,9 +119,24 @@ async function main() {
 			});
 		}
 
-		// Always output results (informational)
-		const output = formatTestOutput(result, filePath);
-		console.error(`\nTest results for ${filePath}:\n${output}\n`);
+		// Output results - JSON if failures, simple text if passed
+		if (result.failed > 0 || result.timedOut) {
+			console.error(JSON.stringify({
+				tool: "bun-test",
+				file: filePath,
+				status: result.timedOut ? "timeout" : "failed",
+				passed: result.passed,
+				failed: result.failed,
+				failures: result.failures.map(f => ({
+					file: f.file,
+					line: f.line,
+					message: f.message.split('\n')[0], // First line only for token efficiency
+				})),
+				hint: result.timedOut ? "Tests timed out - check for hanging async operations" : "Fix the failing test assertions"
+			}));
+		} else {
+			console.error(`✓ ${result.passed} test(s) passed: ${filePath}`);
+		}
 	}
 
 	testLogger.info("Hook completed", {

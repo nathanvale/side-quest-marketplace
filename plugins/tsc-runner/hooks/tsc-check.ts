@@ -54,33 +54,6 @@ export function parseTscOutput(output: string): TscParseResult {
 	return { errorCount: errors.length, errors };
 }
 
-/**
- * Format errors for Claude-friendly output.
- *
- * @param parsed - Parsed TSC output
- * @param filePath - Path to filter errors by
- * @returns Formatted error string
- */
-function formatErrors(parsed: TscParseResult, filePath: string): string {
-	// Filter to only errors in the edited file
-	// TSC outputs relative paths, filePath is absolute, so check if absolute ends with relative
-	const fileErrors = parsed.errors.filter(
-		(e) => e.file === filePath || filePath.endsWith(e.file),
-	);
-
-	if (fileErrors.length === 0) return "";
-
-	const lines: string[] = [
-		`${fileErrors.length} type error(s) in ${filePath}:`,
-	];
-
-	for (const e of fileErrors) {
-		lines.push(`  ${e.file}:${e.line}:${e.col} - ${e.message}`);
-	}
-
-	return lines.join("\n");
-}
-
 async function main() {
 	await initLogger();
 	const cid = createCorrelationId();
@@ -168,7 +141,7 @@ async function main() {
 	}
 
 	// Run tsc once per package (not per file - tsc needs full project context)
-	const allErrors: string[] = [];
+	const allErrors: Array<{ file: string; line: number; col: number; message: string }> = [];
 	let filesProcessed = 0;
 
 	for (const [configDir, files] of packageFiles) {
@@ -195,9 +168,12 @@ async function main() {
 				configDir,
 				timeoutMs: TSC_TIMEOUT_MS,
 			});
-			allErrors.push(
-				`TypeScript check timed out for ${configDir} (${TSC_TIMEOUT_MS / 1000}s limit).`,
-			);
+			allErrors.push({
+				file: configDir,
+				line: 0,
+				col: 0,
+				message: `TypeScript check timed out (${TSC_TIMEOUT_MS / 1000}s limit)`,
+			});
 			continue;
 		}
 
@@ -224,10 +200,17 @@ async function main() {
 			}
 
 			// Filter errors to only those in edited files
-			for (const file of files) {
-				const formatted = formatErrors(parsed, file);
-				if (formatted) {
-					allErrors.push(formatted);
+			for (const error of parsed.errors) {
+				for (const file of files) {
+					if (error.file === file || file.endsWith(error.file)) {
+						allErrors.push({
+							file: error.file,
+							line: error.line,
+							col: error.col,
+							message: error.message,
+						});
+						break;
+					}
 				}
 			}
 		} else {
@@ -242,11 +225,16 @@ async function main() {
 
 	if (allErrors.length > 0) {
 		tscLogger.warn("Type errors found", { cid, errorCount: allErrors.length });
-		console.error(
-			`TypeScript type errors:\n${allErrors.join("\n\n")}\n\n` +
-				"Fix these type errors manually.\n" +
-				"Full project check: bun typecheck",
-		);
+
+		// Output token-efficient JSON for Claude
+		console.error(JSON.stringify({
+			tool: "tsc",
+			status: "error",
+			error_count: allErrors.length,
+			errors: allErrors,
+			hint: "Fix the TypeScript type errors in the affected files"
+		}));
+
 		tscLogger.info("Hook completed", {
 			cid,
 			exitCode: 2,

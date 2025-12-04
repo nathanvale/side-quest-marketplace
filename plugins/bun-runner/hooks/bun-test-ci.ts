@@ -81,21 +81,28 @@ async function main() {
 		});
 	}
 
-	// Output results (informational)
-	const context =
-		changedTestFiles.length === 1
+	// Output results - JSON if failures, simple text if passed
+	if (result.failed > 0 || result.timedOut) {
+		console.error(JSON.stringify({
+			tool: "bun-test",
+			file_count: changedTestFiles.length,
+			status: result.timedOut ? "timeout" : "failed",
+			passed: result.passed,
+			failed: result.failed,
+			failures: result.failures.slice(0, 10).map(f => ({ // Limit to 10 for token efficiency
+				file: f.file,
+				line: f.line,
+				message: f.message.split('\n')[0], // First line only
+			})),
+			hint: result.timedOut
+				? "Tests timed out - check for hanging async operations"
+				: "Fix the failing test assertions. Use bun_testFile MCP tool to debug individual files"
+		}));
+	} else {
+		const context = changedTestFiles.length === 1
 			? changedTestFiles[0]!
 			: `${changedTestFiles.length} test files`;
-	const output = formatTestOutput(result, context);
-
-	console.error(`\nComprehensive test results:\n${output}\n`);
-
-	if (result.failed > 0) {
-		console.error(
-			"\nTo fix failing tests, use:\n" +
-				'  MCP tool: bun_testFile(file: "path/to/test.ts")\n' +
-				`  Fallback CLI: bun test ${changedTestFiles.join(" ")}`,
-		);
+		console.error(`✓ ${result.passed} test(s) passed in ${context}`);
 	}
 
 	testLogger.info("Hook completed", {

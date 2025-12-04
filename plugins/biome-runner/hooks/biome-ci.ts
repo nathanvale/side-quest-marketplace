@@ -19,25 +19,6 @@ import { getChangedFiles } from "./shared/git-utils";
 import { biomeLogger, createCorrelationId, initLogger } from "./shared/logger";
 import { spawnAndCollect } from "./shared/spawn-utils";
 
-function formatDiagnostics(
-	summary: ReturnType<typeof parseBiomeOutput>,
-): string {
-	if (summary.error_count === 0 && summary.warning_count === 0) {
-		return "";
-	}
-
-	const lines: string[] = [];
-	lines.push(
-		`${summary.error_count} error(s), ${summary.warning_count} warning(s):`,
-	);
-
-	for (const d of summary.diagnostics) {
-		lines.push(`  ${d.file}:${d.line} [${d.code}] ${d.message}`);
-	}
-
-	return lines.join("\n");
-}
-
 async function main() {
 	await initLogger();
 	const cid = createCorrelationId();
@@ -126,19 +107,29 @@ async function main() {
 		}
 
 		if (summary.error_count > 0 || summary.warning_count > 0) {
-			const diagnostics = formatDiagnostics(summary);
 			biomeLogger.warn("Issues found", {
 				cid,
 				errors: summary.error_count,
 				warnings: summary.warning_count,
 			});
-			console.error(
-				`Biome CI found issues in ${filesToCheck.length} changed file(s):\n${diagnostics}\n\n` +
-					"CRITICAL: Use MCP tool FIRST (do NOT use CLI):\n" +
-					"  → biome_lintFix\n\n" +
-					"Only if MCP tool fails, use fallback CLI:\n" +
-					"  bun run biome check --write .",
-			);
+
+			// Output token-efficient JSON for Claude
+			console.error(JSON.stringify({
+				tool: "biome",
+				status: "error",
+				file_count: filesToCheck.length,
+				error_count: summary.error_count,
+				warning_count: summary.warning_count,
+				diagnostics: summary.diagnostics.map(d => ({
+					file: d.file,
+					line: d.line,
+					code: d.code,
+					severity: d.severity,
+					message: d.message,
+				})),
+				hint: "MUST use biome_lintFix MCP tool to fix these errors"
+			}));
+
 			biomeLogger.info("Hook completed", {
 				cid,
 				exitCode: 2,

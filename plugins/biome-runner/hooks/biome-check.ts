@@ -87,7 +87,7 @@ async function main() {
 	}
 
 	// Process each file
-	const allErrors: string[] = [];
+	const allDiagnostics: Array<{ file: string; line: number; code: string; message: string }> = [];
 	let filesProcessed = 0;
 	let filesSkipped = 0;
 
@@ -182,24 +182,37 @@ async function main() {
 				});
 			}
 
+			// Collect error diagnostics for JSON output
 			if (summary.error_count > 0) {
-				allErrors.push(formatDiagnostics(summary));
+				for (const d of summary.diagnostics) {
+					if (d.severity === "error") {
+						allDiagnostics.push({
+							file: d.file,
+							line: d.line,
+							code: d.code,
+							message: d.message,
+						});
+					}
+				}
 			}
 		}
 	}
 
-	if (allErrors.length > 0) {
+	if (allDiagnostics.length > 0) {
 		biomeLogger.warn("Unfixable errors found", {
 			cid,
-			errorCount: allErrors.length,
+			errorCount: allDiagnostics.length,
 		});
-		console.error(
-			`Biome found unfixable issues:\n${allErrors.join("\n\n")}\n\n` +
-				"CRITICAL: Use MCP tool FIRST (do NOT use CLI):\n" +
-				"  → biome_lintFix\n\n" +
-				"Only if MCP tool fails, use fallback CLI:\n" +
-				"  bun run biome check --write .",
-		);
+
+		// Output token-efficient JSON for Claude
+		console.error(JSON.stringify({
+			tool: "biome",
+			status: "error",
+			files_processed: filesProcessed,
+			diagnostics: allDiagnostics,
+			hint: "MUST use biome_lintFix MCP tool to fix these errors"
+		}));
+
 		biomeLogger.info("Hook completed", {
 			cid,
 			exitCode: 2,

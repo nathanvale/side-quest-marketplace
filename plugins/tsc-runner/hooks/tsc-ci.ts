@@ -27,23 +27,6 @@ import { parseTscOutput } from "./tsc-check";
 /** Timeout for project-wide TypeScript checks (2 minutes) */
 const TSC_PROJECT_TIMEOUT_MS = 120_000;
 
-/**
- * Format errors for Claude-friendly output.
- *
- * @param parsed - Parsed TSC output
- * @returns Formatted error string
- */
-function formatErrors(parsed: TscParseResult): string {
-	if (parsed.errorCount === 0) return "";
-
-	const lines: string[] = [`${parsed.errorCount} type error(s) found:`];
-
-	for (const e of parsed.errors) {
-		lines.push(`  ${e.file}:${e.line}:${e.col} - ${e.message}`);
-	}
-
-	return lines.join("\n");
-}
 
 async function main() {
 	await initLogger();
@@ -105,11 +88,15 @@ async function main() {
 			cid,
 			timeoutMs: TSC_PROJECT_TIMEOUT_MS,
 		});
-		console.error(
-			`TypeScript project check timed out (${TSC_PROJECT_TIMEOUT_MS / 1000}s limit).\n` +
-				"Project may have complex types or circular references.\n" +
-				"To debug, run: bun typecheck",
-		);
+
+		// Output token-efficient JSON for Claude
+		console.error(JSON.stringify({
+			tool: "tsc",
+			status: "timeout",
+			timeout_ms: TSC_PROJECT_TIMEOUT_MS,
+			hint: "TypeScript check timed out - project may have complex types or circular references"
+		}));
+
 		tscLogger.info("Hook completed", {
 			cid,
 			exitCode: 2,
@@ -150,15 +137,23 @@ async function main() {
 		});
 	}
 
-	const formatted = formatErrors(parsed);
-
-	if (formatted) {
+	if (parsed.errorCount > 0) {
 		tscLogger.warn("Type errors found", { cid, errorCount: parsed.errorCount });
-		console.error(
-			`TypeScript project check:\n${formatted}\n\n` +
-				"Fix these type errors manually.\n" +
-				"Full project check: bun typecheck",
-		);
+
+		// Output token-efficient JSON for Claude
+		console.error(JSON.stringify({
+			tool: "tsc",
+			status: "error",
+			error_count: parsed.errorCount,
+			errors: parsed.errors.map(e => ({
+				file: e.file,
+				line: e.line,
+				col: e.col,
+				message: e.message,
+			})),
+			hint: "Fix the TypeScript type errors in the affected files"
+		}));
+
 		tscLogger.info("Hook completed", {
 			cid,
 			exitCode: 2,
