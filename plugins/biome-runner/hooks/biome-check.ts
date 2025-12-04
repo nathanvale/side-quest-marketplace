@@ -180,8 +180,10 @@ async function main() {
 		});
 		console.error(
 			`Biome found unfixable issues:\n${allErrors.join("\n\n")}\n\n` +
-				"Fix with MCP tool: biome_lintFix\n" +
-				"Fallback CLI: bun run biome check --write .",
+				"CRITICAL: Use MCP tool FIRST (do NOT use CLI):\n" +
+				"  → biome_lintFix\n\n" +
+				"Only if MCP tool fails, use fallback CLI:\n" +
+				"  bun run biome check --write .",
 		);
 		biomeLogger.info("Hook completed", {
 			cid,

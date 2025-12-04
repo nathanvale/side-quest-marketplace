@@ -512,4 +512,13 @@ tool(
 	},
 );
 
+/**
+ * Functions and types already exported above for hook reuse:
+ * - parseBunTestOutput (line 47)
+ * - isWorkspaceProject (line 107)
+ * - TestFailure, TestSummary (lines 28-40)
+ *
+ * These are used by bun-test.ts and bun-test-ci.ts hooks.
+ */
+
 startServer("bun-runner", { version: "1.0.0" });

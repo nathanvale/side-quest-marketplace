@@ -11,6 +11,30 @@
 					}
 				]
 			}
+		],
+		"PostToolUse": [
+			{
+				"matcher": "*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/bun-test.ts",
+						"timeout": 40
+					}
+				]
+			}
+		],
+		"Stop": [
+			{
+				"matcher": "*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/bun-test-ci.ts",
+						"timeout": 90
+					}
+				]
+			}
 		]
 	}
 }
