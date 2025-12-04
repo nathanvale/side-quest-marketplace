@@ -46,7 +46,7 @@ side-quest-marketplace/
 ├── commitlint.config.js       # Conventional commits enforcement
 ├── package.json               # Root workspace configuration
 ├── pnpm-workspace.yaml        # Workspace package definitions
-└── tsconfig.base.json         # Shared TypeScript configuration
+└── tsconfig.json         # Shared TypeScript configuration
 ```
 
 ---
@@ -102,7 +102,7 @@ my-plugin/
 
 ### TypeScript
 
-- Strict mode (`tsconfig.base.json` has `strict: true`)
+- Strict mode (`tsconfig.json` has `strict: true`)
 - Bun types for runtime APIs
 - `noEmit: true` (Bun handles transpilation)
 
@@ -205,7 +205,7 @@ Quick solutions: @./TROUBLESHOOTING.md
 
 | File | Purpose |
 |------|---------|
-| `tsconfig.base.json` | Shared TypeScript config (strict mode) |
+| `tsconfig.json` | Shared TypeScript config (strict mode) |
 | `biome.json` | Linting and formatting rules |
 | `commitlint.config.js` | Commit message enforcement |
 | `package.json` | Root workspace scripts |

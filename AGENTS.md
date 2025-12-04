@@ -17,7 +17,7 @@
 - For writes (commits, branches, merges), use standard `git` CLI; avoid destructive commands.
 
 ## Coding Style & Naming Conventions
-- Language: TypeScript with `tsconfig.base.json` (ESNext, strict, Bun types).
+- Language: TypeScript with `tsconfig.json` (ESNext, strict, Bun types).
 - Formatting/linting: Biome (`biome.json` rules); no manual formatting tweaks in PRs.
 - Tests named `*.test.ts`; overrides in `biome.json` allow relaxed rules for tests.
 - Prefer explicit types; avoid `any`; keep modules ESM (`type: "module"` where applicable).

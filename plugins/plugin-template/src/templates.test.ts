@@ -141,7 +141,7 @@ describe("tsconfigTemplate", () => {
 	test("extends base config", () => {
 		const result = tsconfigTemplate();
 		const parsed = JSON.parse(result);
-		expect(parsed.extends).toBe("../../tsconfig.base.json");
+		expect(parsed.extends).toBe("../../tsconfig.json");
 	});
 
 	test("includes src directory", () => {

@@ -12,8 +12,6 @@ import { getGitRoot } from "@sidequest/core/git";
  * TypeScript looks for tsconfig.json by default.
  * We also check for:
  * - jsconfig.json (used by JS projects with TS tooling)
- *
- * Note: tsconfig.base.json is NOT included - it's for extending, not running tsc.
  */
 export const TSC_CONFIG_FILES = ["tsconfig.json", "jsconfig.json"] as const;
 

@@ -102,7 +102,7 @@ describe("generatePluginStructure", () => {
 		expect(existsSync(tsconfigPath)).toBe(true);
 
 		const tsconfig = await Bun.file(tsconfigPath).json();
-		expect(tsconfig.extends).toBe("../../tsconfig.base.json");
+		expect(tsconfig.extends).toBe("../../tsconfig.json");
 	});
 
 	test("does not create tsconfig.json for markdown type", async () => {

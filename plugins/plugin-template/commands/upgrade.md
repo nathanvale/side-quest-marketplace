@@ -73,7 +73,7 @@ After:
 **tsconfig.json**:
 ```json
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.json",
   "include": ["src/**/*.ts"],
   "exclude": ["**/node_modules/**"]
 }

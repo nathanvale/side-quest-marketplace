@@ -104,7 +104,7 @@ export function pluginJsonTemplate(ctx: TemplateContext): string {
  */
 export function tsconfigTemplate(): string {
 	const config = {
-		extends: "../../tsconfig.base.json",
+		extends: "../../tsconfig.json",
 		include: ["src/**/*.ts"],
 		exclude: ["**/node_modules/**"],
 	};
