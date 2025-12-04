@@ -71,16 +71,19 @@ side-quest-marketplace/
 
 ## Commands
 
-Install → `bun install` | Test → `bun test` | Typecheck → `bun typecheck`
-Format → `bun run format` | Lint → `bun run lint` | Check → `bun run check`
-Validate → `bun run validate` | CI → `bun run ci:full`
+**IMPORTANT:** Use MCP tools for token-efficient results. They parse output and return structured, concise summaries.
 
-**Plugin-specific:**
-Test plugin → `bun --filter <plugin> test` | Typecheck → `bun --filter <plugin> typecheck`
-Validate → `claude plugin validate plugins/<plugin>`
+**Recommended (MCP tools - token optimized):**
+Test → `bun_runTests` | Test file → `bun_testFile` | Coverage → `bun_testCoverage`
+Typecheck → `tsc_check` | Lint check → `biome_lintCheck` | Lint fix → `biome_lintFix`
+Format check → `biome_formatCheck` | Index codebase → `/kit:prime`
 
-**Quick actions:**
-Index codebase → `/kit:prime --force` | AI commit → `/git:commit` | Create PR → `/git:create-pr`
+**Git workflow:**
+AI commit → `/git:commit` | Create PR → `/git:create-pr` | Search history → `/git:history`
+
+**Direct bash (when MCP not needed):**
+Install → `bun install` | Validate → `bun run validate` | CI → `bun run ci:full`
+Plugin-specific → `bun --filter <plugin> test` | `claude plugin validate plugins/<plugin>`
 
 ---
 
