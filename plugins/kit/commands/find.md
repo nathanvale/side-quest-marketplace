@@ -1,60 +1,69 @@
 ---
 description: Find all definitions of a symbol without grepping files
 argument-hint: <symbol-name>
-allowed-tools: Bash(jq:*), Bash(cat:*), Bash(test:*)
+allowed-tools: Bash(kit-index:*)
 ---
 
 # Find Symbol Definitions
 
-Query PROJECT_INDEX.json to find where a symbol is defined.
+Use kit-index CLI to find where a symbol is defined in PROJECT_INDEX.json.
 
-## Pre-flight Check
-
-```bash
-test -f PROJECT_INDEX.json && echo "INDEX_EXISTS" || echo "INDEX_MISSING"
-```
-
-If INDEX_MISSING, tell user to run `/kit:prime` first.
-
-## Query
-
-Find all definitions matching the symbol name:
+## Usage
 
 ```bash
-cat PROJECT_INDEX.json | jq --arg name "$ARGUMENTS" '
-  [.symbols | to_entries[] | .value[] | select(.name == $name)] |
-  sort_by(.file) |
-  .[] |
-  {
-    file: (.file | split("/") | .[-1]),
-    path: .file,
-    line: .start_line,
-    type: .type
-  }
-'
+cd plugins/kit && bun run src/cli.ts find <symbol-name>
 ```
 
-## Output Format
+The CLI will:
+1. Search PROJECT_INDEX.json for exact symbol matches
+2. Fall back to fuzzy search if no exact match found
+3. Display results grouped by file with colorized output
+4. Show symbol type, name, and line number
 
-Present results as a markdown table:
+## Arguments
 
-| File | Line | Type |
-|------|------|------|
-| dataverse-service.ts | 156 | function |
-| types.ts | 42 | interface |
+- `<symbol-name>` - Symbol to search for (function, class, interface, type, etc.)
+- `--format json` - Output JSON instead of markdown (optional)
 
-Include the full path in a details section if needed.
+## Examples
 
-## No Results
+```bash
+# Find exact symbol
+cd plugins/kit && bun run src/cli.ts find parseArgs
 
-If no matches found:
-1. Suggest checking spelling
-2. Offer to use fuzzy search: `cat PROJECT_INDEX.json | jq --arg name "$ARGUMENTS" '[.symbols | to_entries[] | .value[] | select(.name | test($name; "i"))]'`
+# Get JSON output
+cd plugins/kit && bun run src/cli.ts find parseArgs --format json
+
+# Fuzzy search (automatic fallback)
+cd plugins/kit && bun run src/cli.ts find parse
+```
+
+## Output
+
+**Markdown (default):**
+- Grouped by file
+- Colorized by symbol type
+- Line numbers included
+- ADHD-friendly visual hierarchy
+
+**JSON:**
+```json
+{
+  "query": "parseArgs",
+  "count": 1,
+  "results": [{
+    "file": "/path/to/file.ts",
+    "name": "parseArgs",
+    "type": "function",
+    "line": 40
+  }]
+}
+```
 
 ## Token Efficiency
 
-This command queries a pre-built index instead of:
-- Running `kit_grep` across all files
+Queries pre-built index instead of:
+- Running grep across all files
 - Reading multiple source files
 
 Typical savings: 500-2000 tokens per lookup.

@@ -1,36 +1,20 @@
 ---
 description: List all exported symbols from a module/directory
 argument-hint: <directory-path>
-allowed-tools: Bash(jq:*), Bash(cat:*), Bash(test:*), Bash(find:*)
+allowed-tools: Bash(kit-index:*)
 ---
 
 # Module Public API
 
 List all exports from a directory to understand its public interface.
 
-## Pre-flight Check
+## Usage
 
 ```bash
-test -f PROJECT_INDEX.json && echo "INDEX_EXISTS" || echo "INDEX_MISSING"
+cd plugins/kit && bun run src/cli.ts api $ARGUMENTS
 ```
 
-If INDEX_MISSING, tell user to run `/kit:prime` first.
-
-## Query
-
-Find all symbols in files within the specified directory:
-
-```bash
-cat PROJECT_INDEX.json | jq --arg dir "$ARGUMENTS" '
-  .symbols | to_entries[] |
-  select(.key | contains($dir)) |
-  {
-    file: (.key | split("/") | .[-1]),
-    path: .key,
-    symbols: [.value[] | {name, type, line: .start_line}]
-  }
-' | jq -s '.'
-```
+The CLI will scan the directory and list all exported symbols grouped by file and type.
 
 ## Output Format
 

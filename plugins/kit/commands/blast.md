@@ -1,28 +1,20 @@
 ---
 description: Full blast radius analysis for a code location
 argument-hint: <file:line> or <symbol-name>
-allowed-tools: Bash(jq:*), Bash(cat:*), Bash(test:*), Grep, Read
+allowed-tools: Bash(kit-index:*)
 ---
 
 # Blast Radius Analysis
 
 Comprehensive impact analysis: direct callers, transitive impact, and affected tests.
 
-## Pre-flight Check
+## Usage
 
 ```bash
-test -f PROJECT_INDEX.json && echo "INDEX_EXISTS" || echo "INDEX_MISSING"
+cd plugins/kit && bun run src/cli.ts blast $ARGUMENTS
 ```
 
-If INDEX_MISSING, tell user to run `/kit:prime` first.
-
-## Input Parsing
-
-Accept either:
-- `file:line` format: `src/lib/utils.ts:42`
-- Symbol name: `validateEmail`
-
-If file:line, extract the symbol at that location from the index.
+The CLI accepts either `file:line` format (e.g., `src/utils.ts:42`) or a symbol name. It will show multi-level impact with direct callers, transitive callers, and affected tests.
 
 ## Analysis Steps
 

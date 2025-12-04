@@ -6,58 +6,44 @@ allowed-tools: Bash(kit:*), Bash(test:*), Bash(wc:*), Bash(stat:*)
 
 # Prime the Codebase Index
 
-Generate PROJECT_INDEX.json to enable token-efficient codebase queries.
-
-## Pre-flight Check
-
-Check if index already exists and its age:
-```bash
-test -f PROJECT_INDEX.json && stat -f "%Sm" PROJECT_INDEX.json || echo "NO_INDEX"
-```
+Generate PROJECT_INDEX.json to enable token-efficient codebase queries with colorized output.
 
 ## Instructions
 
-1. **If index exists and is < 24 hours old** (and no `--force` argument):
-   - Report index stats and age
-   - Ask if user wants to regenerate
-
-2. **If index is missing, stale, or `--force` specified**:
-   - Run: `kit index . -o PROJECT_INDEX.json`
-   - Report time taken and stats
-
-## After Indexing
-
-Parse the generated index to report:
+Run the kit-index CLI prime command:
 
 ```bash
-cat PROJECT_INDEX.json | jq '{
-  files: (.files | length),
-  symbols: ([.symbols | to_entries[] | .value | length] | add),
-  has_tree: (.file_tree != null)
-}'
+cd plugins/kit && bun run src/cli.ts prime
 ```
 
-## Output Format
+The command will:
+1. Check for existing index and report age/stats if fresh (<24h)
+2. Generate new index if missing, stale, or `--force` flag passed
+3. Output colorized stats with ADHD-friendly visual hierarchy
+4. Suggest installation if kit CLI is not found
 
+## Arguments
+
+- `--force` - Regenerate index even if less than 24 hours old
+- `--format json` - Output JSON instead of colorized markdown
+
+## Examples
+
+```bash
+# Generate or refresh index
+cd plugins/kit && bun run src/cli.ts prime
+
+# Force regenerate
+cd plugins/kit && bun run src/cli.ts prime --force
+
+# Get JSON output
+cd plugins/kit && bun run src/cli.ts prime --format json
 ```
-PROJECT_INDEX.json generated successfully
 
-Stats:
-- Files indexed: N
-- Symbols extracted: N
-- Index size: X MB
-- Time taken: Xs
+## Output Features
 
-You can now use:
-- /kit:find <symbol>   - Find symbol definitions
-- /kit:callers <fn>    - Find who calls a function
-- /kit:overview <file> - Get file symbol summary
-- /kit:stats           - Codebase overview
-```
-
-## Error Handling
-
-If `kit index` fails:
-1. Check if `kit` CLI is installed: `which kit`
-2. Report the error message
-3. Suggest: `uv tool install cased-kit` or `pipx install cased-kit`
+- 🟢 Green checkmarks for success
+- 🔵 Blue numbers for stats
+- 📊 Clear visual hierarchy with colors
+- ⚠️ Warnings for fresh index
+- ❌ Error messages with installation hints

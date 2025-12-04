@@ -10,7 +10,12 @@
 		"format": "biome format --write .",
 		"format:check": "biome format .",
 		"lint": "biome lint .",
-		"check": "biome check --write ."
+		"check": "biome check --write .",
+		"kit-index": "bun run src/cli.ts",
+		"prime": "bun run src/cli.ts prime",
+		"find": "bun run src/cli.ts find",
+		"overview": "bun run src/cli.ts overview",
+		"stats": "bun run src/cli.ts stats"
 	},
 	"dependencies": {
 		"@sidequest/core": "workspace:*",

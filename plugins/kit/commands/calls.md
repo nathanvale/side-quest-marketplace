@@ -1,36 +1,20 @@
 ---
 description: Find all functions called by a given function
 argument-hint: <function-name>
-allowed-tools: Bash(jq:*), Bash(cat:*), Bash(test:*), Read
+allowed-tools: Bash(kit-index:*)
 ---
 
 # Find Function Dependencies
 
 Query PROJECT_INDEX.json to find what functions a given function calls.
 
-## Pre-flight Check
+## Usage
 
 ```bash
-test -f PROJECT_INDEX.json && echo "INDEX_EXISTS" || echo "INDEX_MISSING"
+cd plugins/kit && bun run src/cli.ts calls $ARGUMENTS
 ```
 
-If INDEX_MISSING, tell user to run `/kit:prime` first.
-
-## Strategy
-
-1. First, find the function definition:
-
-```bash
-cat PROJECT_INDEX.json | jq --arg name "$ARGUMENTS" '
-  [.symbols | to_entries[] | .value[] | select(.name == $name and .type == "function")] | .[0]
-'
-```
-
-2. Get the file and line range for the function
-
-3. Read that specific function from the source file
-
-4. Parse the function body to identify called functions
+The CLI will locate the function and analyze what it calls (local, imported, and external).
 
 ## Analysis
 

@@ -1,35 +1,20 @@
 ---
 description: Get all symbols in a file without reading the source
 argument-hint: <file-path>
-allowed-tools: Bash(jq:*), Bash(cat:*), Bash(test:*), Bash(wc:*)
+allowed-tools: Bash(kit-index:*)
 ---
 
 # File Symbol Overview
 
 Query PROJECT_INDEX.json to see all symbols in a file without reading the source.
 
-## Pre-flight Check
+## Usage
 
 ```bash
-test -f PROJECT_INDEX.json && echo "INDEX_EXISTS" || echo "INDEX_MISSING"
+cd plugins/kit && bun run src/cli.ts overview $ARGUMENTS
 ```
 
-If INDEX_MISSING, tell user to run `/kit:prime` first.
-
-## Query
-
-Find all symbols for the specified file:
-
-```bash
-cat PROJECT_INDEX.json | jq --arg file "$ARGUMENTS" '
-  .symbols | to_entries[] |
-  select(.key | endswith($file)) |
-  {
-    file: .key,
-    symbols: [.value[] | {name, type, line: .start_line}] | sort_by(.line)
-  }
-'
-```
+The CLI will output colorized markdown (optimized for parsing) grouped by symbol type.
 
 ## Output Format
 

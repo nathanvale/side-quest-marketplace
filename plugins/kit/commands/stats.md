@@ -1,70 +1,19 @@
 ---
 description: Codebase overview and health metrics from the index
-allowed-tools: Bash(jq:*), Bash(cat:*), Bash(test:*), Bash(stat:*), Bash(wc:*)
+allowed-tools: Bash(kit-index:*)
 ---
 
 # Codebase Statistics
 
 Quick snapshot of codebase health without reading source files.
 
-## Pre-flight Check
+## Usage
 
 ```bash
-test -f PROJECT_INDEX.json && echo "INDEX_EXISTS" || echo "INDEX_MISSING"
+cd plugins/kit && bun run src/cli.ts stats
 ```
 
-If INDEX_MISSING, tell user to run `/kit:prime` first.
-
-## Queries
-
-### Index Metadata
-
-```bash
-stat -f "%Sm %z" PROJECT_INDEX.json  # Last modified and size
-```
-
-### File Counts
-
-```bash
-cat PROJECT_INDEX.json | jq '
-  {
-    total_files: (.files | length),
-    by_extension: (
-      [.files[] | split(".") | .[-1]] |
-      group_by(.) |
-      map({ext: .[0], count: length}) |
-      sort_by(-.count) |
-      .[0:10]
-    )
-  }
-'
-```
-
-### Symbol Counts
-
-```bash
-cat PROJECT_INDEX.json | jq '
-  [.symbols | to_entries[] | .value[]] |
-  group_by(.type) |
-  map({type: .[0].type, count: length}) |
-  sort_by(-.count)
-'
-```
-
-### Top Directories by Complexity
-
-```bash
-cat PROJECT_INDEX.json | jq '
-  [.symbols | to_entries[] | {
-    dir: (.key | split("/")[0:-1] | join("/")),
-    count: (.value | length)
-  }] |
-  group_by(.dir) |
-  map({dir: .[0].dir, symbols: (map(.count) | add)}) |
-  sort_by(-.symbols) |
-  .[0:10]
-'
-```
+The CLI will output colorized markdown with symbol distribution and complexity hotspots.
 
 ## Output Format
 
