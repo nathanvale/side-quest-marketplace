@@ -20,6 +20,7 @@
 - Tool names: `mcp__plugin_<plugin-name>_<server-name>__<tool_name>`
 - **ALWAYS** include `response_format` parameter: `"markdown"` (default) or `"json"`
 - **ALWAYS** add `isError: true` flag to error responses
+- **ALWAYS** Keep temporary scratch space in `tmp/`; keep experiments out of commits.
 
 ---
 
