@@ -1,7 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdir, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-import { isWorkspaceProject, parseBunTestOutput } from "./index";
+import { describe, expect, it } from "bun:test";
+import { parseBunTestOutput } from "./index";
 
 describe("parseBunTestOutput", () => {
 	it("parses all passing tests", () => {
@@ -106,108 +104,5 @@ Ran 3 tests across 1 file. [50.00ms]`;
 
 		expect(result.failures[0]?.stack).toContain("at someFunc");
 		expect(result.failures[0]?.stack).toContain("at anotherFunc");
-	});
-});
-
-describe("isWorkspaceProject", () => {
-	const testDir = join(import.meta.dir, ".test-workspace-detection");
-	const originalCwd = process.cwd();
-
-	beforeEach(async () => {
-		// Create a temp directory for each test
-		await mkdir(testDir, { recursive: true });
-		process.chdir(testDir);
-	});
-
-	afterEach(async () => {
-		// Restore original cwd and clean up
-		process.chdir(originalCwd);
-		await rm(testDir, { recursive: true, force: true });
-	});
-
-	it("returns true for workspace project with array of workspaces", async () => {
-		await writeFile(
-			join(testDir, "package.json"),
-			JSON.stringify({
-				name: "test-workspace",
-				workspaces: ["packages/*", "apps/*"],
-			}),
-		);
-
-		const result = await isWorkspaceProject();
-
-		expect(result).toBe(true);
-	});
-
-	it("returns true for workspace project with single workspace", async () => {
-		await writeFile(
-			join(testDir, "package.json"),
-			JSON.stringify({
-				name: "test-workspace",
-				workspaces: ["packages/*"],
-			}),
-		);
-
-		const result = await isWorkspaceProject();
-
-		expect(result).toBe(true);
-	});
-
-	it("returns false for non-workspace project", async () => {
-		await writeFile(
-			join(testDir, "package.json"),
-			JSON.stringify({
-				name: "regular-project",
-				version: "1.0.0",
-			}),
-		);
-
-		const result = await isWorkspaceProject();
-
-		expect(result).toBe(false);
-	});
-
-	it("returns false for empty workspaces array", async () => {
-		await writeFile(
-			join(testDir, "package.json"),
-			JSON.stringify({
-				name: "test-project",
-				workspaces: [],
-			}),
-		);
-
-		const result = await isWorkspaceProject();
-
-		expect(result).toBe(false);
-	});
-
-	it("returns false when package.json does not exist", async () => {
-		// Don't create package.json - test that missing file is handled
-
-		const result = await isWorkspaceProject();
-
-		expect(result).toBe(false);
-	});
-
-	it("returns false for invalid JSON in package.json", async () => {
-		await writeFile(join(testDir, "package.json"), "not valid json {{{");
-
-		const result = await isWorkspaceProject();
-
-		expect(result).toBe(false);
-	});
-
-	it("returns false when workspaces is not an array", async () => {
-		await writeFile(
-			join(testDir, "package.json"),
-			JSON.stringify({
-				name: "test-project",
-				workspaces: "packages/*", // string instead of array
-			}),
-		);
-
-		const result = await isWorkspaceProject();
-
-		expect(result).toBe(false);
 	});
 });

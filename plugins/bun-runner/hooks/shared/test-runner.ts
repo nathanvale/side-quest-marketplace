@@ -7,7 +7,6 @@
 
 import { spawnWithTimeout } from "@sidequest/core/spawn";
 import {
-	isWorkspaceProject,
 	parseBunTestOutput,
 	type TestSummary,
 } from "../../mcp-servers/bun-runner/index.js";
@@ -30,12 +29,8 @@ export interface TestResult extends TestSummary {
  * @returns Test summary with timeout flag
  */
 export async function runTestFile(filePath: string): Promise<TestResult> {
-	const isWorkspace = await isWorkspaceProject();
-
-	// Build command based on workspace detection
-	const cmd = isWorkspace
-		? ["bun", "--filter", "*", "test", filePath]
-		: ["bun", "test", filePath];
+	// bun test handles workspaces natively - no need for --filter
+	const cmd = ["bun", "test", filePath];
 
 	const { stdout, stderr, exitCode, timedOut } = await spawnWithTimeout(
 		cmd,
@@ -91,13 +86,8 @@ export async function runTestFile(filePath: string): Promise<TestResult> {
 export async function runChangedTests(
 	filePaths: string[],
 ): Promise<TestResult> {
-	const isWorkspace = await isWorkspaceProject();
-
-	// Build command to run all test files
-	// Bun test accepts multiple file arguments
-	const cmd = isWorkspace
-		? ["bun", "--filter", "*", "test", ...filePaths]
-		: ["bun", "test", ...filePaths];
+	// bun test handles workspaces natively - no need for --filter
+	const cmd = ["bun", "test", ...filePaths];
 
 	const { stdout, stderr, exitCode, timedOut } = await spawnWithTimeout(
 		cmd,

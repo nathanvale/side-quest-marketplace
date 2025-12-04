@@ -97,51 +97,17 @@ export function parseBunTestOutput(output: string): TestSummary {
 // --- Helpers ---
 
 /**
- * Detect if the current directory is a Bun/npm workspace root.
- *
- * In workspaces, we need to use `bun --filter '*' test` instead of `bun test`
- * because each package may have its own bunfig.toml with test preloads/setup.
- * Running `bun test` from root ignores package-level configs, causing failures
- * when tests depend on setup files (e.g., happy-dom globals).
- */
-export async function isWorkspaceProject(): Promise<boolean> {
-	try {
-		const pkg = await Bun.file("package.json").json();
-		return Array.isArray(pkg.workspaces) && pkg.workspaces.length > 0;
-	} catch {
-		return false;
-	}
-}
-
-/**
  * Run Bun tests and parse output using native Bun.spawn()
  * Uses AbortController for timeout instead of spawn's buggy timeout option
  *
- * Workspace-aware: Uses `bun --filter '*' test` for workspace projects
- * to ensure each package's bunfig.toml (with test preloads) is respected.
+ * Uses `bun test` directly - Bun natively handles workspace test discovery,
+ * searching all packages for matching test files. The previous `--filter '*'`
+ * approach broke pattern matching because patterns were interpreted as test
+ * name filters within each package rather than cross-workspace file matching.
  */
 async function runBunTests(pattern?: string): Promise<TestSummary> {
-	const isWorkspace = await isWorkspaceProject();
-
-	// Detect if pattern is a specific file path (contains / or is absolute)
-	// vs a test name pattern (like "auth" or "login")
-	const isFilePath =
-		pattern && (pattern.includes("/") || pattern.startsWith("/"));
-
-	// Build command based on workspace detection
-	let cmd: string[];
-	if (isWorkspace && !isFilePath) {
-		// Workspace with pattern: run test script in each package
-		// Pattern filtering works differently - passed to each package's test run
-		cmd = pattern
-			? ["bun", "--filter", "*", "test", pattern]
-			: ["bun", "--filter", "*", "test"];
-	} else {
-		// Non-workspace OR specific file path: direct bun test
-		// File paths don't work with --filter '*' because each package
-		// would interpret the path relative to its own directory
-		cmd = pattern ? ["bun", "test", pattern] : ["bun", "test"];
-	}
+	// Simple: bun test handles workspaces natively
+	const cmd = pattern ? ["bun", "test", pattern] : ["bun", "test"];
 	const TIMEOUT_MS = 30000;
 
 	// Use AbortController for timeout - Bun's timeout option is buggy
@@ -206,20 +172,14 @@ async function runBunTests(pattern?: string): Promise<TestSummary> {
  * Run Bun tests with coverage and parse output
  * Uses AbortController for timeout instead of spawn's buggy timeout option
  *
- * Workspace-aware: Uses `bun --filter '*' test --coverage` for workspace projects.
- * Note: Coverage aggregation across workspaces may vary by Bun version.
+ * Uses `bun test --coverage` directly - Bun handles workspace discovery natively.
  */
 async function runBunTestCoverage(): Promise<{
 	summary: TestSummary;
 	coverage: { percent: number; uncovered: string[] };
 }> {
-	const isWorkspace = await isWorkspaceProject();
 	const TIMEOUT_MS = 60000;
-
-	// Build command based on workspace detection
-	const cmd = isWorkspace
-		? ["bun", "--filter", "*", "test", "--coverage"]
-		: ["bun", "test", "--coverage"];
+	const cmd = ["bun", "test", "--coverage"];
 
 	// Use AbortController for timeout - Bun's timeout option is buggy
 	const controller = new AbortController();
