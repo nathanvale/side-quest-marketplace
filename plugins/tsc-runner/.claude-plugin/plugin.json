@@ -1,11 +1,14 @@
 {
 	"name": "tsc-runner",
-	"description": "TypeScript type checking hooks for Claude Code",
+	"description": "TypeScript type checking hooks and MCP server for Claude Code",
 	"version": "1.0.0",
 	"author": {
 		"name": "Nathan Vale",
 		"email": "hi@nathanvale.com"
 	},
-	"keywords": ["typescript", "tsc", "type-checking"],
-	"license": "MIT"
+	"keywords": ["typescript", "tsc", "type-checking", "mcp"],
+	"license": "MIT",
+	"repository": "https://github.com/nathanvale/side-quest-marketplace",
+	"mcpServers": ["./.mcp.json"],
+	"commands": ["./commands/logs.md"]
 }

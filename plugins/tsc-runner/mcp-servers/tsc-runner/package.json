@@ -11,5 +11,8 @@
 	"dependencies": {
 		"@sidequest/core": "workspace:*",
 		"mcpez": "^1.2.1"
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
 	}
 }

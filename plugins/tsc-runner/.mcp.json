@@ -1,0 +1,8 @@
+{
+	"mcpServers": {
+		"tsc-runner": {
+			"command": "bun",
+			"args": ["run", "mcp-servers/tsc-runner/index.ts"]
+		}
+	}
+}

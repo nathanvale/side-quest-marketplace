@@ -221,6 +221,9 @@
         "@sidequest/core": "workspace:*",
         "mcpez": "^1.2.1",
       },
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
     },
     "plugins/validate-plugin": {
       "name": "@sidequest/validate-plugin",
