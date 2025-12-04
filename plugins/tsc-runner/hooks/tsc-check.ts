@@ -63,8 +63,9 @@ export function parseTscOutput(output: string): TscParseResult {
  */
 function formatErrors(parsed: TscParseResult, filePath: string): string {
 	// Filter to only errors in the edited file
+	// TSC outputs relative paths, filePath is absolute, so check if absolute ends with relative
 	const fileErrors = parsed.errors.filter(
-		(e) => e.file === filePath || e.file.endsWith(filePath),
+		(e) => e.file === filePath || filePath.endsWith(e.file),
 	);
 
 	if (fileErrors.length === 0) return "";

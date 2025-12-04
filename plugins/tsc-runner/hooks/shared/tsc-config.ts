@@ -10,9 +10,15 @@ import { getGitRoot } from "@sidequest/core/git";
 /**
  * Valid TypeScript configuration file names.
  * TypeScript looks for tsconfig.json by default.
- * We also check for jsconfig.json (used by JS projects with TS tooling).
+ * We also check for:
+ * - jsconfig.json (used by JS projects with TS tooling)
+ * - tsconfig.base.json (used by monorepos with shared config)
  */
-export const TSC_CONFIG_FILES = ["tsconfig.json", "jsconfig.json"] as const;
+export const TSC_CONFIG_FILES = [
+	"tsconfig.json",
+	"jsconfig.json",
+	"tsconfig.base.json",
+] as const;
 
 /**
  * Result of checking for TypeScript configuration.

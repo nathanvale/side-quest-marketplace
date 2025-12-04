@@ -3,6 +3,7 @@
  * Provides git-aware file tracking and change detection.
  */
 
+import { realpath } from "node:fs/promises";
 import { resolve } from "node:path";
 import { spawnAndCollect } from "../spawn/index.js";
 
@@ -33,6 +34,8 @@ export async function getGitRoot(): Promise<string | null> {
  * the latter fails on untracked files. This approach handles both tracked and
  * newly created files that haven't been staged yet.
  *
+ * Note: We resolve symlinks to handle cases like /tmp → /private/tmp on macOS.
+ *
  * @param filePath - Path to the file to check
  * @returns true if file is inside the git repo, false otherwise
  */
@@ -40,8 +43,17 @@ export async function isFileInRepo(filePath: string): Promise<boolean> {
 	const gitRoot = await getGitRoot();
 	if (!gitRoot) return false;
 
-	const absolutePath = resolve(filePath);
-	return absolutePath.startsWith(gitRoot);
+	// Resolve symlinks to handle /tmp → /private/tmp on macOS
+	try {
+		const realGitRoot = await realpath(gitRoot);
+		const absolutePath = resolve(filePath);
+		const realAbsolutePath = await realpath(absolutePath);
+		return realAbsolutePath.startsWith(realGitRoot);
+	} catch {
+		// If realpath fails (file doesn't exist), fall back to string comparison
+		const absolutePath = resolve(filePath);
+		return absolutePath.startsWith(gitRoot);
+	}
 }
 
 /**
