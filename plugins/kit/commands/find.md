@@ -1,7 +1,8 @@
 ---
 description: Find all definitions of a symbol without grepping files
-argument-hint: <symbol-name>
+argument-hint: <symbol-name> [index-path]
 allowed-tools: Bash(kit-index:*)
+model: claude-haiku-4-5-20251001
 ---
 
 # Find Symbol Definitions
@@ -11,7 +12,7 @@ Use kit-index CLI to find where a symbol is defined in PROJECT_INDEX.json.
 ## Usage
 
 ```bash
-cd plugins/kit && bun run src/cli.ts find <symbol-name>
+bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts find <symbol-name> --format json
 ```
 
 The CLI will:
@@ -23,19 +24,20 @@ The CLI will:
 ## Arguments
 
 - `<symbol-name>` - Symbol to search for (function, class, interface, type, etc.)
-- `--format json` - Output JSON instead of markdown (optional)
+- `[index-path]` - Optional path to PROJECT_INDEX.json or directory containing it
+- `--format json` - Output JSON for token optimization (recommended for Claude)
 
 ## Examples
 
 ```bash
-# Find exact symbol
-cd plugins/kit && bun run src/cli.ts find parseArgs
+# Find symbol with JSON output (recommended)
+bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts find parseArgs --format json
 
-# Get JSON output
-cd plugins/kit && bun run src/cli.ts find parseArgs --format json
+# Find in specific index
+bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts find MyClass /path/to/project --format json
 
-# Fuzzy search (automatic fallback)
-cd plugins/kit && bun run src/cli.ts find parse
+# Human-readable markdown output
+bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts find parseArgs
 ```
 
 ## Output

@@ -2,6 +2,7 @@
 description: Find potentially unused exports (dead code detection)
 argument-hint: [path?]
 allowed-tools: Bash(kit-index:*)
+model: claude-haiku-4-5-20251001
 ---
 
 # Find Dead Code
@@ -11,7 +12,7 @@ Analyze PROJECT_INDEX.json to find exports with zero incoming references.
 ## Usage
 
 ```bash
-cd plugins/kit && bun run src/cli.ts dead [$ARGUMENTS]
+bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts dead [$ARGUMENTS]
 ```
 
 The CLI will scan for exported symbols with no references. Optional path argument scopes analysis to a directory.

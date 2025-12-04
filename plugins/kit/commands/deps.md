@@ -2,6 +2,7 @@
 description: Show import/export relationships for a file
 argument-hint: <file-path>
 allowed-tools: Bash(kit-index:*)
+model: claude-haiku-4-5-20251001
 ---
 
 # File Dependency Graph
@@ -11,7 +12,7 @@ Show what a file imports and what imports it.
 ## Usage
 
 ```bash
-cd plugins/kit && bun run src/cli.ts deps $ARGUMENTS
+bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts deps $ARGUMENTS
 ```
 
 The CLI will analyze bidirectional dependencies (what this file imports and what imports it).

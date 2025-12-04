@@ -2,6 +2,7 @@
 description: Generate or refresh PROJECT_INDEX.json for fast codebase queries
 argument-hint: [path] [--force] [--format json]
 allowed-tools: Bash(kit:*), Bash(test:*), Bash(wc:*), Bash(stat:*)
+model: claude-haiku-4-5-20251001
 ---
 
 # Prime the Codebase Index
@@ -13,7 +14,7 @@ Generate PROJECT_INDEX.json to enable token-efficient codebase queries with colo
 Run the kit-index CLI prime command from anywhere - it automatically finds and indexes the git repository root:
 
 ```bash
-bun run /Users/nathanvale/code/side-quest-marketplace/plugins/kit/src/cli.ts prime
+bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts prime --format json
 ```
 
 The command will:
@@ -32,17 +33,17 @@ The command will:
 ## Examples
 
 ```bash
-# Generate index at git root (auto-detected)
-bun run /Users/nathanvale/code/side-quest-marketplace/plugins/kit/src/cli.ts prime
+# Generate index at git root (auto-detected) with JSON output
+bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts prime --format json
 
 # Generate index for specific directory
-bun run /Users/nathanvale/code/side-quest-marketplace/plugins/kit/src/cli.ts prime /path/to/project
+bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts prime /path/to/project --format json
 
 # Force regenerate at git root
-bun run /Users/nathanvale/code/side-quest-marketplace/plugins/kit/src/cli.ts prime --force
+bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts prime --force --format json
 
-# Index specific directory with JSON output
-bun run /Users/nathanvale/code/side-quest-marketplace/plugins/kit/src/cli.ts prime ~/my-project --format json
+# Human-readable markdown output
+bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts prime
 ```
 
 ## Output Features

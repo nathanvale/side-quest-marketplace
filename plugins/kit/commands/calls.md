@@ -2,6 +2,7 @@
 description: Find all functions called by a given function
 argument-hint: <function-name>
 allowed-tools: Bash(kit-index:*)
+model: claude-haiku-4-5-20251001
 ---
 
 # Find Function Dependencies
@@ -11,7 +12,7 @@ Query PROJECT_INDEX.json to find what functions a given function calls.
 ## Usage
 
 ```bash
-cd plugins/kit && bun run src/cli.ts calls $ARGUMENTS
+bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts calls $ARGUMENTS
 ```
 
 The CLI will locate the function and analyze what it calls (local, imported, and external).

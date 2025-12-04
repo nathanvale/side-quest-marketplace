@@ -1,6 +1,8 @@
 ---
 description: Codebase overview and health metrics from the index
+argument-hint: [index-path]
 allowed-tools: Bash(kit-index:*)
+model: claude-haiku-4-5-20251001
 ---
 
 # Codebase Statistics
@@ -10,7 +12,7 @@ Quick snapshot of codebase health without reading source files.
 ## Usage
 
 ```bash
-cd plugins/kit && bun run src/cli.ts stats
+bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts stats --format json
 ```
 
 The CLI will output colorized markdown with symbol distribution and complexity hotspots.

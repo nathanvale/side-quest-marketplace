@@ -1,7 +1,8 @@
 ---
 description: Get all symbols in a file without reading the source
-argument-hint: <file-path>
+argument-hint: <file-path> [index-path]
 allowed-tools: Bash(kit-index:*)
+model: claude-haiku-4-5-20251001
 ---
 
 # File Symbol Overview
@@ -11,7 +12,7 @@ Query PROJECT_INDEX.json to see all symbols in a file without reading the source
 ## Usage
 
 ```bash
-cd plugins/kit && bun run src/cli.ts overview $ARGUMENTS
+bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts overview $ARGUMENTS
 ```
 
 The CLI will output colorized markdown (optimized for parsing) grouped by symbol type.

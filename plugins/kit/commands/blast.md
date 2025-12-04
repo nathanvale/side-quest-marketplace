@@ -2,6 +2,7 @@
 description: Full blast radius analysis for a code location
 argument-hint: <file:line> or <symbol-name>
 allowed-tools: Bash(kit-index:*)
+model: claude-haiku-4-5-20251001
 ---
 
 # Blast Radius Analysis
@@ -11,7 +12,7 @@ Comprehensive impact analysis: direct callers, transitive impact, and affected t
 ## Usage
 
 ```bash
-cd plugins/kit && bun run src/cli.ts blast $ARGUMENTS
+bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts blast $ARGUMENTS
 ```
 
 The CLI accepts either `file:line` format (e.g., `src/utils.ts:42`) or a symbol name. It will show multi-level impact with direct callers, transitive callers, and affected tests.

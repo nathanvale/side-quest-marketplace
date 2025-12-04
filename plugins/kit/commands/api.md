@@ -2,6 +2,7 @@
 description: List all exported symbols from a module/directory
 argument-hint: <directory-path>
 allowed-tools: Bash(kit-index:*)
+model: claude-haiku-4-5-20251001
 ---
 
 # Module Public API
@@ -11,7 +12,7 @@ List all exports from a directory to understand its public interface.
 ## Usage
 
 ```bash
-cd plugins/kit && bun run src/cli.ts api $ARGUMENTS
+bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts api $ARGUMENTS
 ```
 
 The CLI will scan the directory and list all exported symbols grouped by file and type.

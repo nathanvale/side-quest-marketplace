@@ -1,6 +1,7 @@
 ---
 description: View Kit plugin logs for debugging
 argument-hint: [lines?] [correlation-id?]
+model: claude-haiku-4-5-20251001
 ---
 
 # Kit Logs Command

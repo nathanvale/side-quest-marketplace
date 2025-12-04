@@ -2,6 +2,7 @@
 description: Find all call sites of a function (blast radius analysis)
 argument-hint: <function-name>
 allowed-tools: Bash(kit-index:*)
+model: claude-haiku-4-5-20251001
 ---
 
 # Find Function Callers
@@ -11,7 +12,7 @@ Query PROJECT_INDEX.json to find all places that call a function.
 ## Usage
 
 ```bash
-cd plugins/kit && bun run src/cli.ts callers $ARGUMENTS
+bun run ${CLAUDE_PLUGIN_ROOT}/src/cli.ts callers $ARGUMENTS
 ```
 
 The CLI will analyze the call graph and use grep fallback if needed.
