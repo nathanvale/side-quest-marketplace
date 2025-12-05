@@ -1,0 +1,9 @@
+{
+	"mcpServers": {
+		"para-obsidian": {
+			"command": "bun",
+			"args": ["run", "${CLAUDE_PLUGIN_ROOT}/mcp/para-obsidian/index.ts"],
+			"env": {}
+		}
+	}
+}
