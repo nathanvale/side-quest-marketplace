@@ -2,10 +2,7 @@
 	"mcpServers": {
 		"biome-runner": {
 			"command": "bun",
-			"args": [
-				"run",
-				"${CLAUDE_PLUGIN_ROOT}/mcp-servers/biome-runner/index.ts"
-			],
+			"args": ["run", "${CLAUDE_PLUGIN_ROOT}/mcp/index.ts"],
 			"env": {}
 		}
 	}

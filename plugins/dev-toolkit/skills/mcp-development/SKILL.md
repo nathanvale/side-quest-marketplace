@@ -1,3 +1,8 @@
+---
+name: mcp-development
+description: Build production-grade MCP servers with mcpez, Bun, and marketplace patterns
+---
+
 # MCP Development Skill
 
 Build production-grade MCP (Model Context Protocol) servers using mcpez and Bun.

@@ -45,7 +45,9 @@ function printUsage(): void {
 		"  dev-toolkit review-template . --format json",
 	];
 
-	console.log(lines.map((line) => (line === "" ? "" : color("cyan", line))).join("\n"));
+	console.log(
+		lines.map((line) => (line === "" ? "" : color("cyan", line))).join("\n"),
+	);
 }
 
 /**
@@ -56,7 +58,8 @@ async function main(): Promise<void> {
 		const args = process.argv.slice(2);
 		const parsed = parseArgs(args);
 		const { command, subcommand, flags } = parsed;
-		const formatFlag = typeof flags.format === "string" ? flags.format : undefined;
+		const formatFlag =
+			typeof flags.format === "string" ? flags.format : undefined;
 		const outputFormat = parseOutputFormat(formatFlag) ?? "md";
 
 		// Handle help flag or no command
@@ -70,7 +73,9 @@ async function main(): Promise<void> {
 			case "create-template": {
 				if (!subcommand) {
 					console.error("Error: create-template requires a template name");
-					console.error("Usage: dev-toolkit create-template <name> [--dest path]");
+					console.error(
+						"Usage: dev-toolkit create-template <name> [--dest path]",
+					);
 					process.exit(1);
 				}
 				const name = subcommand;

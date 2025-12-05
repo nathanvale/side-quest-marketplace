@@ -8,8 +8,8 @@
  * Output: JSON with pass/fail status
  */
 
-import { existsSync } from "node:fs";
 import { basename, dirname } from "node:path";
+import { pathExistsSync } from "@sidequest/core/fs";
 import { formatMarkdown } from "@sidequest/core/validate/reporter";
 import { validatePlugin } from "@sidequest/core/validate/runner";
 
@@ -56,7 +56,7 @@ export function findPluginRoot(filePath: string): string | null {
 	if (filename === "plugin.json" || filename === "hooks.json") {
 		let searchDir = dir;
 		while (searchDir !== "/") {
-			if (existsSync(`${searchDir}/.claude-plugin`)) {
+			if (pathExistsSync(`${searchDir}/.claude-plugin`)) {
 				return searchDir;
 			}
 			searchDir = dirname(searchDir);
@@ -85,7 +85,7 @@ export async function processHook(input: HookInput): Promise<HookResult> {
 	}
 
 	// File doesn't exist (might have been deleted) - pass through
-	if (!existsSync(filePath)) {
+	if (!pathExistsSync(filePath)) {
 		return { status: "pass" };
 	}
 

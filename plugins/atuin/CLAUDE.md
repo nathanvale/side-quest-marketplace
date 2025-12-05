@@ -43,10 +43,10 @@ biome check --write .     # Lint and format
 
 | Tool | Purpose |
 |------|---------|
-| `atuin_search_history` | Fuzzy/prefix/full-text search with filtering by time, directory, exit code |
-| `atuin_get_recent_history` | Get N most recent commands |
-| `atuin_search_by_context` | Filter by git branch or Claude session ID |
-| `atuin_history_insights` | Stats on frequent commands and failure patterns |
+| `mcp__plugin_atuin_bash-history__atuin_search_history` | Fuzzy/prefix/full-text search with filtering by time, directory, exit code |
+| `mcp__plugin_atuin_bash-history__atuin_get_recent_history` | Get N most recent commands |
+| `mcp__plugin_atuin_bash-history__atuin_search_by_context` | Filter by git branch or Claude session ID |
+| `mcp__plugin_atuin_bash-history__atuin_history_insights` | Stats on frequent commands and failure patterns |
 
 ## Key Features
 

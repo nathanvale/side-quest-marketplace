@@ -13,7 +13,7 @@
  */
 
 import { spawn } from "bun";
-import { parseBiomeOutput } from "../mcp-servers/biome-runner/index";
+import { parseBiomeOutput } from "../mcp/index";
 import { hasBiomeConfig, logMissingConfigHint } from "./shared/biome-config";
 import { BIOME_SUPPORTED_EXTENSIONS } from "./shared/constants";
 import { isFileInRepo } from "./shared/git-utils";

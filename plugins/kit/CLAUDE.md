@@ -25,7 +25,7 @@ kit/
 │   ├── validators.ts          # Input validation (19KB)
 │   ├── formatters.ts          # Output formatting
 │   └── logger.ts              # LogTape correlation IDs
-├── mcp-servers/kit/           # MCP server (18 tools)
+├── mcp/kit/           # MCP server (18 tools)
 ├── commands/                  # Slash commands (/kit:logs, /kit:prime, etc.)
 └── docs/                      # Architecture & contributing guides
 ```
@@ -44,7 +44,7 @@ biome check --write .     # Lint and format
 
 ## Key Files
 
-- `mcp-servers/kit/index.ts:kit-plugin` — 18 MCP tools (search, index, analysis, file ops)
+- `mcp/kit/index.ts:kit-plugin` — 18 MCP tools (search, index, analysis, file ops)
 - `src/kit-wrapper.ts:30` — Pure CLI wrappers for all Kit commands (core logic)
 - `src/validators.ts:1` — Comprehensive input validation (27KB of tests!)
 - `src/ast/searcher.ts:1` — Parallel AST search using tree-sitter

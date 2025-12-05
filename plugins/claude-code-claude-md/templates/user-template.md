@@ -74,7 +74,7 @@ How you prefer Claude to respond:
 ### Tools & Plugins
 Reference your global MCP tools using arrow notation for conciseness:
 ```markdown
-Search → `kit_grep` | History → `atuin_search_history` | Git → `git_get_status`
+Search → `kit_grep` | History → `mcp__plugin_atuin_bash-history__atuin_search_history` | Git → `mcp__plugin_git_git-intelligence__git_get_status`
 ```
 
 ### @imports

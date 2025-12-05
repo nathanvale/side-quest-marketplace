@@ -5,9 +5,9 @@
  * Uses spawnSync with argument arrays to prevent command injection.
  */
 
-import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { pathExistsSync } from "@sidequest/core/fs";
 import { spawnSyncCollect } from "@sidequest/core/spawn";
 
 /**
@@ -88,7 +88,7 @@ export function runBinScript(options: RunBinScriptOptions): BinScriptResult {
 	const scriptPath = join(binDir, script);
 
 	// Check if script exists
-	if (!existsSync(scriptPath)) {
+	if (!pathExistsSync(scriptPath)) {
 		logger.warn("Bin script not found", { cid, script, scriptPath });
 		return {
 			stdout: "",
@@ -138,7 +138,7 @@ export function runBinScript(options: RunBinScriptOptions): BinScriptResult {
  * @returns True if script exists
  */
 export function binScriptExists(script: string, binDir = BIN_DIR): boolean {
-	return existsSync(join(binDir, script));
+	return pathExistsSync(join(binDir, script));
 }
 
 /**

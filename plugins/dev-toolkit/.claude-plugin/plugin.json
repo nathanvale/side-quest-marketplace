@@ -11,6 +11,7 @@
 		"./skills/dev-toolkit",
 		"./skills/bun-cli",
 		"./skills/bun-runtime",
-		"./skills/dx-patterns"
+		"./skills/dx-patterns",
+		"./skills/mcp-development"
 	]
 }

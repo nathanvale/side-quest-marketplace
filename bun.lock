@@ -45,17 +45,6 @@
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.0.4",
         "@sidequest/core": "workspace:*",
-      },
-      "devDependencies": {
-        "@types/bun": "latest",
-      },
-    },
-    "plugins/biome-runner/mcp-servers/biome-runner": {
-      "name": "@sidequest/mcp-biome-runner",
-      "version": "1.0.0",
-      "dependencies": {
-        "@modelcontextprotocol/sdk": "^1.0.4",
-        "@sidequest/core": "workspace:*",
         "mcpez": "^1.2.1",
       },
       "devDependencies": {
@@ -66,13 +55,8 @@
       "name": "@sidequest/bun-runner",
       "version": "1.0.0",
       "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.0.4",
         "@sidequest/core": "workspace:*",
-      },
-    },
-    "plugins/bun-runner/mcp-servers/bun-runner": {
-      "name": "@sidequest/mcp-bun-runner",
-      "version": "1.0.0",
-      "dependencies": {
         "mcpez": "^1.2.1",
       },
     },
@@ -103,10 +87,21 @@
       "version": "1.0.0",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.0.4",
+        "@sidequest/core": "workspace:*",
         "mcpez": "^1.2.1",
       },
       "devDependencies": {
         "@types/bun": "latest",
+      },
+    },
+    "plugins/dev-toolkit": {
+      "name": "@sidequest/dev-toolkit",
+      "version": "1.0.0",
+      "bin": {
+        "dev-toolkit": "./src/cli.ts",
+      },
+      "dependencies": {
+        "@sidequest/core": "workspace:*",
       },
     },
     "plugins/firecrawl": {
@@ -120,16 +115,8 @@
       "name": "@sidequest/git",
       "version": "1.0.0",
       "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.0.4",
         "@sidequest/core": "workspace:*",
-      },
-    },
-    "plugins/git/mcp-servers/git-intelligence": {
-      "name": "@sidequest/mcp-git-intelligence",
-      "version": "1.0.0",
-      "bin": {
-        "git-intelligence-mcp": "./index.ts",
-      },
-      "dependencies": {
         "mcpez": "^1.2.1",
       },
     },
@@ -137,7 +124,9 @@
       "name": "@sidequest/kit",
       "version": "1.0.0",
       "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.0.4",
         "@sidequest/core": "workspace:*",
+        "mcpez": "^1.2.1",
         "tree-sitter-wasms": "^0.1.13",
         "web-tree-sitter": "^0.25.10",
       },
@@ -145,19 +134,14 @@
         "@types/bun": "latest",
       },
     },
-    "plugins/kit/mcp-servers/kit": {
-      "name": "@sidequest/mcp-kit",
-      "version": "1.0.0",
-      "dependencies": {
-        "mcpez": "^1.2.1",
-        "zod": "^3.23.8",
-      },
-    },
     "plugins/mcp-manager": {
       "name": "@sidequest/mcp-manager",
       "version": "1.0.0",
       "bin": {
         "mcp-manager": "./src/cli.ts",
+      },
+      "dependencies": {
+        "@sidequest/core": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -182,18 +166,13 @@
         "para-obsidian": "./src/cli.ts",
       },
       "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.0.4",
         "@sidequest/core": "workspace:*",
+        "mcpez": "^1.2.1",
         "yaml": "^2.6.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
-      },
-    },
-    "plugins/para-obsidian/mcp-servers/para-obsidian": {
-      "name": "@sidequest/mcp-para-obsidian",
-      "version": "1.0.0",
-      "dependencies": {
-        "mcpez": "1.2.1",
       },
     },
     "plugins/plugin-template": {
@@ -233,17 +212,8 @@
       "name": "@sidequest/tsc-runner",
       "version": "1.0.0",
       "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.0.4",
         "@sidequest/bun-runner": "workspace:*",
-        "@sidequest/core": "workspace:*",
-      },
-      "devDependencies": {
-        "@types/bun": "latest",
-      },
-    },
-    "plugins/tsc-runner/mcp-servers/tsc-runner": {
-      "name": "@sidequest/mcp-tsc-runner",
-      "version": "1.0.0",
-      "dependencies": {
         "@sidequest/core": "workspace:*",
         "mcpez": "^1.2.1",
       },
@@ -338,25 +308,15 @@
 
     "@sidequest/core": ["@sidequest/core@workspace:core"],
 
+    "@sidequest/dev-toolkit": ["@sidequest/dev-toolkit@workspace:plugins/dev-toolkit"],
+
     "@sidequest/firecrawl": ["@sidequest/firecrawl@workspace:plugins/firecrawl"],
 
     "@sidequest/git": ["@sidequest/git@workspace:plugins/git"],
 
     "@sidequest/kit": ["@sidequest/kit@workspace:plugins/kit"],
 
-    "@sidequest/mcp-biome-runner": ["@sidequest/mcp-biome-runner@workspace:plugins/biome-runner/mcp-servers/biome-runner"],
-
-    "@sidequest/mcp-bun-runner": ["@sidequest/mcp-bun-runner@workspace:plugins/bun-runner/mcp-servers/bun-runner"],
-
-    "@sidequest/mcp-git-intelligence": ["@sidequest/mcp-git-intelligence@workspace:plugins/git/mcp-servers/git-intelligence"],
-
-    "@sidequest/mcp-kit": ["@sidequest/mcp-kit@workspace:plugins/kit/mcp-servers/kit"],
-
     "@sidequest/mcp-manager": ["@sidequest/mcp-manager@workspace:plugins/mcp-manager"],
-
-    "@sidequest/mcp-para-obsidian": ["@sidequest/mcp-para-obsidian@workspace:plugins/para-obsidian/mcp-servers/para-obsidian"],
-
-    "@sidequest/mcp-tsc-runner": ["@sidequest/mcp-tsc-runner@workspace:plugins/tsc-runner/mcp-servers/tsc-runner"],
 
     "@sidequest/melanie": ["@sidequest/melanie@workspace:plugins/melanie"],
 

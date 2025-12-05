@@ -13,7 +13,7 @@ Generates complete scaffold with plugin.json, tsconfig, package.json, MCP templa
 ## MCP Server Example
 
 ```typescript
-// plugins/my-plugin/mcp-servers/my-server/index.ts
+// plugins/my-plugin/mcp/my-server/index.ts
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
@@ -69,7 +69,7 @@ await server.connect(new StdioServerTransport());
   "mcpServers": {
     "my-server": {
       "command": "bun",
-      "args": ["run", "${CLAUDE_PLUGIN_ROOT}/mcp-servers/my-server/index.ts"]
+      "args": ["run", "${CLAUDE_PLUGIN_ROOT}/mcp/my-server/index.ts"]
     }
   }
 }

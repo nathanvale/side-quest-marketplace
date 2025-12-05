@@ -9,7 +9,12 @@ describe("dev-toolkit CLI argument parsing", () => {
 	});
 
 	test("parses create-template with --dest flag", () => {
-		const result = parseArgs(["create-template", "my-cli", "--dest", "./plugins"]);
+		const result = parseArgs([
+			"create-template",
+			"my-cli",
+			"--dest",
+			"./plugins",
+		]);
 		expect(result.command).toBe("create-template");
 		expect(result.subcommand).toBe("my-cli");
 		expect(result.flags.dest).toBe("./plugins");

@@ -2,7 +2,7 @@
 	"mcpServers": {
 		"kit": {
 			"command": "bun",
-			"args": ["run", "${CLAUDE_PLUGIN_ROOT}/mcp-servers/kit/index.ts"],
+			"args": ["run", "${CLAUDE_PLUGIN_ROOT}/mcp/index.ts"],
 			"env": {}
 		}
 	}

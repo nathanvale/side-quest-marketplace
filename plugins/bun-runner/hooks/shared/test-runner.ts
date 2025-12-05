@@ -6,10 +6,7 @@
  */
 
 import { spawnWithTimeout } from "@sidequest/core/spawn";
-import {
-	parseBunTestOutput,
-	type TestSummary,
-} from "../../mcp-servers/bun-runner/index.js";
+import { parseBunTestOutput, type TestSummary } from "../../mcp/index.js";
 import { TEST_CI_TIMEOUT_MS, TEST_FILE_TIMEOUT_MS } from "./constants.js";
 
 /**

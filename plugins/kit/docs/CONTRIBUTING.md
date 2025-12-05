@@ -96,7 +96,7 @@ kit-wrapper.ts (pure functions)
   → Takes inputs, returns outputs
   → Easy to test with mocked spawnSync
 
-mcp-servers/kit/index.ts (effectful)
+mcp/kit/index.ts (effectful)
   → Validates inputs
   → Calls kit-wrapper
   → Formats output

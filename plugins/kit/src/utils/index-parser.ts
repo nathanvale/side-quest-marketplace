@@ -5,8 +5,8 @@
  * Supports git-style directory search to find index from any subdirectory.
  */
 
-import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { pathExistsSync } from "@sidequest/core/fs";
 
 /**
  * Symbol definition from Kit CLI index
@@ -54,7 +54,7 @@ export async function findProjectIndex(
 
 	while (currentDir !== root) {
 		const indexPath = join(currentDir, "PROJECT_INDEX.json");
-		if (existsSync(indexPath)) {
+		if (pathExistsSync(indexPath)) {
 			return indexPath;
 		}
 		currentDir = dirname(currentDir);
@@ -62,7 +62,7 @@ export async function findProjectIndex(
 
 	// Check root directory
 	const rootIndexPath = join(root, "PROJECT_INDEX.json");
-	if (existsSync(rootIndexPath)) {
+	if (pathExistsSync(rootIndexPath)) {
 		return rootIndexPath;
 	}
 
@@ -89,7 +89,7 @@ export function resolveExplicitIndexPath(explicitPath: string): string {
 
 	// Case 1: Direct path to PROJECT_INDEX.json
 	if (resolved.endsWith("PROJECT_INDEX.json")) {
-		if (existsSync(resolved)) {
+		if (pathExistsSync(resolved)) {
 			return resolved;
 		}
 		throw new Error(`PROJECT_INDEX.json not found at: ${resolved}`);
@@ -97,7 +97,7 @@ export function resolveExplicitIndexPath(explicitPath: string): string {
 
 	// Case 2: Directory containing PROJECT_INDEX.json
 	const indexInDir = join(resolved, "PROJECT_INDEX.json");
-	if (existsSync(indexInDir)) {
+	if (pathExistsSync(indexInDir)) {
 		return indexInDir;
 	}
 

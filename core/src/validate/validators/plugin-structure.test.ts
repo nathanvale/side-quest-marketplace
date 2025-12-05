@@ -159,7 +159,7 @@ describe("validatePluginStructure", () => {
 				".claude-plugin/plugin.json": JSON.stringify({
 					name: "test-plugin",
 				}),
-				"mcp-servers/my-server/package.json": JSON.stringify({
+				"mcp/my-server/package.json": JSON.stringify({
 					name: "my-server",
 				}),
 				"package.json": JSON.stringify({ name: "test" }),
@@ -181,7 +181,7 @@ describe("validatePluginStructure", () => {
 				".claude-plugin/plugin.json": JSON.stringify({
 					name: "test-plugin",
 				}),
-				"mcp-servers/my-server/index.ts": "export {}",
+				"mcp/my-server/index.ts": "export {}",
 				"package.json": JSON.stringify({ name: "test" }),
 			});
 			tempDirs.push(pluginRoot);
@@ -200,8 +200,8 @@ describe("validatePluginStructure", () => {
 				".claude-plugin/plugin.json": JSON.stringify({
 					name: "test-plugin",
 				}),
-				"mcp-servers/my-server/index.ts": "export {}",
-				"mcp-servers/my-server/package.json": JSON.stringify({
+				"mcp/my-server/index.ts": "export {}",
+				"mcp/my-server/package.json": JSON.stringify({
 					name: "my-server",
 				}),
 				"package.json": JSON.stringify({ name: "test" }),

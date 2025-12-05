@@ -196,10 +196,7 @@ export function mcpJsonTemplate(ctx: TemplateContext): string {
 		mcpServers: {
 			[ctx.name]: {
 				command: "bun",
-				args: [
-					"run",
-					`\${CLAUDE_PLUGIN_ROOT}/mcp-servers/${ctx.name}/index.ts`,
-				],
+				args: ["run", `\${CLAUDE_PLUGIN_ROOT}/mcp/${ctx.name}/index.ts`],
 				env: {},
 			},
 		},

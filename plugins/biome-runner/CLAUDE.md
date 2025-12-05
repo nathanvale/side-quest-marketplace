@@ -43,11 +43,11 @@ biome-runner/
 │       ├── logger.ts            # Structured JSONL logging
 │       ├── spawn-utils.ts       # Bun.spawn() wrapper
 │       └── types.ts             # TypeScript types
-├── mcp-servers/
-│   └── biome-runner/
-│       ├── index.ts             # MCP server implementation
-│       ├── index.test.ts        # Tests for diagnostic parsing
-│       └── path-validator.ts    # Path validation utilities
+├── mcp/
+│   ├── index.ts              # MCP server implementation
+│   ├── index.test.ts         # Tests for diagnostic parsing
+│   ├── path-validator.ts     # Path validation utilities
+│   └── package.json          # MCP dependencies
 ├── .mcp.json                    # MCP server registration
 ├── package.json                 # Dependencies and scripts
 └── tsconfig.json                # TypeScript configuration
@@ -81,7 +81,7 @@ biome_formatCheck     # Verify formatting
 | `hooks/biome-check.ts` | PostToolUse hook - formats files after Write/Edit |
 | `hooks/biome-ci.ts` | Stop hook - runs full CI validation |
 | `hooks/shared/logger.ts` | Structured logging to `~/.claude/logs/biome-runner.jsonl` |
-| `mcp-servers/biome-runner/index.ts` | MCP server with 3 tools |
+| `mcp/index.ts` | MCP server with 3 tools |
 | `.mcp.json` | MCP server registration config |
 
 ---

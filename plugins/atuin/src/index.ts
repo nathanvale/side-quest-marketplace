@@ -10,6 +10,10 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { pathExists, readTextFile } from "@sidequest/core/fs";
+import {
+	createCorrelationId,
+	createPluginLogger,
+} from "@sidequest/core/logging";
 import { shellExec } from "@sidequest/core/shell";
 import {
 	buildEnhancedPath,
@@ -17,6 +21,17 @@ import {
 	spawnSyncCollect,
 } from "@sidequest/core/spawn";
 import { startServer, tool, z } from "mcpez";
+
+// Initialize logger
+const { initLogger, getSubsystemLogger } = createPluginLogger({
+	name: "atuin",
+	subsystems: ["mcp"],
+});
+
+// Initialize logger on server startup
+initLogger().catch(console.error);
+
+const mcpLogger = getSubsystemLogger("mcp");
 
 // Types
 
@@ -489,7 +504,7 @@ function formatResults(
 // Register tools using Zod schemas
 
 tool(
-	"atuin_search_history",
+	"mcp__plugin_atuin_bash-history__atuin_search_history",
 	{
 		description:
 			"Search command history using atuin. Returns matching commands with timestamps, exit codes, and full command text. Supports filtering by directory, time range, and search mode.",
@@ -540,6 +555,8 @@ tool(
 		},
 	},
 	async (args: Record<string, unknown>) => {
+		const cid = createCorrelationId();
+		const startTime = Date.now();
 		const {
 			query,
 			limit,
@@ -559,30 +576,68 @@ tool(
 			search_mode?: SearchMode;
 			response_format?: string;
 		};
+
+		mcpLogger.info("Tool request", {
+			cid,
+			tool: "atuin_search_history",
+			query,
+			limit: limit ?? 10,
+			search_mode: search_mode ?? "fuzzy",
+		});
+
 		const format =
 			response_format === "json"
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
-		const results = await searchHistory({
-			query,
-			limit: limit ?? 10,
-			includeFailed: include_failed ?? false,
-			cwd,
-			since,
-			until,
-			searchMode: search_mode ?? "fuzzy",
-		});
-		return {
-			...(isError(results) ? { isError: true } : {}),
-			content: [
-				{ type: "text" as const, text: formatResults(results, format) },
-			],
-		};
+
+		try {
+			const results = await searchHistory({
+				query,
+				limit: limit ?? 10,
+				includeFailed: include_failed ?? false,
+				cwd,
+				since,
+				until,
+				searchMode: search_mode ?? "fuzzy",
+			});
+
+			if (isError(results)) {
+				mcpLogger.error("Tool failed", {
+					cid,
+					tool: "atuin_search_history",
+					error: results.error,
+					durationMs: Date.now() - startTime,
+				});
+			} else {
+				mcpLogger.info("Tool response", {
+					cid,
+					tool: "atuin_search_history",
+					success: true,
+					count: results.count,
+					durationMs: Date.now() - startTime,
+				});
+			}
+
+			return {
+				...(isError(results) ? { isError: true } : {}),
+				content: [
+					{ type: "text" as const, text: formatResults(results, format) },
+				],
+			};
+		} catch (error) {
+			mcpLogger.error("Tool failed", {
+				cid,
+				tool: "atuin_search_history",
+				error: error instanceof Error ? error.message : "Unknown error",
+				durationMs: Date.now() - startTime,
+			});
+			throw error;
+		}
 	},
 );
 
 tool(
-	"atuin_get_recent_history",
+	"mcp__plugin_atuin_bash-history__atuin_get_recent_history",
 	{
 		description:
 			"Get recent command history from atuin with timestamps and exit codes.",
@@ -610,30 +665,68 @@ tool(
 		},
 	},
 	async (args: Record<string, unknown>) => {
+		const cid = createCorrelationId();
+		const startTime = Date.now();
 		const { limit, include_failed, response_format } = args as {
 			limit?: number;
 			include_failed?: boolean;
 			response_format?: string;
 		};
+
+		mcpLogger.info("Tool request", {
+			cid,
+			tool: "atuin_get_recent_history",
+			limit: limit ?? 10,
+		});
+
 		const format =
 			response_format === "json"
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
-		const results = await getRecentHistory(
-			limit ?? 10,
-			include_failed ?? false,
-		);
-		return {
-			...(isError(results) ? { isError: true } : {}),
-			content: [
-				{ type: "text" as const, text: formatResults(results, format) },
-			],
-		};
+
+		try {
+			const results = await getRecentHistory(
+				limit ?? 10,
+				include_failed ?? false,
+			);
+
+			if (isError(results)) {
+				mcpLogger.error("Tool failed", {
+					cid,
+					tool: "atuin_get_recent_history",
+					error: results.error,
+					durationMs: Date.now() - startTime,
+				});
+			} else {
+				mcpLogger.info("Tool response", {
+					cid,
+					tool: "atuin_get_recent_history",
+					success: true,
+					count: results.count,
+					durationMs: Date.now() - startTime,
+				});
+			}
+
+			return {
+				...(isError(results) ? { isError: true } : {}),
+				content: [
+					{ type: "text" as const, text: formatResults(results, format) },
+				],
+			};
+		} catch (error) {
+			mcpLogger.error("Tool failed", {
+				cid,
+				tool: "atuin_get_recent_history",
+				error: error instanceof Error ? error.message : "Unknown error",
+				durationMs: Date.now() - startTime,
+			});
+			throw error;
+		}
 	},
 );
 
 tool(
-	"atuin_search_by_context",
+	"mcp__plugin_atuin_bash-history__atuin_search_by_context",
 	{
 		description:
 			"Search command history by git branch or Claude session ID. Use this to find commands you ran on a specific branch or in a specific session.",
@@ -665,32 +758,75 @@ tool(
 		},
 	},
 	async (args: Record<string, unknown>) => {
+		const cid = createCorrelationId();
+		const startTime = Date.now();
 		const { branch, session_id, limit, response_format } = args as {
 			branch?: string;
 			session_id?: string;
 			limit?: number;
 			response_format?: string;
 		};
+
+		mcpLogger.info("Tool request", {
+			cid,
+			tool: "atuin_search_by_context",
+			branch,
+			session_id,
+			limit: limit ?? 20,
+		});
+
 		const format =
 			response_format === "json"
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
-		const results = await searchByContext({
-			branch,
-			sessionId: session_id,
-			limit: limit ?? 20,
-		});
-		return {
-			...(isError(results) ? { isError: true } : {}),
-			content: [
-				{ type: "text" as const, text: formatContextResults(results, format) },
-			],
-		};
+
+		try {
+			const results = await searchByContext({
+				branch,
+				sessionId: session_id,
+				limit: limit ?? 20,
+			});
+
+			if (isError(results)) {
+				mcpLogger.error("Tool failed", {
+					cid,
+					tool: "atuin_search_by_context",
+					error: results.error,
+					durationMs: Date.now() - startTime,
+				});
+			} else {
+				mcpLogger.info("Tool response", {
+					cid,
+					tool: "atuin_search_by_context",
+					success: true,
+					count: results.count,
+					durationMs: Date.now() - startTime,
+				});
+			}
+
+			return {
+				...(isError(results) ? { isError: true } : {}),
+				content: [
+					{
+						type: "text" as const,
+						text: formatContextResults(results, format),
+					},
+				],
+			};
+		} catch (error) {
+			mcpLogger.error("Tool failed", {
+				cid,
+				tool: "atuin_search_by_context",
+				error: error instanceof Error ? error.message : "Unknown error",
+				durationMs: Date.now() - startTime,
+			});
+			throw error;
+		}
 	},
 );
 
 tool(
-	"atuin_history_insights",
+	"mcp__plugin_atuin_bash-history__atuin_history_insights",
 	{
 		description:
 			"Get insights about command history: most frequent commands and failure patterns. Helps identify common workflows and recurring errors.",
@@ -718,22 +854,64 @@ tool(
 		},
 	},
 	async (args: Record<string, unknown>) => {
+		const cid = createCorrelationId();
+		const startTime = Date.now();
 		const { period, focus, response_format } = args as {
 			period?: InsightPeriod;
 			focus?: InsightFocus;
 			response_format?: string;
 		};
+
+		mcpLogger.info("Tool request", {
+			cid,
+			tool: "atuin_history_insights",
+			period: period ?? "today",
+			focus: focus ?? "all",
+		});
+
 		const format =
 			response_format === "json"
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
-		const results = await getHistoryInsights(period ?? "today", focus ?? "all");
-		return {
-			...(isError(results) ? { isError: true } : {}),
-			content: [
-				{ type: "text" as const, text: formatInsights(results, format) },
-			],
-		};
+
+		try {
+			const results = await getHistoryInsights(
+				period ?? "today",
+				focus ?? "all",
+			);
+
+			if (isError(results)) {
+				mcpLogger.error("Tool failed", {
+					cid,
+					tool: "atuin_history_insights",
+					error: results.error,
+					durationMs: Date.now() - startTime,
+				});
+			} else {
+				mcpLogger.info("Tool response", {
+					cid,
+					tool: "atuin_history_insights",
+					success: true,
+					period: results.period,
+					durationMs: Date.now() - startTime,
+				});
+			}
+
+			return {
+				...(isError(results) ? { isError: true } : {}),
+				content: [
+					{ type: "text" as const, text: formatInsights(results, format) },
+				],
+			};
+		} catch (error) {
+			mcpLogger.error("Tool failed", {
+				cid,
+				tool: "atuin_history_insights",
+				error: error instanceof Error ? error.message : "Unknown error",
+				durationMs: Date.now() - startTime,
+			});
+			throw error;
+		}
 	},
 );
 

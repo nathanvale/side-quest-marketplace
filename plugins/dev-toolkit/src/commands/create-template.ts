@@ -1,7 +1,7 @@
-import { color } from "@sidequest/core/formatters";
-import type { OutputFormat } from "@sidequest/core/formatters";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type { OutputFormat } from "@sidequest/core/formatters";
+import { color } from "@sidequest/core/formatters";
 
 /**
  * Create a new CLI template with all Bun CLI patterns
@@ -109,13 +109,13 @@ export async function createTemplateCommand(
 	} else {
 		console.log(color("green", "✅ Template created successfully\n"));
 		console.log(`${color("cyan", "Path:")} ${targetDir}`);
-		console.log("\n" + color("cyan", "Generated files:"));
+		console.log(`\n${color("cyan", "Generated files:")}`);
 		console.log("  - src/cli.ts (main CLI entry point)");
 		console.log("  - src/cli.test.ts (example tests)");
 		console.log("  - package.json (with @sidequest/core dependency)");
 		console.log("  - tsconfig.json (TypeScript configuration)");
 		console.log("  - CLAUDE.md (documentation)");
-		console.log("\n" + color("cyan", "Next steps:"));
+		console.log(`\n${color("cyan", "Next steps:")}`);
 		console.log(`  1. cd ${targetDir}`);
 		console.log("  2. bun install");
 		console.log("  3. bun test");
@@ -256,7 +256,7 @@ describe("CLI argument parsing", () => {
 /**
  * Generate CLAUDE.md template
  */
-function generateClaudeTemplate(name: string, targetDir: string): string {
+function generateClaudeTemplate(name: string, _targetDir: string): string {
 	const title = formatTitle(name);
 	return `# ${title} CLI
 

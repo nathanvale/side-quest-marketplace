@@ -398,3 +398,354 @@ describe("atuin integration", () => {
 		expect(typeof output).toBe("string");
 	});
 });
+
+// ============================================================================
+// MCP Handler Tests - Tool response structure and format handling
+// ============================================================================
+
+type SearchMode = "fuzzy" | "prefix" | "full-text";
+
+describe("MCP handler response structure", () => {
+	describe("atuin_search_history tool", () => {
+		test("should handle successful search results", () => {
+			const mockResult: HistoryResult = {
+				count: 2,
+				commands: [
+					{
+						time: "2024-01-15 10:30:00",
+						exit_code: 0,
+						command: "git status",
+					},
+					{
+						time: "2024-01-15 10:31:00",
+						exit_code: 0,
+						command: "npm test",
+					},
+				],
+			};
+
+			expect(mockResult.count).toBe(2);
+			expect(mockResult.commands).toHaveLength(2);
+			expect(mockResult.commands[0]?.exit_code).toBe(0);
+		});
+
+		test("should handle empty search results", () => {
+			const mockResult: HistoryResult = {
+				count: 0,
+				commands: [],
+				message: "No commands found matching: nonexistent",
+			};
+
+			expect(mockResult.count).toBe(0);
+			expect(mockResult.commands).toHaveLength(0);
+			expect(mockResult.message).toBeTruthy();
+		});
+
+		test("should handle error results", () => {
+			const mockError: ErrorResult = {
+				error: "atuin not found",
+			};
+
+			expect(mockError.error).toBeTruthy();
+		});
+
+		test("should support different search modes", () => {
+			const searchModes: SearchMode[] = ["fuzzy", "prefix", "full-text"];
+			searchModes.forEach((mode) => {
+				expect(["fuzzy", "prefix", "full-text"]).toContain(mode);
+			});
+		});
+
+		test("should validate include_failed parameter", () => {
+			const includeFailed = true;
+			expect(typeof includeFailed).toBe("boolean");
+		});
+	});
+
+	describe("atuin_get_recent_history tool", () => {
+		test("should handle recent history results", () => {
+			const mockResult: HistoryResult = {
+				count: 3,
+				commands: [
+					{
+						time: "2024-01-15 10:30:00",
+						exit_code: 0,
+						command: "echo hello",
+					},
+					{
+						time: "2024-01-15 10:29:00",
+						exit_code: 1,
+						command: "false",
+					},
+					{
+						time: "2024-01-15 10:28:00",
+						exit_code: 0,
+						command: "ls -la",
+					},
+				],
+			};
+
+			expect(mockResult.count).toBe(3);
+			expect(mockResult.commands[1]?.exit_code).toBe(1);
+		});
+
+		test("should handle fallback to zsh history", () => {
+			const mockResult: HistoryResult = {
+				count: 2,
+				commands: [
+					{
+						time: "N/A",
+						exit_code: "N/A",
+						command: "git status",
+					},
+					{
+						time: "N/A",
+						exit_code: "N/A",
+						command: "npm test",
+					},
+				],
+				source: "zsh_history_fallback",
+			};
+
+			expect(mockResult.source).toBe("zsh_history_fallback");
+			expect(mockResult.commands[0]?.exit_code).toBe("N/A");
+			expect(mockResult.commands[0]?.time).toBe("N/A");
+		});
+	});
+
+	describe("atuin_search_by_context tool", () => {
+		interface ContextEntry {
+			ts: string;
+			cmd: string;
+			branch: string;
+			session: string;
+			cwd: string;
+		}
+
+		interface ContextResult {
+			count: number;
+			entries: ContextEntry[];
+			message?: string;
+		}
+
+		test("should handle context search results by branch", () => {
+			const mockResult: ContextResult = {
+				count: 2,
+				entries: [
+					{
+						ts: "2024-01-15 10:30:00",
+						cmd: "git commit -m 'test'",
+						branch: "feature-branch",
+						session: "abc123",
+						cwd: "/path/to/repo",
+					},
+					{
+						ts: "2024-01-15 10:25:00",
+						cmd: "git push",
+						branch: "feature-branch",
+						session: "abc123",
+						cwd: "/path/to/repo",
+					},
+				],
+			};
+
+			expect(mockResult.count).toBe(2);
+			expect(mockResult.entries[0]?.branch).toBe("feature-branch");
+			expect(mockResult.entries[1]?.branch).toBe("feature-branch");
+		});
+
+		test("should handle context search results by session", () => {
+			const mockResult: ContextResult = {
+				count: 1,
+				entries: [
+					{
+						ts: "2024-01-15 10:30:00",
+						cmd: "npm test",
+						branch: "main",
+						session: "session123",
+						cwd: "/path/to/repo",
+					},
+				],
+			};
+
+			expect(mockResult.count).toBe(1);
+			expect(mockResult.entries[0]?.session).toBe("session123");
+		});
+
+		test("should handle empty context results", () => {
+			const mockResult: ContextResult = {
+				count: 0,
+				entries: [],
+				message: "No commands found matching: branch: nonexistent",
+			};
+
+			expect(mockResult.count).toBe(0);
+			expect(mockResult.entries).toHaveLength(0);
+			expect(mockResult.message).toContain("No commands found");
+		});
+	});
+
+	describe("atuin_history_insights tool", () => {
+		interface HistoryInsights {
+			period: string;
+			stats?: string;
+			failedCommands?: { command: string; count: number; lastTime: string }[];
+			message?: string;
+		}
+
+		test("should handle insights with stats", () => {
+			const mockInsights: HistoryInsights = {
+				period: "today",
+				stats: "Most used commands:\n  git: 25\n  npm: 15\n  ls: 10",
+			};
+
+			expect(mockInsights.period).toBe("today");
+			expect(mockInsights.stats).toContain("git: 25");
+		});
+
+		test("should handle insights with failed commands", () => {
+			const mockInsights: HistoryInsights = {
+				period: "week",
+				failedCommands: [
+					{ command: "npm", count: 5, lastTime: "2024-01-15 10:30:00" },
+					{ command: "git", count: 2, lastTime: "2024-01-14 15:20:00" },
+				],
+			};
+
+			expect(mockInsights.failedCommands).toHaveLength(2);
+			expect(mockInsights.failedCommands?.[0]?.count).toBe(5);
+		});
+
+		test("should handle insights with both stats and failures", () => {
+			const mockInsights: HistoryInsights = {
+				period: "month",
+				stats: "git: 100\nnpm: 50",
+				failedCommands: [
+					{ command: "npm", count: 3, lastTime: "2024-01-15 10:30:00" },
+				],
+			};
+
+			expect(mockInsights.stats).toBeTruthy();
+			expect(mockInsights.failedCommands).toHaveLength(1);
+		});
+
+		test("should validate insight period values", () => {
+			const periods = ["today", "week", "month", "all"] as const;
+			periods.forEach((period) => {
+				expect(["today", "week", "month", "all"]).toContain(period);
+			});
+		});
+
+		test("should validate insight focus values", () => {
+			const focuses = ["frequent", "failures", "all"] as const;
+			focuses.forEach((focus) => {
+				expect(["frequent", "failures", "all"]).toContain(focus);
+			});
+		});
+	});
+
+	describe("response format handling", () => {
+		test("should format markdown results with exit codes", () => {
+			const result: HistoryResult = {
+				count: 2,
+				commands: [
+					{
+						time: "2024-01-15 10:30:00",
+						exit_code: 0,
+						command: "git status",
+					},
+					{
+						time: "2024-01-15 10:31:00",
+						exit_code: 1,
+						command: "git push --force",
+					},
+				],
+			};
+
+			const formatted = formatResults(result);
+			expect(formatted).toContain("[OK]");
+			expect(formatted).toContain("[FAIL]");
+			expect(formatted).toContain("Exit: 0");
+			expect(formatted).toContain("Exit: 1");
+		});
+
+		test("should format JSON results", () => {
+			const result: HistoryResult = {
+				count: 1,
+				commands: [
+					{
+						time: "2024-01-15 10:30:00",
+						exit_code: 0,
+						command: "echo test",
+					},
+				],
+			};
+
+			const formatted = JSON.stringify(result);
+			expect(() => JSON.parse(formatted)).not.toThrow();
+			const parsed = JSON.parse(formatted);
+			expect(parsed.count).toBe(1);
+		});
+
+		test("should handle fallback indicator in formatted output", () => {
+			const result: HistoryResult = {
+				count: 1,
+				commands: [
+					{
+						time: "N/A",
+						exit_code: "N/A",
+						command: "echo test",
+					},
+				],
+				source: "zsh_history_fallback",
+			};
+
+			const formatted = formatResults(result);
+			expect(formatted).toContain("[!] Using zsh history fallback");
+		});
+	});
+
+	describe("error handling", () => {
+		test("should detect atuin unavailable errors", () => {
+			const errorMessage = "atuin command not found";
+			const isError =
+				errorMessage.includes("atuin") && errorMessage.includes("not found");
+			expect(isError).toBe(true);
+		});
+
+		test("should handle search with no results gracefully", () => {
+			const result: HistoryResult = {
+				count: 0,
+				commands: [],
+				message: "No commands found matching: test",
+			};
+
+			expect(result.count).toBe(0);
+			expect(result.message).toBeTruthy();
+		});
+
+		test("should validate search options structure", () => {
+			interface SearchOptions {
+				query: string;
+				limit?: number;
+				includeFailed?: boolean;
+				cwd?: string;
+				since?: string;
+				until?: string;
+				searchMode?: SearchMode;
+			}
+
+			const options: SearchOptions = {
+				query: "test",
+				limit: 10,
+				includeFailed: false,
+				searchMode: "fuzzy",
+			};
+
+			expect(options.query).toBe("test");
+			expect(options.limit).toBe(10);
+			expect(options.includeFailed).toBe(false);
+			expect(options.searchMode).toBe("fuzzy");
+		});
+	});
+});

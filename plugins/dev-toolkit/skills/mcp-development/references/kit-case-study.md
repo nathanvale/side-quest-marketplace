@@ -20,9 +20,8 @@ plugins/kit/
 │   └── ast/                          # Tree-sitter AST search engine
 │       ├── searcher.ts               # Parallel AST pattern matching
 │       └── parser.ts                 # Tree-sitter integration
-├── mcp/kit/                          # MCP server
-│   ├── index.ts                      # 1780 lines, 18 tools
-│   └── package.json
+├── mcp/
+│   └── index.ts                      # MCP server (1780 lines, 18 tools)
 └── .mcp.json                         # Server registration
 ```
 
@@ -32,7 +31,7 @@ plugins/kit/
 
 ```
 ┌─────────────────────────────────────┐
-│  MCP Server (mcp/kit/index.ts)      │ ← Effects: Logging, MCP protocol
+│  MCP Server (mcp/index.ts)         │ ← Effects: Logging, MCP protocol
 │  • Validates inputs (Zod schemas)   │
 │  • Calls business logic              │
 │  • Formats output                    │
@@ -650,7 +649,7 @@ Kit demonstrates:
 Use Kit as a reference for your own MCP servers. Copy patterns that work, adapt them to your needs.
 
 **Study these files:**
-- `mcp/kit/index.ts` - Tool registration and handlers
+- `mcp/index.ts` - Tool registration and handlers
 - `src/kit-wrapper.ts` - Business logic implementation
 - `src/validators.ts` - Input validation patterns
 - `src/errors.ts` - Error taxonomy

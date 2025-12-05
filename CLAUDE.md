@@ -213,7 +213,7 @@ Full reference with examples: @./docs/MCP_TOOLS.md
 
 ## Plugin Architecture
 
-Standard structure: `.claude-plugin/`, `commands/`, `hooks/`, `mcp-servers/`, `skills/`, `src/`
+Standard structure: `.claude-plugin/`, `commands/`, `hooks/`, `mcp/`, `skills/`, `src/`
 Tool naming: `mcp__plugin_<name>_<server>__<tool>`
 MCP server config: `.mcp.json` with `${CLAUDE_PLUGIN_ROOT}` paths
 

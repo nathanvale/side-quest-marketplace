@@ -1,6 +1,6 @@
-import { color } from "@sidequest/core/formatters";
-import type { OutputFormat } from "@sidequest/core/formatters";
 import { existsSync, readFileSync } from "node:fs";
+import type { OutputFormat } from "@sidequest/core/formatters";
+import { color } from "@sidequest/core/formatters";
 
 /**
  * Review a CLI template against the Bun CLI standard
@@ -32,10 +32,13 @@ export async function reviewTemplateCommand(
 		hasOutputFormat:
 			content.includes("parseOutputFormat") || content.includes("--format"),
 		hasPrintUsage: content.includes("printUsage"),
-		hasErrorHandling: content.includes("console.error") && content.includes("process.exit"),
+		hasErrorHandling:
+			content.includes("console.error") && content.includes("process.exit"),
 		hasTryCatch: content.includes("try {") && content.includes("catch (error)"),
 		hasColorOutput: content.includes("color("),
-		hasMainFunction: content.includes("async function main") || content.includes("function main"),
+		hasMainFunction:
+			content.includes("async function main") ||
+			content.includes("function main"),
 	};
 
 	// Calculate score
@@ -73,7 +76,7 @@ export async function reviewTemplateCommand(
 			console.log(`  ${icon} ${name}`);
 		});
 
-		console.log("\n" + color("cyan", "Recommendations:"));
+		console.log(`\n${color("cyan", "Recommendations:")}`);
 		if (!checks.hasShebang) {
 			console.log("  - Add shebang: #!/usr/bin/env bun");
 		}
@@ -93,7 +96,9 @@ export async function reviewTemplateCommand(
 			console.log("  - Wrap main logic in try/catch");
 		}
 		if (!checks.hasColorOutput) {
-			console.log("  - Add colored output with color() from @sidequest/core/formatters");
+			console.log(
+				"  - Add colored output with color() from @sidequest/core/formatters",
+			);
 		}
 		if (!checks.hasMainFunction) {
 			console.log("  - Create main() async function");
@@ -103,9 +108,11 @@ export async function reviewTemplateCommand(
 			console.log("  ✅ All checks passing! Your CLI follows the standard.");
 		}
 
-		console.log("\n" + color("cyan", "References:"));
+		console.log(`\n${color("cyan", "References:")}`);
 		console.log("  - Bun CLI Development: skills/bun-cli/SKILL.md");
-		console.log("  - CLI Patterns: skills/bun-cli/references/bun-cli-patterns.md");
+		console.log(
+			"  - CLI Patterns: skills/bun-cli/references/bun-cli-patterns.md",
+		);
 		console.log("  - Para Obsidian Example: plugins/para-obsidian/CLAUDE.md");
 	}
 }

@@ -4,8 +4,8 @@
  * Generates HTML email content for cinema tickets using the Classic Cinemas template.
  */
 
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readTextFileSync } from "@sidequest/core/fs";
 import { formatTicketTypeName } from "./price-scraper.ts";
 
 /**
@@ -175,14 +175,14 @@ export const TEMPLATE_PLACEHOLDERS = [
 export function generateTicketHtml(data: TicketData): string {
 	// Read the Classic Cinemas email template
 	const templatePath = join(
-		__dirname,
+		import.meta.dir,
 		"..",
 		"classic-cinemas-email-template.html",
 	);
 
 	let template: string;
 	try {
-		template = readFileSync(templatePath, "utf-8");
+		template = readTextFileSync(templatePath);
 	} catch (error) {
 		throw new Error(
 			`Failed to read email template at ${templatePath}: ${error instanceof Error ? error.message : String(error)}`,

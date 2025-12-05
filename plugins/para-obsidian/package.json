@@ -8,7 +8,9 @@
 		"para-obsidian": "./src/cli.ts"
 	},
 	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.0.4",
 		"@sidequest/core": "workspace:*",
+		"mcpez": "^1.2.1",
 		"yaml": "^2.6.0"
 	},
 	"scripts": {

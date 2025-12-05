@@ -1,0 +1,8 @@
+{
+	"hooks": [
+		{
+			"event": "SessionStart",
+			"command": "bun run hooks/bootstrap.ts"
+		}
+	]
+}

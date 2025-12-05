@@ -21,7 +21,7 @@ Source context: chat session with user; based on PARA/Templater templates at `pl
 - Template versioning/migration: track template_version, migrate older notes – TODO.
 
 ## Templates & Rules
-- Templates at `plugins/para-brain/templates` (project, area, resource, task, daily, weekly-review, capture, checklist, booking, itinerary, trip-research).
+- Templates default to `<vault>/06_Metadata/Templates` (project, area, resource, task, daily, weekly-review, capture, checklist, booking, itinerary, trip-research).
 - Filename rule: Title Case with spaces; avoid generic names.
 - Frontmatter required per type (see validate-note/STATUS defaults): project/area/resource/task/daily/weekly-review/capture/checklist/booking/itinerary/research.
 - Suggested tags seed: project, area, resource, task, daily, journal, review, weekly, checklist, booking, itinerary, research, capture, inbox, travel, work, family, health, learning, finance, home, career.

@@ -28,7 +28,7 @@ The plugin name is provided as `$1` (or `$ARGUMENTS`).
    - If already markdown-only, inform user and exit
 
 3. **Check for MCP server**:
-   - If `mcp-servers/` exists, warn user that MCP requires TypeScript
+   - If `mcp/` exists, warn user that MCP requires TypeScript
    - Ask if they want to proceed anyway (will break MCP functionality)
 
 ### Confirmation Required
@@ -114,7 +114,7 @@ Do NOT touch these:
 - `commands/` directory
 - `skills/` directory
 - `hooks/` directory
-- `mcp-servers/` directory (warn but preserve)
+- `mcp/` directory (warn but preserve)
 - `.mcp.json`
 
 ### Output Summary

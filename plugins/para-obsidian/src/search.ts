@@ -29,12 +29,18 @@ export interface SearchOptions {
 	readonly dir?: string | ReadonlyArray<string>;
 	/** If true, treat query as a regular expression. */
 	readonly regex?: boolean;
+	/** Optional glob(s) to constrain files (passed to ripgrep). */
+	readonly glob?: string | ReadonlyArray<string>;
 	/** Filter results to notes containing this tag. */
 	readonly tag?: string;
 	/** Filter results by frontmatter field values. */
 	readonly frontmatter?: Record<string, string>;
 	/** Maximum number of results to return. */
 	readonly maxResults?: number;
+	/** Lines of context to include before/after matches. */
+	readonly context?: number;
+	/** Pre-filtered files to allow; used to intersect text hits. */
+	readonly allowedFiles?: ReadonlyArray<string>;
 }
 
 /**
@@ -107,6 +113,17 @@ function buildRgArgs(
 	} else {
 		args.push("--fixed-strings", options.query);
 	}
+	if (options.context && options.context > 0) {
+		args.push("--context", options.context.toString());
+	}
+	const globs = options.glob
+		? Array.isArray(options.glob)
+			? options.glob
+			: [options.glob]
+		: [];
+	for (const glob of globs) {
+		args.push("--glob", glob);
+	}
 	if (options.maxResults) {
 		args.push("--max-count", options.maxResults.toString());
 	}
@@ -166,7 +183,20 @@ export async function searchText(
 			snippet,
 		});
 	}
-	return hits;
+
+	// If tag/frontmatter filters are present, intersect hits with matches
+	const allowed =
+		options.allowedFiles ??
+		(options.tag || options.frontmatter
+			? await filterByFrontmatter(config, {
+					dir: options.dir,
+					tag: options.tag,
+					frontmatter: options.frontmatter,
+				})
+			: undefined);
+	if (!allowed || allowed.length === 0) return hits;
+	const allowedSet = new Set(allowed);
+	return hits.filter((hit) => allowedSet.has(hit.file));
 }
 
 /**

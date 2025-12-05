@@ -19,7 +19,7 @@ Generate well-structured Claude Code plugins following SideQuest marketplace pat
 | Component | Purpose | Files Created |
 |-----------|---------|---------------|
 | commands | Slash commands users invoke | `commands/*.md` |
-| mcp-server | Tools Claude can call | `mcp-servers/{name}/index.ts` |
+| mcp-server | Tools Claude can call | `mcp/{name}/index.ts` |
 | hooks | Event handlers | `hooks/hooks.json` |
 | skills | Autonomous capabilities | `skills/{name}/SKILL.md` |
 
@@ -80,7 +80,7 @@ plugins/{name}/
 │   ├── index.ts
 │   └── index.test.ts
 ├── commands/
-├── mcp-servers/{name}/
+├── mcp/{name}/
 ├── hooks/
 └── skills/{name}/
 ```
@@ -150,7 +150,7 @@ Assistant: I'll scaffold a git-stats plugin with an MCP server.
 ```
 User: My plugin needs an MCP server now
 Assistant: I'll add an MCP server to your existing plugin.
-[Creates mcp-servers/{name}/ directory]
+[Creates mcp/{name}/ directory]
 [Generates index.ts and package.json]
 [Updates .mcp.json]
 ```

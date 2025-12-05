@@ -14,10 +14,10 @@ export async function validateMcpToolNaming(
 	options: ValidatorOptions,
 ): Promise<ValidationIssue[]> {
 	const issues: ValidationIssue[] = [];
-	const mcpServersDir = join(options.pluginRoot, "mcp-servers");
+	const mcpDir = join(options.pluginRoot, "mcp");
 
-	// If mcp-servers directory doesn't exist, skip validation
-	if (!existsSync(mcpServersDir)) {
+	// If mcp directory doesn't exist, skip validation
+	if (!existsSync(mcpDir)) {
 		return issues;
 	}
 
@@ -31,13 +31,18 @@ export async function validateMcpToolNaming(
 			pluginName = packageJson.name?.replace("@sidequest/", "") || "unknown";
 		}
 
-		// Get all server directories
-		const serverDirs = readdirSync(mcpServersDir, { withFileTypes: true })
-			.filter((dirent) => dirent.isDirectory())
+		// Get all server directories (skip node_modules, .git, etc.)
+		const serverDirs = readdirSync(mcpDir, { withFileTypes: true })
+			.filter(
+				(dirent) =>
+					dirent.isDirectory() &&
+					!dirent.name.startsWith(".") &&
+					dirent.name !== "node_modules",
+			)
 			.map((dirent) => dirent.name);
 
 		for (const serverName of serverDirs) {
-			const serverIndexPath = join(mcpServersDir, serverName, "index.ts");
+			const serverIndexPath = join(mcpDir, serverName, "index.ts");
 
 			// Skip if index.ts doesn't exist
 			if (!existsSync(serverIndexPath)) {
@@ -45,8 +50,8 @@ export async function validateMcpToolNaming(
 					ruleId: "mcp/missing-server-index",
 					severity: "warning",
 					message: `MCP server '${serverName}' is missing index.ts`,
-					file: join(mcpServersDir, serverName),
-					suggestion: `Create an index.ts file in mcp-servers/${serverName}/`,
+					file: join(mcpDir, serverName),
+					suggestion: `Create an index.ts file in mcp/${serverName}/`,
 				});
 				continue;
 			}
@@ -141,8 +146,9 @@ export async function validateMcpToolNaming(
 				// 1. Zod schema: response_format: z.enum(["markdown", "json"])
 				// 2. JSON schema: response_format: { type: "string", enum: ["markdown", "json"] }
 				// 3. Allow .optional() or .default() suffixes
+				// Note: Using [\s\S] instead of . to match across newlines
 				const responseFormatPatterns = [
-					/response_format:\s*z\.enum\(\["markdown",\s*"json"\]\)/,
+					/response_format:\s*z[\s\S]*?\.enum\(\["markdown",\s*"json"\]\)/,
 					/response_format:\s*\{\s*type:\s*"string",\s*enum:\s*\["markdown",\s*"json"\]/,
 					/"response_format":\s*\{\s*"type":\s*"string",\s*"enum":\s*\["markdown",\s*"json"\]/,
 				];
@@ -167,8 +173,8 @@ export async function validateMcpToolNaming(
 			ruleId: "mcp/validation-error",
 			severity: "error",
 			message: `Failed to validate MCP tool naming: ${error instanceof Error ? error.message : String(error)}`,
-			file: mcpServersDir,
-			suggestion: "Check that mcp-servers directory is accessible and readable",
+			file: mcpDir,
+			suggestion: "Check that mcp directory is accessible and readable",
 		});
 	}
 

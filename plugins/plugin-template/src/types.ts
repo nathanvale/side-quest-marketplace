@@ -24,7 +24,7 @@ export interface PluginConfig {
 	components: {
 		/** Include commands/ directory with sample command */
 		commands: boolean;
-		/** Include mcp-servers/ with full MCP setup */
+		/** Include mcp/ with full MCP setup */
 		mcpServer: boolean;
 		/** Include hooks/ with hooks.json */
 		hooks: boolean;

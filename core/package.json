@@ -4,6 +4,7 @@
 	"description": "Shared utilities for SideQuest marketplace plugins",
 	"type": "module",
 	"exports": {
+		"./cli": "./src/cli/index.ts",
 		"./logging": "./src/logging/index.ts",
 		"./spawn": "./src/spawn/index.ts",
 		"./shell": "./src/shell/index.ts",

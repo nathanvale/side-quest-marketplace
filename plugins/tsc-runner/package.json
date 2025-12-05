@@ -7,8 +7,10 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.0.4",
 		"@sidequest/bun-runner": "workspace:*",
-		"@sidequest/core": "workspace:*"
+		"@sidequest/core": "workspace:*",
+		"mcpez": "^1.2.1"
 	},
 	"devDependencies": {
 		"@types/bun": "latest"

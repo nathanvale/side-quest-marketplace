@@ -5,12 +5,14 @@
  *
  * PreCompact hook that saves a session summary before context compaction.
  * Helps maintain continuity across context windows.
+ * Includes MCP performance metrics from all plugins.
  */
 
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { PreCompactHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { ensureDir, pathExists } from "@sidequest/core/fs";
+import { getGlobalMetricsCollector } from "@sidequest/core/logging";
 
 interface SessionSummary {
 	timestamp: string;
@@ -148,7 +150,16 @@ if (gitRoot) {
 		// Use repo name as filename to keep summaries separate per project
 		const repoName = gitRoot.split("/").pop() || "unknown";
 		const summaryPath = join(claudeDir, `${repoName}.md`);
-		const content = formatSummary(summary);
+		let content = formatSummary(summary);
+
+		// Append performance metrics
+		const metricsCollector = getGlobalMetricsCollector();
+		await metricsCollector.collect();
+		const metrics = metricsCollector.getSummary();
+
+		if (metrics.totalOperations > 0) {
+			content += "\n\n" + metricsCollector.toMarkdown();
+		}
 
 		await Bun.write(summaryPath, content);
 		console.log(`Session summary saved to ${summaryPath}`);

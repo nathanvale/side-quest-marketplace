@@ -35,7 +35,7 @@ function writePackageJson(pluginName: string) {
  * Helper to write MCP server index.ts
  */
 function writeMcpServer(serverName: string, sourceCode: string) {
-	const serverDir = join(TEST_DIR, "mcp-servers", serverName);
+	const serverDir = join(TEST_DIR, "mcp", serverName);
 	mkdirSync(serverDir, { recursive: true });
 	writeFileSync(join(serverDir, "index.ts"), sourceCode);
 }
@@ -251,7 +251,7 @@ tool("mcp__plugin_test-plugin_test-server__tool_two", {
 	test("should warn when server directory has no index.ts", async () => {
 		writePackageJson("test-plugin");
 
-		const serverDir = join(TEST_DIR, "mcp-servers", "test-server");
+		const serverDir = join(TEST_DIR, "mcp", "test-server");
 		mkdirSync(serverDir, { recursive: true });
 
 		const issues = await validateMcpToolNaming({ pluginRoot: TEST_DIR });

@@ -24,6 +24,7 @@ describe("the-cinema-bandit exports", () => {
 			sessionDateTime: "29 Nov 2025, 4:15pm-6:52pm",
 			screenNumber: "Screen 1",
 			seats: "F9, F10",
+			tickets: [{ type: "Adult", quantity: 2 }],
 		};
 		expect(ticketData.customerName).toBe("Test User");
 	});

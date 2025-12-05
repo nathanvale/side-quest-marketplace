@@ -181,7 +181,7 @@ describe("generateCommands", () => {
 });
 
 describe("generateMcpServer", () => {
-	test("creates mcp-servers/ directory structure", async () => {
+	test("creates mcp/ directory structure", async () => {
 		const pluginPath = join(TEST_DIR, "test-plugin");
 		mkdirSync(pluginPath, { recursive: true });
 

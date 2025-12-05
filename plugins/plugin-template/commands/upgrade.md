@@ -110,7 +110,7 @@ Do NOT touch these:
 - `commands/` directory
 - `skills/` directory
 - `hooks/` directory
-- `mcp-servers/` directory
+- `mcp/` directory
 - `.mcp.json`
 
 ### Post-Upgrade Steps

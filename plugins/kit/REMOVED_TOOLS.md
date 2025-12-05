@@ -9,7 +9,7 @@ The Kit MCP server was refactored to use ONLY the CLI facade tools (`kit-index` 
 
 ## Removed Tools (7 total)
 
-These tools were removed from `/Users/nathanvale/code/side-quest-marketplace/plugins/kit/mcp-servers/kit/index.ts`:
+These tools were removed from `/Users/nathanvale/code/side-quest-marketplace/plugins/kit/mcp/kit/index.ts`:
 
 1. **kit_grep** - Fast text search across repository files
    - Direct Kit CLI wrapper for `kit grep`

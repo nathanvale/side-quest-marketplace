@@ -33,6 +33,11 @@
 						"type": "command",
 						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/biome-ci.ts",
 						"timeout": 60
+					},
+					{
+						"type": "command",
+						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/metrics-summary.ts",
+						"timeout": 10
 					}
 				]
 			}

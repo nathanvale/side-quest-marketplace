@@ -1,6 +1,10 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import {
+	pathExistsSync,
+	readJsonFileSync,
+	writeJsonFileSync,
+} from "@sidequest/core/fs";
 
 const CLAUDE_CONFIG_PATH = join(homedir(), ".claude.json");
 
@@ -37,18 +41,16 @@ export interface ClaudeConfig {
  * Read the ~/.claude.json configuration file
  */
 export function readClaudeConfig(): ClaudeConfig {
-	if (!existsSync(CLAUDE_CONFIG_PATH)) {
+	if (!pathExistsSync(CLAUDE_CONFIG_PATH)) {
 		throw new Error(`Claude config not found at ${CLAUDE_CONFIG_PATH}`);
 	}
 
-	const content = readFileSync(CLAUDE_CONFIG_PATH, "utf-8");
-	return JSON.parse(content) as ClaudeConfig;
+	return readJsonFileSync<ClaudeConfig>(CLAUDE_CONFIG_PATH);
 }
 
 /**
  * Write the ~/.claude.json configuration file
  */
 export function writeClaudeConfig(config: ClaudeConfig): void {
-	const content = JSON.stringify(config, null, 2);
-	writeFileSync(CLAUDE_CONFIG_PATH, content, "utf-8");
+	writeJsonFileSync(CLAUDE_CONFIG_PATH, config);
 }

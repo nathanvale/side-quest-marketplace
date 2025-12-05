@@ -5,7 +5,7 @@
  * - .claude-plugin/plugin.json (required)
  * - agents/ for agent markdown files
  * - hooks/ for hook scripts
- * - mcp-servers/ for MCP server implementations
+ * - mcp/ for MCP server implementations
  * - skills/ for agent skills
  * - commands/ for slash commands
  * - src/ for shared source code (if a workspace package)
@@ -26,7 +26,7 @@ const STANDARD_FOLDERS = new Set([
 	"agents",
 	"commands",
 	"hooks",
-	"mcp-servers",
+	"mcp",
 	"skills",
 	"src",
 ]);
@@ -162,15 +162,20 @@ export async function validatePluginStructure(
 			}
 		}
 
-		// Validate mcp-servers folder structure if it exists
-		const mcpServersPath = join(pluginRoot, "mcp-servers");
-		if (existsSync(mcpServersPath) && statSync(mcpServersPath).isDirectory()) {
-			const serverDirs = readdirSync(mcpServersPath, { withFileTypes: true })
-				.filter((d) => d.isDirectory())
+		// Validate mcp folder structure if it exists
+		const mcpPath = join(pluginRoot, "mcp");
+		if (existsSync(mcpPath) && statSync(mcpPath).isDirectory()) {
+			const serverDirs = readdirSync(mcpPath, { withFileTypes: true })
+				.filter(
+					(d) =>
+						d.isDirectory() &&
+						!d.name.startsWith(".") &&
+						d.name !== "node_modules",
+				)
 				.map((d) => d.name);
 
 			for (const serverName of serverDirs) {
-				const serverPath = join(mcpServersPath, serverName);
+				const serverPath = join(mcpPath, serverName);
 				const indexPath = join(serverPath, "index.ts");
 				const packagePath = join(serverPath, "package.json");
 

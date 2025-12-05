@@ -15,6 +15,9 @@
 		"lint": "biome lint .",
 		"check": "biome check --write ."
 	},
+	"dependencies": {
+		"@sidequest/core": "workspace:*"
+	},
 	"devDependencies": {
 		"@types/bun": "latest"
 	}

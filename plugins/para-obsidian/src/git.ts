@@ -90,6 +90,26 @@ export async function gitStatus(dir: string): Promise<{ clean: boolean }> {
 }
 
 /**
+ * Ensures the vault is inside a git repository and optionally clean.
+ *
+ * Throws if the vault is not in a git repo or has uncommitted changes.
+ *
+ * @param config - Loaded para-obsidian configuration
+ * @throws Error when guard conditions are not met
+ */
+export async function ensureGitGuard(
+	config: ParaObsidianConfig,
+): Promise<void> {
+	await assertGitRepo(config.vault);
+	const status = await gitStatus(config.vault);
+	if (!status.clean) {
+		throw new Error(
+			"Vault has uncommitted changes. Commit or stash before writing.",
+		);
+	}
+}
+
+/**
  * Stages files for commit.
  *
  * @param dir - Git repository directory

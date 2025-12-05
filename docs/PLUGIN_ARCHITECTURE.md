@@ -42,7 +42,7 @@ return {
   "mcpServers": {
     "my-server": {
       "command": "bun",
-      "args": ["run", "${CLAUDE_PLUGIN_ROOT}/mcp-servers/my-server/index.ts"]
+      "args": ["run", "${CLAUDE_PLUGIN_ROOT}/mcp/my-server/index.ts"]
     }
   }
 }

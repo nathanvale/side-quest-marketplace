@@ -304,6 +304,17 @@
 			},
 			"category": "development",
 			"keywords": ["terminal"]
+		},
+		{
+			"name": "dev-toolkit",
+			"source": "./plugins/dev-toolkit",
+			"description": "Development skills for Bun CLI, runtime workflows, and developer experience patterns",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "development",
+			"keywords": ["bun", "cli", "developer-experience", "workflows", "skills"]
 		}
 	]
 }

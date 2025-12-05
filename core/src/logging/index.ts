@@ -43,3 +43,11 @@ export {
 	type PluginLogger,
 	type PluginLoggerOptions,
 } from "./factory.ts";
+export {
+	getGlobalMetricsCollector,
+	MetricsCollector,
+	type MetricsCollectorOptions,
+	type OperationMetrics,
+	type PerformanceSummary,
+	resetGlobalMetricsCollector,
+} from "./metrics.ts";

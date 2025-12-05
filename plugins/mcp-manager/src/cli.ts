@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { pathExistsSync, readJsonFileSync } from "@sidequest/core/fs";
 import {
 	type ProjectConfig,
 	readClaudeConfig,
@@ -22,9 +22,9 @@ interface InstalledPlugins {
  */
 function readProjectMcpJson(projectPath: string): McpJsonConfig | null {
 	const mcpJsonPath = join(projectPath, ".mcp.json");
-	if (!existsSync(mcpJsonPath)) return null;
+	if (!pathExistsSync(mcpJsonPath)) return null;
 	try {
-		return JSON.parse(readFileSync(mcpJsonPath, "utf-8"));
+		return readJsonFileSync<McpJsonConfig>(mcpJsonPath);
 	} catch {
 		return null;
 	}
@@ -41,12 +41,10 @@ function readPluginMcpServers(): Record<
 		process.env.HOME || "",
 		".claude/plugins/installed_plugins.json",
 	);
-	if (!existsSync(pluginsJsonPath)) return {};
+	if (!pathExistsSync(pluginsJsonPath)) return {};
 
 	try {
-		const installed: InstalledPlugins = JSON.parse(
-			readFileSync(pluginsJsonPath, "utf-8"),
-		);
+		const installed = readJsonFileSync<InstalledPlugins>(pluginsJsonPath);
 		const result: Record<
 			string,
 			{ path: string; servers: Record<string, unknown> }
@@ -55,9 +53,9 @@ function readPluginMcpServers(): Record<
 		for (const [name, plugin] of Object.entries(installed.plugins || {})) {
 			// Check for .mcp.json in plugin directory (note: dotfile)
 			const mcpJsonPath = join(plugin.installPath, ".mcp.json");
-			if (existsSync(mcpJsonPath)) {
+			if (pathExistsSync(mcpJsonPath)) {
 				try {
-					const mcpConfig = JSON.parse(readFileSync(mcpJsonPath, "utf-8"));
+					const mcpConfig = readJsonFileSync<McpJsonConfig>(mcpJsonPath);
 					if (
 						mcpConfig.mcpServers &&
 						Object.keys(mcpConfig.mcpServers).length > 0
@@ -85,9 +83,9 @@ interface ClaudeSettings {
  */
 function readClaudeSettings(): ClaudeSettings | null {
 	const settingsPath = join(process.env.HOME || "", ".claude/settings.json");
-	if (!existsSync(settingsPath)) return null;
+	if (!pathExistsSync(settingsPath)) return null;
 	try {
-		return JSON.parse(readFileSync(settingsPath, "utf-8"));
+		return readJsonFileSync<ClaudeSettings>(settingsPath);
 	} catch {
 		return null;
 	}
@@ -354,10 +352,9 @@ async function listServers(showDebug = false) {
 		// Load installed plugins for paths
 		let installedPlugins: InstalledPlugins = { plugins: {} };
 		try {
-			if (existsSync(installedPluginsPath)) {
-				installedPlugins = JSON.parse(
-					readFileSync(installedPluginsPath, "utf-8"),
-				);
+			if (pathExistsSync(installedPluginsPath)) {
+				installedPlugins =
+					readJsonFileSync<InstalledPlugins>(installedPluginsPath);
 			}
 		} catch {
 			// ignore

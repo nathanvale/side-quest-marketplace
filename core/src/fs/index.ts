@@ -6,11 +6,22 @@
  * existence checks or JSON handling.
  */
 
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 
 export async function pathExists(path: string): Promise<boolean> {
 	const file = Bun.file(path);
 	return await file.exists();
+}
+
+/**
+ * Check if a path exists synchronously.
+ *
+ * @param path - Path to check
+ * @returns true if path exists
+ */
+export function pathExistsSync(path: string): boolean {
+	return existsSync(path);
 }
 
 export async function readTextFile(path: string): Promise<string> {
@@ -63,12 +74,37 @@ export async function writeTextFile(
 	await Bun.write(path, contents);
 }
 
+/**
+ * Write text to a file synchronously.
+ *
+ * @param path - Path to file
+ * @param contents - Content to write
+ */
+export function writeTextFileSync(path: string, contents: string): void {
+	writeFileSync(path, contents, "utf-8");
+}
+
 export async function writeJsonFile(
 	path: string,
 	value: unknown,
 	space = 2,
 ): Promise<void> {
 	await writeTextFile(path, `${JSON.stringify(value, null, space)}\n`);
+}
+
+/**
+ * Write JSON to a file synchronously.
+ *
+ * @param path - Path to file
+ * @param value - Value to serialize as JSON
+ * @param space - Indentation spaces (default: 2)
+ */
+export function writeJsonFileSync(
+	path: string,
+	value: unknown,
+	space = 2,
+): void {
+	writeTextFileSync(path, `${JSON.stringify(value, null, space)}\n`);
 }
 
 /**
@@ -83,12 +119,10 @@ export async function ensureDir(path: string): Promise<void> {
 /**
  * Ensure a directory exists synchronously.
  *
- * Uses Bun shell for mkdir -p.
- *
  * @param path - Directory path
  */
 export function ensureDirSync(path: string): void {
-	Bun.spawnSync(["mkdir", "-p", path]);
+	mkdirSync(path, { recursive: true });
 }
 
 /**

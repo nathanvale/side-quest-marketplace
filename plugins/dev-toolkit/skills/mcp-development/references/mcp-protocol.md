@@ -80,7 +80,7 @@ Communication mechanism: stdio (pipe-based), HTTP (network), SSE (streaming).
 plugins/my-plugin/
 ├── .claude-plugin/
 │   └── plugin.json
-├── mcp/                          ← MCP servers here (not mcp-servers/)
+├── mcp/                          )
 │   └── my-server/
 │       ├── index.ts
 │       └── package.json
