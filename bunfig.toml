@@ -1,0 +1,27 @@
+# Bun configuration for SideQuest Marketplace
+# https://bun.sh/docs/runtime/configuration
+
+[test]
+# Use coverage when running tests with --coverage flag
+coverage = false
+coverageSkipTestFiles = true
+
+# Timeout for individual tests (ms)
+timeout = 30000
+
+# Retry flaky tests
+retry = 0
+
+# Run tests in parallel
+smol = false
+
+[install]
+# Prefer offline packages when available
+prefer-offline = true
+
+# Lockfile format
+lockfile = "bun"
+
+[run]
+# Environment variables for all scripts
+# These are inherited by all bun run commands

@@ -1,5 +1,5 @@
-import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { writeTextFile } from "@sidequest/core/fs";
 import type { ManifestEntry } from "./types";
 
 export class IndexGenerator {
@@ -36,6 +36,6 @@ export class IndexGenerator {
 
 		const content = `${lines.join("\n")}\n`;
 		const indexPath = join(this.outputDir, "INDEX.md");
-		await writeFile(indexPath, content, "utf-8");
+		await writeTextFile(indexPath, content);
 	}
 }

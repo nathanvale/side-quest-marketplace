@@ -1,5 +1,4 @@
-import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { readTextFile, sha256, writeTextFile } from "@sidequest/core/fs";
 import type { Manifest, ManifestEntry } from "./types";
 
 export class ManifestManager {
@@ -7,7 +6,7 @@ export class ManifestManager {
 
 	async loadManifest(): Promise<Manifest> {
 		try {
-			const content = await readFile(this.manifestPath, "utf-8");
+			const content = await readTextFile(this.manifestPath);
 			return JSON.parse(content);
 		} catch {
 			// File doesn't exist or is corrupted, return new manifest
@@ -17,7 +16,7 @@ export class ManifestManager {
 
 	async saveManifest(manifest: Manifest): Promise<void> {
 		const content = JSON.stringify(manifest, null, 2);
-		await writeFile(this.manifestPath, content, "utf-8");
+		await writeTextFile(this.manifestPath, content);
 	}
 
 	needsUpdate(url: string, content: string, manifest: Manifest): boolean {
@@ -41,7 +40,7 @@ export class ManifestManager {
 	}
 
 	calculateSha256(content: string): string {
-		return createHash("sha256").update(content).digest("hex");
+		return sha256(content);
 	}
 
 	private createEmptyManifest(): Manifest {

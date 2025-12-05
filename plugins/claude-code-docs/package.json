@@ -13,6 +13,7 @@
 		"check": "biome check --write ."
 	},
 	"dependencies": {
+		"@sidequest/core": "workspace:*",
 		"cheerio": "^1.1.2",
 		"turndown": "^7.2.2",
 		"xml2js": "^0.6.2"

@@ -1,6 +1,5 @@
-import { createHash } from "node:crypto";
-import { writeFile } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
+import { sha256, writeTextFile } from "@sidequest/core/fs";
 import { MarkdownConverter } from "./markdown-converter";
 
 export class DocumentProcessor {
@@ -41,7 +40,7 @@ export class DocumentProcessor {
 	}
 
 	calculateSha256(content: string): string {
-		return createHash("sha256").update(content).digest("hex");
+		return sha256(content);
 	}
 
 	convertHtmlToMarkdown(html: string): string {
@@ -64,6 +63,6 @@ export class DocumentProcessor {
 		}
 
 		// Safe to write
-		await writeFile(fullPath, content, "utf-8");
+		await writeTextFile(fullPath, content);
 	}
 }

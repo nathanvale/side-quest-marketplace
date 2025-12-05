@@ -7,10 +7,10 @@
  * Displays exit codes, timestamps, and command text.
  */
 
-import { execSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { pathExists, readTextFile } from "@sidequest/core/fs";
+import { shellExec } from "@sidequest/core/shell";
 import {
 	buildEnhancedPath,
 	ensureCommandAvailable,
@@ -117,17 +117,17 @@ function buildAtuinCommand(options: SearchOptions): string[] {
 /**
  * Execute atuin search command and parse results
  */
-function searchHistory(options: SearchOptions): SearchResult;
-function searchHistory(
+async function searchHistory(options: SearchOptions): Promise<SearchResult>;
+async function searchHistory(
 	query: string,
 	limit?: number,
 	includeFailed?: boolean,
-): SearchResult;
-function searchHistory(
+): Promise<SearchResult>;
+async function searchHistory(
 	queryOrOptions: string | SearchOptions,
 	limit = 10,
 	includeFailed = false,
-): SearchResult {
+): Promise<SearchResult> {
 	// Normalize to options object
 	const options: SearchOptions =
 		typeof queryOrOptions === "string"
@@ -175,12 +175,9 @@ function searchHistory(
 			const escapedQuery = options.query.replace(/"/g, '\\"');
 			const fallbackLimit = options.limit ?? 10;
 			const fallbackCmd = `fc -l -${fallbackLimit} | grep -i "${escapedQuery}" | awk '{$1=""; print $0}' | sed 's/^ //'`;
-			const output = execSync(fallbackCmd, {
-				encoding: "utf8",
-				shell: "/bin/zsh",
-			});
+			const result = await shellExec(fallbackCmd, { throws: false });
 
-			const lines: string[] = output
+			const lines: string[] = result.stdout
 				.trim()
 				.split("\n")
 				.filter((l: string) => l);
@@ -205,22 +202,25 @@ function searchHistory(
 /**
  * Get recent command history
  */
-function getRecentHistory(limit = 10, includeFailed = false): SearchResult {
+async function getRecentHistory(
+	limit = 10,
+	includeFailed = false,
+): Promise<SearchResult> {
 	return searchHistory("", limit * 2, includeFailed);
 }
 
 /**
  * Search context entries by git branch or session ID
  */
-function searchByContext(options: {
+async function searchByContext(options: {
 	branch?: string;
 	sessionId?: string;
 	limit?: number;
-}): ContextSearchResult {
+}): Promise<ContextSearchResult> {
 	const { branch, sessionId, limit = 20 } = options;
 	const contextFile = join(homedir(), ".claude", "atuin-context.jsonl");
 
-	if (!existsSync(contextFile)) {
+	if (!(await pathExists(contextFile))) {
 		return {
 			count: 0,
 			entries: [],
@@ -230,7 +230,7 @@ function searchByContext(options: {
 	}
 
 	try {
-		const content = readFileSync(contextFile, "utf8");
+		const content = await readTextFile(contextFile);
 		const lines = content.trim().split("\n").filter(Boolean);
 
 		// Parse and filter entries
@@ -327,10 +327,10 @@ type InsightsResult = HistoryInsights | ErrorResult;
 /**
  * Get history insights using atuin stats
  */
-function getHistoryInsights(
+async function getHistoryInsights(
 	period: InsightPeriod = "today",
 	focus: InsightFocus = "all",
-): InsightsResult {
+): Promise<InsightsResult> {
 	const insights: HistoryInsights = { period };
 
 	try {
@@ -339,7 +339,11 @@ function getHistoryInsights(
 			try {
 				const statsCmd =
 					period === "all" ? "atuin stats" : `atuin stats ${period}`;
-				insights.stats = execSync(statsCmd, { encoding: "utf8" });
+				const result = await shellExec(statsCmd, { throws: false });
+				insights.stats =
+					result.exitCode === 0
+						? result.stdout
+						: `No statistics available for ${period}`;
 			} catch {
 				// Stats might fail if no history for period
 				insights.stats = `No statistics available for ${period}`;
@@ -360,10 +364,8 @@ function getHistoryInsights(
 								: "";
 
 				const failedCmd = `atuin search --limit 50 ${afterFlag} --format "{time}\\t{exit}\\t{command}" 2>/dev/null || true`;
-				const output = execSync(failedCmd, {
-					encoding: "utf8",
-					shell: "/bin/bash",
-				});
+				const result = await shellExec(failedCmd, { throws: false });
+				const output = result.stdout;
 
 				if (output.trim()) {
 					// Parse and count failed commands
@@ -561,7 +563,7 @@ tool(
 			response_format === "json"
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
-		const results = searchHistory({
+		const results = await searchHistory({
 			query,
 			limit: limit ?? 10,
 			includeFailed: include_failed ?? false,
@@ -617,7 +619,10 @@ tool(
 			response_format === "json"
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
-		const results = getRecentHistory(limit ?? 10, include_failed ?? false);
+		const results = await getRecentHistory(
+			limit ?? 10,
+			include_failed ?? false,
+		);
 		return {
 			...(isError(results) ? { isError: true } : {}),
 			content: [
@@ -670,7 +675,7 @@ tool(
 			response_format === "json"
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
-		const results = searchByContext({
+		const results = await searchByContext({
 			branch,
 			sessionId: session_id,
 			limit: limit ?? 20,
@@ -722,7 +727,7 @@ tool(
 			response_format === "json"
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
-		const results = getHistoryInsights(period ?? "today", focus ?? "all");
+		const results = await getHistoryInsights(period ?? "today", focus ?? "all");
 		return {
 			...(isError(results) ? { isError: true } : {}),
 			content: [

@@ -1,13 +1,11 @@
 #!/usr/bin/env bun
 
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { ensureDir, pathExists } from "@sidequest/core/fs";
 import { ClaudeDocsFetcher } from "./fetcher";
 
 // Output to plugin's docs directory
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DEFAULT_OUTPUT_DIR = join(__dirname, "..", "docs");
+const DEFAULT_OUTPUT_DIR = join(import.meta.dir, "..", "docs");
 
 const VERSION = "1.0.0";
 
@@ -115,7 +113,7 @@ async function main() {
 
 	// Check if this is first run
 	const manifestPath = join(outputDir, "manifest.json");
-	const isFirstRun = !existsSync(manifestPath);
+	const isFirstRun = !(await pathExists(manifestPath));
 
 	if (isFirstRun) {
 		console.log("🆕 First run detected - fetching all documentation...");
@@ -129,8 +127,7 @@ async function main() {
 
 	try {
 		// Ensure output directory exists
-		const { mkdir } = await import("node:fs/promises");
-		await mkdir(outputDir, { recursive: true });
+		await ensureDir(outputDir);
 
 		const fetcher = new ClaudeDocsFetcher(outputDir);
 
