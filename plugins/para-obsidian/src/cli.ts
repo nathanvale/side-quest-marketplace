@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-import fs from "node:fs";
 import path from "node:path";
 
 /**
@@ -11,11 +10,21 @@ import path from "node:path";
  */
 
 import {
+	coerceValue,
+	parseArgs,
+	parseKeyValuePairs,
+} from "@sidequest/core/cli";
+import {
 	color,
 	emphasize,
 	OutputFormat,
 	parseOutputFormat,
 } from "@sidequest/core/formatters";
+import {
+	pathExistsSync,
+	readTextFileSync,
+	writeTextFileSync,
+} from "@sidequest/core/fs";
 import { discoverAttachments } from "./attachments";
 import {
 	listTemplateVersions,
@@ -36,7 +45,12 @@ import {
 	validateFrontmatterFile,
 } from "./frontmatter";
 import { listDir, readFile } from "./fs";
-import { assertGitRepo, autoCommitChanges, gitStatus } from "./git";
+import {
+	assertGitRepo,
+	autoCommitChanges,
+	ensureGitGuard,
+	gitStatus,
+} from "./git";
 import { buildIndex, loadIndex, saveIndex } from "./indexer";
 import { type InsertMode, insertIntoNote } from "./insert";
 import { renameWithLinkRewrite } from "./links";
@@ -53,7 +67,7 @@ function printUsage(): void {
 		"  bun run src/cli.ts templates [--format md|json]",
 		"  bun run src/cli.ts list [path] [--format md|json]",
 		"  bun run src/cli.ts read <file> [--format md|json]",
-		"  bun run src/cli.ts search <query> [--tag TAG] [--frontmatter key=val|--frontmatter.key val] [--regex] [--dir path[,path2]] [--format md|json]",
+		"  bun run src/cli.ts search <query> [--tag TAG] [--frontmatter key=val|--frontmatter.key val] [--regex] [--dir path[,path2]] [--glob pattern] [--context N] [--format md|json]",
 		"  bun run src/cli.ts index prime [--dir path[,path2]] [--format md|json]",
 		"  bun run src/cli.ts index query [--tag TAG] [--frontmatter key=val|--frontmatter.key val] [--dir path[,path2]] [--format md|json]",
 		'  bun run src/cli.ts create --template <name> --title "<Title>" [--dest path] [--arg key=value ...] [--attachments paths] [--format md|json]',
@@ -84,41 +98,9 @@ function printUsage(): void {
 		'  bun run src/cli.ts create --template project --title "New Project" --area "[[Health]]" --target_completion 2025-12-31',
 		'  bun run src/cli.ts rename "01_Projects/Old.md" "01_Projects/New.md" --dry-run',
 	];
-	console.log(lines.map((line) => color("cyan", line)).join("\n"));
-}
-
-function parseArgs(argv: string[]): {
-	command: string;
-	subcommand?: string;
-	positional: string[];
-	flags: Record<string, string | boolean>;
-} {
-	const positional: string[] = [];
-	const flags: Record<string, string | boolean> = {};
-
-	for (let i = 0; i < argv.length; i++) {
-		const arg = argv[i];
-		if (!arg) continue;
-		if (arg.startsWith("--")) {
-			const [keyRaw, value] = arg.split("=");
-			const key = keyRaw?.slice(2);
-			if (!key) continue;
-			const next = argv[i + 1];
-			if (value !== undefined) {
-				flags[key] = value;
-			} else if (next && !next.startsWith("--")) {
-				flags[key] = next;
-				i++;
-			} else {
-				flags[key] = true;
-			}
-		} else {
-			positional.push(arg);
-		}
-	}
-
-	const [command, subcommand, ...rest] = positional;
-	return { command: command ?? "", subcommand, positional: rest, flags };
+	console.log(
+		lines.map((line) => (line === "" ? "" : color("cyan", line))).join("\n"),
+	);
 }
 
 function parseAttachments(flags: Record<string, string | boolean>): string[] {
@@ -136,21 +118,6 @@ function parseUnset(input: string | boolean | undefined): string[] {
 		.split(",")
 		.map((s) => s.trim())
 		.filter(Boolean);
-}
-
-function parseKeyValuePairs(
-	inputs: ReadonlyArray<string>,
-): Record<string, string> {
-	const entries: Record<string, string> = {};
-	for (const input of inputs) {
-		const [rawKey, ...rest] = input.split("=");
-		if (!rawKey || rest.length === 0) continue;
-		const key = rawKey.trim();
-		const value = rest.join("=").trim();
-		if (!key || !value) continue;
-		entries[key] = value;
-	}
-	return entries;
 }
 
 function parseFrontmatterFilters(
@@ -287,32 +254,6 @@ export function computeFrontmatterHints(
 	return { warnings, fixHints, suggestions };
 }
 
-function coerceValue(raw: string): unknown {
-	const trimmed = raw.trim();
-	if (trimmed.length === 0) return trimmed;
-	if (trimmed === "true") return true;
-	if (trimmed === "false") return false;
-	if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed);
-	if (
-		(trimmed.startsWith("[") && trimmed.endsWith("]")) ||
-		(trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-		(trimmed.startsWith('"') && trimmed.endsWith('"'))
-	) {
-		try {
-			return JSON.parse(trimmed);
-		} catch {
-			// fall through to comma/identity parsing
-		}
-	}
-	if (trimmed.includes(",")) {
-		return trimmed
-			.split(",")
-			.map((s) => s.trim())
-			.filter(Boolean);
-	}
-	return trimmed;
-}
-
 function withAutoDiscoveredAttachments(
 	config: ParaObsidianConfig,
 	note: string,
@@ -389,6 +330,9 @@ async function main(): Promise<void> {
 				}
 				const dryRun = flags["dry-run"] === true || flags["dry-run"] === "true";
 				const attachments = parseAttachments(flags);
+				if (!dryRun) {
+					await ensureGitGuard(config);
+				}
 				const result = renameWithLinkRewrite(config, { from, to, dryRun });
 				if (config.autoCommit && !dryRun) {
 					const paths = [
@@ -420,6 +364,9 @@ async function main(): Promise<void> {
 				const confirm = flags.confirm === true || flags.confirm === "true";
 				const dryRun = flags["dry-run"] === true || flags["dry-run"] === "true";
 				const attachments = parseAttachments(flags);
+				if (!dryRun) {
+					await ensureGitGuard(config);
+				}
 				const result = deleteFile(config, { file, confirm, dryRun });
 				if (config.autoCommit && !dryRun) {
 					await autoCommitChanges(
@@ -536,6 +483,23 @@ async function main(): Promise<void> {
 				const tag = typeof flags.tag === "string" ? flags.tag : undefined;
 				const dirs = parseDirs(flags.dir, config.defaultSearchDirs);
 				const frontmatter = parseFrontmatterFilters(flags);
+				const globs =
+					typeof flags.glob === "string"
+						? flags.glob
+								.split(",")
+								.map((g: string) => g.trim())
+								.filter(Boolean)
+						: undefined;
+				const context =
+					typeof flags.context === "string"
+						? Number.parseInt(flags.context, 10)
+						: undefined;
+
+				const hasFrontmatterFilters =
+					Object.keys(frontmatter).length > 0 || Boolean(tag);
+				const fmMatches = hasFrontmatterFilters
+					? await filterByFrontmatter(config, { frontmatter, tag, dir: dirs })
+					: [];
 
 				const hits = await searchText(config, {
 					query,
@@ -545,12 +509,10 @@ async function main(): Promise<void> {
 						typeof flags["max-results"] === "string"
 							? Number.parseInt(flags["max-results"], 10)
 							: undefined,
+					glob: globs,
+					context,
+					allowedFiles: hasFrontmatterFilters ? fmMatches : undefined,
 				});
-
-				const fmMatches =
-					Object.keys(frontmatter).length > 0 || tag
-						? await filterByFrontmatter(config, { frontmatter, tag, dir: dirs })
-						: [];
 
 				if (isJson) {
 					console.log(
@@ -623,6 +585,7 @@ async function main(): Promise<void> {
 					if (typeof v === "string") argsForTemplate[k] = v;
 				}
 
+				await ensureGitGuard(config);
 				const result = createFromTemplate(config, {
 					template,
 					title,
@@ -730,18 +693,13 @@ async function main(): Promise<void> {
 						typed[k] = coerceValue(v);
 					}
 
-					const result = updateFrontmatterFile(config, target, {
+					const preview = updateFrontmatterFile(config, target, {
 						set: typed,
 						unset,
-						dryRun,
+						dryRun: true,
 					});
-					const attachmentsUsed = withAutoDiscoveredAttachments(
-						config,
-						target,
-						attachments,
-					);
 
-					const after = result.attributes.after;
+					const after = preview.attributes.after;
 					const noteType =
 						typeof after.type === "string" ? (after.type as string) : undefined;
 					const rules = noteType
@@ -802,8 +760,34 @@ async function main(): Promise<void> {
 					}
 
 					const strictFailed = strict && warnings.length > 0;
+					const invalid = !validation.valid;
 
-					if (config.autoCommit && !dryRun && result.updated && !strictFailed) {
+					if (!dryRun && !invalid) {
+						await ensureGitGuard(config);
+					}
+
+					const result =
+						dryRun || strictFailed || invalid
+							? preview
+							: updateFrontmatterFile(config, target, {
+									set: typed,
+									unset,
+									dryRun,
+								});
+
+					const attachmentsUsed = withAutoDiscoveredAttachments(
+						config,
+						target,
+						attachments,
+					);
+
+					if (
+						config.autoCommit &&
+						!dryRun &&
+						result.updated &&
+						!strictFailed &&
+						!invalid
+					) {
 						await autoCommitChanges(
 							config,
 							[result.relative, ...attachmentsUsed],
@@ -827,7 +811,7 @@ async function main(): Promise<void> {
 								2,
 							),
 						);
-						if (strictFailed) process.exit(1);
+						if (strictFailed || invalid) process.exit(1);
 					} else {
 						if (!result.wouldChange) {
 							console.log(emphasize.info(`${result.relative} unchanged`));
@@ -846,7 +830,7 @@ async function main(): Promise<void> {
 							console.log(emphasize.warn("Warnings:"));
 							for (const w of warnings) console.log(`- ${w}`);
 						}
-						if (strictFailed) {
+						if (strictFailed || invalid) {
 							process.exit(1);
 						}
 					}
@@ -862,6 +846,9 @@ async function main(): Promise<void> {
 							? Number.parseInt(flags.force, 10)
 							: undefined;
 					const attachments = parseAttachments(flags);
+					if (!dryRun) {
+						await ensureGitGuard(config);
+					}
 					const result = migrateTemplateVersion(config, target, {
 						forceVersion,
 						dryRun,
@@ -907,6 +894,9 @@ async function main(): Promise<void> {
 							? flags.type.trim()
 							: undefined;
 					const attachments = parseAttachments(flags);
+					if (!dryRun) {
+						await ensureGitGuard(config);
+					}
 					const result = migrateAllTemplateVersions(config, {
 						dir,
 						dryRun,
@@ -994,11 +984,11 @@ async function main(): Promise<void> {
 							? path.resolve(flags["emit-plan"])
 							: undefined;
 					const planAbs = path.resolve(planPath);
-					if (!fs.existsSync(planAbs)) {
+					if (!pathExistsSync(planAbs)) {
 						console.error(`Plan file not found: ${planAbs}`);
 						process.exit(1);
 					}
-					const plan = JSON.parse(fs.readFileSync(planAbs, "utf8"));
+					const plan = JSON.parse(readTextFileSync(planAbs));
 					if (!plan?.entries || !Array.isArray(plan.entries)) {
 						console.error("Plan file must contain entries[]");
 						process.exit(1);
@@ -1009,6 +999,9 @@ async function main(): Promise<void> {
 					}
 
 					const attachments = parseAttachments(flags);
+					if (!dryRun) {
+						await ensureGitGuard(config);
+					}
 					const result = applyVersionPlan(config, {
 						plan,
 						dryRun,
@@ -1046,11 +1039,7 @@ async function main(): Promise<void> {
 								}
 							: undefined;
 					if (emitPlan && filteredPlan) {
-						fs.writeFileSync(
-							emitPlan,
-							JSON.stringify(filteredPlan, null, 2),
-							"utf8",
-						);
+						writeTextFileSync(emitPlan, JSON.stringify(filteredPlan, null, 2));
 					}
 					const updatedFiles = result.results
 						.filter((r) => r.updated)
@@ -1191,7 +1180,7 @@ async function main(): Promise<void> {
 							? path.resolve(flags.save)
 							: undefined;
 					if (savePath) {
-						fs.writeFileSync(savePath, JSON.stringify(plan, null, 2), "utf8");
+						writeTextFileSync(savePath, JSON.stringify(plan, null, 2));
 					}
 					if (isJson) {
 						console.log(
@@ -1249,6 +1238,7 @@ async function main(): Promise<void> {
 				const mode = selected[0] as InsertMode;
 				const attachments = parseAttachments(flags);
 
+				await ensureGitGuard(config);
 				const result = insertIntoNote(config, {
 					file,
 					heading,
