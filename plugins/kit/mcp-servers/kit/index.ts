@@ -7,8 +7,8 @@
  * using the Kit CLI (cased-kit).
  */
 
+import { buildEnhancedPath, spawnSyncCollect } from "@sidequest/core/spawn";
 import { startServer, tool, z } from "mcpez";
-
 import {
 	createCorrelationId,
 	executeAstSearch,
@@ -424,7 +424,6 @@ To enable: uv tool install 'cased-kit[ml]'`,
 			args: { query: args.query },
 		});
 
-		const { spawnSync } = await import("node:child_process");
 		const format = args.response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
@@ -450,25 +449,24 @@ To enable: uv tool install 'cased-kit[ml]'`,
 			cmd.push("--build-index");
 		}
 
-		const result = spawnSync("bun", cmd, {
-			encoding: "utf-8",
-			maxBuffer: 10 * 1024 * 1024,
+		const result = spawnSyncCollect(["bun", ...cmd], {
+			env: { PATH: buildEnhancedPath() },
 		});
 
 		const mcpDuration = Date.now() - mcpStartTime;
 		mcpLogger.info("MCP tool response", {
 			cid: mcpCid,
 			tool: "kit_semantic",
-			success: result.status === 0,
+			success: result.exitCode === 0,
 			durationMs: mcpDuration,
 		});
 
 		return {
-			...(result.status !== 0 ? { isError: true } : {}),
+			...(result.exitCode !== 0 ? { isError: true } : {}),
 			content: [
 				{
 					type: "text" as const,
-					text: result.status === 0 ? result.stdout : result.stderr,
+					text: result.exitCode === 0 ? result.stdout : result.stderr,
 				},
 			],
 		};
@@ -515,13 +513,12 @@ Filters out the function definition to show only actual call sites.`,
 			args: { function_name: args.function_name },
 		});
 
-		const { spawnSync } = await import("node:child_process");
 		const format = args.response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
-		const result = spawnSync(
-			"bun",
+		const result = spawnSyncCollect(
 			[
+				"bun",
 				"run",
 				`${pluginRoot}/src/cli.ts`,
 				"callers",
@@ -529,23 +526,23 @@ Filters out the function definition to show only actual call sites.`,
 				"--format",
 				format,
 			],
-			{ encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 },
+			{ env: { PATH: buildEnhancedPath() } },
 		);
 
 		const mcpDuration = Date.now() - mcpStartTime;
 		mcpLogger.info("MCP tool response", {
 			cid: mcpCid,
 			tool: "kit_callers",
-			success: result.status === 0,
+			success: result.exitCode === 0,
 			durationMs: mcpDuration,
 		});
 
 		return {
-			...(result.status !== 0 ? { isError: true } : {}),
+			...(result.exitCode !== 0 ? { isError: true } : {}),
 			content: [
 				{
 					type: "text" as const,
-					text: result.status === 0 ? result.stdout : result.stderr,
+					text: result.exitCode === 0 ? result.stdout : result.stderr,
 				},
 			],
 		};
@@ -592,37 +589,33 @@ Note: Currently returns helpful error message for TypeScript/JavaScript (kit onl
 			args: { function_name: args.function_name },
 		});
 
-		const { spawnSync } = await import("node:child_process");
 		const format = args.response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
-		const result = spawnSync(
+		const result = spawnSyncCollect([
 			"bun",
-			[
-				"run",
-				`${pluginRoot}/src/cli.ts`,
-				"calls",
-				args.function_name,
-				"--format",
-				format,
-			],
-			{ encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 },
-		);
+			"run",
+			`${pluginRoot}/src/cli.ts`,
+			"calls",
+			args.function_name,
+			"--format",
+			format,
+		]);
 
 		const mcpDuration = Date.now() - mcpStartTime;
 		mcpLogger.info("MCP tool response", {
 			cid: mcpCid,
 			tool: "kit_calls",
-			success: result.status === 0,
+			success: result.exitCode === 0,
 			durationMs: mcpDuration,
 		});
 
 		return {
-			...(result.status !== 0 ? { isError: true } : {}),
+			...(result.exitCode !== 0 ? { isError: true } : {}),
 			content: [
 				{
 					type: "text" as const,
-					text: result.status === 0 ? result.stdout : result.stderr,
+					text: result.exitCode === 0 ? result.stdout : result.stderr,
 				},
 			],
 		};
@@ -671,13 +664,12 @@ Note: Currently returns helpful error message for TypeScript/JavaScript (kit onl
 			args: { file_path: args.file_path },
 		});
 
-		const { spawnSync } = await import("node:child_process");
 		const format = args.response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
-		const result = spawnSync(
-			"bun",
+		const result = spawnSyncCollect(
 			[
+				"bun",
 				"run",
 				`${pluginRoot}/src/cli.ts`,
 				"deps",
@@ -685,23 +677,23 @@ Note: Currently returns helpful error message for TypeScript/JavaScript (kit onl
 				"--format",
 				format,
 			],
-			{ encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 },
+			{ env: { PATH: buildEnhancedPath() } },
 		);
 
 		const mcpDuration = Date.now() - mcpStartTime;
 		mcpLogger.info("MCP tool response", {
 			cid: mcpCid,
 			tool: "kit_deps",
-			success: result.status === 0,
+			success: result.exitCode === 0,
 			durationMs: mcpDuration,
 		});
 
 		return {
-			...(result.status !== 0 ? { isError: true } : {}),
+			...(result.exitCode !== 0 ? { isError: true } : {}),
 			content: [
 				{
 					type: "text" as const,
-					text: result.status === 0 ? result.stdout : result.stderr,
+					text: result.exitCode === 0 ? result.stdout : result.stderr,
 				},
 			],
 		};
@@ -751,7 +743,6 @@ Requires PROJECT_INDEX.json. Run kit_index_prime first if not present.`,
 			args: { path: args.path },
 		});
 
-		const { spawnSync } = await import("node:child_process");
 		const format = args.response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
@@ -766,25 +757,24 @@ Requires PROJECT_INDEX.json. Run kit_index_prime first if not present.`,
 				]
 			: ["run", `${pluginRoot}/src/cli.ts`, "dead", "--format", format];
 
-		const result = spawnSync("bun", cmd, {
-			encoding: "utf-8",
-			maxBuffer: 10 * 1024 * 1024,
+		const result = spawnSyncCollect(["bun", ...cmd], {
+			env: { PATH: buildEnhancedPath() },
 		});
 
 		const mcpDuration = Date.now() - mcpStartTime;
 		mcpLogger.info("MCP tool response", {
 			cid: mcpCid,
 			tool: "kit_dead",
-			success: result.status === 0,
+			success: result.exitCode === 0,
 			durationMs: mcpDuration,
 		});
 
 		return {
-			...(result.status !== 0 ? { isError: true } : {}),
+			...(result.exitCode !== 0 ? { isError: true } : {}),
 			content: [
 				{
 					type: "text" as const,
-					text: result.status === 0 ? result.stdout : result.stderr,
+					text: result.exitCode === 0 ? result.stdout : result.stderr,
 				},
 			],
 		};
@@ -835,13 +825,12 @@ Accepts target as either:
 			args: { target: args.target },
 		});
 
-		const { spawnSync } = await import("node:child_process");
 		const format = args.response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
-		const result = spawnSync(
-			"bun",
+		const result = spawnSyncCollect(
 			[
+				"bun",
 				"run",
 				`${pluginRoot}/src/cli.ts`,
 				"blast",
@@ -849,23 +838,23 @@ Accepts target as either:
 				"--format",
 				format,
 			],
-			{ encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 },
+			{ env: { PATH: buildEnhancedPath() } },
 		);
 
 		const mcpDuration = Date.now() - mcpStartTime;
 		mcpLogger.info("MCP tool response", {
 			cid: mcpCid,
 			tool: "kit_blast",
-			success: result.status === 0,
+			success: result.exitCode === 0,
 			durationMs: mcpDuration,
 		});
 
 		return {
-			...(result.status !== 0 ? { isError: true } : {}),
+			...(result.exitCode !== 0 ? { isError: true } : {}),
 			content: [
 				{
 					type: "text" as const,
-					text: result.status === 0 ? result.stdout : result.stderr,
+					text: result.exitCode === 0 ? result.stdout : result.stderr,
 				},
 			],
 		};
@@ -914,13 +903,12 @@ Uses heuristics to identify likely exported symbols (PascalCase, UPPER_CASE, com
 			args: { directory: args.directory },
 		});
 
-		const { spawnSync } = await import("node:child_process");
 		const format = args.response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
-		const result = spawnSync(
-			"bun",
+		const result = spawnSyncCollect(
 			[
+				"bun",
 				"run",
 				`${pluginRoot}/src/cli.ts`,
 				"api",
@@ -928,23 +916,23 @@ Uses heuristics to identify likely exported symbols (PascalCase, UPPER_CASE, com
 				"--format",
 				format,
 			],
-			{ encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 },
+			{ env: { PATH: buildEnhancedPath() } },
 		);
 
 		const mcpDuration = Date.now() - mcpStartTime;
 		mcpLogger.info("MCP tool response", {
 			cid: mcpCid,
 			tool: "kit_api",
-			success: result.status === 0,
+			success: result.exitCode === 0,
 			durationMs: mcpDuration,
 		});
 
 		return {
-			...(result.status !== 0 ? { isError: true } : {}),
+			...(result.exitCode !== 0 ? { isError: true } : {}),
 			content: [
 				{
 					type: "text" as const,
-					text: result.status === 0 ? result.stdout : result.stderr,
+					text: result.exitCode === 0 ? result.stdout : result.stderr,
 				},
 			],
 		};
@@ -1026,7 +1014,6 @@ Results include file paths, line numbers, and matched content.`,
 			args: { pattern: args.pattern },
 		});
 
-		const { spawnSync } = await import("node:child_process");
 		const format = args.response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
@@ -1048,25 +1035,24 @@ Results include file paths, line numbers, and matched content.`,
 		if (args.max_results) cmd.push("--max-results", String(args.max_results));
 		if (args.directory) cmd.push("--directory", args.directory);
 
-		const result = spawnSync("bun", cmd, {
-			encoding: "utf-8",
-			maxBuffer: 10 * 1024 * 1024,
+		const result = spawnSyncCollect(["bun", ...cmd], {
+			env: { PATH: buildEnhancedPath() },
 		});
 
 		const mcpDuration = Date.now() - mcpStartTime;
 		mcpLogger.info("MCP tool response", {
 			cid: mcpCid,
 			tool: "kit_grep",
-			success: result.status === 0,
+			success: result.exitCode === 0,
 			durationMs: mcpDuration,
 		});
 
 		return {
-			...(result.status !== 0 ? { isError: true } : {}),
+			...(result.exitCode !== 0 ? { isError: true } : {}),
 			content: [
 				{
 					type: "text" as const,
-					text: result.status === 0 ? result.stdout : result.stderr,
+					text: result.exitCode === 0 ? result.stdout : result.stderr,
 				},
 			],
 		};
@@ -1129,7 +1115,6 @@ Requires Kit CLI: uv tool install cased-kit`,
 			args: { dry_run: args.dry_run, model: args.model },
 		});
 
-		const { spawnSync } = await import("node:child_process");
 		const format = args.response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
@@ -1154,26 +1139,24 @@ Requires Kit CLI: uv tool install cased-kit`,
 			cmdArgs.push("--model", args.model);
 		}
 
-		const result = spawnSync("bun", cmdArgs, {
-			encoding: "utf-8",
-			maxBuffer: 10 * 1024 * 1024,
-			timeout: 60000,
+		const result = spawnSyncCollect(["bun", ...cmdArgs], {
+			env: { PATH: buildEnhancedPath() },
 		});
 
 		const mcpDuration = Date.now() - mcpStartTime;
 		mcpLogger.info("MCP tool response", {
 			cid: mcpCid,
 			tool: "kit_commit",
-			success: result.status === 0,
+			success: result.exitCode === 0,
 			durationMs: mcpDuration,
 		});
 
 		return {
-			...(result.status !== 0 ? { isError: true } : {}),
+			...(result.exitCode !== 0 ? { isError: true } : {}),
 			content: [
 				{
 					type: "text" as const,
-					text: result.status === 0 ? result.stdout : result.stderr,
+					text: result.exitCode === 0 ? result.stdout : result.stderr,
 				},
 			],
 		};
@@ -1237,7 +1220,6 @@ IMPORTANT: Default update_pr_body=false for safety.`,
 			args: { pr_url: args.pr_url, update_pr_body: args.update_pr_body },
 		});
 
-		const { spawnSync } = await import("node:child_process");
 		const format = args.response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
@@ -1258,25 +1240,24 @@ IMPORTANT: Default update_pr_body=false for safety.`,
 			cmd.push("--model", args.model);
 		}
 
-		const result = spawnSync("bun", cmd, {
-			encoding: "utf-8",
-			maxBuffer: 10 * 1024 * 1024,
+		const result = spawnSyncCollect(["bun", ...cmd], {
+			env: { PATH: buildEnhancedPath() },
 		});
 
 		const mcpDuration = Date.now() - mcpStartTime;
 		mcpLogger.info("MCP tool response", {
 			cid: mcpCid,
 			tool: "kit_summarize",
-			success: result.status === 0,
+			success: result.exitCode === 0,
 			durationMs: mcpDuration,
 		});
 
 		return {
-			...(result.status !== 0 ? { isError: true } : {}),
+			...(result.exitCode !== 0 ? { isError: true } : {}),
 			content: [
 				{
 					type: "text" as const,
-					text: result.status === 0 ? result.stdout : result.stderr,
+					text: result.exitCode === 0 ? result.stdout : result.stderr,
 				},
 			],
 		};

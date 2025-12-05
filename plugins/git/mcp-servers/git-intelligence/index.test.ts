@@ -1,22 +1,45 @@
 import { describe, expect, test } from "bun:test";
-import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnSync } from "bun";
 
 /**
  * Helper to run git commands safely using argument arrays
  */
 function git(args: string[], cwd: string): string {
-	const result = spawnSync("git", args, {
-		encoding: "utf8",
+	const result = spawnSync({
+		cmd: ["git", ...args],
+		stdout: "pipe",
+		stderr: "pipe",
 		cwd,
-		maxBuffer: 10 * 1024 * 1024,
 	});
-	if (result.status !== 0) {
-		throw new Error(result.stderr || `git exited with code ${result.status}`);
+	if (result.exitCode !== 0) {
+		const stderr =
+			typeof result.stderr === "string"
+				? result.stderr
+				: new TextDecoder().decode(result.stderr);
+		throw new Error(stderr || `git exited with code ${result.exitCode}`);
 	}
-	return result.stdout.trim();
+	const stdout =
+		typeof result.stdout === "string"
+			? result.stdout
+			: new TextDecoder().decode(result.stdout);
+	return stdout.trim();
+}
+
+function runGit(args: string[], cwd: string) {
+	return spawnSync({
+		cmd: ["git", ...args],
+		stdout: "pipe",
+		stderr: "pipe",
+		cwd,
+	});
+}
+
+function decode(output: string | Uint8Array | null | undefined): string {
+	if (!output) return "";
+	return typeof output === "string" ? output : new TextDecoder().decode(output);
 }
 
 // Find the git root by traversing up from this file's directory
@@ -65,17 +88,13 @@ describe("spawnSync security (command injection prevention)", () => {
 			// With spawnSync arrays, it's passed as a literal string argument
 			const maliciousQuery = `"; touch /tmp/pwned-${Date.now()}; echo "`;
 
-			const result = spawnSync(
-				"git",
-				["log", `--grep=${maliciousQuery}`, "--format=%s"],
-				{
-					encoding: "utf8",
-					cwd: dir,
-				},
+			const result = runGit(
+				["log", `--grep=${maliciousQuery}`, "--format=%s`"],
+				dir,
 			);
 
 			// The command completes (with no matches) rather than failing
-			expect(result.status).toBe(0);
+			expect(result.exitCode ?? 1).toBe(0);
 		} finally {
 			cleanupTestRepo(dir);
 		}
@@ -92,14 +111,11 @@ describe("spawnSync security (command injection prevention)", () => {
 			// With spawnSync: "HEAD; rm -rf /" is passed as ONE argument to git
 			const maliciousRef = "HEAD; rm -rf /";
 
-			const result = spawnSync("git", ["diff", "--numstat", maliciousRef], {
-				encoding: "utf8",
-				cwd: dir,
-			});
+			const result = runGit(["diff", "--numstat", maliciousRef], dir);
 
 			// Git fails because it can't find a revision named "HEAD; rm -rf /"
-			expect(result.status).not.toBe(0);
-			expect(result.stderr).toContain("unknown revision");
+			expect(result.exitCode ?? 1).not.toBe(0);
+			expect(decode(result.stderr)).toContain("unknown revision");
 		} finally {
 			cleanupTestRepo(dir);
 		}
@@ -113,13 +129,10 @@ describe("spawnSync security (command injection prevention)", () => {
 			git(["commit", "-m", "test $PATH and `command` and $(subshell)"], dir);
 
 			// Search for literal special characters
-			const result = spawnSync("git", ["log", "--grep=$PATH", "--format=%s"], {
-				encoding: "utf8",
-				cwd: dir,
-			});
+			const result = runGit(["log", "--grep=$PATH", "--format=%s"], dir);
 
-			expect(result.status).toBe(0);
-			expect(result.stdout).toContain("$PATH");
+			expect(result.exitCode ?? 1).toBe(0);
+			expect(decode(result.stdout)).toContain("$PATH");
 		} finally {
 			cleanupTestRepo(dir);
 		}
@@ -132,11 +145,13 @@ describe("git utility functions", () => {
 	});
 
 	test("isGitRepo returns false for non-git directories", () => {
-		const result = spawnSync("git", ["rev-parse", "--git-dir"], {
-			encoding: "utf8",
+		const result = spawnSync({
+			cmd: ["git", "rev-parse", "--git-dir"],
+			stdout: "pipe",
+			stderr: "pipe",
 			cwd: "/tmp",
 		});
-		expect(result.status).not.toBe(0);
+		expect(result.exitCode).not.toBe(0);
 	});
 
 	test("git command returns branch name", () => {
@@ -327,15 +342,11 @@ describe("get_branch_info format", () => {
 
 	test("lists remote branches", () => {
 		// This may be empty in some repos, but shouldn't throw
-		const result = spawnSync(
-			"git",
+		const result = runGit(
 			["branch", "-r", "--format=%(refname:short)"],
-			{
-				encoding: "utf8",
-				cwd: TEST_CWD,
-			},
+			TEST_CWD,
 		);
-		expect(result.status).toBe(0);
+		expect(result.exitCode ?? 1).toBe(0);
 	});
 });
 

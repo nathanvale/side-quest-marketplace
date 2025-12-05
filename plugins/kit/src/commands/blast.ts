@@ -5,33 +5,13 @@
  * Uses kit grep and kit usages to trace multi-level dependencies.
  */
 
-import { spawnSync } from "node:child_process";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import {
+	buildEnhancedPath,
+	ensureCommandAvailable,
+	spawnWithTimeout,
+} from "@sidequest/core/spawn";
 import { color, OutputFormat } from "../formatters/output";
 import { loadProjectIndex } from "../utils/index-parser";
-
-/**
- * Get enhanced PATH for kit CLI execution
- */
-function getEnhancedPath(): string {
-	const currentPath = process.env.PATH || "";
-	const home = homedir();
-
-	const additionalPaths = [
-		join(home, ".local", "bin"),
-		"/opt/homebrew/bin",
-		"/usr/local/bin",
-	];
-
-	const pathsToAdd = additionalPaths.filter(
-		(p) => !currentPath.split(":").includes(p),
-	);
-
-	return pathsToAdd.length > 0
-		? `${pathsToAdd.join(":")}:${currentPath}`
-		: currentPath;
-}
 
 /**
  * Blast radius entry representing an affected file
@@ -79,10 +59,10 @@ function parseTarget(target: string): {
  * @param repoPath - Repository root path
  * @returns Array of files that depend on the target
  */
-function findFileDependents(
+async function findFileDependents(
 	targetFile: string,
 	repoPath: string,
-): BlastEntry[] {
+): Promise<BlastEntry[]> {
 	const entries: BlastEntry[] = [];
 
 	// Normalize target file path (remove leading ./)
@@ -93,20 +73,28 @@ function findFileDependents(
 	const fileBasename = normalizedTarget.replace(/\.[^.]+$/, ""); // Remove extension
 	const pattern = `(import|require).*['"](.*${fileBasename}.*|.*${normalizedTarget}.*)['"']`;
 
-	const result = spawnSync(
-		"kit",
-		["grep", repoPath, pattern, "--max-results", "500", "--format", "json"],
+	const kitCmd = ensureCommandAvailable("kit");
+	const result = await spawnWithTimeout(
+		[
+			kitCmd,
+			"grep",
+			repoPath,
+			pattern,
+			"--max-results",
+			"500",
+			"--format",
+			"json",
+		],
+		30_000,
 		{
-			encoding: "utf8",
-			timeout: 30000,
 			env: {
 				...process.env,
-				PATH: getEnhancedPath(),
+				PATH: buildEnhancedPath(),
 			},
 		},
 	);
 
-	if (result.status === 0 && result.stdout) {
+	if (!result.timedOut && result.exitCode === 0 && result.stdout) {
 		try {
 			const matches = JSON.parse(result.stdout);
 			for (const match of matches) {
@@ -135,24 +123,35 @@ function findFileDependents(
  * @param repoPath - Repository root path
  * @returns Array of files that use this symbol
  */
-function findSymbolUsages(symbolName: string, repoPath: string): BlastEntry[] {
+async function findSymbolUsages(
+	symbolName: string,
+	repoPath: string,
+): Promise<BlastEntry[]> {
 	const entries: BlastEntry[] = [];
 
 	// Use kit grep to find all references to the symbol
-	const result = spawnSync(
-		"kit",
-		["grep", repoPath, symbolName, "--max-results", "500", "--format", "json"],
+	const kitCmd = ensureCommandAvailable("kit");
+	const result = await spawnWithTimeout(
+		[
+			kitCmd,
+			"grep",
+			repoPath,
+			symbolName,
+			"--max-results",
+			"500",
+			"--format",
+			"json",
+		],
+		30_000,
 		{
-			encoding: "utf8",
-			timeout: 30000,
 			env: {
 				...process.env,
-				PATH: getEnhancedPath(),
+				PATH: buildEnhancedPath(),
 			},
 		},
 	);
 
-	if (result.status === 0 && result.stdout) {
+	if (!result.timedOut && result.exitCode === 0 && result.stdout) {
 		try {
 			const matches = JSON.parse(result.stdout);
 			for (const match of matches) {
@@ -266,7 +265,7 @@ export async function executeBlast(
 			});
 
 			// Find all files that depend on this file
-			const dependents = findFileDependents(parsed.file, repoPath);
+			const dependents = await findFileDependents(parsed.file, repoPath);
 			entries = entries.concat(dependents);
 		} else if (parsed.type === "symbol" && parsed.symbol) {
 			// Symbol-based blast radius
@@ -288,7 +287,7 @@ export async function executeBlast(
 			entries = entries.concat(symbolDefs);
 
 			// Find all usages of this symbol
-			const usages = findSymbolUsages(parsed.symbol, repoPath);
+			const usages = await findSymbolUsages(parsed.symbol, repoPath);
 			entries = entries.concat(usages);
 		}
 

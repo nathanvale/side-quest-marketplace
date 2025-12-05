@@ -7,8 +7,11 @@
  * using Bun's built-in color support for ADHD-friendly output.
  */
 
-import { spawnSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
+import {
+	ensureCommandAvailable,
+	spawnWithTimeout,
+} from "@sidequest/core/spawn";
 
 // ANSI color codes for terminal output
 const colors = {
@@ -87,15 +90,20 @@ async function parseIndexStats(): Promise<IndexStats> {
 /**
  * Generate the index using kit CLI
  */
-function generateIndex(): { durationSec: number } {
+async function generateIndex(): Promise<{ durationSec: number }> {
 	console.log(color("blue", "▶ Generating index..."));
 
+	const kitCmd = ensureCommandAvailable("kit");
 	const startTime = Date.now();
-	const result = spawnSync("kit", ["index", ".", "-o", INDEX_FILE], {
-		encoding: "utf-8",
-	});
+	const result = await spawnWithTimeout(
+		[kitCmd, "index", ".", "-o", INDEX_FILE],
+		60_000,
+	);
 
-	if (result.status !== 0) {
+	if (result.timedOut) {
+		throw new Error("kit index timed out");
+	}
+	if (result.exitCode !== 0) {
 		throw new Error(`kit index failed: ${result.stderr}`);
 	}
 
@@ -180,14 +188,15 @@ async function main() {
 		}
 
 		// Generate new index
-		const { durationSec } = generateIndex();
+		const { durationSec } = await generateIndex();
 		await reportSuccess(durationSec);
 	} catch (error) {
 		console.error(color("red", "\n❌ Error:"), error);
 
 		// Check if kit is installed
-		const whichResult = spawnSync("which", ["kit"], { encoding: "utf-8" });
-		if (whichResult.status !== 0) {
+		try {
+			ensureCommandAvailable("kit");
+		} catch {
 			console.error(color("yellow", "\n💡 Kit CLI not found. Install with:"));
 			console.error(color("dim", "  uv tool install cased-kit"));
 			console.error(color("dim", "  # or"));

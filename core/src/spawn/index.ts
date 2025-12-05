@@ -9,6 +9,8 @@
  * @see CLAUDE.md "Race Condition Fix" section for detailed explanation
  */
 
+import { homedir } from "node:os";
+import path from "node:path";
 import { spawn } from "bun";
 
 /**
@@ -21,6 +23,69 @@ export interface SpawnResult {
 	stderr: string;
 	/** Exit code of the process */
 	exitCode: number;
+}
+
+/**
+ * Ensure a command exists on PATH (uses Bun.which).
+ *
+ * @param cmd - Command name to resolve
+ * @returns Resolved absolute path to the command
+ * @throws Error if the command is not found
+ */
+export function ensureCommandAvailable(cmd: string): string {
+	const resolved = Bun.which(cmd);
+	if (!resolved) {
+		throw new Error(`Command not found: ${cmd}`);
+	}
+	return resolved;
+}
+
+/**
+ * Build an augmented PATH including common tool install locations.
+ *
+ * Ensures tools installed via uv, pipx, or Homebrew are discoverable
+ * in non-interactive shells (like MCP servers) that don't source .zshrc/.bashrc.
+ *
+ * @param extraPaths - Additional paths to prepend (optional)
+ * @returns PATH string with defaults + provided paths merged ahead of existing PATH
+ *
+ * @example
+ * ```typescript
+ * // Basic usage - adds ~/.local/bin, /opt/homebrew/bin, /usr/local/bin
+ * const path = buildEnhancedPath();
+ *
+ * // With extra paths
+ * const path = buildEnhancedPath(['/custom/bin', '/another/bin']);
+ *
+ * // Use in spawn options
+ * spawnSyncCollect(['kit', 'index'], { env: { PATH: buildEnhancedPath() } });
+ * ```
+ */
+export function buildEnhancedPath(
+	extraPaths: ReadonlyArray<string> = [],
+): string {
+	const current = process.env.PATH ?? "";
+	const currentPaths = new Set(current.split(":").filter(Boolean));
+	const defaults = [
+		path.join(homedir(), ".local", "bin"),
+		"/opt/homebrew/bin",
+		"/usr/local/bin",
+	];
+
+	// Deduplicate: track all paths we've seen (current + what we're adding)
+	const seen = new Set(currentPaths);
+	const additions: string[] = [];
+
+	for (const p of [...defaults, ...extraPaths]) {
+		if (p && !seen.has(p)) {
+			additions.push(p);
+			seen.add(p);
+		}
+	}
+
+	return additions.length > 0
+		? [...additions, current].filter(Boolean).join(":")
+		: current;
 }
 
 /**
@@ -124,4 +189,42 @@ export async function spawnWithTimeout(
 		}
 		throw error;
 	}
+}
+
+/**
+ * Synchronous spawn helper using Bun.spawnSync with consistent string output.
+ *
+ * @param cmd - Command and arguments as an array
+ * @param options - Optional spawn options
+ * @returns Stdout, stderr, exit code
+ */
+export function spawnSyncCollect(
+	cmd: string[],
+	options?: {
+		env?: Record<string, string | undefined>;
+		cwd?: string;
+	},
+): SpawnResult {
+	const result = Bun.spawnSync({
+		cmd,
+		stdout: "pipe",
+		stderr: "pipe",
+		cwd: options?.cwd,
+		env: options?.env ? { ...process.env, ...options.env } : process.env,
+	});
+
+	const stdout =
+		typeof result.stdout === "string"
+			? result.stdout
+			: new TextDecoder().decode(result.stdout);
+	const stderr =
+		typeof result.stderr === "string"
+			? result.stderr
+			: new TextDecoder().decode(result.stderr);
+
+	return {
+		stdout,
+		stderr,
+		exitCode: result.exitCode ?? 1,
+	};
 }

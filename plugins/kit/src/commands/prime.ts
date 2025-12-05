@@ -5,9 +5,12 @@
  * Supports dual output formats (markdown with colors, or JSON).
  */
 
-import { spawnSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
+import {
+	ensureCommandAvailable,
+	spawnWithTimeout,
+} from "@sidequest/core/spawn";
 import { color, OutputFormat } from "../formatters/output";
 
 interface IndexStats {
@@ -22,12 +25,18 @@ const MAX_AGE_HOURS = 24;
 /**
  * Find git repository root by walking up directory tree
  */
-function findGitRoot(): string | null {
-	const result = spawnSync("git", ["rev-parse", "--show-toplevel"], {
-		encoding: "utf-8",
-	});
+async function findGitRoot(): Promise<string | null> {
+	const gitCmd = ensureCommandAvailable("git");
+	const result = await spawnWithTimeout(
+		[gitCmd, "rev-parse", "--show-toplevel"],
+		10_000,
+	);
 
-	if (result.status === 0 && result.stdout) {
+	if (result.timedOut || result.exitCode !== 0) {
+		return null;
+	}
+
+	if (result.stdout) {
 		return result.stdout.trim();
 	}
 
@@ -38,12 +47,12 @@ function findGitRoot(): string | null {
  * Get the target directory for indexing
  * Priority: custom path > git root > CWD
  */
-function getTargetDir(customPath?: string): string {
+async function getTargetDir(customPath?: string): Promise<string> {
 	if (customPath) {
 		return resolve(customPath);
 	}
 
-	const gitRoot = findGitRoot();
+	const gitRoot = await findGitRoot();
 	if (gitRoot) {
 		return gitRoot;
 	}
@@ -99,16 +108,22 @@ async function parseIndexStats(indexPath: string): Promise<IndexStats> {
 /**
  * Generate the index using kit CLI
  */
-function generateIndex(
+async function generateIndex(
 	targetDir: string,
 	indexPath: string,
-): { durationSec: number } {
+): Promise<{ durationSec: number }> {
+	const kitCmd = ensureCommandAvailable("kit");
 	const startTime = Date.now();
-	const result = spawnSync("kit", ["index", targetDir, "-o", indexPath], {
-		encoding: "utf-8",
-	});
+	const result = await spawnWithTimeout(
+		[kitCmd, "index", targetDir, "-o", indexPath],
+		60_000,
+	);
 
-	if (result.status !== 0) {
+	if (result.timedOut) {
+		throw new Error("kit index timed out");
+	}
+
+	if (result.exitCode !== 0) {
 		throw new Error(`kit index failed: ${result.stderr}`);
 	}
 
@@ -256,7 +271,7 @@ export async function executePrime(
 ): Promise<void> {
 	try {
 		// Determine target directory and index path
-		const targetDir = getTargetDir(customPath);
+		const targetDir = await getTargetDir(customPath);
 		const indexPath = join(targetDir, INDEX_FILE);
 
 		const ageHours = getIndexAge(indexPath);
@@ -277,7 +292,7 @@ export async function executePrime(
 		}
 
 		// Generate new index
-		const { durationSec } = generateIndex(targetDir, indexPath);
+		const { durationSec } = await generateIndex(targetDir, indexPath);
 
 		// Report success
 		if (format === OutputFormat.JSON) {
@@ -301,8 +316,9 @@ export async function executePrime(
 			console.error(color("red", "\n❌ Error:"), error);
 
 			// Check if kit is installed
-			const whichResult = spawnSync("which", ["kit"], { encoding: "utf-8" });
-			if (whichResult.status !== 0) {
+			try {
+				ensureCommandAvailable("kit");
+			} catch {
 				console.error(color("yellow", "\n💡 Kit CLI not found. Install with:"));
 				console.error(color("dim", "  uv tool install cased-kit"));
 				console.error(color("dim", "  # or"));

@@ -5,10 +5,13 @@
  * no call sites (only definitions, no references).
  */
 
-import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import {
+	ensureCommandAvailable,
+	spawnWithTimeout,
+} from "@sidequest/core/spawn";
 import { color, OutputFormat } from "../formatters/output";
 import {
 	getExportedSymbols,
@@ -53,18 +56,16 @@ async function findUsages(
 		// Create temp file for output
 		tempDir = mkdtempSync(join(tmpdir(), "kit-dead-"));
 		const outputFile = join(tempDir, "usages.json");
+		const kitCmd = ensureCommandAvailable("kit");
 
-		const result = spawnSync(
-			"kit",
-			["usages", repoPath, symbolName, "-o", outputFile],
-			{
-				encoding: "utf-8",
-				timeout: 30000,
-			},
+		const result = await spawnWithTimeout(
+			[kitCmd, "usages", repoPath, symbolName, "-o", outputFile],
+			30_000,
+			{ cwd: repoPath },
 		);
 
-		if (result.error) {
-			throw result.error;
+		if (result.timedOut || result.exitCode !== 0) {
+			return null;
 		}
 
 		// Read the output file

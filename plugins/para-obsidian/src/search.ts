@@ -11,9 +11,9 @@
  *
  * @module search
  */
-import { spawnSync } from "node:child_process";
-import fs from "node:fs";
 import path from "node:path";
+import { readTextFile } from "@sidequest/core/fs";
+import { ensureCommandAvailable, spawnAndCollect } from "@sidequest/core/spawn";
 import { parse } from "yaml";
 
 import type { ParaObsidianConfig } from "./config";
@@ -128,7 +128,7 @@ function buildRgArgs(
  *
  * @example
  * ```typescript
- * const hits = searchText(config, {
+ * const hits = await searchText(config, {
  *   query: 'TODO',
  *   dir: 'Projects',
  *   maxResults: 50
@@ -136,20 +136,19 @@ function buildRgArgs(
  * // [{ file: 'Projects/Note.md', line: 15, snippet: '- [ ] TODO: Fix bug' }]
  * ```
  */
-export function searchText(
+export async function searchText(
 	config: ParaObsidianConfig,
 	options: SearchOptions,
-): SearchHit[] {
+): Promise<SearchHit[]> {
 	const args = buildRgArgs(options, config.vault, config.defaultSearchDirs);
 	const [cmd, ...cmdArgs] = args;
-	const command = cmd ?? "rg";
-	const result = spawnSync(command, cmdArgs, {
-		stdio: "pipe",
-		encoding: "utf8",
+	const command = ensureCommandAvailable(cmd ?? "rg");
+	const result = await spawnAndCollect([command, ...cmdArgs], {
+		cwd: config.vault,
 	});
 
 	// No matches returns empty array
-	if (result.status !== 0 && result.stdout.trim().length === 0) {
+	if (result.exitCode !== 0 && result.stdout.trim().length === 0) {
 		return [];
 	}
 
@@ -190,35 +189,31 @@ export function searchText(
  * // ['Projects/Feature A.md', 'Projects/Feature B.md']
  * ```
  */
-export function filterByFrontmatter(
+export async function filterByFrontmatter(
 	config: ParaObsidianConfig,
 	options: FrontmatterFilterOptions,
-): string[] {
+): Promise<string[]> {
 	const filters = options.frontmatter ?? {};
 	const tagFilter = options.tag;
 	// Return early if no filters specified
 	if (Object.keys(filters).length === 0 && !tagFilter) return [];
 
 	const matches: string[] = [];
+	const dirs = resolveDirs(config.vault, options.dir, config.defaultSearchDirs);
 
-	/** Recursively walks a directory collecting .md files. */
-	function walk(dir: string): string[] {
-		const entries = fs.readdirSync(dir, { withFileTypes: true });
+	/** Recursively walks markdown files under a directory using Bun.Glob. */
+	async function walkMarkdownFiles(dir: string): Promise<string[]> {
+		const glob = new Bun.Glob("**/*.md");
 		const files: string[] = [];
-		for (const entry of entries) {
-			const full = path.join(dir, entry.name);
-			if (entry.isDirectory()) {
-				files.push(...walk(full));
-			} else if (entry.isFile() && entry.name.endsWith(".md")) {
-				files.push(full);
-			}
+		for await (const match of glob.scan({ cwd: dir })) {
+			files.push(path.join(dir, match));
 		}
 		return files;
 	}
 
 	/** Checks if a file's frontmatter matches all filters. */
-	function hasFrontmatter(filePath: string): boolean {
-		const content = fs.readFileSync(filePath, "utf8");
+	async function hasFrontmatter(filePath: string): Promise<boolean> {
+		const content = await readTextFile(filePath);
 		if (!content.startsWith("---")) return false;
 		const end = content.indexOf("\n---", 3);
 		if (end === -1) return false;
@@ -239,10 +234,9 @@ export function filterByFrontmatter(
 	}
 
 	// Scan all directories and collect matching files
-	const dirs = resolveDirs(config.vault, options.dir, config.defaultSearchDirs);
 	for (const dir of dirs) {
-		for (const file of walk(dir)) {
-			if (hasFrontmatter(file)) {
+		for (const file of await walkMarkdownFiles(dir)) {
+			if (await hasFrontmatter(file)) {
 				matches.push(path.relative(config.vault, file));
 			}
 		}

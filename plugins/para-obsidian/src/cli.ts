@@ -537,7 +537,7 @@ async function main(): Promise<void> {
 				const dirs = parseDirs(flags.dir, config.defaultSearchDirs);
 				const frontmatter = parseFrontmatterFilters(flags);
 
-				const hits = searchText(config, {
+				const hits = await searchText(config, {
 					query,
 					dir: dirs,
 					regex: flags.regex === true || flags.regex === "true",
@@ -549,7 +549,7 @@ async function main(): Promise<void> {
 
 				const fmMatches =
 					Object.keys(frontmatter).length > 0 || tag
-						? filterByFrontmatter(config, { frontmatter, tag, dir: dirs })
+						? await filterByFrontmatter(config, { frontmatter, tag, dir: dirs })
 						: [];
 
 				if (isJson) {

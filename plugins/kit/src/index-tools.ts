@@ -197,9 +197,12 @@ export async function executeIndexOverview(
 // Prime Tool - Generate/refresh index
 // ============================================================================
 
-import { spawnSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
+import {
+	ensureCommandAvailable,
+	spawnWithTimeout,
+} from "@sidequest/core/spawn";
 
 export interface IndexPrimeResult {
 	success: true;
@@ -226,12 +229,18 @@ const MAX_AGE_HOURS = 24;
 /**
  * Find git repository root
  */
-function findGitRoot(): string | null {
-	const result = spawnSync("git", ["rev-parse", "--show-toplevel"], {
-		encoding: "utf-8",
-	});
+async function findGitRoot(): Promise<string | null> {
+	const gitCmd = ensureCommandAvailable("git");
+	const result = await spawnWithTimeout(
+		[gitCmd, "rev-parse", "--show-toplevel"],
+		10_000,
+	);
 
-	if (result.status === 0 && result.stdout) {
+	if (result.timedOut || result.exitCode !== 0) {
+		return null;
+	}
+
+	if (result.stdout) {
 		return result.stdout.trim();
 	}
 
@@ -242,12 +251,12 @@ function findGitRoot(): string | null {
  * Get target directory for indexing
  * Priority: custom path > git root > CWD
  */
-function getTargetDir(customPath?: string): string {
+async function getTargetDir(customPath?: string): Promise<string> {
 	if (customPath) {
 		return resolve(customPath);
 	}
 
-	const gitRoot = findGitRoot();
+	const gitRoot = await findGitRoot();
 	if (gitRoot) {
 		return gitRoot;
 	}
@@ -267,7 +276,8 @@ export async function executeIndexPrime(
 	customPath?: string,
 ): Promise<IndexPrimeResult | IndexPrimeExistsResult | IndexError> {
 	try {
-		const targetDir = getTargetDir(customPath);
+		const targetDir = await getTargetDir(customPath);
+		const kitCmd = ensureCommandAvailable("kit");
 		const indexPath = join(targetDir, INDEX_FILE);
 
 		// Check if index exists and is fresh
@@ -299,11 +309,19 @@ export async function executeIndexPrime(
 
 		// Generate new index
 		const startTime = Date.now();
-		const result = spawnSync("kit", ["index", targetDir, "-o", indexPath], {
-			encoding: "utf-8",
-		});
+		const result = await spawnWithTimeout(
+			[kitCmd, "index", targetDir, "-o", indexPath],
+			60_000,
+		);
 
-		if (result.status !== 0) {
+		if (result.timedOut) {
+			return {
+				error: "kit index timed out",
+				isError: true,
+			};
+		}
+
+		if (result.exitCode !== 0) {
 			return {
 				error: `kit index failed: ${result.stderr}`,
 				isError: true,

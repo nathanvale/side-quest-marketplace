@@ -4,7 +4,10 @@
  * Uses kit commit to generate intelligent commit messages from staged changes.
  */
 
-import { spawnSync } from "node:child_process";
+import {
+	ensureCommandAvailable,
+	spawnWithTimeout,
+} from "@sidequest/core/spawn";
 import { color, OutputFormat } from "../formatters/output";
 
 /**
@@ -32,16 +35,14 @@ export async function executeCommit(
 		}
 
 		// Execute kit commit
-		const result = spawnSync("kit", args, {
-			encoding: "utf-8",
-			timeout: 60000,
+		const kitCmd = ensureCommandAvailable("kit");
+		const result = await spawnWithTimeout([kitCmd, ...args], 60_000, {
 			cwd: process.cwd(),
 		});
 
 		// Handle errors
-		if (result.error) {
-			const errorMessage =
-				result.error.message || "Failed to execute kit commit";
+		if (result.timedOut) {
+			const errorMessage = "kit commit timed out";
 			if (format === OutputFormat.JSON) {
 				console.error(
 					JSON.stringify(
@@ -61,14 +62,14 @@ export async function executeCommit(
 			process.exit(1);
 		}
 
-		if (result.status !== 0) {
+		if (result.exitCode !== 0) {
 			if (format === OutputFormat.JSON) {
 				console.error(
 					JSON.stringify(
 						{
 							error: result.stderr || "Kit commit failed",
 							isError: true,
-							exitCode: result.status,
+							exitCode: result.exitCode,
 							dryRun,
 							model,
 						},

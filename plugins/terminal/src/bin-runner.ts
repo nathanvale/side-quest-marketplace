@@ -5,13 +5,10 @@
  * Uses spawnSync with argument arrays to prevent command injection.
  */
 
-import {
-	type SpawnSyncOptionsWithStringEncoding,
-	spawnSync,
-} from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { spawnSyncCollect } from "@sidequest/core/spawn";
 
 /**
  * Logger interface compatible with LogTape loggers.
@@ -110,40 +107,25 @@ export function runBinScript(options: RunBinScriptOptions): BinScriptResult {
 
 	const startTime = Date.now();
 
-	const spawnOptions: SpawnSyncOptionsWithStringEncoding = {
-		encoding: "utf8",
-		timeout,
-		maxBuffer: 10 * 1024 * 1024, // 10MB
-	};
-
 	// Use argument array to prevent command injection
-	const result = spawnSync(scriptPath, args, spawnOptions);
+	const result = spawnSyncCollect([scriptPath, ...args]);
 
 	const durationMs = Date.now() - startTime;
 
 	// Log result
-	if (result.error) {
-		logger.error("Bin script execution error", {
-			cid,
-			script,
-			error: result.error.message,
-			durationMs,
-		});
-	} else {
-		logger.debug("Bin script result", {
-			cid,
-			script,
-			exitCode: result.status,
-			durationMs,
-			stdoutLength: result.stdout?.length ?? 0,
-			stderrLength: result.stderr?.length ?? 0,
-		});
-	}
+	logger.debug("Bin script result", {
+		cid,
+		script,
+		exitCode: result.exitCode,
+		durationMs,
+		stdoutLength: result.stdout?.length ?? 0,
+		stderrLength: result.stderr?.length ?? 0,
+	});
 
 	return {
 		stdout: result.stdout?.trim() ?? "",
 		stderr: result.stderr?.trim() ?? "",
-		exitCode: result.status ?? 1,
+		exitCode: result.exitCode ?? 1,
 		scriptFound: true,
 	};
 }

@@ -5,32 +5,12 @@
  * providing a quick overview of the module's public interface.
  */
 
-import { spawnSync } from "node:child_process";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import {
+	buildEnhancedPath,
+	ensureCommandAvailable,
+	spawnWithTimeout,
+} from "@sidequest/core/spawn";
 import { color, OutputFormat } from "../formatters/output";
-
-/**
- * Get enhanced PATH for kit CLI execution
- */
-function getEnhancedPath(): string {
-	const currentPath = process.env.PATH || "";
-	const home = homedir();
-
-	const additionalPaths = [
-		join(home, ".local", "bin"),
-		"/opt/homebrew/bin",
-		"/usr/local/bin",
-	];
-
-	const pathsToAdd = additionalPaths.filter(
-		(p) => !currentPath.split(":").includes(p),
-	);
-
-	return pathsToAdd.length > 0
-		? `${pathsToAdd.join(":")}:${currentPath}`
-		: currentPath;
-}
 
 /**
  * Code symbol from Kit CLI
@@ -50,17 +30,24 @@ interface CodeSymbol {
  * @param directory - Directory path to analyze
  * @returns Array of code symbols
  */
-function extractSymbols(directory: string): CodeSymbol[] {
-	const result = spawnSync("kit", ["symbols", directory, "--format", "json"], {
-		encoding: "utf8",
-		timeout: 30000,
-		env: {
-			...process.env,
-			PATH: getEnhancedPath(),
+async function extractSymbols(directory: string): Promise<CodeSymbol[]> {
+	const kitCmd = ensureCommandAvailable("kit");
+	const result = await spawnWithTimeout(
+		[kitCmd, "symbols", directory, "--format", "json"],
+		30_000,
+		{
+			env: {
+				...process.env,
+				PATH: buildEnhancedPath(),
+			},
 		},
-	});
+	);
 
-	if (result.status !== 0) {
+	if (result.timedOut) {
+		throw new Error("Failed to extract symbols: kit symbols timed out");
+	}
+
+	if (result.exitCode !== 0) {
 		throw new Error(
 			`Failed to extract symbols: ${result.stderr || result.stdout}`,
 		);
@@ -273,7 +260,7 @@ export async function executeApi(
 ): Promise<void> {
 	try {
 		// Extract all symbols from directory
-		const allSymbols = extractSymbols(directory);
+		const allSymbols = await extractSymbols(directory);
 
 		// Filter to exported symbols only
 		const exportedSymbols = allSymbols.filter(isLikelyExported);

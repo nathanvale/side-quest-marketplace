@@ -11,6 +11,11 @@ import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import {
+	buildEnhancedPath,
+	ensureCommandAvailable,
+	spawnSyncCollect,
+} from "@sidequest/core/spawn";
 import { startServer, tool, z } from "mcpez";
 
 // Types
@@ -81,7 +86,7 @@ function isError(
 /**
  * Build the atuin search command with all filtering options
  */
-function buildAtuinCommand(options: SearchOptions): string {
+function buildAtuinCommand(options: SearchOptions): string[] {
 	const {
 		query,
 		limit = 10,
@@ -92,11 +97,11 @@ function buildAtuinCommand(options: SearchOptions): string {
 		searchMode = "fuzzy",
 	} = options;
 
-	const parts = ["atuin", "search"];
-	parts.push(`--limit ${limit}`);
-	parts.push(`--search-mode ${searchMode}`);
-	parts.push("--filter-mode global");
-	parts.push('--format "{time}\\t{exit}\\t{command}"');
+	const parts = ["search"];
+	parts.push(`--limit=${limit}`);
+	parts.push(`--search-mode=${searchMode}`);
+	parts.push("--filter-mode=global");
+	parts.push("--format={time}\\t{exit}\\t{command}");
 
 	if (!includeFailed) parts.push("--exit 0");
 	if (cwd) parts.push(`--cwd "${cwd.replace(/"/g, '\\"')}"`);
@@ -104,9 +109,9 @@ function buildAtuinCommand(options: SearchOptions): string {
 	if (until) parts.push(`--before "${until.replace(/"/g, '\\"')}"`);
 
 	const escapedQuery = query.replace(/"/g, '\\"');
-	parts.push(`"${escapedQuery}"`);
+	parts.push(escapedQuery);
 
-	return parts.join(" ");
+	return parts;
 }
 
 /**
@@ -130,8 +135,17 @@ function searchHistory(
 			: queryOrOptions;
 
 	try {
-		const cmd = buildAtuinCommand(options);
-		const output = execSync(cmd, { encoding: "utf8" });
+		const atuinCmd = ensureCommandAvailable("atuin");
+		const cmd = [atuinCmd, ...buildAtuinCommand(options)];
+		const result = spawnSyncCollect(cmd, {
+			env: { PATH: buildEnhancedPath() },
+		});
+
+		if (result.exitCode !== 0) {
+			throw new Error(result.stderr || "atuin search failed");
+		}
+
+		const output = result.stdout;
 
 		if (!output.trim()) {
 			return {
@@ -141,8 +155,8 @@ function searchHistory(
 			};
 		}
 
-		const lines = output.trim().split("\n");
-		const commands: HistoryCommand[] = lines.map((line) => {
+		const lines: string[] = output.trim().split("\n");
+		const commands: HistoryCommand[] = lines.map((line: string) => {
 			const [time, exitCodeStr, ...commandParts] = line.split("\t");
 			return {
 				time: time ?? "",
@@ -166,11 +180,11 @@ function searchHistory(
 				shell: "/bin/zsh",
 			});
 
-			const lines = output
+			const lines: string[] = output
 				.trim()
 				.split("\n")
-				.filter((l) => l);
-			const commands: HistoryCommand[] = lines.map((command) => ({
+				.filter((l: string) => l);
+			const commands: HistoryCommand[] = lines.map((command: string) => ({
 				time: "N/A",
 				exit_code: "N/A",
 				command: command.trim(),

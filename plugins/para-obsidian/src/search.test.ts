@@ -17,18 +17,18 @@ function writeFile(vault: string, rel: string, content: string) {
 }
 
 describe("search", () => {
-	it("finds text with ripgrep", () => {
+	it("finds text with ripgrep", async () => {
 		const vault = makeTmpDir();
 		writeFile(vault, "note.md", "hello world");
 		process.env.PARA_VAULT = vault;
 
 		const cfg = loadConfig({ cwd: vault });
-		const hits = searchText(cfg, { query: "hello" });
+		const hits = await searchText(cfg, { query: "hello" });
 		expect(hits.length).toBe(1);
 		expect(hits[0]?.file).toBe("note.md");
 	});
 
-	it("filters by frontmatter and tag", () => {
+	it("filters by frontmatter and tag", async () => {
 		const vault = makeTmpDir();
 		writeFile(
 			vault,
@@ -50,7 +50,7 @@ tags: [area]
 		);
 		process.env.PARA_VAULT = vault;
 		const cfg = loadConfig({ cwd: vault });
-		const matches = filterByFrontmatter(cfg, {
+		const matches = await filterByFrontmatter(cfg, {
 			frontmatter: { type: "project" },
 			tag: "project",
 		});

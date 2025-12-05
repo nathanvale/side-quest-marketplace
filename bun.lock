@@ -32,6 +32,7 @@
       "name": "@sidequest/atuin",
       "version": "1.0.0",
       "dependencies": {
+        "@sidequest/core": "workspace:*",
         "mcpez": "^1.2.1",
       },
       "devDependencies": {
@@ -117,6 +118,9 @@
     "plugins/git": {
       "name": "@sidequest/git",
       "version": "1.0.0",
+      "dependencies": {
+        "@sidequest/core": "workspace:*",
+      },
     },
     "plugins/git/mcp-servers/git-intelligence": {
       "name": "@sidequest/mcp-git-intelligence",

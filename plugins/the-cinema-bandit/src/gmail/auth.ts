@@ -5,11 +5,11 @@
  * Uses atomic file writes with 0600 permissions for security.
  */
 
-import { exec } from "node:child_process";
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { spawnSyncCollect } from "@sidequest/core/spawn";
 import { google } from "googleapis";
 import { authLogger } from "../logger.ts";
 import { validateCredentials } from "./credentials";
@@ -70,18 +70,20 @@ async function findAvailablePort(): Promise<number> {
  */
 function openBrowser(url: string): void {
 	const platform = process.platform;
-	const command =
+	const cmd =
 		platform === "darwin"
-			? `open "${url}"`
+			? ["open", url]
 			: platform === "win32"
-				? `start "${url}"`
-				: `xdg-open "${url}"`; // Linux
+				? ["cmd", "/c", "start", "", url]
+				: ["xdg-open", url]; // Linux
 
-	exec(command, (error) => {
-		if (error) {
-			console.error("Could not auto-open browser. Please open manually.");
-		}
-	});
+	const result = spawnSyncCollect(cmd);
+	if (result.exitCode !== 0) {
+		console.error(
+			"Could not auto-open browser. Please open manually.",
+			result.stderr,
+		);
+	}
 }
 
 /**

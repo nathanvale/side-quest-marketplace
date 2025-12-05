@@ -6,6 +6,7 @@
 	"exports": {
 		"./logging": "./src/logging/index.ts",
 		"./spawn": "./src/spawn/index.ts",
+		"./fs": "./src/fs/index.ts",
 		"./git": "./src/git/index.ts",
 		"./workspace": "./src/workspace/index.ts",
 		"./hooks": "./src/hooks/index.ts",

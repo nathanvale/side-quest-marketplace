@@ -11,5 +11,8 @@
 		"format:check": "biome format .",
 		"lint": "biome lint .",
 		"check": "biome check --write ."
+	},
+	"dependencies": {
+		"@sidequest/core": "workspace:*"
 	}
 }

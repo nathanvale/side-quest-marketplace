@@ -8,9 +8,9 @@
  */
 
 import {
-	type SpawnSyncOptionsWithStringEncoding,
-	spawnSync,
-} from "node:child_process";
+	ensureCommandAvailable,
+	spawnSyncCollect,
+} from "@sidequest/core/spawn";
 import { startServer, tool, z } from "mcpez";
 
 // Types
@@ -118,21 +118,14 @@ function isError<T extends object>(
  * @param cwd - Working directory for the command
  */
 function git(args: string[], cwd: string = process.cwd()): string {
-	const options: SpawnSyncOptionsWithStringEncoding = {
-		encoding: "utf8",
+	const gitCmd = ensureCommandAvailable("git");
+	const result = spawnSyncCollect([gitCmd, ...args], {
 		cwd,
-		maxBuffer: 10 * 1024 * 1024,
-	};
+	});
 
-	const result = spawnSync("git", args, options);
-
-	if (result.error) {
-		throw result.error;
-	}
-
-	if (result.status !== 0) {
+	if (result.exitCode !== 0) {
 		const errorMessage =
-			result.stderr?.trim() || `git exited with code ${result.status}`;
+			result.stderr?.trim() || `git exited with code ${result.exitCode}`;
 		throw new Error(errorMessage);
 	}
 
