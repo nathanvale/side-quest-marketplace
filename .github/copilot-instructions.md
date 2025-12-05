@@ -1,81 +1,114 @@
-# GitHub Copilot Instructions for Nathan Vale Claude Code Marketplace
+# SideQuest Marketplace
 
-## Project Overview
-This is a **Bun-based monorepo** containing plugins for the Claude Code marketplace. The core architecture revolves around **plugins**, **commands**, **skills**, and **hooks**.
+Bun monorepo with 20+ Claude Code plugins (MCP servers, slash commands, skills, hooks).
 
-## Architecture & Structure
-- **Monorepo**: Managed with Bun workspaces (`plugins/*`).
-- **Plugins**: Located in `plugins/<plugin-name>/`. Each is a self-contained package.
-- **Commands**: Defined as **Markdown files** in `plugins/<plugin>/commands/*.md`. These serve as instructions for the AI agent.
-- **Skills**: Defined as **Markdown files** in `plugins/<plugin>/skills/<skill-name>/SKILL.md`. They describe capabilities and usage patterns.
-- **Hooks**: Defined in `plugins/<plugin>/hooks/hooks.json`. They map lifecycle events (e.g., `SessionStart`) to scripts.
-- **MCP Servers**: Located in `plugins/<plugin>/mcp-servers/`.
+**Stack:** Bun 1.3.3 | TypeScript 5.7.2 (strict) | Biome 2.3.7 | Conventional Commits
 
-## Development Workflow
-- **Package Manager**: Use `bun` exclusively.
-  - Install deps: `bun install`
-  - Run scripts: `bun run <script>`
-- **Linting & Formatting**: Use **Biome**.
-  - Check: `bun run ci` (runs typecheck, biome check, and tests)
-  - Format: `bun run check` (or `biome check --write .`)
-- **Testing**: `bun run test` (uses Bun's built-in test runner).
-
-## Key Conventions
-
-### Command Definitions (`commands/*.md`)
-Commands are Markdown files with frontmatter:
-```markdown
 ---
-description: Short description of the command
-tags: [tag1, tag2]
+
+## CRITICAL RULES — YOU MUST FOLLOW
+
+| Rule | Why |
+|------|-----|
+| Run `bun run validate` before push | CI blocks PRs that fail |
+| Use `workspace:*` for cross-plugin deps | Version numbers break resolution |
+| Use `response_format: "json"` in MCP tools | Saves 40-60% tokens |
+| Use `${CLAUDE_PLUGIN_ROOT}` in .mcp.json | Absolute paths break portability |
+| Run `bun install` from root only | Plugin-level corrupts lockfile |
+
+**NEVER:**
+- Commit without `bun run validate:quick` passing
+- Create circular dependencies between plugins
+- Skip Kit index prime before multiple code searches
+- Commit files from `.test-scratch/`
+
 ---
-# Command Name
 
-## Your Responsibilities
-1. Step 1
-2. Step 2
+## Commands
 
-## Step 1: Implementation
-```bash
-# Bash script to execute
+| Task | Command |
+|------|---------|
+| Quick validate | `bun run validate:quick` (~5s, pre-commit) |
+| Full validate | `bun run validate` (~30s, before push) |
+| Plugin validate | `claude plugin validate plugins/<name>` |
+| Create plugin | `/plugin-template:create <name>` |
+| Commit | `/git:commit` |
+| Create PR | `/git:create-pr` |
+
+**MCP tools (preferred):** `bun_runTests`, `bun_testFile`, `tsc_check`, `biome_lintCheck`, `biome_lintFix`
+
+---
+
+## Code Search — Use in Priority Order
+
 ```
-```
-
-### Skill Definitions (`skills/*/SKILL.md`)
-Skills define AI capabilities using Markdown frontmatter and descriptive sections:
-```markdown
----
-name: skill-name
-description: When to use this skill
----
-# Skill Name
-## Overview
-...
-## Core Capabilities
-...
+1. kit_index_find     → Know symbol name (~10ms)
+2. kit_index_overview → Need file symbols (~10ms)
+3. kit_callers        → Find who calls function (~200ms)
+4. kit_grep           → Text/regex pattern (~30ms)
+5. kit_semantic       → Fuzzy search (~500ms, last resort)
 ```
 
-### Hooks (`hooks/hooks.json`)
-Define lifecycle hooks using JSON:
+**IMPORTANT:** Run `kit_index_prime` once per session. Index tools are 30-50x faster.
+
+---
+
+## Structure
+
+```
+side-quest-marketplace/
+├── plugins/           # 20+ plugins (workspace packages)
+├── core/              # Shared validation engine
+├── PROJECT_INDEX.json # Kit codebase index
+└── docs/              # Extended documentation
+```
+
+---
+
+## Plugin Development
+
+**Tool naming:** `mcp__plugin_<plugin>_<server>__<tool>`
+
+**Required MCP parameters:**
+```typescript
+{ response_format: "json" }  // ALWAYS
+{ isError: true }            // On errors
+```
+
+**Cross-plugin deps:**
 ```json
-{
-  "hooks": {
-    "SessionStart": [
-      {
-        "type": "command",
-        "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/script.ts"
-      }
-    ]
-  }
-}
+{ "@anthropic/core": "workspace:*" }  // ✓ Correct
+{ "@anthropic/core": "^1.0.0" }       // ✗ Wrong
 ```
 
-## Task Management & Git Workflow
-- **Worktrees**: The project uses a **git worktree** workflow for task isolation.
-- **Tasks**: Tasks are defined in Markdown files (e.g., `tasks/*.md`).
-- **Automation**: Use the provided VS Code tasks (e.g., "Next Task", "Merge PR") which utilize scripts in `~/.claude/scripts/`.
+---
 
-## Critical Files
-- `package.json`: Root workspace configuration.
-- `biome.json`: Linter/formatter configuration.
-- `plugins/nvcc/`: Core plugin containing the main logic.
+## Error Recovery
+
+| Problem | Fix |
+|---------|-----|
+| Typecheck fails | `bun typecheck` for details |
+| Lint fails | `biome_lintFix` to auto-fix |
+| Test fails | `bun_testFile` on failing test |
+| Plugin structure | `claude plugin validate plugins/<name>` |
+| Deps broken | `cd root && rm -rf node_modules bun.lockb && bun install` |
+
+---
+
+## Extended Documentation
+
+Reference these **only when needed** for the specific task:
+
+- Plugin development: @./PLUGIN_DEV_GUIDE.md
+- MCP tools reference: @./docs/MCP_TOOLS.md
+- Git workflow: @./docs/GIT_WORKFLOW.md
+- Troubleshooting: @./TROUBLESHOOTING.md
+
+---
+
+## Pre-Push Checklist
+
+- [ ] `bun run validate` passes
+- [ ] Tests cover new functionality
+- [ ] Commit follows `<type>(<scope>): <subject>`
+- [ ] Cross-plugin deps use `workspace:*`

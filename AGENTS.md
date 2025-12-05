@@ -1,77 +1,114 @@
-# Repository Guidelines
+# SideQuest Marketplace
 
-## Project Structure & Module Organization
-- Monorepo managed by Bun workspaces (`package.json` + `pnpm-workspace.yaml`).
-- Core utilities: `core/` (logging, spawn helpers, validation, shared exports).
-- Plugins: `plugins/*` plus per-plugin MCP servers under `plugins/*/mcp-servers/*`.
-- Docs and templates: see `PLUGIN_DEV_GUIDE.md`, `CLAUDE.md`, and per-plugin `README.md`.
-- Temporary scratch space lives in `tmp/`; keep experiments out of commits.
+Bun monorepo with 20+ Claude Code plugins (MCP servers, slash commands, skills, hooks).
 
-## Build, Test, and Development Commands
-- Prefer MCP tools with JSON format (token-efficient):
-  - `biome_lintCheck({ response_format: "json" })` / `biome_lintFix({ response_format: "json" })`
-  - `tsc_check({ response_format: "json" })`
-  - `bun_runTests({ response_format: "json" })` / `bun_testFile({ response_format: "json" })`
-- Local scripts (when MCP not used): `bun install`; `bun run lint`; `bun run format:check` / `bun run format`; `bun run typecheck`; `bun run test` (use `--filter <pkg>` to scope); `bun run validate` (marketplace consistency).
-- CI aggregate: `bun run ci` (typecheck + format check + tests), `bun run ci:full` (adds validate).
+**Stack:** Bun 1.3.3 | TypeScript 5.7.2 (strict) | Biome 2.3.7 | Conventional Commits
 
-## Git Workflow
-- Prefer the MCP `git` server for read-only ops with JSON format to minimize token usage:
-  - `git_get_status({ response_format: "json" })`
-  - `git_get_branch_info({ response_format: "json" })`
-  - `git_get_diff_summary({ response_format: "json" })`
-- For writes (commits, branches, merges), use standard `git` CLI; avoid destructive commands.
+---
 
-## Coding Style & Naming Conventions
-- Language: TypeScript with `tsconfig.json` (ESNext, strict, Bun types).
-- Formatting/linting: Biome (`biome.json` rules); no manual formatting tweaks in PRs.
-- Tests named `*.test.ts`; overrides in `biome.json` allow relaxed rules for tests.
-- Prefer explicit types; avoid `any`; keep modules ESM (`type: "module"` where applicable).
+## CRITICAL RULES — YOU MUST FOLLOW
 
-## Testing Guidelines
-- Framework: `bun test` in each package; place tests alongside sources as `*.test.ts`.
-- Targeted runs: `bun test path/to/file.test.ts` or workspace-filtered via `bun --filter '<pkg>' test`.
-- Aim to cover new hooks/validators and any MCP command/skill behavior.
+| Rule | Why |
+|------|-----|
+| Run `bun run validate` before push | CI blocks PRs that fail |
+| Use `workspace:*` for cross-plugin deps | Version numbers break resolution |
+| Use `response_format: "json"` in MCP tools | Saves 40-60% tokens |
+| Use `${CLAUDE_PLUGIN_ROOT}` in .mcp.json | Absolute paths break portability |
+| Run `bun install` from root only | Plugin-level corrupts lockfile |
 
-## MCP Tooling (linting, testing, types)
-- MCP servers are available for automation: `plugins/biome-runner` (lint/format), `plugins/tsc-runner` (typecheck), `plugins/bun-runner` (tests). Use their `.mcp.json` definitions to wire into agents/CI.
-- **CRITICAL:** All MCP tools are machine-to-machine interfaces. **ALWAYS use `response_format: "json"`** for token-efficient, structured responses. Never use `"markdown"` format—it wastes tokens on formatting that agents must parse back into structured data.
-- When adding new MCP servers or hooks, mirror existing `hooks.json` and `path-validator` patterns and run `bun run validate`.
+**NEVER:**
+- Commit without `bun run validate:quick` passing
+- Create circular dependencies between plugins
+- Skip Kit index prime before multiple code searches
+- Commit files from `.test-scratch/`
 
-## Kit Tool Priority (Token Efficiency)
+---
 
-**CRITICAL:** Use Kit tools in priority order for maximum token efficiency. Tools listed in order of speed and efficiency:
+## Commands
 
-### Priority 1: Index-Based Navigation (Fastest - Use First)
-- **Setup:** Run `kit_index_prime({ response_format: "json" })` once per session (~2s, generates PROJECT_INDEX.json)
-- **Query index:**
-  - `kit_index_find({ symbol_name: "...", response_format: "json" })` — ~10ms, fastest symbol lookup
-  - `kit_index_overview({ file_path: "...", response_format: "json" })` — ~10ms, all symbols in file
-  - `kit_index_stats({ response_format: "json" })` — ~10ms, codebase statistics
+| Task | Command |
+|------|---------|
+| Quick validate | `bun run validate:quick` (~5s, pre-commit) |
+| Full validate | `bun run validate` (~30s, before push) |
+| Plugin validate | `claude plugin validate plugins/<name>` |
+| Create plugin | `/plugin-template:create <name>` |
+| Commit | `/git:commit` |
+| Create PR | `/git:create-pr` |
 
-### Priority 2: Graph + Analysis (Fast - Targeted Operations)
-Use index + targeted grep (~200-300ms):
-- `kit_callers({ function_name: "...", response_format: "json" })` — Who calls this function?
-- `kit_usages({ symbol: "...", response_format: "json" })` — All usages of symbol
-- `kit_blast({ target: "...", response_format: "json" })` — Change impact analysis
-- `kit_api({ directory: "...", response_format: "json" })` — Module exports
+**MCP tools (preferred):** `bun_runTests`, `bun_testFile`, `tsc_check`, `biome_lintCheck`, `biome_lintFix`
 
-### Priority 3: Direct Search (Slower - When Index Insufficient)
-Full codebase scan (~30-500ms):
-- `kit_grep({ pattern: "...", response_format: "json" })` — ~30ms, text/regex search
-- `kit_ast_search({ pattern: "...", response_format: "json" })` — ~400ms, structural patterns
-- `kit_semantic({ query: "...", response_format: "json" })` — ~500ms, ML-powered (requires `cased-kit[ml]`)
+---
 
-**Rule:** Always try index-based tools first. Only fall back to grep/search when index tools don't have the needed information.
+## Code Search — Use in Priority Order
 
-### Kit Installation
-- Required: `uv tool install cased-kit`
-- Optional ML: `uv tool install cased-kit[ml]` (for semantic search)
-- Prefer Kit MCP over direct CLI to reduce token cost
+```
+1. kit_index_find     → Know symbol name (~10ms)
+2. kit_index_overview → Need file symbols (~10ms)
+3. kit_callers        → Find who calls function (~200ms)
+4. kit_grep           → Text/regex pattern (~30ms)
+5. kit_semantic       → Fuzzy search (~500ms, last resort)
+```
 
-### Git Insights
-- Use the MCP `git` server with JSON format for reads (status/branch/diff) and standard git CLI for writes.
+**IMPORTANT:** Run `kit_index_prime` once per session. Index tools are 30-50x faster.
 
-## Commit & Pull Request Guidelines
-- Commit messages: follow Conventional Commits (`commitlint.config.js` + Husky hook). Examples: `feat: add git context loader`, `fix: correct bun path validation`, `chore: update docs`.
-- PRs: include summary, linked issue/task, testing notes (`bun run ci`), and screenshots or logs for user-facing or tooling changes. Keep plugin/docs updates scoped and cross-reference impacted MCP server if relevant.
+---
+
+## Structure
+
+```
+side-quest-marketplace/
+├── plugins/           # 20+ plugins (workspace packages)
+├── core/              # Shared validation engine
+├── PROJECT_INDEX.json # Kit codebase index
+└── docs/              # Extended documentation
+```
+
+---
+
+## Plugin Development
+
+**Tool naming:** `mcp__plugin_<plugin>_<server>__<tool>`
+
+**Required MCP parameters:**
+```typescript
+{ response_format: "json" }  // ALWAYS
+{ isError: true }            // On errors
+```
+
+**Cross-plugin deps:**
+```json
+{ "@anthropic/core": "workspace:*" }  // ✓ Correct
+{ "@anthropic/core": "^1.0.0" }       // ✗ Wrong
+```
+
+---
+
+## Error Recovery
+
+| Problem | Fix |
+|---------|-----|
+| Typecheck fails | `bun typecheck` for details |
+| Lint fails | `biome_lintFix` to auto-fix |
+| Test fails | `bun_testFile` on failing test |
+| Plugin structure | `claude plugin validate plugins/<name>` |
+| Deps broken | `cd root && rm -rf node_modules bun.lockb && bun install` |
+
+---
+
+## Extended Documentation
+
+Reference these **only when needed** for the specific task:
+
+- Plugin development: @./PLUGIN_DEV_GUIDE.md
+- MCP tools reference: @./docs/MCP_TOOLS.md
+- Git workflow: @./docs/GIT_WORKFLOW.md
+- Troubleshooting: @./TROUBLESHOOTING.md
+
+---
+
+## Pre-Push Checklist
+
+- [ ] `bun run validate` passes
+- [ ] Tests cover new functionality
+- [ ] Commit follows `<type>(<scope>): <subject>`
+- [ ] Cross-plugin deps use `workspace:*`
