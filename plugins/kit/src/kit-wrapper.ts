@@ -2,42 +2,17 @@
  * Kit CLI Wrapper
  *
  * Pure functions for executing Kit CLI commands with proper error handling.
- * Uses spawnSync for synchronous execution to fit MCP tool patterns.
+ * Uses Bun.spawnSync via shared helpers for synchronous execution to fit MCP tool patterns.
  */
 
-import {
-	type SpawnSyncOptionsWithStringEncoding,
-	spawnSync,
-} from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-
-/**
- * Get enhanced PATH that includes common tool installation directories.
- * This ensures kit can be found even when running in non-interactive shells
- * (like Claude Code's MCP servers) that don't source .zshrc/.bashrc.
- */
-function getEnhancedPath(): string {
-	const currentPath = process.env.PATH || "";
-	const home = homedir();
-
-	// Common locations for uv/pipx installed tools
-	const additionalPaths = [
-		join(home, ".local", "bin"),
-		"/opt/homebrew/bin",
-		"/usr/local/bin",
-	];
-
-	// Add paths that aren't already in PATH
-	const pathsToAdd = additionalPaths.filter(
-		(p) => !currentPath.split(":").includes(p),
-	);
-
-	return pathsToAdd.length > 0
-		? `${pathsToAdd.join(":")}:${currentPath}`
-		: currentPath;
-}
+import {
+	buildEnhancedPath,
+	ensureCommandAvailable,
+	spawnSyncCollect,
+} from "@sidequest/core/spawn";
 
 import {
 	ASTSearcher,
@@ -111,15 +86,8 @@ import {
  */
 export function isKitInstalled(): boolean {
 	try {
-		const result = spawnSync("kit", ["--version"], {
-			encoding: "utf8",
-			timeout: 5000,
-			env: {
-				...process.env,
-				PATH: getEnhancedPath(),
-			},
-		});
-		return result.status === 0;
+		ensureCommandAvailable("kit");
+		return true;
 	} catch {
 		return false;
 	}
@@ -131,15 +99,13 @@ export function isKitInstalled(): boolean {
  */
 export function getKitVersion(): string | null {
 	try {
-		const result = spawnSync("kit", ["--version"], {
-			encoding: "utf8",
-			timeout: 5000,
+		const result = spawnSyncCollect(["kit", "--version"], {
 			env: {
 				...process.env,
-				PATH: getEnhancedPath(),
+				PATH: buildEnhancedPath(),
 			},
 		});
-		if (result.status === 0 && result.stdout) {
+		if (result.exitCode === 0 && result.stdout) {
 			return result.stdout.trim();
 		}
 		return null;
@@ -161,35 +127,20 @@ function executeKit(
 		cwd?: string;
 	} = {},
 ): { stdout: string; stderr: string; exitCode: number } {
-	const { timeout = 30000, cwd } = options;
+	const { cwd } = options;
 
-	const spawnOptions: SpawnSyncOptionsWithStringEncoding = {
-		encoding: "utf8",
-		timeout,
-		maxBuffer: 10 * 1024 * 1024, // 10MB
+	const result = spawnSyncCollect(["kit", ...args], {
 		env: {
 			...process.env,
-			PATH: getEnhancedPath(),
+			PATH: buildEnhancedPath(),
 		},
 		...(cwd && { cwd }),
-	};
-
-	const result = spawnSync("kit", args, spawnOptions);
-
-	// Handle spawn errors (e.g., command not found)
-	if (result.error) {
-		const errorMessage = result.error.message || "Failed to execute kit";
-		return {
-			stdout: "",
-			stderr: errorMessage,
-			exitCode: 1,
-		};
-	}
+	});
 
 	return {
 		stdout: result.stdout || "",
 		stderr: result.stderr || "",
-		exitCode: result.status ?? 1,
+		exitCode: result.exitCode ?? 1,
 	};
 }
 
