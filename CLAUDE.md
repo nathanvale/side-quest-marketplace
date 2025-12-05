@@ -7,9 +7,9 @@
 ## CRITICAL RULES
 
 **Plugin Validation (BLOCKING):**
-- **YOU MUST** pass `bun run validate` before commits
-- Pre-commit hook runs validation automatically - fix failures immediately
-- CI pipeline fails on any invalid plugin
+- **YOU MUST** pass `bun run validate` before pushing (full validation)
+- Pre-commit hook runs `bun run validate:quick` automatically - fix failures immediately
+- CI pipeline runs full `bun run validate` - fails on any issue
 
 **Workspace Dependencies:**
 - **ALWAYS** use workspace protocol: `"dependency": "workspace:*"` for cross-plugin deps
@@ -73,6 +73,11 @@ side-quest-marketplace/
 
 **IMPORTANT:** Use MCP tools for token-efficient results. They parse output and return structured, concise summaries.
 
+**Validation Scripts (ADHD-friendly hierarchy):**
+- `bun run validate` — Full validation: typecheck + lint + test + plugin structure (~30s)
+- `bun run validate:quick` — Fast check: typecheck + lint only (~5s, used in pre-commit)
+- `bun run validate:plugins` — Plugin structure validation only (~2s)
+
 **Recommended (MCP tools - token optimized):**
 Test → `bun_runTests` | Test file → `bun_testFile` | Coverage → `bun_testCoverage`
 Typecheck → `tsc_check` | Lint check → `biome_lintCheck` | Lint fix → `biome_lintFix`
@@ -82,7 +87,7 @@ Format check → `biome_formatCheck` | Index codebase → `/kit:prime`
 AI commit → `/git:commit` | Create PR → `/git:create-pr` | Search history → `/git:history`
 
 **Direct bash (when MCP not needed):**
-Install → `bun install` | Validate → `bun run validate` | CI → `bun run ci:full`
+Install → `bun install` | Full validate → `bun run validate` | Quick validate → `bun run validate:quick`
 Plugin-specific → `bun --filter <plugin> test` | `claude plugin validate plugins/<plugin>`
 
 ---

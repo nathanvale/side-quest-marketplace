@@ -1,1 +1,1 @@
-bun run ci && claude plugin validate .
+bun run validate:quick && claude plugin validate .

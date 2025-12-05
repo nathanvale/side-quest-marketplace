@@ -15,9 +15,9 @@
 		"format:check": "bun run biome format .",
 		"lint": "bun run biome lint .",
 		"check": "bun run biome check --write .",
-		"ci": "bun --filter '*' typecheck && bun run check && bun --filter '*' test",
-		"validate": "bun run core/src/validate/cli.ts --all",
-		"ci:full": "bun run ci && bun run validate",
+		"validate": "bun run validate:quick && bun --filter '*' test && bun run validate:plugins",
+		"validate:quick": "bun --filter '*' typecheck && bun run check",
+		"validate:plugins": "bun run core/src/validate/cli.ts --all",
 		"prepare": "husky"
 	},
 	"devDependencies": {
