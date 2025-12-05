@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { ParaObsidianConfig } from "../src/config";
 
 /**
  * Test suite for Para-Obsidian MCP Server
@@ -92,7 +93,7 @@ Test area content.
 /**
  * Mock config for testing
  */
-function createMockConfig(vaultPath: string): any {
+function createMockConfig(vaultPath: string): ParaObsidianConfig {
 	return {
 		vault: vaultPath,
 		templatesDir: join(vaultPath, "templates"),
@@ -175,7 +176,6 @@ describe("Configuration Tools", () => {
 		test("lists template versions", () => {
 			const vault = createTestVault();
 			try {
-				const config = createMockConfig(vault.path);
 				const templates = [
 					{ name: "project", version: 2 },
 					{ name: "area", version: 1 },
@@ -864,14 +864,13 @@ describe("Indexing Tools", () => {
 				{ file: "Done.md", frontmatter: { status: "completed" } },
 			];
 
-			const filtered = results.filter(
-				(r: any) => r.frontmatter.status === "active",
-			);
+			const filtered = results.filter((r) => r.frontmatter.status === "active");
 			expect(filtered).toHaveLength(1);
 		});
 
 		test("returns empty for no matches", () => {
-			const results: any[] = [];
+			const results: Array<{ file: string; frontmatter: { status: string } }> =
+				[];
 
 			expect(results).toHaveLength(0);
 		});

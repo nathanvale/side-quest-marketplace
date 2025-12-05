@@ -14,8 +14,6 @@
 		"@types/bun": "latest"
 	},
 	"dependencies": {
-		"@modelcontextprotocol/sdk": "^1.0.4",
-		"@sidequest/core": "workspace:*",
-		"mcpez": "^1.2.1"
+		"@sidequest/core": "workspace:*"
 	}
 }

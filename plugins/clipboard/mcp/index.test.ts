@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
 // Types matching the MCP server
 enum ResponseFormat {
@@ -216,8 +216,6 @@ describe("clipboard platform detection", () => {
 });
 
 describe("clipboard integration", () => {
-	const originalPlatform = process.platform;
-
 	test("should handle copy operations on current platform", () => {
 		// This is an integration test that verifies the platform-specific commands
 		// are available. We don't actually execute them to avoid side effects.

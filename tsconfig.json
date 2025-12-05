@@ -18,6 +18,7 @@
 		"noUnusedLocals": false,
 		"noUnusedParameters": false,
 		"noPropertyAccessFromIndexSignature": false,
-		"types": ["bun-types"]
+		"types": ["bun-types"],
+		"typeRoots": ["./node_modules", "./node_modules/@types"]
 	}
 }

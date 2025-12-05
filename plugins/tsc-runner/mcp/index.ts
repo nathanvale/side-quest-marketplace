@@ -11,8 +11,8 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { startServer, tool, z } from "@sidequest/core/mcp";
 import { spawnWithTimeout } from "@sidequest/core/spawn";
-import { startServer, tool, z } from "mcpez";
 import {
 	createCorrelationId,
 	initLogger,

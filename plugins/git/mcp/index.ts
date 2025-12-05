@@ -11,11 +11,11 @@ import {
 	createCorrelationId,
 	createPluginLogger,
 } from "@sidequest/core/logging";
+import { startServer, tool, z } from "@sidequest/core/mcp";
 import {
 	ensureCommandAvailable,
 	spawnSyncCollect,
 } from "@sidequest/core/spawn";
-import { startServer, tool, z } from "mcpez";
 
 // Initialize logger
 const { initLogger, getSubsystemLogger } = createPluginLogger({

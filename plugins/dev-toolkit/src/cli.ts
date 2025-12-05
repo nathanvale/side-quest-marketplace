@@ -10,11 +10,7 @@
  */
 
 import { parseArgs } from "@sidequest/core/cli";
-import {
-	color,
-	OutputFormat,
-	parseOutputFormat,
-} from "@sidequest/core/formatters";
+import { color, parseOutputFormat } from "@sidequest/core/formatters";
 import { createTemplateCommand } from "./commands/create-template";
 import { reviewTemplateCommand } from "./commands/review-template";
 

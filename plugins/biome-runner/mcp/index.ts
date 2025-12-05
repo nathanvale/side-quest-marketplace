@@ -11,7 +11,7 @@
  * Uses native Bun.spawn() for better performance over Node.js child_process.
  */
 
-import { startServer, tool, z } from "mcpez";
+import { startServer, tool, z } from "@sidequest/core/mcp";
 import {
 	createCorrelationId,
 	initLogger,

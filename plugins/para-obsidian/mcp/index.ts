@@ -20,7 +20,7 @@ if (!process.env.MCPEZ_AUTO_START) {
 }
 
 import { createCorrelationId } from "@sidequest/core/logging";
-import { startServer, tool, z } from "mcpez";
+import { startServer, tool, z } from "@sidequest/core/mcp";
 import type { ParaObsidianConfig } from "../src/config";
 import { listTemplateVersions, loadConfig } from "../src/config";
 import { createFromTemplate } from "../src/create";
@@ -32,6 +32,7 @@ import {
 	planTemplateVersionBump,
 	readFrontmatterFile,
 	updateFrontmatterFile,
+	type VersionPlanStatus,
 	validateFrontmatterFile,
 } from "../src/frontmatter";
 import { listDir, readFile } from "../src/fs";
@@ -2318,7 +2319,10 @@ Requires git repository with clean working tree (unless dry-run).`,
 			const result = applyVersionPlan(config, {
 				plan,
 				dryRun,
-				statuses: (statuses ?? ["outdated", "missing-version"]) as any[],
+				statuses: (statuses ?? [
+					"outdated",
+					"missing-version",
+				]) as VersionPlanStatus[],
 				dirs: dirs ?? [],
 				migrate: MIGRATIONS,
 			});

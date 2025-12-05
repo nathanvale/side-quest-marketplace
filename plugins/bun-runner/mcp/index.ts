@@ -15,8 +15,8 @@ import {
 	createCorrelationId,
 	createPluginLogger,
 } from "@sidequest/core/logging";
+import { startServer, tool, z } from "@sidequest/core/mcp";
 import { spawn } from "bun";
-import { startServer, tool, z } from "mcpez";
 import {
 	parseBunTestOutput,
 	type TestFailure,

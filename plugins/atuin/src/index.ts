@@ -14,13 +14,13 @@ import {
 	createCorrelationId,
 	createPluginLogger,
 } from "@sidequest/core/logging";
+import { startServer, tool, z } from "@sidequest/core/mcp";
 import { shellExec } from "@sidequest/core/shell";
 import {
 	buildEnhancedPath,
 	ensureCommandAvailable,
 	spawnSyncCollect,
 } from "@sidequest/core/spawn";
-import { startServer, tool, z } from "mcpez";
 
 // Initialize logger
 const { initLogger, getSubsystemLogger } = createPluginLogger({

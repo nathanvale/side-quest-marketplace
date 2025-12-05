@@ -5,12 +5,26 @@
  *
  * Provides PROJECT_INDEX.json-based tools for token-efficient codebase navigation
  * using the Kit CLI (cased-kit).
+ *
+ * ## Observability
+ *
+ * File logging is enabled via the MCP module's built-in observability layer.
+ * Logs are written to: ~/.claude/logs/kit.jsonl
+ *
+ * The `log` API from @sidequest/core/mcp provides dual-logging:
+ * - MCP protocol logging (visible in Claude Desktop inspector)
+ * - JSONL file logging (for post-mortem debugging)
  */
 
-import { buildEnhancedPath, spawnSyncCollect } from "@sidequest/core/spawn";
-import { startServer, tool, z } from "mcpez";
 import {
 	createCorrelationId,
+	log,
+	startServer,
+	tool,
+	z,
+} from "@sidequest/core/mcp";
+import { buildEnhancedPath, spawnSyncCollect } from "@sidequest/core/spawn";
+import {
 	executeAstSearch,
 	executeIndexFind,
 	executeIndexOverview,
@@ -23,17 +37,9 @@ import {
 	formatIndexOverviewResults,
 	formatIndexPrimeResults,
 	formatIndexStatsResults,
-	getKitLogger,
-	initLogger,
 	ResponseFormat,
 	SearchMode,
 } from "../src/index.js";
-
-// Initialize logging
-initLogger().catch(console.error);
-
-/** MCP layer logger for request/response tracking */
-const mcpLogger = getKitLogger();
 
 // ============================================================================
 // Kit Index Find Tool
@@ -82,11 +88,10 @@ NOTE: Requires PROJECT_INDEX.json. Run kit_index_prime first if not present.`,
 		};
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_index_find",
-			args: { symbol_name },
-		});
+		log.info(
+			{ cid: mcpCid, tool: "kit_index_find", args: { symbol_name } },
+			"symbols",
+		);
 
 		// Execute index find
 		const result = await executeIndexFind(symbol_name, index_path);
@@ -98,12 +103,15 @@ NOTE: Requires PROJECT_INDEX.json. Run kit_index_prime first if not present.`,
 				: ResponseFormat.MARKDOWN;
 
 		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_index_find",
-			success: !("isError" in result),
-			durationMs: mcpDuration,
-		});
+		log.info(
+			{
+				cid: mcpCid,
+				tool: "kit_index_find",
+				success: !("isError" in result),
+				durationMs: mcpDuration,
+			},
+			"symbols",
+		);
 
 		return {
 			...("isError" in result ? { isError: true } : {}),
@@ -161,11 +169,10 @@ NOTE: Requires PROJECT_INDEX.json. Run kit_index_prime first if not present.`,
 
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_index_stats",
-			args: { index_path },
-		});
+		log.info(
+			{ cid: mcpCid, tool: "kit_index_stats", args: { index_path } },
+			"symbols",
+		);
 
 		// Execute index stats
 		const result = await executeIndexStats(index_path, top_n);
@@ -177,12 +184,15 @@ NOTE: Requires PROJECT_INDEX.json. Run kit_index_prime first if not present.`,
 				: ResponseFormat.MARKDOWN;
 
 		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_index_stats",
-			success: !("isError" in result),
-			durationMs: mcpDuration,
-		});
+		log.info(
+			{
+				cid: mcpCid,
+				tool: "kit_index_stats",
+				success: !("isError" in result),
+				durationMs: mcpDuration,
+			},
+			"symbols",
+		);
 
 		return {
 			...("isError" in result ? { isError: true } : {}),
@@ -246,11 +256,10 @@ NOTE: Requires PROJECT_INDEX.json. Run kit_index_prime first if not present.`,
 
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_index_overview",
-			args: { file_path },
-		});
+		log.info(
+			{ cid: mcpCid, tool: "kit_index_overview", args: { file_path } },
+			"symbols",
+		);
 
 		// Execute index overview
 		const result = await executeIndexOverview(file_path, index_path);
@@ -262,12 +271,15 @@ NOTE: Requires PROJECT_INDEX.json. Run kit_index_prime first if not present.`,
 				: ResponseFormat.MARKDOWN;
 
 		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_index_overview",
-			success: !("isError" in result),
-			durationMs: mcpDuration,
-		});
+		log.info(
+			{
+				cid: mcpCid,
+				tool: "kit_index_overview",
+				success: !("isError" in result),
+				durationMs: mcpDuration,
+			},
+			"symbols",
+		);
 
 		return {
 			...("isError" in result ? { isError: true } : {}),
@@ -328,11 +340,10 @@ Requires Kit CLI: uv tool install cased-kit`,
 
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_index_prime",
-			args: { path, force },
-		});
+		log.info(
+			{ cid: mcpCid, tool: "kit_index_prime", args: { path, force } },
+			"symbols",
+		);
 
 		// Execute index prime
 		const result = await executeIndexPrime(force, path);
@@ -344,12 +355,15 @@ Requires Kit CLI: uv tool install cased-kit`,
 				: ResponseFormat.MARKDOWN;
 
 		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_index_prime",
-			success: !("isError" in result),
-			durationMs: mcpDuration,
-		});
+		log.info(
+			{
+				cid: mcpCid,
+				tool: "kit_index_prime",
+				success: !("isError" in result),
+				durationMs: mcpDuration,
+			},
+			"symbols",
+		);
 
 		return {
 			...("isError" in result ? { isError: true } : {}),
@@ -428,11 +442,10 @@ To enable: uv tool install 'cased-kit[ml]'`,
 
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_semantic",
-			args: { query },
-		});
+		log.info(
+			{ cid: mcpCid, tool: "kit_semantic", args: { query } },
+			"semantic",
+		);
 
 		const format = response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
@@ -464,12 +477,15 @@ To enable: uv tool install 'cased-kit[ml]'`,
 		});
 
 		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_semantic",
-			success: result.exitCode === 0,
-			durationMs: mcpDuration,
-		});
+		log.info(
+			{
+				cid: mcpCid,
+				tool: "kit_semantic",
+				success: result.exitCode === 0,
+				durationMs: mcpDuration,
+			},
+			"semantic",
+		);
 
 		return {
 			...(result.exitCode !== 0 ? { isError: true } : {}),
@@ -522,11 +538,10 @@ Filters out the function definition to show only actual call sites.`,
 
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_callers",
-			args: { function_name },
-		});
+		log.info(
+			{ cid: mcpCid, tool: "kit_callers", args: { function_name } },
+			"symbols",
+		);
 
 		const format = response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
@@ -545,12 +560,15 @@ Filters out the function definition to show only actual call sites.`,
 		);
 
 		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_callers",
-			success: result.exitCode === 0,
-			durationMs: mcpDuration,
-		});
+		log.info(
+			{
+				cid: mcpCid,
+				tool: "kit_callers",
+				success: result.exitCode === 0,
+				durationMs: mcpDuration,
+			},
+			"symbols",
+		);
 
 		return {
 			...(result.exitCode !== 0 ? { isError: true } : {}),
@@ -603,11 +621,10 @@ Note: Currently returns helpful error message for TypeScript/JavaScript (kit onl
 
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_calls",
-			args: { function_name },
-		});
+		log.info(
+			{ cid: mcpCid, tool: "kit_calls", args: { function_name } },
+			"symbols",
+		);
 
 		const format = response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
@@ -623,12 +640,15 @@ Note: Currently returns helpful error message for TypeScript/JavaScript (kit onl
 		]);
 
 		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_calls",
-			success: result.exitCode === 0,
-			durationMs: mcpDuration,
-		});
+		log.info(
+			{
+				cid: mcpCid,
+				tool: "kit_calls",
+				success: result.exitCode === 0,
+				durationMs: mcpDuration,
+			},
+			"symbols",
+		);
 
 		return {
 			...(result.exitCode !== 0 ? { isError: true } : {}),
@@ -683,11 +703,7 @@ Note: Currently returns helpful error message for TypeScript/JavaScript (kit onl
 
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_deps",
-			args: { file_path },
-		});
+		log.info({ cid: mcpCid, tool: "kit_deps", args: { file_path } }, "symbols");
 
 		const format = response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
@@ -706,12 +722,15 @@ Note: Currently returns helpful error message for TypeScript/JavaScript (kit onl
 		);
 
 		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_deps",
-			success: result.exitCode === 0,
-			durationMs: mcpDuration,
-		});
+		log.info(
+			{
+				cid: mcpCid,
+				tool: "kit_deps",
+				success: result.exitCode === 0,
+				durationMs: mcpDuration,
+			},
+			"symbols",
+		);
 
 		return {
 			...(result.exitCode !== 0 ? { isError: true } : {}),
@@ -767,11 +786,7 @@ Requires PROJECT_INDEX.json. Run kit_index_prime first if not present.`,
 
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_dead",
-			args: { path },
-		});
+		log.info({ cid: mcpCid, tool: "kit_dead", args: { path } }, "symbols");
 
 		const format = response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
@@ -785,12 +800,15 @@ Requires PROJECT_INDEX.json. Run kit_index_prime first if not present.`,
 		});
 
 		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_dead",
-			success: result.exitCode === 0,
-			durationMs: mcpDuration,
-		});
+		log.info(
+			{
+				cid: mcpCid,
+				tool: "kit_dead",
+				success: result.exitCode === 0,
+				durationMs: mcpDuration,
+			},
+			"symbols",
+		);
 
 		return {
 			...(result.exitCode !== 0 ? { isError: true } : {}),
@@ -847,11 +865,7 @@ Accepts target as either:
 
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_blast",
-			args: { target },
-		});
+		log.info({ cid: mcpCid, tool: "kit_blast", args: { target } }, "symbols");
 
 		const format = response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
@@ -870,12 +884,15 @@ Accepts target as either:
 		);
 
 		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_blast",
-			success: result.exitCode === 0,
-			durationMs: mcpDuration,
-		});
+		log.info(
+			{
+				cid: mcpCid,
+				tool: "kit_blast",
+				success: result.exitCode === 0,
+				durationMs: mcpDuration,
+			},
+			"symbols",
+		);
 
 		return {
 			...(result.exitCode !== 0 ? { isError: true } : {}),
@@ -930,11 +947,7 @@ Uses heuristics to identify likely exported symbols (PascalCase, UPPER_CASE, com
 
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_api",
-			args: { directory },
-		});
+		log.info({ cid: mcpCid, tool: "kit_api", args: { directory } }, "symbols");
 
 		const format = response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
@@ -953,12 +966,15 @@ Uses heuristics to identify likely exported symbols (PascalCase, UPPER_CASE, com
 		);
 
 		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_api",
-			success: result.exitCode === 0,
-			durationMs: mcpDuration,
-		});
+		log.info(
+			{
+				cid: mcpCid,
+				tool: "kit_api",
+				success: result.exitCode === 0,
+				durationMs: mcpDuration,
+			},
+			"symbols",
+		);
 
 		return {
 			...(result.exitCode !== 0 ? { isError: true } : {}),
@@ -1052,11 +1068,7 @@ Results include file paths, line numbers, and matched content.`,
 
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_grep",
-			args: { pattern },
-		});
+		log.info({ cid: mcpCid, tool: "kit_grep", args: { pattern } }, "grep");
 
 		const format = response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
@@ -1084,12 +1096,15 @@ Results include file paths, line numbers, and matched content.`,
 		});
 
 		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_grep",
-			success: result.exitCode === 0,
-			durationMs: mcpDuration,
-		});
+		log.info(
+			{
+				cid: mcpCid,
+				tool: "kit_grep",
+				success: result.exitCode === 0,
+				durationMs: mcpDuration,
+			},
+			"grep",
+		);
 
 		return {
 			...(result.exitCode !== 0 ? { isError: true } : {}),
@@ -1155,11 +1170,10 @@ Requires Kit CLI: uv tool install cased-kit`,
 
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_commit",
-			args: { dry_run, model },
-		});
+		log.info(
+			{ cid: mcpCid, tool: "kit_commit", args: { dry_run, model } },
+			"commit",
+		);
 
 		const format = response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
@@ -1190,12 +1204,15 @@ Requires Kit CLI: uv tool install cased-kit`,
 		});
 
 		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_commit",
-			success: result.exitCode === 0,
-			durationMs: mcpDuration,
-		});
+		log.info(
+			{
+				cid: mcpCid,
+				tool: "kit_commit",
+				success: result.exitCode === 0,
+				durationMs: mcpDuration,
+			},
+			"commit",
+		);
 
 		return {
 			...(result.exitCode !== 0 ? { isError: true } : {}),
@@ -1262,11 +1279,10 @@ IMPORTANT: Default update_pr_body=false for safety.`,
 
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_summarize",
-			args: { pr_url, update_pr_body },
-		});
+		log.info(
+			{ cid: mcpCid, tool: "kit_summarize", args: { pr_url, update_pr_body } },
+			"summarize",
+		);
 
 		const format = response_format === "json" ? "json" : "markdown";
 		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
@@ -1293,12 +1309,15 @@ IMPORTANT: Default update_pr_body=false for safety.`,
 		});
 
 		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_summarize",
-			success: result.exitCode === 0,
-			durationMs: mcpDuration,
-		});
+		log.info(
+			{
+				cid: mcpCid,
+				tool: "kit_summarize",
+				success: result.exitCode === 0,
+				durationMs: mcpDuration,
+			},
+			"summarize",
+		);
 
 		return {
 			...(result.exitCode !== 0 ? { isError: true } : {}),
@@ -1383,11 +1402,10 @@ Two modes:
 
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_ast_search",
-			args: { pattern, mode },
-		});
+		log.info(
+			{ cid: mcpCid, tool: "kit_ast_search", args: { pattern, mode } },
+			"ast",
+		);
 
 		const result = await executeAstSearch({
 			pattern,
@@ -1398,15 +1416,18 @@ Two modes:
 		});
 
 		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_ast_search",
-			success: !("error" in result),
-			durationMs: mcpDuration,
-		});
+		log.info(
+			{
+				cid: mcpCid,
+				tool: "kit_ast_search",
+				success: !("error" in result),
+				durationMs: mcpDuration,
+			},
+			"ast",
+		);
 
 		// Format output
-		const format = args.response_format === "json" ? "json" : "markdown";
+		const format = response_format === "json" ? "json" : "markdown";
 
 		if ("error" in result) {
 			return {
@@ -1508,11 +1529,7 @@ Requires Kit CLI: uv tool install cased-kit`,
 
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_usages",
-			args: { symbol },
-		});
+		log.info({ cid: mcpCid, tool: "kit_usages", args: { symbol } }, "usages");
 
 		const result = executeKitUsages({
 			symbolName: symbol,
@@ -1521,15 +1538,18 @@ Requires Kit CLI: uv tool install cased-kit`,
 		});
 
 		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_usages",
-			success: !("error" in result),
-			durationMs: mcpDuration,
-		});
+		log.info(
+			{
+				cid: mcpCid,
+				tool: "kit_usages",
+				success: !("error" in result),
+				durationMs: mcpDuration,
+			},
+			"usages",
+		);
 
 		// Format output
-		const format = args.response_format === "json" ? "json" : "markdown";
+		const format = response_format === "json" ? "json" : "markdown";
 
 		if ("error" in result) {
 			return {
@@ -1625,11 +1645,10 @@ Requires Kit CLI: uv tool install cased-kit`,
 
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_file_tree",
-			args: { path, subpath },
-		});
+		log.info(
+			{ cid: mcpCid, tool: "kit_file_tree", args: { path, subpath } },
+			"fileTree",
+		);
 
 		const result = executeKitFileTree({
 			path,
@@ -1637,12 +1656,15 @@ Requires Kit CLI: uv tool install cased-kit`,
 		});
 
 		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_file_tree",
-			success: !("error" in result),
-			durationMs: mcpDuration,
-		});
+		log.info(
+			{
+				cid: mcpCid,
+				tool: "kit_file_tree",
+				success: !("error" in result),
+				durationMs: mcpDuration,
+			},
+			"fileTree",
+		);
 
 		// Format output
 		const format = response_format === "json" ? "json" : "markdown";
@@ -1738,11 +1760,14 @@ Requires Kit CLI: uv tool install cased-kit`,
 
 		const mcpCid = createCorrelationId();
 		const mcpStartTime = Date.now();
-		mcpLogger.info("MCP tool request", {
-			cid: mcpCid,
-			tool: "kit_file_content",
-			args: { fileCount: files.length },
-		});
+		log.info(
+			{
+				cid: mcpCid,
+				tool: "kit_file_content",
+				args: { fileCount: files.length },
+			},
+			"fileContent",
+		);
 
 		const result = executeKitFileContent({
 			filePaths: files,
@@ -1750,12 +1775,15 @@ Requires Kit CLI: uv tool install cased-kit`,
 		});
 
 		const mcpDuration = Date.now() - mcpStartTime;
-		mcpLogger.info("MCP tool response", {
-			cid: mcpCid,
-			tool: "kit_file_content",
-			success: !("error" in result),
-			durationMs: mcpDuration,
-		});
+		log.info(
+			{
+				cid: mcpCid,
+				tool: "kit_file_content",
+				success: !("error" in result),
+				durationMs: mcpDuration,
+			},
+			"fileContent",
+		);
 
 		// Format output
 		const format = response_format === "json" ? "json" : "markdown";
@@ -1833,4 +1861,21 @@ function formatBytes(bytes: number): string {
 // Start Server
 // ============================================================================
 
-startServer();
+startServer("kit", {
+	version: "1.0.0",
+	fileLogging: {
+		enabled: true,
+		subsystems: [
+			"grep",
+			"semantic",
+			"symbols",
+			"fileTree",
+			"fileContent",
+			"usages",
+			"ast",
+			"commit",
+			"summarize",
+		],
+		level: "debug",
+	},
+});
