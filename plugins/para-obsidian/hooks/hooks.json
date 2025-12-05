@@ -1,5 +1,5 @@
 {
-	"description": "Development toolkit with Bun CLI, runtime workflows, and DX patterns",
+	"description": "Obsidian PARA method integration with CLI operations and MCP server",
 	"hooks": {
 		"SessionStart": [
 			{
