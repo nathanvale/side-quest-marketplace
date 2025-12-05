@@ -74,8 +74,8 @@ side-quest-marketplace/
 **IMPORTANT:** Use MCP tools for token-efficient results. They parse output and return structured, concise summaries.
 
 **Validation Scripts (ADHD-friendly hierarchy):**
-- `bun run validate` — Full validation: typecheck + lint + test + plugin structure (~30s)
-- `bun run validate:quick` — Fast check: typecheck + lint only (~5s, used in pre-commit)
+- `bun run validate` — Full validation: typecheck + lint + test + plugin structure (~30s, runs on pre-push)
+- `bun run validate:quick` — Fast check: typecheck + lint only (~5s, runs on pre-commit)
 - `bun run validate:plugins` — Plugin structure validation only (~2s)
 
 **Recommended (MCP tools - token optimized):**
