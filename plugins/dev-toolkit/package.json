@@ -1,0 +1,18 @@
+{
+	"name": "@sidequest/dev-toolkit",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Development skills for Bun CLI, runtime workflows, and developer experience patterns",
+	"type": "module",
+	"bin": {
+		"dev-toolkit": "./src/cli.ts"
+	},
+	"scripts": {
+		"test": "bun test",
+		"typecheck": "tsc --noEmit",
+		"check": "biome check --write ."
+	},
+	"dependencies": {
+		"@sidequest/core": "workspace:*"
+	}
+}

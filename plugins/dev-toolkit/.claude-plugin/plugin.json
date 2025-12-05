@@ -1,0 +1,16 @@
+{
+	"name": "dev-toolkit",
+	"version": "1.0.0",
+	"description": "Development skills for Bun CLI, runtime workflows, and developer experience patterns",
+	"author": {
+		"name": "Nathan Vale",
+		"email": "hi@nathanvale.com"
+	},
+	"commands": ["./commands/sample.md"],
+	"skills": [
+		"./skills/dev-toolkit",
+		"./skills/bun-cli",
+		"./skills/bun-runtime",
+		"./skills/dx-patterns"
+	]
+}
