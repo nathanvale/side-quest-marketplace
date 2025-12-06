@@ -13,7 +13,7 @@ EFFORT="$3"
 TASK_TYPE="${4:-task}"
 PROJECT="${5:-}"
 AREA="${6:-}"
-DEST="${7:-00_Inbox}"
+DEST="${7:-Tasks}"
 ```
 
 **priority options**: low | medium | high | urgent
@@ -23,16 +23,29 @@ DEST="${7:-00_Inbox}"
 ## Command
 
 ```bash
-para-obsidian create --template task \
+bun src/cli.ts create --template task \
   --title "$TITLE" \
   --dest "$DEST" \
   --arg "Task title=$TITLE" \
-  --arg "Priority=$PRIORITY" \
-  --arg "Effort=$EFFORT" \
-  --arg "Task type=$TASK_TYPE" \
-  --arg "Project=$PROJECT" \
-  --arg "Area=$AREA"
+  --arg "Priority (low/medium/high/urgent)=$PRIORITY" \
+  --arg "Effort (small/medium/large)=$EFFORT" \
+  --arg "Task type (task/reminder/habit/chore)=$TASK_TYPE" \
+  --arg "Project (optional)=$PROJECT" \
+  --arg "Area (optional)=$AREA" \
+  --content '{
+    "Description": "...",
+    "Success Criteria": "- [ ] ...",
+    "Notes": "..."
+  }'
 ```
+
+## Content Sections
+
+| Section | Purpose |
+|---------|---------|
+| `Description` | What is this task? Desired outcome? |
+| `Success Criteria` | How will you know it's done? |
+| `Notes` | Context, blockers, resources needed |
 
 ## Frontmatter Hints
 

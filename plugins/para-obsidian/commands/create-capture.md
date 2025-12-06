@@ -22,23 +22,32 @@ DEST="${6:-00_Inbox}"
 ## Command
 
 ```bash
-para-obsidian create --template capture \
+bun src/cli.ts create --template capture \
   --title "$TITLE" \
   --dest "$DEST" \
   --arg "Title=$TITLE" \
   --arg "Captured from (thought/article/conversation/etc.)=$CAPTURED_FROM" \
   --arg "Resonance (inspiring/useful/personal/surprising)=$RESONANCE" \
   --arg "Urgency (high/medium/low)=$URGENCY" \
-  --arg "Content=$CONTENT"
+  --arg "Content=$CONTENT" \
+  --content '{
+    "Why I Saved This": "...",
+    "Connections": "- [[...]]",
+    "Next Actions": "- [ ] Process within 48 hours"
+  }'
 ```
 
-## Frontmatter Hints
+## Content Sections
 
-- **Suggested tags**: inbox, capture, work, family, health, learning, finance
+| Section | Purpose |
+|---------|---------|
+| `Why I Saved This` | What resonated? Why worth keeping? |
+| `Connections` | What does this relate to? |
+| `Next Actions` | Processing tasks |
 
 ## Examples
 
 ```
-/para-obsidian:create-capture "Playwright vs Puppeteer" "Consider switching to Playwright for web scraping" voice
-/para-obsidian:create-capture "ADHD Time Boxing" "Use 25-minute blocks with 5-minute breaks" article useful medium
+/para-obsidian:create-capture "Playwright vs Puppeteer" "Consider switching to Playwright" voice
+/para-obsidian:create-capture "ADHD Time Boxing" "Use 25-minute blocks" article useful medium
 ```

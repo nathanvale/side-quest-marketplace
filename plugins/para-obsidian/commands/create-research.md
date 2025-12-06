@@ -20,14 +20,35 @@ DEST="${5:-00_Inbox}"
 ## Command
 
 ```bash
-para-obsidian create --template research \
+bun src/cli.ts create --template research \
   --title "$TITLE" \
   --dest "$DEST" \
   --arg "Research title=$TITLE" \
-  --arg "Research type=$RESEARCH_TYPE" \
+  --arg "Research type (activities/dining/hike/gear/transport)=$RESEARCH_TYPE" \
   --arg "Project=$PROJECT" \
-  --arg "Status=$STATUS"
+  --content '{
+    "Overview": "...",
+    "Option 1": "**Name**: ...\n**Why**: ...\n**Cost**: ...\n**Book**: ...",
+    "Option 2": "**Name**: ...\n**Why**: ...\n**Cost**: ...\n**Book**: ...",
+    "Details": "...",
+    "Timing": "- **Hours**: ...\n- **Duration**: ...\n- **Best time**: ...",
+    "Getting There": "...",
+    "Sources": "- ...",
+    "Decision": "**Chosen**: ...\n**Booked**: [[]]"
+  }'
 ```
+
+## Content Sections
+
+| Section | Purpose |
+|---------|---------|
+| `Overview` | What is this research about? |
+| `Option 1/2` | Recommendations with cost/booking |
+| `Details` | Main research content |
+| `Timing` | Hours, duration, best time |
+| `Getting There` | Directions, parking, transport |
+| `Sources` | Where did info come from? |
+| `Decision` | What did you decide? |
 
 ## Frontmatter Hints
 
@@ -36,7 +57,7 @@ para-obsidian create --template research \
 ## Examples
 
 ```
-/para-obsidian:create-research "Jest vs Vitest vs Bun Test Comparison" comparison "[[Website Redesign]]"
-/para-obsidian:create-research "Cloud Provider Selection" decision "[[Infrastructure Migration]]" in-progress
-/para-obsidian:create-research "WebAuthn and Passkeys Deep Dive" exploration "[[Auth System Upgrade]]"
+/para-obsidian:create-research "Jest vs Vitest" comparison "[[Website Redesign]]"
+/para-obsidian:create-research "Cloud Provider Selection" decision "[[Infrastructure]]" in-progress
+/para-obsidian:create-research "WebAuthn Deep Dive" exploration "[[Auth Upgrade]]"
 ```

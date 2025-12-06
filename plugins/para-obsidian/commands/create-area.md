@@ -14,10 +14,26 @@ DEST="${2:-02_Areas}"
 ## Command
 
 ```bash
-para-obsidian create --template area \
+bun src/cli.ts create --template area \
   --title "$TITLE" \
-  --dest "$DEST"
+  --dest "$DEST" \
+  --arg "Area title=$TITLE" \
+  --content '{
+    "Overview": "...",
+    "Standards to Maintain": "- [ ] ...\n- [ ] ...",
+    "Review Questions": "- Am I giving this area enough attention?\n- What projects should emerge?",
+    "Notes": "..."
+  }'
 ```
+
+## Content Sections
+
+| Section | Purpose |
+|---------|---------|
+| `Overview` | What does this area encompass? |
+| `Standards to Maintain` | Ongoing commitments |
+| `Review Questions` | Reflection prompts |
+| `Notes` | Observations, ideas, improvements |
 
 ## Frontmatter Hints
 

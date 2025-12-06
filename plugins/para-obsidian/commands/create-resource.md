@@ -18,12 +18,32 @@ DEST="${4:-03_Resources}"
 ## Command
 
 ```bash
-para-obsidian create --template resource \
+bun src/cli.ts create --template resource \
   --title "$TITLE" \
   --dest "$DEST" \
-  --arg "Source type=$SOURCE" \
-  --arg "Related areas=$AREAS"
+  --arg "Resource title=$TITLE" \
+  --arg "Source type (book/article/video/course/podcast/etc.)=$SOURCE" \
+  --arg "Primary area this relates to=$AREAS" \
+  --content '{
+    "Summary": "...",
+    "Key Insights": "1. ...\n2. ...\n3. ...",
+    "Notable Quotes": "> ...",
+    "Connections": "- **Related to**: [[...]]\n- **Useful for**: [[...]]",
+    "Action Items": "- [ ] ...",
+    "Personal Reflection": "..."
+  }'
 ```
+
+## Content Sections
+
+| Section | Purpose |
+|---------|---------|
+| `Summary` | Key points in 2-3 sentences |
+| `Key Insights` | Most valuable ideas |
+| `Notable Quotes` | Passages worth remembering |
+| `Connections` | How it relates to existing knowledge |
+| `Action Items` | What will you DO with this? |
+| `Personal Reflection` | How does this change your thinking? |
 
 ## Frontmatter Hints
 
@@ -32,7 +52,7 @@ para-obsidian create --template resource \
 ## Examples
 
 ```
-/para-obsidian:create-resource "Atomic Habits" book "[[Health]],[[Learning]]"
+/para-obsidian:create-resource "Atomic Habits" book "[[Health]]"
 /para-obsidian:create-resource "TypeScript Best Practices 2025" article "[[Career]]"
 /para-obsidian:create-resource "React Server Components" video
 ```

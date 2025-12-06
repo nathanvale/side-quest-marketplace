@@ -16,13 +16,30 @@ DEST="${4:-01_Projects}"
 ## Command
 
 ```bash
-para-obsidian create --template project \
+bun src/cli.ts create --template project \
   --title "$TITLE" \
   --dest "$DEST" \
   --arg "Project title=$TITLE" \
   --arg "Target completion date (YYYY-MM-DD)=$TARGET_DATE" \
-  --arg "Area=$AREA"
+  --arg "Area=$AREA" \
+  --content '{
+    "Why This Matters": "...",
+    "Success Criteria": "- [ ] ...\n- [ ] ...",
+    "Next Actions": "- [ ] ...",
+    "Key Resources": "- ...",
+    "Notes": "..."
+  }'
 ```
+
+## Content Sections
+
+| Section | Purpose |
+|---------|---------|
+| `Why This Matters` | What problem does this solve? Why now? |
+| `Success Criteria` | How will you know this is DONE? |
+| `Next Actions` | Immediate next steps |
+| `Key Resources` | Links, docs, references |
+| `Notes` | Context, ideas, learnings |
 
 ## Frontmatter Hints
 
