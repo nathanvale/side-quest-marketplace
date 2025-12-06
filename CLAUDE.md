@@ -165,33 +165,21 @@ The marketplace provides 70+ MCP tools across plugins.
 
 **CRITICAL for Agents:** All MCP tools are machine-to-machine interfaces. **ALWAYS use `response_format: "json"`** for token-efficient, structured responses. Never use `"markdown"` format.
 
-### Kit Search Tool Speed Hierarchy (CRITICAL - Use in Priority Order)
+### Kit Tools: Which to Use?
 
-**YOU MUST** follow this hierarchy for maximum token efficiency:
+**CRITICAL:** Always follow this priority order. Index tools are 30-50x faster.
 
-#### Priority 1: Index-Based Navigation (~10ms - Use First)
-- **Setup:** `kit_index_prime({ response_format: "json" })` — Run once per session (~2s)
-- **Query index:**
-  - `kit_index_find({ symbol_name: "...", response_format: "json" })` — Fastest symbol lookup
-  - `kit_index_overview({ file_path: "...", response_format: "json" })` — All symbols in file
-  - `kit_index_stats({ response_format: "json" })` — Codebase statistics
-  - `kit_file_tree({ response_format: "json" })` — Repository structure (~50ms)
+| Need | Tool(s) | Speed | Setup |
+|------|---------|-------|-------|
+| **Find where X is defined** | `kit_index_find` | ~10ms | Run `kit_index_prime` once per session |
+| **Find who uses X** | `kit_callers` / `kit_usages` | ~200ms | Same setup |
+| **Find by structure** | `kit_ast_search` | ~30-500ms | No setup needed |
+| **Find by meaning** | `kit_semantic` | ~500ms | Requires ML deps + first-run index build |
+| **Show file/module structure** | `kit_file_tree` / `kit_api` | ~50ms | No setup needed |
 
-#### Priority 2: Graph + Analysis (~200-300ms - Targeted Operations)
-Use index + targeted grep:
-- `kit_callers({ function_name: "...", response_format: "json" })` — Who calls this function?
-- `kit_usages({ symbol: "...", response_format: "json" })` — All usages of symbol
-- `kit_blast({ target: "...", response_format: "json" })` — Change impact analysis
-- `kit_api({ directory: "...", response_format: "json" })` — Module exports
-- `kit_dead({ response_format: "json" })` — Dead code detection (~500ms)
+**Priority hierarchy:** 1) Index → 2) Graph/Analysis → 3) Direct Search (ast/semantic)
 
-#### Priority 3: Direct Search (~30-500ms - When Index Insufficient)
-Full codebase scan (last resort):
-- `kit_grep({ pattern: "...", response_format: "json" })` — Text/regex search (~30ms)
-- `kit_ast_search({ pattern: "...", response_format: "json" })` — Structural patterns (~400ms)
-- `kit_semantic({ query: "...", response_format: "json" })` — ML-powered (~500ms, requires `cased-kit[ml]`)
-
-**Rule:** Index tools are 30-50x faster. Always try Priority 1 first, then Priority 2, only fall back to Priority 3 when index tools don't have the needed information.
+→ Always use `response_format: "json"` for token efficiency (40-60% savings vs markdown)
 
 ### Other MCP Tools
 
