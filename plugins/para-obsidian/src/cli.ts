@@ -57,6 +57,7 @@ import { renameWithLinkRewrite } from "./links";
 import { MIGRATIONS } from "./migrations";
 import { filterByFrontmatter, searchText } from "./search";
 import { semanticSearch } from "./semantic";
+import { getTemplate, getTemplateFields } from "./templates";
 
 function printUsage(): void {
 	const lines = [
@@ -65,6 +66,7 @@ function printUsage(): void {
 		"Usage:",
 		"  bun run src/cli.ts config [--format md|json]",
 		"  bun run src/cli.ts templates [--format md|json]",
+		"  bun run src/cli.ts template-fields <template> [--format md|json]",
 		"  bun run src/cli.ts list [path] [--format md|json]",
 		"  bun run src/cli.ts read <file> [--format md|json]",
 		"  bun run src/cli.ts search <query> [--tag TAG] [--frontmatter key=val|--frontmatter.key val] [--regex] [--dir path[,path2]] [--glob pattern] [--context N] [--format md|json]",
@@ -316,6 +318,146 @@ async function main(): Promise<void> {
 				} else {
 					for (const tpl of templates) {
 						console.log(emphasize.info(`${tpl.name}: v${tpl.version}`));
+					}
+				}
+				break;
+			}
+
+			case "template-fields": {
+				const templateName = subcommand;
+				if (!templateName) {
+					console.error("template-fields requires <template> argument");
+					process.exit(1);
+				}
+
+				const template = getTemplate(config, templateName);
+				if (!template) {
+					console.error(`Template not found: ${templateName}`);
+					process.exit(1);
+				}
+
+				const fields = getTemplateFields(template);
+				const requiredFields = fields.filter(
+					(f) => !f.isAutoDate && f.inFrontmatter,
+				);
+				const autoFields = fields.filter((f) => f.isAutoDate);
+				const bodyFields = fields.filter(
+					(f) => !f.isAutoDate && !f.inFrontmatter,
+				);
+
+				if (isJson) {
+					// Build enhanced field info with type hints
+					const enhancedRequired = requiredFields.map((f) => {
+						const result: {
+							key: string;
+							type?: string;
+							example?: string;
+						} = { key: f.key };
+
+						// Check if template wraps this prompt in wikilinks
+						const promptPattern = `<% tp.system.prompt("${f.key}") %>`;
+						const isWrappedInWikilinks = template.content.includes(
+							`[[${promptPattern}]]`,
+						);
+
+						// Infer type and example from key name
+						if (f.key.toLowerCase().includes("date")) {
+							result.type = "date";
+							result.example = new Date().toISOString().split("T")[0];
+						} else if (
+							f.key.toLowerCase().includes("area") ||
+							f.key.toLowerCase().includes("project")
+						) {
+							result.type = "wikilink";
+							result.example = isWrappedInWikilinks
+								? "Note Name"
+								: "[[Note Name]]";
+						} else {
+							result.type = "string";
+						}
+
+						return result;
+					});
+
+					// Build frontmatter hints from config rules
+					const rules = config.frontmatterRules?.[templateName];
+					const frontmatterHints: Record<
+						string,
+						{
+							type: string;
+							values?: readonly string[];
+							default?: string;
+							required?: readonly string[];
+							suggested?: readonly string[];
+						}
+					> = {};
+
+					if (rules?.required) {
+						for (const [fieldName, rule] of Object.entries(rules.required)) {
+							if (rule.type === "enum" && rule.enum) {
+								frontmatterHints[fieldName] = {
+									type: "enum",
+									values: rule.enum,
+									default: rule.enum[0],
+								};
+							} else if (rule.type === "array" && rule.includes) {
+								frontmatterHints[fieldName] = {
+									type: "array",
+									required: rule.includes,
+									suggested: config.suggestedTags ?? [],
+								};
+							}
+						}
+					}
+
+					console.log(
+						JSON.stringify(
+							{
+								template: templateName,
+								version: template.version,
+								fields: {
+									required: enhancedRequired,
+									auto: autoFields.map((f) => f.key),
+									body: bodyFields.map((f) => f.key),
+								},
+								frontmatter_hints: frontmatterHints,
+								example: Object.fromEntries(
+									enhancedRequired.map((f) => [f.key, f.example ?? "..."]),
+								),
+							},
+							null,
+							2,
+						),
+					);
+				} else {
+					console.log(
+						emphasize.info(
+							`Template Fields: ${templateName} (v${template.version})`,
+						),
+					);
+					console.log("");
+
+					if (requiredFields.length > 0) {
+						console.log(emphasize.info("Required Fields (provide in args):"));
+						for (const f of requiredFields) {
+							console.log(`  - ${f.key}`);
+						}
+						console.log("");
+					}
+
+					if (autoFields.length > 0) {
+						console.log(emphasize.info("Auto-filled Fields:"));
+						for (const f of autoFields) {
+							console.log(`  - ${f.key}`);
+						}
+						console.log("");
+					}
+
+					if (bodyFields.length > 0) {
+						console.log(emphasize.info("Body Fields:"));
+						for (const f of bodyFields) {
+							console.log(`  - ${f.key}`);
+						}
 					}
 				}
 				break;

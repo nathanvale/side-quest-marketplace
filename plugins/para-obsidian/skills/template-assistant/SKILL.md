@@ -10,7 +10,7 @@ description: Generate intelligent content for PARA Obsidian vault templates. Use
 ### 1. Discover Template Structure
 
 ```bash
-para_template_fields({ template: "project", response_format: "json" })
+para-obsidian template-fields project --format json
 ```
 
 Returns required args, auto-filled fields, and body sections.
@@ -34,22 +34,19 @@ Ask focused questions matching the template type:
 
 ### 4. Create Note with Content
 
-```json
-{
-  "template": "project",
-  "title": "Launch Dark Mode",
-  "args": { "Area": "[[Product]]", "Target completion date (YYYY-MM-DD)": "2025-03-31" },
-  "content": {
-    "Why This Matters": "Dark mode reduces eye strain...",
-    "Success Criteria": "- [ ] Theme toggle works\n- [ ] Persists across sessions"
-  },
-  "response_format": "json"
-}
+```bash
+para-obsidian create --template project \
+  --title "Launch Dark Mode" \
+  --arg "Area=[[Product]]" \
+  --arg "Target completion date (YYYY-MM-DD)=2025-03-31" \
+  --content '{"Why This Matters": "Dark mode reduces eye strain...", "Success Criteria": "- [ ] Theme toggle works\n- [ ] Persists across sessions"}'
 ```
 
 ### 5. Validate Result
 
-Use `para_frontmatter_validate` to verify compliance if needed.
+```bash
+para-obsidian frontmatter validate "Launch Dark Mode.md" --format json
+```
 
 ---
 
@@ -57,8 +54,8 @@ Use `para_frontmatter_validate` to verify compliance if needed.
 
 | Error | Resolution |
 |-------|------------|
-| Template not found | Check `para_templates` for available templates |
-| Missing required arg | Use `para_template_fields` to discover requirements |
+| Template not found | Run `para-obsidian templates` to list available templates |
+| Missing required arg | Run `para-obsidian template-fields <template>` to discover requirements |
 | Section not injected | Heading may not exist in template |
 | Vault not git repo | Ensure PARA_VAULT is an initialized git repository |
 
@@ -70,4 +67,4 @@ Load these as needed based on the task:
 
 - **Template details**: `./references/template-catalog.md` — Full catalog of all 11 templates with required args and body sections
 - **Generation patterns**: `./references/content-strategies.md` — Template-specific content generation strategies (goal clarification, success criteria, risk identification)
-- **Examples**: `./references/examples.md` — Complete MCP call examples for project, area, resource, task, capture
+- **Examples**: `./references/examples.md` — Complete CLI examples for project, area, resource, task, capture

@@ -290,9 +290,3 @@ Load additional strategy files only when needed:
 - Tier 1 templates: Always loaded
 - Tier 2: Load on demand
 - Tier 3: Lazy load specialized templates
-
-### Caching
-Cache template field structure after first inspection:
-```
-para_template_fields → Cache for session
-```
