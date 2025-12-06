@@ -173,6 +173,7 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 				enum: ["pending", "paid", "refunded", "cancelled"],
 			},
 			tags: { type: "array", includes: ["booking"] },
+			template_version: { type: "string", optional: true },
 		},
 	},
 	itinerary: {
