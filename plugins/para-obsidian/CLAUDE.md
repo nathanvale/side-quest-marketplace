@@ -28,12 +28,22 @@ CLI + MCP server for PARA-style Obsidian vault management with frontmatter valid
 - **NEVER** use generic names like "Untitled" or "New Note"
 - Rename operations rewrite all wikilinks and markdown links automatically
 
+**Default Destinations:**
+Notes are automatically placed in their PARA folder unless `--dest` is specified:
+| Template | Default Folder |
+|----------|----------------|
+| project | `01_Projects` |
+| area | `02_Areas` |
+| resource | `03_Resources` |
+| task | `07_Tasks` |
+| daily, weekly-review, capture, booking, checklist, itinerary-day, trip-research | `00_Inbox` |
+
 ---
 
 ## Quick Reference
 
 **Type:** CLI + MCP Server | **Runtime:** Bun | **Language:** TypeScript (strict mode)
-**Dependencies:** yaml, @sidequest/core | **Test Framework:** Bun test (51 tests passing)
+**Dependencies:** yaml, @sidequest/core | **Test Framework:** Bun test (216 tests passing)
 
 ### Directory Structure
 
@@ -43,7 +53,7 @@ para-obsidian/
 │   ├── cli.ts                    # Main CLI entry (37.9 KB, 15 functions)
 │   ├── config.ts                 # ENV-first config loader
 │   ├── frontmatter.ts            # Parse/validate/migrate frontmatter
-│   ├── create.ts                 # Template-based note creation
+│   ├── create.ts                 # Template-based note creation + section injection
 │   ├── search.ts                 # Text search + frontmatter filters
 │   ├── semantic.ts               # Kit semantic search integration
 │   ├── indexer.ts                # Build/save/load frontmatter index
@@ -56,9 +66,8 @@ para-obsidian/
 │   ├── templates.ts              # Templater arg substitution
 │   ├── fs.ts                     # Vault-scoped file operations
 │   └── format.ts                 # Colored CLI output
-├── mcp/para-obsidian/    # MCP server (19 tools)
-│   ├── index.ts                  # mcpez-based MCP server
-│   └── tools.meta.ts             # Tool metadata helpers
+├── mcp/                           # MCP server (20 tools)
+│   └── index.ts                  # mcpez-based MCP server (thin CLI wrapper)
 ├── STATUS.md                      # Development progress tracker
 ├── SPEC.md                        # Working specification
 └── package.json                   # Dependencies + scripts
@@ -70,7 +79,7 @@ para-obsidian/
 
 ```bash
 # Development
-bun test --recursive       # Run all tests (51 passing)
+bun test --recursive       # Run all tests (209 passing)
 bun run typecheck          # Type checking
 bun run check              # Biome lint + format
 
@@ -80,7 +89,7 @@ para-obsidian list [dir]                       # List vault files
 para-obsidian read <file>                      # Read note contents
 para-obsidian search <query> [--dir] [--tag]   # Search with filters
 para-obsidian semantic <query> [--dir]         # Semantic search via Kit
-para-obsidian create <type> [args...]          # Create from template
+para-obsidian create <type> [args...] [--content JSON]  # Create from template with optional content injection
 para-obsidian insert <file> <heading> <text>   # Insert under heading
 para-obsidian rename <old> <new> [--dry-run]   # Rename with link rewrite
 para-obsidian delete <file> [--dry-run]        # Delete with confirm
@@ -109,7 +118,7 @@ para-obsidian templates                        # List template versions
 | `src/git.ts` | Git safety guards + auto-commit | 5.7 KB |
 | `src/indexer.ts` | Lightweight frontmatter/tag/heading index | 5.5 KB |
 | `src/migrations.ts` | Template version migration hooks | 9.3 KB |
-| `mcp/para-obsidian/index.ts` | MCP server (19 tools) | 14.7 KB |
+| `mcp/index.ts` | MCP server (20 tools, thin CLI wrapper) | 14.7 KB |
 
 ---
 
@@ -127,7 +136,7 @@ para-obsidian templates                        # List template versions
 - `semantic_search` — Semantic search via Kit CLI
 
 **Note Management:**
-- `create` — Create from template (Templater substitution)
+- `create` — Create from template with optional content injection (Templater substitution)
 - `insert` — Insert text under heading/block
 - `rename` — Rename with automatic link rewrite
 - `delete` — Delete with confirmation
@@ -162,7 +171,7 @@ para-obsidian templates                        # List template versions
 **TypeScript:** Strict mode, tab indentation, functional style
 **Frontmatter:** YAML parsing via `yaml` library, strict validation per note type
 **File Operations:** Vault-scoped paths, git safety checks before writes
-**Testing:** Bun test framework, 175 tests covering CLI/frontmatter/migrations/MCP
+**Testing:** Bun test framework, 216 tests covering CLI/frontmatter/migrations/MCP
 **Kit ML:** Automatic installation prompt for semantic search dependencies
 
 ---
@@ -215,6 +224,43 @@ para-obsidian templates                        # List template versions
 - Template: `<% tp.system.prompt("Project title") %>`
 - Args: `{ "Project title": "My Project" }`  ← Capital P, space included!
 
+### Content Injection (NEW!)
+
+Create notes AND inject content into sections in a single operation:
+
+```bash
+# CLI: Create project with content injected into body sections
+para-obsidian create --template project --title "My Project" \
+  --arg "Area=[[Work]]" \
+  --content '{"Why This Matters": "This addresses...", "Success Criteria": "- [ ] Done"}'
+```
+
+```json
+// MCP call: para_create with content parameter
+{
+  "template": "project",
+  "title": "My Project",
+  "args": { "Area": "[[Work]]" },
+  "content": {
+    "Why This Matters": "This project addresses a critical need.",
+    "Success Criteria": "- [ ] Feature complete\n- [ ] Tests pass"
+  }
+}
+
+// Returns
+{
+  "filePath": "My Project.md",
+  "sectionsInjected": 2,
+  "sectionsSkipped": [],
+  "injectedHeadings": ["Why This Matters", "Success Criteria"]
+}
+```
+
+**Architecture:** MCP is a thin wrapper → CLI does all heavy lifting:
+- CLI creates file from template AND injects content in one operation
+- Skipped sections (missing headings, empty content) are reported, not errors
+- Useful for AI-assisted content generation workflows
+
 ### Frontmatter Validation
 
 Each note type enforces strict frontmatter schema:
@@ -253,10 +299,12 @@ Safety guards before writes:
 ## Testing
 
 ```bash
-bun test --recursive              # All tests (51 passing)
+bun test --recursive              # All tests (209 passing)
 bun test src/frontmatter.test.ts  # Frontmatter operations
 bun test src/git.test.ts          # Git safety guards
 bun test src/migrations.test.ts   # Template migrations
+bun test src/create.test.ts       # Note creation + section injection
+bun test src/cli.test.ts          # CLI integration tests
 ```
 
 **Test Coverage:**
@@ -266,6 +314,8 @@ bun test src/migrations.test.ts   # Template migrations
 - Git safety guards (repo check, clean tree)
 - CLI arg parsing and command execution
 - Template version planning and application
+- Content injection into sections (injectSections)
+- CLI --content flag integration
 
 ---
 
@@ -287,9 +337,11 @@ bun test src/migrations.test.ts   # Template migrations
 - ✅ Bulk migration (migrate-all, plan, apply-plan)
 - ✅ Attachment auto-discovery for commits
 - ✅ Semantic search via Kit CLI
-- ✅ MCP server (19 tools matching CLI)
+- ✅ MCP server (20 tools, thin CLI wrapper)
 - ✅ Colored CLI output and JSON mode
-- ✅ 51 tests passing
+- ✅ Content injection via --content flag
+- ✅ Default destinations per template type (PARA folders)
+- ✅ 216 tests passing
 
 **Remaining:**
 - Consider richer hints for frontmatter set (allowed enums)

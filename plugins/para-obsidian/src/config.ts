@@ -14,6 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import {
+	DEFAULT_DESTINATIONS,
 	DEFAULT_FRONTMATTER_RULES,
 	DEFAULT_SUGGESTED_TAGS,
 	DEFAULT_TEMPLATE_VERSIONS,
@@ -75,6 +76,8 @@ export interface ParaObsidianConfig {
 	readonly frontmatterRules?: Record<string, FrontmatterRules>;
 	/** Expected template_version for each note type. Used for migration tracking. */
 	readonly templateVersions?: Record<string, number>;
+	/** Default destination directories for each template type (e.g., project → 01_Projects). */
+	readonly defaultDestinations?: Record<string, string>;
 }
 
 /**
@@ -193,6 +196,7 @@ export function loadConfig(
 		suggestedTags: merged.suggestedTags ?? [...DEFAULT_SUGGESTED_TAGS],
 		frontmatterRules: merged.frontmatterRules ?? DEFAULT_FRONTMATTER_RULES,
 		templateVersions: merged.templateVersions ?? DEFAULT_TEMPLATE_VERSIONS,
+		defaultDestinations: merged.defaultDestinations ?? DEFAULT_DESTINATIONS,
 	};
 }
 

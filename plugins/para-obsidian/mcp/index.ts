@@ -26,7 +26,6 @@ import {
 import { startServer, tool, z } from "@sidequest/core/mcp";
 import type { ParaObsidianConfig } from "../src/config";
 import { listTemplateVersions, loadConfig } from "../src/config";
-import { createFromTemplate } from "../src/create";
 import { deleteFile } from "../src/delete";
 import {
 	applyVersionPlan,
@@ -1366,6 +1365,8 @@ Template files expected at vault/06_Metadata/Templates/{template}.md
 
 Filename: Title Case with spaces (e.g., "My Project Note.md")
 
+Optionally injects content into template sections (headings) in a single operation.
+
 Requires git repository with clean working tree.`,
 		inputSchema: {
 			template: z
@@ -1380,6 +1381,12 @@ Requires git repository with clean working tree.`,
 				.record(z.string())
 				.optional()
 				.describe("Additional template arguments (key-value pairs)"),
+			content: z
+				.record(z.string())
+				.optional()
+				.describe(
+					'Content to inject into template sections (heading → body mapping, e.g., {"Why This Matters": "This project addresses..."})',
+				),
 			response_format: z
 				.enum(["markdown", "json"])
 				.optional()
@@ -1398,26 +1405,69 @@ Requires git repository with clean working tree.`,
 			title,
 			dest,
 			args: templateArgs,
+			content,
 			response_format,
 		} = args as {
 			template: string;
 			title: string;
 			dest?: string;
 			args?: Record<string, string>;
+			content?: Record<string, string>;
 			response_format?: string;
 		};
 		const cid = createCorrelationId();
 		const startTime = Date.now();
-		log({ cid, tool: "para_create", event: "request", template, title });
+		log({
+			cid,
+			tool: "para_create",
+			event: "request",
+			template,
+			title,
+			hasContent: !!content,
+		});
 
 		try {
-			const config = loadConfig();
-			const result = createFromTemplate(config, {
+			// Build CLI args - MCP is thin wrapper, CLI does heavy lifting
+			const cliArgs = [
+				"create",
+				"--template",
 				template,
+				"--title",
 				title,
-				dest,
-				args: templateArgs ?? {},
+				"--format",
+				"json",
+			];
+
+			if (dest) {
+				cliArgs.push("--dest", dest);
+			}
+
+			if (templateArgs) {
+				for (const [key, value] of Object.entries(templateArgs)) {
+					cliArgs.push("--arg", `${key}=${value}`);
+				}
+			}
+
+			if (content) {
+				cliArgs.push("--content", JSON.stringify(content));
+			}
+
+			// Call CLI via subprocess
+			const cliPath = new URL("../src/cli.ts", import.meta.url).pathname;
+			const proc = Bun.spawn(["bun", "run", cliPath, ...cliArgs], {
+				stdout: "pipe",
+				stderr: "pipe",
 			});
+
+			const stdout = await new Response(proc.stdout).text();
+			const stderr = await new Response(proc.stderr).text();
+			const exitCode = await proc.exited;
+
+			if (exitCode !== 0) {
+				throw new Error(stderr.trim() || `CLI exited with code ${exitCode}`);
+			}
+
+			const result = JSON.parse(stdout);
 			const format = parseResponseFormat(response_format);
 
 			log({
@@ -1426,6 +1476,7 @@ Requires git repository with clean working tree.`,
 				event: "response",
 				success: true,
 				filePath: result.filePath,
+				sectionsInjected: result.sectionsInjected,
 				durationMs: Date.now() - startTime,
 			});
 
@@ -1440,13 +1491,22 @@ Requires git repository with clean working tree.`,
 				};
 			}
 
+			// Format markdown output
+			const lines = ["## Note Created", "", `**File:** ${result.filePath}`];
+			if (result.sectionsInjected !== undefined) {
+				lines.push(`**Sections injected:** ${result.sectionsInjected}`);
+				if (result.injectedHeadings?.length > 0) {
+					lines.push(`**Headings:** ${result.injectedHeadings.join(", ")}`);
+				}
+				if (result.sectionsSkipped?.length > 0) {
+					lines.push(
+						`**Skipped:** ${result.sectionsSkipped.map((s: { heading: string }) => s.heading).join(", ")}`,
+					);
+				}
+			}
+
 			return {
-				content: [
-					{
-						type: "text" as const,
-						text: `## Note Created\n\n**File:** ${result.filePath}`,
-					},
-				],
+				content: [{ type: "text" as const, text: lines.join("\n") }],
 			};
 		} catch (error) {
 			log({

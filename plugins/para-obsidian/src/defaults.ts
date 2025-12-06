@@ -201,3 +201,21 @@ export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
 	itinerary: 2,
 	research: 2,
 };
+
+/**
+ * Default destination directories for each template type.
+ * These map to the PARA folder structure.
+ */
+export const DEFAULT_DESTINATIONS: Record<string, string> = {
+	project: "01_Projects",
+	area: "02_Areas",
+	resource: "03_Resources",
+	task: "07_Tasks",
+	daily: "00_Inbox",
+	"weekly-review": "00_Inbox",
+	capture: "00_Inbox",
+	booking: "00_Inbox",
+	checklist: "00_Inbox",
+	"itinerary-day": "00_Inbox",
+	"trip-research": "00_Inbox",
+};

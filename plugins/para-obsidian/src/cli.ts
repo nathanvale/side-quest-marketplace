@@ -31,7 +31,7 @@ import {
 	loadConfig,
 	type ParaObsidianConfig,
 } from "./config";
-import { createFromTemplate } from "./create";
+import { createFromTemplate, injectSections } from "./create";
 import { deleteFile } from "./delete";
 import {
 	applyVersionPlan,
@@ -70,7 +70,7 @@ function printUsage(): void {
 		"  bun run src/cli.ts search <query> [--tag TAG] [--frontmatter key=val|--frontmatter.key val] [--regex] [--dir path[,path2]] [--glob pattern] [--context N] [--format md|json]",
 		"  bun run src/cli.ts index prime [--dir path[,path2]] [--format md|json]",
 		"  bun run src/cli.ts index query [--tag TAG] [--frontmatter key=val|--frontmatter.key val] [--dir path[,path2]] [--format md|json]",
-		'  bun run src/cli.ts create --template <name> --title "<Title>" [--dest path] [--arg key=value ...] [--attachments paths] [--format md|json]',
+		'  bun run src/cli.ts create --template <name> --title "<Title>" [--dest path] [--arg key=value ...] [--content \'{"heading": "content"}\'] [--attachments paths] [--format md|json]',
 		'  bun run src/cli.ts insert <file> --heading "<Heading>" --content "<Content>" [--before|--after|--append|--prepend] [--attachments paths] [--format md|json]',
 		"  bun run src/cli.ts rename <from> <to> [--dry-run] [--attachments paths] [--format md|json]",
 		"  bun run src/cli.ts delete <file> --confirm [--dry-run] [--attachments paths] [--format md|json]",
@@ -579,14 +579,35 @@ async function main(): Promise<void> {
 					typeof flags.template === "string" ? flags.template : undefined;
 				const title = typeof flags.title === "string" ? flags.title : undefined;
 				const dest = typeof flags.dest === "string" ? flags.dest : undefined;
+				const contentJson =
+					typeof flags.content === "string" ? flags.content : undefined;
 				if (!template || !title) {
 					console.error("create requires --template and --title");
 					process.exit(1);
 				}
 
+				// Parse --content JSON if provided
+				let contentSections: Record<string, string> | undefined;
+				if (contentJson) {
+					try {
+						contentSections = JSON.parse(contentJson);
+						if (
+							typeof contentSections !== "object" ||
+							contentSections === null
+						) {
+							throw new Error("--content must be a JSON object");
+						}
+					} catch (e) {
+						const msg = e instanceof Error ? e.message : "Invalid JSON";
+						console.error(`Invalid --content JSON: ${msg}`);
+						process.exit(1);
+					}
+				}
+
 				const argsForTemplate: Record<string, string> = {};
 				for (const [k, v] of Object.entries(flags)) {
-					if (["template", "title", "dest", "format"].includes(k)) continue;
+					if (["template", "title", "dest", "format", "content"].includes(k))
+						continue;
 					if (typeof v === "string") argsForTemplate[k] = v;
 				}
 
@@ -597,6 +618,22 @@ async function main(): Promise<void> {
 					dest,
 					args: argsForTemplate,
 				});
+
+				// Inject content into sections if provided
+				let injectionResult:
+					| {
+							injected: string[];
+							skipped: Array<{ heading: string; reason: string }>;
+					  }
+					| undefined;
+				if (contentSections && Object.keys(contentSections).length > 0) {
+					injectionResult = injectSections(
+						config,
+						result.filePath,
+						contentSections,
+					);
+				}
+
 				const attachments = withAutoDiscoveredAttachments(
 					config,
 					result.filePath,
@@ -610,9 +647,37 @@ async function main(): Promise<void> {
 					);
 				}
 				if (isJson) {
-					console.log(JSON.stringify(result, null, 2));
+					const output: Record<string, unknown> = {
+						filePath: result.filePath,
+						content: result.content,
+					};
+					if (injectionResult) {
+						output.sectionsInjected = injectionResult.injected.length;
+						output.sectionsSkipped = injectionResult.skipped;
+						output.injectedHeadings = injectionResult.injected;
+					}
+					console.log(JSON.stringify(output, null, 2));
 				} else {
 					console.log(emphasize.success(`Created ${result.filePath}`));
+					if (injectionResult) {
+						if (injectionResult.injected.length > 0) {
+							console.log(
+								emphasize.info(
+									`Injected content into ${injectionResult.injected.length} section(s): ${injectionResult.injected.join(", ")}`,
+								),
+							);
+						}
+						if (injectionResult.skipped.length > 0) {
+							console.log(
+								emphasize.warn(
+									`Skipped ${injectionResult.skipped.length} section(s):`,
+								),
+							);
+							for (const skip of injectionResult.skipped) {
+								console.log(`  - ${skip.heading}: ${skip.reason}`);
+							}
+						}
+					}
 				}
 				break;
 			}
