@@ -30,7 +30,7 @@
  *
  * server.registerTool("greet", {
  *   description: "Greet someone",
- *   inputSchema: z.object({ name: z.string() }),
+ *   inputSchema: { name: z.string() },
  * }, async ({ name }) => ({ content: [{ type: "text", text: `Hello ${name}!` }] }));
  *
  * const transport = new StdioServerTransport();
@@ -44,7 +44,7 @@
  *
  * tool("greet", {
  *   description: "Greet someone",
- *   inputSchema: z.object({ name: z.string() }),
+ *   inputSchema: { name: z.string() },
  * }, async ({ name }) => ({ content: [{ type: "text", text: `Hello ${name}!` }] }));
  * ```
  *
@@ -389,7 +389,22 @@ export type ToolOptions = {
 	title?: string;
 	/** Tool description shown to LLMs */
 	description?: string;
-	/** Input schema (Zod or JSON Schema) */
+	/**
+	 * Input schema (Zod or JSON Schema)
+	 *
+	 * IMPORTANT: Use plain object with Zod validators per field (mcpez pattern):
+	 * ```typescript
+	 * inputSchema: {
+	 *   query: z.string().describe("Search query"),
+	 *   limit: z.number().optional().describe("Max results")
+	 * }
+	 * ```
+	 *
+	 * NOT a Zod object wrapper:
+	 * ```typescript
+	 * inputSchema: z.object({ query: z.string() })  // WRONG!
+	 * ```
+	 */
 	inputSchema?: Record<string, unknown> | unknown;
 	/** Output schema (Zod or JSON Schema) */
 	outputSchema?: Record<string, unknown> | unknown;

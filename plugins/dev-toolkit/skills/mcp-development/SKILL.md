@@ -68,13 +68,13 @@ tool(
   "hello",
   {
     description: "A simple greeting tool",
-    inputSchema: z.object({
+    inputSchema: {
       name: z.string().describe("Name to greet"),
       response_format: z
         .enum(["markdown", "json"])
         .optional()
         .describe("Output format: 'markdown' (default) or 'json'"),
-    }),
+    },
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -219,13 +219,13 @@ tool(
   "my_tool",
   {
     description: "What this tool does",
-    inputSchema: z.object({
+    inputSchema: {
       query: z.string().describe("What to search for"),
       response_format: z
         .enum(["markdown", "json"])
         .optional()
         .describe("Output format: 'markdown' (default) or 'json'"),
-    }),
+    },
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -263,7 +263,7 @@ tool(
 ### Schema Best Practices
 
 ```typescript
-z.object({
+inputSchema: {
   // Required parameter with description
   query: z.string().describe("Search query"),
 
@@ -281,7 +281,7 @@ z.object({
     minScore: z.number().optional(),
     maxPrice: z.number().optional()
   }).optional()
-})
+}
 ```
 
 ---
