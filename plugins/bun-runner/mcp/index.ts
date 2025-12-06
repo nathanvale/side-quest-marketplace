@@ -369,12 +369,18 @@ function formatCoverageResult(
  * Why: MCP tools should return structured error responses with isError flag
  * so Claude knows the operation failed and can take corrective action.
  */
-function errorResponse(message: string) {
+function errorResponse(
+	message: string,
+	format: ResponseFormat = ResponseFormat.JSON,
+) {
 	return {
 		content: [
 			{
 				type: "text" as const,
-				text: JSON.stringify({ error: message, isError: true }),
+				text:
+					format === ResponseFormat.JSON
+						? JSON.stringify({ error: message, isError: true })
+						: `**Error:** ${message}`,
 			},
 		],
 		isError: true,
@@ -435,6 +441,7 @@ tool(
 				});
 				return errorResponse(
 					error instanceof Error ? error.message : "Invalid pattern",
+					ResponseFormat.JSON,
 				);
 			}
 		}
@@ -457,6 +464,7 @@ tool(
 			});
 
 			return {
+				...(summary.failed > 0 ? { isError: true } : {}),
 				content: [
 					{ type: "text" as const, text: formatTestSummary(summary, format) },
 				],
@@ -468,7 +476,10 @@ tool(
 				error: error instanceof Error ? error.message : "Unknown error",
 				durationMs: Date.now() - startTime,
 			});
-			throw error;
+			return errorResponse(
+				error instanceof Error ? error.message : "Unknown error",
+				format,
+			);
 		}
 	},
 );
@@ -518,6 +529,7 @@ tool(
 			});
 			return errorResponse(
 				error instanceof Error ? error.message : "Invalid file path",
+				ResponseFormat.JSON,
 			);
 		}
 
@@ -539,6 +551,7 @@ tool(
 			});
 
 			return {
+				...(summary.failed > 0 ? { isError: true } : {}),
 				content: [
 					{
 						type: "text" as const,
@@ -553,7 +566,10 @@ tool(
 				error: error instanceof Error ? error.message : "Unknown error",
 				durationMs: Date.now() - startTime,
 			});
-			throw error;
+			return errorResponse(
+				error instanceof Error ? error.message : "Unknown error",
+				format,
+			);
 		}
 	},
 );
@@ -602,6 +618,7 @@ tool(
 			});
 
 			return {
+				...(summary.failed > 0 ? { isError: true } : {}),
 				content: [
 					{
 						type: "text" as const,
@@ -616,7 +633,10 @@ tool(
 				error: error instanceof Error ? error.message : "Unknown error",
 				durationMs: Date.now() - startTime,
 			});
-			throw error;
+			return errorResponse(
+				error instanceof Error ? error.message : "Unknown error",
+				format,
+			);
 		}
 	},
 );
@@ -630,5 +650,12 @@ export { parseBunTestOutput };
 
 // Only start the server when run directly, not when imported by tests
 if (import.meta.main) {
-	startServer("bun-runner", { version: "1.0.0" });
+	startServer("bun-runner", {
+		version: "1.0.0",
+		fileLogging: {
+			enabled: true,
+			subsystems: ["mcp"],
+			level: "info",
+		},
+	});
 }

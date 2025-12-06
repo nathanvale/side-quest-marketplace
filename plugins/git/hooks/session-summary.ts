@@ -158,7 +158,7 @@ if (gitRoot) {
 		const metrics = metricsCollector.getSummary();
 
 		if (metrics.totalOperations > 0) {
-			content += "\n\n" + metricsCollector.toMarkdown();
+			content += `\n\n${metricsCollector.toMarkdown()}`;
 		}
 
 		await Bun.write(summaryPath, content);

@@ -369,4 +369,11 @@ tool(
 );
 
 // Start the server
-startServer("clipboard", { version: "1.0.0" });
+startServer("clipboard", {
+	version: "1.0.0",
+	fileLogging: {
+		enabled: true,
+		subsystems: ["mcp"],
+		level: "info",
+	},
+});

@@ -345,12 +345,18 @@ function formatFormatCheckResult(
  * Why: MCP tools should return structured error responses with isError flag
  * so Claude knows the operation failed and can take corrective action.
  */
-function errorResponse(message: string) {
+function errorResponse(
+	message: string,
+	format: ResponseFormat = ResponseFormat.JSON,
+) {
 	return {
 		content: [
 			{
 				type: "text" as const,
-				text: JSON.stringify({ error: message, isError: true }),
+				text:
+					format === ResponseFormat.JSON
+						? JSON.stringify({ error: message, isError: true })
+						: `**Error:** ${message}`,
 			},
 		],
 		isError: true,
@@ -427,20 +433,38 @@ tool(
 			args.response_format === "json"
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
-		const summary = await runBiomeCheck(validatedPath);
-		log.info({
-			message: "Tool response",
-			cid,
-			tool: "biome_lintCheck",
-			errors: summary.error_count,
-			warnings: summary.warning_count,
-			durationMs: Date.now() - startTime,
-		});
-		return {
-			content: [
-				{ type: "text" as const, text: formatLintSummary(summary, format) },
-			],
-		};
+		try {
+			const summary = await runBiomeCheck(validatedPath);
+			log.info({
+				message: "Tool response",
+				cid,
+				tool: "biome_lintCheck",
+				errors: summary.error_count,
+				warnings: summary.warning_count,
+				durationMs: Date.now() - startTime,
+			});
+			return {
+				...(summary.error_count > 0 ? { isError: true } : {}),
+				content: [
+					{
+						type: "text" as const,
+						text: formatLintSummary(summary, format),
+					},
+				],
+			};
+		} catch (error) {
+			log.error({
+				message: "Tool failed",
+				cid,
+				tool: "biome_lintCheck",
+				error: error instanceof Error ? error.message : "Unknown error",
+				durationMs: Date.now() - startTime,
+			});
+			return errorResponse(
+				error instanceof Error ? error.message : "Unknown error",
+				format,
+			);
+		}
 	},
 );
 
@@ -499,30 +523,45 @@ tool(
 			args.response_format === "json"
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
-		const { formatFixed, lintFixed, remaining } = await runBiomeFix(
-			validatedPath,
-			cid,
-		);
-		const totalFixed = formatFixed + lintFixed;
-		log.info({
-			message: "Tool response",
-			cid,
-			tool: "biome_lintFix",
-			formatFixed,
-			lintFixed,
-			totalFixed,
-			remainingErrors: remaining.error_count,
-			remainingWarnings: remaining.warning_count,
-			durationMs: Date.now() - startTime,
-		});
-		return {
-			content: [
-				{
-					type: "text" as const,
-					text: formatLintFixResult(totalFixed, remaining, format),
-				},
-			],
-		};
+		try {
+			const { formatFixed, lintFixed, remaining } = await runBiomeFix(
+				validatedPath,
+				cid,
+			);
+			const totalFixed = formatFixed + lintFixed;
+			log.info({
+				message: "Tool response",
+				cid,
+				tool: "biome_lintFix",
+				formatFixed,
+				lintFixed,
+				totalFixed,
+				remainingErrors: remaining.error_count,
+				remainingWarnings: remaining.warning_count,
+				durationMs: Date.now() - startTime,
+			});
+			return {
+				...(remaining.error_count > 0 ? { isError: true } : {}),
+				content: [
+					{
+						type: "text" as const,
+						text: formatLintFixResult(totalFixed, remaining, format),
+					},
+				],
+			};
+		} catch (error) {
+			log.error({
+				message: "Tool failed",
+				cid,
+				tool: "biome_lintFix",
+				error: error instanceof Error ? error.message : "Unknown error",
+				durationMs: Date.now() - startTime,
+			});
+			return errorResponse(
+				error instanceof Error ? error.message : "Unknown error",
+				format,
+			);
+		}
 	},
 );
 
@@ -581,24 +620,46 @@ tool(
 			args.response_format === "json"
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
-		const { formatted, files } = await runBiomeFormatCheck(validatedPath);
-		log.info({
-			message: "Tool response",
-			cid,
-			tool: "biome_formatCheck",
-			formatted,
-			unformattedCount: files.length,
-			durationMs: Date.now() - startTime,
-		});
-		return {
-			content: [
-				{
-					type: "text" as const,
-					text: formatFormatCheckResult(formatted, files, format),
-				},
-			],
-		};
+		try {
+			const { formatted, files } = await runBiomeFormatCheck(validatedPath);
+			log.info({
+				message: "Tool response",
+				cid,
+				tool: "biome_formatCheck",
+				formatted,
+				unformattedCount: files.length,
+				durationMs: Date.now() - startTime,
+			});
+			return {
+				...(!formatted ? { isError: true } : {}),
+				content: [
+					{
+						type: "text" as const,
+						text: formatFormatCheckResult(formatted, files, format),
+					},
+				],
+			};
+		} catch (error) {
+			log.error({
+				message: "Tool failed",
+				cid,
+				tool: "biome_formatCheck",
+				error: error instanceof Error ? error.message : "Unknown error",
+				durationMs: Date.now() - startTime,
+			});
+			return errorResponse(
+				error instanceof Error ? error.message : "Unknown error",
+				format,
+			);
+		}
 	},
 );
 
-startServer("biome-runner", { version: "1.0.0" });
+startServer("biome-runner", {
+	version: "1.0.0",
+	fileLogging: {
+		enabled: true,
+		subsystems: ["mcp"],
+		level: "info",
+	},
+});

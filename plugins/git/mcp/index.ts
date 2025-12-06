@@ -121,6 +121,12 @@ enum ResponseFormat {
 	JSON = "json",
 }
 
+function formatErrorMessage(message: string, format: ResponseFormat): string {
+	return format === ResponseFormat.JSON
+		? JSON.stringify({ error: message, isError: true })
+		: `**Error:** ${message}`;
+}
+
 function isError<T extends object>(
 	result: GitResult<T>,
 ): result is ErrorResult {
@@ -772,7 +778,16 @@ tool(
 				error: error instanceof Error ? error.message : "Unknown error",
 				durationMs: Date.now() - startTime,
 			});
-			throw error;
+			const message = error instanceof Error ? error.message : "Unknown error";
+			return {
+				isError: true,
+				content: [
+					{
+						type: "text" as const,
+						text: formatErrorMessage(message, format),
+					},
+				],
+			};
 		}
 	},
 );
@@ -871,7 +886,16 @@ tool(
 				error: error instanceof Error ? error.message : "Unknown error",
 				durationMs: Date.now() - startTime,
 			});
-			throw error;
+			const message = error instanceof Error ? error.message : "Unknown error";
+			return {
+				isError: true,
+				content: [
+					{
+						type: "text" as const,
+						text: formatErrorMessage(message, format),
+					},
+				],
+			};
 		}
 	},
 );
@@ -958,7 +982,16 @@ tool(
 				error: error instanceof Error ? error.message : "Unknown error",
 				durationMs: Date.now() - startTime,
 			});
-			throw error;
+			const message = error instanceof Error ? error.message : "Unknown error";
+			return {
+				isError: true,
+				content: [
+					{
+						type: "text" as const,
+						text: formatErrorMessage(message, format),
+					},
+				],
+			};
 		}
 	},
 );
@@ -1032,7 +1065,16 @@ tool(
 				error: error instanceof Error ? error.message : "Unknown error",
 				durationMs: Date.now() - startTime,
 			});
-			throw error;
+			const message = error instanceof Error ? error.message : "Unknown error";
+			return {
+				isError: true,
+				content: [
+					{
+						type: "text" as const,
+						text: formatErrorMessage(message, format),
+					},
+				],
+			};
 		}
 	},
 );
@@ -1106,7 +1148,16 @@ tool(
 				error: error instanceof Error ? error.message : "Unknown error",
 				durationMs: Date.now() - startTime,
 			});
-			throw error;
+			const message = error instanceof Error ? error.message : "Unknown error";
+			return {
+				isError: true,
+				content: [
+					{
+						type: "text" as const,
+						text: formatErrorMessage(message, format),
+					},
+				],
+			};
 		}
 	},
 );
@@ -1186,7 +1237,16 @@ tool(
 				error: error instanceof Error ? error.message : "Unknown error",
 				durationMs: Date.now() - startTime,
 			});
-			throw error;
+			const message = error instanceof Error ? error.message : "Unknown error";
+			return {
+				isError: true,
+				content: [
+					{
+						type: "text" as const,
+						text: formatErrorMessage(message, format),
+					},
+				],
+			};
 		}
 	},
 );
@@ -1258,10 +1318,26 @@ tool(
 				error: error instanceof Error ? error.message : "Unknown error",
 				durationMs: Date.now() - startTime,
 			});
-			throw error;
+			const message = error instanceof Error ? error.message : "Unknown error";
+			return {
+				isError: true,
+				content: [
+					{
+						type: "text" as const,
+						text: formatErrorMessage(message, format),
+					},
+				],
+			};
 		}
 	},
 );
 
 // Start the MCP server
-startServer("git-intelligence", { version: "1.0.0" });
+startServer("git-intelligence", {
+	version: "1.0.0",
+	fileLogging: {
+		enabled: true,
+		subsystems: ["mcp"],
+		level: "info",
+	},
+});

@@ -245,4 +245,11 @@ tool(
 	},
 );
 
-startServer("tsc-runner", { version: "1.0.0" });
+startServer("tsc-runner", {
+	version: "1.0.0",
+	fileLogging: {
+		enabled: true,
+		subsystems: ["mcp"],
+		level: "info",
+	},
+});

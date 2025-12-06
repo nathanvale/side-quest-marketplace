@@ -19,7 +19,7 @@ async function main() {
 
 	// Only output if we have data
 	if (summary.totalOperations > 0) {
-		console.log("\n" + collector.toMarkdown());
+		console.log(`\n${collector.toMarkdown()}`);
 	}
 
 	process.exit(0);
