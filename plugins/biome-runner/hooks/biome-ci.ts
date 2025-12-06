@@ -12,7 +12,7 @@
  * - 2: Blocking error (lint/format errors found, shown to Claude for follow-up)
  */
 
-import { parseBiomeOutput } from "../mcp/index";
+import { parseBiomeOutput } from "../mcp/biome-runner/index";
 import { hasBiomeConfig, logMissingConfigHint } from "./shared/biome-config";
 import { BIOME_SUPPORTED_EXTENSIONS } from "./shared/constants";
 import { getChangedFiles } from "./shared/git-utils";
@@ -121,7 +121,7 @@ async function main() {
 					file_count: filesToCheck.length,
 					error_count: summary.error_count,
 					warning_count: summary.warning_count,
-					diagnostics: summary.diagnostics.map((d) => ({
+					diagnostics: summary.diagnostics.map((d: { file: string; line: number; code: string; severity: string; message: string }) => ({
 						file: d.file,
 						line: d.line,
 						code: d.code,
