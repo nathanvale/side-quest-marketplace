@@ -522,8 +522,8 @@ export function migrateTemplateVersion(
 		if (transformed.changes?.length) changes.push(...transformed.changes);
 	}
 
-	// Update template_version and write
-	nextAttributes.template_version = expected;
+	// Update template_version and write (as string for validation)
+	nextAttributes.template_version = String(expected);
 	const content = serializeFrontmatter(nextAttributes, nextBody);
 	if (!dryRun) {
 		const { absolute } = resolveVaultPath(config.vault, relative);

@@ -170,7 +170,7 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			},
 			payment_status: {
 				type: "enum",
-				enum: ["pending", "paid", "refunded", "cancelled"],
+				enum: ["pending", "partial", "paid", "refunded", "cancelled"],
 			},
 			tags: { type: "array", includes: ["booking"] },
 			template_version: { type: "string", optional: true },
