@@ -121,7 +121,9 @@ Plugin-specific → `bun --filter <plugin> test` | `claude plugin validate plugi
 ## Code Conventions
 
 **TypeScript:** Strict mode, no unchecked indexed access, Bun types, ESNext target
-**Biome:** Recommended rules, test overrides (`noTemplateCurlyInString: off`, `noUnusedFunctionParameters: off`)
+**Biome:** Recommended rules + test overrides. See `biome.json` for full config:
+  - Main: `noNonNullAssertion: off` (line 21)
+  - Test files: `noTemplateCurlyInString: off`, `noUnusedFunctionParameters: off` (lines 34-37)
 **Testing:** Bun test native, `*.test.ts` alongside source, `import { describe, expect, test } from "bun:test"`
 **File Naming:** kebab-case files/dirs, `*.test.ts` for tests, `SKILL.md` for skills
 
@@ -213,7 +215,7 @@ Full guide: @./docs/PLUGIN_ARCHITECTURE.md
 
 ## Codebase Statistics
 
-From PROJECT_INDEX.json (as of latest prime):
+From PROJECT_INDEX.json (auto-generated, update via `kit_index_prime`):
 - **Files indexed:** 208 TypeScript files
 - **Total symbols:** 878
 - **Distribution:** Functions 61%, Interfaces 26%, Methods 7%, Types 3%, Classes 1%, Enums 1%
@@ -261,15 +263,7 @@ Full overview: @./docs/PLUGINS_OVERVIEW.md
 
 | Resource | Location |
 |----------|----------|
-| Plugin Dev Guide | @./PLUGIN_DEV_GUIDE.md |
-| Troubleshooting | @./TROUBLESHOOTING.md |
-| Git Workflow | @./docs/GIT_WORKFLOW.md |
-| MCP Tools Reference | @./docs/MCP_TOOLS.md |
-| Plugin Architecture | @./docs/PLUGIN_ARCHITECTURE.md |
-| Plugins Overview | @./docs/PLUGINS_OVERVIEW.md |
 | Claude Code Docs | `/claude-code-docs:help` |
-| Validation Engine | core/src/validate/ |
-| Example Plugins | plugins/git, plugins/kit |
 
 ---
 
