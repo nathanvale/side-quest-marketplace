@@ -34,6 +34,15 @@ import {
 } from "@sidequest/core/mcp";
 ```
 
+### CLI Wrapper Imports (for tools that wrap external CLIs)
+
+```typescript
+import { buildEnhancedPath, spawnSyncCollect } from "@sidequest/core/spawn";
+
+// buildEnhancedPath() - Returns PATH with uv, Homebrew, and common tool directories
+// spawnSyncCollect() - Executes command and collects stdout/stderr
+```
+
 ---
 
 ## Server Creation
@@ -562,6 +571,78 @@ log.info({ cid, ... }, "api");
 
 ---
 
+## CLI Wrapper Module (@sidequest/core/spawn)
+
+For MCP tools that wrap external CLI programs:
+
+### buildEnhancedPath()
+
+Returns an enhanced PATH that includes common tool locations:
+
+```typescript
+import { buildEnhancedPath } from "@sidequest/core/spawn";
+
+const enhancedPath = buildEnhancedPath();
+// Includes: ~/.local/bin (uv), /opt/homebrew/bin, standard PATH
+```
+
+### spawnSyncCollect()
+
+Executes a command and collects stdout/stderr:
+
+```typescript
+import { spawnSyncCollect } from "@sidequest/core/spawn";
+
+const result = spawnSyncCollect(
+  ["bun", "run", "script.ts", "--arg", value],
+  { env: { PATH: buildEnhancedPath() } }
+);
+
+// result.exitCode - 0 for success, non-zero for error
+// result.stdout - Standard output as string
+// result.stderr - Standard error as string
+```
+
+### Complete CLI Wrapper Example (from Kit)
+
+```typescript
+import { createCorrelationId, log, tool, z } from "@sidequest/core/mcp";
+import { buildEnhancedPath, spawnSyncCollect } from "@sidequest/core/spawn";
+
+tool("my_cli_wrapper", {
+  description: "Wraps external CLI tool",
+  inputSchema: {
+    query: z.string().describe("Query to pass to CLI"),
+    response_format: z.enum(["markdown", "json"]).optional()
+      .describe("Output format: 'markdown' (default) or 'json'"),
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async (args: Record<string, unknown>) => {
+  const { query, response_format } = args as { query: string; response_format?: string };
+
+  const cid = createCorrelationId();
+  const startTime = Date.now();
+  log.info({ cid, tool: "my_cli_wrapper", args: { query } }, "cli");
+
+  const format = response_format === "json" ? "json" : "markdown";
+  const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
+
+  const result = spawnSyncCollect(
+    ["bun", "run", `${pluginRoot}/src/cli.ts`, "search", query, "--format", format],
+    { env: { PATH: buildEnhancedPath() } }
+  );
+
+  log.info({ cid, tool: "my_cli_wrapper", success: result.exitCode === 0, durationMs: Date.now() - startTime }, "cli");
+
+  return {
+    ...(result.exitCode !== 0 ? { isError: true } : {}),
+    content: [{ type: "text" as const, text: result.exitCode === 0 ? result.stdout : result.stderr }],
+  };
+});
+```
+
+---
+
 ## Summary
 
 `@sidequest/core/mcp` provides:
@@ -572,12 +653,18 @@ log.info({ cid, ... }, "api");
 - **log** - Hierarchical logging with subsystems
 - **createCorrelationId()** - Request tracing
 
+`@sidequest/core/spawn` provides:
+
+- **buildEnhancedPath()** - Enhanced PATH for CLI discovery
+- **spawnSyncCollect()** - Execute CLI and collect output
+
 **Key patterns:**
 
-1. Import everything from `@sidequest/core/mcp`
-2. Use correlation IDs for request tracing
-3. Log with subsystems for hierarchical filtering
-4. Support both markdown and JSON response formats
-5. Return structured errors with recovery hints
+1. Import from `@sidequest/core/mcp` for MCP functionality
+2. Import from `@sidequest/core/spawn` for CLI wrappers
+3. Use correlation IDs for request tracing
+4. Log with subsystems for hierarchical filtering
+5. Support both markdown and JSON response formats
+6. Return structured errors with recovery hints
 
 See Kit plugin for production examples: @./kit-case-study.md

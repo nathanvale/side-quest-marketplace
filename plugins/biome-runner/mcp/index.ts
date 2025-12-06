@@ -11,17 +11,15 @@
  * Uses native Bun.spawn() for better performance over Node.js child_process.
  */
 
-import { startServer, tool, z } from "@sidequest/core/mcp";
 import {
 	createCorrelationId,
-	initLogger,
-	mcpLogger,
-} from "../hooks/shared/logger";
+	log,
+	startServer,
+	tool,
+	z,
+} from "@sidequest/core/mcp";
 import { spawnAndCollect } from "../hooks/shared/spawn-utils";
 import { validatePathOrDefault } from "./path-validator";
-
-// Initialize logger on server startup
-initLogger().catch(console.error);
 
 // --- Types ---
 
@@ -159,7 +157,8 @@ async function runBiomeFix(
 		// Biome format reports number of changed files in summary.changed
 		formatFixed = report.summary?.changed || 0;
 	} catch (error) {
-		mcpLogger.warn("Failed to parse Biome format output", {
+		log.warning({
+			message: "Failed to parse Biome format output",
 			cid,
 			error: error instanceof Error ? error.message : "Unknown",
 			stdout: formatStdout.substring(0, 200),
@@ -184,7 +183,8 @@ async function runBiomeFix(
 		// Biome check reports number of changed files in summary.changed
 		lintFixed = report.summary?.changed || 0;
 	} catch (error) {
-		mcpLogger.warn("Failed to parse Biome check output", {
+		log.warning({
+			message: "Failed to parse Biome check output",
 			cid,
 			error: error instanceof Error ? error.message : "Unknown",
 			stdout: checkStdout.substring(0, 200),
@@ -192,7 +192,8 @@ async function runBiomeFix(
 		});
 	}
 
-	mcpLogger.debug("Biome fix completed", {
+	log.debug({
+		message: "Biome fix completed",
 		cid,
 		formatFixed,
 		lintFixed,
@@ -386,8 +387,8 @@ tool(
 			response_format: z
 				.enum(["markdown", "json"])
 				.optional()
-				.default("markdown")
-				.describe("Output format: 'markdown' (default) or 'json'"),
+				.default("json")
+				.describe("Output format: 'markdown' or 'json' (default)"),
 		},
 		annotations: {
 			readOnlyHint: true,
@@ -399,7 +400,8 @@ tool(
 	async (args: { path?: string; response_format?: string }) => {
 		const cid = createCorrelationId();
 		const startTime = Date.now();
-		mcpLogger.info("Tool request", {
+		log.info({
+			message: "Tool request",
 			cid,
 			tool: "biome_lintCheck",
 			path: args.path,
@@ -410,7 +412,8 @@ tool(
 		try {
 			validatedPath = await validatePathOrDefault(args.path);
 		} catch (error) {
-			mcpLogger.warn("Validation failed", {
+			log.warning({
+				message: "Validation failed",
 				cid,
 				tool: "biome_lintCheck",
 				error: error instanceof Error ? error.message : "Unknown",
@@ -425,7 +428,8 @@ tool(
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
 		const summary = await runBiomeCheck(validatedPath);
-		mcpLogger.info("Tool response", {
+		log.info({
+			message: "Tool response",
 			cid,
 			tool: "biome_lintCheck",
 			errors: summary.error_count,
@@ -455,8 +459,8 @@ tool(
 			response_format: z
 				.enum(["markdown", "json"])
 				.optional()
-				.default("markdown")
-				.describe("Output format: 'markdown' (default) or 'json'"),
+				.default("json")
+				.describe("Output format: 'markdown' or 'json' (default)"),
 		},
 		annotations: {
 			readOnlyHint: false,
@@ -468,7 +472,8 @@ tool(
 	async (args: { path?: string; response_format?: string }) => {
 		const cid = createCorrelationId();
 		const startTime = Date.now();
-		mcpLogger.info("Tool request", {
+		log.info({
+			message: "Tool request",
 			cid,
 			tool: "biome_lintFix",
 			path: args.path,
@@ -479,7 +484,8 @@ tool(
 		try {
 			validatedPath = await validatePathOrDefault(args.path);
 		} catch (error) {
-			mcpLogger.warn("Validation failed", {
+			log.warning({
+				message: "Validation failed",
 				cid,
 				tool: "biome_lintFix",
 				error: error instanceof Error ? error.message : "Unknown",
@@ -498,7 +504,8 @@ tool(
 			cid,
 		);
 		const totalFixed = formatFixed + lintFixed;
-		mcpLogger.info("Tool response", {
+		log.info({
+			message: "Tool response",
 			cid,
 			tool: "biome_lintFix",
 			formatFixed,
@@ -534,8 +541,8 @@ tool(
 			response_format: z
 				.enum(["markdown", "json"])
 				.optional()
-				.default("markdown")
-				.describe("Output format: 'markdown' (default) or 'json'"),
+				.default("json")
+				.describe("Output format: 'markdown' or 'json' (default)"),
 		},
 		annotations: {
 			readOnlyHint: true,
@@ -547,7 +554,8 @@ tool(
 	async (args: { path?: string; response_format?: string }) => {
 		const cid = createCorrelationId();
 		const startTime = Date.now();
-		mcpLogger.info("Tool request", {
+		log.info({
+			message: "Tool request",
 			cid,
 			tool: "biome_formatCheck",
 			path: args.path,
@@ -558,7 +566,8 @@ tool(
 		try {
 			validatedPath = await validatePathOrDefault(args.path);
 		} catch (error) {
-			mcpLogger.warn("Validation failed", {
+			log.warning({
+				message: "Validation failed",
 				cid,
 				tool: "biome_formatCheck",
 				error: error instanceof Error ? error.message : "Unknown",
@@ -573,7 +582,8 @@ tool(
 				? ResponseFormat.JSON
 				: ResponseFormat.MARKDOWN;
 		const { formatted, files } = await runBiomeFormatCheck(validatedPath);
-		mcpLogger.info("Tool response", {
+		log.info({
+			message: "Tool response",
 			cid,
 			tool: "biome_formatCheck",
 			formatted,

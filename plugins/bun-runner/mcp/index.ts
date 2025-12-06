@@ -398,7 +398,8 @@ tool(
 			response_format: z
 				.enum(["markdown", "json"])
 				.optional()
-				.describe("Output format: 'markdown' (default) or 'json'"),
+				.default("json")
+				.describe("Output format: 'markdown' or 'json' (default)"),
 		},
 		annotations: {
 			readOnlyHint: true,
@@ -484,7 +485,8 @@ tool(
 			response_format: z
 				.enum(["markdown", "json"])
 				.optional()
-				.describe("Output format: 'markdown' (default) or 'json'"),
+				.default("json")
+				.describe("Output format: 'markdown' or 'json' (default)"),
 		},
 		annotations: {
 			readOnlyHint: true,
@@ -565,7 +567,8 @@ tool(
 			response_format: z
 				.enum(["markdown", "json"])
 				.optional()
-				.describe("Output format: 'markdown' (default) or 'json'"),
+				.default("json")
+				.describe("Output format: 'markdown' or 'json' (default)"),
 		},
 		annotations: {
 			readOnlyHint: true,

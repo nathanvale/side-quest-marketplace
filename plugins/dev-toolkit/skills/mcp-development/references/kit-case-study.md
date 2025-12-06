@@ -107,69 +107,104 @@ tool("kit_summarize", ...)             // PR summaries (~3s)
 
 ## The 6-Step Handler Pattern
 
-Kit's handlers follow a consistent 6-step pattern (used across all 18 tools):
+Kit's handlers follow a consistent 6-step pattern (used across all 18 tools). Here's the **actual code** from Kit's production server:
 
 ```typescript
-async (args, _extra: unknown) => {
-  // Step 1: Generate correlation ID for request tracing
-  const cid = createCorrelationId();
+// From plugins/kit/mcp/index.ts - ACTUAL PRODUCTION CODE
 
-  // Step 2: Log the request
-  const logger = getSubsystemLogger(
-    args.search_mode === "semantic" ? "semantic" : "grep"
-  );
-  logger.info("MCP tool request", {
-    cid,
-    tool: "kit_grep",
-    args,
-    timestamp: new Date().toISOString()
-  });
+import {
+  createCorrelationId,
+  log,
+  startServer,
+  tool,
+  z,
+} from "@sidequest/core/mcp";
+import { buildEnhancedPath, spawnSyncCollect } from "@sidequest/core/spawn";
 
-  try {
-    // Step 3: Execute business logic
-    const results = await executeKitGrep(args.pattern);
+tool(
+  "kit_grep",  // SHORT name - Claude Code adds prefix
+  {
+    description: `Fast text search across repository files using Kit CLI.
 
-    // Step 4: Format output based on response_format
-    const text = args.response_format === "json"
-      ? JSON.stringify(results)
-      : formatResultsAsMarkdown(results);
+Searches for literal patterns with optional regex support. Great for:
+- Finding function definitions
+- Locating error messages
+- Searching for specific strings
 
-    // Step 5: Log the response
-    logger.info("MCP tool response", {
-      cid,
-      tool: "kit_grep",
-      success: true,
-      resultCount: results.length,
-      durationMs: Date.now() - startTime
-    });
-
-    // Step 6: Return MCP response
-    return {
-      content: [{ type: "text", text }]
+Results include file paths, line numbers, and matched content.`,
+    inputSchema: {
+      pattern: z.string().describe('Search pattern (text or regex). Example: "function auth"'),
+      path: z.string().optional().describe("Repository path to search"),
+      include: z.string().optional().describe('Include files matching pattern. Example: "*.ts"'),
+      exclude: z.string().optional().describe('Exclude files matching pattern. Example: "*.test.ts"'),
+      case_sensitive: z.boolean().optional().describe("Case sensitive search (default: true)"),
+      max_results: z.number().optional().describe("Maximum results to return (default: 100, max: 1000)"),
+      directory: z.string().optional().describe("Limit search to specific subdirectory"),
+      response_format: z.enum(["markdown", "json"]).optional()
+        .describe("Output format: 'markdown' (default) or 'json'"),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  async (args: Record<string, unknown>) => {
+    // Step 1: Extract and type args
+    const { pattern, path, include, exclude, case_sensitive, max_results, directory, response_format } = args as {
+      pattern: string;
+      path?: string;
+      include?: string;
+      exclude?: string;
+      case_sensitive?: boolean;
+      max_results?: number;
+      directory?: string;
+      response_format?: string;
     };
-  } catch (error) {
-    // Step 5 (error path): Log the error
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error("MCP tool failed", {
-      cid,
-      tool: "kit_grep",
-      error: errorMessage
+
+    // Step 2: Generate correlation ID and log request
+    const mcpCid = createCorrelationId();
+    const mcpStartTime = Date.now();
+    log.info({ cid: mcpCid, tool: "kit_grep", args: { pattern } }, "grep");
+
+    // Step 3: Build CLI command
+    const format = response_format === "json" ? "json" : "markdown";
+    const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
+    const cmd = ["run", `${pluginRoot}/src/cli.ts`, "grep", pattern, "--format", format];
+
+    // Add optional flags
+    if (path) cmd.push("--path", path);
+    if (include) cmd.push("--include", include);
+    if (exclude) cmd.push("--exclude", exclude);
+    if (case_sensitive === false) cmd.push("--case-insensitive", "true");
+    if (max_results) cmd.push("--max-results", String(max_results));
+    if (directory) cmd.push("--directory", directory);
+
+    // Step 4: Execute CLI via spawnSyncCollect
+    const result = spawnSyncCollect(["bun", ...cmd], {
+      env: { PATH: buildEnhancedPath() },
     });
 
-    // Step 6 (error path): Return error with recovery hint
+    // Step 5: Log response with duration
+    const mcpDuration = Date.now() - mcpStartTime;
+    log.info({
+      cid: mcpCid,
+      tool: "kit_grep",
+      success: result.exitCode === 0,
+      durationMs: mcpDuration,
+    }, "grep");
+
+    // Step 6: Return MCP response with conditional isError
     return {
+      ...(result.exitCode !== 0 ? { isError: true } : {}),
       content: [{
-        type: "text",
-        text: JSON.stringify({
-          error: errorMessage,
-          hint: "Check pattern syntax. Use kit_grep --help for examples",
-          isError: true
-        })
+        type: "text" as const,
+        text: result.exitCode === 0 ? result.stdout : result.stderr,
       }],
-      isError: true
     };
-  }
-}
+  },
+);
 ```
 
 ### Correlation ID Tracing Example
