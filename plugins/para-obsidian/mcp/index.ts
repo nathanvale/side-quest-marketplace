@@ -45,6 +45,7 @@ import { renameWithLinkRewrite } from "../src/links";
 import { MIGRATIONS } from "../src/migrations";
 import { filterByFrontmatter, searchText } from "../src/search";
 import { semanticSearch } from "../src/semantic";
+import { getTemplate, getTemplateFields } from "../src/templates";
 
 // ============================================================================
 // Logging
@@ -420,6 +421,238 @@ catalog display.`,
 			log({
 				cid,
 				tool: "para_templates",
+				event: "error",
+				error: error instanceof Error ? error.message : String(error),
+			});
+			const format = parseResponseFormat(
+				args.response_format as string | undefined,
+			);
+			return {
+				isError: true,
+				content: [{ type: "text" as const, text: formatError(error, format) }],
+			};
+		}
+	},
+);
+
+// ============================================================================
+// Template Fields Tool
+// ============================================================================
+
+tool(
+	"para_template_fields",
+	{
+		description: `Inspect a template to see what fields it requires.
+
+Extracts all Templater prompt fields from a template, showing:
+- Exact key names to use in args (e.g., "Project title", "Area")
+- Whether fields appear in frontmatter vs body
+- Which fields auto-fill (like dates)
+
+This tool makes it clear what arguments to provide when creating notes from templates.
+
+Example: For project template, shows you need:
+  { "Project title": "...", "Target completion date (YYYY-MM-DD)": "...", "Area": "..." }`,
+		inputSchema: {
+			template: z
+				.string()
+				.describe("Template name (e.g., 'project', 'capture')"),
+			response_format: z
+				.enum(["markdown", "json"])
+				.optional()
+				.describe("Output format: 'markdown' (default) or 'json'"),
+		},
+		annotations: {
+			readOnlyHint: true,
+			destructiveHint: false,
+			idempotentHint: true,
+			openWorldHint: false,
+		},
+	},
+	async (args: Record<string, unknown>) => {
+		const cid = createCorrelationId();
+		const startTime = Date.now();
+		log({ cid, tool: "para_template_fields", event: "request", args });
+
+		try {
+			const config = loadConfig();
+			const templateName = args.template as string;
+			const template = getTemplate(config, templateName);
+
+			if (!template) {
+				throw new Error(`Template not found: ${templateName}`);
+			}
+
+			const fields = getTemplateFields(template);
+			const format = parseResponseFormat(
+				args.response_format as string | undefined,
+			);
+
+			log({
+				cid,
+				tool: "para_template_fields",
+				event: "response",
+				success: true,
+				template: templateName,
+				fieldCount: fields.length,
+				durationMs: Date.now() - startTime,
+			});
+
+			if (format === ResponseFormat.JSON) {
+				const requiredFields = fields.filter(
+					(f) => !f.isAutoDate && f.inFrontmatter,
+				);
+				const autoFields = fields.filter((f) => f.isAutoDate);
+				const bodyFields = fields.filter(
+					(f) => !f.isAutoDate && !f.inFrontmatter,
+				);
+
+				// Build enhanced field info with type hints
+				const enhancedRequired = requiredFields.map((f) => {
+					const result: {
+						key: string;
+						type?: string;
+						example?: string;
+					} = { key: f.key };
+
+					// Infer type and example from key name
+					if (f.key.toLowerCase().includes("date")) {
+						result.type = "date";
+						result.example = new Date().toISOString().split("T")[0];
+					} else if (
+						f.key.toLowerCase().includes("area") ||
+						f.key.toLowerCase().includes("project")
+					) {
+						result.type = "wikilink";
+						result.example = "[[Note Name]]";
+					} else {
+						result.type = "string";
+					}
+
+					return result;
+				});
+
+				// Build frontmatter hints from config rules
+				const rules = config.frontmatterRules?.[templateName];
+				const frontmatterHints: Record<
+					string,
+					{
+						type: string;
+						values?: readonly string[];
+						default?: string;
+						required?: readonly string[];
+						suggested?: readonly string[];
+					}
+				> = {};
+
+				if (rules?.required) {
+					for (const [fieldName, rule] of Object.entries(rules.required)) {
+						if (rule.type === "enum" && rule.enum) {
+							frontmatterHints[fieldName] = {
+								type: "enum",
+								values: rule.enum,
+								default: rule.enum[0],
+							};
+						} else if (rule.type === "array" && rule.includes) {
+							frontmatterHints[fieldName] = {
+								type: "array",
+								required: rule.includes,
+								suggested: config.suggestedTags ?? [],
+							};
+						}
+					}
+				}
+
+				return {
+					content: [
+						{
+							type: "text" as const,
+							text: JSON.stringify(
+								{
+									template: templateName,
+									version: template.version,
+									fields: {
+										required: enhancedRequired,
+										auto: autoFields.map((f) => f.key),
+										body: bodyFields.map((f) => f.key),
+									},
+									frontmatter_hints: frontmatterHints,
+									example: Object.fromEntries(
+										enhancedRequired.map((f) => [f.key, f.example ?? "..."]),
+									),
+								},
+								null,
+								2,
+							),
+						},
+					],
+				};
+			}
+
+			const lines = [
+				`## Template Fields: ${templateName} (v${template.version})`,
+				"",
+			];
+
+			const requiredFields = fields.filter(
+				(f) => !f.isAutoDate && f.inFrontmatter,
+			);
+			const autoFields = fields.filter((f) => f.isAutoDate);
+			const bodyFields = fields.filter(
+				(f) => !f.isAutoDate && !f.inFrontmatter,
+			);
+
+			if (requiredFields.length > 0) {
+				lines.push("### Required Fields (provide in args):", "");
+				for (const field of requiredFields) {
+					lines.push(`- \`"${field.key}"\` (frontmatter)`);
+				}
+				lines.push("");
+			}
+
+			if (autoFields.length > 0) {
+				lines.push("### Auto-filled Fields (no args needed):", "");
+				for (const field of autoFields) {
+					lines.push(`- \`"${field.key}"\` (auto-fills with current date)`);
+				}
+				lines.push("");
+			}
+
+			if (bodyFields.length > 0) {
+				lines.push("### Optional Body Fields:", "");
+				for (const field of bodyFields) {
+					lines.push(`- \`"${field.key}"\``);
+				}
+				lines.push("");
+			}
+
+			if (requiredFields.length > 0) {
+				lines.push("### Example MCP Call:", "", "```json");
+				const example: Record<string, string> = {};
+				for (const field of requiredFields.slice(0, 3)) {
+					example[field.key] = "...";
+				}
+				lines.push(
+					JSON.stringify(
+						{
+							template: templateName,
+							title: "My Note Title",
+							args: example,
+						},
+						null,
+						2,
+					),
+				);
+				lines.push("```");
+			}
+
+			return {
+				content: [{ type: "text" as const, text: lines.join("\n") }],
+			};
+		} catch (error) {
+			log({
+				cid,
+				tool: "para_template_fields",
 				event: "error",
 				error: error instanceof Error ? error.message : String(error),
 			});

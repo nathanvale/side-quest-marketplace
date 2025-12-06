@@ -9,6 +9,7 @@
 	},
 	"dependencies": {
 		"@sidequest/core": "workspace:*",
+		"date-fns": "^4.1.0",
 		"yaml": "^2.6.0"
 	},
 	"scripts": {

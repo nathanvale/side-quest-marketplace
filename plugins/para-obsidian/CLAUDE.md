@@ -113,11 +113,12 @@ para-obsidian templates                        # List template versions
 
 ---
 
-## MCP Tools (19 Total)
+## MCP Tools (20 Total)
 
 **Configuration:**
 - `config` — Load resolved configuration
 - `templates` — List configured template versions
+- `template_fields` — Inspect template to see required args (NEW!)
 
 **File Operations:**
 - `list` — List vault files/directories
@@ -184,6 +185,35 @@ para-obsidian templates                        # List template versions
 2. User config: `~/.config/para-obsidian/config.json`
 3. Project config: `.para-obsidianrc` in vault root
 4. Hardcoded defaults (templates dir, suggested tags, frontmatter rules)
+
+### Template Field Discovery
+
+**NEW!** Use `template_fields` tool to discover what args a template needs:
+
+```json
+// MCP call
+{ "template": "project", "response_format": "json" }
+
+// Returns
+{
+  "template": "project",
+  "version": 2,
+  "fields": {
+    "required": ["Project title", "Target completion date (YYYY-MM-DD)", "Area"],
+    "auto": ["created"],
+    "body": []
+  },
+  "example": {
+    "Project title": "...",
+    "Target completion date (YYYY-MM-DD)": "...",
+    "Area": "..."
+  }
+}
+```
+
+**Key insight:** The arg keys must match the **exact Templater prompt text** from the template:
+- Template: `<% tp.system.prompt("Project title") %>`
+- Args: `{ "Project title": "My Project" }`  ← Capital P, space included!
 
 ### Frontmatter Validation
 

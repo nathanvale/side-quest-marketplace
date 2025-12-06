@@ -16,7 +16,7 @@ import path from "node:path";
 import type { ParaObsidianConfig } from "./config";
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter";
 import { resolveVaultPath } from "./fs";
-import { getTemplate } from "./templates";
+import { applyDateSubstitutions, getTemplate } from "./templates";
 
 /**
  * Options for creating a new note from a template.
@@ -98,9 +98,10 @@ export function applyArgsToTemplate(
  *
  * This function:
  * 1. Loads the specified template
- * 2. Applies any argument substitutions
- * 3. Injects template_version and title into frontmatter
- * 4. Creates the file with Title Case filename
+ * 2. Replaces all `<% tp.date.now(...) %>` patterns with actual dates
+ * 3. Replaces all `<% tp.system.prompt(...) %>` patterns with provided args
+ * 4. Injects template_version and title into frontmatter
+ * 5. Creates the file with Title Case filename
  *
  * @param config - Para-obsidian configuration
  * @param options - Creation options (template, title, dest, args)
@@ -113,9 +114,13 @@ export function applyArgsToTemplate(
  *   template: 'project',
  *   title: 'New Feature',
  *   dest: 'Projects',
- *   args: { area: '[[Development]]' }
+ *   args: {
+ *     'Project title': 'New Feature',
+ *     'Target completion date (YYYY-MM-DD)': '2025-12-31',
+ *     'Area': '[[Development]]'
+ *   }
  * });
- * // Creates 'Projects/New Feature.md' from the project template
+ * // Creates 'Projects/New Feature.md' with dates auto-filled
  * ```
  */
 export function createFromTemplate(
@@ -133,10 +138,13 @@ export function createFromTemplate(
 		throw new Error(`File already exists: ${target.relative}`);
 	}
 
-	// Apply argument substitutions to template content
-	const filled = options.args
-		? applyArgsToTemplate(tpl.content, options.args)
-		: tpl.content;
+	// Apply template substitutions:
+	// 1. First, replace all date patterns (tp.date.now) with actual dates
+	// 2. Then, replace all prompt patterns (tp.system.prompt) with provided args
+	//    - Auto-include "Title" from options.title so templates with title prompts work
+	let filled = applyDateSubstitutions(tpl.content);
+	const argsWithTitle = { Title: options.title, ...options.args };
+	filled = applyArgsToTemplate(filled, argsWithTitle);
 
 	const { attributes, body } = parseFrontmatter(filled);
 
