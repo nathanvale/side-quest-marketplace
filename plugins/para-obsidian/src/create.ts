@@ -7,6 +7,7 @@
  * - Template argument substitution
  * - Automatic template_version injection
  * - Title field injection
+ * - Content injection into template sections
  *
  * @module create
  */
@@ -16,7 +17,12 @@ import path from "node:path";
 import type { ParaObsidianConfig } from "./config";
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter";
 import { resolveVaultPath } from "./fs";
-import { applyDateSubstitutions, getTemplate } from "./templates";
+import { insertIntoNote } from "./insert";
+import {
+	applyDateSubstitutions,
+	detectTitlePromptKey,
+	getTemplate,
+} from "./templates";
 
 /**
  * Options for creating a new note from a template.
@@ -26,10 +32,20 @@ export interface CreateOptions {
 	readonly template: string;
 	/** Title for the new note. Will be used for filename and title field. */
 	readonly title: string;
-	/** Destination directory relative to vault. Defaults to vault root. */
+	/** Destination directory relative to vault. Defaults to template's configured folder. */
 	readonly dest?: string;
 	/** Arguments to substitute for Templater prompts in the template. */
 	readonly args?: Record<string, string>;
+}
+
+/**
+ * Result of injecting content into multiple sections.
+ */
+export interface InjectSectionsResult {
+	/** List of heading names that were successfully injected. */
+	readonly injected: string[];
+	/** List of sections that were skipped with reasons. */
+	readonly skipped: Array<{ heading: string; reason: string }>;
 }
 
 /**
@@ -115,7 +131,8 @@ export function applyArgsToTemplate(
 
 	// Second, replace any remaining optional prompts (with defaults) with their default values
 	// Match: <% tp.system.prompt("any", "default") %>
-	const optionalPromptRegex = /<% tp\.system\.prompt\("([^"]+)"\s*,\s*"([^"]*)"\s*\)\s*%>/g;
+	const optionalPromptRegex =
+		/<% tp\.system\.prompt\("([^"]+)"\s*,\s*"([^"]*)"\s*\)\s*%>/g;
 	output = output.replace(optionalPromptRegex, (_match, _key, defaultValue) => {
 		return defaultValue;
 	});
@@ -160,7 +177,9 @@ export function createFromTemplate(
 	const tpl = getTemplate(config, options.template);
 	if (!tpl) throw new Error(`Template not found: ${options.template}`);
 
-	const destDir = options.dest ?? "";
+	// Resolve destination: explicit > config default > vault root
+	const destDir =
+		options.dest ?? config.defaultDestinations?.[options.template] ?? "";
 	const filename = titleToFilename(options.title);
 	const target = resolveVaultPath(config.vault, path.join(destDir, filename));
 
@@ -171,9 +190,11 @@ export function createFromTemplate(
 	// Apply template substitutions:
 	// 1. First, replace all date patterns (tp.date.now) with actual dates
 	// 2. Then, replace all prompt patterns (tp.system.prompt) with provided args
-	//    - Auto-include "Title" from options.title so templates with title prompts work
+	//    - Auto-detect the title prompt key (e.g., "Title", "Project title", "Resource title")
+	//    - Inject options.title using the detected key for automatic substitution
 	let filled = applyDateSubstitutions(tpl.content);
-	const argsWithTitle = { Title: options.title, ...options.args };
+	const titleKey = detectTitlePromptKey(tpl);
+	const argsWithTitle = { [titleKey]: options.title, ...options.args };
 	filled = applyArgsToTemplate(filled, argsWithTitle);
 
 	const { attributes, body } = parseFrontmatter(filled);
@@ -197,4 +218,61 @@ export function createFromTemplate(
 	fs.writeFileSync(target.absolute, content, "utf8");
 
 	return { filePath: target.relative, content };
+}
+
+/**
+ * Injects content into multiple sections of a note.
+ *
+ * For each heading → content pair, appends the content under that heading.
+ * Skips sections with empty content or missing headings, collecting errors
+ * for reporting.
+ *
+ * @param config - Para-obsidian configuration
+ * @param filePath - Path to the file (relative to vault)
+ * @param sections - Mapping of heading names to content to inject
+ * @returns Result with lists of injected and skipped sections
+ *
+ * @example
+ * ```typescript
+ * const result = injectSections(config, 'Projects/My Project.md', {
+ *   'Why This Matters': 'This project addresses...',
+ *   'Success Criteria': '- [ ] Feature complete\n- [ ] Tests pass',
+ *   'Next Actions': '- [ ] Design mockups'
+ * });
+ * // result.injected: ['Why This Matters', 'Success Criteria', 'Next Actions']
+ * // result.skipped: []
+ * ```
+ */
+export function injectSections(
+	config: ParaObsidianConfig,
+	filePath: string,
+	sections: Record<string, string>,
+): InjectSectionsResult {
+	const injected: string[] = [];
+	const skipped: Array<{ heading: string; reason: string }> = [];
+
+	for (const [heading, content] of Object.entries(sections)) {
+		// Skip empty content
+		if (!content.trim()) {
+			skipped.push({ heading, reason: "Empty content" });
+			continue;
+		}
+
+		try {
+			insertIntoNote(config, {
+				file: filePath,
+				heading,
+				content,
+				mode: "append",
+			});
+			injected.push(heading);
+		} catch (error) {
+			skipped.push({
+				heading,
+				reason: error instanceof Error ? error.message : String(error),
+			});
+		}
+	}
+
+	return { injected, skipped };
 }

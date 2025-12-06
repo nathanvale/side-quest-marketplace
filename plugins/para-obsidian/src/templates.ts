@@ -88,6 +88,44 @@ export function getTemplate(
 }
 
 /**
+ * Detects the title-related prompt key in a template.
+ *
+ * Templates use varying prompt keys for the title field:
+ * - `"Title"` (generic)
+ * - `"Project title"` (project template)
+ * - `"Resource title"` (resource template)
+ * - etc.
+ *
+ * This function scans frontmatter for prompts containing "title"
+ * (case-insensitive) and returns the exact key for arg substitution.
+ *
+ * @param template - Template info with content to analyze
+ * @returns The detected title prompt key, or "Title" as fallback
+ *
+ * @example
+ * ```typescript
+ * // Template with: title: "<% tp.system.prompt("Resource title") %>"
+ * detectTitlePromptKey(template); // "Resource title"
+ *
+ * // Template with: title: "<% tp.system.prompt("Title") %>"
+ * detectTitlePromptKey(template); // "Title"
+ *
+ * // Template without title prompt
+ * detectTitlePromptKey(template); // "Title" (fallback)
+ * ```
+ */
+export function detectTitlePromptKey(template: TemplateInfo): string {
+	const frontmatterMatch = template.content.match(/^---\n([\s\S]*?)\n---/);
+	const frontmatter = frontmatterMatch?.[1] ?? "";
+
+	// Find prompt key containing "title" (case-insensitive)
+	const titlePromptRegex = /<%\s*tp\.system\.prompt\("([^"]*title[^"]*)"\)/i;
+	const match = frontmatter.match(titlePromptRegex);
+
+	return match?.[1] ?? "Title";
+}
+
+/**
  * Field information extracted from a template.
  */
 export interface TemplateField {

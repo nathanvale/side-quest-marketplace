@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { addDays, format } from "date-fns";
 
-import { applyDateSubstitutions, convertTemplaterFormat } from "./templates";
+import {
+	applyDateSubstitutions,
+	convertTemplaterFormat,
+	detectTitlePromptKey,
+	type TemplateInfo,
+} from "./templates";
 
 describe("convertTemplaterFormat", () => {
 	test("converts YYYY-MM-DD to yyyy-MM-dd", () => {
@@ -110,5 +115,112 @@ Tomorrow: <% tp.date.now("YYYY-MM-DD", 1) %>`;
 		const input = 'Before <% tp.date.now("YYYY-MM-DD") %> After';
 		const result = applyDateSubstitutions(input);
 		expect(result).toBe(`Before ${todayFormatted} After`);
+	});
+});
+
+describe("detectTitlePromptKey", () => {
+	function makeTemplate(content: string): TemplateInfo {
+		return {
+			name: "test",
+			path: "/test.md",
+			version: 1,
+			content,
+		};
+	}
+
+	test("detects 'Resource title' prompt key", () => {
+		const template = makeTemplate(`---
+title: "<% tp.system.prompt("Resource title") %>"
+type: resource
+---
+# <% tp.system.prompt("Resource title") %>`);
+
+		expect(detectTitlePromptKey(template)).toBe("Resource title");
+	});
+
+	test("detects 'Project title' prompt key", () => {
+		const template = makeTemplate(`---
+title: "<% tp.system.prompt("Project title") %>"
+type: project
+---
+Body`);
+
+		expect(detectTitlePromptKey(template)).toBe("Project title");
+	});
+
+	test("detects 'Area title' prompt key", () => {
+		const template = makeTemplate(`---
+title: "<% tp.system.prompt("Area title") %>"
+type: area
+---
+Body`);
+
+		expect(detectTitlePromptKey(template)).toBe("Area title");
+	});
+
+	test("detects generic 'Title' prompt key", () => {
+		const template = makeTemplate(`---
+title: "<% tp.system.prompt("Title") %>"
+type: capture
+---
+Body`);
+
+		expect(detectTitlePromptKey(template)).toBe("Title");
+	});
+
+	test("is case-insensitive when matching 'title'", () => {
+		const template = makeTemplate(`---
+title: "<% tp.system.prompt("My TITLE Here") %>"
+type: test
+---
+Body`);
+
+		expect(detectTitlePromptKey(template)).toBe("My TITLE Here");
+	});
+
+	test("falls back to 'Title' when no title prompt found", () => {
+		const template = makeTemplate(`---
+type: test
+other_field: "<% tp.system.prompt("Something else") %>"
+---
+Body`);
+
+		expect(detectTitlePromptKey(template)).toBe("Title");
+	});
+
+	test("falls back to 'Title' for empty frontmatter", () => {
+		const template = makeTemplate(`---
+---
+Body only`);
+
+		expect(detectTitlePromptKey(template)).toBe("Title");
+	});
+
+	test("falls back to 'Title' for no frontmatter", () => {
+		const template = makeTemplate(`# Just markdown
+No frontmatter here`);
+
+		expect(detectTitlePromptKey(template)).toBe("Title");
+	});
+
+	test("only matches prompts in frontmatter, not body", () => {
+		const template = makeTemplate(`---
+type: test
+---
+# <% tp.system.prompt("Body title") %>
+
+This is body content with a title prompt.`);
+
+		// Should fall back to "Title" since "Body title" is not in frontmatter
+		expect(detectTitlePromptKey(template)).toBe("Title");
+	});
+
+	test("handles whitespace variations in prompt syntax", () => {
+		const template = makeTemplate(`---
+title: "<%  tp.system.prompt("Spaced title")  %>"
+---
+Body`);
+
+		expect(detectTitlePromptKey(template)).toBe("Spaced title");
 	});
 });
