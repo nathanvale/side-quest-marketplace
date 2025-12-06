@@ -544,7 +544,12 @@ async function main(): Promise<void> {
 						? Number.parseInt(flags.limit, 10)
 						: undefined;
 				try {
-					const hits = await semanticSearch(config, { query, dir, limit });
+					// Interactive mode for CLI - will prompt to install Kit ML if needed
+					const hits = await semanticSearch(
+						config,
+						{ query, dir, limit },
+						true, // interactive
+					);
 					if (isJson) {
 						console.log(JSON.stringify({ query, hits }, null, 2));
 					} else {

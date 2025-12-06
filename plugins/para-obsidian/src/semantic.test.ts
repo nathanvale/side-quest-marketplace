@@ -10,7 +10,7 @@ describe("semanticSearch", () => {
 			{ file: "note.md", score: 0.9, line: 10, snippet: "Example" },
 		];
 		const runner = async () => hits;
-		const result = await semanticSearch(cfg, { query: "test" }, runner);
+		const result = await semanticSearch(cfg, { query: "test" }, true, runner);
 		expect(result[0]?.file).toBe("note.md");
 		expect(result[0]?.dir).toBe(".");
 	});
@@ -18,7 +18,7 @@ describe("semanticSearch", () => {
 	it("throws on empty query", async () => {
 		const cfg: ParaObsidianConfig = { vault: "/tmp" };
 		await expect(
-			semanticSearch(cfg, { query: "" }, async () => []),
+			semanticSearch(cfg, { query: "" }, true, async () => []),
 		).rejects.toThrow("query is required");
 	});
 });

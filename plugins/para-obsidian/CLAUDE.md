@@ -161,7 +161,8 @@ para-obsidian templates                        # List template versions
 **TypeScript:** Strict mode, tab indentation, functional style
 **Frontmatter:** YAML parsing via `yaml` library, strict validation per note type
 **File Operations:** Vault-scoped paths, git safety checks before writes
-**Testing:** Bun test framework, 51 tests covering CLI/frontmatter/migrations
+**Testing:** Bun test framework, 175 tests covering CLI/frontmatter/migrations/MCP
+**Kit ML:** Automatic installation prompt for semantic search dependencies
 
 ---
 
@@ -329,7 +330,7 @@ if (!isClean) throw new Error("Working tree must be clean");
 - Plugin requires Obsidian vault with PARA structure (Projects, Areas, Resources, Archives)
 - Templates expected at `plugins/para-brain/templates` (project, area, resource, task, etc.)
 - Frontmatter rules mirror validate-note defaults from para-brain
-- Semantic search requires Kit CLI (`uv tool install cased-kit`)
+- Semantic search requires Kit CLI with ML dependencies (auto-prompted to install)
 - Index cached at vault root (`<vault>/.para-obsidian-index.json`)
 - Git auto-commit uses template: `chore(vault): <operation> <filename>`
 - Suggested tags: project, area, resource, task, daily, journal, review, weekly, checklist, booking, itinerary, research, capture, inbox, travel, work, family, health, learning, finance, home, career

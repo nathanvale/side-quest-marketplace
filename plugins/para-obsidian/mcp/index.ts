@@ -19,7 +19,10 @@ if (!process.env.MCPEZ_AUTO_START) {
 	process.env.MCPEZ_AUTO_START = "false";
 }
 
-import { createCorrelationId } from "@sidequest/core/logging";
+import {
+	createCorrelationId,
+	createPluginLogger,
+} from "@sidequest/core/logging";
 import { startServer, tool, z } from "@sidequest/core/mcp";
 import type { ParaObsidianConfig } from "../src/config";
 import { listTemplateVersions, loadConfig } from "../src/config";
@@ -47,6 +50,14 @@ import { semanticSearch } from "../src/semantic";
 // Logging
 // ============================================================================
 
+const { initLogger, getSubsystemLogger } = createPluginLogger({
+	name: "para-obsidian",
+	subsystems: ["mcp"],
+});
+
+initLogger().catch(console.error);
+const mcpLogger = getSubsystemLogger("mcp");
+
 interface LogEntry {
 	cid: string;
 	tool: string;
@@ -54,9 +65,7 @@ interface LogEntry {
 }
 
 function log(entry: LogEntry): void {
-	console.error(
-		JSON.stringify({ ...entry, timestamp: new Date().toISOString() }),
-	);
+	mcpLogger.info({ ...entry, timestamp: new Date().toISOString() });
 }
 
 // ============================================================================
@@ -801,7 +810,12 @@ Falls back to text search if ML dependencies unavailable.`,
 		try {
 			const config = loadConfig();
 			const dirs = parseDirs(dir);
-			const hits = await semanticSearch(config, { query, dir: dirs, limit });
+			// Non-interactive mode for MCP - will provide clear error message if Kit ML not installed
+			const hits = await semanticSearch(
+				config,
+				{ query, dir: dirs, limit },
+				false, // non-interactive
+			);
 			const format = parseResponseFormat(response_format);
 
 			log({
@@ -2393,5 +2407,10 @@ Requires git repository with clean working tree (unless dry-run).`,
 if (import.meta.main) {
 	startServer("para-obsidian", {
 		version: "0.1.0",
+		fileLogging: {
+			enabled: true,
+			subsystems: ["mcp"],
+			level: "info",
+		},
 	});
 }

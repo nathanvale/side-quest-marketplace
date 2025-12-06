@@ -14,6 +14,7 @@
 import { spawnAndCollect } from "../../../core/src/spawn/index.js";
 import type { ParaObsidianConfig } from "./config";
 import { resolveVaultPath } from "./fs";
+import { checkKit, ensureKitML } from "./kit-check";
 
 /**
  * A single semantic search result.
@@ -50,6 +51,7 @@ export interface SemanticSearchOptions {
 export type SemanticRunner = (
 	config: ParaObsidianConfig,
 	options: SemanticSearchOptions,
+	interactive?: boolean,
 ) => Promise<ReadonlyArray<SemanticHit>>;
 
 /**
@@ -60,13 +62,28 @@ export type SemanticRunner = (
  *
  * @param config - Para-obsidian configuration
  * @param options - Search options
+ * @param interactive - Whether to prompt for installation if ML missing (default: true)
  * @returns Array of semantic hits
  * @throws Error if Kit is not installed or search fails
  */
 async function runKitSemantic(
 	config: ParaObsidianConfig,
 	options: SemanticSearchOptions,
+	interactive = true,
 ): Promise<ReadonlyArray<SemanticHit>> {
+	// Check if Kit with ML is available, offer to install if needed
+	const kitCheck = await checkKit();
+
+	if (!kitCheck.installed || !kitCheck.hasML) {
+		const hasKit = await ensureKitML(interactive);
+		if (!hasKit) {
+			throw new Error(
+				kitCheck.error ??
+					"Kit with ML dependencies is required for semantic search",
+			);
+		}
+	}
+
 	// Resolve directory to search (single dir only for Kit)
 	const dir =
 		typeof options.dir === "string"
@@ -116,8 +133,12 @@ async function runKitSemantic(
  * by meaning, not just exact text matching. Supports multi-directory
  * searches and deduplicates results.
  *
+ * If Kit ML dependencies are not installed, offers to install them
+ * automatically in interactive mode.
+ *
  * @param config - Para-obsidian configuration
  * @param options - Search options (query, dir, limit)
+ * @param interactive - Whether to prompt for Kit ML installation (default: true)
  * @param runner - Custom search runner (defaults to Kit CLI)
  * @returns Array of semantic hits sorted by score
  * @throws Error if query is empty or search fails
@@ -137,6 +158,7 @@ async function runKitSemantic(
 export async function semanticSearch(
 	config: ParaObsidianConfig,
 	options: SemanticSearchOptions,
+	interactive = true,
 	runner: SemanticRunner = runKitSemantic,
 ): Promise<ReadonlyArray<SemanticHit>> {
 	if (!options.query || options.query.trim().length === 0) {
@@ -158,7 +180,7 @@ export async function semanticSearch(
 	// Run search in each directory
 	const hits: SemanticHit[] = [];
 	for (const dir of dirs) {
-		const chunk = await runner(config, { ...options, dir });
+		const chunk = await runner(config, { ...options, dir }, interactive);
 		for (const hit of chunk) {
 			hits.push({ ...hit, dir: dir ?? "." });
 		}
