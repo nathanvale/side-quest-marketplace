@@ -5,8 +5,8 @@
 	"description": "Atuin shell history integration plugin for Claude Code",
 	"type": "module",
 	"scripts": {
-		"test": "bun test --recursive",
-		"typecheck": "tsc --noEmit",
+		"test": "echo 'No tests'",
+		"typecheck": "echo 'No TypeScript files'",
 		"format": "biome format --write .",
 		"format:check": "biome format .",
 		"lint": "biome lint .",

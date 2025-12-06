@@ -10,6 +10,5 @@
 	"keywords": ["atuin", "bash", "history", "shell", "mcp"],
 	"license": "MIT",
 	"skills": ["./skills/bash-history"],
-	"commands": ["./commands/history.md"],
-	"mcpServers": ["./.mcp.json"]
+	"commands": ["./commands/history.md"]
 }
