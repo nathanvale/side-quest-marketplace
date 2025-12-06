@@ -989,134 +989,22 @@ Uses heuristics to identify likely exported symbols (PascalCase, UPPER_CASE, com
 );
 
 // ============================================================================
-// Kit Grep Tool
+// Kit Grep Tool - DISABLED
 // ============================================================================
-
-tool(
-	"kit_grep",
-	{
-		description: `Fast text search across repository files using Kit CLI.
-
-Searches for literal patterns with optional regex support. Great for:
-- Finding function definitions
-- Locating error messages
-- Searching for specific strings
-
-Results include file paths, line numbers, and matched content.`,
-		inputSchema: {
-			pattern: z
-				.string()
-				.describe('Search pattern (text or regex). Example: "function auth"'),
-			path: z
-				.string()
-				.optional()
-				.describe(
-					"Repository path to search (default: current directory, or KIT_DEFAULT_PATH env var)",
-				),
-			include: z
-				.string()
-				.optional()
-				.describe('Include files matching pattern. Example: "*.ts"'),
-			exclude: z
-				.string()
-				.optional()
-				.describe('Exclude files matching pattern. Example: "*.test.ts"'),
-			case_sensitive: z
-				.boolean()
-				.optional()
-				.describe("Case sensitive search (default: true)"),
-			max_results: z
-				.number()
-				.optional()
-				.describe("Maximum results to return (default: 100, max: 1000)"),
-			directory: z
-				.string()
-				.optional()
-				.describe("Limit search to specific subdirectory"),
-			response_format: z
-				.enum(["markdown", "json"])
-				.optional()
-				.describe("Output format: 'markdown' (default) or 'json'"),
-		},
-		annotations: {
-			readOnlyHint: true,
-			destructiveHint: false,
-			idempotentHint: true,
-			openWorldHint: false,
-		},
-	},
-	async (args: Record<string, unknown>) => {
-		const {
-			pattern,
-			path,
-			include,
-			exclude,
-			case_sensitive,
-			max_results,
-			directory,
-			response_format,
-		} = args as {
-			pattern: string;
-			path?: string;
-			include?: string;
-			exclude?: string;
-			case_sensitive?: boolean;
-			max_results?: number;
-			directory?: string;
-			response_format?: string;
-		};
-
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		log.info({ cid: mcpCid, tool: "kit_grep", args: { pattern } }, "grep");
-
-		const format = response_format === "json" ? "json" : "markdown";
-		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
-
-		// Build command arguments
-		const cmd = [
-			"run",
-			`${pluginRoot}/src/cli.ts`,
-			"grep",
-			pattern,
-			"--format",
-			format,
-		];
-
-		// Add optional flags
-		if (path) cmd.push("--path", path);
-		if (include) cmd.push("--include", include);
-		if (exclude) cmd.push("--exclude", exclude);
-		if (case_sensitive === false) cmd.push("--case-insensitive", "true");
-		if (max_results) cmd.push("--max-results", String(max_results));
-		if (directory) cmd.push("--directory", directory);
-
-		const result = spawnSyncCollect(["bun", ...cmd], {
-			env: { PATH: buildEnhancedPath() },
-		});
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		log.info(
-			{
-				cid: mcpCid,
-				tool: "kit_grep",
-				success: result.exitCode === 0,
-				durationMs: mcpDuration,
-			},
-			"grep",
-		);
-
-		return {
-			...(result.exitCode !== 0 ? { isError: true } : {}),
-			content: [
-				{
-					type: "text" as const,
-					text: result.exitCode === 0 ? result.stdout : result.stderr,
-				},
-			],
-		};
-	},
-);
+//
+// DEPRECATED: kit_grep has been disabled to encourage use of Priority 1/2 tools
+// (index-based and graph-based search) which are 30-50x faster and don't timeout
+// on large codebases.
+//
+// Use these alternatives instead:
+// - kit_index_find: Fast symbol lookup from PROJECT_INDEX.json (~10ms)
+// - kit_callers: Find who calls a function (~200ms)
+// - kit_usages: Find all usages of a symbol (~200ms)
+// - kit_ast_search: Find code by structure (async functions, classes, etc.)
+//
+// Rationale: Grep operations on large repos timeout at ~30s and hit Kit CLI
+// limitations. Index-based tools provide the same results faster and more
+// reliably.
 
 // ============================================================================
 // Kit Commit Tool
@@ -1866,7 +1754,6 @@ startServer("kit", {
 	fileLogging: {
 		enabled: true,
 		subsystems: [
-			"grep",
 			"semantic",
 			"symbols",
 			"fileTree",
