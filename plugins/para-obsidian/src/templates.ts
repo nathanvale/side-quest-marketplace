@@ -175,6 +175,9 @@ export function getTemplateFields(template: TemplateInfo): TemplateField[] {
  * Templater uses Moment.js format strings. We need to convert them to date-fns.
  * This uses a regex-based approach to handle case-sensitive token matching.
  *
+ * Both Moment.js and date-fns use square brackets for literal text, but Moment
+ * uses [W] for week number while date-fns uses 'w' or 'I'. We handle this specially.
+ *
  * @see https://momentjs.com/docs/#/displaying/format/
  * @see https://date-fns.org/docs/format
  *
@@ -185,6 +188,7 @@ export function getTemplateFields(template: TemplateInfo): TemplateField[] {
  * ```typescript
  * convertTemplaterFormat("YYYY-MM-DD"); // "yyyy-MM-dd"
  * convertTemplaterFormat("dddd, MMMM D, YYYY"); // "EEEE, MMMM d, yyyy"
+ * convertTemplaterFormat("YYYY-[W]ww"); // "yyyy-'W'II" (ISO week number)
  * ```
  */
 export function convertTemplaterFormat(templaterFormat: string): string {
@@ -193,9 +197,18 @@ export function convertTemplaterFormat(templaterFormat: string): string {
 
 	let result = templaterFormat;
 
+	// Week number special case: Moment's [W]ww → date-fns 'W'II
+	// [W] is literal W, ww is week number (ISO)
+	result = result.replace(/\[W\]ww/g, "'W'II");
+	result = result.replace(/\[W\]w/g, "'W'I");
+
 	// Year tokens (case sensitive)
 	result = result.replace(/YYYY/g, "yyyy");
 	result = result.replace(/YY/g, "yy");
+
+	// Week tokens (must come after special week handling above)
+	result = result.replace(/ww/g, "II"); // ISO week
+	result = result.replace(/w/g, "I"); // ISO week
 
 	// Day of week tokens (lowercase d) - must come before day of month
 	// Process longest first

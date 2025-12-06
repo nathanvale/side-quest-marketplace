@@ -240,4 +240,87 @@ Effort: <% tp.system.prompt("Effort (small/medium/large)") %>`,
 		expect(written).toContain("task_type: task");
 		expect(written).toContain("Effort: small");
 	});
+
+	it("handles optional parameters with default values", () => {
+		const vault = makeTmpDir();
+		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		writeTemplate(
+			templatesDir,
+			"resource",
+			`---
+title: "<% tp.system.prompt("Title") %>"
+type: resource
+source: <% tp.system.prompt("Source type") %>
+source_url: "<% tp.system.prompt("Source URL (optional)", "") %>"
+author: "<% tp.system.prompt("Author (optional)", "") %>"
+tags:
+  - resource
+---
+# <% tp.system.prompt("Title") %>
+
+Source: <% tp.system.prompt("Source type") %>
+URL: <% tp.system.prompt("Source URL (optional)", "") %>
+Author: <% tp.system.prompt("Author (optional)", "") %>`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		const result = createFromTemplate(makeConfig(vault, templatesDir), {
+			template: "resource",
+			title: "Building a Second Brain",
+			args: {
+				"Source type": "book",
+				"Source URL (optional)": "https://example.com",
+				"Author (optional)": "Tiago Forte",
+			},
+		});
+
+		expect(result.filePath).toBe("Building A Second Brain.md");
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+		expect(written).toContain("title: Building a Second Brain");
+		expect(written).toContain("source: book");
+		expect(written).toContain("source_url: https://example.com");
+		expect(written).toContain("author: Tiago Forte");
+		expect(written).toContain("URL: https://example.com");
+		expect(written).toContain("Author: Tiago Forte");
+	});
+
+	it("handles optional parameters when not provided", () => {
+		const vault = makeTmpDir();
+		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		writeTemplate(
+			templatesDir,
+			"resource",
+			`---
+title: "<% tp.system.prompt("Title") %>"
+type: resource
+source: <% tp.system.prompt("Source type") %>
+source_url: "<% tp.system.prompt("Source URL (optional)", "") %>"
+author: "<% tp.system.prompt("Author (optional)", "") %>"
+tags:
+  - resource
+---
+# <% tp.system.prompt("Title") %>
+
+Source: <% tp.system.prompt("Source type") %>`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		const result = createFromTemplate(makeConfig(vault, templatesDir), {
+			template: "resource",
+			title: "Quick Note",
+			args: {
+				"Source type": "article",
+				"Source URL (optional)": "",
+				"Author (optional)": "",
+			},
+		});
+
+		expect(result.filePath).toBe("Quick Note.md");
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+		expect(written).toContain("title: Quick Note");
+		expect(written).toContain("source: article");
+		// Empty strings may or may not have quotes after YAML parsing
+		expect(written).toMatch(/source_url:\s*(""|''|$)/);
+		expect(written).toMatch(/author:\s*(""|''|$)/);
+	});
 });

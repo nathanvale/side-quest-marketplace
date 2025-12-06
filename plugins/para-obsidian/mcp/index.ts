@@ -515,6 +515,12 @@ Example: For project template, shows you need:
 						example?: string;
 					} = { key: f.key };
 
+					// Check if template already wraps this prompt in wikilinks
+					const promptPattern = `<% tp.system.prompt("${f.key}") %>`;
+					const isWrappedInWikilinks = template.content.includes(
+						`[[${promptPattern}]]`,
+					);
+
 					// Infer type and example from key name
 					if (f.key.toLowerCase().includes("date")) {
 						result.type = "date";
@@ -524,7 +530,10 @@ Example: For project template, shows you need:
 						f.key.toLowerCase().includes("project")
 					) {
 						result.type = "wikilink";
-						result.example = "[[Note Name]]";
+						// If template already has [[ ]], provide just the name
+						result.example = isWrappedInWikilinks
+							? "Note Name"
+							: "[[Note Name]]";
 					} else {
 						result.type = "string";
 					}

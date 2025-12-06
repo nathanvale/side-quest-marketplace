@@ -67,8 +67,11 @@ function titleToFilename(title: string): string {
 /**
  * Substitutes Templater-style prompt placeholders with provided values.
  *
- * Replaces patterns like `<% tp.system.prompt("key") %>` with the
- * corresponding value from the args object.
+ * Replaces both single-argument and two-argument Templater prompts:
+ * - `<% tp.system.prompt("key") %>` - required field
+ * - `<% tp.system.prompt("key", "default") %>` - optional field with default
+ *
+ * Also handles unmatched optional prompts by replacing them with their defaults.
  *
  * @param content - Template content with Templater prompts
  * @param args - Key-value pairs to substitute
@@ -79,6 +82,14 @@ function titleToFilename(title: string): string {
  * const template = 'Project: <% tp.system.prompt("name") %>';
  * applyArgsToTemplate(template, { name: 'My Project' });
  * // 'Project: My Project'
+ *
+ * const template2 = 'URL: <% tp.system.prompt("url", "") %>';
+ * applyArgsToTemplate(template2, { url: 'https://example.com' });
+ * // 'URL: https://example.com'
+ *
+ * const template3 = 'URL: <% tp.system.prompt("url", "") %>';
+ * applyArgsToTemplate(template3, {});
+ * // 'URL: ' (default value used)
  * ```
  */
 export function applyArgsToTemplate(
@@ -86,10 +97,29 @@ export function applyArgsToTemplate(
 	args: Record<string, string>,
 ): string {
 	let output = content;
+
+	// First, replace provided args
 	for (const [key, value] of Object.entries(args)) {
-		const needle = `<% tp.system.prompt("${key}") %>`;
-		output = output.replaceAll(needle, value);
+		// Match both single-argument and two-argument forms
+		// Single: <% tp.system.prompt("key") %>
+		// Double: <% tp.system.prompt("key", "default") %>
+		const singleArg = `<% tp.system.prompt("${key}") %>`;
+		const doubleArg = new RegExp(
+			`<% tp\\.system\\.prompt\\("${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"\\s*,\\s*"[^"]*"\\s*\\)\\s*%>`,
+			"g",
+		);
+
+		output = output.replaceAll(singleArg, value);
+		output = output.replace(doubleArg, value);
 	}
+
+	// Second, replace any remaining optional prompts (with defaults) with their default values
+	// Match: <% tp.system.prompt("any", "default") %>
+	const optionalPromptRegex = /<% tp\.system\.prompt\("([^"]+)"\s*,\s*"([^"]*)"\s*\)\s*%>/g;
+	output = output.replace(optionalPromptRegex, (_match, _key, defaultValue) => {
+		return defaultValue;
+	});
+
 	return output;
 }
 
