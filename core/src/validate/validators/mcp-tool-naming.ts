@@ -8,7 +8,7 @@ import type { ValidationIssue, ValidatorOptions } from "../types.ts";
 
 /**
  * Validates that MCP tools follow the naming convention:
- * mcp__plugin_<plugin-name>_<server-name>__<tool_name>
+ * mcp__<plugin-name>_<server-name>__<tool_name>
  */
 export async function validateMcpToolNaming(
 	options: ValidatorOptions,
@@ -63,7 +63,7 @@ export async function validateMcpToolNaming(
 			// We look for ANY name definition (including non-compliant ones) and validate them
 			// Two common patterns:
 			// 1. mcpez: tool("tool_name", ...)
-			// 2. MCP SDK: name: "mcp__plugin_..." (should start with mcp__plugin_)
+			// 2. MCP SDK: name: "mcp__..." (should start with mcp__)
 			// We filter to only names that look like MCP tool names (start with mcp__ or are function calls to tool())
 			const mcpezPattern = /tool\(\s*["']([^"']+)["']/g;
 			// For MCP SDK, only match names that start with "mcp__" to avoid false positives
@@ -84,11 +84,11 @@ export async function validateMcpToolNaming(
 				continue;
 			}
 
-			// Expected format: mcp__plugin_<plugin-name>_<server-name>__<tool_name>
+			// Expected format: mcp__<plugin-name>_<server-name>__<tool_name>
 			// plugin and server names: kebab-case (lowercase letters, numbers, hyphens)
 			// tool name: snake_case (lowercase letters, numbers, underscores)
 			const validToolNamePattern =
-				/^mcp__plugin_([a-z0-9-]+)_([a-z0-9-]+)__([a-z0-9_]+)$/;
+				/^mcp__([a-z0-9-]+)_([a-z0-9-]+)__([a-z0-9_]+)$/;
 
 			// Track tool names we've already seen to detect duplicates
 			const seenToolNames = new Set<string>();
@@ -113,11 +113,11 @@ export async function validateMcpToolNaming(
 
 				if (!conventionMatch) {
 					// Tool name doesn't follow convention
-					const expectedPrefix = `mcp__plugin_${pluginName}_${serverName}__`;
+					const expectedPrefix = `mcp__${pluginName}_${serverName}__`;
 					issues.push({
 						ruleId: "mcp/invalid-tool-naming",
 						severity: "warning",
-						message: `Tool "${toolName}" does not follow naming convention: mcp__plugin_<plugin>_<server>__<tool>`,
+						message: `Tool "${toolName}" does not follow naming convention: mcp__<plugin>_<server>__<tool>`,
 						file: serverIndexPath,
 						suggestion: `Expected prefix: ${expectedPrefix}<tool_name>`,
 					});
@@ -132,9 +132,9 @@ export async function validateMcpToolNaming(
 						issues.push({
 							ruleId: "mcp/incorrect-plugin-server-name",
 							severity: "error",
-							message: `Tool "${toolName}" has incorrect plugin/server name. Expected: mcp__plugin_${pluginName}_${serverName}__${toolNamePart}`,
+							message: `Tool "${toolName}" has incorrect plugin/server name. Expected: mcp__${pluginName}_${serverName}__${toolNamePart}`,
 							file: serverIndexPath,
-							suggestion: `Update tool name to: mcp__plugin_${pluginName}_${serverName}__${toolNamePart}`,
+							suggestion: `Update tool name to: mcp__${pluginName}_${serverName}__${toolNamePart}`,
 						});
 					}
 				}

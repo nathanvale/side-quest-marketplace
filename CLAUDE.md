@@ -17,7 +17,7 @@
 - **NEVER** create circular dependencies between plugins
 
 **MCP Server Conventions:**
-- Tool names: `mcp__plugin_<plugin-name>_<server-name>__<tool_name>`
+- Tool names: `mcp__<plugin-name>_<server-name>__<tool_name>`
 - **ALWAYS** include `response_format` parameter: `"markdown"` (default) or `"json"`
 - **ALWAYS** add `isError: true` flag to error responses
 - **ALWAYS** use `${CLAUDE_PLUGIN_ROOT}` in `.mcp.json` for plugin-relative paths
@@ -214,7 +214,7 @@ Full reference with examples: @./docs/MCP_TOOLS.md
 ## Plugin Architecture
 
 Standard structure: `.claude-plugin/`, `commands/`, `hooks/`, `mcp/`, `skills/`, `src/`
-Tool naming: `mcp__plugin_<name>_<server>__<tool>`
+Tool naming: `mcp__<name>_<server>__<tool>`
 MCP server config: `.mcp.json` with `${CLAUDE_PLUGIN_ROOT}` paths
 
 **Create plugin:** `/plugin-template:create my-plugin`

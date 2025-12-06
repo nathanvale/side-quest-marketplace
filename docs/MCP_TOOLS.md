@@ -24,21 +24,21 @@ All MCP tool calls MUST include `response_format: "json"` — saves 40-60% token
 
 | Plugin | Tools | Use For |
 |--------|-------|---------|
-| **Git** | `mcp__plugin_git_git-intelligence__git_get_recent_commits`, `git_search_commits`, `git_get_status` | History, status |
+| **Git** | `mcp__git_git-intelligence__git_get_recent_commits`, `git_search_commits`, `git_get_status` | History, status |
 | **Bun** | `bun_runTests`, `bun_testFile`, `bun_testCoverage` | Testing |
 | **Biome** | `biome_lintCheck`, `biome_lintFix`, `biome_formatCheck` | Linting |
-| **TSC** | `mcp__plugin_tsc-runner_tsc-runner__tsc_check` | Type checking |
-| **Atuin** | `mcp__plugin_atuin_bash-history__atuin_search_history`, `atuin_history_insights` | Shell history |
+| **TSC** | `mcp__tsc-runner_tsc-runner__tsc_check` | Type checking |
+| **Atuin** | `mcp__atuin_bash-history__atuin_search_history`, `atuin_history_insights` | Shell history |
 
 ---
 
 ## Tool Naming Convention
 
 ```
-mcp__plugin_<plugin>_<server>__<tool>
+mcp__<plugin>_<server>__<tool>
 ```
 
-Example: `mcp__plugin_git_git-intelligence__git_get_recent_commits`
+Example: `mcp__git_git-intelligence__git_get_recent_commits`
 
 ---
 

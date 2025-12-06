@@ -39,7 +39,7 @@ Development skills and tools for building, testing, and optimizing Bun CLI appli
 - Scripts: TypeScript CLI template generator
 
 ### 5. MCP Server Development
-- Tool naming conventions (mcp__plugin_*__* pattern)
+- Tool naming conventions (mcp__*__* pattern)
 - Error handling patterns
 - Response format standardization
 - Testing MCP servers

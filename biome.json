@@ -10,7 +10,8 @@
 			"**",
 			"!!plugins/the-cinema-bandit/classic-cinemas-email-template.html",
 			"!!plugins/the-cinema-bandit/examples/*.html"
-		]
+		],
+		"ignoreUnknown": true
 	},
 	"linter": {
 		"enabled": true,

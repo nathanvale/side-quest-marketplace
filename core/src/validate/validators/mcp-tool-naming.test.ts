@@ -48,7 +48,7 @@ describe("validateMcpToolNaming", () => {
 import { tool, z } from "mcpez";
 
 tool(
-  "mcp__plugin_test-plugin_test-server__my_tool",
+  "mcp__test-plugin_test-server__my_tool",
   {
     description: "Test tool",
     inputSchema: {
@@ -79,7 +79,7 @@ const server = new Server({ name: "test" }, { capabilities: { tools: {} } });
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
-      name: "mcp__plugin_test-plugin_test-server__sdk_tool",
+      name: "mcp__test-plugin_test-server__sdk_tool",
       description: "SDK-style tool",
       inputSchema: {
         type: "object",
@@ -130,9 +130,7 @@ tool(
 		);
 		expect(namingIssue).toBeDefined();
 		expect(namingIssue?.message).toContain("invalid_tool_name");
-		expect(namingIssue?.suggestion).toContain(
-			"mcp__plugin_test-plugin_test-server__",
-		);
+		expect(namingIssue?.suggestion).toContain("mcp__test-plugin_test-server__");
 	});
 
 	test("should error when plugin/server names are incorrect", async () => {
@@ -142,7 +140,7 @@ tool(
 import { tool, z } from "mcpez";
 
 tool(
-  "mcp__plugin_wrong-plugin_wrong-server__my_tool",
+  "mcp__wrong-plugin_wrong-server__my_tool",
   {
     description: "Test tool",
     inputSchema: {
@@ -166,7 +164,7 @@ tool(
 		);
 		expect(namingIssue).toBeDefined();
 		expect(namingIssue?.message).toContain(
-			"mcp__plugin_test-plugin_test-server__my_tool",
+			"mcp__test-plugin_test-server__my_tool",
 		);
 		expect(namingIssue?.severity).toBe("error");
 	});
@@ -178,7 +176,7 @@ tool(
 import { tool, z } from "mcpez";
 
 tool(
-  "mcp__plugin_test-plugin_test-server__my_tool",
+  "mcp__test-plugin_test-server__my_tool",
   {
     description: "Test tool",
     inputSchema: {
@@ -215,7 +213,7 @@ tool("tool_one", {
   inputSchema: { query: z.string() },
 }, async (args) => {});
 
-tool("mcp__plugin_test-plugin_test-server__tool_two", {
+tool("mcp__test-plugin_test-server__tool_two", {
   inputSchema: {
     query: z.string(),
     response_format: z.enum(["markdown", "json"]).optional(),
@@ -271,7 +269,7 @@ tool("mcp__plugin_test-plugin_test-server__tool_two", {
 		const source = `
 import { tool, z } from "mcpez";
 
-tool("mcp__plugin_my-plugin_my-server__my_tool", {
+tool("mcp__my-plugin_my-server__my_tool", {
   inputSchema: {
     response_format: z.enum(["markdown", "json"]).optional(),
   },
@@ -294,7 +292,7 @@ tool("mcp__plugin_my-plugin_my-server__my_tool", {
 		const source = `
 import { tool, z } from "mcpez";
 
-tool("mcp__plugin_test-plugin_test-server__get_recent_commits", {
+tool("mcp__test-plugin_test-server__get_recent_commits", {
   inputSchema: {
     response_format: z.enum(["markdown", "json"]).optional(),
   },
@@ -318,7 +316,7 @@ tool("mcp__plugin_test-plugin_test-server__get_recent_commits", {
 import { tool, z } from "mcpez";
 
 // Tool defined once
-tool("mcp__plugin_test-plugin_test-server__my_tool", {
+tool("mcp__test-plugin_test-server__my_tool", {
   inputSchema: {
     query: z.string(),
     response_format: z.enum(["markdown", "json"]).optional(),
@@ -326,7 +324,7 @@ tool("mcp__plugin_test-plugin_test-server__my_tool", {
 }, async (args) => {});
 
 // Same tool name referenced elsewhere (e.g., in comments or tests)
-// name: "mcp__plugin_test-plugin_test-server__my_tool"
+// name: "mcp__test-plugin_test-server__my_tool"
 `;
 		writeMcpServer("test-server", source);
 

@@ -43,7 +43,7 @@ Model Context Protocol is a standardized way for Claude (and other LLMs) to inte
 ### Tool
 
 A function Claude can call. Has:
-- **name**: Unique identifier (e.g., `mcp__plugin_git_git-intelligence__get_recent_commits`)
+- **name**: Unique identifier (e.g., `mcp__git_git-intelligence__get_recent_commits`)
 - **description**: What it does
 - **inputSchema**: Parameters (JSON Schema)
 - **annotations**: Metadata (readOnly, destructive, etc.)
@@ -92,12 +92,11 @@ plugins/my-plugin/
 ### Tool Naming Convention
 
 ```
-mcp__plugin_<plugin-name>_<server-name>__<tool_name>
+mcp__<plugin-name>_<server-name>__<tool_name>
 ```
 
 **Format:**
 - `mcp__` = MCP prefix (required)
-- `plugin_` = literal prefix
 - `<plugin-name>` = kebab-case plugin name
 - `_` = separator
 - `<server-name>` = kebab-case server name
@@ -107,10 +106,10 @@ mcp__plugin_<plugin-name>_<server-name>__<tool_name>
 **Examples:**
 
 ```
-mcp__plugin_git_git-intelligence__get_recent_commits
-mcp__plugin_kit_kit__grep
-mcp__plugin_biome-runner_biome-runner__lint_check
-mcp__plugin_clipboard_clipboard__copy
+mcp__git_git-intelligence__get_recent_commits
+mcp__kit_kit__grep
+mcp__biome-runner_biome-runner__lint_check
+mcp__clipboard_clipboard__copy
 ```
 
 ### .mcp.json Format
@@ -281,7 +280,7 @@ const server = new Server({
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [{
-    name: "mcp__plugin_my_my-server__do_something",
+    name: "mcp__my_my-server__do_something",
     description: "Does something useful",
     inputSchema: {
       type: "object",
@@ -343,7 +342,7 @@ Claude asks: "What tools do you provide?"
   "result": {
     "tools": [
       {
-        "name": "mcp__plugin_...",
+        "name": "mcp__...",
         "description": "...",
         "inputSchema": { /* ... */ }
       }
@@ -362,7 +361,7 @@ Claude asks: "Please execute this tool"
   "id": 2,
   "method": "tools/call",
   "params": {
-    "name": "mcp__plugin_git_git-intelligence__get_recent_commits",
+    "name": "mcp__git_git-intelligence__get_recent_commits",
     "arguments": {
       "limit": 10,
       "response_format": "json"
@@ -395,7 +394,7 @@ Claude asks: "Please execute this tool"
 ### Requirements
 
 1. **Valid plugin.json** - Metadata complete
-2. **Tool naming convention** - `mcp__plugin_<name>_<server>__<tool>`
+2. **Tool naming convention** - `mcp__<name>_<server>__<tool>`
 3. **response_format support** - Every tool accepts this parameter
 4. **Error handling** - Proper error responses with isError flag
 5. **Documentation** - Clear descriptions for all tools
@@ -417,7 +416,7 @@ Claude asks: "Please execute this tool"
 ### Issue: Tool Not Appearing
 
 **Check:**
-1. Tool name matches pattern `mcp__plugin_*`
+1. Tool name matches pattern `mcp__*`
 2. ListToolsRequestSchema handler is implemented
 3. .mcp.json syntax is valid
 4. Server starts without errors
@@ -480,10 +479,10 @@ const format = args.response_format || "markdown";
 
 ```typescript
 // ✓ Good: Clear and specific
-"mcp__plugin_git_git-intelligence__get_recent_commits"
+"mcp__git_git-intelligence__get_recent_commits"
 
 // ✗ Bad: Too generic
-"mcp__plugin_git_git-intelligence__get"
+"mcp__git_git-intelligence__get"
 ```
 
 ### 2. Error Messages
@@ -505,7 +504,7 @@ const format = args.response_format || "markdown";
 ```typescript
 // ✓ Good: Clear and detailed
 {
-  name: "mcp__plugin_search_fileserver__search_files",
+  name: "mcp__search_fileserver__search_files",
   description: "Search files by name or content. Supports regex patterns in queries.",
   inputSchema: {
     type: "object",
@@ -561,7 +560,7 @@ MCP enables:
 **Key marketplace conventions:**
 
 1. **Directory:** Use `mcp/` not `mcp-servers/`
-2. **Naming:** Follow `mcp__plugin_<name>_<server>__<tool>` pattern
+2. **Naming:** Follow `mcp__<name>_<server>__<tool>` pattern
 3. **Parameters:** Always support `response_format`
 4. **Errors:** Return `{ error, hint, isError: true }`
 5. **Paths:** Use `${CLAUDE_PLUGIN_ROOT}` in .mcp.json

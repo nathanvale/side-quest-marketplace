@@ -1,6 +1,6 @@
 ---
 name: mcp-development
-description: Build production-grade MCP servers with @sidequest/core/mcp, Bun, and marketplace patterns
+description: Build production-grade MCP (Model Context Protocol) servers with observability, correlation ID tracing, and dual logging. Use when creating new MCP servers, adding tools to existing servers, implementing file logging, debugging MCP issues, or following Side Quest marketplace patterns. Covers @sidequest/core/mcp declarative API, Zod schemas, Bun runtime, and 9 gold standard patterns validated across Kit plugin (18 tools, 9 plugins). Includes error handling, response format switching, and MCP annotations.
 ---
 
 # MCP Development Skill
@@ -152,7 +152,7 @@ All MCP servers follow these 4 patterns:
 ### 1. Tool Registration
 
 Register tools with the MCP server. Each tool has:
-- **name**: Unique identifier following `mcp__plugin_<plugin>_<server>__<tool>` pattern
+- **name**: Unique identifier following `mcp__<plugin>_<server>__<tool>` pattern
 - **description**: What the tool does
 - **inputSchema**: Zod schema or JSON schema for parameters
 - **annotations**: readOnlyHint, destructiveHint, idempotentHint, openWorldHint
@@ -1102,7 +1102,7 @@ import { describe, expect, test } from "bun:test";
 describe("my-server", () => {
   test("executes hello tool", async () => {
     const args = { name: "Nathan", response_format: "json" };
-    const result = await callTool("mcp__plugin_my-plugin_my-server__hello", args);
+    const result = await callTool("mcp__my-plugin_my-server__hello", args);
 
     expect(result).toEqual({
       content: [{
@@ -1114,14 +1114,14 @@ describe("my-server", () => {
 
   test("returns markdown by default", async () => {
     const args = { name: "Nathan" };
-    const result = await callTool("mcp__plugin_my-plugin_my-server__hello", args);
+    const result = await callTool("mcp__my-plugin_my-server__hello", args);
 
     expect(result.content[0].text).toContain("Hello, Nathan!");
   });
 
   test("handles errors gracefully", async () => {
     const args = { query: "" }; // Empty query
-    const result = await callTool("mcp__plugin_my-plugin_my-server__search", args);
+    const result = await callTool("mcp__my-plugin_my-server__search", args);
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("isError");
@@ -1157,7 +1157,7 @@ bun install
 
 ### Tool not appearing
 
-1. Check tool name matches pattern: `mcp__plugin_<plugin>_<server>__<tool>`
+1. Check tool name matches pattern: `mcp__<plugin>_<server>__<tool>`
 2. Verify ListToolsRequestSchema is implemented
 3. Check .mcp.json path is correct
 

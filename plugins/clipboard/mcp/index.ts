@@ -5,8 +5,8 @@
  * Provides cross-platform clipboard operations with structured error handling.
  *
  * Tools:
- * - mcp__plugin_clipboard_clipboard__copy: Copy text to clipboard
- * - mcp__plugin_clipboard_clipboard__paste: Paste text from clipboard
+ * - mcp__clipboard_clipboard__copy: Copy text to clipboard
+ * - mcp__clipboard_clipboard__paste: Paste text from clipboard
  */
 
 import {
@@ -123,7 +123,7 @@ function getClipboardCommands(operation: "copy" | "paste"): {
 
 // Tool: Copy to clipboard
 tool(
-	"mcp__plugin_clipboard_clipboard__copy",
+	"mcp__clipboard_clipboard__copy",
 	{
 		description: "Copy text to the system clipboard",
 		inputSchema: {
@@ -249,7 +249,7 @@ tool(
 
 // Tool: Paste from clipboard
 tool(
-	"mcp__plugin_clipboard_clipboard__paste",
+	"mcp__clipboard_clipboard__paste",
 	{
 		description: "Paste text from the system clipboard",
 		inputSchema: {

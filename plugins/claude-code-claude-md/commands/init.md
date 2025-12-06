@@ -145,13 +145,13 @@ Extract: Top-level folders, depth-2 structure
 ### 1.3 Git Intelligence
 
 ```
-Tool: mcp__plugin_git_git-intelligence__git_get_recent_commits (limit: 20)
+Tool: mcp__git_git-intelligence__git_get_recent_commits (limit: 20)
 Extract:
 - Commit message format (conventional? descriptive?)
 - Active contributors
 - Recent areas of change
 
-Tool: mcp__plugin_git_git-intelligence__git_get_branch_info
+Tool: mcp__git_git-intelligence__git_get_branch_info
 Extract:
 - Branch naming pattern
 - Default branch name
@@ -484,7 +484,7 @@ At start, check which tools are available:
 ```typescript
 // Check for enhanced capabilities
 const hasKit = toolExists("kit_file_tree");
-const hasGit = toolExists("mcp__plugin_git_git-intelligence__git_get_recent_commits");
+const hasGit = toolExists("mcp__git_git-intelligence__git_get_recent_commits");
 const hasBunRunner = toolExists("bun_lintCheck");
 
 // Adjust discovery strategy
@@ -505,7 +505,7 @@ User: /init
 
 Claude: 🔍 Analyzing project...
 
-[Runs kit_file_tree, reads package.json, mcp__plugin_git_git-intelligence__git_get_recent_commits]
+[Runs kit_file_tree, reads package.json, mcp__git_git-intelligence__git_get_recent_commits]
 
 ## Discovery Complete
 
@@ -554,8 +554,8 @@ If MCP tools unavailable:
 | `kit_file_tree` | `ls -la` + `find . -type d -maxdepth 2` |
 | `kit_symbols` | Skip, rely on file structure |
 | `kit_grep` | `grep -r` via Bash |
-| `mcp__plugin_git_git-intelligence__git_get_recent_commits` | `git log --oneline -20` via Bash |
-| `mcp__plugin_git_git-intelligence__git_get_branch_info` | `git branch -a` via Bash |
+| `mcp__git_git-intelligence__git_get_recent_commits` | `git log --oneline -20` via Bash |
+| `mcp__git_git-intelligence__git_get_branch_info` | `git branch -a` via Bash |
 
 The command should work (with reduced intelligence) even without MCP tools.
 
@@ -744,7 +744,7 @@ $ claude --print "/init --ci --update"
 [init] Detecting project context...
 [init]   ├─ kit_file_tree: 23 directories
 [init]   ├─ package.json: 8 scripts
-[init]   ├─ mcp__plugin_git_git-intelligence__git_get_recent_commits: conventional commits
+[init]   ├─ mcp__git_git-intelligence__git_get_recent_commits: conventional commits
 [init]   └─ tsconfig.json: strict mode
 [init] Comparing with existing...
 [init] Changes detected:

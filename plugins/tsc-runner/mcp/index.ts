@@ -144,7 +144,7 @@ async function runTsc(cwd: string, configPath: string): Promise<TscRunResult> {
 }
 
 tool(
-	"mcp__plugin_tsc-runner_tsc-runner__tsc_check",
+	"mcp__tsc-runner_tsc-runner__tsc_check",
 	{
 		description:
 			"Run TypeScript type checking (tsc --noEmit) using the nearest tsconfig/jsconfig.",

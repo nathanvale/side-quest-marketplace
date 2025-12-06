@@ -180,9 +180,9 @@ Hooks detect changed files using:
 ### Tool Naming
 
 ```
-mcp__plugin_biome-runner_biome-runner__biome_lintCheck
-mcp__plugin_biome-runner_biome-runner__biome_lintFix
-mcp__plugin_biome-runner_biome-runner__biome_formatCheck
+mcp__biome-runner_biome-runner__biome_lintCheck
+mcp__biome-runner_biome-runner__biome_lintFix
+mcp__biome-runner_biome-runner__biome_formatCheck
 ```
 
 ### Response Formats

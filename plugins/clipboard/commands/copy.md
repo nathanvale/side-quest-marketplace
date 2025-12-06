@@ -25,14 +25,14 @@ Copy text to the system clipboard using the MCP clipboard tool.
 
 ## Implementation
 
-This command uses the `mcp__plugin_clipboard_clipboard__copy` MCP tool which handles cross-platform clipboard operations (macOS pbcopy, Linux xclip, Windows clip).
+This command uses the `mcp__clipboard_clipboard__copy` MCP tool which handles cross-platform clipboard operations (macOS pbcopy, Linux xclip, Windows clip).
 
 ## Instructions
 
 When the user runs this command:
 
 1. Extract the text argument from `$ARGUMENTS`
-2. Call the `mcp__plugin_clipboard_clipboard__copy` MCP tool with the text
+2. Call the `mcp__clipboard_clipboard__copy` MCP tool with the text
 3. Report success or error to the user
 
 If no arguments provided, ask the user what they want to copy.

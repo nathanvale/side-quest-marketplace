@@ -15,10 +15,10 @@ Generates: `plugin.json`, `package.json`, `tsconfig.json`, source scaffold
 ### Tool Naming (REQUIRED)
 
 ```
-mcp__plugin_<plugin>_<server>__<tool>
+mcp__<plugin>_<server>__<tool>
 ```
 
-Example: `mcp__plugin_git_git-intelligence__git_get_recent_commits`
+Example: `mcp__git_git-intelligence__git_get_recent_commits`
 
 ### Required Parameters
 

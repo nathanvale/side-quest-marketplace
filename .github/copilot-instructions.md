@@ -67,7 +67,7 @@ side-quest-marketplace/
 
 ## Plugin Development
 
-**Tool naming:** `mcp__plugin_<plugin>_<server>__<tool>`
+**Tool naming:** `mcp__<plugin>_<server>__<tool>`
 
 **Required MCP parameters:**
 ```typescript

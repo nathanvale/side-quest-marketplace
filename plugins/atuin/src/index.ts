@@ -504,7 +504,7 @@ function formatResults(
 // Register tools using Zod schemas
 
 tool(
-	"mcp__plugin_atuin_bash-history__atuin_search_history",
+	"mcp__atuin_bash-history__atuin_search_history",
 	{
 		description:
 			"Search command history using atuin. Returns matching commands with timestamps, exit codes, and full command text. Supports filtering by directory, time range, and search mode.",
@@ -637,7 +637,7 @@ tool(
 );
 
 tool(
-	"mcp__plugin_atuin_bash-history__atuin_get_recent_history",
+	"mcp__atuin_bash-history__atuin_get_recent_history",
 	{
 		description:
 			"Get recent command history from atuin with timestamps and exit codes.",
@@ -726,7 +726,7 @@ tool(
 );
 
 tool(
-	"mcp__plugin_atuin_bash-history__atuin_search_by_context",
+	"mcp__atuin_bash-history__atuin_search_by_context",
 	{
 		description:
 			"Search command history by git branch or Claude session ID. Use this to find commands you ran on a specific branch or in a specific session.",
@@ -826,7 +826,7 @@ tool(
 );
 
 tool(
-	"mcp__plugin_atuin_bash-history__atuin_history_insights",
+	"mcp__atuin_bash-history__atuin_history_insights",
 	{
 		description:
 			"Get insights about command history: most frequent commands and failure patterns. Helps identify common workflows and recurring errors.",

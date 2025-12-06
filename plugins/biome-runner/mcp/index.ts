@@ -362,13 +362,13 @@ function errorResponse(message: string) {
  * MCP Tools
  *
  * Tool names registered with mcpez's tool() function are automatically prefixed
- * with `mcp__plugin_biome-runner_biome-runner__` to follow marketplace convention:
- * mcp__plugin_<plugin>_<server>__<tool>
+ * with `mcp__biome-runner_biome-runner__` to follow marketplace convention:
+ * mcp__<plugin>_<server>__<tool>
  *
  * Examples:
- * - "biome_lintCheck" becomes "mcp__plugin_biome-runner_biome-runner__biome_lintCheck"
- * - "biome_lintFix" becomes "mcp__plugin_biome-runner_biome-runner__biome_lintFix"
- * - "biome_formatCheck" becomes "mcp__plugin_biome-runner_biome-runner__biome_formatCheck"
+ * - "biome_lintCheck" becomes "mcp__biome-runner_biome-runner__biome_lintCheck"
+ * - "biome_lintFix" becomes "mcp__biome-runner_biome-runner__biome_lintFix"
+ * - "biome_formatCheck" becomes "mcp__biome-runner_biome-runner__biome_formatCheck"
  */
 
 tool(

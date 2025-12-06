@@ -24,7 +24,7 @@ const server = new Server(
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [{
-    name: "mcp__plugin_my-plugin_my-server__my_tool",
+    name: "mcp__my-plugin_my-server__my_tool",
     description: "What this tool does",
     inputSchema: {
       type: "object",
@@ -82,7 +82,7 @@ await server.connect(new StdioServerTransport());
 ## Tool Naming Convention
 
 ```
-mcp__plugin_<plugin>_<server>__<tool>
+mcp__<plugin>_<server>__<tool>
 ```
 
 ---
