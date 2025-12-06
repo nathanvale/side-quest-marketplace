@@ -1,66 +1,48 @@
-Create a booking record note.
+---
+description: Create a booking record note for reservations and tickets
+argument-hint: <title> <booking-type> <project> <date> <cost> <currency> [payment-status] [dest]
+allowed-tools: Bash(para-obsidian:*)
+---
 
-Bookings track reservations, tickets, and scheduled services.
+## Variables
 
-## Required Arguments
-- `$TITLE` - Booking description
-- `$BOOKING_TYPE` - Type: flight | hotel | restaurant | event | appointment | transport
-- `$PROJECT` - Related project as wikilink
-- `$DATE` - Booking date (YYYY-MM-DD)
-- `$COST` - Cost amount (e.g. "150.00")
-- `$CURRENCY` - Currency code (e.g. "AUD", "USD")
+```bash
+TITLE="$1"
+BOOKING_TYPE="$2"
+PROJECT="$3"
+DATE="$4"
+COST="$5"
+CURRENCY="$6"
+PAYMENT_STATUS="${7:-pending}"
+DEST="${8:-00_Inbox}"
+```
 
-## Optional Arguments
-- `$PAYMENT_STATUS` - Status: pending | paid | refunded (default: pending)
-- `$DEST` - Destination folder (default: 00_Inbox)
-
-## Auto-filled Fields
-- `created` - Today's date
-- `status` - confirmed
-- `template_version` - 2
-- `tags` - Always includes "booking"
-
-## Frontmatter Hints
-- **booking_type**: flight, hotel, restaurant, event, appointment, transport
-- **payment_status**: pending | paid | refunded
-- **Suggested tags**: booking, travel, event
+**booking_type options**: flight | hotel | restaurant | event | appointment | transport
+**payment_status options**: pending | paid | refunded
 
 ## Command
+
 ```bash
 para-obsidian create --template booking \
   --title "$TITLE" \
-  --dest "${DEST:-00_Inbox}" \
+  --dest "$DEST" \
   --arg "Booking title=$TITLE" \
   --arg "Booking type=$BOOKING_TYPE" \
   --arg "Project=$PROJECT" \
   --arg "Date (YYYY-MM-DD)=$DATE" \
   --arg "Cost=$COST" \
   --arg "Currency=$CURRENCY" \
-  --arg "Payment status=${PAYMENT_STATUS:-pending}"
+  --arg "Payment status=$PAYMENT_STATUS"
 ```
 
-## Example Usage
+## Frontmatter Hints
 
-For flight booking: "Melbourne to Tokyo flight"
+- **Suggested tags**: booking, travel, event
 
-```
-TITLE: "MEL-NRT Qantas QF79"
-BOOKING_TYPE: "flight"
-PROJECT: "[[Japan 2025]]"
-DATE: "2025-03-15"
-COST: "1850.00"
-CURRENCY: "AUD"
-PAYMENT_STATUS: "paid"
-```
-
-For restaurant reservation: "Dinner at Vue de Monde"
+## Examples
 
 ```
-TITLE: "Vue de Monde Dinner"
-BOOKING_TYPE: "restaurant"
-PROJECT: "[[Anniversary Weekend]]"
-DATE: "2025-02-14"
-COST: "450.00"
-CURRENCY: "AUD"
-PAYMENT_STATUS: "pending"
+/para-obsidian:create-booking "MEL-NRT Qantas QF79" flight "[[Japan 2025]]" 2025-03-15 1850.00 AUD paid
+/para-obsidian:create-booking "Vue de Monde Dinner" restaurant "[[Anniversary Weekend]]" 2025-02-14 450.00 AUD pending
+/para-obsidian:create-booking "Dentist Checkup" appointment "[[Health]]" 2025-01-20 180.00 AUD
 ```

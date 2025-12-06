@@ -1,50 +1,40 @@
-Create a reusable checklist note.
+---
+description: Create a reusable checklist note
+argument-hint: <title> <checklist-type> <project> [dest]
+allowed-tools: Bash(para-obsidian:*)
+---
 
-Checklists are templates for recurring processes or procedures.
+## Variables
 
-## Required Arguments
-- `$TITLE` - Checklist name
-- `$CHECKLIST_TYPE` - Type of checklist (e.g. "packing", "deployment", "review")
-- `$PROJECT` - Related project as wikilink
+```bash
+TITLE="$1"
+CHECKLIST_TYPE="$2"
+PROJECT="$3"
+DEST="${4:-00_Inbox}"
+```
 
-## Optional Arguments
-- `$DEST` - Destination folder (default: 00_Inbox)
-
-## Auto-filled Fields
-- `created` - Today's date
-- `status` - draft
-- `template_version` - 2
-- `tags` - Always includes "checklist"
-
-## Frontmatter Hints
-- **checklist_type**: packing, deployment, review, shopping, travel, maintenance
-- **status**: draft | active | completed
-- **Suggested tags**: checklist, process, recurring
+**checklist_type options**: packing | deployment | review | shopping | travel | maintenance
 
 ## Command
+
 ```bash
 para-obsidian create --template checklist \
   --title "$TITLE" \
-  --dest "${DEST:-00_Inbox}" \
+  --dest "$DEST" \
   --arg "Checklist title=$TITLE" \
   --arg "Checklist type=$CHECKLIST_TYPE" \
   --arg "Project=$PROJECT"
 ```
 
-## Example Usage
+## Frontmatter Hints
 
-For travel checklist: "Japan Trip Packing"
+- **status**: draft | active | completed
+- **Suggested tags**: checklist, process, recurring
 
-```
-TITLE: "Japan Trip Packing Checklist"
-CHECKLIST_TYPE: "packing"
-PROJECT: "[[Japan 2025]]"
-```
-
-For deployment process: "Production Deploy Steps"
+## Examples
 
 ```
-TITLE: "Production Deployment Checklist"
-CHECKLIST_TYPE: "deployment"
-PROJECT: "[[Website Redesign]]"
+/para-obsidian:create-checklist "Japan Trip Packing Checklist" packing "[[Japan 2025]]"
+/para-obsidian:create-checklist "Production Deployment Checklist" deployment "[[Website Redesign]]"
+/para-obsidian:create-checklist "Weekly Grocery List" shopping "[[Home Management]]"
 ```

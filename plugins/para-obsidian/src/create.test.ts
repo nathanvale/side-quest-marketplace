@@ -234,7 +234,7 @@ Effort: <% tp.system.prompt("Effort (small/medium/large)") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("07_Tasks/Review PR.md");
+		expect(result.filePath).toBe("Tasks/Review PR.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		expect(written).toContain("title: Review PR");
 		expect(written).toContain("task_type: task");
@@ -397,7 +397,7 @@ Body`,
 		).toBe(true);
 	});
 
-	it("creates task in 07_Tasks by default", () => {
+	it("creates task in Tasks by default", () => {
 		const vault = makeTmpDir();
 		const templatesDir = path.join(vault, "06_Metadata", "Templates");
 		writeTemplate(
@@ -416,13 +416,11 @@ Body`,
 			title: "Review PR",
 		});
 
-		expect(result.filePath).toBe("07_Tasks/Review PR.md");
-		expect(fs.existsSync(path.join(vault, "07_Tasks", "Review PR.md"))).toBe(
-			true,
-		);
+		expect(result.filePath).toBe("Tasks/Review PR.md");
+		expect(fs.existsSync(path.join(vault, "Tasks", "Review PR.md"))).toBe(true);
 	});
 
-	it("creates daily note in 00_Inbox by default", () => {
+	it("creates daily note in Daily Notes by default", () => {
 		const vault = makeTmpDir();
 		const templatesDir = path.join(vault, "06_Metadata", "Templates");
 		writeTemplate(
@@ -441,10 +439,10 @@ Body`,
 			title: "2025-12-06",
 		});
 
-		expect(result.filePath).toBe("00_Inbox/2025-12-06.md");
-		expect(fs.existsSync(path.join(vault, "00_Inbox", "2025-12-06.md"))).toBe(
-			true,
-		);
+		expect(result.filePath).toBe("Daily Notes/2025-12-06.md");
+		expect(
+			fs.existsSync(path.join(vault, "Daily Notes", "2025-12-06.md")),
+		).toBe(true);
 	});
 
 	it("creates capture note in 00_Inbox by default", () => {

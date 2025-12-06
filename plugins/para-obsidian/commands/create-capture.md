@@ -1,57 +1,44 @@
-Capture content to the inbox for later processing.
+---
+description: Capture content to the inbox for later processing
+argument-hint: <title> <content> <captured-from> [resonance] [urgency] [dest]
+allowed-tools: Bash(para-obsidian:*)
+---
 
-## Required Arguments
-- `$TITLE` - Brief title for the capture
-- `$CONTENT` - The actual content being captured
-- `$CAPTURED_FROM` - Source: thought | conversation | article | book | video | podcast | email | meeting | voice
+## Variables
 
-## Optional Arguments
-- `$RESONANCE` - Why it resonated: inspiring | useful | personal | surprising (default: useful)
-- `$URGENCY` - Processing priority: high | medium | low (default: medium)
-- `$DEST` - Destination folder (default: 00_Inbox)
+```bash
+TITLE="$1"
+CONTENT="$2"
+CAPTURED_FROM="$3"
+RESONANCE="${4:-useful}"
+URGENCY="${5:-medium}"
+DEST="${6:-00_Inbox}"
+```
 
-## Auto-filled Fields
-- `created` - Current date (YYYY-MM-DD)
-- `status` - inbox
-- `template_version` - 2
-- `tags` - Always includes "inbox"
-
-## Frontmatter Hints
-- **captured_from**: thought, conversation, article, book, video, podcast, email, meeting, voice
-- **resonance**: inspiring | useful | personal | surprising
-- **urgency**: high | medium | low
-- **Suggested tags**: inbox, capture, work, family, health, learning, finance
+**captured_from options**: thought | conversation | article | book | video | podcast | email | meeting | voice
+**resonance options**: inspiring | useful | personal | surprising
+**urgency options**: high | medium | low
 
 ## Command
+
 ```bash
 para-obsidian create --template capture \
   --title "$TITLE" \
-  --dest "${DEST:-00_Inbox}" \
+  --dest "$DEST" \
   --arg "Title=$TITLE" \
   --arg "Captured from (thought/article/conversation/etc.)=$CAPTURED_FROM" \
-  --arg "Resonance (inspiring/useful/personal/surprising)=${RESONANCE:-useful}" \
-  --arg "Urgency (high/medium/low)=${URGENCY:-medium}" \
+  --arg "Resonance (inspiring/useful/personal/surprising)=$RESONANCE" \
+  --arg "Urgency (high/medium/low)=$URGENCY" \
   --arg "Content=$CONTENT"
 ```
 
-## Example Usage
+## Frontmatter Hints
 
-For voice memo: "I should look into using Playwright for web scraping instead of Puppeteer"
+- **Suggested tags**: inbox, capture, work, family, health, learning, finance
 
-```
-TITLE: "Playwright vs Puppeteer for Scraping"
-CONTENT: "Consider switching to Playwright for web scraping. It has better browser automation APIs and handles dynamic content more reliably than Puppeteer."
-CAPTURED_FROM: "voice"
-RESONANCE: "useful"
-URGENCY: "low"
-```
-
-For article highlight: Key insight from blog post about ADHD productivity
+## Examples
 
 ```
-TITLE: "ADHD Time Boxing Strategy"
-CONTENT: "Use 25-minute focused blocks with 5-minute breaks. The constraint helps ADHD brains engage hyperfocus without burnout."
-CAPTURED_FROM: "article"
-RESONANCE: "useful"
-URGENCY: "medium"
+/para-obsidian:create-capture "Playwright vs Puppeteer" "Consider switching to Playwright for web scraping" voice
+/para-obsidian:create-capture "ADHD Time Boxing" "Use 25-minute blocks with 5-minute breaks" article useful medium
 ```

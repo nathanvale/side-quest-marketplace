@@ -1,39 +1,40 @@
-Create a daily journal note.
+---
+description: Create a daily journal note
+argument-hint: [date] [dest]
+allowed-tools: Bash(para-obsidian:*)
+---
 
-Daily notes capture thoughts, reflections, and daily tracking.
+## Variables
 
-## Required Arguments
-- `$DATE` - Date for the daily note (YYYY-MM-DD format, default: today)
-
-## Optional Arguments
-- `$DEST` - Destination folder (default: 05_Journal/Daily)
-
-## Auto-filled Fields
-- `created` - The specified date
-- `title` - Formatted as "Daily - YYYY-MM-DD"
-- `template_version` - 2
-- `tags` - Always includes "daily" and "journal"
-
-## Frontmatter Hints
-- **Suggested tags**: daily, journal, reflection, gratitude
+```bash
+DATE="${1:-$(date +%Y-%m-%d)}"
+DEST="${2:-05_Journal/Daily}"
+```
 
 ## Command
+
 ```bash
 para-obsidian create --template daily \
-  --title "Daily - ${DATE:-$(date +%Y-%m-%d)}" \
-  --dest "${DEST:-05_Journal/Daily}"
+  --title "Daily - $DATE" \
+  --dest "$DEST"
 ```
 
-## Example Usage
+## Frontmatter Hints
 
-For today's daily note:
+- **Suggested tags**: daily, journal, reflection, gratitude
 
-```
-DATE: "2025-12-06"
-```
+## Notes
 
-The note will be created as "Daily - 2025-12-06.md" with sections for:
+The note will be created with sections for:
 - Morning intentions
 - Daily log
 - Evening reflection
 - Gratitude
+
+## Examples
+
+```
+/para-obsidian:create-daily
+/para-obsidian:create-daily 2025-12-06
+/para-obsidian:create-daily 2025-12-06 "05_Journal/Daily"
+```

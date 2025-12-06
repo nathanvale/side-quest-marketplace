@@ -10,7 +10,7 @@ description: Generate intelligent content for PARA Obsidian vault templates. Use
 ### 1. Discover Template Structure
 
 ```bash
-para-obsidian template-fields project --format json
+bun src/cli.ts template-fields project --format json
 ```
 
 Returns required args, auto-filled fields, and body sections.
@@ -35,7 +35,7 @@ Ask focused questions matching the template type:
 ### 4. Create Note with Content
 
 ```bash
-para-obsidian create --template project \
+bun src/cli.ts create --template project \
   --title "Launch Dark Mode" \
   --arg "Area=[[Product]]" \
   --arg "Target completion date (YYYY-MM-DD)=2025-03-31" \
@@ -45,7 +45,7 @@ para-obsidian create --template project \
 ### 5. Validate Result
 
 ```bash
-para-obsidian frontmatter validate "Launch Dark Mode.md" --format json
+bun src/cli.ts frontmatter validate "Launch Dark Mode.md" --format json
 ```
 
 ---
@@ -54,8 +54,8 @@ para-obsidian frontmatter validate "Launch Dark Mode.md" --format json
 
 | Error | Resolution |
 |-------|------------|
-| Template not found | Run `para-obsidian templates` to list available templates |
-| Missing required arg | Run `para-obsidian template-fields <template>` to discover requirements |
+| Template not found | Run `bun src/cli.ts templates` to list available templates |
+| Missing required arg | Run `bun src/cli.ts template-fields <template>` to discover requirements |
 | Section not injected | Heading may not exist in template |
 | Vault not git repo | Ensure PARA_VAULT is an initialized git repository |
 

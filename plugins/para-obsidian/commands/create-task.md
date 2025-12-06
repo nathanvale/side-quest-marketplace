@@ -1,60 +1,48 @@
-Create a new task note for actionable items.
+---
+description: Create a new task note for actionable items
+argument-hint: <title> <priority> <effort> [task-type] [project] [area] [dest]
+allowed-tools: Bash(para-obsidian:*)
+---
 
-Tasks are specific, actionable items with clear completion criteria.
+## Variables
 
-## Required Arguments
-- `$TITLE` - Task description
-- `$PRIORITY` - Priority level: low | medium | high | urgent
-- `$EFFORT` - Effort estimate: small | medium | large
+```bash
+TITLE="$1"
+PRIORITY="$2"
+EFFORT="$3"
+TASK_TYPE="${4:-task}"
+PROJECT="${5:-}"
+AREA="${6:-}"
+DEST="${7:-00_Inbox}"
+```
 
-## Optional Arguments
-- `$TASK_TYPE` - Type: task (default) | reminder | habit | chore
-- `$PROJECT` - Related project as wikilink (e.g. "[[Cinema Booking Tool]]")
-- `$AREA` - Related area as wikilink (e.g. "[[Health]]")
-- `$DEST` - Destination folder (default: 00_Inbox)
-
-## Auto-filled Fields
-- `created` - Today's date
-- `status` - not-started
-- `template_version` - 2
-- `tags` - Always includes "task"
-
-## Frontmatter Hints
-- **task_type**: task | reminder | habit | chore
-- **status**: not-started | in-progress | blocked | done | cancelled
-- **priority**: low | medium | high | urgent
-- **effort**: small | medium | large
-- **Suggested tags**: task, work, family, health, home
+**priority options**: low | medium | high | urgent
+**effort options**: small | medium | large
+**task_type options**: task | reminder | habit | chore
 
 ## Command
+
 ```bash
 para-obsidian create --template task \
   --title "$TITLE" \
-  --dest "${DEST:-00_Inbox}" \
+  --dest "$DEST" \
   --arg "Task title=$TITLE" \
   --arg "Priority=$PRIORITY" \
   --arg "Effort=$EFFORT" \
-  --arg "Task type=${TASK_TYPE:-task}" \
-  --arg "Project=${PROJECT:-}" \
-  --arg "Area=${AREA:-}"
+  --arg "Task type=$TASK_TYPE" \
+  --arg "Project=$PROJECT" \
+  --arg "Area=$AREA"
 ```
 
-## Example Usage
+## Frontmatter Hints
 
-For quick task: "Book dentist appointment"
+- **status**: not-started | in-progress | blocked | done | cancelled
+- **Suggested tags**: task, work, family, health, home
 
-```
-TITLE: "Book Dentist Appointment"
-PRIORITY: "medium"
-EFFORT: "small"
-AREA: "[[Health]]"
-```
-
-For project task: "Implement login screen"
+## Examples
 
 ```
-TITLE: "Implement Login Screen"
-PRIORITY: "high"
-EFFORT: "large"
-PROJECT: "[[Mobile App Redesign]]"
+/para-obsidian:create-task "Book Dentist Appointment" medium small task "" "[[Health]]"
+/para-obsidian:create-task "Implement Login Screen" high large task "[[Mobile App Redesign]]"
+/para-obsidian:create-task "Pay electricity bill" medium small reminder "" "[[Finance]]"
 ```

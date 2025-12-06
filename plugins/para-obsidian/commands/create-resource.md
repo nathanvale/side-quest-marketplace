@@ -1,47 +1,38 @@
-Create a new resource note for reference material.
+---
+description: Create a new resource note for reference material
+argument-hint: <title> <source> [areas] [dest]
+allowed-tools: Bash(para-obsidian:*)
+---
 
-Resources are topic-based collections of information you may want to reference later.
+## Variables
 
-## Required Arguments
-- `$TITLE` - Resource title
-- `$SOURCE` - Source type: book | article | video | course | podcast | paper | web
+```bash
+TITLE="$1"
+SOURCE="$2"
+AREAS="${3:-}"
+DEST="${4:-03_Resources}"
+```
 
-## Optional Arguments
-- `$AREAS` - Related areas as comma-separated wikilinks (e.g. "[[Health]],[[Learning]]")
-- `$DEST` - Destination folder (default: 03_Resources)
-
-## Auto-filled Fields
-- `created` - Today's date
-- `template_version` - 2
-- `tags` - Always includes "resource"
-
-## Frontmatter Hints
-- **source**: book | article | video | course | podcast | paper | web
-- **Suggested tags**: resource, reference, learning, work
+**source options**: book | article | video | course | podcast | paper | web
 
 ## Command
+
 ```bash
 para-obsidian create --template resource \
   --title "$TITLE" \
-  --dest "${DEST:-03_Resources}" \
+  --dest "$DEST" \
   --arg "Source type=$SOURCE" \
-  --arg "Related areas=${AREAS:-}"
+  --arg "Related areas=$AREAS"
 ```
 
-## Example Usage
+## Frontmatter Hints
 
-For book notes: "Atomic Habits by James Clear"
+- **Suggested tags**: resource, reference, learning, work
 
-```
-TITLE: "Atomic Habits"
-SOURCE: "book"
-AREAS: "[[Health]],[[Learning]]"
-```
-
-For article reference: "TypeScript Best Practices 2025"
+## Examples
 
 ```
-TITLE: "TypeScript Best Practices 2025"
-SOURCE: "article"
-AREAS: "[[Career]]"
+/para-obsidian:create-resource "Atomic Habits" book "[[Health]],[[Learning]]"
+/para-obsidian:create-resource "TypeScript Best Practices 2025" article "[[Career]]"
+/para-obsidian:create-resource "React Server Components" video
 ```

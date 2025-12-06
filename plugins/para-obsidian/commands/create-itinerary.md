@@ -1,56 +1,43 @@
-Create an itinerary note for trip planning.
+---
+description: Create an itinerary note for trip planning
+argument-hint: <title> <project> <trip-date> <day-number> [energy-level] [dest]
+allowed-tools: Bash(para-obsidian:*)
+---
 
-Itineraries organize daily activities for travel or events.
+## Variables
 
-## Required Arguments
-- `$TITLE` - Itinerary day title (e.g. "Tokyo Day 1 - Arrival")
-- `$PROJECT` - Related trip project as wikilink
-- `$TRIP_DATE` - Date of this itinerary day (YYYY-MM-DD)
-- `$DAY_NUMBER` - Day number in the trip (e.g. "1", "2")
+```bash
+TITLE="$1"
+PROJECT="$2"
+TRIP_DATE="$3"
+DAY_NUMBER="$4"
+ENERGY_LEVEL="${5:-medium}"
+DEST="${6:-00_Inbox}"
+```
 
-## Optional Arguments
-- `$ENERGY_LEVEL` - Expected energy: high | medium | low (default: medium)
-- `$DEST` - Destination folder (default: 00_Inbox)
-
-## Auto-filled Fields
-- `created` - Today's date
-- `template_version` - 2
-- `tags` - Always includes "itinerary"
-
-## Frontmatter Hints
-- **energy_level**: high | medium | low (helps plan activity intensity)
-- **Suggested tags**: itinerary, travel, planning
+**energy_level options**: high | medium | low (helps plan activity intensity)
 
 ## Command
+
 ```bash
 para-obsidian create --template itinerary \
   --title "$TITLE" \
-  --dest "${DEST:-00_Inbox}" \
+  --dest "$DEST" \
   --arg "Itinerary title=$TITLE" \
   --arg "Project=$PROJECT" \
   --arg "Trip date (YYYY-MM-DD)=$TRIP_DATE" \
   --arg "Day number=$DAY_NUMBER" \
-  --arg "Energy level=${ENERGY_LEVEL:-medium}"
+  --arg "Energy level=$ENERGY_LEVEL"
 ```
 
-## Example Usage
+## Frontmatter Hints
 
-For arrival day: "Tokyo trip day 1"
+- **Suggested tags**: itinerary, travel, planning
 
-```
-TITLE: "Tokyo Day 1 - Arrival & Shibuya"
-PROJECT: "[[Japan 2025]]"
-TRIP_DATE: "2025-03-15"
-DAY_NUMBER: "1"
-ENERGY_LEVEL: "low"  # Jet lag expected
-```
-
-For active day: "Kyoto temples tour"
+## Examples
 
 ```
-TITLE: "Kyoto Day 4 - Temple Circuit"
-PROJECT: "[[Japan 2025]]"
-TRIP_DATE: "2025-03-18"
-DAY_NUMBER: "4"
-ENERGY_LEVEL: "high"
+/para-obsidian:create-itinerary "Tokyo Day 1 - Arrival & Shibuya" "[[Japan 2025]]" 2025-03-15 1 low
+/para-obsidian:create-itinerary "Kyoto Day 4 - Temple Circuit" "[[Japan 2025]]" 2025-03-18 4 high
+/para-obsidian:create-itinerary "Melbourne Day 2 - Great Ocean Road" "[[Road Trip]]" 2025-04-10 2
 ```

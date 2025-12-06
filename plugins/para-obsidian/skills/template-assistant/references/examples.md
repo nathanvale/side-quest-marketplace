@@ -12,8 +12,9 @@ Sample interactions and generated content for common scenarios.
 
 **Generated CLI Command:**
 ```bash
-para-obsidian create --template project \
+bun src/cli.ts create --template project \
   --title "Launch Dark Mode" \
+  --arg "Project title=Launch Dark Mode" \
   --arg "Target completion date (YYYY-MM-DD)=2025-03-31" \
   --arg "Area=[[Product Development]]" \
   --content '{
@@ -31,8 +32,9 @@ para-obsidian create --template project \
 
 **Generated CLI Command:**
 ```bash
-para-obsidian create --template project \
+bun src/cli.ts create --template project \
   --title "Complete Half Marathon" \
+  --arg "Project title=Complete Half Marathon" \
   --arg "Target completion date (YYYY-MM-DD)=2025-09-15" \
   --arg "Area=[[Health]]" \
   --content '{
@@ -54,8 +56,9 @@ para-obsidian create --template project \
 
 **Generated CLI Command:**
 ```bash
-para-obsidian create --template area \
+bun src/cli.ts create --template area \
   --title "Engineering" \
+  --arg "Area title=Engineering" \
   --content '{
     "Overview": "Technical skills and software development responsibilities. Encompasses coding proficiency, system design, code quality, and staying current with industry practices. Primary focus for career growth and daily work output.",
     "Standards to Maintain": "- [ ] Code reviews completed within 24 hours\n- [ ] Test coverage above 80% on new code\n- [ ] Documentation updated with major changes\n- [ ] Technical debt addressed each sprint\n- [ ] Learning: 2 hours/week on new technologies",
@@ -69,8 +72,9 @@ para-obsidian create --template area \
 
 **Generated CLI Command:**
 ```bash
-para-obsidian create --template area \
+bun src/cli.ts create --template area \
   --title "Family" \
+  --arg "Area title=Family" \
   --content '{
     "Overview": "Relationships with Melanie and Levi. Encompasses quality time, communication, household coordination, and supporting each other'\''s goals. Foundation for personal fulfillment and emotional wellbeing.",
     "Standards to Maintain": "- [ ] Weekly 1:1 quality time with Levi\n- [ ] Date night with Melanie monthly minimum\n- [ ] Family dinner together 5x/week\n- [ ] Present and phone-free during family activities\n- [ ] Coordinate schedules Sunday evening",
@@ -88,10 +92,11 @@ para-obsidian create --template area \
 
 **Generated CLI Command:**
 ```bash
-para-obsidian create --template resource \
+bun src/cli.ts create --template resource \
   --title "Atomic Habits" \
+  --arg "Resource title=Atomic Habits" \
   --arg "Source type (book/article/video/course/podcast/etc.)=book" \
-  --arg "Main topic=habits" \
+  --arg "Primary area this relates to=[[Learning]]" \
   --arg "Author (optional)=James Clear" \
   --content '{
     "Summary": "Small habits compound into remarkable results through consistent application. The book provides a practical framework (cue, craving, response, reward) for building good habits and breaking bad ones. Key insight: focus on identity change ('\''be a runner'\'') rather than outcomes ('\''run a marathon'\'').",
@@ -111,12 +116,13 @@ para-obsidian create --template resource \
 
 **Generated CLI Command:**
 ```bash
-para-obsidian create --template task \
+bun src/cli.ts create --template task \
   --title "Review Auth Refactor PR" \
+  --arg "Task title=Review Auth Refactor PR" \
   --arg "Task type (task/reminder/habit/chore)=task" \
   --arg "Priority (low/medium/high/urgent)=high" \
   --arg "Effort (small/medium/large)=medium" \
-  --arg "Project (optional)=Auth System Upgrade" \
+  --arg "Project (optional)=[[Auth System Upgrade]]" \
   --arg "Due date (YYYY-MM-DD)=2025-12-08" \
   --content '{
     "Description": "Review Sarah'\''s pull request #247 for the authentication system refactor. Focus on security implications, test coverage, and backward compatibility with existing sessions.",
@@ -134,8 +140,9 @@ para-obsidian create --template task \
 
 **Generated CLI Command:**
 ```bash
-para-obsidian create --template capture \
+bun src/cli.ts create --template capture \
   --title "AI Meeting Summary Idea" \
+  --arg "Title=AI Meeting Summary Idea" \
   --arg "Captured from (thought/article/conversation/etc.)=thought" \
   --arg "Resonance (inspiring/useful/personal/surprising)=useful" \
   --arg "Urgency (high/medium/low)=medium" \

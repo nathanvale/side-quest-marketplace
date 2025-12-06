@@ -17,11 +17,20 @@
  * - `--key=value` (equals syntax)
  * - `--key` (boolean flag)
  *
+ * Duplicate flags are stored as arrays:
+ * - `--arg foo --arg bar` → flags.arg = ["foo", "bar"]
+ * - `--arg foo` → flags.arg = "foo"
+ * - `--force --force` → flags.force = [true, true]
+ *
  * Returns command, subcommand, positional args, and flags.
  *
  * @example
  * parseArgs(["config", "--format", "json"])
  * // → { command: "config", positional: [], flags: { format: "json" } }
+ *
+ * @example
+ * parseArgs(["create", "--arg", "a=1", "--arg", "b=2"])
+ * // → { command: "create", positional: [], flags: { arg: ["a=1", "b=2"] } }
  *
  * @example
  * parseArgs(["frontmatter", "migrate", "file.md", "--force", "2"])
@@ -31,10 +40,10 @@ export function parseArgs(argv: string[]): {
 	command: string;
 	subcommand?: string;
 	positional: string[];
-	flags: Record<string, string | boolean>;
+	flags: Record<string, string | boolean | (string | boolean)[]>;
 } {
 	const positional: string[] = [];
-	const flags: Record<string, string | boolean> = {};
+	const flags: Record<string, string | boolean | (string | boolean)[]> = {};
 
 	for (let i = 0; i < argv.length; i++) {
 		const arg = argv[i];
@@ -44,13 +53,25 @@ export function parseArgs(argv: string[]): {
 			const key = keyRaw?.slice(2);
 			if (!key) continue;
 			const next = argv[i + 1];
+
+			const setValue = (newValue: string | boolean) => {
+				const existing = flags[key];
+				if (existing === undefined) {
+					flags[key] = newValue;
+				} else if (Array.isArray(existing)) {
+					existing.push(newValue);
+				} else {
+					flags[key] = [existing, newValue];
+				}
+			};
+
 			if (value !== undefined) {
-				flags[key] = value;
+				setValue(value);
 			} else if (next && !next.startsWith("--")) {
-				flags[key] = next;
+				setValue(next);
 				i++;
 			} else {
-				flags[key] = true;
+				setValue(true);
 			}
 		} else {
 			positional.push(arg);

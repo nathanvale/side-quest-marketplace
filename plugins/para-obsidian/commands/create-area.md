@@ -1,47 +1,41 @@
-Create a new area of responsibility note.
+---
+description: Create a new area of responsibility note
+argument-hint: <title> [dest]
+allowed-tools: Bash(para-obsidian:*)
+---
 
-Areas represent ongoing standards you maintain throughout life - they have no end date.
+## Variables
 
-## Required Arguments
-- `$TITLE` - Area name (used for filename and title field)
-
-## Optional Arguments
-- `$DEST` - Destination folder (default: 02_Areas)
-
-## Auto-filled Fields
-- `created` - Today's date
-- `status` - active
-- `template_version` - 2
-- `tags` - Always includes "area"
-
-## Frontmatter Hints
-- **status**: active (only valid value for areas)
-- **Suggested tags**: area, work, family, health, learning, finance, home, career
+```bash
+TITLE="$1"
+DEST="${2:-02_Areas}"
+```
 
 ## Command
+
 ```bash
 para-obsidian create --template area \
   --title "$TITLE" \
-  --dest "${DEST:-02_Areas}"
+  --dest "$DEST"
 ```
 
-## Example Usage
+## Frontmatter Hints
 
-For responsibility: "Managing my physical health and fitness"
-
-```
-TITLE: "Health"
-```
-
-For responsibility: "Personal financial management"
-
-```
-TITLE: "Finance"
-```
+- **status**: active (only valid value for areas)
+- **Suggested tags**: area, work, family, health, learning, finance, home, career
 
 ## Notes
-Areas are never "done" - they represent ongoing standards you maintain. Examples:
+
+Areas are never "done" - they represent ongoing standards you maintain:
 - Health, Fitness, Mental Wellbeing
 - Family, Relationships, Parenting
 - Career, Professional Development
 - Finance, Home, Admin
+
+## Examples
+
+```
+/para-obsidian:create-area "Health"
+/para-obsidian:create-area "Finance"
+/para-obsidian:create-area "Career" "02_Areas/Work"
+```

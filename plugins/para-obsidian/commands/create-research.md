@@ -1,60 +1,42 @@
-Create a research note for investigation and analysis.
+---
+description: Create a research note for investigation and analysis
+argument-hint: <title> <research-type> <project> [status] [dest]
+allowed-tools: Bash(para-obsidian:*)
+---
 
-Research notes capture findings, comparisons, and decision-making context.
+## Variables
 
-## Required Arguments
-- `$TITLE` - Research topic title
-- `$RESEARCH_TYPE` - Type: comparison | investigation | decision | exploration
-- `$PROJECT` - Related project as wikilink
+```bash
+TITLE="$1"
+RESEARCH_TYPE="$2"
+PROJECT="$3"
+STATUS="${4:-in-progress}"
+DEST="${5:-00_Inbox}"
+```
 
-## Optional Arguments
-- `$STATUS` - Status: in-progress | completed | abandoned (default: in-progress)
-- `$DEST` - Destination folder (default: 00_Inbox)
-
-## Auto-filled Fields
-- `created` - Today's date
-- `template_version` - 2
-- `tags` - Always includes "research"
-
-## Frontmatter Hints
-- **research_type**: comparison, investigation, decision, exploration
-- **status**: in-progress | completed | abandoned
-- **Suggested tags**: research, analysis, decision
+**research_type options**: comparison | investigation | decision | exploration
+**status options**: in-progress | completed | abandoned
 
 ## Command
+
 ```bash
 para-obsidian create --template research \
   --title "$TITLE" \
-  --dest "${DEST:-00_Inbox}" \
+  --dest "$DEST" \
   --arg "Research title=$TITLE" \
   --arg "Research type=$RESEARCH_TYPE" \
   --arg "Project=$PROJECT" \
-  --arg "Status=${STATUS:-in-progress}"
+  --arg "Status=$STATUS"
 ```
 
-## Example Usage
+## Frontmatter Hints
 
-For tool comparison: "Comparing testing frameworks"
+- **Suggested tags**: research, analysis, decision
 
-```
-TITLE: "Jest vs Vitest vs Bun Test Comparison"
-RESEARCH_TYPE: "comparison"
-PROJECT: "[[Website Redesign]]"
-```
-
-For decision making: "Which cloud provider to use"
+## Examples
 
 ```
-TITLE: "Cloud Provider Selection - AWS vs GCP vs Azure"
-RESEARCH_TYPE: "decision"
-PROJECT: "[[Infrastructure Migration]]"
-STATUS: "in-progress"
-```
-
-For exploration: "Understanding WebAuthn"
-
-```
-TITLE: "WebAuthn and Passkeys Deep Dive"
-RESEARCH_TYPE: "exploration"
-PROJECT: "[[Auth System Upgrade]]"
+/para-obsidian:create-research "Jest vs Vitest vs Bun Test Comparison" comparison "[[Website Redesign]]"
+/para-obsidian:create-research "Cloud Provider Selection" decision "[[Infrastructure Migration]]" in-progress
+/para-obsidian:create-research "WebAuthn and Passkeys Deep Dive" exploration "[[Auth System Upgrade]]"
 ```

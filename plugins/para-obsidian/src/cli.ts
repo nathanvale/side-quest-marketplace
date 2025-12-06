@@ -14,6 +14,37 @@ import {
 	parseArgs,
 	parseKeyValuePairs,
 } from "@sidequest/core/cli";
+
+/**
+ * Normalize a flag value to single value (string or boolean).
+ * If array, returns the first element. Otherwise returns as-is.
+ */
+function normalizeFlagValue(
+	value: string | boolean | (string | boolean)[] | undefined,
+): string | boolean | undefined {
+	if (Array.isArray(value)) {
+		return value[0];
+	}
+	return value;
+}
+
+/**
+ * Normalize flags record by converting all array values to their first element.
+ * Used for functions that don't expect array flag values.
+ */
+function normalizeFlags(
+	flags: Record<string, string | boolean | (string | boolean)[]>,
+): Record<string, string | boolean> {
+	const normalized: Record<string, string | boolean> = {};
+	for (const [key, value] of Object.entries(flags)) {
+		const norm = normalizeFlagValue(value);
+		if (norm !== undefined) {
+			normalized[key] = norm;
+		}
+	}
+	return normalized;
+}
+
 import {
 	color,
 	emphasize,
@@ -471,7 +502,7 @@ async function main(): Promise<void> {
 					process.exit(1);
 				}
 				const dryRun = flags["dry-run"] === true || flags["dry-run"] === "true";
-				const attachments = parseAttachments(flags);
+				const attachments = parseAttachments(normalizeFlags(flags));
 				if (!dryRun) {
 					await ensureGitGuard(config);
 				}
@@ -505,7 +536,7 @@ async function main(): Promise<void> {
 				}
 				const confirm = flags.confirm === true || flags.confirm === "true";
 				const dryRun = flags["dry-run"] === true || flags["dry-run"] === "true";
-				const attachments = parseAttachments(flags);
+				const attachments = parseAttachments(normalizeFlags(flags));
 				if (!dryRun) {
 					await ensureGitGuard(config);
 				}
@@ -586,8 +617,11 @@ async function main(): Promise<void> {
 
 				if (action === "query") {
 					const tag = typeof flags.tag === "string" ? flags.tag : undefined;
-					const dirs = parseDirs(flags.dir, config.defaultSearchDirs);
-					const frontmatter = parseFrontmatterFilters(flags);
+					const dirs = parseDirs(
+						normalizeFlagValue(flags.dir),
+						config.defaultSearchDirs,
+					);
+					const frontmatter = parseFrontmatterFilters(normalizeFlags(flags));
 					const index = loadIndex(config);
 					if (!index) {
 						console.error("Index not found. Run index prime first.");
@@ -623,8 +657,11 @@ async function main(): Promise<void> {
 					process.exit(1);
 				}
 				const tag = typeof flags.tag === "string" ? flags.tag : undefined;
-				const dirs = parseDirs(flags.dir, config.defaultSearchDirs);
-				const frontmatter = parseFrontmatterFilters(flags);
+				const dirs = parseDirs(
+					normalizeFlagValue(flags.dir),
+					config.defaultSearchDirs,
+				);
+				const frontmatter = parseFrontmatterFilters(normalizeFlags(flags));
 				const globs =
 					typeof flags.glob === "string"
 						? flags.glob
@@ -680,7 +717,10 @@ async function main(): Promise<void> {
 					console.error("semantic requires <query>");
 					process.exit(1);
 				}
-				const dir = parseDirs(flags.dir, config.defaultSearchDirs);
+				const dir = parseDirs(
+					normalizeFlagValue(flags.dir),
+					config.defaultSearchDirs,
+				);
 				const limit =
 					typeof flags.limit === "string"
 						? Number.parseInt(flags.limit, 10)
@@ -746,12 +786,18 @@ async function main(): Promise<void> {
 					}
 				}
 
-				const argsForTemplate: Record<string, string> = {};
-				for (const [k, v] of Object.entries(flags)) {
-					if (["template", "title", "dest", "format", "content"].includes(k))
-						continue;
-					if (typeof v === "string") argsForTemplate[k] = v;
+				// Normalize --arg flags to array, then parse key=value pairs
+				const argValues: string[] = [];
+				if (flags.arg !== undefined) {
+					if (Array.isArray(flags.arg)) {
+						argValues.push(
+							...(flags.arg.filter((v) => typeof v === "string") as string[]),
+						);
+					} else if (typeof flags.arg === "string") {
+						argValues.push(flags.arg);
+					}
 				}
+				const argsForTemplate = parseKeyValuePairs(argValues);
 
 				await ensureGitGuard(config);
 				const result = createFromTemplate(config, {
@@ -779,7 +825,7 @@ async function main(): Promise<void> {
 				const attachments = withAutoDiscoveredAttachments(
 					config,
 					result.filePath,
-					parseAttachments(flags),
+					parseAttachments(normalizeFlags(flags)),
 				);
 				if (config.autoCommit) {
 					await autoCommitChanges(
@@ -883,11 +929,11 @@ async function main(): Promise<void> {
 					const strict = flags.strict === true || flags.strict === "true";
 					const suggestOnly =
 						flags.suggest === true || flags.suggest === "true";
-					const attachments = parseAttachments(flags);
-					const unset = parseUnset(flags.unset);
+					const attachments = parseAttachments(normalizeFlags(flags));
+					const unset = parseUnset(normalizeFlagValue(flags.unset));
 					const additionalPairs = positional.slice(1);
 					const setPairs = {
-						...parseFrontmatterFilters(flags, []),
+						...parseFrontmatterFilters(normalizeFlags(flags), []),
 						...parseKeyValuePairs(additionalPairs),
 						...(typeof flags.set === "string"
 							? parseKeyValuePairs([flags.set])
@@ -1057,7 +1103,7 @@ async function main(): Promise<void> {
 						typeof flags.force === "string"
 							? Number.parseInt(flags.force, 10)
 							: undefined;
-					const attachments = parseAttachments(flags);
+					const attachments = parseAttachments(normalizeFlags(flags));
 					if (!dryRun) {
 						await ensureGitGuard(config);
 					}
@@ -1096,7 +1142,10 @@ async function main(): Promise<void> {
 				if (action === "migrate-all") {
 					const dryRun =
 						flags["dry-run"] === true || flags["dry-run"] === "true";
-					const dir = parseDirs(flags.dir, config.defaultSearchDirs);
+					const dir = parseDirs(
+						normalizeFlagValue(flags.dir),
+						config.defaultSearchDirs,
+					);
 					const forceVersion =
 						typeof flags.force === "string"
 							? Number.parseInt(flags.force, 10)
@@ -1105,7 +1154,7 @@ async function main(): Promise<void> {
 						typeof flags.type === "string" && flags.type.trim().length > 0
 							? flags.type.trim()
 							: undefined;
-					const attachments = parseAttachments(flags);
+					const attachments = parseAttachments(normalizeFlags(flags));
 					if (!dryRun) {
 						await ensureGitGuard(config);
 					}
@@ -1185,12 +1234,15 @@ async function main(): Promise<void> {
 					}
 					const dryRun =
 						flags["dry-run"] === true || flags["dry-run"] === "true";
-					const statuses = parseStatuses(flags.statuses, [
+					const statuses = parseStatuses(normalizeFlagValue(flags.statuses), [
 						"outdated",
 						"missing-version",
 						"current",
 					]) as VersionPlanStatus[];
-					const dirs = parseDirs(flags.dir, config.defaultSearchDirs);
+					const dirs = parseDirs(
+						normalizeFlagValue(flags.dir),
+						config.defaultSearchDirs,
+					);
 					const emitPlan =
 						typeof flags["emit-plan"] === "string"
 							? path.resolve(flags["emit-plan"])
@@ -1210,7 +1262,7 @@ async function main(): Promise<void> {
 						process.exit(1);
 					}
 
-					const attachments = parseAttachments(flags);
+					const attachments = parseAttachments(normalizeFlags(flags));
 					if (!dryRun) {
 						await ensureGitGuard(config);
 					}
@@ -1349,7 +1401,10 @@ async function main(): Promise<void> {
 						);
 						process.exit(1);
 					}
-					const dir = parseDirs(flags.dir, config.defaultSearchDirs);
+					const dir = parseDirs(
+						normalizeFlagValue(flags.dir),
+						config.defaultSearchDirs,
+					);
 					if (flags.interactive === true || flags.interactive === "true") {
 						const plan = planTemplateVersionBump(config, {
 							type,
@@ -1448,7 +1503,7 @@ async function main(): Promise<void> {
 					process.exit(1);
 				}
 				const mode = selected[0] as InsertMode;
-				const attachments = parseAttachments(flags);
+				const attachments = parseAttachments(normalizeFlags(flags));
 
 				await ensureGitGuard(config);
 				const result = insertIntoNote(config, {

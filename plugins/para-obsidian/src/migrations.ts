@@ -279,6 +279,45 @@ const bookingV1To2: MigrationFn = (ctx): MigrationResult => {
 	};
 };
 
+/** Migrates booking notes v2→v3: normalizes booking_type enum, payment_status "unpaid"→"pending", ensures cost is string. */
+const bookingV2To3: MigrationFn = (ctx): MigrationResult => {
+	const next = { ...ctx.attributes };
+	const changes: string[] = [];
+
+	// Normalize old booking types to new enum
+	if (next.booking_type === "hotel") {
+		next.booking_type = "accommodation";
+		changes.push('booking_type: "hotel" → "accommodation"');
+	} else if (next.booking_type === "restaurant") {
+		next.booking_type = "dining";
+		changes.push('booking_type: "restaurant" → "dining"');
+	} else if (next.booking_type === "event") {
+		next.booking_type = "activity";
+		changes.push('booking_type: "event" → "activity"');
+	} else if (next.booking_type === "appointment") {
+		next.booking_type = "activity";
+		changes.push('booking_type: "appointment" → "activity"');
+	}
+
+	// Normalize payment_status: unpaid → pending
+	if (next.payment_status === "unpaid") {
+		next.payment_status = "pending";
+		changes.push('payment_status: "unpaid" → "pending"');
+	}
+
+	// Ensure cost is string
+	if (typeof next.cost === "number") {
+		next.cost = next.cost.toString();
+		changes.push("cost: converted number to string");
+	}
+
+	return {
+		attributes: next,
+		body: ctx.body,
+		changes,
+	};
+};
+
 /** Migrates itinerary notes v1→v2: adds energy_level default; ensures "itinerary" tag. */
 const itineraryV1To2: MigrationFn = (ctx): MigrationResult => {
 	const energy = ensureField(
@@ -353,6 +392,7 @@ export const MIGRATIONS: MigrationHooks = {
 	},
 	booking: {
 		1: { 2: bookingV1To2 },
+		2: { 3: bookingV2To3 },
 	},
 	itinerary: {
 		1: { 2: itineraryV1To2 },

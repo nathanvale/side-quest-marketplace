@@ -92,7 +92,7 @@ Complete catalog of all 11 PARA templates with their structure and content requi
 **Required Args:**
 - `Resource title` - Title of the resource
 - `Source type (book/article/video/course/podcast/etc.)` - Content type
-- `Main topic` - Primary tag
+- `Primary area this relates to` - Related area (wikilink format)
 
 **Optional Args:**
 - `Source URL (optional)` - Link to source
@@ -124,14 +124,15 @@ Complete catalog of all 11 PARA templates with their structure and content requi
 
 **Required Args:**
 - `Task title` - Name of the task
-- `Task type (task/reminder/habit/chore)` - Category
+- `Priority (low/medium/high/urgent)` - Task priority
+- `Effort (small/medium/large)` - Effort estimate
 
 **Optional Args:**
-- `Project (optional)` - Parent project
-- `Area (optional)` - Related area
+- `Task type (task/reminder/habit/chore)` - Category (default: task)
+- `Project (optional)` - Parent project (wikilink format)
+- `Area (optional)` - Related area (wikilink format)
+- `Start date (YYYY-MM-DD)` - When to start
 - `Due date (YYYY-MM-DD)` - When it's due
-- `Priority (low/medium/high/urgent)` - Default: medium
-- `Effort (small/medium/large)` - Default: medium
 
 **Auto-filled:**
 - `created` - Today's date

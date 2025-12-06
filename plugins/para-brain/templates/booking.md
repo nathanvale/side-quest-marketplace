@@ -8,9 +8,9 @@ project: "[[<% tp.system.prompt("Project") %>]]"
 booking_ref: ""
 provider: ""
 date: <% tp.system.prompt("Booking date (YYYY-MM-DD)") %>
-cost: 0
-currency: AUD
-payment_status: unpaid
+cost: <% tp.system.prompt("Cost (numeric only, e.g., 1850.00)", "") %>
+currency: <% tp.system.prompt("Currency (e.g., AUD, USD, EUR)", "AUD") %>
+payment_status: <% tp.system.prompt("Payment status (pending/paid/refunded/cancelled)", "pending") %>
 cancellation_deadline:
 tags:
   - booking

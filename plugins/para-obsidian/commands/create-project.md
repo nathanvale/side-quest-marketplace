@@ -1,50 +1,37 @@
-Create a new project note in the Obsidian vault.
+---
+description: Create a new project note in the Obsidian vault
+argument-hint: <title> <target-date> <area> [dest]
+allowed-tools: Bash(para-obsidian:*)
+---
 
-## Required Arguments
-- `$TITLE` - Project name (used for filename and title field)
-- `$TARGET_DATE` - Target completion date (YYYY-MM-DD format)
-- `$AREA` - Related area as wikilink, e.g. `[[Health]]` or `[[AI Practice]]`
+## Variables
 
-## Optional Arguments
-- `$DEST` - Destination folder (default: 01_Projects)
-- `$TAGS` - Additional tags, comma-separated (e.g. "automation,cinema")
-
-## Auto-filled Fields
-- `created` - Today's date
-- `start_date` - Today's date
-- `template_version` - 2
-- `tags` - Always includes "project"
-
-## Frontmatter Hints
-- **status**: active (default) | on-hold | completed | archived
-- **priority**: Inferred from content if not specified
-- **Suggested tags**: project, work, family, health, learning, finance, home, career
+```bash
+TITLE="$1"
+TARGET_DATE="$2"
+AREA="$3"
+DEST="${4:-01_Projects}"
+```
 
 ## Command
+
 ```bash
 para-obsidian create --template project \
   --title "$TITLE" \
-  --dest "${DEST:-01_Projects}" \
+  --dest "$DEST" \
   --arg "Project title=$TITLE" \
   --arg "Target completion date (YYYY-MM-DD)=$TARGET_DATE" \
   --arg "Area=$AREA"
 ```
 
-## Example Usage
+## Frontmatter Hints
 
-For task: "Build a CLI tool to automate cinema bookings by end of December"
+- **status**: active (default) | on-hold | completed | archived
+- **Suggested tags**: project, work, family, health, learning, finance, home, career
 
-```
-TITLE: "Cinema Booking Tool"
-TARGET_DATE: "2025-12-31"
-AREA: "[[AI Practice]]"
-TAGS: "automation,cinema"
-```
-
-For goal: "Get my driver's license renewed before it expires"
+## Examples
 
 ```
-TITLE: "Drivers License Renewal"
-TARGET_DATE: "2025-02-28"
-AREA: "[[Admin]]"
+/para-obsidian:create-project "Cinema Booking Tool" 2025-12-31 "[[AI Practice]]"
+/para-obsidian:create-project "Drivers License Renewal" 2025-02-28 "[[Admin]]"
 ```
