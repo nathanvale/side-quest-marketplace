@@ -76,70 +76,17 @@ bun test src/index.test.ts        # Integration tests
 
 ---
 
-## How to Use Kit (Quick Decision Tree)
+## Quick Reference: Which Tool to Use?
 
-**Question: What do you need to find?**
+| Need | Tool | Speed | Example |
+|------|------|-------|---------|
+| **Where is X defined?** | `kit_index_find` | ~10ms | "Find executeKitGrep function" |
+| **Who uses X?** | `kit_callers` / `kit_usages` | ~200ms | "Who calls executeKitGrep?" |
+| **Find code by structure** | `kit_ast_search` | ~30-500ms | "Find all async functions" |
+| **Find code by meaning** | `kit_semantic` | ~500ms | "How does auth work?" |
+| **Show module exports/structure** | `kit_api` / `kit_file_tree` | ~50ms | "What does kit export?" |
 
-### 1. Finding a Symbol Definition
-**"Where is the `executeKitGrep` function defined?"**
-```
-→ Use: kit_index_find("executeKitGrep")
-→ Speed: ~10ms
-→ Returns: File path + line number
-→ Why: Fastest option, requires PROJECT_INDEX.json (run kit_index_prime first)
-```
-
-### 2. Finding All Uses of a Symbol
-**"Who calls the `executeKitGrep` function?"** or **"Where is `UserService` used?"**
-```
-→ Use: kit_callers("executeKitGrep") or kit_usages("UserService")
-→ Speed: ~200ms
-→ Returns: All call sites with context
-→ Why: Fast graph-based analysis, no timeouts
-```
-
-### 3. Finding Code by Structure
-**"Find all async functions in the codebase"** or **"Show me all try-catch blocks"**
-```
-→ Use: kit_ast_search("async function") or kit_ast_search("try catch")
-→ Speed: ~30-500ms
-→ Returns: Code matches with node types and line numbers
-→ Why: Structural patterns are more accurate than text search
-```
-
-### 4. Finding Code by Meaning
-**"How does authentication work?"** or **"Show me error handling patterns"**
-```
-→ Use: kit_semantic("authentication flow logic")
-→ Speed: ~500ms (slower, ML-powered)
-→ Returns: Semantically similar code snippets
-→ Why: Natural language search when structure/naming doesn't help
-→ Note: First use requires building vector index (~10s), then cached
-```
-
-### 5. Understanding Module Structure
-**"What does the kit plugin export?"** or **"Show me the structure of src/commands"**
-```
-→ Use: kit_api("plugins/kit/src") or kit_file_tree()
-→ Speed: ~50ms
-→ Returns: All exported symbols or directory structure
-→ Why: Quick way to understand APIs and file layout
-```
-
----
-
-## Tool Priority Hierarchy (CRITICAL)
-
-**ALWAYS follow this order:**
-
-| Priority | Tools | Speed | When | Example |
-|----------|-------|-------|------|---------|
-| **1️⃣ Index** | `kit_index_find`, `kit_index_overview`, `kit_index_stats` | ~10ms | Looking up where something is defined | "Where is executeKitGrep?" |
-| **2️⃣ Graph** | `kit_callers`, `kit_usages`, `kit_blast`, `kit_api` | ~200-300ms | Finding who uses something or impact analysis | "Who calls executeKitGrep?" |
-| **3️⃣ Structure** | `kit_ast_search` | ~30-500ms | Finding code by structural patterns | "Find all async functions" |
-| **4️⃣ Semantic** | `kit_semantic` | ~500ms+ | Finding code by meaning/intent | "How does auth work?" |
-
-**Rule:** Index tools are 30-50x faster. Always try Priority 1 first, then Priority 2, only go to Priority 3/4 if needed.
+**CRITICAL RULE:** Index tools are 30-50x faster → always try Priority 1 first, then Priority 2, only Priority 3/4 if needed.
 
 ---
 
