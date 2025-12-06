@@ -21,11 +21,12 @@ uv tool install cased-kit
 kit/
 ├── src/                       # Core library code
 │   ├── ast/                   # Tree-sitter AST search engine
-│   ├── kit-wrapper.ts         # Pure CLI wrappers (25KB, core logic)
-│   ├── validators.ts          # Input validation (19KB)
+│   ├── kit-wrapper.ts         # Pure CLI wrappers
+│   ├── validators.ts          # Input validation
 │   ├── formatters.ts          # Output formatting
 │   └── logger.ts              # LogTape correlation IDs
-├── mcp/kit/           # MCP server (18 tools)
+├── mcp/
+│   └── index.ts               # 17 MCP tools (index, analysis, search, file ops)
 ├── commands/                  # Slash commands (/kit:logs, /kit:prime, etc.)
 └── docs/                      # Architecture & contributing guides
 ```
@@ -44,10 +45,10 @@ biome check --write .     # Lint and format
 
 ## Key Files
 
-- `mcp/kit/index.ts:kit-plugin` — 18 MCP tools (search, index, analysis, file ops)
-- `src/kit-wrapper.ts:30` — Pure CLI wrappers for all Kit commands (core logic)
-- `src/validators.ts:1` — Comprehensive input validation (27KB of tests!)
-- `src/ast/searcher.ts:1` — Parallel AST search using tree-sitter
+- `mcp/index.ts` — 17 MCP tools (index, analysis, search, file ops)
+- `src/kit-wrapper.ts` — Pure CLI wrappers for all Kit commands (core logic)
+- `src/validators.ts` — Comprehensive input validation (extensive edge case coverage)
+- `src/ast/searcher.ts` — Parallel AST search using tree-sitter
 
 ---
 
@@ -75,32 +76,88 @@ bun test src/index.test.ts        # Integration tests
 
 ---
 
-## MCP Tools (18 Total)
+## How to Use Kit (Quick Decision Tree)
 
-Kit provides 18 tools across 5 categories. See @../../../docs/MCP_TOOLS.md for complete reference.
+**Question: What do you need to find?**
 
-**Most used:**
-- `kit_grep` — Text/regex search (~30ms, fastest for literals)
-- `kit_index_find` — Symbol lookup (~10ms, requires `kit_index_prime`)
-- `kit_semantic` — Natural language search (~500ms, ML-powered)
-- `kit_callers` — Find who calls a function (~200ms)
-- `kit_file_tree` — Repository structure (~50ms)
+### 1. Finding a Symbol Definition
+**"Where is the `executeKitGrep` function defined?"**
+```
+→ Use: kit_index_find("executeKitGrep")
+→ Speed: ~10ms
+→ Returns: File path + line number
+→ Why: Fastest option, requires PROJECT_INDEX.json (run kit_index_prime first)
+```
 
-**Tool priority:** Index-based (~10ms) → Graph+analysis (~200-300ms) → Direct search (~30-500ms)
+### 2. Finding All Uses of a Symbol
+**"Who calls the `executeKitGrep` function?"** or **"Where is `UserService` used?"**
+```
+→ Use: kit_callers("executeKitGrep") or kit_usages("UserService")
+→ Speed: ~200ms
+→ Returns: All call sites with context
+→ Why: Fast graph-based analysis, no timeouts
+```
+
+### 3. Finding Code by Structure
+**"Find all async functions in the codebase"** or **"Show me all try-catch blocks"**
+```
+→ Use: kit_ast_search("async function") or kit_ast_search("try catch")
+→ Speed: ~30-500ms
+→ Returns: Code matches with node types and line numbers
+→ Why: Structural patterns are more accurate than text search
+```
+
+### 4. Finding Code by Meaning
+**"How does authentication work?"** or **"Show me error handling patterns"**
+```
+→ Use: kit_semantic("authentication flow logic")
+→ Speed: ~500ms (slower, ML-powered)
+→ Returns: Semantically similar code snippets
+→ Why: Natural language search when structure/naming doesn't help
+→ Note: First use requires building vector index (~10s), then cached
+```
+
+### 5. Understanding Module Structure
+**"What does the kit plugin export?"** or **"Show me the structure of src/commands"**
+```
+→ Use: kit_api("plugins/kit/src") or kit_file_tree()
+→ Speed: ~50ms
+→ Returns: All exported symbols or directory structure
+→ Why: Quick way to understand APIs and file layout
+```
 
 ---
 
-## Learn More
+## Tool Priority Hierarchy (CRITICAL)
 
-- **MCP Tools Reference:** @../../../docs/MCP_TOOLS.md (complete tool catalog with usage patterns)
-- **Architecture:** @./docs/ARCHITECTURE.md (MCP layer, semantic cache, AST search flow)
-- **Contributing:** @./docs/CONTRIBUTING.md (implementation patterns, debugging tips)
+**ALWAYS follow this order:**
+
+| Priority | Tools | Speed | When | Example |
+|----------|-------|-------|------|---------|
+| **1️⃣ Index** | `kit_index_find`, `kit_index_overview`, `kit_index_stats` | ~10ms | Looking up where something is defined | "Where is executeKitGrep?" |
+| **2️⃣ Graph** | `kit_callers`, `kit_usages`, `kit_blast`, `kit_api` | ~200-300ms | Finding who uses something or impact analysis | "Who calls executeKitGrep?" |
+| **3️⃣ Structure** | `kit_ast_search` | ~30-500ms | Finding code by structural patterns | "Find all async functions" |
+| **4️⃣ Semantic** | `kit_semantic` | ~500ms+ | Finding code by meaning/intent | "How does auth work?" |
+
+**Rule:** Index tools are 30-50x faster. Always try Priority 1 first, then Priority 2, only go to Priority 3/4 if needed.
 
 ---
 
-## Notes
+## Complete Tool Reference
+
+See @../../../docs/MCP_TOOLS.md for all 17 tools with detailed descriptions, parameters, and edge cases.
+
+---
+
+## Implementation Notes
 
 - **Per-repo semantic cache** — Vector DB stored in `<repo>/.kit/vector_db/` (gitignored)
-- **AST search is local** — Tree-sitter runs in-process, no Kit CLI subprocess
-- **Parallel AST processing** — Recent perf optimization (commit 04b89f4)
-- **Extensive validation** — 27KB of edge case tests ensure robust input handling
+- **AST search is local** — Tree-sitter runs in-process, no subprocess overhead
+- **Extensive validation** — Input validation prevents edge case failures
+- **Graceful degradation** — Semantic search falls back to grep if ML unavailable
+
+## Documentation
+
+- **Complete tool reference:** @../../../docs/MCP_TOOLS.md
+- **Architecture internals:** @./docs/ARCHITECTURE.md
+- **Contributing guide:** @./docs/CONTRIBUTING.md
