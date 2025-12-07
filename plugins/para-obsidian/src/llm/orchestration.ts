@@ -23,11 +23,11 @@ import { readFile } from "../fs";
 import { autoCommitChanges } from "../git";
 import { listAreas, listProjects, listTags } from "../indexer";
 import {
-	callOllama,
-	DEFAULT_LLM_MODEL,
-	type ExtractionResult,
+	callModel,
+	type LLMModel,
 	parseOllamaResponse,
-} from "../llm";
+} from "@sidequest/core/llm";
+import { DEFAULT_LLM_MODEL, type ExtractionResult } from "../llm";
 import {
 	getTemplate,
 	getTemplateFields,
@@ -152,7 +152,7 @@ export async function convertNoteToTemplate(
 
 	// 5. Call LLM
 	const model = options.model ?? DEFAULT_LLM_MODEL;
-	const rawResponse = await callOllama(prompt, model);
+	const rawResponse = await callModel({ model: model as LLMModel, prompt });
 	const extracted = parseOllamaResponse(rawResponse);
 
 	// 6. Dry run check
@@ -365,7 +365,7 @@ export async function extractMetadata(
 
 	// 5. Call LLM
 	const model = options.model ?? DEFAULT_LLM_MODEL;
-	const rawResponse = await callOllama(prompt, model);
+	const rawResponse = await callModel({ model: model as LLMModel, prompt });
 	const extracted = parseOllamaResponse(rawResponse);
 
 	// 6. Apply arg overrides if provided
@@ -449,7 +449,7 @@ export async function suggestFieldValues(
 
 	// Call LLM
 	const model = options.model ?? DEFAULT_LLM_MODEL;
-	const rawResponse = await callOllama(prompt, model);
+	const rawResponse = await callModel({ model: model as LLMModel, prompt });
 	return parseOllamaResponse(rawResponse);
 }
 

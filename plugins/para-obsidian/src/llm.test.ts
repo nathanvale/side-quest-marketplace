@@ -80,8 +80,8 @@ describe("parseOllamaResponse", () => {
 });
 
 describe("constants", () => {
-	test("DEFAULT_LLM_MODEL is set", () => {
-		expect(DEFAULT_LLM_MODEL).toBe("qwen2.5:14b");
+	test("DEFAULT_LLM_MODEL is set to sonnet", () => {
+		expect(DEFAULT_LLM_MODEL).toBe("sonnet");
 	});
 
 	test("DEFAULT_OLLAMA_URL is localhost", () => {
