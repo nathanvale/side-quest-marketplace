@@ -85,10 +85,20 @@ import {
 import { buildIndex, loadIndex, saveIndex } from "./indexer";
 import { type InsertMode, insertIntoNote } from "./insert";
 import { renameWithLinkRewrite } from "./links";
+import {
+	buildConversionPrompt,
+	callOllama,
+	DEFAULT_LLM_MODEL,
+	parseOllamaResponse,
+} from "./llm";
 import { MIGRATIONS } from "./migrations";
 import { filterByFrontmatter, searchText } from "./search";
 import { semanticSearch } from "./semantic";
-import { getTemplate, getTemplateFields } from "./templates";
+import {
+	getTemplate,
+	getTemplateFields,
+	getTemplateSections,
+} from "./templates";
 
 function printUsage(): void {
 	const lines = [
@@ -108,6 +118,7 @@ function printUsage(): void {
 		"  bun run src/cli.ts rename <from> <to> [--dry-run] [--attachments paths] [--format md|json]",
 		"  bun run src/cli.ts delete <file> --confirm [--dry-run] [--attachments paths] [--format md|json]",
 		"  bun run src/cli.ts semantic <query> [--dir path[,path2]] [--limit N] [--format md|json]",
+		"  bun run src/cli.ts convert <source-file> --template <type> [--model name] [--title override] [--dest path] [--dry-run] [--format md|json]",
 		"  bun run src/cli.ts frontmatter get <file> [--format md|json]",
 		"  bun run src/cli.ts frontmatter validate <file> [--format md|json]",
 		"  bun run src/cli.ts frontmatter set <file> key=value [...] [--unset key1,key2] [--dry-run] [--attachments paths] [--format md|json]",
@@ -864,6 +875,166 @@ async function main(): Promise<void> {
 							for (const skip of injectionResult.skipped) {
 								console.log(`  - ${skip.heading}: ${skip.reason}`);
 							}
+						}
+					}
+				}
+				break;
+			}
+
+			case "convert": {
+				// Convert freeform note to structured template using local LLM
+				const sourceFile = subcommand;
+				const template =
+					typeof flags.template === "string" ? flags.template : undefined;
+				const model =
+					typeof flags.model === "string" ? flags.model : DEFAULT_LLM_MODEL;
+				const dryRun = flags["dry-run"] === true;
+				const dest = typeof flags.dest === "string" ? flags.dest : undefined;
+				const titleOverride =
+					typeof flags.title === "string" ? flags.title : undefined;
+
+				if (!sourceFile) {
+					console.error("convert requires <source-file>");
+					process.exit(1);
+				}
+				if (!template) {
+					console.error("convert requires --template flag");
+					process.exit(1);
+				}
+
+				// 1. Read existing note content
+				let existingContent: string;
+				try {
+					const { body, attributes } = readFrontmatterFile(config, sourceFile);
+					// Include existing frontmatter in content for context
+					existingContent =
+						Object.keys(attributes).length > 0
+							? `Existing frontmatter:\n${JSON.stringify(attributes, null, 2)}\n\nBody:\n${body}`
+							: body;
+				} catch {
+					// File might not have frontmatter, read as plain text
+					existingContent = readFile(config.vault, sourceFile);
+				}
+
+				// 2. Get template info and fields
+				const templateInfo = getTemplate(config, template);
+				if (!templateInfo) {
+					console.error(`Template "${template}" not found`);
+					process.exit(1);
+				}
+				const fields = getTemplateFields(templateInfo);
+				const sections = getTemplateSections(templateInfo);
+				const rules = config.frontmatterRules?.[template];
+
+				// 3. Build prompt and call LLM
+				if (!isJson) {
+					console.log(emphasize.info(`Extracting with model: ${model}...`));
+				}
+				const prompt = buildConversionPrompt(
+					existingContent,
+					template,
+					fields,
+					sections,
+					rules,
+				);
+				const rawResponse = await callOllama(prompt, model);
+				const extracted = parseOllamaResponse(rawResponse);
+
+				// 4. Dry run - just show extraction
+				if (dryRun) {
+					if (isJson) {
+						console.log(
+							JSON.stringify({ extracted, dryRun: true, model }, null, 2),
+						);
+					} else {
+						console.log(emphasize.info("Extracted (dry run):"));
+						console.log(emphasize.info(`  Title: ${extracted.title}`));
+						console.log(emphasize.info("  Args:"));
+						for (const [k, v] of Object.entries(extracted.args)) {
+							console.log(`    ${k}: ${v}`);
+						}
+						if (Object.keys(extracted.content).length > 0) {
+							console.log(emphasize.info("  Content sections:"));
+							for (const heading of Object.keys(extracted.content)) {
+								console.log(`    - ${heading}`);
+							}
+						}
+					}
+					break;
+				}
+
+				// 5. Create note with extracted frontmatter
+				await ensureGitGuard(config);
+				const result = createFromTemplate(config, {
+					template,
+					title: titleOverride ?? extracted.title,
+					dest,
+					args: extracted.args as Record<string, string>,
+				});
+
+				// 6. Inject content sections
+				let injectionResult:
+					| {
+							injected: string[];
+							skipped: Array<{ heading: string; reason: string }>;
+					  }
+					| undefined;
+				if (extracted.content && Object.keys(extracted.content).length > 0) {
+					injectionResult = injectSections(
+						config,
+						result.filePath,
+						extracted.content,
+					);
+				}
+
+				// 7. Validate the result
+				const validation = validateFrontmatterFile(config, result.filePath);
+
+				// 8. Auto-commit if enabled
+				if (config.autoCommit) {
+					await autoCommitChanges(
+						config,
+						[result.filePath],
+						`convert ${sourceFile} to ${template}`,
+					);
+				}
+
+				// 9. Output
+				if (isJson) {
+					console.log(
+						JSON.stringify(
+							{
+								source: sourceFile,
+								created: result.filePath,
+								model,
+								validation: {
+									valid: validation.valid,
+									issues: validation.issues,
+								},
+								sectionsInjected: injectionResult?.injected ?? [],
+								sectionsSkipped: injectionResult?.skipped ?? [],
+							},
+							null,
+							2,
+						),
+					);
+				} else {
+					console.log(emphasize.success(`Created ${result.filePath}`));
+					if (validation.valid) {
+						console.log(emphasize.success("✓ Validation passed"));
+					} else {
+						console.log(emphasize.warn("⚠ Validation issues:"));
+						for (const issue of validation.issues) {
+							console.log(`  - ${issue.field}: ${issue.message}`);
+						}
+					}
+					if (injectionResult) {
+						if (injectionResult.injected.length > 0) {
+							console.log(
+								emphasize.info(
+									`Injected ${injectionResult.injected.length} section(s): ${injectionResult.injected.join(", ")}`,
+								),
+							);
 						}
 					}
 				}

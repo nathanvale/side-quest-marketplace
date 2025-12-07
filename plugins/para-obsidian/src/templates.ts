@@ -203,6 +203,49 @@ export function getTemplateFields(template: TemplateInfo): TemplateField[] {
 	return fields;
 }
 
+/**
+ * Extracts markdown heading names from a template's body.
+ *
+ * Scans the body section (after frontmatter) for level-2 headings (## ...)
+ * and returns their text content. Used to tell the LLM what sections
+ * exist in the target template during note conversion.
+ *
+ * @param template - Template info with content to analyze
+ * @returns Array of section heading names (without ## prefix)
+ *
+ * @example
+ * ```typescript
+ * const template = getTemplate(config, 'booking');
+ * const sections = getTemplateSections(template);
+ * // ["Booking Details", "Cost & Payment", "Contact Information", "Important Notes"]
+ * ```
+ */
+export function getTemplateSections(template: TemplateInfo): string[] {
+	// Extract body section (after frontmatter)
+	const frontmatterMatch = template.content.match(/^---\n([\s\S]*?)\n---/);
+	const body = frontmatterMatch
+		? template.content.slice(frontmatterMatch[0].length)
+		: template.content;
+
+	// Find all level-2 headings (## Heading)
+	const headingRegex = /^##\s+(.+)$/gm;
+	const sections: string[] = [];
+
+	for (const match of body.matchAll(headingRegex)) {
+		const heading = match[1]?.trim();
+		if (heading) {
+			// Strip any Templater prompts from heading text
+			// e.g., "## <% tp.system.prompt("Title") %>" → skip or extract
+			const cleanHeading = heading.replace(/<%\s*tp\.[^%]+%>/g, "").trim();
+			if (cleanHeading) {
+				sections.push(cleanHeading);
+			}
+		}
+	}
+
+	return sections;
+}
+
 // ============================================================================
 // Date Substitution
 // ============================================================================

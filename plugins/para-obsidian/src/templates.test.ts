@@ -5,6 +5,7 @@ import {
 	applyDateSubstitutions,
 	convertTemplaterFormat,
 	detectTitlePromptKey,
+	getTemplateSections,
 	type TemplateInfo,
 } from "./templates";
 
@@ -222,5 +223,104 @@ title: "<%  tp.system.prompt("Spaced title")  %>"
 Body`);
 
 		expect(detectTitlePromptKey(template)).toBe("Spaced title");
+	});
+});
+
+describe("getTemplateSections", () => {
+	function makeTemplate(content: string): TemplateInfo {
+		return {
+			name: "test",
+			path: "/test.md",
+			version: 1,
+			content,
+		};
+	}
+
+	test("extracts h2 headings from template body", () => {
+		const template = makeTemplate(`---
+title: "Test"
+---
+## Section One
+content here
+
+## Section Two
+more content`);
+
+		expect(getTemplateSections(template)).toEqual([
+			"Section One",
+			"Section Two",
+		]);
+	});
+
+	test("returns empty array for template with no body headings", () => {
+		const template = makeTemplate(`---
+title: "Test"
+---
+No headings here, just plain text.`);
+
+		expect(getTemplateSections(template)).toEqual([]);
+	});
+
+	test("ignores h1 and h3+ headings", () => {
+		const template = makeTemplate(`---
+title: "Test"
+---
+# H1 Heading
+## H2 Heading
+### H3 Heading
+#### H4 Heading`);
+
+		expect(getTemplateSections(template)).toEqual(["H2 Heading"]);
+	});
+
+	test("strips Templater prompts from heading text", () => {
+		const template = makeTemplate(`---
+title: "Test"
+---
+## <% tp.system.prompt("Title") %>
+## Notes`);
+
+		// The Templater prompt heading should be stripped to empty and excluded
+		expect(getTemplateSections(template)).toEqual(["Notes"]);
+	});
+
+	test("handles template without frontmatter", () => {
+		const template = makeTemplate(`# Just markdown
+## Section One
+## Section Two`);
+
+		expect(getTemplateSections(template)).toEqual([
+			"Section One",
+			"Section Two",
+		]);
+	});
+
+	test("handles empty frontmatter", () => {
+		const template = makeTemplate(`---
+---
+## Only Section`);
+
+		expect(getTemplateSections(template)).toEqual(["Only Section"]);
+	});
+
+	test("handles real booking template sections", () => {
+		const template = makeTemplate(`---
+title: "<% tp.system.prompt("Booking title") %>"
+type: booking
+---
+## Booking Details
+
+## Cost & Payment
+
+## Contact Information
+
+## Important Notes`);
+
+		expect(getTemplateSections(template)).toEqual([
+			"Booking Details",
+			"Cost & Payment",
+			"Contact Information",
+			"Important Notes",
+		]);
 	});
 });
