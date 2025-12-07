@@ -62,7 +62,7 @@ import {
 	loadConfig,
 	type ParaObsidianConfig,
 } from "./config";
-import { createFromTemplate, replaceH1Title, replaceSections } from "./create";
+import { createFromTemplate, replaceSections } from "./create";
 import { deleteFile } from "./delete";
 import {
 	applyVersionPlan,
@@ -85,7 +85,6 @@ import {
 import {
 	buildIndex,
 	listAreas,
-	listProjects,
 	listTags,
 	loadIndex,
 	saveIndex,
@@ -93,23 +92,11 @@ import {
 } from "./indexer";
 import { type InsertMode, insertIntoNote } from "./insert";
 import { renameWithLinkRewrite } from "./links";
-import {
-	buildConstraintSet,
-	buildStructuredPrompt,
-	callOllama,
-	DEFAULT_CRITICAL_RULES,
-	DEFAULT_LLM_MODEL,
-	parseOllamaResponse,
-	type VaultContext,
-} from "./llm";
+import { extractMetadata, validateModel } from "./llm";
 import { MIGRATIONS } from "./migrations";
 import { filterByFrontmatter, searchText } from "./search";
 import { semanticSearch } from "./semantic";
-import {
-	getTemplate,
-	getTemplateFields,
-	getTemplateSections,
-} from "./templates";
+import { getTemplate, getTemplateFields } from "./templates";
 
 function printUsage(): void {
 	const lines = [
@@ -125,11 +112,11 @@ function printUsage(): void {
 		"  bun run src/cli.ts index prime [--dir path[,path2]] [--format md|json]",
 		"  bun run src/cli.ts index query [--tag TAG] [--frontmatter key=val|--frontmatter.key val] [--dir path[,path2]] [--format md|json]",
 		'  bun run src/cli.ts create --template <name> --title "<Title>" [--dest path] [--arg key=value ...] [--content \'{"heading": "content"}\'] [--attachments paths] [--format md|json]',
+		"  bun run src/cli.ts create --template <name> --source <file> [--preview] [--model name] [--arg key=value ...] [--format md|json]",
 		'  bun run src/cli.ts insert <file> --heading "<Heading>" --content "<Content>" [--before|--after|--append|--prepend] [--attachments paths] [--format md|json]',
 		"  bun run src/cli.ts rename <from> <to> [--dry-run] [--attachments paths] [--format md|json]",
 		"  bun run src/cli.ts delete <file> --confirm [--dry-run] [--attachments paths] [--format md|json]",
 		"  bun run src/cli.ts semantic <query> [--dir path[,path2]] [--limit N] [--format md|json]",
-		"  bun run src/cli.ts convert <source-file> --template <type> [--model name] [--title override] [--dest path] [--dry-run] [--format md|json]",
 		"  bun run src/cli.ts frontmatter get <file> [--format md|json]",
 		"  bun run src/cli.ts frontmatter validate <file> [--format md|json]",
 		"  bun run src/cli.ts frontmatter set <file> key=value [...] [--unset key1,key2] [--dry-run] [--attachments paths] [--format md|json]",
@@ -151,6 +138,8 @@ function printUsage(): void {
 		"  bun run src/cli.ts config --format json",
 		"  bun run src/cli.ts list 01_Projects",
 		'  bun run src/cli.ts create --template project --title "New Project" --area "[[Health]]" --target_completion 2025-12-31',
+		'  bun run src/cli.ts create --template task --source "inbox/rough-notes.md" --preview',
+		'  bun run src/cli.ts create --template task --source "inbox/rough-notes.md" --model qwen:7b --arg "priority=high"',
 		'  bun run src/cli.ts rename "01_Projects/Old.md" "01_Projects/New.md" --dry-run',
 	];
 	console.log(
@@ -242,6 +231,48 @@ function matchesDir(file: string, dirs?: ReadonlyArray<string>): boolean {
 			normalizedFile.startsWith(`${normalizedDir}/`)
 		);
 	});
+}
+
+/**
+ * Parse --arg flags into key=value overrides.
+ *
+ * Handles both single string and array of strings from CLI parsing.
+ * Supports values with embedded '=' signs (e.g., --arg "url=https://example.com/path?a=b")
+ *
+ * @param argFlags - Raw --arg flag value(s) from parseArgs
+ * @returns Record mapping arg keys to their values
+ *
+ * @example
+ * ```typescript
+ * parseArgOverrides("priority=high")
+ * // Returns: { priority: "high" }
+ *
+ * parseArgOverrides(["priority=high", "area=[[Work]]"])
+ * // Returns: { priority: "high", area: "[[Work]]" }
+ * ```
+ */
+function parseArgOverrides(
+	argFlags: string | boolean | (string | boolean)[] | undefined,
+): Record<string, string> {
+	const overrides: Record<string, string> = {};
+
+	// Normalize to array of strings only
+	let stringFlags: string[];
+	if (typeof argFlags === "string") {
+		stringFlags = [argFlags];
+	} else if (Array.isArray(argFlags)) {
+		stringFlags = argFlags.filter((v): v is string => typeof v === "string");
+	} else {
+		stringFlags = [];
+	}
+
+	for (const arg of stringFlags) {
+		const [key, ...valueParts] = arg.split("=");
+		if (key && valueParts.length > 0) {
+			overrides[key] = valueParts.join("=");
+		}
+	}
+	return overrides;
 }
 
 export function suggestFieldsForType(
@@ -840,6 +871,193 @@ async function main(): Promise<void> {
 				const dest = typeof flags.dest === "string" ? flags.dest : undefined;
 				const contentJson =
 					typeof flags.content === "string" ? flags.content : undefined;
+				const sourceFile =
+					typeof flags.source === "string" ? flags.source : undefined;
+				const preview = flags.preview === true || flags.preview === "true";
+				const modelFlag =
+					typeof flags.model === "string" ? flags.model : undefined;
+
+				// Validate required flags based on mode
+				if (sourceFile) {
+					// AI-powered mode: --source is provided
+					if (!template) {
+						console.error("create with --source requires --template");
+						process.exit(1);
+					}
+
+					// Parse --arg overrides
+					const argOverrides = parseArgOverrides(flags.arg);
+
+					// Get model from flags, config, or default
+					const availableModels = config.availableModels ?? [
+						"sonnet",
+						"haiku",
+						"qwen:7b",
+						"qwen:14b",
+					];
+					const defaultModel = config.defaultModel ?? "sonnet";
+					const model = modelFlag ?? defaultModel;
+
+					// Validate model against available models
+					try {
+						validateModel(model, availableModels);
+					} catch (error) {
+						const message =
+							error instanceof Error ? error.message : "Invalid model";
+						console.error(message);
+						process.exit(1);
+					}
+
+					if (preview) {
+						// Preview mode - extract and display suggestions without creating file
+						try {
+							const extracted = await extractMetadata(config, {
+								sourceFile,
+								template,
+								model,
+								extractContent: false, // Skip content extraction for preview (token savings)
+								argOverrides,
+							});
+
+							if (isJson) {
+								console.log(
+									JSON.stringify(
+										{
+											metadata: extracted.args,
+											title: extracted.title,
+											model,
+											preview: true,
+										},
+										null,
+										2,
+									),
+								);
+							} else {
+								console.log(emphasize.info(`AI Suggestions (using ${model}):`));
+								console.log(`  title: ${extracted.title}`);
+								for (const [key, value] of Object.entries(extracted.args)) {
+									if (value !== null) {
+										console.log(`  ${key}: ${value}`);
+									}
+								}
+								console.log("");
+								console.log(
+									emphasize.info(
+										`To create: bun src/cli.ts create --template ${template} --source "${sourceFile}"`,
+									),
+								);
+								console.log(
+									emphasize.info(
+										'Override fields: --arg "priority=high" --arg "area=[[Work]]"',
+									),
+								);
+							}
+						} catch (error) {
+							const message =
+								error instanceof Error ? error.message : "Extraction failed";
+							console.error(message);
+							process.exit(1);
+						}
+						break;
+					}
+
+					// Full AI-powered creation mode
+					try {
+						const extracted = await extractMetadata(config, {
+							sourceFile,
+							template,
+							model,
+							extractContent: true,
+							argOverrides,
+						});
+
+						// Use extracted title if --title not provided
+						const resolvedTitle = title ?? extracted.title;
+
+						await ensureGitGuard(config);
+						const result = createFromTemplate(config, {
+							template,
+							title: resolvedTitle,
+							dest,
+							args: extracted.args as Record<string, string>,
+						});
+
+						// Inject extracted content into sections if any
+						let injectionResult:
+							| {
+									injected: string[];
+									skipped: Array<{ heading: string; reason: string }>;
+							  }
+							| undefined;
+						if (
+							extracted.content &&
+							Object.keys(extracted.content).length > 0
+						) {
+							injectionResult = replaceSections(
+								config,
+								result.filePath,
+								extracted.content,
+								{ preserveComments: true },
+							);
+						}
+
+						const attachments = withAutoDiscoveredAttachments(
+							config,
+							result.filePath,
+							parseAttachments(normalizeFlags(flags)),
+						);
+						if (config.autoCommit) {
+							await autoCommitChanges(
+								config,
+								[result.filePath, ...attachments],
+								`create ${result.filePath}`,
+							);
+						}
+
+						if (isJson) {
+							const output: Record<string, unknown> = {
+								filePath: result.filePath,
+								content: result.content,
+								model,
+							};
+							if (injectionResult) {
+								output.sectionsInjected = injectionResult.injected.length;
+								output.sectionsSkipped = injectionResult.skipped;
+								output.injectedHeadings = injectionResult.injected;
+							}
+							console.log(JSON.stringify(output, null, 2));
+						} else {
+							console.log(emphasize.success(`Created ${result.filePath}`));
+							if (injectionResult) {
+								if (injectionResult.injected.length > 0) {
+									console.log(
+										emphasize.info(
+											`Injected content into ${injectionResult.injected.length} section(s): ${injectionResult.injected.join(", ")}`,
+										),
+									);
+								}
+								if (injectionResult.skipped.length > 0) {
+									console.log(
+										emphasize.warn(
+											`Skipped ${injectionResult.skipped.length} section(s):`,
+										),
+									);
+									for (const skip of injectionResult.skipped) {
+										console.log(`  - ${skip.heading}: ${skip.reason}`);
+									}
+								}
+							}
+						}
+					} catch (error) {
+						const message =
+							error instanceof Error ? error.message : "AI extraction failed";
+						console.error(message);
+						process.exit(1);
+					}
+					break;
+				}
+
+				// Blank template mode (original behavior when --source is NOT provided)
 				if (!template || !title) {
 					console.error("create requires --template and --title");
 					process.exit(1);
@@ -942,243 +1160,6 @@ async function main(): Promise<void> {
 							for (const skip of injectionResult.skipped) {
 								console.log(`  - ${skip.heading}: ${skip.reason}`);
 							}
-						}
-					}
-				}
-				break;
-			}
-
-			case "convert": {
-				// Convert freeform note to structured template using local LLM
-				const sourceFile = subcommand;
-				const template =
-					typeof flags.template === "string" ? flags.template : undefined;
-				const model =
-					typeof flags.model === "string" ? flags.model : DEFAULT_LLM_MODEL;
-				const dryRun = flags["dry-run"] === true;
-				const dest = typeof flags.dest === "string" ? flags.dest : undefined;
-				const titleOverride =
-					typeof flags.title === "string" ? flags.title : undefined;
-
-				if (!sourceFile) {
-					console.error("convert requires <source-file>");
-					process.exit(1);
-				}
-				if (!template) {
-					console.error("convert requires --template flag");
-					process.exit(1);
-				}
-
-				// 1. Read existing note content
-				let existingContent: string;
-				try {
-					const { body, attributes } = readFrontmatterFile(config, sourceFile);
-					// Include existing frontmatter in content for context
-					existingContent =
-						Object.keys(attributes).length > 0
-							? `Existing frontmatter:\n${JSON.stringify(attributes, null, 2)}\n\nBody:\n${body}`
-							: body;
-				} catch {
-					// File might not have frontmatter, read as plain text
-					existingContent = readFile(config.vault, sourceFile);
-				}
-
-				// 2. Get template info and fields
-				const templateInfo = getTemplate(config, template);
-				if (!templateInfo) {
-					console.error(`Template "${template}" not found`);
-					process.exit(1);
-				}
-				const fields = getTemplateFields(templateInfo);
-				const sections = getTemplateSections(templateInfo);
-				const rules = config.frontmatterRules?.[template];
-
-				// 3. Fetch vault context for intelligent extraction
-				const vaultContext: VaultContext = {
-					areas: listAreas(config),
-					projects: listProjects(config),
-					suggestedTags: listTags(config),
-				};
-
-				if (!isJson) {
-					console.log(
-						emphasize.info(
-							`Vault context: ${vaultContext.areas.length} areas, ${vaultContext.projects.length} projects, ${vaultContext.suggestedTags.length} tags`,
-						),
-					);
-				}
-
-				// 4. Build prompt and call LLM
-				if (!isJson) {
-					console.log(emphasize.info(`Extracting with model: ${model}...`));
-				}
-
-				// Build constraint set from template metadata
-				const constraints = buildConstraintSet(
-					fields,
-					sections,
-					rules,
-					vaultContext,
-				);
-
-				// Build structured prompt
-				const prompt = buildStructuredPrompt({
-					systemRole: `You are extracting structured data from an existing note to convert it to a "${template}" template.`,
-					sourceContent: existingContent,
-					constraints,
-					criticalRules: DEFAULT_CRITICAL_RULES,
-				});
-
-				const rawResponse = await callOllama(prompt, model);
-				const extracted = parseOllamaResponse(rawResponse);
-
-				// 5. Dry run - just show extraction
-				if (dryRun) {
-					if (isJson) {
-						console.log(
-							JSON.stringify({ extracted, dryRun: true, model }, null, 2),
-						);
-					} else {
-						console.log(emphasize.info("Extracted (dry run):"));
-						console.log(emphasize.info(`  Title: ${extracted.title}`));
-						console.log(emphasize.info("  Args:"));
-						for (const [k, v] of Object.entries(extracted.args)) {
-							console.log(`    ${k}: ${v}`);
-						}
-						if (Object.keys(extracted.content).length > 0) {
-							console.log(emphasize.info("  Content sections:"));
-							for (const heading of Object.keys(extracted.content)) {
-								console.log(`    - ${heading}`);
-							}
-						}
-					}
-					break;
-				}
-
-				// 6. Create note from template base
-				// Title priority: CLI override > extracted.title > extracted.args.title
-				const resolvedTitle =
-					titleOverride ??
-					(extracted.title !== "Untitled" ? extracted.title : null) ??
-					(typeof extracted.args.title === "string"
-						? extracted.args.title
-						: null) ??
-					extracted.title;
-
-				await ensureGitGuard(config);
-				const result = createFromTemplate(config, {
-					template,
-					title: resolvedTitle,
-					dest,
-					args: extracted.args as Record<string, string>,
-				});
-
-				// 7. Update frontmatter with extracted values (handles non-Templater templates)
-				// Filter out null values and Templater prompt keys (which are already substituted)
-				// Only keep keys that would be valid frontmatter field names (lowercase, underscores)
-				const frontmatterUpdates: Record<string, unknown> = {};
-				for (const [key, value] of Object.entries(extracted.args)) {
-					// Skip null values
-					if (value === null || value === "null") continue;
-
-					// Skip Templater prompt text - these are already substituted in the template
-					// Templater prompts contain: spaces, parentheses, or start with capital letter
-					// Valid field names: title, trip_date, day_number, location, accommodation
-					// Invalid (prompt text): "Day title", "Date (YYYY-MM-DD)", "Location", "Project"
-					if (
-						key.includes(" ") ||
-						key.includes("(") ||
-						key.includes(")") ||
-						/^[A-Z]/.test(key)
-					) {
-						continue; // Skip Templater prompt keys
-					}
-
-					frontmatterUpdates[key] = value;
-				}
-				// Always set template_version to the current expected version
-				const expectedVersion = config.templateVersions?.[template];
-				if (expectedVersion !== undefined) {
-					frontmatterUpdates.template_version = expectedVersion;
-				}
-				if (Object.keys(frontmatterUpdates).length > 0) {
-					updateFrontmatterFile(config, result.filePath, {
-						set: frontmatterUpdates,
-						dryRun: false,
-					});
-				}
-
-				// 8. Replace H1 title placeholder with actual title
-				const noteTitle =
-					typeof extracted.args.title === "string"
-						? extracted.args.title
-						: (titleOverride ?? extracted.title);
-				replaceH1Title(config, result.filePath, noteTitle);
-
-				// 9. Replace content sections (not append)
-				let injectionResult:
-					| {
-							injected: string[];
-							skipped: Array<{ heading: string; reason: string }>;
-					  }
-					| undefined;
-				if (extracted.content && Object.keys(extracted.content).length > 0) {
-					injectionResult = replaceSections(
-						config,
-						result.filePath,
-						extracted.content,
-						{ preserveComments: true },
-					);
-				}
-
-				// 10. Validate the result
-				const validation = validateFrontmatterFile(config, result.filePath);
-
-				// 11. Auto-commit if enabled
-				if (config.autoCommit) {
-					await autoCommitChanges(
-						config,
-						[result.filePath],
-						`convert ${sourceFile} to ${template}`,
-					);
-				}
-
-				// 12. Output
-				if (isJson) {
-					console.log(
-						JSON.stringify(
-							{
-								source: sourceFile,
-								created: result.filePath,
-								model,
-								validation: {
-									valid: validation.valid,
-									issues: validation.issues,
-								},
-								sectionsInjected: injectionResult?.injected ?? [],
-								sectionsSkipped: injectionResult?.skipped ?? [],
-							},
-							null,
-							2,
-						),
-					);
-				} else {
-					console.log(emphasize.success(`Created ${result.filePath}`));
-					if (validation.valid) {
-						console.log(emphasize.success("✓ Validation passed"));
-					} else {
-						console.log(emphasize.warn("⚠ Validation issues:"));
-						for (const issue of validation.issues) {
-							console.log(`  - ${issue.field}: ${issue.message}`);
-						}
-					}
-					if (injectionResult) {
-						if (injectionResult.injected.length > 0) {
-							console.log(
-								emphasize.info(
-									`Injected ${injectionResult.injected.length} section(s): ${injectionResult.injected.join(", ")}`,
-								),
-							);
 						}
 					}
 				}
