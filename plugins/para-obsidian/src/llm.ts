@@ -231,6 +231,7 @@ ALLOWED TAGS (choose ONLY from this list):
 ${vaultContext.suggestedTags.join(", ")}
 → DO NOT invent new tags - only use tags from this list
 → Select 1-3 most relevant tags for the content
+→ IMPORTANT: Check VALIDATION RULES for required tag inclusions (e.g., area notes MUST include "area" tag)
 
 `
 		: "";
@@ -274,6 +275,11 @@ CRITICAL RULES:
 7. Enum values MUST match exactly from the validation rules
 8. For content sections, preserve markdown formatting (lists, bold, links, etc.)
 9. The title should be descriptive and based on the note content
+10. For wikilink fields (area, project): Use literal null when no value exists
+    - CORRECT: "area": null
+    - WRONG: "area": "[[null]]" or "area": "null"
+11. Tags MUST include required values from validation rules (check "includes" field)
+    - Example: area notes must include "area" in tags array
 
 OUTPUT (JSON only, no explanation, no markdown fences):`;
 }
