@@ -46,7 +46,7 @@ Notes are automatically placed in their PARA folder unless `--dest` is specified
 ## Quick Reference
 
 **Type:** CLI + MCP Server | **Runtime:** Bun | **Language:** TypeScript (strict mode)
-**Dependencies:** yaml, @sidequest/core | **Test Framework:** Bun test (270+ tests passing)
+**Dependencies:** yaml, @sidequest/core | **Test Framework:** Bun test (294 tests passing)
 
 ### Directory Structure
 
@@ -97,7 +97,11 @@ para-obsidian list [dir]                       # List vault files
 para-obsidian read <file>                      # Read note contents
 para-obsidian search <query> [--dir] [--tag]   # Search with filters
 para-obsidian semantic <query> [--dir]         # Semantic search via Kit
-para-obsidian create <type> [args...] [--content JSON]  # Create from template with optional content injection
+para-obsidian create --template <type> --title "Name"    # Create blank template
+para-obsidian create --template <type> --source file.md  # AI-powered: extract metadata from source
+para-obsidian create --template <type> --source file.md --preview  # Preview AI suggestions only (75% token savings)
+para-obsidian create --template <type> --source file.md --model haiku  # Use specific model
+para-obsidian create --template <type> --source file.md --arg "priority=high"  # Override AI suggestions
 para-obsidian insert <file> <heading> <text>   # Insert under heading
 para-obsidian rename <old> <new> [--dry-run]   # Rename with link rewrite
 para-obsidian delete <file> [--dry-run]        # Delete with confirm
@@ -299,12 +303,40 @@ Rename operations rewrite all references:
 - Markdown links: `[text](old-name.md)` → `[text](new-name.md)`
 - Scoped to vault only (no external links modified)
 
+### AI-Powered Create Mode
+
+**Unified `create` command** with AI-powered metadata extraction:
+
+```bash
+# Blank template (manual entry)
+para-obsidian create --template task --title "Fix shed door"
+
+# AI-powered: extract metadata from existing note
+para-obsidian create --template task --source "inbox/rough-note.md"
+
+# Preview mode: see suggestions without creating (75% token savings)
+para-obsidian create --template task --source "inbox/rough-note.md" --preview
+
+# Override specific AI suggestions
+para-obsidian create --template task --source "inbox/rough-note.md" \
+  --arg "priority=high" --arg "area=[[Work]]"
+
+# Use specific model (sonnet, haiku, or Ollama models like qwen2.5:14b)
+para-obsidian create --template task --source "inbox/rough-note.md" --model haiku
+```
+
+**Model Selection:**
+- **Claude models** (`sonnet`, `haiku`) → Uses `claude -p` headless CLI
+- **Ollama models** (`qwen2.5:14b`, `qwen:7b`, etc.) → Uses Ollama HTTP API
+- Default model configurable in `.paraobsidianrc` via `defaultModel` field
+- Available models validated against `availableModels` config array
+
 ### LLM Utilities Architecture (3-Layer Design)
 
-**Purpose:** Reusable, deterministic LLM integration for note conversion and field suggestions.
+**Purpose:** Reusable, deterministic LLM integration for AI-powered create and field suggestions.
 
 **Layer 3: High-Level Orchestration** (`src/llm/orchestration.ts`):
-- `convertNoteToTemplate()` — Full conversion pipeline (existing convert command)
+- `extractMetadata()` — Full extraction pipeline for `create --source`
 - `suggestFieldValues()` — Lightweight field extraction for slash commands
 - `batchConvert()` — Bulk operations with shared constraints
 
@@ -365,7 +397,7 @@ Safety guards before writes:
 ## Testing
 
 ```bash
-bun test --recursive                      # All tests (270+ passing)
+bun test --recursive                      # All tests (294 passing)
 bun test src/frontmatter.test.ts          # Frontmatter operations
 bun test src/git.test.ts                  # Git safety guards
 bun test src/migrations.test.ts           # Template migrations
@@ -416,7 +448,9 @@ bun test src/llm/orchestration.test.ts    # Orchestration workflows (4 tests)
 - ✅ LLM utilities (3-layer architecture: constraints, prompt-builder, orchestration)
 - ✅ Constraint-driven deterministic extraction
 - ✅ Reusable field suggestion utilities for slash commands
-- ✅ 270+ tests passing
+- ✅ AI-powered create mode with --source, --preview, --model, --arg flags
+- ✅ Model routing (Claude headless + Ollama HTTP) via @sidequest/core/llm
+- ✅ 294 tests passing
 
 **Future Enhancements Enabled by LLM Architecture:**
 - Slash commands with AI-assisted field suggestions (infrastructure ready)
