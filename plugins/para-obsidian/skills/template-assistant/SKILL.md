@@ -22,10 +22,22 @@ bun src/cli.ts list-projects --format json
 bun src/cli.ts list-tags --format json
 ```
 
-**Why this matters:**
-- **Areas**: Prefer existing areas over creating new ones. Only suggest new areas when content doesn't fit existing.
-- **Projects**: When creating tasks, link to real existing projects.
-- **Tags**: Use ONLY from the allowed list - don't invent tags.
+**CRITICAL: Classification vs Invention**
+
+When selecting areas/projects, you are CLASSIFYING content into existing categories, NOT inventing factual data:
+
+- **Areas/Projects** = CLASSIFICATION (analytical task)
+  - Analyze the content to determine which life domain or responsibility it belongs to
+  - Areas are ongoing RESPONSIBILITIES or LIFE DOMAINS (Home, Work, Health, Finance, Learning, Family, etc.)
+  - Projects are temporary initiatives with completion dates
+  - **Example classifications:**
+    - Garden shed construction → [[Home]] (ongoing home maintenance responsibility)
+    - Fitness goals → [[Health]] (ongoing health management domain)
+    - Work deadline → [[Work]] (professional responsibilities)
+
+- **Factual Data** = INVENTION (requires user knowledge)
+  - Dates, numbers, specific names must come from user
+  - Use `null` when unknown, never guess
 
 **Via MCP tools:**
 - `para_list_areas` - Get existing areas
@@ -33,7 +45,7 @@ bun src/cli.ts list-tags --format json
 - `para_list_tags` - Get allowed tags
 - `para_scan_tags` - See tags actually in use
 
-**For slash commands:** Use `AskUserQuestion` to present existing areas/projects as options, with "Other" for new entries.
+**For slash commands:** Use `AskUserQuestion` to present existing areas/projects as options with descriptions of what domain they represent. Include "Other" for new classifications when content doesn't fit existing categories.
 
 ### 1. Discover Template Structure
 
@@ -49,10 +61,16 @@ Ask focused questions matching the template type:
 
 | Template | Key Questions |
 |----------|---------------|
-| project | What's the goal? How will you know it's done? Which area does this belong to? ← CHECK existing areas first |
+| project | What's the goal? How will you know it's done? Which life domain does this belong to (analyze: Home/Work/Health/Finance/Learning/Family)? ← CLASSIFY into existing areas |
 | area | What's your responsibility? What standards matter? |
-| resource | Why does this resonate? What's the key insight? Which area is this for? ← CHECK existing areas |
-| task | What's the outcome? What's the priority? Which project is this for? ← CHECK existing projects |
+| resource | Why does this resonate? What's the key insight? Which life domain is this resource for? ← CLASSIFY based on content domain |
+| task | What's the outcome? What's the priority? Which project is this supporting (analyze task context)? ← CLASSIFY into existing projects or standalone |
+
+**Classification approach:**
+- Analyze note content to determine life domain or project context
+- Present existing areas/projects as classification options
+- Only suggest new areas/projects when content clearly doesn't fit existing categories
+- Remember: Classification = analytical judgment, not data invention
 
 ### 3. Generate Section Content
 
@@ -109,44 +127,65 @@ Load these as needed based on the task:
 
 ### Automatic Mode (convert command)
 
-The convert command automatically fetches vault context and guides LLM to prefer existing areas/projects/tags:
+The convert command uses **classification-based prompting** to intelligently populate area/project fields:
 
 ```bash
 bun src/cli.ts convert note.md --template project
 # Vault context: 5 areas, 12 projects, 20 tags
-# LLM picks [[Health]] area (existing) instead of creating [[Wellness]]
+# LLM analyzes content and classifies into existing [[Health]] area
+# Example: "fitness tracking" content → [[Health]] (not "Wellness" or "Fitness")
 ```
+
+**How classification works:**
+1. LLM receives existing areas/projects as classification options
+2. Analyzes note content to determine life domain or project context
+3. Selects best-matching existing category OR suggests new one if content doesn't fit
+4. Areas represent ongoing RESPONSIBILITIES (Home, Work, Health) not temporary topics
+5. Projects represent temporary INITIATIVES with completion dates
+
+**Classification examples from prompt:**
+- Garden shed → [[Home]] (ongoing home maintenance responsibility)
+- Fitness goals → [[Health]] (ongoing health management domain)
+- Work project → [[Work]] (professional responsibilities domain)
 
 ### Interactive Mode (slash commands)
 
-For manual note creation via slash commands, use this pattern:
+For manual note creation via slash commands, use **classification-based questioning**:
 
 1. **Fetch context** via MCP tools
-2. **Present options** via AskUserQuestion
-3. **Create note** with user's choice
+2. **Analyze content** to determine likely domain
+3. **Present options** with domain descriptions via AskUserQuestion
+4. **Create note** with classification
 
 **Example:**
 ```typescript
 // 1. Fetch existing areas
 const { areas } = await para_list_areas({ response_format: "json" });
 
-// 2. Ask user
+// 2. Analyze content and ask user (with domain context)
 const answer = await AskUserQuestion({
-  question: "Which area should this project belong to?",
+  question: "This content appears to be about fitness tracking. Which life domain should it belong to?",
   header: "Area",
-  options: areas.map(a => ({
-    label: a,
-    description: `Use existing area: ${a}`
-  }))
+  options: [
+    { label: "Health", description: "Ongoing health & wellness management (recommended for fitness)" },
+    { label: "Personal", description: "Personal development & self-improvement" },
+    { label: "Home", description: "Home responsibilities & maintenance" }
+  ],
+  multiSelect: false
 });
 
-// 3. Create with selected area
+// 3. Create with classified area
 await para_create({
   template: "project",
   title: "My Project",
   args: { "Area": `[[${answer}]]` }  // No quotes!
 });
 ```
+
+**Classification guidance:**
+- Frame options with domain descriptions so user understands what each area represents
+- Suggest most likely classification based on content analysis
+- Only offer "Other" when content clearly doesn't fit any existing domain
 
 ### Tag Selection Pattern
 

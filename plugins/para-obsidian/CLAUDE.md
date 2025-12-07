@@ -46,13 +46,13 @@ Notes are automatically placed in their PARA folder unless `--dest` is specified
 ## Quick Reference
 
 **Type:** CLI + MCP Server | **Runtime:** Bun | **Language:** TypeScript (strict mode)
-**Dependencies:** yaml, @sidequest/core | **Test Framework:** Bun test (216 tests passing)
+**Dependencies:** yaml, @sidequest/core | **Test Framework:** Bun test (270+ tests passing)
 
 ### Directory Structure
 
 ```
 para-obsidian/
-├── src/                           # Core CLI logic (150 symbols)
+├── src/                           # Core CLI logic (200+ symbols)
 │   ├── cli.ts                    # Main CLI entry (37.9 KB, 15 functions)
 │   ├── config.ts                 # ENV-first config loader
 │   ├── frontmatter.ts            # Parse/validate/migrate frontmatter
@@ -66,9 +66,14 @@ para-obsidian/
 │   ├── git.ts                    # Git guard + auto-commit
 │   ├── migrations.ts             # Template version migrations
 │   ├── attachments.ts            # Auto-discover linked attachments
-│   ├── templates.ts              # Templater arg substitution
+│   ├── templates.ts              # Templater arg substitution + date/section extraction
 │   ├── fs.ts                     # Vault-scoped file operations
-│   └── format.ts                 # Colored CLI output
+│   ├── format.ts                 # Colored CLI output
+│   ├── llm.ts                    # LLM integration (HTTP client + re-exports)
+│   └── llm/                      # LLM utilities (3-layer architecture)
+│       ├── constraints.ts        # Constraint enforcement for deterministic extraction
+│       ├── prompt-builder.ts     # Composable prompt construction
+│       └── orchestration.ts      # High-level workflows (convert, suggest, batch)
 ├── mcp/                           # MCP server (20 tools)
 │   └── index.ts                  # mcpez-based MCP server (thin CLI wrapper)
 ├── STATUS.md                      # Development progress tracker
@@ -82,7 +87,7 @@ para-obsidian/
 
 ```bash
 # Development
-bun test --recursive       # Run all tests (209 passing)
+bun test --recursive       # Run all tests (270+ passing)
 bun run typecheck          # Type checking
 bun run check              # Biome lint + format
 
@@ -116,6 +121,11 @@ para-obsidian templates                        # List template versions
 |------|---------|-------|
 | `src/cli.ts` | Main CLI entry point with arg parsing | 37.9 KB |
 | `src/frontmatter.ts` | Frontmatter operations (parse/validate/migrate) | 31.9 KB |
+| `src/llm/constraints.ts` | Constraint enforcement for deterministic LLM extraction | 414 |
+| `src/llm/prompt-builder.ts` | Composable, declarative prompt construction | 330 |
+| `src/llm/orchestration.ts` | High-level LLM workflows (convert, suggest, batch) | 400 |
+| `src/llm.ts` | LLM HTTP client + re-exports from llm/* modules | 129 |
+| `src/templates.ts` | Template metadata + Templater substitution | 368 |
 | `src/config.ts` | ENV-first config resolution | 7.3 KB |
 | `src/search.ts` | Text + frontmatter filtering | 7.0 KB |
 | `src/git.ts` | Git safety guards + auto-commit | 5.7 KB |
@@ -289,6 +299,59 @@ Rename operations rewrite all references:
 - Markdown links: `[text](old-name.md)` → `[text](new-name.md)`
 - Scoped to vault only (no external links modified)
 
+### LLM Utilities Architecture (3-Layer Design)
+
+**Purpose:** Reusable, deterministic LLM integration for note conversion and field suggestions.
+
+**Layer 3: High-Level Orchestration** (`src/llm/orchestration.ts`):
+- `convertNoteToTemplate()` — Full conversion pipeline (existing convert command)
+- `suggestFieldValues()` — Lightweight field extraction for slash commands
+- `batchConvert()` — Bulk operations with shared constraints
+
+**Layer 2: Prompt Building** (`src/llm/prompt-builder.ts`):
+- `buildStructuredPrompt()` — Declarative prompt construction
+- Composable sections: constraints, critical rules, few-shot examples
+- Separates required vs optional fields for clarity
+
+**Layer 3: Constraint Enforcement** (`src/llm/constraints.ts`):
+- `buildConstraintSet()` — Extracts enum values, required/optional status from templates + rules
+- Determinism improvements:
+  - Inline enum values: `"status" REQUIRED - must be one of: active, on-hold, completed`
+  - Explicit wikilink guidance: `format [[Name]], or null if not applicable`
+  - Array includes: `tags MUST include: project`
+  - Vault context awareness: existing areas/projects/tags constrain LLM output
+
+**Layer 1: LLM Client** (`src/llm.ts`):
+- `callOllama()` — HTTP transport to Ollama API (JSON format mode)
+- `parseOllamaResponse()` — JSON parsing with markdown fence cleanup
+- Re-exports from `llm/*` modules for convenient access
+
+**Usage Example (Field Suggestions for Slash Commands)**:
+```typescript
+import { buildConstraintSet, buildStructuredPrompt, callOllama, parseOllamaResponse } from './llm';
+
+// In a slash command that prompts for project metadata:
+const template = getTemplate(config, 'project');
+const constraints = buildConstraintSet(template, rules, vaultContext);
+const prompt = buildStructuredPrompt({
+  systemRole: 'Extract project metadata from user input',
+  task: 'Suggest frontmatter values based on title and description',
+  sourceContent: `Title: ${userTitle}\nDescription: ${userDescription}`,
+  constraints
+});
+
+const response = await callOllama(prompt, 'qwen2.5:7b');
+const { args, title } = parseOllamaResponse(response);
+
+// Present suggestions to user for confirmation before creating note
+```
+
+**Benefits**:
+- **Determinism**: Constraint-driven prompts reduce hallucinations
+- **Reusability**: Shared utilities across convert command, slash commands, bulk operations
+- **Testability**: 100% test coverage on all layers (34 + 26 + 75 = 135 new tests)
+- **Maintainability**: Declarative prompts easier to update than monolithic strings
+
 ### Git Integration
 
 Safety guards before writes:
@@ -302,12 +365,15 @@ Safety guards before writes:
 ## Testing
 
 ```bash
-bun test --recursive              # All tests (209 passing)
-bun test src/frontmatter.test.ts  # Frontmatter operations
-bun test src/git.test.ts          # Git safety guards
-bun test src/migrations.test.ts   # Template migrations
-bun test src/create.test.ts       # Note creation + section injection
-bun test src/cli.test.ts          # CLI integration tests
+bun test --recursive                      # All tests (270+ passing)
+bun test src/frontmatter.test.ts          # Frontmatter operations
+bun test src/git.test.ts                  # Git safety guards
+bun test src/migrations.test.ts           # Template migrations
+bun test src/create.test.ts               # Note creation + section injection
+bun test src/cli.test.ts                  # CLI integration tests
+bun test src/llm/constraints.test.ts      # Constraint enforcement (34 tests)
+bun test src/llm/prompt-builder.test.ts   # Prompt building (26 tests)
+bun test src/llm/orchestration.test.ts    # Orchestration workflows (4 tests)
 ```
 
 **Test Coverage:**
@@ -319,6 +385,9 @@ bun test src/cli.test.ts          # CLI integration tests
 - Template version planning and application
 - Content injection into sections (injectSections)
 - CLI --content flag integration
+- LLM constraint enforcement (enum values, required/optional, vault context)
+- Declarative prompt construction with composable sections
+- High-level orchestration workflows (convert, suggest, batch)
 
 ---
 
@@ -344,7 +413,15 @@ bun test src/cli.test.ts          # CLI integration tests
 - ✅ Colored CLI output and JSON mode
 - ✅ Content injection via --content flag
 - ✅ Default destinations per template type (PARA folders)
-- ✅ 216 tests passing
+- ✅ LLM utilities (3-layer architecture: constraints, prompt-builder, orchestration)
+- ✅ Constraint-driven deterministic extraction
+- ✅ Reusable field suggestion utilities for slash commands
+- ✅ 270+ tests passing
+
+**Future Enhancements Enabled by LLM Architecture:**
+- Slash commands with AI-assisted field suggestions (infrastructure ready)
+- Bulk conversion operations (batch utilities available)
+- Few-shot learning examples (prompt-builder supports composable examples)
 
 **Remaining:**
 - Consider richer hints for frontmatter set (allowed enums)

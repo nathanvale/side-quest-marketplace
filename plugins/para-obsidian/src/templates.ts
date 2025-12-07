@@ -278,10 +278,12 @@ export function convertTemplaterFormat(templaterFormat: string): string {
 
 	let result = templaterFormat;
 
-	// Week number special case: Moment's [W]ww → date-fns 'W'II
-	// [W] is literal W, ww is week number (ISO)
-	result = result.replace(/\[W\]ww/g, "'W'II");
-	result = result.replace(/\[W\]w/g, "'W'I");
+	// Week number special case: Moment's [W]WW or [W]ww → date-fns 'W'II
+	// [W] is literal W, WW/ww is week number (ISO)
+	result = result.replace(/\[W\]WW/g, "'W'II"); // Uppercase WW
+	result = result.replace(/\[W\]ww/g, "'W'II"); // Lowercase ww
+	result = result.replace(/\[W\]W/g, "'W'I"); // Uppercase W
+	result = result.replace(/\[W\]w/g, "'W'I"); // Lowercase w
 
 	// Year tokens (case sensitive)
 	result = result.replace(/YYYY/g, "yyyy");

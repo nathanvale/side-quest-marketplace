@@ -62,12 +62,7 @@ import {
 	loadConfig,
 	type ParaObsidianConfig,
 } from "./config";
-import {
-	createFromTemplate,
-	injectSections,
-	replaceH1Title,
-	replaceSections,
-} from "./create";
+import { createFromTemplate, replaceH1Title, replaceSections } from "./create";
 import { deleteFile } from "./delete";
 import {
 	applyVersionPlan,
@@ -99,8 +94,10 @@ import {
 import { type InsertMode, insertIntoNote } from "./insert";
 import { renameWithLinkRewrite } from "./links";
 import {
-	buildConversionPrompt,
+	buildConstraintSet,
+	buildStructuredPrompt,
 	callOllama,
+	DEFAULT_CRITICAL_RULES,
 	DEFAULT_LLM_MODEL,
 	parseOllamaResponse,
 	type VaultContext,
@@ -895,10 +892,11 @@ async function main(): Promise<void> {
 					  }
 					| undefined;
 				if (contentSections && Object.keys(contentSections).length > 0) {
-					injectionResult = injectSections(
+					injectionResult = replaceSections(
 						config,
 						result.filePath,
 						contentSections,
+						{ preserveComments: true },
 					);
 				}
 
@@ -1014,14 +1012,23 @@ async function main(): Promise<void> {
 				if (!isJson) {
 					console.log(emphasize.info(`Extracting with model: ${model}...`));
 				}
-				const prompt = buildConversionPrompt(
-					existingContent,
-					template,
+
+				// Build constraint set from template metadata
+				const constraints = buildConstraintSet(
 					fields,
 					sections,
 					rules,
 					vaultContext,
 				);
+
+				// Build structured prompt
+				const prompt = buildStructuredPrompt({
+					systemRole: `You are extracting structured data from an existing note to convert it to a "${template}" template.`,
+					sourceContent: existingContent,
+					constraints,
+					criticalRules: DEFAULT_CRITICAL_RULES,
+				});
+
 				const rawResponse = await callOllama(prompt, model);
 				const extracted = parseOllamaResponse(rawResponse);
 
@@ -1067,12 +1074,27 @@ async function main(): Promise<void> {
 				});
 
 				// 7. Update frontmatter with extracted values (handles non-Templater templates)
-				// Filter out null values and convert to proper types
+				// Filter out null values and Templater prompt keys (which are already substituted)
+				// Only keep keys that would be valid frontmatter field names (lowercase, underscores)
 				const frontmatterUpdates: Record<string, unknown> = {};
 				for (const [key, value] of Object.entries(extracted.args)) {
-					if (value !== null && value !== "null") {
-						frontmatterUpdates[key] = value;
+					// Skip null values
+					if (value === null || value === "null") continue;
+
+					// Skip Templater prompt text - these are already substituted in the template
+					// Templater prompts contain: spaces, parentheses, or start with capital letter
+					// Valid field names: title, trip_date, day_number, location, accommodation
+					// Invalid (prompt text): "Day title", "Date (YYYY-MM-DD)", "Location", "Project"
+					if (
+						key.includes(" ") ||
+						key.includes("(") ||
+						key.includes(")") ||
+						/^[A-Z]/.test(key)
+					) {
+						continue; // Skip Templater prompt keys
 					}
+
+					frontmatterUpdates[key] = value;
 				}
 				// Always set template_version to the current expected version
 				const expectedVersion = config.templateVersions?.[template];
@@ -1871,4 +1893,9 @@ async function main(): Promise<void> {
 	}
 }
 
-main();
+// Only run main when executed directly (not when imported)
+if (import.meta.main) {
+	main().then(() => {
+		process.exit(0);
+	});
+}

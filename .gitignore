@@ -38,3 +38,4 @@ plugins/melanie/
 
 tmp/
 .test-scratch/
+.vault-id

@@ -81,7 +81,7 @@ type: capture
 			title: "My Capture Note",
 		});
 
-		expect(result.filePath).toBe("00_Inbox/My Capture Note.md");
+		expect(result.filePath).toBe("00 Inbox/My Capture Note.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		// YAML serializer may or may not quote simple strings
 		expect(written).toContain("title: My Capture Note");
@@ -122,7 +122,7 @@ Area: <% tp.system.prompt("Area") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("01_Projects/Build Dashboard.md");
+		expect(result.filePath).toBe("01 Projects/Build Dashboard.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		expect(written).toContain("title: Build Dashboard");
 		expect(written).toContain("target_completion: 2025-12-31");
@@ -158,7 +158,7 @@ Description: <% tp.system.prompt("Description") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("02_Areas/Engineering.md");
+		expect(result.filePath).toBe("02 Areas/Engineering.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		expect(written).toContain("title: Engineering");
 		expect(written).toContain(
@@ -196,7 +196,7 @@ Topic: <% tp.system.prompt("Main topic") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("03_Resources/Refactoring UI.md");
+		expect(result.filePath).toBe("03 Resources/Refactoring UI.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		expect(written).toContain("title: Refactoring UI");
 		expect(written).toContain("source: book");
@@ -274,7 +274,7 @@ Author: <% tp.system.prompt("Author (optional)", "") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("03_Resources/Building A Second Brain.md");
+		expect(result.filePath).toBe("03 Resources/Building A Second Brain.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		expect(written).toContain("title: Building a Second Brain");
 		expect(written).toContain("source: book");
@@ -315,7 +315,7 @@ Source: <% tp.system.prompt("Source type") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("03_Resources/Quick Note.md");
+		expect(result.filePath).toBe("03 Resources/Quick Note.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		expect(written).toContain("title: Quick Note");
 		expect(written).toContain("source: article");
@@ -343,9 +343,9 @@ Body`,
 			title: "My Project",
 		});
 
-		expect(result.filePath).toBe("01_Projects/My Project.md");
+		expect(result.filePath).toBe("01 Projects/My Project.md");
 		expect(
-			fs.existsSync(path.join(vault, "01_Projects", "My Project.md")),
+			fs.existsSync(path.join(vault, "01 Projects", "My Project.md")),
 		).toBe(true);
 	});
 
@@ -368,8 +368,8 @@ Body`,
 			title: "Health",
 		});
 
-		expect(result.filePath).toBe("02_Areas/Health.md");
-		expect(fs.existsSync(path.join(vault, "02_Areas", "Health.md"))).toBe(true);
+		expect(result.filePath).toBe("02 Areas/Health.md");
+		expect(fs.existsSync(path.join(vault, "02 Areas", "Health.md"))).toBe(true);
 	});
 
 	it("creates resource in 03_Resources by default", () => {
@@ -391,9 +391,9 @@ Body`,
 			title: "Atomic Habits",
 		});
 
-		expect(result.filePath).toBe("03_Resources/Atomic Habits.md");
+		expect(result.filePath).toBe("03 Resources/Atomic Habits.md");
 		expect(
-			fs.existsSync(path.join(vault, "03_Resources", "Atomic Habits.md")),
+			fs.existsSync(path.join(vault, "03 Resources", "Atomic Habits.md")),
 		).toBe(true);
 	});
 
@@ -464,9 +464,9 @@ Body`,
 			title: "Quick Thought",
 		});
 
-		expect(result.filePath).toBe("00_Inbox/Quick Thought.md");
+		expect(result.filePath).toBe("00 Inbox/Quick Thought.md");
 		expect(
-			fs.existsSync(path.join(vault, "00_Inbox", "Quick Thought.md")),
+			fs.existsSync(path.join(vault, "00 Inbox", "Quick Thought.md")),
 		).toBe(true);
 	});
 

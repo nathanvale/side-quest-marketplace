@@ -14,8 +14,10 @@ import fs from "node:fs";
 import path from "node:path";
 
 import {
+	DEFAULT_AVAILABLE_MODELS,
 	DEFAULT_DESTINATIONS,
 	DEFAULT_FRONTMATTER_RULES,
+	DEFAULT_MODEL,
 	DEFAULT_SUGGESTED_TAGS,
 	DEFAULT_TEMPLATE_VERSIONS,
 } from "./defaults";
@@ -78,6 +80,10 @@ export interface ParaObsidianConfig {
 	readonly templateVersions?: Record<string, number>;
 	/** Default destination directories for each template type (e.g., project → 01_Projects). */
 	readonly defaultDestinations?: Record<string, string>;
+	/** Available LLM models for AI-powered features. */
+	readonly availableModels?: ReadonlyArray<string>;
+	/** Default LLM model to use. */
+	readonly defaultModel?: string;
 }
 
 /**
@@ -208,6 +214,8 @@ export function loadConfig(
 		frontmatterRules: merged.frontmatterRules ?? DEFAULT_FRONTMATTER_RULES,
 		templateVersions: merged.templateVersions ?? DEFAULT_TEMPLATE_VERSIONS,
 		defaultDestinations: merged.defaultDestinations ?? DEFAULT_DESTINATIONS,
+		availableModels: merged.availableModels ?? [...DEFAULT_AVAILABLE_MODELS],
+		defaultModel: merged.defaultModel ?? DEFAULT_MODEL,
 	};
 }
 

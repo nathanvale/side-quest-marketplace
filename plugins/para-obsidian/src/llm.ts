@@ -4,32 +4,86 @@
  * Uses Ollama's HTTP API to extract structured data from freeform notes.
  * This module provides:
  * - HTTP client for Ollama API
- * - Prompt builder for note-to-template conversion
+ * - Prompt building utilities (re-exported from submodules)
+ * - High-level orchestration workflows (re-exported from submodules)
  *
  * @module llm
  */
 
-import type { FrontmatterRules } from "./config";
-import { DEFAULT_FRONTMATTER_RULES } from "./defaults";
-import type { TemplateField } from "./templates";
-
-/**
- * Vault context for guiding LLM extraction.
- */
-export interface VaultContext {
-	/** Existing area names from 02_Areas/ */
-	readonly areas: ReadonlyArray<string>;
-	/** Existing project names from 01_Projects/ */
-	readonly projects: ReadonlyArray<string>;
-	/** Allowed tag values from config */
-	readonly suggestedTags: ReadonlyArray<string>;
-}
+// Re-export types and functions from submodules
+export type {
+	ConstraintSet,
+	FieldConstraint,
+	VaultContext,
+} from "./llm/constraints";
+export { buildConstraintSet } from "./llm/constraints";
+export type {
+	BatchConvertOptions,
+	ConversionResult,
+	ConvertNoteOptions,
+	ExtractMetadataOptions,
+	SuggestFieldValuesOptions,
+} from "./llm/orchestration";
+export {
+	batchConvert,
+	convertNoteToTemplate,
+	extractMetadata,
+	suggestFieldValues,
+} from "./llm/orchestration";
+export type { PromptExample, PromptTemplate } from "./llm/prompt-builder";
+export {
+	buildCriticalRules,
+	buildExamplesSection,
+	buildStructuredPrompt,
+	DEFAULT_CRITICAL_RULES,
+} from "./llm/prompt-builder";
 
 /** Default Ollama model for extraction tasks */
 export const DEFAULT_LLM_MODEL = "qwen2.5:14b";
 
 /** Default Ollama API URL */
 export const DEFAULT_OLLAMA_URL = "http://localhost:11434";
+
+/**
+ * Model name type - supports Claude models and Ollama models.
+ */
+export type ModelName =
+	| "sonnet"
+	| "haiku"
+	| "qwen:7b"
+	| "qwen:14b"
+	| "qwen-coder:17b"
+	| "qwen-coder:14b";
+
+/**
+ * Validate that a model name is in the allowed models list.
+ *
+ * @param model - Model name to validate
+ * @param allowedModels - List of allowed model names from config
+ * @returns The validated model name
+ * @throws Error if model is not in allowed list
+ *
+ * @example
+ * ```typescript
+ * const model = validateModel("sonnet", ["sonnet", "haiku"]);
+ * // Returns: "sonnet"
+ *
+ * validateModel("qwen:7b", ["sonnet", "haiku"]);
+ * // Throws: Invalid model "qwen:7b". Allowed models: sonnet, haiku
+ * ```
+ */
+export function validateModel(
+	model: string,
+	allowedModels: ReadonlyArray<string>,
+): ModelName {
+	if (!allowedModels.includes(model)) {
+		throw new Error(
+			`Invalid model "${model}". Allowed models: ${allowedModels.join(", ")}\n` +
+				`Add to .paraobsidianrc "availableModels" to enable.`,
+		);
+	}
+	return model as ModelName;
+}
 
 /**
  * Result of LLM extraction from a note.
@@ -133,153 +187,4 @@ export function parseOllamaResponse(response: string): ExtractionResult {
 			`Failed to parse LLM response as JSON. Raw response:\n${response}`,
 		);
 	}
-}
-
-/**
- * Format validation rules for inclusion in prompt.
- *
- * @param rules - Frontmatter rules for a template type
- * @returns Formatted rules string
- */
-function formatRules(rules: FrontmatterRules | undefined): string {
-	if (!rules?.required) {
-		return "No specific validation rules";
-	}
-
-	const lines: string[] = [];
-	for (const [field, rule] of Object.entries(rules.required)) {
-		if (rule.type === "enum" && rule.enum) {
-			lines.push(`- ${field}: must be one of [${rule.enum.join(", ")}]`);
-		} else if (rule.type === "date") {
-			lines.push(`- ${field}: date in YYYY-MM-DD format`);
-		} else if (rule.type === "wikilink") {
-			lines.push(`- ${field}: wikilink format [[Name]]`);
-		} else if (rule.type === "array") {
-			const includesNote = rule.includes
-				? ` (must include: ${rule.includes.join(", ")})`
-				: "";
-			lines.push(`- ${field}: array of strings${includesNote}`);
-		} else {
-			lines.push(`- ${field}: ${rule.type}`);
-		}
-	}
-
-	return lines.join("\n");
-}
-
-/**
- * Build a conversion prompt for extracting data from a note.
- *
- * @param existingContent - The freeform note content to convert
- * @param template - Target template name (e.g., "booking")
- * @param fields - Template fields to extract
- * @param sections - Body section headings from the template
- * @param rules - Validation rules for the template type
- * @param vaultContext - Optional vault context (existing areas, projects, tags) to guide extraction
- * @returns Prompt string for LLM
- *
- * @example
- * ```typescript
- * const prompt = buildConversionPrompt(
- *   noteContent,
- *   "booking",
- *   templateFields,
- *   ["Booking Details", "Cost & Payment"],
- *   frontmatterRules,
- *   { areas: ["Work", "Family"], projects: [], suggestedTags: ["travel", "project"] }
- * );
- * ```
- */
-export function buildConversionPrompt(
-	existingContent: string,
-	template: string,
-	fields: TemplateField[],
-	sections: string[] = [],
-	rules?: FrontmatterRules,
-	vaultContext?: VaultContext,
-): string {
-	// Get rules from defaults if not provided
-	const effectiveRules = rules ?? DEFAULT_FRONTMATTER_RULES[template];
-
-	const fieldList = fields
-		.filter((f) => !f.isAutoDate) // Skip auto-filled date fields
-		.map((f) => `- "${f.key}"${f.inFrontmatter ? " (frontmatter)" : " (body)"}`)
-		.join("\n");
-
-	// Build section list if provided
-	const sectionList =
-		sections.length > 0
-			? `\nBODY SECTIONS TO FILL:\n${sections.map((s) => `- "${s}"`).join("\n")}\n`
-			: "";
-
-	// Build vault context section if provided
-	const vaultContextSection = vaultContext
-		? `
-VAULT CONTEXT:
-
-EXISTING AREAS (prefer these if content matches):
-${vaultContext.areas.map((a) => `- ${a}`).join("\n")}
-→ If an area fits the content, use wikilink format: [[AreaName]]
-→ If none fit, you may suggest a new area name
-→ CRITICAL: Wikilinks must NOT be quoted in frontmatter for Dataview compatibility
-
-EXISTING PROJECTS (for task linking):
-${vaultContext.projects.map((p) => `- ${p}`).join("\n")}
-→ Link tasks to relevant existing projects when applicable
-
-ALLOWED TAGS (choose ONLY from this list):
-${vaultContext.suggestedTags.join(", ")}
-→ DO NOT invent new tags - only use tags from this list
-→ Select 1-3 most relevant tags for the content
-→ IMPORTANT: Check VALIDATION RULES for required tag inclusions (e.g., area notes MUST include "area" tag)
-
-`
-		: "";
-
-	return `You are extracting structured data from an existing note to convert it to a "${template}" template.
-
-EXISTING NOTE CONTENT:
----
-${existingContent}
----
-
-TARGET TEMPLATE: ${template}
-
-REQUIRED FIELDS TO EXTRACT:
-${fieldList}
-${sectionList}
-VALIDATION RULES:
-${formatRules(effectiveRules)}
-${vaultContextSection}
-OUTPUT FORMAT:
-Return ONLY a JSON object with this exact structure:
-{
-  "args": {
-    "<field key exactly as shown above>": "<extracted value>",
-    ...
-  },
-  "content": {
-    "<Section Heading>": "<content to inject under that heading>",
-    ...
-  },
-  "title": "<suggested title for the note>"
-}
-
-CRITICAL RULES:
-1. Extract values from the note content for BOTH frontmatter (args) AND body sections (content)
-2. Use null for missing/unknown values in args - DO NOT invent data
-3. For "content", use EXACT heading names from BODY SECTIONS TO FILL above
-4. Omit content sections that have no relevant content to extract
-5. String values must be properly quoted: "500" not 500
-6. Dates MUST be YYYY-MM-DD format (e.g., "2025-12-26")
-7. Enum values MUST match exactly from the validation rules
-8. For content sections, preserve markdown formatting (lists, bold, links, etc.)
-9. The title should be descriptive and based on the note content
-10. For wikilink fields (area, project): Use literal null when no value exists
-    - CORRECT: "area": null
-    - WRONG: "area": "[[null]]" or "area": "null"
-11. Tags MUST include required values from validation rules (check "includes" field)
-    - Example: area notes must include "area" in tags array
-
-OUTPUT (JSON only, no explanation, no markdown fences):`;
 }

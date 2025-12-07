@@ -162,6 +162,23 @@ function includesRequired(
 }
 
 /**
+ * Format a value for display in error messages.
+ * Truncates long values and shows type information.
+ */
+function formatValueForError(value: unknown): string {
+	if (value === null) return "null";
+	if (value === undefined) return "undefined";
+	const type = typeof value;
+	if (type === "string") {
+		const str = value as string;
+		return str.length > 50 ? `"${str.slice(0, 47)}..."` : `"${str}"`;
+	}
+	if (type === "number" || type === "boolean") return String(value);
+	if (Array.isArray(value)) return `array[${value.length}]`;
+	return type;
+}
+
+/**
  * Validates a single field value against its rule.
  *
  * @param field - Field name (for error messages)
@@ -174,31 +191,48 @@ function validateField(
 	value: unknown,
 	rule: FieldRule,
 ): ValidationIssue | undefined {
+	const optionalHint = rule.optional ? " (or omit if not applicable)" : "";
+
 	switch (rule.type) {
 		case "string": {
 			if (typeof value !== "string") {
-				return { field, message: "must be a string" };
+				return {
+					field,
+					message: `expected string, got ${formatValueForError(value)}${optionalHint}`,
+				};
 			}
 			return undefined;
 		}
 		case "date": {
 			if (typeof value !== "string" || !isDateLike(value)) {
-				return { field, message: "must be a date string (YYYY-MM-DD)" };
+				return {
+					field,
+					message: `expected date (YYYY-MM-DD), got ${formatValueForError(value)}${optionalHint}`,
+				};
 			}
 			return undefined;
 		}
 		case "array": {
 			if (!isArray(value)) {
-				return { field, message: "must be an array" };
+				return {
+					field,
+					message: `expected array, got ${formatValueForError(value)}${optionalHint}`,
+				};
 			}
 			if (rule.includes && !includesRequired(value, rule.includes)) {
-				return { field, message: `must include: ${rule.includes.join(", ")}` };
+				return {
+					field,
+					message: `must include: ${rule.includes.join(", ")}`,
+				};
 			}
 			return undefined;
 		}
 		case "wikilink": {
 			if (typeof value !== "string" || !value.startsWith("[[")) {
-				return { field, message: "must be a wikilink [[...]]" };
+				return {
+					field,
+					message: `expected wikilink [[...]], got ${formatValueForError(value)}${optionalHint}`,
+				};
 			}
 			return undefined;
 		}
@@ -206,7 +240,7 @@ function validateField(
 			if (typeof value !== "string" || !rule.enum?.includes(value)) {
 				return {
 					field,
-					message: `must be one of: ${rule.enum?.join(", ") ?? ""}`,
+					message: `expected one of [${rule.enum?.join(", ") ?? ""}], got ${formatValueForError(value)}${optionalHint}`,
 				};
 			}
 			return undefined;

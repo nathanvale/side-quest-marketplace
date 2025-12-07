@@ -209,7 +209,6 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			contact_email: { type: "string", optional: true },
 			contact_url: { type: "string", optional: true },
 			tags: { type: "array", includes: ["booking"] },
-			template_version: { type: "string", optional: true },
 		},
 	},
 	itinerary: {
@@ -252,6 +251,7 @@ export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
 	checklist: 3,
 	booking: 3,
 	itinerary: 3,
+	"itinerary-day": 3,
 	research: 3,
 };
 
@@ -260,15 +260,35 @@ export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
  * These map to the PARA folder structure.
  */
 export const DEFAULT_DESTINATIONS: Record<string, string> = {
-	project: "01_Projects",
-	area: "02_Areas",
-	resource: "03_Resources",
+	project: "01 Projects",
+	area: "02 Areas",
+	resource: "03 Resources",
 	task: "Tasks",
 	daily: "Daily Notes",
 	"weekly-review": "Weekly Notes",
-	capture: "00_Inbox",
-	booking: "00_Inbox",
-	checklist: "00_Inbox",
-	itinerary: "00_Inbox",
-	research: "00_Inbox",
+	capture: "00 Inbox",
+	booking: "00 Inbox",
+	checklist: "00 Inbox",
+	itinerary: "00 Inbox",
+	"itinerary-day": "00 Inbox",
+	research: "00 Inbox",
 };
+
+/**
+ * Default available LLM models for AI-powered features.
+ * Includes Claude models (via headless) and Ollama models (via HTTP API).
+ */
+export const DEFAULT_AVAILABLE_MODELS = [
+	"sonnet",
+	"haiku",
+	"qwen:7b",
+	"qwen:14b",
+	"qwen-coder:17b",
+	"qwen-coder:14b",
+] as const;
+
+/**
+ * Default LLM model for AI-powered operations.
+ * Claude Sonnet provides the best balance of quality and speed.
+ */
+export const DEFAULT_MODEL = "sonnet";
