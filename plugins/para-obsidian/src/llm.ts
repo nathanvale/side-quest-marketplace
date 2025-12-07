@@ -13,6 +13,18 @@ import type { FrontmatterRules } from "./config";
 import { DEFAULT_FRONTMATTER_RULES } from "./defaults";
 import type { TemplateField } from "./templates";
 
+/**
+ * Vault context for guiding LLM extraction.
+ */
+export interface VaultContext {
+	/** Existing area names from 02_Areas/ */
+	readonly areas: ReadonlyArray<string>;
+	/** Existing project names from 01_Projects/ */
+	readonly projects: ReadonlyArray<string>;
+	/** Allowed tag values from config */
+	readonly suggestedTags: ReadonlyArray<string>;
+}
+
 /** Default Ollama model for extraction tasks */
 export const DEFAULT_LLM_MODEL = "qwen2.5:14b";
 
@@ -163,6 +175,7 @@ function formatRules(rules: FrontmatterRules | undefined): string {
  * @param fields - Template fields to extract
  * @param sections - Body section headings from the template
  * @param rules - Validation rules for the template type
+ * @param vaultContext - Optional vault context (existing areas, projects, tags) to guide extraction
  * @returns Prompt string for LLM
  *
  * @example
@@ -172,7 +185,8 @@ function formatRules(rules: FrontmatterRules | undefined): string {
  *   "booking",
  *   templateFields,
  *   ["Booking Details", "Cost & Payment"],
- *   frontmatterRules
+ *   frontmatterRules,
+ *   { areas: ["Work", "Family"], projects: [], suggestedTags: ["travel", "project"] }
  * );
  * ```
  */
@@ -182,6 +196,7 @@ export function buildConversionPrompt(
 	fields: TemplateField[],
 	sections: string[] = [],
 	rules?: FrontmatterRules,
+	vaultContext?: VaultContext,
 ): string {
 	// Get rules from defaults if not provided
 	const effectiveRules = rules ?? DEFAULT_FRONTMATTER_RULES[template];
@@ -197,6 +212,29 @@ export function buildConversionPrompt(
 			? `\nBODY SECTIONS TO FILL:\n${sections.map((s) => `- "${s}"`).join("\n")}\n`
 			: "";
 
+	// Build vault context section if provided
+	const vaultContextSection = vaultContext
+		? `
+VAULT CONTEXT:
+
+EXISTING AREAS (prefer these if content matches):
+${vaultContext.areas.map((a) => `- ${a}`).join("\n")}
+→ If an area fits the content, use wikilink format: [[AreaName]]
+→ If none fit, you may suggest a new area name
+→ CRITICAL: Wikilinks must NOT be quoted in frontmatter for Dataview compatibility
+
+EXISTING PROJECTS (for task linking):
+${vaultContext.projects.map((p) => `- ${p}`).join("\n")}
+→ Link tasks to relevant existing projects when applicable
+
+ALLOWED TAGS (choose ONLY from this list):
+${vaultContext.suggestedTags.join(", ")}
+→ DO NOT invent new tags - only use tags from this list
+→ Select 1-3 most relevant tags for the content
+
+`
+		: "";
+
 	return `You are extracting structured data from an existing note to convert it to a "${template}" template.
 
 EXISTING NOTE CONTENT:
@@ -211,7 +249,7 @@ ${fieldList}
 ${sectionList}
 VALIDATION RULES:
 ${formatRules(effectiveRules)}
-
+${vaultContextSection}
 OUTPUT FORMAT:
 Return ONLY a JSON object with this exact structure:
 {

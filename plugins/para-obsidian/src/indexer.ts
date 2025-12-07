@@ -229,6 +229,40 @@ export function listAreas(config: ParaObsidianConfig): string[] {
 }
 
 /**
+ * Lists all projects from the vault.
+ *
+ * Scans the 01_Projects directory for project notes and returns their titles.
+ *
+ * @param config - Para-obsidian configuration
+ * @returns Array of project titles
+ *
+ * @example
+ * ```typescript
+ * const projects = listProjects(config);
+ * console.log(`Found ${projects.length} projects: ${projects.join(', ')}`);
+ * ```
+ */
+export function listProjects(config: ParaObsidianConfig): string[] {
+	const projectsDir = resolveVaultPath(config.vault, "01_Projects");
+	const projects: string[] = [];
+
+	if (!fs.existsSync(projectsDir.absolute)) {
+		return projects;
+	}
+
+	// Scan 01_Projects directory for .md files
+	const files = fs.readdirSync(projectsDir.absolute);
+	for (const file of files) {
+		if (file.endsWith(".md")) {
+			// Use filename without extension as project title
+			projects.push(file.replace(/\.md$/, ""));
+		}
+	}
+
+	return projects.sort();
+}
+
+/**
  * Lists suggested tags from config.
  *
  * Returns the curated list of tags from the para-obsidian config.
@@ -294,10 +328,7 @@ export function scanTags(config: ParaObsidianConfig): string[] {
 					}
 				}
 			}
-		} catch {
-			// Skip files that can't be parsed
-			continue;
-		}
+		} catch {}
 	}
 
 	return Array.from(tagSet).sort();

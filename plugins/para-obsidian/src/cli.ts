@@ -90,6 +90,7 @@ import {
 import {
 	buildIndex,
 	listAreas,
+	listProjects,
 	listTags,
 	loadIndex,
 	saveIndex,
@@ -102,6 +103,7 @@ import {
 	callOllama,
 	DEFAULT_LLM_MODEL,
 	parseOllamaResponse,
+	type VaultContext,
 } from "./llm";
 import { MIGRATIONS } from "./migrations";
 import { filterByFrontmatter, searchText } from "./search";
@@ -401,7 +403,9 @@ async function main(): Promise<void> {
 				} else {
 					if (tags.length === 0) {
 						console.log(
-							emphasize.warn("No suggested tags configured (see suggestedTags in config)"),
+							emphasize.warn(
+								"No suggested tags configured (see suggestedTags in config)",
+							),
 						);
 					} else {
 						console.log(emphasize.info(`Configured tags (${tags.length}):`));
@@ -991,7 +995,22 @@ async function main(): Promise<void> {
 				const sections = getTemplateSections(templateInfo);
 				const rules = config.frontmatterRules?.[template];
 
-				// 3. Build prompt and call LLM
+				// 3. Fetch vault context for intelligent extraction
+				const vaultContext: VaultContext = {
+					areas: listAreas(config),
+					projects: listProjects(config),
+					suggestedTags: listTags(config),
+				};
+
+				if (!isJson) {
+					console.log(
+						emphasize.info(
+							`Vault context: ${vaultContext.areas.length} areas, ${vaultContext.projects.length} projects, ${vaultContext.suggestedTags.length} tags`,
+						),
+					);
+				}
+
+				// 4. Build prompt and call LLM
 				if (!isJson) {
 					console.log(emphasize.info(`Extracting with model: ${model}...`));
 				}
@@ -1001,11 +1020,12 @@ async function main(): Promise<void> {
 					fields,
 					sections,
 					rules,
+					vaultContext,
 				);
 				const rawResponse = await callOllama(prompt, model);
 				const extracted = parseOllamaResponse(rawResponse);
 
-				// 4. Dry run - just show extraction
+				// 5. Dry run - just show extraction
 				if (dryRun) {
 					if (isJson) {
 						console.log(
@@ -1028,7 +1048,7 @@ async function main(): Promise<void> {
 					break;
 				}
 
-				// 5. Create note from template base
+				// 6. Create note from template base
 				// Title priority: CLI override > extracted.title > extracted.args.title
 				const resolvedTitle =
 					titleOverride ??
@@ -1046,7 +1066,7 @@ async function main(): Promise<void> {
 					args: extracted.args as Record<string, string>,
 				});
 
-				// 6. Update frontmatter with extracted values (handles non-Templater templates)
+				// 7. Update frontmatter with extracted values (handles non-Templater templates)
 				// Filter out null values and convert to proper types
 				const frontmatterUpdates: Record<string, unknown> = {};
 				for (const [key, value] of Object.entries(extracted.args)) {
@@ -1066,14 +1086,14 @@ async function main(): Promise<void> {
 					});
 				}
 
-				// 7. Replace H1 title placeholder with actual title
+				// 8. Replace H1 title placeholder with actual title
 				const noteTitle =
 					typeof extracted.args.title === "string"
 						? extracted.args.title
 						: (titleOverride ?? extracted.title);
 				replaceH1Title(config, result.filePath, noteTitle);
 
-				// 8. Replace content sections (not append)
+				// 9. Replace content sections (not append)
 				let injectionResult:
 					| {
 							injected: string[];
@@ -1089,10 +1109,10 @@ async function main(): Promise<void> {
 					);
 				}
 
-				// 9. Validate the result
+				// 10. Validate the result
 				const validation = validateFrontmatterFile(config, result.filePath);
 
-				// 10. Auto-commit if enabled
+				// 11. Auto-commit if enabled
 				if (config.autoCommit) {
 					await autoCommitChanges(
 						config,
@@ -1101,7 +1121,7 @@ async function main(): Promise<void> {
 					);
 				}
 
-				// 11. Output
+				// 12. Output
 				if (isJson) {
 					console.log(
 						JSON.stringify(

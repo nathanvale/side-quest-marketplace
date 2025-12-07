@@ -10,6 +10,7 @@ import {
 	DEFAULT_LLM_MODEL,
 	DEFAULT_OLLAMA_URL,
 	parseOllamaResponse,
+	type VaultContext,
 } from "./llm";
 import type { TemplateField } from "./templates";
 
@@ -190,6 +191,105 @@ describe("buildConversionPrompt", () => {
 		const prompt = buildConversionPrompt("test", "booking", sampleFields, []);
 
 		expect(prompt).not.toContain("BODY SECTIONS TO FILL:");
+	});
+});
+
+describe("buildConversionPrompt with vault context", () => {
+	const sampleFields: TemplateField[] = [
+		{ key: "title", inFrontmatter: true, isAutoDate: false },
+		{ key: "Project", inFrontmatter: true, isAutoDate: false },
+	];
+
+	test("includes existing areas in prompt", () => {
+		const vaultContext: VaultContext = {
+			areas: ["Work", "Health", "Finance"],
+			projects: [],
+			suggestedTags: [],
+		};
+
+		const prompt = buildConversionPrompt(
+			"Content",
+			"project",
+			sampleFields,
+			[],
+			undefined,
+			vaultContext,
+		);
+
+		expect(prompt).toContain("EXISTING AREAS");
+		expect(prompt).toContain("- Work");
+		expect(prompt).toContain("- Health");
+		expect(prompt).toContain("- Finance");
+	});
+
+	test("includes existing projects in prompt", () => {
+		const vaultContext: VaultContext = {
+			areas: [],
+			projects: ["Build Garden Shed", "Learn Piano"],
+			suggestedTags: [],
+		};
+
+		const prompt = buildConversionPrompt(
+			"Content",
+			"task",
+			sampleFields,
+			[],
+			undefined,
+			vaultContext,
+		);
+
+		expect(prompt).toContain("EXISTING PROJECTS");
+		expect(prompt).toContain("- Build Garden Shed");
+		expect(prompt).toContain("- Learn Piano");
+	});
+
+	test("includes allowed tags in prompt", () => {
+		const vaultContext: VaultContext = {
+			areas: [],
+			projects: [],
+			suggestedTags: ["project", "task", "daily", "journal"],
+		};
+
+		const prompt = buildConversionPrompt(
+			"Content",
+			"project",
+			sampleFields,
+			[],
+			undefined,
+			vaultContext,
+		);
+
+		expect(prompt).toContain("ALLOWED TAGS");
+		expect(prompt).toContain("project, task, daily, journal");
+		expect(prompt).toContain("DO NOT invent new tags");
+	});
+
+	test("works without vault context (backward compatible)", () => {
+		const prompt = buildConversionPrompt("Content", "project", sampleFields);
+
+		expect(prompt).not.toContain("VAULT CONTEXT:");
+		expect(prompt).toContain("OUTPUT FORMAT"); // Should still work
+	});
+
+	test("includes wikilink formatting guidance", () => {
+		const vaultContext: VaultContext = {
+			areas: ["Work"],
+			projects: [],
+			suggestedTags: [],
+		};
+
+		const prompt = buildConversionPrompt(
+			"Content",
+			"project",
+			sampleFields,
+			[],
+			undefined,
+			vaultContext,
+		);
+
+		expect(prompt).toContain("[[");
+		expect(prompt).toContain("Wikilinks must NOT be quoted");
+		expect(prompt).toContain("Dataview");
 	});
 });
 
