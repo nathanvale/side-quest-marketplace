@@ -174,6 +174,9 @@ Example: start_date: 2025-12-06
 **Hint for area:**
 Type: wikilink
 Example: area: [[Note Name]]
+
+**IMPORTANT:** Wikilinks in YAML frontmatter must NOT be quoted for Dataview compatibility.
+Use `area: [[Note Name]]` not `area: "[[Note Name]]"`
 ```
 
 ### Setting Resource Source

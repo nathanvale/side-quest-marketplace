@@ -17,7 +17,7 @@ import path from "node:path";
 import type { ParaObsidianConfig } from "./config";
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter";
 import { resolveVaultPath } from "./fs";
-import { insertIntoNote } from "./insert";
+import { insertIntoNote, replaceSectionContent } from "./insert";
 import {
 	applyDateSubstitutions,
 	detectTitlePromptKey,
@@ -276,3 +276,61 @@ export function injectSections(
 
 	return { injected, skipped };
 }
+
+/**
+ * Replaces content in multiple sections of a note.
+ *
+ * Unlike injectSections which appends content, this function
+ * completely replaces the content under each heading.
+ *
+ * @param config - Para-obsidian configuration
+ * @param filePath - Path to the file (relative to vault)
+ * @param sections - Mapping of heading names to content to replace with
+ * @param options - Options for replacement behavior
+ * @returns Result with lists of replaced and skipped sections
+ *
+ * @example
+ * ```typescript
+ * const result = replaceSections(config, 'Projects/My Project.md', {
+ *   'Why This Matters': 'This project addresses...',
+ *   'Success Criteria': '- [ ] Feature complete',
+ * });
+ * ```
+ */
+export function replaceSections(
+	config: ParaObsidianConfig,
+	filePath: string,
+	sections: Record<string, string>,
+	options?: { preserveComments?: boolean },
+): InjectSectionsResult {
+	const injected: string[] = [];
+	const skipped: Array<{ heading: string; reason: string }> = [];
+
+	for (const [heading, content] of Object.entries(sections)) {
+		// Skip null/empty content
+		if (content === null || !content.trim()) {
+			skipped.push({ heading, reason: "Empty content" });
+			continue;
+		}
+
+		try {
+			replaceSectionContent(config, {
+				file: filePath,
+				heading,
+				content,
+				preserveComments: options?.preserveComments,
+			});
+			injected.push(heading);
+		} catch (error) {
+			skipped.push({
+				heading,
+				reason: error instanceof Error ? error.message : String(error),
+			});
+		}
+	}
+
+	return { injected, skipped };
+}
+
+// Re-export for convenience
+export { replaceH1Title } from "./insert";

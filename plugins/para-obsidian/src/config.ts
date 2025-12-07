@@ -60,7 +60,7 @@ export interface FieldRule {
 export interface ParaObsidianConfig {
 	/** Absolute path to the Obsidian vault root directory. */
 	readonly vault: string;
-	/** Directory containing note templates. Defaults to vault/06_Metadata/Templates. */
+	/** Directory containing note templates. Defaults to vault/Templates. */
 	readonly templatesDir?: string;
 	/** Path to the cached vault index file. Defaults to vault/.para-obsidian-index.json. */
 	readonly indexPath?: string;
@@ -144,6 +144,13 @@ export interface LoadConfigOptions {
  * 3. Explicit: path from PARA_OBSIDIAN_CONFIG env var
  * 4. Required: PARA_VAULT env var (always required)
  *
+ * Environment variables:
+ * - PARA_VAULT (required): Path to Obsidian vault
+ * - PARA_TEMPLATES_DIR (optional): Override templates directory
+ * - PARA_OBSIDIAN_CONFIG (optional): Path to JSON config file
+ *
+ * Default templates directory: vault/Templates (was vault/06_Metadata/Templates)
+ *
  * @param options - Configuration loading options
  * @returns Fully resolved configuration object
  * @throws Error if PARA_VAULT is not set or doesn't point to a valid directory
@@ -186,8 +193,12 @@ export function loadConfig(
 		throw new Error(`PARA_VAULT does not point to a directory: ${vault}`);
 	}
 
+	// Templates dir priority: PARA_TEMPLATES_DIR env > config files > default (vault/Templates)
+	const envTemplatesDir = process.env.PARA_TEMPLATES_DIR;
 	const templatesDir =
-		merged.templatesDir ?? path.join(vault, "06_Metadata", "Templates");
+		(envTemplatesDir && envTemplatesDir.trim().length > 0
+			? envTemplatesDir
+			: merged.templatesDir) ?? path.join(vault, "Templates");
 
 	return {
 		...merged,

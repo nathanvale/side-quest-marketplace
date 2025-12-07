@@ -24,7 +24,7 @@ function makeConfig(vault: string, templatesDir: string): ParaObsidianConfig {
 describe("createFromTemplate", () => {
 	it("creates a file from template with args", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"project",
@@ -45,12 +45,12 @@ Body`,
 		expect(result.filePath.endsWith(".md")).toBe(true);
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		expect(written.includes("My Project")).toBe(true);
-		expect(written).toContain("template_version: 2");
+		expect(written).toContain("template_version: 3");
 	});
 
 	it("throws if template missing", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		process.env.PARA_VAULT = vault;
 		expect(() =>
 			createFromTemplate(makeConfig(vault, templatesDir), {
@@ -62,7 +62,7 @@ Body`,
 
 	it("auto-injects Title arg from title option for uppercase Title prompts", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		// Template uses uppercase "Title" which matches real templates
 		writeTemplate(
 			templatesDir,
@@ -90,7 +90,7 @@ type: capture
 
 	it("creates project with all required fields filled", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"project",
@@ -133,7 +133,7 @@ Area: <% tp.system.prompt("Area") %>`,
 
 	it("creates area with all required fields filled", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"area",
@@ -168,7 +168,7 @@ Description: <% tp.system.prompt("Description") %>`,
 
 	it("creates resource with all required fields filled", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"resource",
@@ -205,7 +205,7 @@ Topic: <% tp.system.prompt("Main topic") %>`,
 
 	it("creates task with all required fields filled", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"task",
@@ -243,7 +243,7 @@ Effort: <% tp.system.prompt("Effort (small/medium/large)") %>`,
 
 	it("handles optional parameters with default values", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"resource",
@@ -286,7 +286,7 @@ Author: <% tp.system.prompt("Author (optional)", "") %>`,
 
 	it("handles optional parameters when not provided", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"resource",
@@ -326,7 +326,7 @@ Source: <% tp.system.prompt("Source type") %>`,
 
 	it("creates project in 01_Projects by default", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"project",
@@ -351,7 +351,7 @@ Body`,
 
 	it("creates area in 02_Areas by default", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"area",
@@ -374,7 +374,7 @@ Body`,
 
 	it("creates resource in 03_Resources by default", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"resource",
@@ -399,7 +399,7 @@ Body`,
 
 	it("creates task in Tasks by default", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"task",
@@ -422,7 +422,7 @@ Body`,
 
 	it("creates daily note in Daily Notes by default", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"daily",
@@ -447,7 +447,7 @@ Body`,
 
 	it("creates capture note in 00_Inbox by default", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"capture",
@@ -472,7 +472,7 @@ Body`,
 
 	it("explicit dest overrides default destination", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"project",
@@ -501,7 +501,7 @@ Body`,
 	// Regression tests: real-world prompt keys (not just "Title")
 	it("auto-detects 'Resource title' prompt key from real templates", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		// Use the exact pattern from real vault templates
 		writeTemplate(
 			templatesDir,
@@ -540,7 +540,7 @@ Source: <% tp.system.prompt("Source type (book/article/video/course/podcast/etc.
 
 	it("auto-detects 'Project title' prompt key from real templates", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"project",
@@ -574,7 +574,7 @@ tags:
 
 	it("auto-detects 'Area title' prompt key from real templates", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"area",
@@ -602,7 +602,7 @@ tags:
 
 	it("backward compatible with 'Title' prompt key", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		// This is the old pattern that should still work
 		writeTemplate(
 			templatesDir,

@@ -74,7 +74,7 @@ describe("cli", () => {
 describe("cli create --content", () => {
 	it("creates note and injects content into sections", async () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"project",
@@ -129,7 +129,7 @@ type: project
 
 	it("handles invalid JSON in --content flag", async () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"project",
@@ -162,7 +162,7 @@ type: project
 
 	it("reports partial success when some headings missing", async () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"project",
@@ -216,7 +216,7 @@ type: project
 
 	it("outputs markdown format by default with injection results", async () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"project",
@@ -256,7 +256,7 @@ type: project
 
 	it("creates note without content when --content not provided", async () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"project",
@@ -293,7 +293,7 @@ type: project
 
 	it("skips empty content values in --content", async () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
 			"project",

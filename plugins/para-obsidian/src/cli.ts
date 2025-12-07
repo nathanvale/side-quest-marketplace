@@ -62,7 +62,12 @@ import {
 	loadConfig,
 	type ParaObsidianConfig,
 } from "./config";
-import { createFromTemplate, injectSections } from "./create";
+import {
+	createFromTemplate,
+	injectSections,
+	replaceH1Title,
+	replaceSections,
+} from "./create";
 import { deleteFile } from "./delete";
 import {
 	applyVersionPlan,
@@ -963,16 +968,52 @@ async function main(): Promise<void> {
 					break;
 				}
 
-				// 5. Create note with extracted frontmatter
+				// 5. Create note from template base
+				// Title priority: CLI override > extracted.title > extracted.args.title
+				const resolvedTitle =
+					titleOverride ??
+					(extracted.title !== "Untitled" ? extracted.title : null) ??
+					(typeof extracted.args.title === "string"
+						? extracted.args.title
+						: null) ??
+					extracted.title;
+
 				await ensureGitGuard(config);
 				const result = createFromTemplate(config, {
 					template,
-					title: titleOverride ?? extracted.title,
+					title: resolvedTitle,
 					dest,
 					args: extracted.args as Record<string, string>,
 				});
 
-				// 6. Inject content sections
+				// 6. Update frontmatter with extracted values (handles non-Templater templates)
+				// Filter out null values and convert to proper types
+				const frontmatterUpdates: Record<string, unknown> = {};
+				for (const [key, value] of Object.entries(extracted.args)) {
+					if (value !== null && value !== "null") {
+						frontmatterUpdates[key] = value;
+					}
+				}
+				// Always set template_version to the current expected version
+				const expectedVersion = config.templateVersions?.[template];
+				if (expectedVersion !== undefined) {
+					frontmatterUpdates.template_version = expectedVersion;
+				}
+				if (Object.keys(frontmatterUpdates).length > 0) {
+					updateFrontmatterFile(config, result.filePath, {
+						set: frontmatterUpdates,
+						dryRun: false,
+					});
+				}
+
+				// 7. Replace H1 title placeholder with actual title
+				const noteTitle =
+					typeof extracted.args.title === "string"
+						? extracted.args.title
+						: (titleOverride ?? extracted.title);
+				replaceH1Title(config, result.filePath, noteTitle);
+
+				// 8. Replace content sections (not append)
 				let injectionResult:
 					| {
 							injected: string[];
@@ -980,17 +1021,18 @@ async function main(): Promise<void> {
 					  }
 					| undefined;
 				if (extracted.content && Object.keys(extracted.content).length > 0) {
-					injectionResult = injectSections(
+					injectionResult = replaceSections(
 						config,
 						result.filePath,
 						extracted.content,
+						{ preserveComments: true },
 					);
 				}
 
-				// 7. Validate the result
+				// 9. Validate the result
 				const validation = validateFrontmatterFile(config, result.filePath);
 
-				// 8. Auto-commit if enabled
+				// 10. Auto-commit if enabled
 				if (config.autoCommit) {
 					await autoCommitChanges(
 						config,
@@ -999,7 +1041,7 @@ async function main(): Promise<void> {
 					);
 				}
 
-				// 9. Output
+				// 11. Output
 				if (isJson) {
 					console.log(
 						JSON.stringify(

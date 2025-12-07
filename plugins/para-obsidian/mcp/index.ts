@@ -144,6 +144,8 @@ interface FrontmatterHint {
 	readonly examples?: ReadonlyArray<string>;
 	/** Human-readable description of the field. */
 	readonly description?: string;
+	/** Additional notes or warnings for this field type. */
+	readonly notes?: string;
 }
 
 /**
@@ -213,6 +215,8 @@ function computeFrontmatterHint(
 		return {
 			...hintProps,
 			examples: ["[[Note Name]]"],
+			notes:
+				"IMPORTANT: Do NOT quote wikilinks in YAML frontmatter for Dataview compatibility. Use [[Note]] not \"[[Note]]\"",
 		};
 	}
 
@@ -1361,7 +1365,7 @@ Creates a note using Templater-style substitution:
 - {{date}} → Current date (YYYY-MM-DD)
 - {{arg_name}} → Custom arguments
 
-Template files expected at vault/06_Metadata/Templates/{template}.md
+Template files expected at vault/Templates/{template}.md (configurable via PARA_TEMPLATES_DIR)
 
 Filename: Title Case with spaces (e.g., "My Project Note.md")
 

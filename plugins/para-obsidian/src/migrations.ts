@@ -345,6 +345,161 @@ const researchV1To2: MigrationFn = (ctx): MigrationResult => {
 	};
 };
 
+// ============================================================================
+// V2 → V3 MIGRATIONS
+// ============================================================================
+
+/** project v2→v3: removes reviewed/review_period, adds new optional fields */
+const projectV2To3: MigrationFn = (ctx): MigrationResult => {
+	const next = { ...ctx.attributes };
+	const changes: string[] = [];
+
+	// Remove obsolete fields
+	if ("reviewed" in next) {
+		delete next.reviewed;
+		changes.push("removed: reviewed");
+	}
+	if ("review_period" in next) {
+		delete next.review_period;
+		changes.push("removed: review_period");
+	}
+
+	// Add new optional fields with defaults
+	if (!next.depends_on) {
+		next.depends_on = [];
+	}
+	if (!next.blocks) {
+		next.blocks = [];
+	}
+	if (!next.completion_date) {
+		next.completion_date = "";
+	}
+
+	return { attributes: next, body: ctx.body, changes };
+};
+
+/** area v2→v3: removes reviewed/review_period */
+const areaV2To3: MigrationFn = (ctx): MigrationResult => {
+	const next = { ...ctx.attributes };
+	const changes: string[] = [];
+	if ("reviewed" in next) {
+		delete next.reviewed;
+		changes.push("removed: reviewed");
+	}
+	if ("review_period" in next) {
+		delete next.review_period;
+		changes.push("removed: review_period");
+	}
+	return { attributes: next, body: ctx.body, changes };
+};
+
+/** resource v2→v3: renames source→source_type, removes areas/reviewed */
+const resourceV2To3: MigrationFn = (ctx): MigrationResult => {
+	const next = { ...ctx.attributes };
+	const changes: string[] = [];
+
+	// Rename source → source_type
+	if ("source" in next && !("source_type" in next)) {
+		next.source_type = next.source;
+		delete next.source;
+		changes.push("renamed: source → source_type");
+	}
+
+	// Remove obsolete fields
+	if ("areas" in next) {
+		delete next.areas;
+		changes.push("removed: areas");
+	}
+	if ("reviewed" in next) {
+		delete next.reviewed;
+		changes.push("removed: reviewed");
+	}
+
+	return { attributes: next, body: ctx.body, changes };
+};
+
+/** task v2→v3: removes reviewed, adds new optional fields */
+const taskV2To3: MigrationFn = (ctx): MigrationResult => {
+	const next = { ...ctx.attributes };
+	const changes: string[] = [];
+	if ("reviewed" in next) {
+		delete next.reviewed;
+		changes.push("removed: reviewed");
+	}
+	if (!next.depends_on) {
+		next.depends_on = [];
+	}
+	if (!next.blocks) {
+		next.blocks = [];
+	}
+	return { attributes: next, body: ctx.body, changes };
+};
+
+/** daily v2→v3: adds week field */
+const dailyV2To3: MigrationFn = (ctx): MigrationResult => {
+	const next = { ...ctx.attributes };
+	const changes: string[] = [];
+	if (!next.week) {
+		next.week = "";
+		changes.push("added: week");
+	}
+	return { attributes: next, body: ctx.body, changes };
+};
+
+/** weekly-review v2→v3: adds week_start, focus_areas */
+const weeklyReviewV2To3: MigrationFn = (ctx): MigrationResult => {
+	const next = { ...ctx.attributes };
+	const changes: string[] = [];
+	if (!next.week_start) {
+		next.week_start = "";
+		changes.push("added: week_start");
+	}
+	if (!next.focus_areas) {
+		next.focus_areas = "";
+		changes.push("added: focus_areas");
+	}
+	return { attributes: next, body: ctx.body, changes };
+};
+
+/** capture v2→v3: renames captured_from → source */
+const captureV2To3: MigrationFn = (ctx): MigrationResult => {
+	const next = { ...ctx.attributes };
+	const changes: string[] = [];
+	if ("captured_from" in next && !("source" in next)) {
+		next.source = next.captured_from;
+		delete next.captured_from;
+		changes.push("renamed: captured_from → source");
+	}
+	return { attributes: next, body: ctx.body, changes };
+};
+
+/** checklist v2→v3: no structural changes, just version bump */
+const checklistV2To3: MigrationFn = (ctx): MigrationResult => {
+	return { attributes: ctx.attributes, body: ctx.body, changes: [] };
+};
+
+/** itinerary v2→v3: adds location field */
+const itineraryV2To3: MigrationFn = (ctx): MigrationResult => {
+	const next = { ...ctx.attributes };
+	const changes: string[] = [];
+	if (!next.location) {
+		next.location = "";
+		changes.push("added: location");
+	}
+	return { attributes: next, body: ctx.body, changes };
+};
+
+/** research v2→v3: adds location field */
+const researchV2To3: MigrationFn = (ctx): MigrationResult => {
+	const next = { ...ctx.attributes };
+	const changes: string[] = [];
+	if (!next.location) {
+		next.location = "";
+		changes.push("added: location");
+	}
+	return { attributes: next, body: ctx.body, changes };
+};
+
 /**
  * Registry of all migration functions indexed by template type and version transitions.
  *
@@ -364,40 +519,47 @@ const researchV1To2: MigrationFn = (ctx): MigrationResult => {
  */
 export const MIGRATIONS: MigrationHooks = {
 	project: {
-		1: {
-			2: projectV1To2,
-			3: projectV1To2,
-		},
-	},
-	resource: {
-		1: { 2: resourceV1To2 },
-	},
-	daily: {
-		1: { 2: dailyV1To2 },
+		1: { 2: projectV1To2, 3: projectV1To2 },
+		2: { 3: projectV2To3 },
 	},
 	area: {
-		1: { 2: areaV1To2 },
+		1: { 2: areaV1To2, 3: areaV1To2 },
+		2: { 3: areaV2To3 },
+	},
+	resource: {
+		1: { 2: resourceV1To2, 3: resourceV1To2 },
+		2: { 3: resourceV2To3 },
 	},
 	task: {
-		1: { 2: taskV1To2 },
+		1: { 2: taskV1To2, 3: taskV1To2 },
+		2: { 3: taskV2To3 },
+	},
+	daily: {
+		1: { 2: dailyV1To2, 3: dailyV1To2 },
+		2: { 3: dailyV2To3 },
 	},
 	"weekly-review": {
-		1: { 2: weeklyReviewV1To2 },
+		1: { 2: weeklyReviewV1To2, 3: weeklyReviewV1To2 },
+		2: { 3: weeklyReviewV2To3 },
 	},
 	capture: {
-		1: { 2: captureV1To2 },
+		1: { 2: captureV1To2, 3: captureV1To2 },
+		2: { 3: captureV2To3 },
 	},
 	checklist: {
-		1: { 2: checklistV1To2 },
+		1: { 2: checklistV1To2, 3: checklistV1To2 },
+		2: { 3: checklistV2To3 },
 	},
 	booking: {
 		1: { 2: bookingV1To2 },
 		2: { 3: bookingV2To3 },
 	},
 	itinerary: {
-		1: { 2: itineraryV1To2 },
+		1: { 2: itineraryV1To2, 3: itineraryV1To2 },
+		2: { 3: itineraryV2To3 },
 	},
 	research: {
-		1: { 2: researchV1To2 },
+		1: { 2: researchV1To2, 3: researchV1To2 },
+		2: { 3: researchV2To3 },
 	},
 };

@@ -32,6 +32,12 @@ Ask focused questions matching the template type:
 
 **Metadata-Heavy** (task, booking, checklist, capture): Focus on frontmatter, minimal body content
 
+**CRITICAL:** When generating wikilinks for frontmatter args, do NOT include quotes:
+- ✅ Correct: `--arg "Area=[[Product]]"`
+- ❌ Wrong: `--arg "Area=\"[[Product]]\""`
+
+This ensures Dataview queries work correctly.
+
 ### 4. Create Note with Content
 
 ```bash

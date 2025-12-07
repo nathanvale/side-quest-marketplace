@@ -201,3 +201,135 @@ export function insertIntoNote(
 
 	return { relative: target.relative, mode: options.mode };
 }
+
+/**
+ * Options for replacing content in a section.
+ */
+export interface ReplaceSectionOptions {
+	/** Path to the file (relative to vault). */
+	readonly file: string;
+	/** Heading text to locate (without # prefix). */
+	readonly heading: string;
+	/** New content to replace the section with. */
+	readonly content: string;
+	/** If true, preserve HTML comments in the section. */
+	readonly preserveComments?: boolean;
+}
+
+/**
+ * Replaces the content of a section under a heading.
+ *
+ * Unlike insertIntoNote which appends/prepends, this function
+ * completely replaces the content between a heading and the next
+ * heading of equal or higher level.
+ *
+ * @param config - Para-obsidian configuration
+ * @param options - Replace options (file, heading, content)
+ * @returns Result with relative path
+ * @throws Error if file doesn't exist or heading not found
+ *
+ * @example
+ * ```typescript
+ * replaceSectionContent(config, {
+ *   file: 'Projects/Note.md',
+ *   heading: 'Why This Matters',
+ *   content: 'This project solves...'
+ * });
+ * ```
+ */
+export function replaceSectionContent(
+	config: ParaObsidianConfig,
+	options: ReplaceSectionOptions,
+): { relative: string } {
+	const target = resolveVaultPath(config.vault, options.file);
+	if (!fs.existsSync(target.absolute)) {
+		throw new Error(`File not found: ${options.file}`);
+	}
+
+	const raw = fs.readFileSync(target.absolute, "utf8");
+	const lines = normalizeLines(raw);
+	const heading = findHeading(lines, options.heading);
+	if (!heading) {
+		throw new Error(`Heading not found: ${options.heading}`);
+	}
+
+	const sectionEnd = findSectionEnd(lines, heading.index, heading.level);
+	const sectionStart = heading.index + 1;
+
+	// Extract comments if preserving
+	const comments: string[] = [];
+	if (options.preserveComments) {
+		for (let i = sectionStart; i < sectionEnd; i++) {
+			const line = lines[i];
+			if (line && /^\s*<!--.*-->\s*$/.test(line)) {
+				comments.push(line);
+			}
+		}
+	}
+
+	// Build new section content
+	const newContent = normalizeLines(options.content);
+	const newSection =
+		options.preserveComments && comments.length > 0
+			? [...comments, "", ...newContent, ""]
+			: ["", ...newContent, ""];
+
+	// Replace section content
+	const updatedLines = [
+		...lines.slice(0, sectionStart),
+		...newSection,
+		...lines.slice(sectionEnd),
+	];
+
+	fs.writeFileSync(target.absolute, updatedLines.join("\n"), "utf8");
+
+	return { relative: target.relative };
+}
+
+/**
+ * Replaces the H1 title in a note.
+ *
+ * Finds the first `# title` line and replaces it with the new title.
+ *
+ * @param config - Para-obsidian configuration
+ * @param file - Path to the file (relative to vault)
+ * @param newTitle - New title text (without # prefix)
+ * @returns Result indicating if replacement was made
+ *
+ * @example
+ * ```typescript
+ * replaceH1Title(config, 'Projects/Note.md', 'My Project');
+ * // Changes "# null" to "# My Project"
+ * ```
+ */
+export function replaceH1Title(
+	config: ParaObsidianConfig,
+	file: string,
+	newTitle: string,
+): { relative: string; replaced: boolean } {
+	const target = resolveVaultPath(config.vault, file);
+	if (!fs.existsSync(target.absolute)) {
+		throw new Error(`File not found: ${file}`);
+	}
+
+	const raw = fs.readFileSync(target.absolute, "utf8");
+	const lines = normalizeLines(raw);
+
+	let replaced = false;
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		if (line === undefined) continue;
+		// Match H1: exactly one # followed by space
+		if (/^#\s+/.test(line)) {
+			lines[i] = `# ${newTitle}`;
+			replaced = true;
+			break;
+		}
+	}
+
+	if (replaced) {
+		fs.writeFileSync(target.absolute, lines.join("\n"), "utf8");
+	}
+
+	return { relative: target.relative, replaced };
+}

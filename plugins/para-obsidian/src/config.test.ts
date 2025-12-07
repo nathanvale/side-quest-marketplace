@@ -29,14 +29,15 @@ describe("loadConfig", () => {
 
 	it("resolves vault and default templates dir", () => {
 		const vault = makeTmpDir();
-		fs.mkdirSync(path.join(vault, "06_Metadata", "Templates"), {
+		// Default templates dir is now vault/Templates (not 06_Metadata/Templates)
+		fs.mkdirSync(path.join(vault, "Templates"), {
 			recursive: true,
 		});
 		process.env.PARA_VAULT = vault;
 
 		const cfg = loadConfig();
 		expect(cfg.vault).toBe(path.resolve(vault));
-		expect(cfg.templatesDir).toBe(path.join(vault, "06_Metadata", "Templates"));
+		expect(cfg.templatesDir).toBe(path.join(vault, "Templates"));
 		expect(cfg.suggestedTags).toEqual([...DEFAULT_SUGGESTED_TAGS]);
 		expect(cfg.frontmatterRules).toEqual(DEFAULT_FRONTMATTER_RULES);
 	});
@@ -44,7 +45,7 @@ describe("loadConfig", () => {
 	it("applies user config overrides", () => {
 		const vault = makeTmpDir();
 		const home = makeTmpDir();
-		fs.mkdirSync(path.join(vault, "06_Metadata", "Templates"), {
+		fs.mkdirSync(path.join(vault, "Templates"), {
 			recursive: true,
 		});
 		process.env.PARA_VAULT = vault;
@@ -63,7 +64,7 @@ describe("loadConfig", () => {
 
 	it("applies explicit config path from PARA_OBSIDIAN_CONFIG", () => {
 		const vault = makeTmpDir();
-		fs.mkdirSync(path.join(vault, "06_Metadata", "Templates"), {
+		fs.mkdirSync(path.join(vault, "Templates"), {
 			recursive: true,
 		});
 		process.env.PARA_VAULT = vault;
@@ -83,7 +84,7 @@ describe("loadConfig", () => {
 		const vault = makeTmpDir();
 		const home = makeTmpDir();
 		const cwd = makeTmpDir();
-		fs.mkdirSync(path.join(vault, "06_Metadata", "Templates"), {
+		fs.mkdirSync(path.join(vault, "Templates"), {
 			recursive: true,
 		});
 		process.env.PARA_VAULT = vault;

@@ -22,6 +22,9 @@ CLI + MCP server for PARA-style Obsidian vault management with frontmatter valid
 - Template versions tracked via `template_version` field
 - Migration required when template versions change
 - Use `frontmatter validate` before manual edits
+- **CRITICAL:** Wikilinks in YAML frontmatter must NOT be quoted for Dataview compatibility
+  - ✅ Correct: `project: [[Building A Garden Shed]]`
+  - ❌ Wrong: `project: "[[Building A Garden Shed]]"`
 
 **Filename Conventions:**
 - **ALWAYS** use Title Case with spaces (e.g., "My Project Note.md")
@@ -35,7 +38,7 @@ Notes are automatically placed in their PARA folder unless `--dest` is specified
 | project | `01_Projects` |
 | area | `02_Areas` |
 | resource | `03_Resources` |
-| task | `07_Tasks` |
+| task | `Tasks` |
 | daily, weekly-review, capture, booking, checklist, itinerary-day, trip-research | `00_Inbox` |
 
 ---

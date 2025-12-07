@@ -18,7 +18,7 @@ function writeFile(relPath: string, content: string, vault: string) {
 describe("frontmatter file validation", () => {
 	it("validates a project frontmatter", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		fs.mkdirSync(templatesDir, { recursive: true });
 		process.env.PARA_VAULT = vault;
 
@@ -32,9 +32,7 @@ status: active
 start_date: 2025-01-01
 target_completion: 2025-12-31
 area: "[[Health]]"
-reviewed: 2025-01-01
-review_period: 7d
-template_version: 2
+template_version: 3
 tags: [project]
 ---
 Body`,
@@ -49,7 +47,7 @@ Body`,
 
 	it("reports issues for missing required fields", () => {
 		const vault = makeTmpDir();
-		const templatesDir = path.join(vault, "06_Metadata", "Templates");
+		const templatesDir = path.join(vault, "Templates");
 		fs.mkdirSync(templatesDir, { recursive: true });
 		process.env.PARA_VAULT = vault;
 

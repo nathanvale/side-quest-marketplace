@@ -37,17 +37,17 @@ Body`,
 
 		const config: ParaObsidianConfig = {
 			vault,
-			templateVersions: { project: 2 },
+			templateVersions: { project: 3 },
 		};
 
 		const result = migrateTemplateVersion(config, "note.md", {
 			migrate: MIGRATIONS,
 		});
 		expect(result.updated).toBe(true);
-		expect(result.toVersion).toBe(2);
+		expect(result.toVersion).toBe(3);
 		expect(result.wouldChange).toBe(true);
 		const content = fs.readFileSync(path.join(vault, "note.md"), "utf8");
-		expect(content).toContain("template_version: 2");
+		expect(content).toMatch(/template_version:\s*["']?3["']?/);
 	});
 
 	it("migrates all notes under a directory", () => {
@@ -75,7 +75,7 @@ Body`,
 
 		const config: ParaObsidianConfig = {
 			vault,
-			templateVersions: { project: 3, area: 2 },
+			templateVersions: { project: 3, area: 3 },
 		};
 
 		const summary = migrateAllTemplateVersions(config, { migrate: MIGRATIONS });
@@ -84,7 +84,7 @@ Body`,
 		expect(summary.skipped).toBe(0);
 		expect(summary.changes.length).toBeGreaterThanOrEqual(0);
 		const migrated = fs.readFileSync(path.join(vault, "note.md"), "utf8");
-		expect(migrated).toContain("template_version: 3");
+		expect(migrated).toMatch(/template_version:\s*["']?3["']?/);
 	});
 
 	it("updates outdated version", () => {
@@ -113,7 +113,7 @@ Body`,
 		expect(result.wouldChange).toBe(true);
 		expect(Array.isArray(result.changes ?? [])).toBe(true);
 		const content = fs.readFileSync(path.join(vault, "note.md"), "utf8");
-		expect(content).toContain("template_version: 3");
+		expect(content).toMatch(/template_version:\s*["']?3["']?/);
 	});
 
 	it("fills defaults for task migration", () => {
@@ -131,19 +131,19 @@ Body`,
 
 		const config: ParaObsidianConfig = {
 			vault,
-			templateVersions: { task: 2 },
+			templateVersions: { task: 3 },
 		};
 
 		const result = migrateTemplateVersion(config, "task.md", {
 			migrate: MIGRATIONS,
 		});
-		expect(result.toVersion).toBe(2);
+		expect(result.toVersion).toBe(3);
 		expect((result.changes ?? []).length).toBeGreaterThan(0);
 		const content = fs.readFileSync(path.join(vault, "task.md"), "utf8");
 		expect(content).toContain("status:");
 		expect(content).toContain("effort:");
 		expect(content).toContain("task_type:");
-		expect(content).toContain("template_version: 2");
+		expect(content).toMatch(/template_version:\s*["']?3["']?/);
 	});
 
 	it("applies a plan to migrate only outdated files", () => {
@@ -164,19 +164,19 @@ Body`,
 			`---
 type: project
 title: Test
-template_version: 2
+template_version: 3
 ---
 Body`,
 		);
 
 		const config: ParaObsidianConfig = {
 			vault,
-			templateVersions: { project: 2 },
+			templateVersions: { project: 3 },
 		};
 
 		const plan = planTemplateVersionBump(config, {
 			type: "project",
-			toVersion: 2,
+			toVersion: 3,
 		});
 
 		const result = applyVersionPlan(config, {
@@ -187,12 +187,12 @@ Body`,
 		expect(result.updated).toBe(1);
 		expect(result.errors).toBe(0);
 		const migrated = fs.readFileSync(path.join(vault, "project.md"), "utf8");
-		expect(migrated).toContain("template_version: 2");
+		expect(migrated).toMatch(/template_version:\s*["']?3["']?/);
 		const untouched = fs.readFileSync(
 			path.join(vault, "project-current.md"),
 			"utf8",
 		);
-		expect(untouched).toContain("template_version: 2");
+		expect(untouched).toMatch(/template_version:\s*["']?3["']?/);
 	});
 
 	it("skips entries when status filter excludes them", () => {
