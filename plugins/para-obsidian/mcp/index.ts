@@ -216,7 +216,7 @@ function computeFrontmatterHint(
 			...hintProps,
 			examples: ["[[Note Name]]"],
 			notes:
-				"IMPORTANT: Do NOT quote wikilinks in YAML frontmatter for Dataview compatibility. Use [[Note]] not \"[[Note]]\"",
+				'IMPORTANT: Do NOT quote wikilinks in YAML frontmatter for Dataview compatibility. Use [[Note]] not "[[Note]]"',
 		};
 	}
 

@@ -192,3 +192,113 @@ export function loadIndex(config: ParaObsidianConfig): VaultIndex | undefined {
 	const raw = fs.readFileSync(indexPath, "utf8");
 	return JSON.parse(raw) as VaultIndex;
 }
+
+/**
+ * Lists all areas from the vault.
+ *
+ * Scans the 02_Areas directory for area notes and returns their titles.
+ * Falls back to scanning frontmatter if directory doesn't exist.
+ *
+ * @param config - Para-obsidian configuration
+ * @returns Array of area titles
+ *
+ * @example
+ * ```typescript
+ * const areas = listAreas(config);
+ * console.log(`Found ${areas.length} areas: ${areas.join(', ')}`);
+ * ```
+ */
+export function listAreas(config: ParaObsidianConfig): string[] {
+	const areasDir = resolveVaultPath(config.vault, "02_Areas");
+	const areas: string[] = [];
+
+	if (!fs.existsSync(areasDir.absolute)) {
+		return areas;
+	}
+
+	// Scan 02_Areas directory for .md files
+	const files = fs.readdirSync(areasDir.absolute);
+	for (const file of files) {
+		if (file.endsWith(".md")) {
+			// Use filename without extension as area title
+			areas.push(file.replace(/\.md$/, ""));
+		}
+	}
+
+	return areas.sort();
+}
+
+/**
+ * Lists suggested tags from config.
+ *
+ * Returns the curated list of tags from the para-obsidian config.
+ * This is the authoritative list that users manage in their config file.
+ *
+ * @param config - Para-obsidian configuration
+ * @returns Array of suggested tag names (sorted)
+ *
+ * @example
+ * ```typescript
+ * const tags = listTags(config);
+ * console.log(`Available tags: ${tags.join(', ')}`);
+ * ```
+ */
+export function listTags(config: ParaObsidianConfig): string[] {
+	return config.suggestedTags ? [...config.suggestedTags].sort() : [];
+}
+
+/**
+ * Scans vault for all tags actually used in frontmatter.
+ *
+ * Returns tags found in notes across the vault.
+ * Uses the vault index if available, otherwise scans all files.
+ *
+ * @param config - Para-obsidian configuration
+ * @returns Array of unique tag names (sorted)
+ *
+ * @example
+ * ```typescript
+ * const tags = scanTags(config);
+ * console.log(`Found ${tags.length} tags in use: ${tags.join(', ')}`);
+ * ```
+ */
+export function scanTags(config: ParaObsidianConfig): string[] {
+	const tagSet = new Set<string>();
+
+	// Try to use existing index first
+	const index = loadIndex(config);
+	if (index) {
+		for (const entry of index.entries) {
+			for (const tag of entry.tags) {
+				tagSet.add(tag);
+			}
+		}
+		return Array.from(tagSet).sort();
+	}
+
+	// Fallback: scan all markdown files
+	const vaultRoot = config.vault;
+	const markdownFiles: string[] = [];
+	walkMarkdownFiles(vaultRoot, "", markdownFiles);
+
+	for (const file of markdownFiles) {
+		const fullPath = path.join(vaultRoot, file);
+		try {
+			const content = fs.readFileSync(fullPath, "utf8");
+			const { attributes } = parseFrontmatter(content);
+			const tags = attributes.tags;
+			if (Array.isArray(tags)) {
+				for (const tag of tags) {
+					if (typeof tag === "string") {
+						tagSet.add(tag);
+					}
+				}
+			}
+		} catch {
+			// Skip files that can't be parsed
+			continue;
+		}
+	}
+
+	return Array.from(tagSet).sort();
+}

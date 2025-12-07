@@ -87,7 +87,14 @@ import {
 	ensureGitGuard,
 	gitStatus,
 } from "./git";
-import { buildIndex, loadIndex, saveIndex } from "./indexer";
+import {
+	buildIndex,
+	listAreas,
+	listTags,
+	loadIndex,
+	saveIndex,
+	scanTags,
+} from "./indexer";
 import { type InsertMode, insertIntoNote } from "./insert";
 import { renameWithLinkRewrite } from "./links";
 import {
@@ -365,6 +372,59 @@ async function main(): Promise<void> {
 				} else {
 					for (const tpl of templates) {
 						console.log(emphasize.info(`${tpl.name}: v${tpl.version}`));
+					}
+				}
+				break;
+			}
+
+			case "list-areas": {
+				const areas = listAreas(config);
+				if (isJson) {
+					console.log(JSON.stringify({ areas, count: areas.length }, null, 2));
+				} else {
+					if (areas.length === 0) {
+						console.log(emphasize.warn("No areas found in 02_Areas/"));
+					} else {
+						console.log(emphasize.info(`Found ${areas.length} areas:`));
+						for (const area of areas) {
+							console.log(`  ${area}`);
+						}
+					}
+				}
+				break;
+			}
+
+			case "list-tags": {
+				const tags = listTags(config);
+				if (isJson) {
+					console.log(JSON.stringify({ tags, count: tags.length }, null, 2));
+				} else {
+					if (tags.length === 0) {
+						console.log(
+							emphasize.warn("No suggested tags configured (see suggestedTags in config)"),
+						);
+					} else {
+						console.log(emphasize.info(`Configured tags (${tags.length}):`));
+						for (const tag of tags) {
+							console.log(`  ${tag}`);
+						}
+					}
+				}
+				break;
+			}
+
+			case "scan-tags": {
+				const tags = scanTags(config);
+				if (isJson) {
+					console.log(JSON.stringify({ tags, count: tags.length }, null, 2));
+				} else {
+					if (tags.length === 0) {
+						console.log(emphasize.warn("No tags found in vault frontmatter"));
+					} else {
+						console.log(emphasize.info(`Tags in use (${tags.length}):`));
+						for (const tag of tags) {
+							console.log(`  ${tag}`);
+						}
 					}
 				}
 				break;
