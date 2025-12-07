@@ -81,9 +81,28 @@ After conversion, you'll have:
 - Original note left untouched
 - Optional auto-commit (if enabled in config)
 
+## Recommended Models
+
+Choose based on your speed/quality preference:
+
+```bash
+# qwen2.5:14b — Default, balanced quality & speed
+/para-obsidian:convert "file.md" --template booking --model qwen2.5:14b
+
+# qwen2.5-coder:14b — Better for structured data extraction
+/para-obsidian:convert "file.md" --template booking --model qwen2.5-coder:14b
+
+# qwen2.5:7b — Faster, lighter, good for quick conversions
+/para-obsidian:convert "file.md" --template booking --model qwen2.5:7b
+
+# qwen2.5-coder:7b — Fastest, smaller model for quick extractions
+/para-obsidian:convert "file.md" --template booking --model qwen2.5-coder:7b
+```
+
 ## Tips
 
 - **Dry-run first**: Use `--dry-run` to preview extraction before creating
 - **Check model availability**: Run `ollama list` to see installed models
-- **Faster extraction**: Use `qwen2.5:7b` for quicker results (slightly less accurate)
-- **Better quality**: Use `mistral:latest` or `neural-chat:latest` for higher-quality extraction
+- **Install missing models**: `ollama pull qwen2.5:14b` or preferred model
+- **Better quality**: Use coder variants for structured data (booking, project, etc.)
+- **Faster extraction**: Use 7b variants for quicker results
