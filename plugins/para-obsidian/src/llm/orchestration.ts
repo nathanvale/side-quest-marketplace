@@ -66,9 +66,34 @@ function stripWikilinks(value: string | null): string | null {
 }
 
 /**
+ * Check if a value represents a null/empty value.
+ * Handles various null representations from LLM responses.
+ *
+ * @example
+ * isNullishValue(null) // true
+ * isNullishValue("null") // true
+ * isNullishValue("NULL") // true
+ * isNullishValue("  null  ") // true
+ * isNullishValue("") // true
+ * isNullishValue("  ") // true
+ * isNullishValue("Strahan") // false
+ */
+function isNullishValue(value: string | null): boolean {
+	if (value === null) return true;
+	if (typeof value !== "string") return false;
+
+	const trimmed = value.trim();
+	if (trimmed === "") return true;
+
+	// Check for various null representations (case-insensitive)
+	const lowerValue = trimmed.toLowerCase();
+	return lowerValue === "null" || lowerValue === "none" || lowerValue === "n/a";
+}
+
+/**
  * Normalize extracted args from LLM response.
  * - Strips wikilink brackets (templates already have them)
- * - Converts empty/null/"null" strings to null
+ * - Converts empty/null/"null" strings to null (case-insensitive, whitespace-tolerant)
  * - Handles title field specially (never null, use empty check)
  * - Preserves non-wikilink values as-is
  */
@@ -87,10 +112,11 @@ function normalizeExtractedArgs(
 
 		if (isWikilinkField) {
 			normalized[key] = stripWikilinks(value);
-		} else if (value === null || value === "null" || value === "") {
+		} else if (isNullishValue(value)) {
 			normalized[key] = null;
 		} else {
-			normalized[key] = value;
+			// Trim whitespace from non-null values
+			normalized[key] = typeof value === "string" ? value.trim() : value;
 		}
 	}
 

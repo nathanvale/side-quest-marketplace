@@ -211,6 +211,15 @@ function formatFieldConstraints(
 				}
 			}
 
+			// Special handling for location field
+			if (f.key.toLowerCase() === "location") {
+				line +=
+					"\n  → Extract from: headings, first paragraph, filename, or explicit mentions";
+				line +=
+					"\n  → Use specific place name (e.g., 'Cradle Mountain', 'Strahan', 'Lake St Clair')";
+				line += "\n  → Use null ONLY if truly no location mentioned anywhere";
+			}
+
 			return line;
 		})
 		.join("\n");
