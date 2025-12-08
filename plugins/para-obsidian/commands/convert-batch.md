@@ -26,6 +26,8 @@ Batch convert multiple unsorted notes to PARA-compliant notes using the note-cre
 /para-obsidian:convert-batch "_Sort/2025 Tassie Holiday/02_Itinerary" itinerary "01 Projects/2025 Tassie Holiday" "Day {N} - " "project=[[2025 Tassie Holiday]]"
 ```
 
+**Note on Wikilinks:** Project wikilinks are automatically quoted in YAML frontmatter for Dataview compatibility (e.g., `project: "[[2025 Tassie Holiday]]"`)
+
 ## How It Works
 
 1. Invokes the `note-creator` subagent

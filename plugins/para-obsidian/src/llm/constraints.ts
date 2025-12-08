@@ -325,15 +325,15 @@ ${areaList}
 → Common areas: Home, Work, Health, Finance, Learning, Family, Personal, Career, Hobbies
 → Area = ongoing RESPONSIBILITY or LIFE DOMAIN (not a temporary project)
 → Example: Garden shed → [[Home]], Fitness goals → [[Health]], Work project → [[Work]]
-→ CRITICAL: Wikilinks must NOT be quoted: area: [[Home]] NOT area: "[[Home]]"
+→ CRITICAL: Wikilinks MUST be quoted: area: "[[Home]]" (valid YAML, Dataview-compatible)
 
 EXISTING PROJECTS (for task linking):
 ${projectList}
 → Tasks should link to projects when applicable
-→ If existing project matches, use: [[ProjectName]]
+→ If existing project matches, use: "[[ProjectName]]" (QUOTED in YAML)
 → If no project matches, suggest new project name based on content
 → Use null ONLY if task is standalone (not part of any project)
-→ CRITICAL: Wikilinks must NOT be quoted
+→ CRITICAL: Wikilinks MUST be quoted for YAML validity and Dataview compatibility
 
 ALLOWED TAGS (choose ONLY from this list):
 ${context.suggestedTags.join(", ")}

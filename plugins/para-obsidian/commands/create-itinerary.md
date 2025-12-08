@@ -54,6 +54,7 @@ bun src/cli.ts create --template itinerary \
 ## Frontmatter Hints
 
 - **Suggested tags**: itinerary, travel, planning
+- **Wikilinks**: Project wikilinks are automatically quoted in YAML frontmatter for Dataview compatibility (e.g., `project: "[[Japan 2025]]"`)
 
 ## Examples
 

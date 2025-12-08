@@ -48,6 +48,7 @@ bun src/cli.ts create --template resource \
 ## Frontmatter Hints
 
 - **Suggested tags**: resource, reference, learning, work
+- **Wikilinks**: Area wikilinks are automatically quoted in YAML frontmatter for Dataview compatibility (e.g., `area: "[[Health]]"`)
 
 ## Examples
 

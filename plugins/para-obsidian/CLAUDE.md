@@ -22,9 +22,9 @@ CLI + MCP server for PARA-style Obsidian vault management with frontmatter valid
 - Template versions tracked via `template_version` field
 - Migration required when template versions change
 - Use `frontmatter validate` before manual edits
-- **CRITICAL:** Wikilinks in YAML frontmatter must NOT be quoted for Dataview compatibility
-  - ✅ Correct: `project: [[Building A Garden Shed]]`
-  - ❌ Wrong: `project: "[[Building A Garden Shed]]"`
+- **CRITICAL:** Wikilinks in YAML frontmatter MUST be quoted for Dataview compatibility and valid YAML
+  - ✅ Correct: `project: "[[Building A Garden Shed]]"` (valid YAML, Dataview-compatible)
+  - ❌ Wrong: `project: [[Building A Garden Shed]]` (invalid YAML, breaks parsing)
 
 **Filename Conventions:**
 - **ALWAYS** use Title Case with spaces (e.g., "My Project Note.md")

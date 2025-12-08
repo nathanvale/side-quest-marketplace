@@ -53,6 +53,7 @@ bun src/cli.ts create --template research \
 ## Frontmatter Hints
 
 - **Suggested tags**: research, analysis, decision
+- **Wikilinks**: Project wikilinks are automatically quoted in YAML frontmatter for Dataview compatibility (e.g., `project: "[[Website Redesign]]"`)
 
 ## Examples
 

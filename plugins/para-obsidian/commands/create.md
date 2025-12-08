@@ -64,6 +64,8 @@ para-obsidian create --template $1 \
 /para-obsidian:create capture title="Quick idea" content="..." captured_from=thought
 ```
 
+**Note on Wikilinks:** Area and project wikilinks are automatically quoted in YAML frontmatter for Dataview compatibility (e.g., `area: "[[AI Practice]]"`)
+
 ## Notes
 
 - Use `para-obsidian template-fields <template> --format json` to see exact field names

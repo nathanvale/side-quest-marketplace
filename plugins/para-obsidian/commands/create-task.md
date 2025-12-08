@@ -51,6 +51,7 @@ bun src/cli.ts create --template task \
 
 - **status**: not-started | in-progress | blocked | done | cancelled
 - **Suggested tags**: task, work, family, health, home
+- **Wikilinks**: Project and area wikilinks are automatically quoted in YAML frontmatter for Dataview compatibility (e.g., `project: "[[Mobile App Redesign]]"`, `area: "[[Health]]"`)
 
 ## Examples
 

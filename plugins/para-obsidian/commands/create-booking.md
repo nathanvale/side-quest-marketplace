@@ -55,6 +55,7 @@ bun src/cli.ts create --template booking \
 ## Frontmatter Hints
 
 - **Suggested tags**: booking, travel, event
+- **Wikilinks**: Project wikilinks are automatically quoted in YAML frontmatter for Dataview compatibility (e.g., `project: "[[Japan 2025]]"`)
 
 ## Examples
 

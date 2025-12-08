@@ -45,6 +45,7 @@ bun src/cli.ts create --template project \
 
 - **status**: active (default) | on-hold | completed | archived
 - **Suggested tags**: project, work, family, health, learning, finance, home, career
+- **Wikilinks**: Area wikilinks are automatically quoted in YAML frontmatter for Dataview compatibility (e.g., `area: "[[AI Practice]]"`)
 
 ## Examples
 
