@@ -18,6 +18,7 @@ import type { ParaObsidianConfig } from "./config";
  */
 export const DEFAULT_SUGGESTED_TAGS = [
 	"project",
+	"trip",
 	"area",
 	"resource",
 	"task",
@@ -238,10 +239,29 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			tags: { type: "array", includes: ["research"] },
 		},
 	},
+	trip: {
+		required: {
+			title: { type: "string" },
+			created: { type: "date" },
+			type: { type: "enum", enum: ["project"] },
+			status: {
+				type: "enum",
+				enum: ["active", "on-hold", "completed", "archived"],
+			},
+			start_date: { type: "date" },
+			target_completion: { type: "date" },
+			completion_date: { type: "string", optional: true },
+			area: { type: "wikilink" },
+			depends_on: { type: "array", optional: true },
+			blocks: { type: "array", optional: true },
+			tags: { type: "array", includes: ["project", "trip"] },
+		},
+	},
 };
 
 export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
 	project: 3,
+	trip: 2,
 	area: 3,
 	resource: 3,
 	task: 3,
@@ -261,6 +281,7 @@ export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
  */
 export const DEFAULT_DESTINATIONS: Record<string, string> = {
 	project: "01 Projects",
+	trip: "01 Projects",
 	area: "02 Areas",
 	resource: "03 Resources",
 	task: "Tasks",
