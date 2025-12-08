@@ -121,17 +121,20 @@ async function runKitSemantic(
 			? resolveVaultPath(config.vault, options.dir)
 			: undefined;
 
+	// Store vector index in user's cache dir to avoid indexing the index itself
+	const persistDir = `${process.env.HOME}/.cache/para-obsidian/vector-index`;
+
 	const args = [
 		"kit",
-		"semantic",
-		"--path",
-		dir?.absolute ?? config.vault,
-		"--query",
-		options.query,
+		"search-semantic",
+		dir?.absolute ?? config.vault, // Positional: PATH
+		options.query, // Positional: QUERY
 		"--top-k",
 		(options.limit ?? 10).toString(),
 		"--chunk-by",
 		"lines", // Markdown-optimized: use lines instead of symbols
+		"--persist-dir",
+		persistDir,
 	];
 
 	const { stdout, exitCode, stderr } = await spawnAndCollect(args, {

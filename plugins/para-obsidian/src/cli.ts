@@ -382,30 +382,57 @@ async function handleCreateFromSource(options: {
 			args: nonNullArgs,
 		});
 
+		// Helper to wrap value in wikilink format for Dataview compatibility
+		const toWikilink = (val: string | null): string | null => {
+			if (!val || val === "null") return null;
+			// Already wrapped in brackets
+			if (val.startsWith("[[") && val.endsWith("]]")) return val;
+			return `[[${val}]]`;
+		};
+
+		// Helper to ensure URLs have https:// prefix
+		const normalizeUrl = (val: string | null): string | null => {
+			if (!val || val === "null" || val === "") return null;
+			// Already has protocol
+			if (val.startsWith("http://") || val.startsWith("https://")) return val;
+			// Add https:// prefix
+			return `https://${val}`;
+		};
+
 		// Clean up wikilink fields - ALWAYS set the extracted value to override template output
-		// Template creates "[[value]]" format; we need to ensure clean string values
+		// Wrap in [[...]] for Dataview compatibility (wikilinks must be quoted in YAML)
 		// ALSO apply argOverrides to ensure they take precedence over LLM extraction
 		// Must include all wikilink fields that may appear in templates
 		const frontmatterCleanup: Record<string, unknown> = {};
 		const wikilinkFields = ["project", "area", "accommodation", "decision"];
+		const urlFields = ["contact_url", "url", "website", "source_url"];
 		for (const field of wikilinkFields) {
 			const extractedValue = Object.entries(extracted.args).find(([key]) =>
 				key.toLowerCase().includes(field),
 			)?.[1];
-			// ALWAYS set wikilink fields - either to extracted value or null
-			// This ensures clean string values override any malformed template output
-			frontmatterCleanup[field] = extractedValue ?? null;
+			// ALWAYS set wikilink fields - wrap in [[...]] or null
+			// This ensures Dataview-compatible wikilink format
+			frontmatterCleanup[field] = toWikilink(extractedValue ?? null);
+		}
+		// Normalize URL fields - ensure they have https:// prefix
+		for (const field of urlFields) {
+			const extractedValue = Object.entries(extracted.args).find(
+				([key]) => key.toLowerCase() === field.toLowerCase(),
+			)?.[1];
+			if (extractedValue) {
+				frontmatterCleanup[field] = normalizeUrl(extractedValue);
+			}
 		}
 
 		// Apply argOverrides to frontmatter (ensures overrides win regardless of key casing)
 		if (argOverrides && Object.keys(argOverrides).length > 0) {
 			for (const [key, value] of Object.entries(argOverrides)) {
-				// Strip wikilink brackets if present (frontmatter should store unwrapped values)
-				const normalizedValue =
-					value.startsWith("[[") && value.endsWith("]]")
-						? value.slice(2, -2)
-						: value;
-				frontmatterCleanup[key] = normalizedValue;
+				// For wikilink fields, ensure brackets are present
+				if (wikilinkFields.includes(key.toLowerCase())) {
+					frontmatterCleanup[key] = toWikilink(value);
+				} else {
+					frontmatterCleanup[key] = value;
+				}
 			}
 		}
 

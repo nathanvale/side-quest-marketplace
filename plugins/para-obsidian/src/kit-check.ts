@@ -47,23 +47,19 @@ export async function checkKit(): Promise<KitCheckResult> {
 		};
 	}
 
-	// Check if ML dependencies are installed via uv tool list
-	const { exitCode: uvExitCode, stdout: uvList } = await spawnAndCollect(
-		["uv", "tool", "list"],
-		{ env: { ...process.env } },
-	);
+	// Check if ML dependencies work by testing search-semantic command
+	// This is more reliable than checking uv tool list (which doesn't show extras)
+	const { exitCode: semanticExitCode, stderr: semanticStderr } =
+		await spawnAndCollect(["kit", "search-semantic", "--help"], {
+			env: { ...process.env },
+		});
 
-	if (uvExitCode !== 0) {
-		return {
-			installed: true,
-			hasML: false,
-			version: kitVersion.trim(),
-			error: "Could not check ML dependencies (uv not available)",
-		};
-	}
-
-	// Check if cased-kit is installed with ML extras
-	const hasML = uvList.includes("cased-kit") && uvList.includes("[ml]");
+	// If the command exists and doesn't fail, ML is available
+	// Common failure: "No such command 'search-semantic'" or import errors
+	const hasML =
+		semanticExitCode === 0 &&
+		!semanticStderr.toLowerCase().includes("no such command") &&
+		!semanticStderr.toLowerCase().includes("modulenotfounderror");
 
 	return {
 		installed: true,
@@ -108,7 +104,7 @@ export function getKitMLErrorMessage(check: KitCheckResult): string {
 		"│                                                                │",
 	);
 	lines.push(
-		"│  1. Ensure Python 3.11 is installed (NOT 3.12+):              │",
+		"│  1. Ensure Python 3.11 is installed (NOT 3.12+):               │",
 	);
 	lines.push(
 		"│     python3 --version                                          │",
@@ -117,7 +113,7 @@ export function getKitMLErrorMessage(check: KitCheckResult): string {
 		"│                                                                │",
 	);
 	lines.push(
-		"│     ⚠️  Kit ML has compatibility issues with Python 3.12+.      │",
+		"│     ⚠️  Kit ML has compatibility issues with Python 3.12+.     │",
 	);
 	lines.push(
 		"│     Use pyenv to install 3.11:                                 │",
@@ -129,7 +125,7 @@ export function getKitMLErrorMessage(check: KitCheckResult): string {
 		"│                                                                │",
 	);
 	lines.push(
-		"│  2. Install Kit with ML dependencies:                         │",
+		"│  2. Install Kit with ML dependencies:                          │",
 	);
 	lines.push(
 		"│     uv tool install 'cased-kit[ml]'                            │",
@@ -144,7 +140,7 @@ export function getKitMLErrorMessage(check: KitCheckResult): string {
 		"│     kit --version                                              │",
 	);
 	lines.push(
-		"│     kit semantic --help                                        │",
+		"│     kit search-semantic --help                                 │",
 	);
 	lines.push(
 		"│                                                                │",
