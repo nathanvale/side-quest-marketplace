@@ -71,6 +71,31 @@ describe("cli", () => {
 	});
 });
 
+describe("cli convert (compat)", () => {
+	it("fails with a clear message when template is missing", async () => {
+		const vault = makeTmpDir();
+		const templatesDir = path.join(vault, "Templates");
+		fs.mkdirSync(templatesDir, { recursive: true });
+		writeTemplate(
+			templatesDir,
+			"task",
+			`---
+title: "<% tp.system.prompt("Title") %>"
+type: task
+---`,
+		);
+		commitAll(vault);
+
+		const { stderr, exitCode } = await runCli(
+			["convert", "inbox/rough-note.md", "--format", "json"],
+			{ PARA_VAULT: vault },
+		);
+
+		expect(exitCode).toBe(1);
+		expect(stderr).toContain("Unknown command: convert");
+	});
+});
+
 describe("cli create --content", () => {
 	it("creates note and injects content into sections", async () => {
 		const vault = makeTmpDir();

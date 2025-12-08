@@ -40,6 +40,64 @@ import {
 } from "./prompt-builder";
 
 /**
+ * Strip wikilink brackets from a value if present.
+ * Templates already wrap values in [[...]], so AI responses with brackets cause double-wrapping.
+ *
+ * @example
+ * stripWikilinks("[[Home]]") // "Home"
+ * stripWikilinks("Home") // "Home"
+ * stripWikilinks("[[]]") // null (empty wikilink)
+ * stripWikilinks(null) // null
+ */
+function stripWikilinks(value: string | null): string | null {
+	if (value === null || value === "null") return null;
+
+	let stripped = value.trim();
+
+	// Strip outer wikilink brackets if present
+	if (stripped.startsWith("[[") && stripped.endsWith("]]")) {
+		stripped = stripped.slice(2, -2).trim();
+	}
+
+	// Return null for empty values
+	if (stripped === "" || stripped === "null") return null;
+
+	return stripped;
+}
+
+/**
+ * Normalize extracted args from LLM response.
+ * - Strips wikilink brackets (templates already have them)
+ * - Converts empty/null/"null" strings to null
+ * - Handles title field specially (never null, use empty check)
+ * - Preserves non-wikilink values as-is
+ */
+function normalizeExtractedArgs(
+	args: Record<string, string | null>,
+): Record<string, string | null> {
+	const normalized: Record<string, string | null> = {};
+
+	for (const [key, value] of Object.entries(args)) {
+		// Check if this key is typically a wikilink field (area, project, etc.)
+		const isWikilinkField =
+			key.toLowerCase().includes("area") ||
+			key.toLowerCase().includes("project") ||
+			key.toLowerCase() === "area" ||
+			key.toLowerCase() === "project";
+
+		if (isWikilinkField) {
+			normalized[key] = stripWikilinks(value);
+		} else if (value === null || value === "null" || value === "") {
+			normalized[key] = null;
+		} else {
+			normalized[key] = value;
+		}
+	}
+
+	return normalized;
+}
+
+/**
  * Result of a note conversion operation.
  */
 export interface ConversionResult {
@@ -155,6 +213,9 @@ export async function convertNoteToTemplate(
 	const rawResponse = await callModel({ model: model as LLMModel, prompt });
 	const extracted = parseOllamaResponse(rawResponse);
 
+	// 5b. Normalize extracted args (strip wikilinks, handle nulls)
+	extracted.args = normalizeExtractedArgs(extracted.args);
+
 	// 6. Dry run check
 	if (options.dryRun) {
 		return {
@@ -166,27 +227,60 @@ export async function convertNoteToTemplate(
 	}
 
 	// 7. Create note from template
+	// Resolve title with fallbacks, rejecting "null" and "Untitled" as invalid
+	const isValidTitle = (t: unknown): t is string =>
+		typeof t === "string" && t !== "" && t !== "null" && t !== "Untitled";
+
 	const resolvedTitle =
 		options.titleOverride ??
-		(extracted.title !== "Untitled" ? extracted.title : null) ??
-		(typeof extracted.args.title === "string" ? extracted.args.title : null) ??
+		(isValidTitle(extracted.title) ? extracted.title : null) ??
+		(isValidTitle(extracted.args.title) ? extracted.args.title : null) ??
 		extracted.title;
+
+	// Filter out null values before passing to template substitution
+	// (null values would otherwise be coerced to "null" strings)
+	const nonNullArgs: Record<string, string> = {};
+	for (const [key, value] of Object.entries(extracted.args)) {
+		if (value !== null) {
+			nonNullArgs[key] = value;
+		}
+	}
 
 	const result = createFromTemplate(config, {
 		template: options.template,
 		title: resolvedTitle,
 		dest: options.dest,
-		args: extracted.args as Record<string, string>,
+		args: nonNullArgs,
 	});
 
 	// 8. Update frontmatter with extracted values
-	// Filter out null values and Templater prompt keys (which are already substituted)
+	// - Wikilink fields (project, area) get explicit null to overwrite bad template defaults
+	// - Other null values are skipped
+	// - Templater prompt keys are used to extract wikilink values, then skipped for direct frontmatter updates
 	const frontmatterUpdates: Record<string, unknown> = {};
-	for (const [key, value] of Object.entries(extracted.args)) {
-		// Skip null values
-		if (value === null || value === "null") continue;
 
-		// Skip Templater prompt text - these are already substituted in the template
+	// Track which wikilink fields we've seen values for
+	const wikilinkFieldsFound: Record<string, string | null> = {
+		project: null,
+		area: null,
+	};
+
+	// Helper to check if a key refers to a wikilink field
+	const getWikilinkFieldName = (k: string): "project" | "area" | null => {
+		const lower = k.toLowerCase();
+		if (lower === "project" || lower.includes("project")) return "project";
+		if (lower === "area" || lower.includes("area")) return "area";
+		return null;
+	};
+
+	for (const [key, value] of Object.entries(extracted.args)) {
+		// Check if this is a wikilink field (even if it's a Templater prompt key)
+		const wikilinkField = getWikilinkFieldName(key);
+		if (wikilinkField && value !== null) {
+			wikilinkFieldsFound[wikilinkField] = value;
+		}
+
+		// Skip Templater prompt text for direct frontmatter updates
 		// Templater prompts contain: spaces, parentheses, or start with capital letter
 		// Valid field names: title, trip_date, day_number, location, accommodation
 		// Invalid (prompt text): "Day title", "Date (YYYY-MM-DD)", "Location", "Project"
@@ -199,7 +293,15 @@ export async function convertNoteToTemplate(
 			continue; // Skip Templater prompt keys
 		}
 
-		frontmatterUpdates[key] = value;
+		// Add non-wikilink fields if they have a value
+		if (!wikilinkField && value !== null && value !== "null") {
+			frontmatterUpdates[key] = value;
+		}
+	}
+
+	// Always set wikilink fields (to value or null) to overwrite bad template defaults
+	for (const [field, value] of Object.entries(wikilinkFieldsFound)) {
+		frontmatterUpdates[field] = value;
 	}
 
 	// Always set template_version to the current expected version
@@ -368,6 +470,14 @@ export async function extractMetadata(
 	const rawResponse = await callModel({ model: model as LLMModel, prompt });
 	const extracted = parseOllamaResponse(rawResponse);
 
+	// 5b. Normalize extracted args (strip wikilinks, handle nulls)
+	extracted.args = normalizeExtractedArgs(extracted.args);
+
+	// 5c. Normalize title (treat "null" string as "Untitled")
+	if (extracted.title === "null" || extracted.title === "") {
+		extracted.title = "Untitled";
+	}
+
 	// 6. Apply arg overrides if provided
 	if (options.argOverrides) {
 		for (const [key, value] of Object.entries(options.argOverrides)) {
@@ -450,7 +560,17 @@ export async function suggestFieldValues(
 	// Call LLM
 	const model = options.model ?? DEFAULT_LLM_MODEL;
 	const rawResponse = await callModel({ model: model as LLMModel, prompt });
-	return parseOllamaResponse(rawResponse);
+	const extracted = parseOllamaResponse(rawResponse);
+
+	// Normalize extracted args (strip wikilinks, handle nulls)
+	extracted.args = normalizeExtractedArgs(extracted.args);
+
+	// Normalize title (treat "null" string as "Untitled")
+	if (extracted.title === "null" || extracted.title === "") {
+		extracted.title = "Untitled";
+	}
+
+	return extracted;
 }
 
 /**

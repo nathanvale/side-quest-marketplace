@@ -44,16 +44,16 @@ para-obsidian create --template $1 \
 
 | Template | Default Dest | Key Fields |
 |----------|--------------|------------|
-| `project` | 01_Projects | title, target_date, area |
-| `area` | 02_Areas | title |
-| `resource` | 03_Resources | title, source, areas |
-| `task` | 00_Inbox | title, priority, effort |
-| `capture` | 00_Inbox | title, content, captured_from |
-| `daily` | 05_Journal/Daily | date |
-| `checklist` | 00_Inbox | title, checklist_type, project |
-| `booking` | 00_Inbox | title, booking_type, project, date, cost, currency |
-| `itinerary` | 00_Inbox | title, project, trip_date, day_number |
-| `research` | 00_Inbox | title, research_type, project |
+| `project` | 01 Projects | title, target_date, area |
+| `area` | 02 Areas | title |
+| `resource` | 03 Resources | title, source, areas |
+| `task` | Tasks | title, priority, effort |
+| `capture` | 00 Inbox | title, content, captured_from |
+| `daily` | Daily Notes | date |
+| `checklist` | 00 Inbox | title, checklist_type, project |
+| `booking` | 00 Inbox | title, booking_type, project, date, cost, currency |
+| `itinerary` | 00 Inbox | title, project, trip_date, day_number |
+| `research` | 00 Inbox | title, research_type, project |
 
 ## Examples
 

@@ -168,8 +168,11 @@ export function getTemplateFields(template: TemplateInfo): TemplateField[] {
 		? template.content.slice(frontmatterMatch[0].length)
 		: template.content;
 
-	// Find all tp.system.prompt("...") fields
-	const promptRegex = /<%\s*tp\.system\.prompt\("([^"]+)"\)\s*%>/g;
+	// Find all tp.system.prompt("...") fields (both single and two-arg forms)
+	// Single: <% tp.system.prompt("key") %>
+	// Double: <% tp.system.prompt("key", "default") %>
+	const promptRegex =
+		/<%\s*tp\.system\.prompt\("([^"]+)"(?:\s*,\s*"[^"]*")?\)\s*%>/g;
 
 	// Scan frontmatter
 	for (const match of frontmatter.matchAll(promptRegex)) {

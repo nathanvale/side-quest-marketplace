@@ -10,7 +10,7 @@ allowed-tools: Bash(para-obsidian:*)
 TITLE="$1"
 SOURCE="$2"
 AREAS="${3:-}"
-DEST="${4:-03_Resources}"
+DEST="${4:-03 Resources}"
 ```
 
 **source options**: book | article | video | course | podcast | paper | web

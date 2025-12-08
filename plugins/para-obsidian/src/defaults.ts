@@ -283,6 +283,7 @@ export const DEFAULT_AVAILABLE_MODELS = [
 	"haiku",
 	"qwen:7b",
 	"qwen:14b",
+	"qwen2.5:14b",
 	"qwen-coder:17b",
 	"qwen-coder:14b",
 ] as const;

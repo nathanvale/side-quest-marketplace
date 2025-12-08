@@ -275,6 +275,204 @@ function parseArgOverrides(
 	return overrides;
 }
 
+async function handleCreateFromSource(options: {
+	config: ParaObsidianConfig;
+	template: string;
+	sourceFile: string;
+	model: string;
+	preview: boolean;
+	title?: string;
+	dest?: string;
+	flags: Record<string, string | boolean | (string | boolean)[] | undefined>;
+	isJson: boolean;
+}) {
+	const {
+		config,
+		template,
+		sourceFile,
+		model,
+		preview,
+		title,
+		dest,
+		flags,
+		isJson,
+	} = options;
+	const argFlags = (flags as { arg?: string | boolean | (string | boolean)[] })
+		.arg;
+	const argOverrides = parseArgOverrides(argFlags);
+
+	if (preview) {
+		try {
+			const extracted = await extractMetadata(config, {
+				sourceFile,
+				template,
+				model,
+				extractContent: false, // Skip content extraction for preview (token savings)
+				argOverrides,
+			});
+
+			if (isJson) {
+				console.log(
+					JSON.stringify(
+						{
+							metadata: extracted.args,
+							title: extracted.title,
+							model,
+							preview: true,
+						},
+						null,
+						2,
+					),
+				);
+			} else {
+				console.log(emphasize.info(`AI Suggestions (using ${model}):`));
+				console.log(`  title: ${extracted.title}`);
+				for (const [key, value] of Object.entries(extracted.args)) {
+					if (value !== null) {
+						console.log(`  ${key}: ${value}`);
+					}
+				}
+				console.log("");
+				console.log(
+					emphasize.info(
+						`To create: bun src/cli.ts create --template ${template} --source "${sourceFile}"`,
+					),
+				);
+				console.log(
+					emphasize.info(
+						'Override fields: --arg "priority=high" --arg "area=[[Work]]"',
+					),
+				);
+			}
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : "Extraction failed";
+			console.error(message);
+			process.exit(1);
+		}
+		return;
+	}
+
+	try {
+		const extracted = await extractMetadata(config, {
+			sourceFile,
+			template,
+			model,
+			extractContent: true,
+			argOverrides,
+		});
+
+		const resolvedTitle = title ?? extracted.title;
+
+		// Filter out nulls before substitution to avoid "null" strings being written
+		const nonNullArgs: Record<string, string> = {};
+		for (const [key, value] of Object.entries(extracted.args)) {
+			if (value !== null) {
+				nonNullArgs[key] = value;
+			}
+		}
+
+		await ensureGitGuard(config);
+		const result = createFromTemplate(config, {
+			template,
+			title: resolvedTitle,
+			dest,
+			args: nonNullArgs,
+		});
+
+		// Clean up empty wikilinks - only set null for fields without extracted values
+		// Template creates "[[value]]" format; only override with null if LLM returned null/undefined
+		const frontmatterCleanup: Record<string, unknown> = {};
+		const wikilinkFields = ["project", "area"];
+		for (const field of wikilinkFields) {
+			const extractedValue = Object.entries(extracted.args).find(([key]) =>
+				key.toLowerCase().includes(field),
+			)?.[1];
+			if (extractedValue === null || extractedValue === undefined) {
+				frontmatterCleanup[field] = null;
+			}
+		}
+		if (Object.keys(frontmatterCleanup).length > 0) {
+			updateFrontmatterFile(config, result.filePath, {
+				set: frontmatterCleanup,
+				dryRun: false,
+			});
+		}
+
+		let injectionResult:
+			| {
+					injected: string[];
+					skipped: Array<{ heading: string; reason: string }>;
+			  }
+			| undefined;
+		if (extracted.content && Object.keys(extracted.content).length > 0) {
+			injectionResult = replaceSections(
+				config,
+				result.filePath,
+				extracted.content,
+				{ preserveComments: true },
+			);
+		}
+
+		const flagsWithoutUndefined = Object.fromEntries(
+			Object.entries(flags).filter(([, value]) => value !== undefined),
+		) as Record<string, string | boolean | (string | boolean)[]>;
+
+		const attachments = withAutoDiscoveredAttachments(
+			config,
+			result.filePath,
+			parseAttachments(normalizeFlags(flagsWithoutUndefined)),
+		);
+		if (config.autoCommit) {
+			await autoCommitChanges(
+				config,
+				[result.filePath, ...attachments],
+				`create ${result.filePath}`,
+			);
+		}
+
+		if (isJson) {
+			const output: Record<string, unknown> = {
+				filePath: result.filePath,
+				content: result.content,
+				model,
+			};
+			if (injectionResult) {
+				output.sectionsInjected = injectionResult.injected.length;
+				output.sectionsSkipped = injectionResult.skipped;
+				output.injectedHeadings = injectionResult.injected;
+			}
+			console.log(JSON.stringify(output, null, 2));
+		} else {
+			console.log(emphasize.success(`Created ${result.filePath}`));
+			if (injectionResult) {
+				if (injectionResult.injected.length > 0) {
+					console.log(
+						emphasize.info(
+							`Injected content into ${injectionResult.injected.length} section(s): ${injectionResult.injected.join(", ")}`,
+						),
+					);
+				}
+				if (injectionResult.skipped.length > 0) {
+					console.log(
+						emphasize.warn(
+							`Skipped ${injectionResult.skipped.length} section(s):`,
+						),
+					);
+					for (const skip of injectionResult.skipped) {
+						console.log(`  - ${skip.heading}: ${skip.reason}`);
+					}
+				}
+			}
+		}
+	} catch (error) {
+		const message =
+			error instanceof Error ? error.message : "AI extraction failed";
+		console.error(message);
+		process.exit(1);
+	}
+}
+
 export function suggestFieldsForType(
 	config: ParaObsidianConfig,
 	type?: string,
@@ -885,15 +1083,13 @@ async function main(): Promise<void> {
 						process.exit(1);
 					}
 
-					// Parse --arg overrides
-					const argOverrides = parseArgOverrides(flags.arg);
-
 					// Get model from flags, config, or default
 					const availableModels = config.availableModels ?? [
 						"sonnet",
 						"haiku",
 						"qwen:7b",
 						"qwen:14b",
+						"qwen2.5:14b",
 					];
 					const defaultModel = config.defaultModel ?? "sonnet";
 					const model = modelFlag ?? defaultModel;
@@ -908,152 +1104,20 @@ async function main(): Promise<void> {
 						process.exit(1);
 					}
 
-					if (preview) {
-						// Preview mode - extract and display suggestions without creating file
-						try {
-							const extracted = await extractMetadata(config, {
-								sourceFile,
-								template,
-								model,
-								extractContent: false, // Skip content extraction for preview (token savings)
-								argOverrides,
-							});
-
-							if (isJson) {
-								console.log(
-									JSON.stringify(
-										{
-											metadata: extracted.args,
-											title: extracted.title,
-											model,
-											preview: true,
-										},
-										null,
-										2,
-									),
-								);
-							} else {
-								console.log(emphasize.info(`AI Suggestions (using ${model}):`));
-								console.log(`  title: ${extracted.title}`);
-								for (const [key, value] of Object.entries(extracted.args)) {
-									if (value !== null) {
-										console.log(`  ${key}: ${value}`);
-									}
-								}
-								console.log("");
-								console.log(
-									emphasize.info(
-										`To create: bun src/cli.ts create --template ${template} --source "${sourceFile}"`,
-									),
-								);
-								console.log(
-									emphasize.info(
-										'Override fields: --arg "priority=high" --arg "area=[[Work]]"',
-									),
-								);
-							}
-						} catch (error) {
-							const message =
-								error instanceof Error ? error.message : "Extraction failed";
-							console.error(message);
-							process.exit(1);
-						}
-						break;
-					}
-
-					// Full AI-powered creation mode
-					try {
-						const extracted = await extractMetadata(config, {
-							sourceFile,
-							template,
-							model,
-							extractContent: true,
-							argOverrides,
-						});
-
-						// Use extracted title if --title not provided
-						const resolvedTitle = title ?? extracted.title;
-
-						await ensureGitGuard(config);
-						const result = createFromTemplate(config, {
-							template,
-							title: resolvedTitle,
-							dest,
-							args: extracted.args as Record<string, string>,
-						});
-
-						// Inject extracted content into sections if any
-						let injectionResult:
-							| {
-									injected: string[];
-									skipped: Array<{ heading: string; reason: string }>;
-							  }
-							| undefined;
-						if (
-							extracted.content &&
-							Object.keys(extracted.content).length > 0
-						) {
-							injectionResult = replaceSections(
-								config,
-								result.filePath,
-								extracted.content,
-								{ preserveComments: true },
-							);
-						}
-
-						const attachments = withAutoDiscoveredAttachments(
-							config,
-							result.filePath,
-							parseAttachments(normalizeFlags(flags)),
-						);
-						if (config.autoCommit) {
-							await autoCommitChanges(
-								config,
-								[result.filePath, ...attachments],
-								`create ${result.filePath}`,
-							);
-						}
-
-						if (isJson) {
-							const output: Record<string, unknown> = {
-								filePath: result.filePath,
-								content: result.content,
-								model,
-							};
-							if (injectionResult) {
-								output.sectionsInjected = injectionResult.injected.length;
-								output.sectionsSkipped = injectionResult.skipped;
-								output.injectedHeadings = injectionResult.injected;
-							}
-							console.log(JSON.stringify(output, null, 2));
-						} else {
-							console.log(emphasize.success(`Created ${result.filePath}`));
-							if (injectionResult) {
-								if (injectionResult.injected.length > 0) {
-									console.log(
-										emphasize.info(
-											`Injected content into ${injectionResult.injected.length} section(s): ${injectionResult.injected.join(", ")}`,
-										),
-									);
-								}
-								if (injectionResult.skipped.length > 0) {
-									console.log(
-										emphasize.warn(
-											`Skipped ${injectionResult.skipped.length} section(s):`,
-										),
-									);
-									for (const skip of injectionResult.skipped) {
-										console.log(`  - ${skip.heading}: ${skip.reason}`);
-									}
-								}
-							}
-						}
-					} catch (error) {
-						const message =
-							error instanceof Error ? error.message : "AI extraction failed";
-						console.error(message);
-						process.exit(1);
-					}
+					await handleCreateFromSource({
+						config,
+						template,
+						sourceFile,
+						model,
+						preview,
+						title,
+						dest,
+						flags: flags as Record<
+							string,
+							string | boolean | (string | boolean)[] | undefined
+						>,
+						isJson,
+					});
 					break;
 				}
 

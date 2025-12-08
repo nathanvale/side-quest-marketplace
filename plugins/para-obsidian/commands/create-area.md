@@ -8,7 +8,7 @@ allowed-tools: Bash(para-obsidian:*)
 
 ```bash
 TITLE="$1"
-DEST="${2:-02_Areas}"
+DEST="${2:-02 Areas}"
 ```
 
 ## Command

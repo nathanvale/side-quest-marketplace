@@ -625,6 +625,170 @@ type: capture
 		expect(written).toContain("# Quick Note");
 		expect(written).not.toContain('tp.system.prompt("Title")');
 	});
+
+	it("strips wikilinks from value when template already wraps prompt in [[...]]", () => {
+		const vault = makeTmpDir();
+		const templatesDir = path.join(vault, "Templates");
+		// Template wraps Area prompt in [[...]]
+		writeTemplate(
+			templatesDir,
+			"project",
+			`---
+title: "<% tp.system.prompt("Project title") %>"
+type: project
+area: "[[<% tp.system.prompt("Area") %>]]"
+tags:
+  - project
+---
+# <% tp.system.prompt("Project title") %>`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		// Pass value WITH wikilinks - should strip them to prevent [[[[Home]]]]
+		const result = createFromTemplate(makeConfig(vault, templatesDir), {
+			template: "project",
+			title: "Test Wikilink Normalization",
+			args: {
+				Area: "[[Home]]",
+			},
+		});
+
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+		// Should be [[Home]], NOT [[[[Home]]]]
+		expect(written).toContain('area: "[[Home]]"');
+		expect(written).not.toContain("[[[[");
+	});
+
+	it("preserves wikilinks in value when template does not wrap prompt", () => {
+		const vault = makeTmpDir();
+		const templatesDir = path.join(vault, "Templates");
+		// Template does NOT wrap Area prompt in [[...]] but quotes the value
+		writeTemplate(
+			templatesDir,
+			"project",
+			`---
+title: "<% tp.system.prompt("Project title") %>"
+type: project
+area: "<% tp.system.prompt("Area") %>"
+tags:
+  - project
+---
+# <% tp.system.prompt("Project title") %>`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		// Pass value WITH wikilinks - should preserve them since template doesn't wrap
+		const result = createFromTemplate(makeConfig(vault, templatesDir), {
+			template: "project",
+			title: "Test Wikilink Preserved",
+			args: {
+				Area: "[[Home]]",
+			},
+		});
+
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+		// Should keep [[Home]] as provided (YAML will quote the brackets)
+		expect(written).toContain("[[Home]]");
+		// Should NOT double-wrap
+		expect(written).not.toContain("[[[[");
+	});
+
+	it("works with plain values when template wraps prompt in [[...]]", () => {
+		const vault = makeTmpDir();
+		const templatesDir = path.join(vault, "Templates");
+		// Template wraps Area prompt in [[...]]
+		writeTemplate(
+			templatesDir,
+			"project",
+			`---
+title: "<% tp.system.prompt("Project title") %>"
+type: project
+area: "[[<% tp.system.prompt("Area") %>]]"
+tags:
+  - project
+---
+# <% tp.system.prompt("Project title") %>`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		// Pass plain value WITHOUT wikilinks - template adds them
+		const result = createFromTemplate(makeConfig(vault, templatesDir), {
+			template: "project",
+			title: "Test Plain Value",
+			args: {
+				Area: "Work",
+			},
+		});
+
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+		// Should be [[Work]] from template wrapping
+		expect(written).toContain('area: "[[Work]]"');
+	});
+
+	it("handles missing required args gracefully (replaces with empty string)", () => {
+		const vault = makeTmpDir();
+		const templatesDir = path.join(vault, "Templates");
+		// Template with required prompt that won't have a value
+		writeTemplate(
+			templatesDir,
+			"project",
+			`---
+title: "<% tp.system.prompt("Project title") %>"
+type: project
+target_completion: <% tp.system.prompt("Target date") %>
+area: "[[<% tp.system.prompt("Area") %>]]"
+---
+# <% tp.system.prompt("Project title") %>`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		// Only pass title, not Target date or Area
+		const result = createFromTemplate(makeConfig(vault, templatesDir), {
+			template: "project",
+			title: "No Args Test",
+		});
+
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+		// Unsubstituted prompts should be replaced with empty strings
+		// preventing YAML parse errors from nested quotes
+		expect(written).toContain("title: No Args Test");
+		expect(written).toContain("target_completion: null"); // empty becomes null in YAML
+		expect(written).toContain('area: "[[]]"'); // empty wikilink
+		// Should NOT contain raw Templater patterns
+		expect(written).not.toContain("tp.system.prompt");
+	});
+
+	it("strips wikilinks from values for double-arg prompts wrapped in wikilinks", () => {
+		const vault = makeTmpDir();
+		const templatesDir = path.join(vault, "Templates");
+		// Template with double-arg prompt (with default) wrapped in wikilinks
+		// This is the pattern used by task.md for project/area fields
+		writeTemplate(
+			templatesDir,
+			"task",
+			`---
+title: "<% tp.system.prompt("Task title") %>"
+type: task
+project: "[[<% tp.system.prompt("Project (optional)", "") %>]]"
+---
+# <% tp.system.prompt("Task title") %>`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		// Pass value with wikilinks - should be stripped to prevent [[[[...]]]]
+		const result = createFromTemplate(makeConfig(vault, templatesDir), {
+			template: "task",
+			title: "Test Task",
+			args: {
+				"Project (optional)": "[[My Project]]",
+			},
+		});
+
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+		// Should be [[My Project]] not [[[[My Project]]]]
+		expect(written).toContain('project: "[[My Project]]"');
+		expect(written).not.toContain("[[[[");
+	});
 });
 
 describe("injectSections", () => {

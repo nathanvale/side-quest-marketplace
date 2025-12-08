@@ -102,10 +102,12 @@ describe("validateModel", () => {
 			"haiku",
 			"qwen:7b",
 			"qwen:14b",
+			"qwen2.5:14b",
 			"qwen-coder:17b",
 		];
 		expect(validateModel("qwen:7b", allowed)).toBe("qwen:7b");
 		expect(validateModel("qwen:14b", allowed)).toBe("qwen:14b");
+		expect(validateModel("qwen2.5:14b", allowed)).toBe("qwen2.5:14b");
 		expect(validateModel("qwen-coder:17b", allowed)).toBe("qwen-coder:17b");
 	});
 

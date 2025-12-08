@@ -10,7 +10,7 @@ allowed-tools: Bash(para-obsidian:*)
 TITLE="$1"
 TARGET_DATE="$2"
 AREA="$3"
-DEST="${4:-01_Projects}"
+DEST="${4:-01 Projects}"
 ```
 
 ## Command

@@ -81,6 +81,24 @@ function titleToFilename(title: string): string {
 }
 
 /**
+ * Strips wikilink brackets from a value if present.
+ *
+ * @param value - Value that may contain wikilink brackets
+ * @returns Value with outer wikilink brackets removed
+ *
+ * @example
+ * ```typescript
+ * stripWikilinks('[[Home]]'); // 'Home'
+ * stripWikilinks('Home'); // 'Home'
+ * stripWikilinks('[[My Project]]'); // 'My Project'
+ * ```
+ */
+function stripWikilinks(value: string): string {
+	const match = value.match(/^\[\[(.+)\]\]$/);
+	return match?.[1] ?? value;
+}
+
+/**
  * Substitutes Templater-style prompt placeholders with provided values.
  *
  * Replaces both single-argument and two-argument Templater prompts:
@@ -88,6 +106,10 @@ function titleToFilename(title: string): string {
  * - `<% tp.system.prompt("key", "default") %>` - optional field with default
  *
  * Also handles unmatched optional prompts by replacing them with their defaults.
+ *
+ * **Wikilink handling**: If the template wraps a prompt in `[[...]]` and the
+ * provided value also contains `[[...]]`, the brackets are stripped from the
+ * value to prevent double-wrapping (e.g., `[[[[Home]]]]`).
  *
  * @param content - Template content with Templater prompts
  * @param args - Key-value pairs to substitute
@@ -106,6 +128,11 @@ function titleToFilename(title: string): string {
  * const template3 = 'URL: <% tp.system.prompt("url", "") %>';
  * applyArgsToTemplate(template3, {});
  * // 'URL: ' (default value used)
+ *
+ * // Wikilink normalization
+ * const template4 = 'area: [[<% tp.system.prompt("Area") %>]]';
+ * applyArgsToTemplate(template4, { Area: '[[Home]]' });
+ * // 'area: [[Home]]' (not [[[[Home]]]])
  * ```
  */
 export function applyArgsToTemplate(
@@ -120,13 +147,22 @@ export function applyArgsToTemplate(
 		// Single: <% tp.system.prompt("key") %>
 		// Double: <% tp.system.prompt("key", "default") %>
 		const singleArg = `<% tp.system.prompt("${key}") %>`;
-		const doubleArg = new RegExp(
-			`<% tp\\.system\\.prompt\\("${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"\\s*,\\s*"[^"]*"\\s*\\)\\s*%>`,
-			"g",
-		);
+		const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+		const doubleArgPattern = `<% tp\\.system\\.prompt\\("${escapedKey}"\\s*,\\s*"[^"]*"\\s*\\)\\s*%>`;
+		const doubleArg = new RegExp(doubleArgPattern, "g");
 
-		output = output.replaceAll(singleArg, value);
-		output = output.replace(doubleArg, value);
+		// Check if the prompt is wrapped in wikilinks in the template
+		// Need to check both single-arg and double-arg forms
+		const wrappedSingleArg = `[[${singleArg}]]`;
+		const wrappedDoubleArgPattern = new RegExp(
+			`\\[\\[<% tp\\.system\\.prompt\\("${escapedKey}"\\s*,\\s*"[^"]*"\\s*\\)\\s*%>\\]\\]`,
+		);
+		const isWrappedInWikilinks =
+			output.includes(wrappedSingleArg) || wrappedDoubleArgPattern.test(output);
+		const effectiveValue = isWrappedInWikilinks ? stripWikilinks(value) : value;
+
+		output = output.replaceAll(singleArg, effectiveValue);
+		output = output.replace(doubleArg, effectiveValue);
 	}
 
 	// Second, replace any remaining optional prompts (with defaults) with their default values
@@ -136,6 +172,13 @@ export function applyArgsToTemplate(
 	output = output.replace(optionalPromptRegex, (_match, _key, defaultValue) => {
 		return defaultValue;
 	});
+
+	// Third, replace any remaining required prompts (single-arg) with empty strings
+	// This prevents YAML parse errors from unsubstituted patterns like:
+	// area: "[[<% tp.system.prompt("Area") %>]]" which contains nested quotes
+	// Match: <% tp.system.prompt("any") %>
+	const requiredPromptRegex = /<% tp\.system\.prompt\("([^"]+)"\)\s*%>/g;
+	output = output.replace(requiredPromptRegex, "");
 
 	return output;
 }

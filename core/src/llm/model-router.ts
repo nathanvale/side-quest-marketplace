@@ -17,6 +17,7 @@ export type ClaudeModel = "sonnet" | "haiku";
 export type OllamaModel =
 	| "qwen:7b"
 	| "qwen:14b"
+	| "qwen2.5:14b"
 	| "qwen-coder:17b"
 	| "qwen-coder:14b";
 
@@ -58,6 +59,7 @@ export function isOllamaModel(model: LLMModel): model is OllamaModel {
 	return (
 		model === "qwen:7b" ||
 		model === "qwen:14b" ||
+		model === "qwen2.5:14b" ||
 		model === "qwen-coder:17b" ||
 		model === "qwen-coder:14b"
 	);
