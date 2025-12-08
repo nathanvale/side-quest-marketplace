@@ -20,15 +20,19 @@ export interface ExtractionResult {
 }
 
 /**
- * Parse LLM response, handling potential markdown code fences.
+ * Parse LLM response, handling potential markdown code fences and thinking blocks.
  *
  * @param response - Raw response from LLM
  * @returns Parsed extraction result
  * @throws Error if response is not valid JSON
  */
 export function parseOllamaResponse(response: string): ExtractionResult {
-	// Strip markdown code fences if present
 	let json = response.trim();
+
+	// Strip <thinking>...</thinking> blocks (Claude extended thinking)
+	json = json.replace(/<thinking>[\s\S]*?<\/thinking>/g, "").trim();
+
+	// Strip markdown code fences if present
 	if (json.startsWith("```json")) {
 		json = json.slice(7);
 	} else if (json.startsWith("```")) {

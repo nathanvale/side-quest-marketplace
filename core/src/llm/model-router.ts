@@ -115,7 +115,27 @@ export async function callClaudeHeadless(
 			);
 		}
 
-		return result.stdout;
+		// Parse the JSON output and extract the result field
+		// Claude headless returns: {"type":"result","result":"...","..."}
+		try {
+			const output = JSON.parse(result.stdout) as {
+				type: string;
+				result: string;
+				is_error?: boolean;
+			};
+
+			if (output.is_error) {
+				throw new Error(`Claude returned error: ${output.result}`);
+			}
+
+			return output.result;
+		} catch (parseError) {
+			// If parsing fails, return raw output (backwards compatibility)
+			if (parseError instanceof SyntaxError) {
+				return result.stdout;
+			}
+			throw parseError;
+		}
 	} catch (error) {
 		if (error instanceof Error && error.message.includes("command not found")) {
 			throw new Error(
