@@ -40,6 +40,29 @@ import {
 } from "./prompt-builder";
 
 /**
+ * Recursively flatten a nested array to extract the innermost string value.
+ * Handles malformed LLM output like `[["- Lodge Name"]]` or `[[["value"]]]`.
+ *
+ * @example
+ * flattenToString([["- Lodge Name"]]) // "- Lodge Name"
+ * flattenToString([[["deep"]]]) // "deep"
+ * flattenToString("simple") // "simple"
+ * flattenToString([]) // null
+ * flattenToString(null) // null
+ */
+export function flattenToString(value: unknown): string | null {
+	if (value === null || value === undefined) return null;
+	if (typeof value === "string") return value;
+	if (Array.isArray(value)) {
+		if (value.length === 0) return null;
+		// Recursively extract from first element
+		return flattenToString(value[0]);
+	}
+	// For other types (number, boolean), convert to string
+	return String(value);
+}
+
+/**
  * Strip wikilink brackets from a value if present.
  * Templates already wrap values in [[...]], so AI responses with brackets cause double-wrapping.
  *
@@ -63,6 +86,36 @@ function stripWikilinks(value: string | null): string | null {
 	if (stripped === "" || stripped === "null") return null;
 
 	return stripped;
+}
+
+/**
+ * Clean up a wikilink value extracted from LLM response.
+ * - Flattens nested arrays to string
+ * - Removes markdown list prefixes (- or *)
+ * - Strips wikilink brackets
+ *
+ * Order matters: prefix must be removed before wikilink detection
+ * since "- [[Foo]]" doesn't start with "[[".
+ *
+ * @example
+ * cleanWikilinkValue([["- Lake St Clair Lodge"]]) // "Lake St Clair Lodge"
+ * cleanWikilinkValue("[[Home]]") // "Home"
+ * cleanWikilinkValue("- [[Some Project]]") // "Some Project"
+ */
+export function cleanWikilinkValue(value: unknown): string | null {
+	// First flatten any nested arrays
+	const flattened = flattenToString(value);
+	if (flattened === null) return null;
+
+	// Remove markdown list prefixes FIRST (before wikilink stripping)
+	// because "- [[Foo]]" doesn't start with "[[" so wikilink detection fails
+	const withoutPrefix = flattened.replace(/^[-*]\s*/, "").trim();
+
+	// Then strip wikilinks
+	const stripped = stripWikilinks(withoutPrefix);
+	if (stripped === null) return null;
+
+	return stripped.trim() || null;
 }
 
 /**
@@ -91,32 +144,54 @@ function isNullishValue(value: string | null): boolean {
 }
 
 /**
+ * List of known wikilink field names (case-insensitive).
+ * These fields may contain nested arrays from LLM output that need flattening.
+ */
+const WIKILINK_FIELD_NAMES = [
+	"area",
+	"project",
+	"accommodation",
+	"decision",
+] as const;
+
+/**
+ * Check if a field key represents a wikilink-type field.
+ * Matches exact names and partial matches (e.g., "Project title" matches "project").
+ */
+function isWikilinkField(key: string): boolean {
+	const lowerKey = key.toLowerCase();
+	return WIKILINK_FIELD_NAMES.some(
+		(field) => lowerKey === field || lowerKey.includes(field),
+	);
+}
+
+/**
  * Normalize extracted args from LLM response.
+ * - Flattens nested arrays for wikilink fields (handles malformed LLM output)
  * - Strips wikilink brackets (templates already have them)
+ * - Removes markdown list prefixes from wikilink values
  * - Converts empty/null/"null" strings to null (case-insensitive, whitespace-tolerant)
  * - Handles title field specially (never null, use empty check)
  * - Preserves non-wikilink values as-is
  */
 function normalizeExtractedArgs(
-	args: Record<string, string | null>,
+	args: Record<string, unknown>,
 ): Record<string, string | null> {
 	const normalized: Record<string, string | null> = {};
 
 	for (const [key, value] of Object.entries(args)) {
-		// Check if this key is typically a wikilink field (area, project, etc.)
-		const isWikilinkField =
-			key.toLowerCase().includes("area") ||
-			key.toLowerCase().includes("project") ||
-			key.toLowerCase() === "area" ||
-			key.toLowerCase() === "project";
-
-		if (isWikilinkField) {
-			normalized[key] = stripWikilinks(value);
-		} else if (isNullishValue(value)) {
+		if (isWikilinkField(key)) {
+			// Use cleanWikilinkValue which handles nested arrays, wikilinks, and markdown prefixes
+			normalized[key] = cleanWikilinkValue(value);
+		} else if (isNullishValue(value as string | null)) {
 			normalized[key] = null;
 		} else {
+			// Handle non-wikilink fields
+			// First flatten any arrays (shouldn't happen, but safety net)
+			const flattened = flattenToString(value);
 			// Trim whitespace from non-null values
-			normalized[key] = typeof value === "string" ? value.trim() : value;
+			normalized[key] =
+				typeof flattened === "string" ? flattened.trim() : flattened;
 		}
 	}
 
@@ -286,16 +361,21 @@ export async function convertNoteToTemplate(
 	const frontmatterUpdates: Record<string, unknown> = {};
 
 	// Track which wikilink fields we've seen values for
-	const wikilinkFieldsFound: Record<string, string | null> = {
-		project: null,
-		area: null,
-	};
+	// Use WIKILINK_FIELD_NAMES to ensure consistency with normalizeExtractedArgs
+	const wikilinkFieldsFound: Record<string, string | null> = {};
+	for (const field of WIKILINK_FIELD_NAMES) {
+		wikilinkFieldsFound[field] = null;
+	}
 
 	// Helper to check if a key refers to a wikilink field
-	const getWikilinkFieldName = (k: string): "project" | "area" | null => {
+	// Returns the canonical field name if match found, null otherwise
+	const getWikilinkFieldName = (
+		k: string,
+	): (typeof WIKILINK_FIELD_NAMES)[number] | null => {
 		const lower = k.toLowerCase();
-		if (lower === "project" || lower.includes("project")) return "project";
-		if (lower === "area" || lower.includes("area")) return "area";
+		for (const field of WIKILINK_FIELD_NAMES) {
+			if (lower === field || lower.includes(field)) return field;
+		}
 		return null;
 	};
 

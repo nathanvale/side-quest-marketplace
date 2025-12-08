@@ -5,7 +5,12 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import type { ConversionResult, ConvertNoteOptions } from "./orchestration";
+import {
+	type ConversionResult,
+	type ConvertNoteOptions,
+	cleanWikilinkValue,
+	flattenToString,
+} from "./orchestration";
 
 describe("ConversionResult interface", () => {
 	test("has correct structure", () => {
@@ -73,6 +78,127 @@ describe("ConvertNoteOptions interface", () => {
 		expect(options.titleOverride).toBe("My Custom Title");
 		expect(options.dest).toBe("01_Projects");
 		expect(options.dryRun).toBe(true);
+	});
+});
+
+describe("flattenToString", () => {
+	test("returns null for null input", () => {
+		expect(flattenToString(null)).toBeNull();
+	});
+
+	test("returns null for undefined input", () => {
+		expect(flattenToString(undefined)).toBeNull();
+	});
+
+	test("returns null for empty array", () => {
+		expect(flattenToString([])).toBeNull();
+	});
+
+	test("returns string as-is", () => {
+		expect(flattenToString("simple")).toBe("simple");
+	});
+
+	test("extracts string from single-level array", () => {
+		expect(flattenToString(["value"])).toBe("value");
+	});
+
+	test("extracts string from nested array (depth 2)", () => {
+		expect(flattenToString([["- Lodge Name"]])).toBe("- Lodge Name");
+	});
+
+	test("extracts string from deeply nested array (depth 3)", () => {
+		expect(flattenToString([[["deep"]]])).toBe("deep");
+	});
+
+	test("extracts string from very deep nested array", () => {
+		expect(flattenToString([[[["very deep"]]]])).toBe("very deep");
+	});
+
+	test("handles number by converting to string", () => {
+		expect(flattenToString(42)).toBe("42");
+	});
+
+	test("handles boolean by converting to string", () => {
+		expect(flattenToString(true)).toBe("true");
+	});
+
+	test("handles nested empty arrays", () => {
+		expect(flattenToString([[]])).toBeNull();
+	});
+
+	test("handles the exact accommodation bug case", () => {
+		expect(flattenToString([["- Accommodation Strahan Village"]])).toBe(
+			"- Accommodation Strahan Village",
+		);
+	});
+});
+
+describe("cleanWikilinkValue", () => {
+	test("returns null for null input", () => {
+		expect(cleanWikilinkValue(null)).toBeNull();
+	});
+
+	test("returns null for empty array", () => {
+		expect(cleanWikilinkValue([])).toBeNull();
+	});
+
+	test("strips wikilink brackets from string", () => {
+		expect(cleanWikilinkValue("[[Home]]")).toBe("Home");
+	});
+
+	test("strips markdown list prefix from string", () => {
+		expect(cleanWikilinkValue("- Some Value")).toBe("Some Value");
+	});
+
+	test("strips asterisk list prefix from string", () => {
+		expect(cleanWikilinkValue("* Some Value")).toBe("Some Value");
+	});
+
+	test("handles nested array with markdown prefix", () => {
+		expect(cleanWikilinkValue([["- Lake St Clair Lodge"]])).toBe(
+			"Lake St Clair Lodge",
+		);
+	});
+
+	test("handles nested array with wikilinks and markdown prefix", () => {
+		expect(cleanWikilinkValue([["- [[Some Project]]"]])).toBe("Some Project");
+	});
+
+	test("handles the exact accommodation bug case", () => {
+		// This is the exact case that was causing issues
+		expect(cleanWikilinkValue([["- Accommodation Strahan Village"]])).toBe(
+			"Accommodation Strahan Village",
+		);
+	});
+
+	test("handles deeply nested arrays", () => {
+		expect(cleanWikilinkValue([[["- Deep Value"]]])).toBe("Deep Value");
+	});
+
+	test("returns null for string 'null'", () => {
+		expect(cleanWikilinkValue("null")).toBeNull();
+	});
+
+	test("returns null for empty string", () => {
+		expect(cleanWikilinkValue("")).toBeNull();
+	});
+
+	test("returns null for whitespace-only string", () => {
+		expect(cleanWikilinkValue("   ")).toBeNull();
+	});
+
+	test("handles wikilink-wrapped null", () => {
+		expect(cleanWikilinkValue("[[null]]")).toBeNull();
+	});
+
+	test("preserves simple values without transformations", () => {
+		expect(cleanWikilinkValue("Lake St Clair Lodge")).toBe(
+			"Lake St Clair Lodge",
+		);
+	});
+
+	test("trims whitespace from extracted values", () => {
+		expect(cleanWikilinkValue("  Some Value  ")).toBe("Some Value");
 	});
 });
 

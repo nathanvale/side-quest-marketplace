@@ -466,7 +466,8 @@ describe("buildExamplesSection", () => {
 
 describe("DEFAULT_CRITICAL_RULES", () => {
 	test("has expected number of rules", () => {
-		expect(DEFAULT_CRITICAL_RULES.length).toBe(14);
+		// Rules 1-12 with sub-items for multi-line rules (10, 11, 12)
+		expect(DEFAULT_CRITICAL_RULES.length).toBe(20);
 	});
 
 	test("includes rule numbers", () => {

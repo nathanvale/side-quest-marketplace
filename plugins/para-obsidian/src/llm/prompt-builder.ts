@@ -69,7 +69,7 @@ export const DEFAULT_CRITICAL_RULES: ReadonlyArray<string> = [
 	'    - Example: area notes must include "area" in tags array',
 	"12. All field values must be valid YAML primitives:",
 	'    - Strings: "value" (single string, NOT arrays unless field type is array)',
-	"    - Null: null (literal null, not \"null\" or [null])",
+	'    - Null: null (literal null, not "null" or [null])',
 	"    - Arrays only for 'tags' and explicit array fields",
 	'    - Example CORRECT: "location": "Cradle Mountain"',
 	'    - Example WRONG: "location": [["- Cradle Mountain"]]',

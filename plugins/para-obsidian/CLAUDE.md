@@ -96,7 +96,7 @@ para-obsidian config                           # Show resolved config
 para-obsidian list [dir]                       # List vault files
 para-obsidian read <file>                      # Read note contents
 para-obsidian search <query> [--dir] [--tag]   # Search with filters
-para-obsidian semantic <query> [--dir]         # Semantic search via Kit
+para-obsidian semantic <query> [--para folders] [--dir] [--limit N]  # Semantic search via Kit
 para-obsidian create --template <type> --title "Name"    # Create blank template
 para-obsidian create --template <type> --source file.md  # AI-powered: extract metadata from source
 para-obsidian create --template <type> --source file.md --preview  # Preview AI suggestions only (75% token savings)

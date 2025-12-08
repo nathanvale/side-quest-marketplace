@@ -1,73 +1,182 @@
 ---
-description: Create any note type dynamically by querying template fields
-argument-hint: <template> [key=value pairs or positional args]
+description: Create PARA notes from templates with optional AI-powered field extraction
+argument-hint: <template> [title or --source file] [key=value args]
 allowed-tools: Bash(para-obsidian:*)
 ---
 
-## Dynamic Note Creation
+# Create PARA Notes
 
-This command discovers template fields at runtime and maps your arguments to them.
+Universal note creation command supporting all templates with two modes:
 
-## Step 1: Discover Template Fields
+1. **Manual mode**: Provide title and args directly
+2. **AI mode**: Extract metadata from existing note with `--source`
 
-First, query the template to see what arguments are needed:
+---
 
-!`bun src/cli.ts template-fields $1 --format json`
+## Usage Patterns
 
-## Step 2: Parse User Arguments
-
-User provided: `$ARGUMENTS`
-
-The arguments after the template name can be:
-- **Named**: `title="My Note" area="[[Work]]"`
-- **Positional**: Values in order of required fields
-
-Map the user's input to the discovered fields from Step 1.
-
-## Step 3: Build and Run Command
-
-Construct the `para-obsidian create` command:
+### Pattern 1: Quick Create (Title + Args)
 
 ```bash
-para-obsidian create --template $1 \
-  --title "<title from args>" \
-  --dest "<appropriate PARA folder>" \
-  --arg "Field1=value1" \
-  --arg "Field2=value2" \
-  --content '{
-    "Section1": "content...",
-    "Section2": "content..."
-  }'
+/para-obsidian:create <template> <title> [key=value...]
 ```
 
-## Available Templates
+Example:
+```bash
+/para-obsidian:create task "Fix shed door" priority=high effort=small area="[[Home]]"
+/para-obsidian:create project "Garden Redesign" target_completion=2025-06-30 area="[[Home]]"
+```
 
-| Template | Default Dest | Key Fields |
-|----------|--------------|------------|
-| `project` | 01 Projects | title, target_date, area |
-| `area` | 02 Areas | title |
-| `resource` | 03 Resources | title, source, areas |
-| `task` | Tasks | title, priority, effort |
-| `capture` | 00 Inbox | title, content, captured_from |
-| `daily` | Daily Notes | date |
-| `checklist` | 00 Inbox | title, checklist_type, project |
-| `booking` | 00 Inbox | title, booking_type, project, date, cost, currency |
-| `itinerary` | 00 Inbox | title, project, trip_date, day_number |
-| `research` | 00 Inbox | title, research_type, project |
+### Pattern 2: AI-Powered Create (Extract from Source)
+
+```bash
+/para-obsidian:create <template> --source <file> [--preview] [--arg key=value...]
+```
+
+Example:
+```bash
+/para-obsidian:create task --source "inbox/rough-notes.md"
+/para-obsidian:create project --source "inbox/ideas.md" --preview
+/para-obsidian:create task --source "inbox/todo.md" --arg "priority=high"
+```
+
+---
+
+## Template Quick Reference
+
+| Template | Required Fields | Common Args |
+|----------|-----------------|-------------|
+| `task` | title | priority, effort, area, project |
+| `project` | title | target_completion, area, status |
+| `area` | title | responsibility |
+| `resource` | title | source, type, areas |
+| `trip` | title, start_date, end_date | area, status |
+| `booking` | title | booking_type, project, date, cost |
+| `capture` | title | content, captured_from, tags |
+
+**Tip**: Run without args to see template-specific field requirements:
+```bash
+bun src/cli.ts template-fields <template> --format json
+```
+
+---
+
+## How to Use
+
+When the user invokes this command, analyze their arguments and construct the appropriate CLI call:
+
+### Parse the arguments provided by the user:
+
+1. **First argument** is always the template name
+2. **Detect mode**:
+   - If second arg is `--source`: AI mode (extract from file)
+   - Otherwise: Manual mode (title + args)
+
+### AI Mode (when --source is present):
+
+```bash
+bun src/cli.ts create \
+  --template <template> \
+  --source <file> \
+  [--preview] \
+  [--arg key=value ...]
+```
+
+- `--preview`: Show suggestions without creating (75% token savings)
+- `--arg`: Override AI suggestions (e.g., `--arg "priority=high"`)
+
+### Manual Mode (title + args):
+
+```bash
+bun src/cli.ts create \
+  --template <template> \
+  --title "<title>" \
+  [--arg key=value ...]
+```
+
+- Parse remaining args as `key=value` pairs
+- Add each as `--arg "key=value"`
+
+---
 
 ## Examples
 
-```
-/para-obsidian:create project title="Cinema Tool" target_date="2025-12-31" area="[[AI Practice]]"
-/para-obsidian:create task "Book Dentist" priority=medium effort=small area="[[Health]]"
+### Manual Mode
+
+```bash
+# Task with priority and effort
+/para-obsidian:create task "Book dentist appointment" priority=high effort=small area="[[Health]]"
+
+# Project with completion date
+/para-obsidian:create project "Kitchen Renovation" target_completion=2025-08-15 area="[[Home]]" status=planning
+
+# Trip with dates
+/para-obsidian:create trip "Tassie 2026" start_date=2026-01-05 end_date=2026-01-15 area="[[Travel]]"
+
+# Daily note (no args needed)
 /para-obsidian:create daily
-/para-obsidian:create capture title="Quick idea" content="..." captured_from=thought
 ```
 
-**Note on Wikilinks:** Area and project wikilinks are automatically quoted in YAML frontmatter for Dataview compatibility (e.g., `area: "[[AI Practice]]"`)
+### AI Mode
+
+```bash
+# Preview AI suggestions without creating
+/para-obsidian:create task --source "inbox/rough-notes.md" --preview
+
+# Create task from rough notes
+/para-obsidian:create task --source "inbox/brainstorm.md"
+
+# Override AI suggestions
+/para-obsidian:create project --source "inbox/idea.md" --arg "area=[[Work]]" --arg "status=active"
+
+# Extract trip from email
+/para-obsidian:create trip --source "inbox/holiday-plans.md"
+```
+
+---
+
+## Field Discovery
+
+To see exactly what fields a template needs:
+
+```bash
+bun src/cli.ts template-fields <template> --format json
+```
+
+Returns:
+```json
+{
+  "template": "task",
+  "version": 1,
+  "fields": {
+    "required": ["Task title", "Priority", "Effort estimate"],
+    "auto": ["created"],
+    "body": []
+  }
+}
+```
+
+**Important**: Field names must match Templater prompt text exactly (case-sensitive).
+
+---
+
+## Default Destinations
+
+Notes are placed in PARA folders automatically unless `--dest` specified:
+
+| Template | Default Folder |
+|----------|----------------|
+| project, trip | `01 Projects` |
+| area | `02 Areas` |
+| resource | `03 Resources` |
+| task | `Tasks` |
+| booking, checklist, itinerary, research, capture, daily | `00 Inbox` |
+
+---
 
 ## Notes
 
-- Use `para-obsidian template-fields <template> --format json` to see exact field names
-- Field names must match Templater prompt text exactly (case-sensitive)
-- For simpler usage, prefer the static `/para-obsidian:create-<type>` commands
+- **Wikilinks**: Area/project wikilinks are automatically quoted for Dataview compatibility
+- **AI models**: Default is `sonnet`, override with `--model haiku` or `--model qwen2.5:14b`
+- **Token savings**: Use `--preview` to see suggestions without creating (75% token reduction)
+- **Overrides**: `--arg` flags override AI suggestions in AI mode
