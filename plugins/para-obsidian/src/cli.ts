@@ -1481,7 +1481,9 @@ async function main(): Promise<void> {
 						if (!result.wouldChange) {
 							console.log(emphasize.info(`${result.relative} unchanged`));
 						} else {
-							const verb = dryRun ? "Would update" : "Updated";
+							// Use result.updated to accurately reflect if write happened
+							// (validation failures return preview with updated: false)
+							const verb = result.updated ? "Updated" : "Would update";
 							console.log(
 								emphasize.success(
 									`${verb} ${result.relative} (${result.changes.length} change(s))`,
