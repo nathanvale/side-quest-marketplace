@@ -789,6 +789,103 @@ project: "[[<% tp.system.prompt("Project (optional)", "") %>]]"
 		expect(written).toContain('project: "[[My Project]]"');
 		expect(written).not.toContain("[[[[");
 	});
+
+	it("replaces null placeholder in frontmatter with arg value", () => {
+		const vault = makeTmpDir();
+		const templatesDir = path.join(vault, "Templates");
+		writeTemplate(
+			templatesDir,
+			"trip",
+			`---
+title: "null"
+status: null
+start_date: null
+area: "[[null]]"
+---
+# null
+
+Body content`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		const result = createFromTemplate(makeConfig(vault, templatesDir), {
+			template: "trip",
+			title: "My Trip",
+			args: {
+				status: "active",
+				start_date: "2025-12-26",
+				area: "[[Travel]]",
+			},
+		});
+
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+		// Title may or may not be quoted depending on YAML serialization
+		expect(written).toMatch(/title: "?My Trip"?/);
+		expect(written).toContain("status: active");
+		expect(written).toContain("start_date: 2025-12-26");
+		expect(written).toContain('area: "[[Travel]]"');
+		expect(written).toContain("# My Trip");
+		expect(written).not.toMatch(/: null\b/);
+		expect(written).not.toContain("[[null]]");
+	});
+
+	it("replaces YAML null (unquoted) placeholder in frontmatter", () => {
+		const vault = makeTmpDir();
+		const templatesDir = path.join(vault, "Templates");
+		writeTemplate(
+			templatesDir,
+			"test",
+			`---
+title: null
+target_completion: null
+---
+Body`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		const result = createFromTemplate(makeConfig(vault, templatesDir), {
+			template: "test",
+			title: "Test Note",
+			args: {
+				target_completion: "2026-01-01",
+			},
+		});
+
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+		// Title may or may not be quoted depending on YAML serialization
+		expect(written).toMatch(/title: "?Test Note"?/);
+		expect(written).toContain("target_completion: 2026-01-01");
+	});
+
+	it("does not replace non-null frontmatter values with args", () => {
+		const vault = makeTmpDir();
+		const templatesDir = path.join(vault, "Templates");
+		writeTemplate(
+			templatesDir,
+			"test",
+			`---
+title: "null"
+status: planning
+priority: high
+---
+Body`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		const result = createFromTemplate(makeConfig(vault, templatesDir), {
+			template: "test",
+			title: "Test Note",
+			args: {
+				status: "active",
+				priority: "low",
+			},
+		});
+
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+		// status and priority should NOT be replaced since they weren't null
+		expect(written).toContain("status: planning");
+		expect(written).toContain("priority: high");
+	});
 });
 
 describe("injectSections", () => {

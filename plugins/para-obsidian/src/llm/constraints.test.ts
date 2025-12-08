@@ -457,7 +457,7 @@ describe("formatVaultContext", () => {
 		const formatted = formatVaultContext(constraints.vaultContext);
 
 		expect(formatted).toContain(
-			"CRITICAL: Wikilinks MUST be quoted: area: \"[[Home]]\" (valid YAML, Dataview-compatible)",
+			'CRITICAL: Wikilinks MUST be quoted: area: "[[Home]]" (valid YAML, Dataview-compatible)',
 		);
 	});
 

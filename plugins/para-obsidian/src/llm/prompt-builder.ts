@@ -67,6 +67,12 @@ export const DEFAULT_CRITICAL_RULES: ReadonlyArray<string> = [
 	'    - WRONG: "area": "[[null]]" or "area": "null"',
 	'11. Tags MUST include required values from validation rules (check "includes" field)',
 	'    - Example: area notes must include "area" in tags array',
+	"12. All field values must be valid YAML primitives:",
+	'    - Strings: "value" (single string, NOT arrays unless field type is array)',
+	"    - Null: null (literal null, not \"null\" or [null])",
+	"    - Arrays only for 'tags' and explicit array fields",
+	'    - Example CORRECT: "location": "Cradle Mountain"',
+	'    - Example WRONG: "location": [["- Cradle Mountain"]]',
 ];
 
 /**
@@ -204,6 +210,9 @@ function formatFieldConstraints(
 			} else if (f.type === "wikilink") {
 				line +=
 					" - wikilink format [[Name]], or null if not applicable (use literal null, not a string)";
+				line += "\n  → Output as SINGLE STRING VALUE, not an array";
+				line += '\n  → Example: "accommodation": "Booking - Lodge"';
+				line += '\n  → WRONG: "accommodation": [["- Lodge"]]';
 			} else if (f.type === "array") {
 				line += " - array of strings";
 				if (f.arrayIncludes && f.arrayIncludes.length > 0) {

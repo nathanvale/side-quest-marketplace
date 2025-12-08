@@ -38,8 +38,8 @@ export {
 	DEFAULT_CRITICAL_RULES,
 } from "./llm/prompt-builder";
 
-/** Default LLM model for extraction tasks (uses Claude Sonnet via headless CLI) */
-export const DEFAULT_LLM_MODEL = "sonnet";
+/** Default LLM model for extraction tasks (uses Claude Haiku via headless CLI) */
+export const DEFAULT_LLM_MODEL = "haiku";
 
 /** Default Ollama API URL */
 export const DEFAULT_OLLAMA_URL = "http://localhost:11434";

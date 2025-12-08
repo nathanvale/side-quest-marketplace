@@ -99,6 +99,77 @@ function stripWikilinks(value: string): string {
 }
 
 /**
+ * Checks if a value represents null in frontmatter.
+ *
+ * Handles various null representations:
+ * - YAML null: `null`
+ * - Quoted null: `"null"`
+ * - Wikilink with null: `"[[null]]"` (quoted string in YAML)
+ * - Array with null: `[[null]]` (parsed as nested arrays)
+ *
+ * @param value - The value to check
+ * @returns True if the value represents null
+ */
+function isNullPlaceholder(value: unknown): boolean {
+	if (value === null) return true;
+	if (value === "null") return true;
+	// Handle quoted wikilink case like "[[null]]" which stays as string
+	if (typeof value === "string" && value === "[[null]]") return true;
+	// Handle array case like [[null]] which parses as [["null"]] or [null]
+	if (Array.isArray(value)) {
+		if (value.length === 1) {
+			const inner = value[0];
+			if (inner === null || inner === "null") return true;
+			if (Array.isArray(inner) && inner.length === 1) {
+				return inner[0] === null || inner[0] === "null";
+			}
+		}
+	}
+	return false;
+}
+
+/**
+ * Applies args directly to frontmatter fields with null placeholders.
+ *
+ * This handles templates that use `null` or `"null"` as placeholder values
+ * instead of Templater prompts. For each arg key that matches a frontmatter
+ * field name, if the field's value is null, it's replaced with the arg value.
+ *
+ * **Wikilink handling**: If an arg value contains wikilinks (e.g., `[[Travel]]`),
+ * it's wrapped in quotes for valid YAML.
+ *
+ * @param attributes - Parsed frontmatter attributes object
+ * @param args - Key-value pairs to apply
+ * @returns Updated attributes with null placeholders replaced
+ *
+ * @example
+ * ```typescript
+ * const attrs = { title: "null", status: null, area: [["null"]] };
+ * const result = applyArgsToFrontmatter(attrs, {
+ *   title: "My Trip",
+ *   status: "active",
+ *   area: "[[Travel]]"
+ * });
+ * // { title: "My Trip", status: "active", area: "[[Travel]]" }
+ * ```
+ */
+export function applyArgsToFrontmatter(
+	attributes: Record<string, unknown>,
+	args: Record<string, string>,
+): Record<string, unknown> {
+	const result = { ...attributes };
+
+	for (const [key, value] of Object.entries(args)) {
+		// Only replace if the field exists and is a null placeholder
+		if (key in result && isNullPlaceholder(result[key])) {
+			result[key] = value;
+		}
+	}
+
+	return result;
+}
+
+/**
  * Substitutes Templater-style prompt placeholders with provided values.
  *
  * Replaces both single-argument and two-argument Templater prompts:
@@ -240,7 +311,21 @@ export function createFromTemplate(
 	const argsWithTitle = { [titleKey]: options.title, ...options.args };
 	filled = applyArgsToTemplate(filled, argsWithTitle);
 
-	const { attributes, body } = parseFrontmatter(filled);
+	const { attributes: rawAttributes, body: rawBody } = parseFrontmatter(filled);
+
+	// Apply args to frontmatter fields with null placeholders
+	// This handles templates that use null instead of Templater prompts
+	const argsForFrontmatter = { title: options.title, ...options.args };
+	const attributes = applyArgsToFrontmatter(
+		rawAttributes,
+		argsForFrontmatter,
+	) as Record<string, unknown>;
+
+	// Also replace null in the H1 title if present (# null → # My Title)
+	let body = rawBody;
+	if (body.match(/^#\s+null\s*$/m)) {
+		body = body.replace(/^#\s+null\s*$/m, `# ${options.title}`);
+	}
 
 	// Inject template_version if not present and configured
 	if (
@@ -251,7 +336,7 @@ export function createFromTemplate(
 	}
 
 	// Inject title if not provided by args/template substitution
-	if (!attributes.title) {
+	if (!attributes.title || attributes.title === "null") {
 		attributes.title = options.title;
 	}
 	const content = serializeFrontmatter(attributes, body);
