@@ -382,6 +382,7 @@ async function handleCreateFromSource(options: {
 
 		// Clean up empty wikilinks - only set null for fields without extracted values
 		// Template creates "[[value]]" format; only override with null if LLM returned null/undefined
+		// ALSO apply argOverrides to ensure they take precedence over LLM extraction
 		const frontmatterCleanup: Record<string, unknown> = {};
 		const wikilinkFields = ["project", "area"];
 		for (const field of wikilinkFields) {
@@ -392,6 +393,19 @@ async function handleCreateFromSource(options: {
 				frontmatterCleanup[field] = null;
 			}
 		}
+
+		// Apply argOverrides to frontmatter (ensures overrides win regardless of key casing)
+		if (argOverrides && Object.keys(argOverrides).length > 0) {
+			for (const [key, value] of Object.entries(argOverrides)) {
+				// Strip wikilink brackets if present (frontmatter should store unwrapped values)
+				const normalizedValue =
+					value.startsWith("[[") && value.endsWith("]]")
+						? value.slice(2, -2)
+						: value;
+				frontmatterCleanup[key] = normalizedValue;
+			}
+		}
+
 		if (Object.keys(frontmatterCleanup).length > 0) {
 			updateFrontmatterFile(config, result.filePath, {
 				set: frontmatterCleanup,
