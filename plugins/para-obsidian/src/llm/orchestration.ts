@@ -11,6 +11,11 @@
  * @module llm/orchestration
  */
 
+import {
+	callModel,
+	type LLMModel,
+	parseOllamaResponse,
+} from "@sidequest/core/llm";
 import type { ParaObsidianConfig } from "../config";
 import { createFromTemplate, replaceH1Title, replaceSections } from "../create";
 import {
@@ -22,11 +27,6 @@ import {
 import { readFile } from "../fs";
 import { autoCommitChanges } from "../git";
 import { listAreas, listProjects, listTags } from "../indexer";
-import {
-	callModel,
-	type LLMModel,
-	parseOllamaResponse,
-} from "@sidequest/core/llm";
 import { DEFAULT_LLM_MODEL, type ExtractionResult } from "../llm";
 import {
 	getTemplate,
