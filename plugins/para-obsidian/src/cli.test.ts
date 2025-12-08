@@ -362,3 +362,106 @@ type: project
 		expect(result.sectionsSkipped[0].reason).toBe("Empty content");
 	});
 });
+
+describe("cli frontmatter set", () => {
+	it("shows 'Would update' when validation fails", async () => {
+		const vault = makeTmpDir();
+		const templatesDir = path.join(vault, "Templates");
+		writeTemplate(
+			templatesDir,
+			"project",
+			`---
+title: "<% tp.system.prompt("Title") %>"
+type: project
+---`,
+		);
+
+		// Create a project file with valid frontmatter
+		const projectPath = path.join(vault, "01 Projects", "Test Project.md");
+		fs.mkdirSync(path.dirname(projectPath), { recursive: true });
+		fs.writeFileSync(
+			projectPath,
+			`---
+title: Test Project
+created: 2025-01-01
+type: project
+status: active
+start_date: 2025-01-01
+target_completion: 2025-12-31
+area: "[[Work]]"
+template_version: 3
+tags: [project]
+---
+# Test Project
+`,
+			"utf8",
+		);
+		commitAll(vault);
+
+		// Try to set an invalid status value - this should fail validation
+		const { stdout, exitCode } = await runCli(
+			["frontmatter", "set", "01 Projects/Test Project.md", "status=invalid_status_value"],
+			{ PARA_VAULT: vault },
+		);
+
+		// Validation should fail (exit code 1) but output should say "Would update" not "Updated"
+		expect(exitCode).toBe(1);
+		expect(stdout).toContain("Would update");
+		expect(stdout).not.toContain("Updated 01");
+
+		// Verify the file was NOT changed (original status should still be "active")
+		const fileContent = fs.readFileSync(projectPath, "utf8");
+		expect(fileContent).toContain("status: active");
+		expect(fileContent).not.toContain("status: invalid_status_value");
+	});
+
+	it("shows 'Updated' when set succeeds", async () => {
+		const vault = makeTmpDir();
+		const templatesDir = path.join(vault, "Templates");
+		writeTemplate(
+			templatesDir,
+			"project",
+			`---
+title: "<% tp.system.prompt("Title") %>"
+type: project
+---`,
+		);
+
+		// Create a project file with valid frontmatter
+		const projectPath = path.join(vault, "01 Projects", "Test Project.md");
+		fs.mkdirSync(path.dirname(projectPath), { recursive: true });
+		fs.writeFileSync(
+			projectPath,
+			`---
+title: Test Project
+created: 2025-01-01
+type: project
+status: active
+start_date: 2025-01-01
+target_completion: 2025-12-31
+area: "[[Work]]"
+template_version: 3
+tags: [project]
+---
+# Test Project
+`,
+			"utf8",
+		);
+		commitAll(vault);
+
+		// Set a valid status value - this should succeed
+		const { stdout, exitCode } = await runCli(
+			["frontmatter", "set", "01 Projects/Test Project.md", "status=completed"],
+			{ PARA_VAULT: vault },
+		);
+
+		// Validation should pass and file should be updated
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("Updated");
+
+		// Verify the file WAS changed
+		const fileContent = fs.readFileSync(projectPath, "utf8");
+		expect(fileContent).toContain("status: completed");
+		expect(fileContent).not.toContain("status: active");
+	});
+});
