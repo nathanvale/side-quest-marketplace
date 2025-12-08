@@ -2,7 +2,8 @@
  * Kit installation and ML dependency checking utilities.
  *
  * This module provides helpers to check if Kit is installed and if ML
- * dependencies are available, with automatic installation prompts.
+ * dependencies are available. Returns detailed error messages with
+ * installation instructions when dependencies are missing.
  *
  * @module kit-check
  */
@@ -42,7 +43,7 @@ export async function checkKit(): Promise<KitCheckResult> {
 		return {
 			installed: false,
 			hasML: false,
-			error: "Kit CLI not found. Install with: uv tool install cased-kit",
+			error: "Kit CLI not found",
 		};
 	}
 
@@ -72,89 +73,89 @@ export async function checkKit(): Promise<KitCheckResult> {
 }
 
 /**
- * Installs Kit with ML dependencies using uv tool install.
+ * Generates a detailed error message for missing Kit ML dependencies.
  *
- * This will upgrade an existing Kit installation to include ML capabilities.
+ * Provides step-by-step installation instructions including the known
+ * Python 3.12+ compatibility issue that frequently causes problems.
  *
- * @returns True if installation succeeded, false otherwise
+ * @param check - The result from checkKit()
+ * @returns Formatted error message with installation instructions
  */
-export async function installKitML(): Promise<boolean> {
-	const { exitCode, stderr } = await spawnAndCollect(
-		["uv", "tool", "install", "cased-kit[ml]", "--upgrade"],
-		{ env: { ...process.env } },
+export function getKitMLErrorMessage(check: KitCheckResult): string {
+	const lines: string[] = [];
+
+	// Header
+	lines.push("ERROR: Semantic search unavailable");
+	lines.push("");
+
+	// Specific issue
+	if (!check.installed) {
+		lines.push("Kit CLI is not installed.");
+	} else if (!check.hasML) {
+		lines.push("Kit is installed but missing ML dependencies.");
+		if (check.version) {
+			lines.push(`Current version: ${check.version}`);
+		}
+	}
+
+	lines.push("");
+
+	// Installation box
+	lines.push(
+		"┌─ INSTALLATION ─────────────────────────────────────────────────┐",
+	);
+	lines.push(
+		"│                                                                │",
+	);
+	lines.push(
+		"│  1. Ensure Python 3.11 is installed (NOT 3.12+):              │",
+	);
+	lines.push(
+		"│     python3 --version                                          │",
+	);
+	lines.push(
+		"│                                                                │",
+	);
+	lines.push(
+		"│     ⚠️  Kit ML has compatibility issues with Python 3.12+.      │",
+	);
+	lines.push(
+		"│     Use pyenv to install 3.11:                                 │",
+	);
+	lines.push(
+		"│       pyenv install 3.11.9 && pyenv global 3.11.9              │",
+	);
+	lines.push(
+		"│                                                                │",
+	);
+	lines.push(
+		"│  2. Install Kit with ML dependencies:                         │",
+	);
+	lines.push(
+		"│     uv tool install 'cased-kit[ml]'                            │",
+	);
+	lines.push(
+		"│                                                                │",
+	);
+	lines.push(
+		"│  3. Verify installation:                                       │",
+	);
+	lines.push(
+		"│     kit --version                                              │",
+	);
+	lines.push(
+		"│     kit semantic --help                                        │",
+	);
+	lines.push(
+		"│                                                                │",
+	);
+	lines.push(
+		"└────────────────────────────────────────────────────────────────┘",
 	);
 
-	if (exitCode !== 0) {
-		console.error(`Failed to install Kit ML dependencies: ${stderr.trim()}`);
-		return false;
-	}
+	lines.push("");
+	lines.push("For text-based search (no ML required), use:");
+	lines.push('  para-obsidian search "your query" [--dir folder]');
 
-	return true;
-}
-
-/**
- * Ensures Kit with ML dependencies is installed, prompting if needed.
- *
- * Checks installation status and offers to install if missing.
- * In non-interactive mode, throws an error with installation instructions.
- *
- * @param interactive - Whether to prompt for installation (default: true)
- * @returns True if Kit ML is available, false if user declined
- * @throws Error if not installed and non-interactive
- */
-export async function ensureKitML(interactive = true): Promise<boolean> {
-	const check = await checkKit();
-
-	if (check.hasML) {
-		return true;
-	}
-
-	if (!check.installed) {
-		const message =
-			"Kit CLI is not installed. Install with: uv tool install cased-kit[ml]";
-		if (!interactive) {
-			throw new Error(message);
-		}
-		console.error(message);
-		return false;
-	}
-
-	// Kit is installed but missing ML dependencies
-	const message = `Kit is installed but missing ML dependencies.
-
-To enable semantic search, install ML dependencies:
-  uv tool install cased-kit[ml] --upgrade`;
-
-	if (!interactive) {
-		throw new Error(message);
-	}
-
-	// In interactive mode, offer to install
-	console.log(message);
-	console.log("");
-	console.log("Install now? (y/n)");
-
-	// Read from stdin
-	const stdin = Bun.stdin.stream();
-	const reader = stdin.getReader();
-	const { value } = await reader.read();
-	reader.releaseLock();
-
-	const response = value
-		? new TextDecoder().decode(value).trim().toLowerCase()
-		: "n";
-
-	if (response === "y" || response === "yes") {
-		console.log("Installing Kit ML dependencies...");
-		const success = await installKitML();
-		if (success) {
-			console.log("✓ Kit ML dependencies installed successfully");
-			return true;
-		}
-		console.error("✗ Installation failed");
-		return false;
-	}
-
-	console.log("Skipping installation");
-	return false;
+	return lines.join("\n");
 }

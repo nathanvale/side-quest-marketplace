@@ -314,3 +314,31 @@ export const DEFAULT_AVAILABLE_MODELS = [
  * Claude Sonnet provides the best balance of quality and speed.
  */
 export const DEFAULT_MODEL = "sonnet";
+
+/**
+ * Default PARA folder mappings for semantic search shortcuts.
+ * Maps short names to actual vault folder names.
+ *
+ * Usage:
+ *   para-obsidian semantic "query" --para projects
+ *   para-obsidian semantic "query" --para projects,areas
+ */
+export const DEFAULT_PARA_FOLDERS: Record<string, string> = {
+	inbox: "00 Inbox",
+	projects: "01 Projects",
+	areas: "02 Areas",
+	resources: "03 Resources",
+	archives: "04 Archives",
+};
+
+/**
+ * Default PARA folders to search when --para flag is not specified.
+ * Includes all PARA folders: inbox, projects, areas, resources, archives.
+ */
+export const DEFAULT_PARA_SEARCH_FOLDERS = [
+	"inbox",
+	"projects",
+	"areas",
+	"resources",
+	"archives",
+] as const;

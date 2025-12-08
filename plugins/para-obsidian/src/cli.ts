@@ -116,7 +116,7 @@ function printUsage(): void {
 		'  bun run src/cli.ts insert <file> --heading "<Heading>" --content "<Content>" [--before|--after|--append|--prepend] [--attachments paths] [--format md|json]',
 		"  bun run src/cli.ts rename <from> <to> [--dry-run] [--attachments paths] [--format md|json]",
 		"  bun run src/cli.ts delete <file> --confirm [--dry-run] [--attachments paths] [--format md|json]",
-		"  bun run src/cli.ts semantic <query> [--dir path[,path2]] [--limit N] [--format md|json]",
+		"  bun run src/cli.ts semantic <query> [--para folder[,folder2]] [--dir path] [--limit N] [--format md|json]",
 		"  bun run src/cli.ts frontmatter get <file> [--format md|json]",
 		"  bun run src/cli.ts frontmatter validate <file> [--format md|json]",
 		"  bun run src/cli.ts frontmatter set <file> key=value [...] [--unset key1,key2] [--dry-run] [--attachments paths] [--format md|json]",
@@ -133,10 +133,12 @@ function printUsage(): void {
 		"  --dry-run         Preview changes without writing",
 		"  --confirm         Required for delete",
 		"  --attachments     Comma-separated vault-relative files to include in auto-commit",
+		"  --para            PARA folder shortcuts: inbox,projects,areas,resources,archives (default: all)",
 		"",
 		"Examples:",
 		"  bun run src/cli.ts config --format json",
 		"  bun run src/cli.ts list 01_Projects",
+		'  bun run src/cli.ts semantic "trip planning" --para projects,resources',
 		'  bun run src/cli.ts create --template project --title "New Project" --area "[[Health]]" --target_completion 2025-12-31',
 		'  bun run src/cli.ts create --template task --source "inbox/rough-notes.md" --preview',
 		'  bun run src/cli.ts create --template task --source "inbox/rough-notes.md" --model qwen:7b --arg "priority=high"',
@@ -380,18 +382,19 @@ async function handleCreateFromSource(options: {
 			args: nonNullArgs,
 		});
 
-		// Clean up empty wikilinks - only set null for fields without extracted values
-		// Template creates "[[value]]" format; only override with null if LLM returned null/undefined
+		// Clean up wikilink fields - ALWAYS set the extracted value to override template output
+		// Template creates "[[value]]" format; we need to ensure clean string values
 		// ALSO apply argOverrides to ensure they take precedence over LLM extraction
+		// Must include all wikilink fields that may appear in templates
 		const frontmatterCleanup: Record<string, unknown> = {};
-		const wikilinkFields = ["project", "area"];
+		const wikilinkFields = ["project", "area", "accommodation", "decision"];
 		for (const field of wikilinkFields) {
 			const extractedValue = Object.entries(extracted.args).find(([key]) =>
 				key.toLowerCase().includes(field),
 			)?.[1];
-			if (extractedValue === null || extractedValue === undefined) {
-				frontmatterCleanup[field] = null;
-			}
+			// ALWAYS set wikilink fields - either to extracted value or null
+			// This ensures clean string values override any malformed template output
+			frontmatterCleanup[field] = extractedValue ?? null;
 		}
 
 		// Apply argOverrides to frontmatter (ensures overrides win regardless of key casing)
@@ -1037,34 +1040,37 @@ async function main(): Promise<void> {
 					console.error("semantic requires <query>");
 					process.exit(1);
 				}
-				const dir = parseDirs(
-					normalizeFlagValue(flags.dir),
-					config.defaultSearchDirs,
-				);
+				// Parse --dir (explicit directory) or --para (PARA shortcuts)
+				const dir = parseDirs(normalizeFlagValue(flags.dir), undefined);
+				const para = typeof flags.para === "string" ? flags.para : undefined;
 				const limit =
 					typeof flags.limit === "string"
 						? Number.parseInt(flags.limit, 10)
 						: undefined;
 				try {
-					// Interactive mode for CLI - will prompt to install Kit ML if needed
-					const hits = await semanticSearch(
-						config,
-						{ query, dir, limit },
-						true, // interactive
-					);
+					const hits = await semanticSearch(config, {
+						query,
+						dir,
+						para,
+						limit,
+					});
 					if (isJson) {
 						console.log(JSON.stringify({ query, hits }, null, 2));
 					} else {
-						for (const hit of hits) {
-							const line = hit.line ? `:${hit.line}` : "";
-							const score = hit.score.toFixed(3);
-							const dirLabel =
-								hit.dir && hit.dir !== "." ? `[${hit.dir}] ` : "";
-							console.log(
-								emphasize.info(
-									`${dirLabel}${hit.file}${line} (${score}) ${hit.snippet ?? ""}`.trim(),
-								),
-							);
+						if (hits.length === 0) {
+							console.log(emphasize.warn("No results found."));
+						} else {
+							for (const hit of hits) {
+								const line = hit.line ? `:${hit.line}` : "";
+								const score = hit.score.toFixed(3);
+								const dirLabel =
+									hit.dir && hit.dir !== "." ? `[${hit.dir}] ` : "";
+								console.log(
+									emphasize.info(
+										`${dirLabel}${hit.file}${line} (${score}) ${hit.snippet ?? ""}`.trim(),
+									),
+								);
+							}
 						}
 					}
 				} catch (error) {

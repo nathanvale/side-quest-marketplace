@@ -1063,12 +1063,7 @@ Falls back to text search if ML dependencies unavailable.`,
 		try {
 			const config = loadConfig();
 			const dirs = parseDirs(dir);
-			// Non-interactive mode for MCP - will provide clear error message if Kit ML not installed
-			const hits = await semanticSearch(
-				config,
-				{ query, dir: dirs, limit },
-				false, // non-interactive
-			);
+			const hits = await semanticSearch(config, { query, dir: dirs, limit });
 			const format = parseResponseFormat(response_format);
 
 			log({

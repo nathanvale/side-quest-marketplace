@@ -18,6 +18,8 @@ import {
 	DEFAULT_DESTINATIONS,
 	DEFAULT_FRONTMATTER_RULES,
 	DEFAULT_MODEL,
+	DEFAULT_PARA_FOLDERS,
+	DEFAULT_PARA_SEARCH_FOLDERS,
 	DEFAULT_SUGGESTED_TAGS,
 	DEFAULT_TEMPLATE_VERSIONS,
 } from "./defaults";
@@ -84,6 +86,10 @@ export interface ParaObsidianConfig {
 	readonly availableModels?: ReadonlyArray<string>;
 	/** Default LLM model to use. */
 	readonly defaultModel?: string;
+	/** PARA folder mappings (e.g., "projects" → "01 Projects"). */
+	readonly paraFolders?: Record<string, string>;
+	/** Default PARA folders to search when --para flag omitted. */
+	readonly defaultParaSearchFolders?: ReadonlyArray<string>;
 }
 
 /**
@@ -216,6 +222,10 @@ export function loadConfig(
 		defaultDestinations: merged.defaultDestinations ?? DEFAULT_DESTINATIONS,
 		availableModels: merged.availableModels ?? [...DEFAULT_AVAILABLE_MODELS],
 		defaultModel: merged.defaultModel ?? DEFAULT_MODEL,
+		paraFolders: merged.paraFolders ?? DEFAULT_PARA_FOLDERS,
+		defaultParaSearchFolders: merged.defaultParaSearchFolders ?? [
+			...DEFAULT_PARA_SEARCH_FOLDERS,
+		],
 	};
 }
 
