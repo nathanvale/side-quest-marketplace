@@ -19,6 +19,9 @@ import {
 import type { ParaObsidianConfig } from "../config";
 import { createFromTemplate, replaceH1Title, replaceSections } from "../create";
 import {
+	DEFAULT_TITLE_PREFIXES,
+} from "../defaults";
+import {
 	readFrontmatterFile,
 	updateFrontmatterFile,
 	type ValidationIssue,
@@ -62,6 +65,46 @@ export function flattenToString(value: unknown): string | null {
 	}
 	// For other types (number, boolean), convert to string
 	return String(value);
+}
+
+/**
+ * Apply template-specific title prefix if configured, avoiding duplication.
+ *
+ * @param title - The base title to potentially prefix
+ * @param template - Template name to look up prefix for
+ * @param config - Para-obsidian configuration
+ * @returns Title with prefix applied if needed, or original title
+ *
+ * @example
+ * applyTitlePrefix("Christmas Day Hotels", "research", config)
+ * // "Research - Christmas Day Hotels"
+ *
+ * applyTitlePrefix("Research - Hotels", "research", config)
+ * // "Research - Hotels" (not duplicated)
+ *
+ * applyTitlePrefix("My Task", "task", config)
+ * // "My Task" (no prefix for tasks)
+ */
+export function applyTitlePrefix(
+	title: string,
+	template: string,
+	config: ParaObsidianConfig,
+): string {
+	// Get prefix from config or defaults
+	const prefix = config.titlePrefixes?.[template] ?? DEFAULT_TITLE_PREFIXES[template];
+
+	if (!prefix) return title; // No prefix configured for this template
+
+	// Check if title already starts with the prefix (case-insensitive)
+	const titleLower = title.toLowerCase();
+	const prefixLower = prefix.toLowerCase();
+
+	if (titleLower.startsWith(prefixLower)) {
+		return title; // Already has prefix, don't duplicate
+	}
+
+	// Apply prefix with space
+	return `${prefix} ${title}`;
 }
 
 /**
@@ -360,11 +403,14 @@ export async function convertNoteToTemplate(
 	const isValidTitle = (t: unknown): t is string =>
 		typeof t === "string" && t !== "" && t !== "null" && t !== "Untitled";
 
-	const resolvedTitle =
+	const baseTitle =
 		options.titleOverride ??
 		(isValidTitle(extracted.title) ? extracted.title : null) ??
 		(isValidTitle(extracted.args.title) ? extracted.args.title : null) ??
 		extracted.title;
+
+	// Apply template-specific prefix (e.g., "Research -", "Booking -")
+	const resolvedTitle = applyTitlePrefix(baseTitle, options.template, config);
 
 	// Filter out null values before passing to template substitution
 	// (null values would otherwise be coerced to "null" strings)
@@ -632,6 +678,9 @@ export async function extractMetadata(
 	if (extracted.title === "null" || extracted.title === "") {
 		extracted.title = "Untitled";
 	}
+
+	// 6d. Apply template-specific prefix to title
+	extracted.title = applyTitlePrefix(extracted.title, options.template, config);
 
 	// 7. Apply arg overrides if provided
 	if (options.argOverrides) {

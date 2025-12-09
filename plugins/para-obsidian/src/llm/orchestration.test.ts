@@ -5,10 +5,12 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import type { ParaObsidianConfig } from "../config";
 import {
+	applyTitlePrefix,
+	cleanWikilinkValue,
 	type ConversionResult,
 	type ConvertNoteOptions,
-	cleanWikilinkValue,
 	type ExtractMetadataOptions,
 	flattenToString,
 	getWikilinkFieldsFromRules,
@@ -350,6 +352,88 @@ describe("getWikilinkFieldsFromRules", () => {
 		expect(result).toContain("project");
 		expect(result).toContain("decision");
 		expect(result).toHaveLength(2);
+	});
+});
+
+describe("applyTitlePrefix", () => {
+	const mockConfig: ParaObsidianConfig = {
+		vault: "/vault",
+		titlePrefixes: {
+			research: "Research -",
+			booking: "Booking -",
+		},
+	};
+
+	test("applies prefix to title without prefix", () => {
+		const result = applyTitlePrefix(
+			"Christmas Day Hotels",
+			"research",
+			mockConfig,
+		);
+		expect(result).toBe("Research - Christmas Day Hotels");
+	});
+
+	test("does not duplicate existing prefix (exact case)", () => {
+		const result = applyTitlePrefix(
+			"Research - Christmas Day Hotels",
+			"research",
+			mockConfig,
+		);
+		expect(result).toBe("Research - Christmas Day Hotels");
+	});
+
+	test("does not duplicate existing prefix (case-insensitive)", () => {
+		const result = applyTitlePrefix(
+			"research - Christmas Day Hotels",
+			"research",
+			mockConfig,
+		);
+		expect(result).toBe("research - Christmas Day Hotels");
+	});
+
+	test("does not duplicate existing prefix (mixed case)", () => {
+		const result = applyTitlePrefix(
+			"RESEARCH - Hotels",
+			"research",
+			mockConfig,
+		);
+		expect(result).toBe("RESEARCH - Hotels");
+	});
+
+	test("returns title unchanged when no prefix configured", () => {
+		const result = applyTitlePrefix("My Task", "task", mockConfig);
+		expect(result).toBe("My Task");
+	});
+
+	test("applies booking prefix correctly", () => {
+		const result = applyTitlePrefix(
+			"Melbourne Sisters Hotel",
+			"booking",
+			mockConfig,
+		);
+		expect(result).toBe("Booking - Melbourne Sisters Hotel");
+	});
+
+	test("uses default prefix when not in config", () => {
+		const configWithoutPrefixes: ParaObsidianConfig = {
+			vault: "/vault",
+		};
+		const result = applyTitlePrefix(
+			"Tasmania Trip",
+			"trip",
+			configWithoutPrefixes,
+		);
+		expect(result).toBe("Trip - Tasmania Trip");
+	});
+
+	test("does not add prefix to project (no default)", () => {
+		const result = applyTitlePrefix("My Project", "project", mockConfig);
+		expect(result).toBe("My Project");
+	});
+
+	test("handles empty string title", () => {
+		const result = applyTitlePrefix("", "research", mockConfig);
+		expect(result).toBe("Research - ");
 	});
 });
 

@@ -39,8 +39,11 @@ export {
 	DEFAULT_CRITICAL_RULES,
 } from "./llm/prompt-builder";
 
-/** Default LLM model for extraction tasks (uses Claude Haiku via headless CLI) */
-export const DEFAULT_LLM_MODEL = "haiku";
+// Import default model from centralized defaults
+import { DEFAULT_MODEL } from "./defaults";
+
+/** Default LLM model for extraction tasks (re-exported from defaults.ts) */
+export const DEFAULT_LLM_MODEL = DEFAULT_MODEL;
 
 /** Default Ollama API URL */
 export const DEFAULT_OLLAMA_URL = "http://localhost:11434";

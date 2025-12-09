@@ -311,9 +311,9 @@ export const DEFAULT_AVAILABLE_MODELS = [
 
 /**
  * Default LLM model for AI-powered operations.
- * Claude Sonnet provides the best balance of quality and speed.
+ * Claude Haiku is fast, cheap, and reliable for JSON extraction.
  */
-export const DEFAULT_MODEL = "sonnet";
+export const DEFAULT_MODEL = "haiku";
 
 /**
  * Default PARA folder mappings for semantic search shortcuts.
@@ -342,3 +342,26 @@ export const DEFAULT_PARA_SEARCH_FOLDERS = [
 	"resources",
 	"archives",
 ] as const;
+
+/**
+ * Default title prefixes for specific template types.
+ * Following Tiago Forte's PARA naming conventions with adaptations for specific note types.
+ *
+ * Prefixes are applied automatically during note creation to improve:
+ * - Scanning and filtering in file lists
+ * - Visual grouping of related notes
+ * - Clarity about note purpose
+ *
+ * Convention:
+ * - Specific types (research, booking, trip) get prefixes
+ * - PARA core (project, area, resource) follow Forte's style (emoji/capitalized/lowercase)
+ * - Tasks don't need prefixes (action-oriented by nature)
+ * - Captures are temporary inbox items (no prefix)
+ */
+export const DEFAULT_TITLE_PREFIXES: Partial<Record<string, string>> = {
+	research: "Research -",
+	booking: "Booking -",
+	trip: "Trip -",
+	itinerary: "Itinerary -",
+	checklist: "Checklist -",
+};

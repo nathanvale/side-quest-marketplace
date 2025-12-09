@@ -90,6 +90,8 @@ export interface ParaObsidianConfig {
 	readonly paraFolders?: Record<string, string>;
 	/** Default PARA folders to search when --para flag omitted. */
 	readonly defaultParaSearchFolders?: ReadonlyArray<string>;
+	/** Title prefixes for specific template types (e.g., "research" → "Research -"). */
+	readonly titlePrefixes?: Partial<Record<string, string>>;
 }
 
 /**

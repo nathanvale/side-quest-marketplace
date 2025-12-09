@@ -63,6 +63,7 @@ import {
 	type ParaObsidianConfig,
 } from "./config";
 import { createFromTemplate, replaceSections } from "./create";
+import { DEFAULT_AVAILABLE_MODELS, DEFAULT_MODEL } from "./defaults";
 import { deleteFile } from "./delete";
 import {
 	applyVersionPlan,
@@ -1153,13 +1154,9 @@ async function main(): Promise<void> {
 
 					// Get model from flags, config, or default
 					const availableModels = config.availableModels ?? [
-						"sonnet",
-						"haiku",
-						"qwen:7b",
-						"qwen:14b",
-						"qwen2.5:14b",
+						...DEFAULT_AVAILABLE_MODELS,
 					];
-					const defaultModel = config.defaultModel ?? "sonnet";
+					const defaultModel = config.defaultModel ?? DEFAULT_MODEL;
 					const model = modelFlag ?? defaultModel;
 
 					// Validate model against available models
