@@ -124,10 +124,15 @@ bun run src/cli.ts rename "old-name.md" "New Name.md"
 
 ## Default Search Directories
 
-Validation scans PARA-managed folders by default (configured in `.paraobsidianrc`):
-- `00_Inbox`
-- `01_Projects`
-- `02_Areas`
-- `03_Resources`
-- `04_Archives`
+Validation scans PARA-managed folders by default:
+- `00 Inbox`
+- `01 Projects`
+- `02 Areas`
+- `03 Resources`
+- `04 Archives`
 - `Tasks`
+- `Daily Notes`
+- `Weekly Notes`
+- `Attachments` (included for git operations, typically no markdown files)
+
+**Excluded:** `_Sort`, `Templates`, `.obsidian`, and other non-PARA folders

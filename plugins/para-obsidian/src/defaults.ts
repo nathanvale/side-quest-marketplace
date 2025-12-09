@@ -306,6 +306,8 @@ export const DEFAULT_DESTINATIONS: Record<string, string> = {
 	itinerary: "00 Inbox",
 	"itinerary-day": "00 Inbox",
 	research: "00 Inbox",
+	// Attachments folder (for git operations, not template destination)
+	attachments: "Attachments",
 };
 
 /**
