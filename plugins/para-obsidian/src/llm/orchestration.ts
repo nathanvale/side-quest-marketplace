@@ -148,6 +148,7 @@ function isNullishValue(value: string | null): boolean {
 /**
  * List of known wikilink field names (case-insensitive).
  * These fields may contain nested arrays from LLM output that need flattening.
+ * Used for normalizing LLM output before further processing.
  */
 const WIKILINK_FIELD_NAMES = [
 	"area",
@@ -155,6 +156,22 @@ const WIKILINK_FIELD_NAMES = [
 	"accommodation",
 	"decision",
 ] as const;
+
+/**
+ * Extract wikilink field names from a template's frontmatter rules.
+ * Returns only fields that are defined with type: "wikilink" in the schema.
+ *
+ * @param rules - The frontmatter rules for a specific template type
+ * @returns Array of field names that are wikilink type
+ */
+export function getWikilinkFieldsFromRules(
+	rules: { required?: Record<string, { type: string }> } | undefined,
+): string[] {
+	if (!rules?.required) return [];
+	return Object.entries(rules.required)
+		.filter(([, field]) => field.type === "wikilink")
+		.map(([name]) => name);
+}
 
 /**
  * Check if a field key represents a wikilink-type field.
@@ -366,25 +383,24 @@ export async function convertNoteToTemplate(
 	});
 
 	// 9. Update frontmatter with extracted values
-	// - Wikilink fields (project, area) get explicit null to overwrite bad template defaults
+	// - Wikilink fields defined in template schema get explicit null to overwrite bad template defaults
 	// - Other null values are skipped
 	// - Templater prompt keys are used to extract wikilink values, then skipped for direct frontmatter updates
 	const frontmatterUpdates: Record<string, unknown> = {};
 
 	// Track which wikilink fields we've seen values for
-	// Use WIKILINK_FIELD_NAMES to ensure consistency with normalizeExtractedArgs
+	// Only include fields that are defined in this template's schema (not all possible wikilink fields)
+	const templateWikilinkFields = getWikilinkFieldsFromRules(rules);
 	const wikilinkFieldsFound: Record<string, string | null> = {};
-	for (const field of WIKILINK_FIELD_NAMES) {
+	for (const field of templateWikilinkFields) {
 		wikilinkFieldsFound[field] = null;
 	}
 
-	// Helper to check if a key refers to a wikilink field
+	// Helper to check if a key refers to a wikilink field defined in this template
 	// Returns the canonical field name if match found, null otherwise
-	const getWikilinkFieldName = (
-		k: string,
-	): (typeof WIKILINK_FIELD_NAMES)[number] | null => {
+	const getWikilinkFieldName = (k: string): string | null => {
 		const lower = k.toLowerCase();
-		for (const field of WIKILINK_FIELD_NAMES) {
+		for (const field of templateWikilinkFields) {
 			if (lower === field || lower.includes(field)) return field;
 		}
 		return null;

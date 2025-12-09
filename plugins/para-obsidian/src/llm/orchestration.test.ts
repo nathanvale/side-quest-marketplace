@@ -11,6 +11,7 @@ import {
 	cleanWikilinkValue,
 	type ExtractMetadataOptions,
 	flattenToString,
+	getWikilinkFieldsFromRules,
 } from "./orchestration";
 
 describe("ConversionResult interface", () => {
@@ -245,6 +246,110 @@ describe("cleanWikilinkValue", () => {
 
 	test("trims whitespace from extracted values", () => {
 		expect(cleanWikilinkValue("  Some Value  ")).toBe("Some Value");
+	});
+});
+
+describe("getWikilinkFieldsFromRules", () => {
+	test("returns empty array for undefined rules", () => {
+		expect(getWikilinkFieldsFromRules(undefined)).toEqual([]);
+	});
+
+	test("returns empty array for rules without required", () => {
+		expect(getWikilinkFieldsFromRules({})).toEqual([]);
+	});
+
+	test("returns empty array when no wikilink fields", () => {
+		const rules = {
+			required: {
+				title: { type: "string" },
+				status: { type: "enum" },
+				tags: { type: "array" },
+			},
+		};
+		expect(getWikilinkFieldsFromRules(rules)).toEqual([]);
+	});
+
+	test("extracts wikilink fields from rules", () => {
+		const rules = {
+			required: {
+				title: { type: "string" },
+				project: { type: "wikilink" },
+				area: { type: "wikilink" },
+				status: { type: "enum" },
+			},
+		};
+		const result = getWikilinkFieldsFromRules(rules);
+		expect(result).toContain("project");
+		expect(result).toContain("area");
+		expect(result).toHaveLength(2);
+	});
+
+	test("area template has no wikilink fields", () => {
+		// This mirrors the actual area rules from defaults.ts
+		const areaRules = {
+			required: {
+				title: { type: "string" },
+				created: { type: "date" },
+				type: { type: "enum" },
+				status: { type: "enum" },
+				tags: { type: "array" },
+			},
+		};
+		const result = getWikilinkFieldsFromRules(areaRules);
+		expect(result).toEqual([]);
+		// Specifically: no accommodation or decision fields
+		expect(result).not.toContain("accommodation");
+		expect(result).not.toContain("decision");
+	});
+
+	test("project template has area wikilink field", () => {
+		// This mirrors the actual project rules from defaults.ts
+		const projectRules = {
+			required: {
+				title: { type: "string" },
+				created: { type: "date" },
+				type: { type: "enum" },
+				status: { type: "enum" },
+				target_completion: { type: "date" },
+				area: { type: "wikilink" },
+				tags: { type: "array" },
+			},
+		};
+		const result = getWikilinkFieldsFromRules(projectRules);
+		expect(result).toEqual(["area"]);
+		// Specifically: no accommodation or decision fields
+		expect(result).not.toContain("accommodation");
+		expect(result).not.toContain("decision");
+	});
+
+	test("itinerary-day template has accommodation wikilink field", () => {
+		// This mirrors the actual itinerary-day rules from defaults.ts
+		const itineraryDayRules = {
+			required: {
+				title: { type: "string" },
+				project: { type: "wikilink" },
+				accommodation: { type: "wikilink" },
+			},
+		};
+		const result = getWikilinkFieldsFromRules(itineraryDayRules);
+		expect(result).toContain("project");
+		expect(result).toContain("accommodation");
+		expect(result).toHaveLength(2);
+	});
+
+	test("research template has decision wikilink field", () => {
+		// This mirrors the actual research rules from defaults.ts
+		const researchRules = {
+			required: {
+				title: { type: "string" },
+				project: { type: "wikilink" },
+				decision: { type: "wikilink" },
+			},
+		};
+		const result = getWikilinkFieldsFromRules(researchRules);
+		expect(result).toContain("project");
+		expect(result).toContain("decision");
+		expect(result).toHaveLength(2);
 	});
 });
 
