@@ -99,7 +99,7 @@ function findMatchingAttachments(
 
 	// Remove emoji prefixes and normalize
 	const cleanName = noteName
-		.replace(/^[🎫📊✅🗓️]\s*/, "") // Remove emoji prefix
+		.replace(/^(?:🎫|📊|✅|🗓️)\s*/u, "") // Remove emoji prefix
 		.toLowerCase();
 
 	const matches: Array<{ path: string; score: number }> = [];
@@ -194,7 +194,11 @@ export async function linkAttachmentsToNotes(
 	let totalLinks = 0;
 
 	for (const notePath of notes) {
-		const matches = findMatchingAttachments(notePath, allAttachments, threshold);
+		const matches = findMatchingAttachments(
+			notePath,
+			allAttachments,
+			threshold,
+		);
 
 		if (matches.length === 0) continue;
 
@@ -229,7 +233,10 @@ export async function linkAttachmentsToNotes(
 		// Update frontmatter
 		if (!dryRun) {
 			const { body } = parseFrontmatter(content);
-			const updatedAttributes = { ...attributes, attachments: updatedAttachments };
+			const updatedAttributes = {
+				...attributes,
+				attachments: updatedAttachments,
+			};
 			const updatedContent = serializeFrontmatter(updatedAttributes, body);
 			fs.writeFileSync(noteAbsolute, updatedContent, "utf8");
 		}

@@ -66,7 +66,6 @@ import { createFromTemplate, replaceSections } from "./create";
 import { DEFAULT_AVAILABLE_MODELS, DEFAULT_MODEL } from "./defaults";
 import { deleteFile } from "./delete";
 import { flattenAttachments } from "./flatten";
-import { linkAttachmentsToNotes } from "./link-attachments";
 import {
 	applyVersionPlan,
 	migrateAllTemplateVersions,
@@ -97,7 +96,10 @@ import {
 	scanTags,
 } from "./indexer";
 import { type InsertMode, insertIntoNote } from "./insert";
+import { linkAttachmentsToNotes } from "./link-attachments";
 import { renameWithLinkRewrite } from "./links";
+import { findOrphans } from "./orphans";
+import { cleanBrokenLinks } from "./clean-links";
 import {
 	extractMetadata,
 	getWikilinkFieldsFromRules,
@@ -976,6 +978,68 @@ async function main(): Promise<void> {
 							for (const att of attachments) {
 								console.log(`    - ${att}`);
 							}
+						}
+					}
+				}
+
+				if (config.autoCommit && !dryRun && result.notesUpdated > 0) {
+					await commitAllNotes(config);
+				}
+				break;
+			}
+
+			case "find-orphans": {
+				const dir = subcommand ?? ".";
+
+				const result = findOrphans(config.vault, { dir });
+
+				if (isJson) {
+					console.log(JSON.stringify(result, null, 2));
+				} else {
+					if (result.brokenLinks.length > 0) {
+						console.log(emphasize.error(`Found ${result.brokenLinks.length} broken links:`));
+						for (const { note, link, location } of result.brokenLinks) {
+							console.log(`  ${note} (${location}): [[${link}]]`);
+						}
+						console.log("");
+					}
+
+					if (result.orphanAttachments.length > 0) {
+						console.log(emphasize.warn(`Found ${result.orphanAttachments.length} orphan attachments:`));
+						for (const att of result.orphanAttachments) {
+							console.log(`  ${att}`);
+						}
+					}
+
+					if (result.brokenLinks.length === 0 && result.orphanAttachments.length === 0) {
+						console.log(emphasize.success("No orphans or broken links found!"));
+					}
+				}
+				break;
+			}
+
+			case "clean-broken-links": {
+				const dir = subcommand ?? ".";
+				const dryRun = flags["dry-run"] === true || flags["dry-run"] === "true";
+
+				if (!dryRun) {
+					await ensureGitGuard(config);
+				}
+
+				const result = cleanBrokenLinks(config.vault, { dir, dryRun });
+
+				if (isJson) {
+					console.log(JSON.stringify(result, null, 2));
+				} else {
+					console.log(
+						emphasize.success(
+							`${dryRun ? "Would remove" : "Removed"} ${result.linksRemoved} broken links from ${result.notesUpdated} notes`,
+						),
+					);
+					if (result.notesUpdated > 0) {
+						console.log("\nUpdated notes:");
+						for (const { note, linksRemoved } of result.updates) {
+							console.log(`  ${note}: ${linksRemoved} links removed`);
 						}
 					}
 				}

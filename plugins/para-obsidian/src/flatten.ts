@@ -16,7 +16,6 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { parseFrontmatter } from "./frontmatter";
 import { resolveVaultPath } from "./fs";
 
 /**
@@ -83,7 +82,6 @@ export function generateFlatFilename(
 	const nameWithoutExt = path.basename(basename, ext);
 
 	// Extract type hint from parent directory or filename
-	const parentDir = path.basename(path.dirname(originalPath));
 	const typeHint = inferTypeFromPath(originalPath);
 
 	// Build descriptive name: timestamp-type-description.ext
