@@ -21,6 +21,7 @@ import { parse, stringify } from "yaml";
 
 import type { FieldRule, FrontmatterRules, ParaObsidianConfig } from "./config";
 import { readFile, resolveVaultPath } from "./fs";
+import { getManagedFolders } from "./git";
 
 /**
  * Result of parsing frontmatter from Markdown content.
@@ -333,6 +334,51 @@ export function readFrontmatterFile(
 }
 
 /**
+ * Issue information for a single file in bulk validation results.
+ */
+export interface BulkValidationFileResult {
+	/** Vault-relative path to the file. */
+	readonly file: string;
+	/** Note type from frontmatter (if present). */
+	readonly type?: string;
+	/** Whether the file passed validation. */
+	readonly valid: boolean;
+	/** List of validation issues found. Empty if valid. */
+	readonly errors: ReadonlyArray<ValidationIssue>;
+}
+
+/**
+ * Summary statistics for bulk validation results.
+ */
+export interface BulkValidationSummary {
+	/** Total files validated. */
+	readonly total: number;
+	/** Files that passed validation. */
+	readonly valid: number;
+	/** Files that failed validation. */
+	readonly invalid: number;
+	/** Statistics grouped by note type. */
+	readonly byType: Record<
+		string,
+		{
+			readonly total: number;
+			readonly valid: number;
+			readonly invalid: number;
+		}
+	>;
+}
+
+/**
+ * Complete result of bulk frontmatter validation.
+ */
+export interface BulkValidationResult {
+	/** Aggregate statistics across all validated files. */
+	readonly summary: BulkValidationSummary;
+	/** Per-file validation results with detailed issues. */
+	readonly issues: ReadonlyArray<BulkValidationFileResult>;
+}
+
+/**
  * Validates a file's frontmatter against type-specific rules.
  *
  * Reads the file, determines its type from frontmatter, and validates
@@ -429,6 +475,143 @@ export function validateFrontmatterFile(
 
 	const issues = [...result.issues, ...versionIssues, ...filenameIssues];
 	return { valid: issues.length === 0, issues, relative, attributes };
+}
+
+/**
+ * Validates frontmatter across multiple files in the vault.
+ *
+ * Scans directories for Markdown files, validates each file's frontmatter
+ * against type-specific rules, and returns structured error data with
+ * aggregate statistics.
+ *
+ * Uses the same validation logic as validateFrontmatterFile() for
+ * consistency, including template_version and filename validation.
+ *
+ * @param config - Para-obsidian configuration with rules and vault path
+ * @param options - Validation options
+ * @param options.dirs - Directories to scan (defaults to config.defaultSearchDirs)
+ * @param options.type - Optional filter to validate only notes of this type
+ * @returns Bulk validation result with summary stats and per-file issues
+ *
+ * @example
+ * ```typescript
+ * // Validate all files in default search dirs
+ * const result = validateFrontmatterBulk(config, {});
+ * console.log(`${result.summary.invalid} of ${result.summary.total} files have issues`);
+ *
+ * // Validate only project notes
+ * const projectResult = validateFrontmatterBulk(config, { type: 'project' });
+ * console.log(`Projects: ${projectResult.summary.valid} valid, ${projectResult.summary.invalid} invalid`);
+ *
+ * // Validate specific directories
+ * const areasResult = validateFrontmatterBulk(config, { dirs: ['02_Areas'] });
+ * for (const file of areasResult.issues.filter(f => !f.valid)) {
+ *   console.log(`${file.file}: ${file.errors.length} issues`);
+ * }
+ * ```
+ */
+export function validateFrontmatterBulk(
+	config: ParaObsidianConfig,
+	options: {
+		readonly dirs?: readonly string[];
+		readonly type?: string;
+	} = {},
+): BulkValidationResult {
+	// Determine which directories to scan - use managed folders if not specified
+	const dirs =
+		options.dirs ??
+		config.defaultSearchDirs ??
+		Array.from(getManagedFolders(config));
+	const resolvedDirs = dirs.map(
+		(entry) => resolveVaultPath(config.vault, entry).absolute,
+	);
+
+	// Collect all Markdown files from specified directories
+	const files = resolvedDirs.flatMap((dir) =>
+		listFilesRecursive(dir, { extensions: [".md"] }),
+	);
+
+	// Initialize statistics tracking
+	const byType: Record<
+		string,
+		{ total: number; valid: number; invalid: number }
+	> = {};
+	const issues: BulkValidationFileResult[] = [];
+	let validCount = 0;
+	let invalidCount = 0;
+
+	// Validate each file
+	for (const file of files) {
+		const relative = path.relative(config.vault, file);
+
+		try {
+			// Validate the file using existing single-file validation
+			const result = validateFrontmatterFile(config, relative);
+			const noteType = result.attributes.type as string | undefined;
+
+			// Apply optional type filter
+			if (options.type && noteType !== options.type) {
+				continue;
+			}
+
+			// Update statistics
+			if (result.valid) {
+				validCount++;
+			} else {
+				invalidCount++;
+			}
+
+			// Track per-type statistics
+			const typeKey = noteType ?? "unknown";
+			if (!byType[typeKey]) {
+				byType[typeKey] = { total: 0, valid: 0, invalid: 0 };
+			}
+			byType[typeKey].total++;
+			if (result.valid) {
+				byType[typeKey].valid++;
+			} else {
+				byType[typeKey].invalid++;
+			}
+
+			// Record file result
+			issues.push({
+				file: relative,
+				type: noteType,
+				valid: result.valid,
+				errors: result.issues,
+			});
+		} catch (error) {
+			// Handle validation errors gracefully
+			invalidCount++;
+			const typeKey = "error";
+			if (!byType[typeKey]) {
+				byType[typeKey] = { total: 0, valid: 0, invalid: 0 };
+			}
+			byType[typeKey].total++;
+			byType[typeKey].invalid++;
+
+			issues.push({
+				file: relative,
+				valid: false,
+				errors: [
+					{
+						field: "_validation",
+						message: error instanceof Error ? error.message : String(error),
+					},
+				],
+			});
+		}
+	}
+
+	return {
+		summary: {
+			total: validCount + invalidCount,
+			valid: validCount,
+			invalid: invalidCount,
+			byType,
+		},
+		issues,
+	};
 }
 
 /**

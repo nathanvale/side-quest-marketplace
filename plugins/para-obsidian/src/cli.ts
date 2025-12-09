@@ -74,6 +74,7 @@ import {
 	updateFrontmatterFile,
 	type VersionPlanStatus,
 	validateFrontmatter,
+	validateFrontmatterBulk,
 	validateFrontmatterFile,
 } from "./frontmatter";
 import { listDir, readFile } from "./fs";
@@ -127,6 +128,7 @@ function printUsage(): void {
 		"  bun run src/cli.ts semantic <query> [--para folder[,folder2]] [--dir path] [--limit N] [--format md|json]",
 		"  bun run src/cli.ts frontmatter get <file> [--format md|json]",
 		"  bun run src/cli.ts frontmatter validate <file> [--format md|json]",
+		"  bun run src/cli.ts frontmatter validate-all [--dir path[,path2]] [--type noteType] [--format md|json]",
 		"  bun run src/cli.ts frontmatter set <file> key=value [...] [--unset key1,key2] [--dry-run] [--attachments paths] [--format md|json]",
 		"  bun run src/cli.ts frontmatter migrate <file> [--force <version>] [--dry-run] [--attachments paths] [--format md|json]",
 		"  bun run src/cli.ts frontmatter migrate-all [--dir path[,path2]] [--force <version>] [--type <type>] [--dry-run] [--attachments paths] [--format md|json]",
@@ -1299,12 +1301,27 @@ async function main(): Promise<void> {
 			case "frontmatter": {
 				const action = subcommand;
 				const target = positional[0];
-				if (!action || !target) {
-					console.error("frontmatter requires action and <file>");
+				// validate-all, migrate-all, plan, and apply-plan don't require a target file
+				const requiresTarget = ![
+					"validate-all",
+					"migrate-all",
+					"plan",
+					"apply-plan",
+				].includes(action ?? "");
+				if (!action || (requiresTarget && !target)) {
+					console.error(
+						requiresTarget
+							? "frontmatter requires action and <file>"
+							: "frontmatter requires action",
+					);
 					process.exit(1);
 				}
 
 				if (action === "get") {
+					if (!target) {
+						console.error("frontmatter get requires <file>");
+						process.exit(1);
+					}
 					const { attributes } = readFrontmatterFile(config, target);
 					if (isJson) {
 						console.log(
@@ -1321,6 +1338,10 @@ async function main(): Promise<void> {
 				}
 
 				if (action === "validate") {
+					if (!target) {
+						console.error("frontmatter validate requires <file>");
+						process.exit(1);
+					}
 					const result = validateFrontmatterFile(config, target);
 					if (isJson) {
 						console.log(
@@ -1349,7 +1370,75 @@ async function main(): Promise<void> {
 					break;
 				}
 
+				if (action === "validate-all") {
+					const dirs = parseDirs(
+						normalizeFlagValue(flags.dir),
+						config.defaultSearchDirs,
+					);
+					const type =
+						typeof flags.type === "string" && flags.type.trim().length > 0
+							? flags.type.trim()
+							: undefined;
+
+					const result = validateFrontmatterBulk(config, { dirs, type });
+
+					if (isJson) {
+						console.log(JSON.stringify(result, null, 2));
+					} else {
+						const { summary, issues } = result;
+						const totalFiles = summary.total;
+						const validFiles = summary.valid;
+						const invalidFiles = summary.invalid;
+
+						// Overall summary
+						if (invalidFiles === 0) {
+							console.log(
+								emphasize.success(
+									`✓ All ${totalFiles} file(s) passed validation`,
+								),
+							);
+						} else {
+							console.log(
+								emphasize.warn(
+									`${invalidFiles} of ${totalFiles} file(s) have issues (${validFiles} valid)`,
+								),
+							);
+						}
+
+						// Per-type breakdown
+						if (Object.keys(summary.byType).length > 0) {
+							console.log("\nBy type:");
+							for (const [noteType, stats] of Object.entries(summary.byType)) {
+								const status =
+									stats.invalid === 0
+										? emphasize.success("✓")
+										: emphasize.warn("✗");
+								console.log(
+									`  ${status} ${noteType}: ${stats.valid}/${stats.total} valid`,
+								);
+							}
+						}
+
+						// Show detailed issues for files that failed
+						const filesWithIssues = issues.filter((f) => !f.valid);
+						if (filesWithIssues.length > 0) {
+							console.log("\nFiles with issues:");
+							for (const file of filesWithIssues) {
+								console.log(emphasize.warn(`\n${file.file}:`));
+								for (const error of file.errors) {
+									console.log(`  - ${error.field}: ${error.message}`);
+								}
+							}
+						}
+					}
+					break;
+				}
+
 				if (action === "set" || action === "edit") {
+					if (!target) {
+						console.error("frontmatter set|edit requires <file>");
+						process.exit(1);
+					}
 					const dryRun =
 						flags["dry-run"] === true || flags["dry-run"] === "true";
 					const strict = flags.strict === true || flags.strict === "true";
@@ -1525,6 +1614,10 @@ async function main(): Promise<void> {
 				}
 
 				if (action === "migrate") {
+					if (!target) {
+						console.error("frontmatter migrate requires <file>");
+						process.exit(1);
+					}
 					const dryRun =
 						flags["dry-run"] === true || flags["dry-run"] === "true";
 					const forceVersion =

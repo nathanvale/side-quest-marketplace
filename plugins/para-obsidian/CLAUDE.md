@@ -107,6 +107,7 @@ para-obsidian rename <old> <new> [--dry-run]   # Rename with link rewrite
 para-obsidian delete <file> [--dry-run]        # Delete with confirm
 para-obsidian frontmatter get <file>           # Extract frontmatter
 para-obsidian frontmatter validate <file>      # Validate against rules
+para-obsidian frontmatter validate-all [--dir path[,path2]] [--type noteType] [--format md|json]  # Bulk validate vault
 para-obsidian frontmatter set <file> key=val   # Update frontmatter
 para-obsidian frontmatter migrate <file>       # Migrate template version
 para-obsidian frontmatter migrate-all <type>   # Bulk migrate notes
@@ -139,7 +140,7 @@ para-obsidian templates                        # List template versions
 
 ---
 
-## MCP Tools (20 Total)
+## MCP Tools (21 Total)
 
 **Configuration:**
 - `config` — Load resolved configuration
@@ -161,6 +162,7 @@ para-obsidian templates                        # List template versions
 **Frontmatter:**
 - `frontmatter_get` — Extract frontmatter from note
 - `frontmatter_validate` — Validate against type rules
+- `frontmatter_validate_all` — Bulk validate vault with structured error reporting (NEW!)
 - `frontmatter_set` — Update frontmatter fields
 - `frontmatter_migrate` — Migrate single note to new template version
 - `frontmatter_migrate_all` — Bulk migrate notes by type
@@ -285,6 +287,58 @@ Each note type enforces strict frontmatter schema:
 - **Area:** title, responsibility, tags, template_version
 - **Resource:** title, type, source, tags, template_version
 - **Task:** title, status, priority, project/area, template_version
+
+**Single-file validation:**
+```bash
+para-obsidian frontmatter validate "01_Projects/My Project.md"
+```
+
+**Bulk validation (NEW!):**
+```bash
+# Validate entire vault
+para-obsidian frontmatter validate-all
+
+# Validate specific directories
+para-obsidian frontmatter validate-all --dir "01_Projects,02_Areas"
+
+# Validate specific note type
+para-obsidian frontmatter validate-all --type project
+
+# JSON output for AI agents
+para-obsidian frontmatter validate-all --format json
+```
+
+**Structured error output:**
+```json
+{
+  "summary": {
+    "total": 150,
+    "valid": 120,
+    "invalid": 30,
+    "byType": {
+      "project": { "total": 50, "valid": 45, "invalid": 5 },
+      "area": { "total": 30, "valid": 25, "invalid": 5 }
+    }
+  },
+  "issues": [
+    {
+      "file": "01_Projects/My Project.md",
+      "type": "project",
+      "valid": false,
+      "errors": [
+        { "field": "status", "message": "Invalid value 'todo' (allowed: active, on-hold, completed)" },
+        { "field": "template_version", "message": "outdated (found 1, expected 2)" }
+      ]
+    }
+  ]
+}
+```
+
+**Use cases:**
+- AI-powered batch fixing of validation errors
+- Vault health monitoring
+- Pre-migration validation
+- CI/CD quality checks
 
 Validation errors include field path, expected type, and suggestions.
 
@@ -429,6 +483,7 @@ bun test src/llm/orchestration.test.ts    # Orchestration workflows (4 tests)
 - ✅ Config loader (ENV-first, rc files, defaults)
 - ✅ File operations (list, read, vault-scoped paths)
 - ✅ Frontmatter (parse, validate, get, set, migrate)
+- ✅ Bulk frontmatter validation with structured error reporting
 - ✅ Template creation (Templater substitution, Title Case filenames)
 - ✅ Search (text + frontmatter/tag filtering)
 - ✅ Indexer (build/save/load frontmatter/tags/headings)
@@ -441,7 +496,7 @@ bun test src/llm/orchestration.test.ts    # Orchestration workflows (4 tests)
 - ✅ Bulk migration (migrate-all, plan, apply-plan)
 - ✅ Attachment auto-discovery for commits
 - ✅ Semantic search via Kit CLI
-- ✅ MCP server (20 tools, thin CLI wrapper)
+- ✅ MCP server (21 tools, thin CLI wrapper)
 - ✅ Colored CLI output and JSON mode
 - ✅ Content injection via --content flag
 - ✅ Default destinations per template type (PARA folders)
@@ -450,7 +505,7 @@ bun test src/llm/orchestration.test.ts    # Orchestration workflows (4 tests)
 - ✅ Reusable field suggestion utilities for slash commands
 - ✅ AI-powered create mode with --source, --preview, --model, --arg flags
 - ✅ Model routing (Claude headless + Ollama HTTP) via @sidequest/core/llm
-- ✅ 294 tests passing
+- ✅ 299 tests passing
 
 **Future Enhancements Enabled by LLM Architecture:**
 - Slash commands with AI-assisted field suggestions (infrastructure ready)
