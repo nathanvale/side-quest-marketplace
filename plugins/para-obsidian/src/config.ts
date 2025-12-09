@@ -187,7 +187,14 @@ export function loadConfig(
 
 	const envConfigPath = resolveRcFromEnv();
 	const userRc = loadJsonIfExists<ParaObsidianConfig>(resolveUserRc()) ?? {};
-	const projectRcPath = resolveProjectRc(cwd);
+
+	// Resolve vault path first so we can look for .paraobsidianrc in the vault
+	const vault = path.resolve(envVault);
+	if (!fs.existsSync(vault) || !fs.statSync(vault).isDirectory()) {
+		throw new Error(`PARA_VAULT does not point to a directory: ${vault}`);
+	}
+
+	const projectRcPath = resolveProjectRc(vault);
 	const projectRc = projectRcPath
 		? (loadJsonIfExists<ParaObsidianConfig>(projectRcPath) ?? {})
 		: {};
@@ -201,11 +208,6 @@ export function loadConfig(
 		...explicitRc,
 		vault: envVault,
 	};
-
-	const vault = path.resolve(merged.vault);
-	if (!fs.existsSync(vault) || !fs.statSync(vault).isDirectory()) {
-		throw new Error(`PARA_VAULT does not point to a directory: ${vault}`);
-	}
 
 	// Templates dir priority: PARA_TEMPLATES_DIR env > config files > default (vault/Templates)
 	const envTemplatesDir = process.env.PARA_TEMPLATES_DIR;
@@ -228,6 +230,7 @@ export function loadConfig(
 		defaultParaSearchFolders: merged.defaultParaSearchFolders ?? [
 			...DEFAULT_PARA_SEARCH_FOLDERS,
 		],
+		titlePrefixes: merged.titlePrefixes,
 	};
 }
 

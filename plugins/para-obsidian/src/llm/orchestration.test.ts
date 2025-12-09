@@ -8,9 +8,9 @@ import { describe, expect, test } from "bun:test";
 import type { ParaObsidianConfig } from "../config";
 import {
 	applyTitlePrefix,
-	cleanWikilinkValue,
 	type ConversionResult,
 	type ConvertNoteOptions,
+	cleanWikilinkValue,
 	type ExtractMetadataOptions,
 	flattenToString,
 	getWikilinkFieldsFromRules,

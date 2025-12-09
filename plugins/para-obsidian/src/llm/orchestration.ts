@@ -18,9 +18,7 @@ import {
 } from "@sidequest/core/llm";
 import type { ParaObsidianConfig } from "../config";
 import { createFromTemplate, replaceH1Title, replaceSections } from "../create";
-import {
-	DEFAULT_TITLE_PREFIXES,
-} from "../defaults";
+import { DEFAULT_TITLE_PREFIXES } from "../defaults";
 import {
 	readFrontmatterFile,
 	updateFrontmatterFile,
@@ -91,7 +89,8 @@ export function applyTitlePrefix(
 	config: ParaObsidianConfig,
 ): string {
 	// Get prefix from config or defaults
-	const prefix = config.titlePrefixes?.[template] ?? DEFAULT_TITLE_PREFIXES[template];
+	const prefix =
+		config.titlePrefixes?.[template] ?? DEFAULT_TITLE_PREFIXES[template];
 
 	if (!prefix) return title; // No prefix configured for this template
 
