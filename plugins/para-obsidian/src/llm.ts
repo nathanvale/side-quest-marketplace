@@ -28,6 +28,7 @@ export {
 	batchConvert,
 	convertNoteToTemplate,
 	extractMetadata,
+	getWikilinkFieldsFromRules,
 	suggestFieldValues,
 } from "./llm/orchestration";
 export type { PromptExample, PromptTemplate } from "./llm/prompt-builder";

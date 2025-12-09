@@ -94,7 +94,11 @@ import {
 } from "./indexer";
 import { type InsertMode, insertIntoNote } from "./insert";
 import { renameWithLinkRewrite } from "./links";
-import { extractMetadata, validateModel } from "./llm";
+import {
+	extractMetadata,
+	getWikilinkFieldsFromRules,
+	validateModel,
+} from "./llm";
 import { MIGRATIONS } from "./migrations";
 import { filterByFrontmatter, searchText } from "./search";
 import { semanticSearch } from "./semantic";
@@ -410,18 +414,18 @@ async function handleCreateFromSource(options: {
 			return `https://${val}`;
 		};
 
-		// Clean up wikilink fields - ALWAYS set the extracted value to override template output
+		// Clean up wikilink fields - ONLY set fields defined in this template's schema
 		// Wrap in [[...]] for Dataview compatibility (wikilinks must be quoted in YAML)
 		// ALSO apply argOverrides to ensure they take precedence over LLM extraction
-		// Must include all wikilink fields that may appear in templates
 		const frontmatterCleanup: Record<string, unknown> = {};
-		const wikilinkFields = ["project", "area", "accommodation", "decision"];
+		const rules = config.frontmatterRules?.[template];
+		const wikilinkFields = getWikilinkFieldsFromRules(rules);
 		const urlFields = ["contact_url", "url", "website", "source_url"];
 		for (const field of wikilinkFields) {
 			const extractedValue = Object.entries(extracted.args).find(([key]) =>
 				key.toLowerCase().includes(field),
 			)?.[1];
-			// ALWAYS set wikilink fields - wrap in [[...]] or null
+			// ALWAYS set wikilink fields defined in schema - wrap in [[...]] or null
 			// This ensures Dataview-compatible wikilink format
 			frontmatterCleanup[field] = toWikilink(extractedValue ?? null);
 		}
