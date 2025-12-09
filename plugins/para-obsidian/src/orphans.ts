@@ -52,7 +52,18 @@ function extractWikilinks(
 ): ReadonlyArray<{ link: string; location: "frontmatter" | "body" }> {
 	const { absolute } = resolveVaultPath(vault, notePath);
 	const content = fs.readFileSync(absolute, "utf8");
-	const { attributes, body } = parseFrontmatter(content);
+
+	let attributes: Record<string, unknown>;
+	let body: string;
+
+	try {
+		const parsed = parseFrontmatter(content);
+		attributes = parsed.attributes;
+		body = parsed.body;
+	} catch (error) {
+		// Skip files with invalid frontmatter (e.g., Templater templates)
+		return [];
+	}
 
 	const links: Array<{ link: string; location: "frontmatter" | "body" }> = [];
 

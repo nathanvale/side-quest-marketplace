@@ -57,6 +57,7 @@ import {
 	writeTextFileSync,
 } from "@sidequest/core/fs";
 import { discoverAttachments } from "./attachments";
+import { cleanBrokenLinks } from "./clean-links";
 import {
 	listTemplateVersions,
 	loadConfig,
@@ -98,14 +99,13 @@ import {
 import { type InsertMode, insertIntoNote } from "./insert";
 import { linkAttachmentsToNotes } from "./link-attachments";
 import { renameWithLinkRewrite } from "./links";
-import { findOrphans } from "./orphans";
-import { cleanBrokenLinks } from "./clean-links";
 import {
 	extractMetadata,
 	getWikilinkFieldsFromRules,
 	validateModel,
 } from "./llm";
 import { MIGRATIONS } from "./migrations";
+import { findOrphans } from "./orphans";
 import { filterByFrontmatter, searchText } from "./search";
 import { semanticSearch } from "./semantic";
 import { getTemplate, getTemplateFields } from "./templates";
@@ -997,7 +997,11 @@ async function main(): Promise<void> {
 					console.log(JSON.stringify(result, null, 2));
 				} else {
 					if (result.brokenLinks.length > 0) {
-						console.log(emphasize.error(`Found ${result.brokenLinks.length} broken links:`));
+						console.log(
+							emphasize.error(
+								`Found ${result.brokenLinks.length} broken links:`,
+							),
+						);
 						for (const { note, link, location } of result.brokenLinks) {
 							console.log(`  ${note} (${location}): [[${link}]]`);
 						}
@@ -1005,13 +1009,20 @@ async function main(): Promise<void> {
 					}
 
 					if (result.orphanAttachments.length > 0) {
-						console.log(emphasize.warn(`Found ${result.orphanAttachments.length} orphan attachments:`));
+						console.log(
+							emphasize.warn(
+								`Found ${result.orphanAttachments.length} orphan attachments:`,
+							),
+						);
 						for (const att of result.orphanAttachments) {
 							console.log(`  ${att}`);
 						}
 					}
 
-					if (result.brokenLinks.length === 0 && result.orphanAttachments.length === 0) {
+					if (
+						result.brokenLinks.length === 0 &&
+						result.orphanAttachments.length === 0
+					) {
 						console.log(emphasize.success("No orphans or broken links found!"));
 					}
 				}
