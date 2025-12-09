@@ -60,6 +60,11 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			area: { type: "wikilink" },
 			depends_on: { type: "array", optional: true },
 			blocks: { type: "array", optional: true },
+			attachments: {
+				type: "array",
+				optional: true,
+				description: "Wikilinks to files in flat Attachments/ folder",
+			},
 			tags: { type: "array", includes: ["project"] },
 		},
 	},
@@ -92,6 +97,11 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			rating: { type: "enum", enum: ["1", "2", "3", "4", "5"], optional: true },
 			project: { type: "wikilink", optional: true },
 			area: { type: "wikilink", optional: true },
+			attachments: {
+				type: "array",
+				optional: true,
+				description: "Wikilinks to files in flat Attachments/ folder",
+			},
 			tags: { type: "array", includes: ["resource"] },
 		},
 	},
@@ -176,6 +186,7 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			status: { type: "enum", enum: ["draft", "in-progress", "complete"] },
 			tags: { type: "array", includes: ["checklist"] },
 		},
+		forbidden: ["area"],
 	},
 	booking: {
 		required: {
@@ -209,8 +220,14 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			contact_phone: { type: "string", optional: true },
 			contact_email: { type: "string", optional: true },
 			contact_url: { type: "string", optional: true },
+			attachments: {
+				type: "array",
+				optional: true,
+				description: "Wikilinks to files in flat Attachments/ folder",
+			},
 			tags: { type: "array", includes: ["booking"] },
 		},
+		forbidden: ["area"],
 	},
 	itinerary: {
 		required: {
@@ -225,6 +242,7 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			energy_level: { type: "enum", enum: ["low", "medium", "high"] },
 			tags: { type: "array", includes: ["itinerary"] },
 		},
+		forbidden: ["area"],
 	},
 	research: {
 		required: {
@@ -249,8 +267,14 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 				enum: ["researching", "comparing", "decided", "booked", "cancelled"],
 			},
 			decision: { type: "wikilink", optional: true },
+			attachments: {
+				type: "array",
+				optional: true,
+				description: "Wikilinks to files in flat Attachments/ folder",
+			},
 			tags: { type: "array", includes: ["research"] },
 		},
+		forbidden: ["area"],
 	},
 	trip: {
 		required: {
@@ -374,9 +398,9 @@ export const DEFAULT_PARA_SEARCH_FOLDERS = [
  * - Captures are temporary inbox items (no prefix)
  */
 export const DEFAULT_TITLE_PREFIXES: Partial<Record<string, string>> = {
-	research: "📊 Research -",
-	booking: "🎫 Booking -",
-	trip: "✈️ Trip -",
-	itinerary: "🗓️ Itinerary -",
-	checklist: "✅ Checklist -",
+	research: "📊 ",
+	booking: "🎫 ",
+	trip: "✈️ ",
+	itinerary: "🗓️ ",
+	checklist: "✅ ",
 };
