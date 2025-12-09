@@ -528,7 +528,7 @@ if (!isClean) throw new Error("Working tree must be clean");
 - Frontmatter rules mirror validate-note defaults from para-brain
 - Semantic search requires Kit CLI with ML dependencies (auto-prompted to install)
 - Index cached at vault root (`<vault>/.para-obsidian-index.json`)
-- Git auto-commit uses template: `chore(vault): <operation> <filename>`
+- Git auto-commit uses template: `docs: <note title>`
 - Suggested tags: project, area, resource, task, daily, journal, review, weekly, checklist, booking, itinerary, research, capture, inbox, travel, work, family, health, learning, finance, home, career
 - Test suite validates frontmatter rules, migrations, and link rewrites
 - CLI uses colored output (green for success, yellow for warnings, red for errors)

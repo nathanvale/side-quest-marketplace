@@ -39,7 +39,7 @@ describe("autoCommitChanges", () => {
 
 		expect(result.committed).toBe(true);
 		const log = (await Bun.$`git log -1 --pretty=%B`.cwd(vault).text()).trim();
-		expect(log).toBe("chore: para-obsidian test");
+		expect(log).toBe("docs: para-obsidian test");
 		const tracked = (await Bun.$`git ls-files`.cwd(vault).text()).split("\n");
 		expect(tracked).toContain("note.md");
 		expect(tracked).toContain("assets/image.png");

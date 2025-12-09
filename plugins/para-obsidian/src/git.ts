@@ -325,7 +325,7 @@ export async function autoCommitChanges(
 
 	// Build commit message from template
 	const template =
-		config.gitCommitMessageTemplate ?? "chore: para-obsidian {summary}";
+		config.gitCommitMessageTemplate ?? "docs: para-obsidian {summary}";
 	const message = template
 		.replace("{summary}", summary)
 		.replace("{files}", normalizedPaths.join(", "));
@@ -475,7 +475,7 @@ export async function commitNote(
 
 	// Build commit message from note title (filename without .md)
 	const title = path.basename(notePath, ".md");
-	const message = `chore: ${title}`;
+	const message = `docs: ${title}`;
 
 	// Commit
 	const { committed } = await gitCommit(gitRoot, message);

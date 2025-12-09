@@ -297,7 +297,7 @@ describe("extractLinkedAttachments", () => {
 });
 
 describe("commitNote", () => {
-	it("commits a single note with message 'chore: <note title>'", async () => {
+	it("commits a single note with message 'docs: <note title>'", async () => {
 		const { commitNote } = await import("./git");
 		const vault = makeTmpDir();
 		await initGit(vault);
@@ -308,12 +308,12 @@ describe("commitNote", () => {
 		const result = await commitNote(makeConfig(vault), "My Project Note.md");
 
 		expect(result.committed).toBe(true);
-		expect(result.message).toBe("chore: My Project Note");
+		expect(result.message).toBe("docs: My Project Note");
 		expect(result.files).toContain("My Project Note.md");
 
 		// Verify commit exists
 		const log = await Bun.$`git log --oneline -1`.cwd(vault).text();
-		expect(log).toContain("chore: My Project Note");
+		expect(log).toContain("docs: My Project Note");
 	});
 
 	it("includes linked attachments in same commit", async () => {
@@ -353,7 +353,7 @@ describe("commitNote", () => {
 
 		const result = await commitNote(makeConfig(vault), "Build Garden Shed.md");
 
-		expect(result.message).toBe("chore: Build Garden Shed");
+		expect(result.message).toBe("docs: Build Garden Shed");
 	});
 
 	it("handles notes in subdirectories", async () => {
@@ -373,7 +373,7 @@ describe("commitNote", () => {
 		);
 
 		expect(result.committed).toBe(true);
-		expect(result.message).toBe("chore: Website Redesign");
+		expect(result.message).toBe("docs: Website Redesign");
 		expect(result.files).toContain("projects/Website Redesign.md");
 	});
 
@@ -434,7 +434,7 @@ describe("commitAllNotes", () => {
 		// Verify 3 commits were created
 		const log = await Bun.$`git log --oneline`.cwd(vault).text();
 		const commits = log.trim().split("\n");
-		expect(commits.filter((c) => c.includes("chore:"))).toHaveLength(3);
+		expect(commits.filter((c) => c.includes("docs:"))).toHaveLength(3);
 	});
 
 	it("returns accurate count of committed notes", async () => {

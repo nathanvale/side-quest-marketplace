@@ -29,4 +29,4 @@ Run the para-obsidian CLI git commit command:
 - **No arguments**: Commits all uncommitted `.md` files in PARA folders
 - **With file**: Commits only the specified file
 
-Each note is committed with a message following the pattern: `chore(vault): <operation> <filename>`
+Each note is committed with a message following the pattern: `docs: <note title>`
