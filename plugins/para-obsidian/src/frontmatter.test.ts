@@ -107,6 +107,104 @@ Body`,
 			true,
 		);
 	});
+
+	it("rejects forbidden fields when present", () => {
+		const rules = {
+			required: {
+				title: { type: "string" },
+				project: { type: "wikilink" },
+			},
+			forbidden: ["area"],
+		} as const;
+		const attrs = {
+			title: "Research Note",
+			project: "[[My Project]]",
+			area: "[[Family]]", // Forbidden field
+		};
+		const result = validateFrontmatter(attrs, rules);
+		expect(result.valid).toBe(false);
+		expect(result.issues).toHaveLength(1);
+		expect(result.issues[0]?.field).toBe("area");
+		expect(result.issues[0]?.message).toBe(
+			"field not allowed for this note type",
+		);
+	});
+
+	it("passes validation when forbidden field is absent", () => {
+		const rules = {
+			required: {
+				title: { type: "string" },
+				project: { type: "wikilink" },
+			},
+			forbidden: ["area"],
+		} as const;
+		const attrs = {
+			title: "Research Note",
+			project: "[[My Project]]",
+		};
+		const result = validateFrontmatter(attrs, rules);
+		expect(result.valid).toBe(true);
+		expect(result.issues).toHaveLength(0);
+	});
+
+	it("ignores forbidden field when null or empty string", () => {
+		const rules = {
+			required: {
+				title: { type: "string" },
+				project: { type: "wikilink" },
+			},
+			forbidden: ["area"],
+		} as const;
+		const attrsNull = {
+			title: "Research Note",
+			project: "[[My Project]]",
+			area: null,
+		};
+		const resultNull = validateFrontmatter(attrsNull, rules);
+		expect(resultNull.valid).toBe(true);
+
+		const attrsEmpty = {
+			title: "Research Note",
+			project: "[[My Project]]",
+			area: "",
+		};
+		const resultEmpty = validateFrontmatter(attrsEmpty, rules);
+		expect(resultEmpty.valid).toBe(true);
+	});
+
+	it("validates research note with forbidden area field", () => {
+		const rules = {
+			required: {
+				title: { type: "string" },
+				created: { type: "date" },
+				type: { type: "enum", enum: ["research"] },
+				project: { type: "wikilink" },
+				tags: { type: "array", includes: ["research"] },
+			},
+			forbidden: ["area"],
+		} as const;
+		const attrsWithArea = {
+			title: "Hiking Research",
+			created: "2025-12-07",
+			type: "research",
+			project: "[[Tassie Holiday]]",
+			area: "[[Family]]", // Should fail
+			tags: ["research"],
+		};
+		const resultWithArea = validateFrontmatter(attrsWithArea, rules);
+		expect(resultWithArea.valid).toBe(false);
+		expect(resultWithArea.issues.some((i) => i.field === "area")).toBe(true);
+
+		const attrsWithoutArea = {
+			title: "Hiking Research",
+			created: "2025-12-07",
+			type: "research",
+			project: "[[Tassie Holiday]]",
+			tags: ["research"],
+		};
+		const resultWithoutArea = validateFrontmatter(attrsWithoutArea, rules);
+		expect(resultWithoutArea.valid).toBe(true);
+	});
 });
 
 describe("frontmatter update", () => {

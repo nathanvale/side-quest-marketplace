@@ -28,11 +28,14 @@ import {
 /**
  * Defines validation rules for frontmatter fields by note type.
  * Each type (e.g., "project", "area") can specify required fields
- * and their expected types/constraints.
+ * and their expected types/constraints, as well as forbidden fields
+ * that should not appear for this note type.
  */
 export interface FrontmatterRules {
 	/** Map of field names to their validation rules. */
 	readonly required?: Record<string, FieldRule>;
+	/** Array of field names that are not allowed for this note type. */
+	readonly forbidden?: ReadonlyArray<string>;
 }
 
 /**

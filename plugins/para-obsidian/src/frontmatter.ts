@@ -283,24 +283,40 @@ export function validateFrontmatter(
 	attributes: Record<string, unknown>,
 	rules?: FrontmatterRules,
 ): ValidationResult {
-	if (!rules?.required) {
+	if (!rules?.required && !rules?.forbidden) {
 		return { valid: true, issues: [] };
 	}
 
 	const issues: ValidationIssue[] = [];
-	for (const [field, rule] of Object.entries(rules.required)) {
-		const value = attributes[field];
-		// Check for missing required fields
-		if (value === undefined || value === null || value === "") {
-			if (!rule.optional) {
-				issues.push({ field, message: "is required" });
-			}
-			continue;
-		}
 
-		// Validate field type and constraints
-		const issue = validateField(field, value, rule);
-		if (issue) issues.push(issue);
+	// Check required fields
+	if (rules?.required) {
+		for (const [field, rule] of Object.entries(rules.required)) {
+			const value = attributes[field];
+			// Check for missing required fields
+			if (value === undefined || value === null || value === "") {
+				if (!rule.optional) {
+					issues.push({ field, message: "is required" });
+				}
+				continue;
+			}
+
+			// Validate field type and constraints
+			const issue = validateField(field, value, rule);
+			if (issue) issues.push(issue);
+		}
+	}
+
+	// Check forbidden fields
+	if (rules?.forbidden) {
+		for (const forbiddenField of rules.forbidden) {
+			if (forbiddenField in attributes) {
+				issues.push({
+					field: forbiddenField,
+					message: "field not allowed for this note type",
+				});
+			}
+		}
 	}
 
 	return { valid: issues.length === 0, issues };

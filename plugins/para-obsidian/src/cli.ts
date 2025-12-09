@@ -62,10 +62,11 @@ import {
 	loadConfig,
 	type ParaObsidianConfig,
 } from "./config";
-import { flattenAttachments } from "./flatten";
 import { createFromTemplate, replaceSections } from "./create";
 import { DEFAULT_AVAILABLE_MODELS, DEFAULT_MODEL } from "./defaults";
 import { deleteFile } from "./delete";
+import { flattenAttachments } from "./flatten";
+import { linkAttachmentsToNotes } from "./link-attachments";
 import {
 	applyVersionPlan,
 	migrateAllTemplateVersions,
@@ -928,6 +929,58 @@ async function main(): Promise<void> {
 
 				if (config.autoCommit && !dryRun && result.attachmentsMoved > 0) {
 					// Commit all changes (moved files + updated note references)
+					await commitAllNotes(config);
+				}
+				break;
+			}
+
+			case "link-attachments": {
+				const dir = subcommand;
+				if (!dir) {
+					console.error(emphasize.error("Usage: link-attachments <directory>"));
+					console.error(
+						"Example: link-attachments '01 Projects/2025 Tassie Holiday'",
+					);
+					process.exit(1);
+				}
+
+				const dryRun = flags["dry-run"] === true || flags["dry-run"] === "true";
+				const threshold =
+					typeof flags.threshold === "number"
+						? flags.threshold
+						: typeof flags.threshold === "string"
+							? Number.parseFloat(flags.threshold)
+							: 0.3;
+
+				if (!dryRun) {
+					await ensureGitGuard(config);
+				}
+
+				const result = await linkAttachmentsToNotes(config.vault, dir, {
+					dryRun,
+					threshold,
+				});
+
+				if (isJson) {
+					console.log(JSON.stringify(result, null, 2));
+				} else {
+					console.log(
+						emphasize.success(
+							`${dryRun ? "Would link" : "Linked"} ${result.totalLinks} attachments to ${result.notesUpdated} notes`,
+						),
+					);
+					if (result.notesUpdated > 0) {
+						console.log("\nLinked attachments:");
+						for (const { note, attachments } of result.updates) {
+							console.log(`  ${note}:`);
+							for (const att of attachments) {
+								console.log(`    - ${att}`);
+							}
+						}
+					}
+				}
+
+				if (config.autoCommit && !dryRun && result.notesUpdated > 0) {
 					await commitAllNotes(config);
 				}
 				break;

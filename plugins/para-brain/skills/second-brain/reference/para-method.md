@@ -5,6 +5,7 @@
 ## Table of Contents
 - [The Core Principle](#the-core-principle)
 - [The Four Categories](#the-four-categories)
+- [Resources vs Attachments: The Critical Distinction](#resources-vs-attachments-the-critical-distinction)
 - [The Key Distinction: Projects vs. Areas](#the-key-distinction-projects-vs-areas)
 - [Why Breaking Areas into Projects Matters](#why-breaking-areas-into-projects-matters)
 - [Why PARA Works](#why-para-works)
@@ -109,6 +110,101 @@ PARA stands for **Projects, Areas, Resources, and Archives** - four top-level ca
 - Not currently needed
 - Preserved for potential future use
 - Keeps other categories clean
+
+---
+
+## Resources vs Attachments: The Critical Distinction
+
+One of the most common sources of confusion in PARA implementation is the relationship between **Resources** (a top-level PARA category) and **Attachments** (a physical folder within Projects/Areas).
+
+### Resources = Reference Materials (Knowledge Sources)
+
+Resources are **knowledge you're collecting about topics of interest** - articles, notes, research, learnings. They exist independently as reference material you might use someday.
+
+**Characteristics**:
+- Topic-based organization
+- Reference and learning material
+- May never be directly used
+- Lives at the top level of PARA
+- Contains notes, articles, research
+
+**Examples**:
+- Resources/Habit Formation (notes about habit science)
+- Resources/Project Management (PM methodologies)
+- Resources/Coffee (brewing techniques, roasters)
+
+### Attachments = Physical Files (Artifacts)
+
+Attachments are **files directly related to active work** in a specific Project or Area - PDFs, images, spreadsheets, contracts. They are artifacts of the work itself.
+
+**Characteristics**:
+- Work-specific and actionable
+- Directly supports a Project or Area
+- Physical files that accompany work
+- Lives within Projects/Areas folders
+- Contains PDFs, images, spreadsheets, contracts
+
+**Examples**:
+- Projects/Launch Website/Attachments/design-mockups.pdf
+- Areas/Health/Attachments/lab-results-2024.pdf
+- Projects/Q1 Hiring/Attachments/candidate-resumes/
+
+### The Pattern: Three-Part System
+
+Most Projects and Areas follow this structure:
+
+```
+Projects/
+  └── Launch Website/
+      ├── Notes/              # Your thinking and planning
+      ├── Attachments/        # Physical files (PDFs, images, etc.)
+      └── README.md          # Project overview
+```
+
+**Notes** = Your thoughts, plans, meeting notes
+**Attachments** = Files you're working with
+**README** = Quick reference/dashboard
+
+This keeps work organized and prevents file sprawl.
+
+### Common Confusion Resolved
+
+**Q: "I have a PDF about habit formation. Does it go in Resources or Attachments?"**
+
+A: Ask yourself:
+- Is this **reference material** about a topic? → Resources/Habit Formation
+- Is this **a file I'm actively using** for a project? → Projects/[Project Name]/Attachments
+
+**Q: "Where do screenshots from a research project go?"**
+
+A: If they're **artifacts of the work** → Projects/[Project Name]/Attachments
+If they're **reference material** you might use later → Resources/[Topic]
+
+**Q: "Can something be in both places?"**
+
+A: Yes! A research paper might:
+- Be referenced in Resources/Machine Learning (for general knowledge)
+- Be attached to Projects/AI Feature Launch/Attachments (for active use)
+
+**Q: "What about Areas?"**
+
+A: Areas also have Attachments:
+- Areas/Health/Attachments/medical-records.pdf
+- Areas/Finances/Attachments/tax-documents/
+
+The same principle applies: Attachments = files directly supporting that Area's ongoing responsibilities.
+
+### The Key Test
+
+When deciding between Resources and Attachments, ask:
+
+1. **"Am I collecting knowledge about a topic?"** → Resources
+2. **"Am I working with files for active work?"** → Attachments
+
+Resources = Learning and reference
+Attachments = Work artifacts and deliverables
+
+---
 
 ## The Key Distinction: Projects vs. Areas
 

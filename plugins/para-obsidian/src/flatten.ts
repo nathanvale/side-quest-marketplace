@@ -109,8 +109,7 @@ function inferTypeFromPath(filePath: string): string | null {
 	const lowerPath = filePath.toLowerCase();
 
 	// Type hints from directory names
-	if (lowerPath.includes("hikes") || lowerPath.includes("hike"))
-		return "hike";
+	if (lowerPath.includes("hikes") || lowerPath.includes("hike")) return "hike";
 	if (lowerPath.includes("booking")) return "booking";
 	if (lowerPath.includes("photo") || lowerPath.includes("image"))
 		return "photo";
@@ -226,10 +225,7 @@ export async function flattenAttachments(
 	// Step 4: Remove empty directories
 	let emptyDirsRemoved = 0;
 	if (removeEmptyDirs && !dryRun) {
-		emptyDirsRemoved = removeEmptyDirectories(
-			vault,
-			"Attachments/Organized",
-		);
+		emptyDirsRemoved = removeEmptyDirectories(vault, "Attachments/Organized");
 	}
 
 	return {
