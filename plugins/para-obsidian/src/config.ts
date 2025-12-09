@@ -22,6 +22,7 @@ import {
 	DEFAULT_PARA_SEARCH_FOLDERS,
 	DEFAULT_SUGGESTED_TAGS,
 	DEFAULT_TEMPLATE_VERSIONS,
+	DEFAULT_TITLE_PREFIXES,
 } from "./defaults";
 
 /**
@@ -228,7 +229,7 @@ export function loadConfig(
 		defaultParaSearchFolders: merged.defaultParaSearchFolders ?? [
 			...DEFAULT_PARA_SEARCH_FOLDERS,
 		],
-		titlePrefixes: merged.titlePrefixes,
+		titlePrefixes: merged.titlePrefixes ?? DEFAULT_TITLE_PREFIXES,
 	};
 }
 

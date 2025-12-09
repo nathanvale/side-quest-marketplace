@@ -372,9 +372,9 @@ export const DEFAULT_PARA_SEARCH_FOLDERS = [
  * - Captures are temporary inbox items (no prefix)
  */
 export const DEFAULT_TITLE_PREFIXES: Partial<Record<string, string>> = {
-	research: "Research -",
-	booking: "Booking -",
-	trip: "Trip -",
-	itinerary: "Itinerary -",
-	checklist: "Checklist -",
+	research: "📊 Research -",
+	booking: "🎫 Booking -",
+	trip: "✈️ Trip -",
+	itinerary: "🗓️ Itinerary -",
+	checklist: "✅ Checklist -",
 };
