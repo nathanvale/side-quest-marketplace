@@ -27,6 +27,9 @@ export type LLMModel = ClaudeModel | OllamaModel;
 /** Default Ollama API URL */
 export const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 
+/** Default timeout for LLM calls in milliseconds (60 seconds) */
+export const DEFAULT_LLM_TIMEOUT_MS = 60000;
+
 /**
  * Options for calling an LLM model.
  */
@@ -37,6 +40,8 @@ export interface CallModelOptions {
 	prompt: string;
 	/** Ollama API URL (only used for Ollama models) */
 	ollamaUrl?: string;
+	/** Timeout in milliseconds (default: 60000ms / 60 seconds) */
+	timeoutMs?: number;
 }
 
 /**
@@ -88,28 +93,45 @@ export function validateModel(
  *
  * @param prompt - The prompt to send
  * @param model - Claude model identifier (sonnet or haiku)
+ * @param timeoutMs - Timeout in milliseconds (default: 60000ms / 60 seconds)
  * @returns The generated response text
- * @throws Error if Claude CLI fails or is not installed
+ * @throws Error if Claude CLI fails, times out, or is not installed
  */
 export async function callClaudeHeadless(
 	prompt: string,
 	model: ClaudeModel,
+	timeoutMs: number = DEFAULT_LLM_TIMEOUT_MS,
 ): Promise<string> {
 	try {
-		const result = await spawnAndCollect(
-			[
-				"claude",
-				"-p",
-				prompt,
-				"--output-format",
-				"json",
-				"--model",
-				model,
-				"--tools",
-				'""',
-			],
-			{ cwd: process.cwd() },
-		);
+		// Create a timeout promise
+		const timeoutPromise = new Promise<never>((_, reject) => {
+			setTimeout(() => {
+				reject(
+					new Error(
+						`Claude CLI call timed out after ${timeoutMs}ms. Try using --model haiku for faster responses.`,
+					),
+				);
+			}, timeoutMs);
+		});
+
+		// Race between the actual call and timeout
+		const result = await Promise.race([
+			spawnAndCollect(
+				[
+					"claude",
+					"-p",
+					prompt,
+					"--output-format",
+					"json",
+					"--model",
+					model,
+					"--tools",
+					'""',
+				],
+				{ cwd: process.cwd() },
+			),
+			timeoutPromise,
+		]);
 
 		if (result.exitCode !== 0) {
 			throw new Error(
@@ -156,30 +178,48 @@ export async function callClaudeHeadless(
  * @param prompt - The prompt to send
  * @param model - Ollama model identifier
  * @param ollamaUrl - Ollama API URL (default: http://localhost:11434)
+ * @param timeoutMs - Timeout in milliseconds (default: 60000ms / 60 seconds)
  * @returns The generated response text
- * @throws Error if Ollama is not running or model not found
+ * @throws Error if Ollama is not running, model not found, or call times out
  */
 export async function callOllamaModel(
 	prompt: string,
 	model: OllamaModel,
 	ollamaUrl: string = DEFAULT_OLLAMA_URL,
+	timeoutMs: number = DEFAULT_LLM_TIMEOUT_MS,
 ): Promise<string> {
 	let response: Response;
 
 	try {
-		response = await fetch(`${ollamaUrl}/api/generate`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				model,
-				prompt,
-				stream: false,
-				format: "json",
-			}),
-		});
+		// Create AbortController for timeout
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+		try {
+			response = await fetch(`${ollamaUrl}/api/generate`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					model,
+					prompt,
+					stream: false,
+					format: "json",
+				}),
+				signal: controller.signal,
+			});
+		} finally {
+			clearTimeout(timeoutId);
+		}
 	} catch (error) {
-		if (error instanceof Error && error.message.includes("ECONNREFUSED")) {
-			throw new Error(`Ollama is not running. Start it with: ollama serve`);
+		if (error instanceof Error) {
+			if (error.name === "AbortError") {
+				throw new Error(
+					`Ollama call timed out after ${timeoutMs}ms. Try using a smaller model or increasing timeout.`,
+				);
+			}
+			if (error.message.includes("ECONNREFUSED")) {
+				throw new Error(`Ollama is not running. Start it with: ollama serve`);
+			}
 		}
 		throw error;
 	}
@@ -206,14 +246,14 @@ export async function callOllamaModel(
  * @throws Error if model is unknown or call fails
  */
 export async function callModel(options: CallModelOptions): Promise<string> {
-	const { model, prompt, ollamaUrl } = options;
+	const { model, prompt, ollamaUrl, timeoutMs } = options;
 
 	if (isClaudeModel(model)) {
-		return callClaudeHeadless(prompt, model);
+		return callClaudeHeadless(prompt, model, timeoutMs);
 	}
 
 	if (isOllamaModel(model)) {
-		return callOllamaModel(prompt, model, ollamaUrl);
+		return callOllamaModel(prompt, model, ollamaUrl, timeoutMs);
 	}
 
 	throw new Error(`Unknown model: ${model}`);
