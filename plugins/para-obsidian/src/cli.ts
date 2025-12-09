@@ -115,6 +115,7 @@ function printUsage(): void {
 		"  bun run src/cli.ts index query [--tag TAG] [--frontmatter key=val|--frontmatter.key val] [--dir path[,path2]] [--format md|json]",
 		'  bun run src/cli.ts create --template <name> --title "<Title>" [--dest path] [--arg key=value ...] [--content \'{"heading": "content"}\'] [--attachments paths] [--format md|json]',
 		"  bun run src/cli.ts create --template <name> --source <file> [--preview] [--model name] [--arg key=value ...] [--format md|json]",
+		'  bun run src/cli.ts create --template <name> --source-text "<text>" [--preview] [--model name] [--arg key=value ...] [--format md|json]',
 		'  bun run src/cli.ts insert <file> --heading "<Heading>" --content "<Content>" [--before|--after|--append|--prepend] [--attachments paths] [--format md|json]',
 		"  bun run src/cli.ts rename <from> <to> [--dry-run] [--attachments paths] [--format md|json]",
 		"  bun run src/cli.ts delete <file> --confirm [--dry-run] [--attachments paths] [--format md|json]",
@@ -144,6 +145,7 @@ function printUsage(): void {
 		'  bun run src/cli.ts create --template project --title "New Project" --area "[[Health]]" --target_completion 2025-12-31',
 		'  bun run src/cli.ts create --template task --source "inbox/rough-notes.md" --preview',
 		'  bun run src/cli.ts create --template task --source "inbox/rough-notes.md" --model qwen:7b --arg "priority=high"',
+		'  bun run src/cli.ts create --template area --source-text "Managing Muffin: vet visits, grooming, food subscription"',
 		'  bun run src/cli.ts rename "01_Projects/Old.md" "01_Projects/New.md" --dry-run',
 	];
 	console.log(
@@ -282,7 +284,8 @@ function parseArgOverrides(
 async function handleCreateFromSource(options: {
 	config: ParaObsidianConfig;
 	template: string;
-	sourceFile: string;
+	sourceFile?: string;
+	sourceText?: string;
 	model: string;
 	preview: boolean;
 	title?: string;
@@ -294,6 +297,7 @@ async function handleCreateFromSource(options: {
 		config,
 		template,
 		sourceFile,
+		sourceText,
 		model,
 		preview,
 		title,
@@ -309,6 +313,7 @@ async function handleCreateFromSource(options: {
 		try {
 			const extracted = await extractMetadata(config, {
 				sourceFile,
+				sourceContent: sourceText,
 				template,
 				model,
 				extractContent: false, // Skip content extraction for preview (token savings)
@@ -337,9 +342,12 @@ async function handleCreateFromSource(options: {
 					}
 				}
 				console.log("");
+				const sourceHint = sourceFile
+					? `--source "${sourceFile}"`
+					: '--source-text "..."';
 				console.log(
 					emphasize.info(
-						`To create: bun src/cli.ts create --template ${template} --source "${sourceFile}"`,
+						`To create: bun src/cli.ts create --template ${template} ${sourceHint}`,
 					),
 				);
 				console.log(
@@ -360,6 +368,7 @@ async function handleCreateFromSource(options: {
 	try {
 		const extracted = await extractMetadata(config, {
 			sourceFile,
+			sourceContent: sourceText,
 			template,
 			model,
 			extractContent: true,
@@ -1120,15 +1129,21 @@ async function main(): Promise<void> {
 					typeof flags.content === "string" ? flags.content : undefined;
 				const sourceFile =
 					typeof flags.source === "string" ? flags.source : undefined;
+				const sourceText =
+					typeof flags["source-text"] === "string"
+						? flags["source-text"]
+						: undefined;
 				const preview = flags.preview === true || flags.preview === "true";
 				const modelFlag =
 					typeof flags.model === "string" ? flags.model : undefined;
 
 				// Validate required flags based on mode
-				if (sourceFile) {
-					// AI-powered mode: --source is provided
+				if (sourceFile || sourceText) {
+					// AI-powered mode: --source or --source-text is provided
 					if (!template) {
-						console.error("create with --source requires --template");
+						console.error(
+							"create with --source or --source-text requires --template",
+						);
 						process.exit(1);
 					}
 
@@ -1157,6 +1172,7 @@ async function main(): Promise<void> {
 						config,
 						template,
 						sourceFile,
+						sourceText,
 						model,
 						preview,
 						title,
@@ -1970,7 +1986,7 @@ async function main(): Promise<void> {
 					// para-obsidian git commit [file]
 					// If file is provided, commit that specific file
 					// Otherwise, commit all uncommitted .md files
-					const fileArg = args[3]; // para-obsidian git commit <file>
+					const fileArg = positional[0]; // Use parsed positional, not raw args
 					try {
 						if (fileArg) {
 							// Commit single file
