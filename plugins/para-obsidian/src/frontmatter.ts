@@ -203,15 +203,15 @@ function validateField(
 			}
 			return undefined;
 		}
-	case "number": {
-		if (typeof value !== "number") {
-			return {
-				field,
-				message: `expected number, got ${formatValueForError(value)}${optionalHint}`,
-			};
+		case "number": {
+			if (typeof value !== "number") {
+				return {
+					field,
+					message: `expected number, got ${formatValueForError(value)}${optionalHint}`,
+				};
+			}
+			return undefined;
 		}
-		return undefined;
-	}
 		case "date": {
 			if (typeof value !== "string" || !isDateLike(value)) {
 				return {

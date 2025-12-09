@@ -18,6 +18,7 @@ import path from "node:path";
 import type { ParaObsidianConfig } from "./config";
 import { parseFrontmatter } from "./frontmatter";
 import { resolveVaultPath } from "./fs";
+import { getManagedFolders } from "./git";
 
 /**
  * Indexed metadata for a single Markdown file.
@@ -98,7 +99,12 @@ export function buildIndex(
 	config: ParaObsidianConfig,
 	dir?: string | ReadonlyArray<string>,
 ): VaultIndex {
-	const dirs = Array.isArray(dir) ? dir : dir ? [dir] : ["."];
+	// Default to PARA-managed folders (like git), not entire vault root
+	const dirs = Array.isArray(dir)
+		? dir
+		: dir
+			? [dir]
+			: Array.from(getManagedFolders(config));
 	const files: string[] = [];
 
 	// Collect all Markdown files from specified directories

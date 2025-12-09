@@ -31,7 +31,8 @@ tags: [a, b]
 		);
 		process.env.PARA_VAULT = vault;
 		const cfg = loadConfig({ cwd: vault });
-		const idx = buildIndex(cfg);
+		// Pass explicit directory since temp vault doesn't have PARA folders
+		const idx = buildIndex(cfg, ".");
 		const indexPath = saveIndex(cfg, idx);
 		expect(fs.existsSync(indexPath)).toBe(true);
 
