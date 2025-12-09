@@ -60,7 +60,7 @@ function extractWikilinks(
 		const parsed = parseFrontmatter(content);
 		attributes = parsed.attributes;
 		body = parsed.body;
-	} catch (error) {
+	} catch {
 		// Skip files with invalid frontmatter (e.g., Templater templates)
 		return [];
 	}
