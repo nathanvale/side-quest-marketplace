@@ -9,6 +9,7 @@ import {
 	type ConversionResult,
 	type ConvertNoteOptions,
 	cleanWikilinkValue,
+	type ExtractMetadataOptions,
 	flattenToString,
 } from "./orchestration";
 
@@ -78,6 +79,51 @@ describe("ConvertNoteOptions interface", () => {
 		expect(options.titleOverride).toBe("My Custom Title");
 		expect(options.dest).toBe("01_Projects");
 		expect(options.dryRun).toBe(true);
+	});
+});
+
+describe("ExtractMetadataOptions interface", () => {
+	test("supports sourceFile mode (extract from file)", () => {
+		const options: ExtractMetadataOptions = {
+			sourceFile: "inbox/rough-notes.md",
+			template: "task",
+		};
+
+		expect(options.sourceFile).toBe("inbox/rough-notes.md");
+		expect(options.sourceContent).toBeUndefined();
+		expect(options.template).toBe("task");
+	});
+
+	test("supports sourceContent mode (extract from raw text)", () => {
+		const options: ExtractMetadataOptions = {
+			sourceContent:
+				"Managing my dog Muffin - vet visits, grooming, food subscription",
+			template: "area",
+		};
+
+		expect(options.sourceFile).toBeUndefined();
+		expect(options.sourceContent).toBe(
+			"Managing my dog Muffin - vet visits, grooming, food subscription",
+		);
+		expect(options.template).toBe("area");
+	});
+
+	test("supports all optional fields with sourceContent", () => {
+		const options: ExtractMetadataOptions = {
+			sourceContent: "Book the plumber for kitchen sink repair",
+			template: "task",
+			model: "haiku",
+			extractContent: false,
+			argOverrides: { priority: "high", area: "[[Home]]" },
+		};
+
+		expect(options.sourceContent).toBeDefined();
+		expect(options.model).toBe("haiku");
+		expect(options.extractContent).toBe(false);
+		expect(options.argOverrides).toEqual({
+			priority: "high",
+			area: "[[Home]]",
+		});
 	});
 });
 

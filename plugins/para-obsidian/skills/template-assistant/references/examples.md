@@ -12,7 +12,7 @@ Sample interactions and generated content for common scenarios.
 
 **Generated CLI Command:**
 ```bash
-bun src/cli.ts create --template project \
+bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts create --template project \
   --title "Launch Dark Mode" \
   --arg "Project title=Launch Dark Mode" \
   --arg "Target completion date (YYYY-MM-DD)=2025-03-31" \
@@ -32,7 +32,7 @@ bun src/cli.ts create --template project \
 
 **Generated CLI Command:**
 ```bash
-bun src/cli.ts create --template project \
+bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts create --template project \
   --title "Complete Half Marathon" \
   --arg "Project title=Complete Half Marathon" \
   --arg "Target completion date (YYYY-MM-DD)=2025-09-15" \
@@ -56,7 +56,7 @@ bun src/cli.ts create --template project \
 
 **Generated CLI Command:**
 ```bash
-bun src/cli.ts create --template area \
+bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts create --template area \
   --title "Engineering" \
   --arg "Area title=Engineering" \
   --content '{
@@ -72,7 +72,7 @@ bun src/cli.ts create --template area \
 
 **Generated CLI Command:**
 ```bash
-bun src/cli.ts create --template area \
+bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts create --template area \
   --title "Family" \
   --arg "Area title=Family" \
   --content '{
@@ -92,7 +92,7 @@ bun src/cli.ts create --template area \
 
 **Generated CLI Command:**
 ```bash
-bun src/cli.ts create --template resource \
+bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts create --template resource \
   --title "Atomic Habits" \
   --arg "Resource title=Atomic Habits" \
   --arg "Source type (book/article/video/course/podcast/etc.)=book" \
@@ -116,7 +116,7 @@ bun src/cli.ts create --template resource \
 
 **Generated CLI Command:**
 ```bash
-bun src/cli.ts create --template task \
+bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts create --template task \
   --title "Review Auth Refactor PR" \
   --arg "Task title=Review Auth Refactor PR" \
   --arg "Task type (task/reminder/habit/chore)=task" \
@@ -140,7 +140,7 @@ bun src/cli.ts create --template task \
 
 **Generated CLI Command:**
 ```bash
-bun src/cli.ts create --template capture \
+bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts create --template capture \
   --title "AI Meeting Summary Idea" \
   --arg "Title=AI Meeting Summary Idea" \
   --arg "Captured from (thought/article/conversation/etc.)=thought" \

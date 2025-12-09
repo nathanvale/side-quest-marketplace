@@ -30,9 +30,9 @@ import { listAreas, listProjects, listTags } from "../indexer";
 import { DEFAULT_LLM_MODEL, type ExtractionResult } from "../llm";
 import {
 	extractSourceHeadings,
+	getEditableSections,
 	getTemplate,
 	getTemplateFields,
-	getTemplateSections,
 	suggestSectionMapping,
 } from "../templates";
 import { buildConstraintSet, type VaultContext } from "./constraints";
@@ -299,7 +299,7 @@ export async function convertNoteToTemplate(
 	}
 
 	const fields = getTemplateFields(templateInfo);
-	const sections = getTemplateSections(templateInfo);
+	const sections = getEditableSections(templateInfo);
 	const rules = config.frontmatterRules?.[options.template];
 
 	// 4. Extract source document structure for intelligent mapping
@@ -480,11 +480,13 @@ export async function convertNoteToTemplate(
 }
 
 /**
- * Options for extracting metadata from a source file.
+ * Options for extracting metadata from a source file or raw content.
  */
 export interface ExtractMetadataOptions {
-	/** Path to the source note file (relative to vault) */
-	sourceFile: string;
+	/** Path to the source note file (relative to vault) - mutually exclusive with sourceContent */
+	sourceFile?: string;
+	/** Raw source content to extract from - mutually exclusive with sourceFile */
+	sourceContent?: string;
 	/** Target template name */
 	template: string;
 	/** LLM model to use (default: qwen2.5:14b) */
@@ -530,20 +532,31 @@ export async function extractMetadata(
 	config: ParaObsidianConfig,
 	options: ExtractMetadataOptions,
 ): Promise<ExtractionResult> {
-	// 1. Read source note
+	// 1. Get source content - either from file or directly provided
 	let existingContent: string;
-	try {
-		const { body, attributes } = readFrontmatterFile(
-			config,
-			options.sourceFile,
+
+	if (options.sourceContent) {
+		// Raw content provided directly
+		existingContent = options.sourceContent;
+	} else if (options.sourceFile) {
+		// Read from file
+		try {
+			const { body, attributes } = readFrontmatterFile(
+				config,
+				options.sourceFile,
+			);
+			existingContent =
+				Object.keys(attributes).length > 0
+					? `Existing frontmatter:\n${JSON.stringify(attributes, null, 2)}\n\nBody:\n${body}`
+					: body;
+		} catch {
+			// File might not have frontmatter, read as plain text
+			existingContent = readFile(config.vault, options.sourceFile);
+		}
+	} else {
+		throw new Error(
+			"Either sourceFile or sourceContent must be provided to extractMetadata",
 		);
-		existingContent =
-			Object.keys(attributes).length > 0
-				? `Existing frontmatter:\n${JSON.stringify(attributes, null, 2)}\n\nBody:\n${body}`
-				: body;
-	} catch {
-		// File might not have frontmatter, read as plain text
-		existingContent = readFile(config.vault, options.sourceFile);
 	}
 
 	// 2. Build vault context
@@ -560,7 +573,7 @@ export async function extractMetadata(
 	}
 
 	const fields = getTemplateFields(templateInfo);
-	const sections = getTemplateSections(templateInfo);
+	const sections = getEditableSections(templateInfo);
 	const rules = config.frontmatterRules?.[options.template];
 
 	// 4. Extract source document structure for intelligent mapping
@@ -665,7 +678,7 @@ export async function suggestFieldValues(
 	};
 
 	const fields = getTemplateFields(templateInfo);
-	const sections = getTemplateSections(templateInfo);
+	const sections = getEditableSections(templateInfo);
 	const rules = config.frontmatterRules?.[options.template];
 
 	// Build constraints

@@ -250,6 +250,77 @@ export function getTemplateSections(template: TemplateInfo): string[] {
 }
 
 /**
+ * Get the content between a heading and the next heading of same or higher level.
+ *
+ * @param body - Template body content (without frontmatter)
+ * @param heading - The heading to find content for
+ * @returns Content between this heading and the next, or empty string if not found
+ */
+function getSectionContent(body: string, heading: string): string {
+	// Escape special regex characters in heading
+	const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+	// Find the heading and capture content until next level-2 heading or end
+	// Allow any whitespace after the heading line
+	const regex = new RegExp(
+		`^##\\s+${escapedHeading}\\s*$([\\s\\S]*?)(?=^##\\s|\\z)`,
+		"gm",
+	);
+	const match = regex.exec(body);
+
+	return match?.[1] ?? "";
+}
+
+/**
+ * Check if section content contains a dataview block.
+ *
+ * Dataview blocks are code blocks with language identifier "dataview":
+ * ```dataview
+ * TABLE ...
+ * ```
+ *
+ * @param content - Section content to check
+ * @returns true if content contains a dataview block
+ */
+function hasDataviewBlock(content: string): boolean {
+	return /```dataview[\s\S]*?```/.test(content);
+}
+
+/**
+ * Get template sections that are editable (don't contain dataview blocks).
+ *
+ * Filters out sections that have dataview queries, since those should
+ * be preserved and not overwritten by LLM-generated content.
+ *
+ * @param template - Template info with content to analyze
+ * @returns Array of section heading names that can be edited
+ *
+ * @example
+ * ```typescript
+ * const template = getTemplate(config, 'area');
+ * const editableSections = getEditableSections(template);
+ * // ["Description", "Standards to Maintain", "Key Metrics", "Routines & Habits", "Review Questions", "Notes"]
+ * // (excludes "Current Projects", "Related Tasks", "Related Resources" which have dataview)
+ * ```
+ */
+export function getEditableSections(template: TemplateInfo): string[] {
+	// Get all sections
+	const allSections = getTemplateSections(template);
+
+	// Extract body section (after frontmatter)
+	const frontmatterMatch = template.content.match(/^---\n([\s\S]*?)\n---/);
+	const body = frontmatterMatch
+		? template.content.slice(frontmatterMatch[0].length)
+		: template.content;
+
+	// Filter out sections with dataview blocks
+	return allSections.filter((heading) => {
+		const content = getSectionContent(body, heading);
+		return !hasDataviewBlock(content);
+	});
+}
+
+/**
  * Extract all headings from a markdown document.
  *
  * Returns heading text and level for intelligent section mapping.

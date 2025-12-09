@@ -13,13 +13,13 @@ Before creating notes, understand what already exists:
 
 ```bash
 # List existing areas
-bun src/cli.ts list-areas --format json
+bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts list-areas --format json
 
 # List existing projects (for task linking)
-bun src/cli.ts list-projects --format json
+bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts list-projects --format json
 
 # Show allowed tags from config
-bun src/cli.ts list-tags --format json
+bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts list-tags --format json
 ```
 
 **CRITICAL: Classification vs Invention**
@@ -50,7 +50,7 @@ When selecting areas/projects, you are CLASSIFYING content into existing categor
 ### 1. Discover Template Structure
 
 ```bash
-bun src/cli.ts template-fields project --format json
+bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts template-fields project --format json
 ```
 
 Returns required args, auto-filled fields, and body sections.
@@ -87,7 +87,7 @@ This ensures Dataview queries work correctly.
 ### 4. Create Note with Content
 
 ```bash
-bun src/cli.ts create --template project \
+bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts create --template project \
   --title "Launch Dark Mode" \
   --arg "Area=[[Product]]" \
   --arg "Target completion date (YYYY-MM-DD)=2025-03-31" \
@@ -97,7 +97,7 @@ bun src/cli.ts create --template project \
 ### 5. Validate Result
 
 ```bash
-bun src/cli.ts frontmatter validate "Launch Dark Mode.md" --format json
+bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts frontmatter validate "Launch Dark Mode.md" --format json
 ```
 
 ---
@@ -106,8 +106,8 @@ bun src/cli.ts frontmatter validate "Launch Dark Mode.md" --format json
 
 | Error | Resolution |
 |-------|------------|
-| Template not found | Run `bun src/cli.ts templates` to list available templates |
-| Missing required arg | Run `bun src/cli.ts template-fields <template>` to discover requirements |
+| Template not found | Run `bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts templates` to list available templates |
+| Missing required arg | Run `bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts template-fields <template>` to discover requirements |
 | Section not injected | Heading may not exist in template |
 | Vault not git repo | Ensure PARA_VAULT is an initialized git repository |
 
@@ -130,7 +130,7 @@ Load these as needed based on the task:
 The convert command uses **classification-based prompting** to intelligently populate area/project fields:
 
 ```bash
-bun src/cli.ts convert note.md --template project
+bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts convert note.md --template project
 # Vault context: 5 areas, 12 projects, 20 tags
 # LLM analyzes content and classifies into existing [[Health]] area
 # Example: "fitness tracking" content → [[Health]] (not "Wellness" or "Fitness")
