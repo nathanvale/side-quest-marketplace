@@ -62,6 +62,7 @@ import {
 	loadConfig,
 	type ParaObsidianConfig,
 } from "./config";
+import { flattenAttachments } from "./flatten";
 import { createFromTemplate, replaceSections } from "./create";
 import { DEFAULT_AVAILABLE_MODELS, DEFAULT_MODEL } from "./defaults";
 import { deleteFile } from "./delete";
@@ -892,6 +893,42 @@ async function main(): Promise<void> {
 							`${dryRun ? "Would rename" : "Renamed"} ${from} → ${to} (rewrites: ${result.rewrites.length})`,
 						),
 					);
+				}
+				break;
+			}
+
+			case "flatten-attachments": {
+				const dryRun = flags["dry-run"] === true || flags["dry-run"] === "true";
+				const removeEmptyDirs =
+					flags["remove-empty-dirs"] === true ||
+					flags["remove-empty-dirs"] === "true";
+
+				if (!dryRun) {
+					await ensureGitGuard(config);
+				}
+
+				const result = await flattenAttachments(config.vault, {
+					dryRun,
+					removeEmptyDirs,
+				});
+
+				if (isJson) {
+					console.log(JSON.stringify(result, null, 2));
+				} else {
+					console.log(
+						emphasize.success(
+							`${dryRun ? "Would flatten" : "Flattened"} ${result.attachmentsMoved} attachments`,
+						),
+					);
+					console.log(`  Notes updated: ${result.notesUpdated}`);
+					if (removeEmptyDirs) {
+						console.log(`  Empty dirs removed: ${result.emptyDirsRemoved}`);
+					}
+				}
+
+				if (config.autoCommit && !dryRun && result.attachmentsMoved > 0) {
+					// Commit all changes (moved files + updated note references)
+					await commitAllNotes(config);
 				}
 				break;
 			}
