@@ -386,7 +386,48 @@ export function validateFrontmatterFile(
 		}
 	}
 
-	const issues = [...result.issues, ...versionIssues];
+	// Validate filename format
+	const filenameIssues: ValidationIssue[] = [];
+	const filename = path.basename(relative, ".md");
+
+	// Check for Title Case (each word should start with uppercase)
+	const words = filename.split(" ");
+	const hasCorrectCase = words.every((word) => {
+		if (word.length === 0) return true;
+		// Allow emoji prefixes and special chars
+		const firstLetter = word.match(/[a-zA-Z]/)?.[0];
+		if (!firstLetter) return true; // No letters (e.g., emoji-only)
+		return firstLetter === firstLetter.toUpperCase();
+	});
+
+	if (!hasCorrectCase) {
+		filenameIssues.push({
+			field: "filename",
+			message: `should use Title Case (found "${filename}")`,
+		});
+	}
+
+	// Check for invalid filename characters
+	const invalidChars = /[/\\:*?"<>|]/;
+	if (invalidChars.test(filename)) {
+		filenameIssues.push({
+			field: "filename",
+			message: `contains invalid characters: /\\:*?"<>|`,
+		});
+	}
+
+	// Check for expected prefix based on note type
+	if (type && config.titlePrefixes?.[type]) {
+		const expectedPrefix = config.titlePrefixes[type];
+		if (!filename.startsWith(expectedPrefix)) {
+			filenameIssues.push({
+				field: "filename",
+				message: `should start with "${expectedPrefix}" for type "${type}"`,
+			});
+		}
+	}
+
+	const issues = [...result.issues, ...versionIssues, ...filenameIssues];
 	return { valid: issues.length === 0, issues, relative, attributes };
 }
 
