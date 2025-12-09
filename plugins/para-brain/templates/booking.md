@@ -12,6 +12,7 @@ cost: <% tp.system.prompt("Cost (numeric only, e.g., 1850.00)", "") %>
 currency: <% tp.system.prompt("Currency (e.g., AUD, USD, EUR)", "AUD") %>
 payment_status: <% tp.system.prompt("Payment status (pending/paid/refunded/cancelled)", "pending") %>
 cancellation_deadline:
+attachments: []
 tags:
   - booking
 ---
@@ -57,9 +58,16 @@ tags:
 
 ## Attachments
 
-<!-- Link to PDFs, emails, screenshots -->
+<!-- Attachments are stored in frontmatter `attachments: []` array -->
+<!-- Add links as: "[[Attachments/filename.pdf]]" -->
 
--
+```dataview
+LIST
+FROM ""
+WHERE file = this.file
+FLATTEN attachments as attachment
+WHERE attachment
+```
 
 ---
 
