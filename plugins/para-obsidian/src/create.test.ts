@@ -346,9 +346,9 @@ Body`,
 		});
 
 		expect(result.filePath).toBe("00 Inbox/My Project.md");
-		expect(
-			fs.existsSync(path.join(vault, "00 Inbox", "My Project.md")),
-		).toBe(true);
+		expect(fs.existsSync(path.join(vault, "00 Inbox", "My Project.md"))).toBe(
+			true,
+		);
 	});
 
 	it("creates area in 00 Inbox by default (PARA method)", () => {
@@ -419,7 +419,9 @@ Body`,
 		});
 
 		expect(result.filePath).toBe("00 Inbox/Review PR.md");
-		expect(fs.existsSync(path.join(vault, "00 Inbox", "Review PR.md"))).toBe(true);
+		expect(fs.existsSync(path.join(vault, "00 Inbox", "Review PR.md"))).toBe(
+			true,
+		);
 	});
 
 	it("creates daily note in 00 Inbox by default (PARA method)", () => {
@@ -442,9 +444,9 @@ Body`,
 		});
 
 		expect(result.filePath).toBe("00 Inbox/2025-12-06.md");
-		expect(
-			fs.existsSync(path.join(vault, "00 Inbox", "2025-12-06.md")),
-		).toBe(true);
+		expect(fs.existsSync(path.join(vault, "00 Inbox", "2025-12-06.md"))).toBe(
+			true,
+		);
 	});
 
 	it("creates capture note in 00_Inbox by default", () => {
