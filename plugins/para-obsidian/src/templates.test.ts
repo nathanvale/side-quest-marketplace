@@ -5,7 +5,9 @@ import {
 	applyDateSubstitutions,
 	convertTemplaterFormat,
 	detectTitlePromptKey,
+	extractSourceHeadings,
 	getTemplateSections,
+	suggestSectionMapping,
 	type TemplateInfo,
 } from "./templates";
 
@@ -322,5 +324,339 @@ type: booking
 			"Contact Information",
 			"Important Notes",
 		]);
+	});
+});
+
+describe("extractSourceHeadings", () => {
+	test("extracts headings with correct levels", () => {
+		const content = `# Title
+Some content
+## Section One
+More content
+### Subsection`;
+
+		const headings = extractSourceHeadings(content);
+
+		expect(headings).toHaveLength(3);
+		expect(headings[0]).toEqual({ text: "Title", level: 1, startLine: 1 });
+		expect(headings[1]).toEqual({
+			text: "Section One",
+			level: 2,
+			startLine: 3,
+		});
+		expect(headings[2]).toEqual({
+			text: "Subsection",
+			level: 3,
+			startLine: 5,
+		});
+	});
+
+	test("returns empty array for empty content", () => {
+		expect(extractSourceHeadings("")).toEqual([]);
+		expect(extractSourceHeadings("   \n\t  \n  ")).toEqual([]);
+	});
+
+	test("returns empty array when no headings found", () => {
+		const content = `Just plain text here.
+No headings at all.
+More text.`;
+
+		expect(extractSourceHeadings(content)).toEqual([]);
+	});
+
+	test("line numbers are accurate", () => {
+		const content = `Line 1: regular text
+Line 2: more text
+# Heading One
+Line 4: text
+Line 5: text
+## Heading Two
+Line 7: text`;
+
+		const headings = extractSourceHeadings(content);
+
+		expect(headings).toHaveLength(2);
+		expect(headings[0]?.startLine).toBe(3);
+		expect(headings[1]?.startLine).toBe(6);
+	});
+
+	test("preserves inline formatting in heading text", () => {
+		const content = `# **Bold** Title
+## Link [example](url) here
+### Inline \`code\` here
+#### _Italic_ text`;
+
+		const headings = extractSourceHeadings(content);
+
+		expect(headings).toHaveLength(4);
+		expect(headings[0]?.text).toBe("**Bold** Title");
+		expect(headings[1]?.text).toBe("Link [example](url) here");
+		expect(headings[2]?.text).toBe("Inline `code` here");
+		expect(headings[3]?.text).toBe("_Italic_ text");
+	});
+
+	test("filters out headings inside code blocks", () => {
+		const content = `# Real Heading
+
+\`\`\`markdown
+# Fake Heading in Code
+## Another Fake
+\`\`\`
+
+## Real Section
+
+\`\`\`
+### More Fake
+\`\`\`
+
+### Real Subsection`;
+
+		const headings = extractSourceHeadings(content);
+
+		expect(headings).toHaveLength(3);
+		expect(headings[0]?.text).toBe("Real Heading");
+		expect(headings[1]?.text).toBe("Real Section");
+		expect(headings[2]?.text).toBe("Real Subsection");
+	});
+
+	test("handles mixed content with text between headings", () => {
+		const content = `# Main Title
+
+This is some introductory text.
+It spans multiple lines.
+
+## Overview
+
+More content here.
+- List item 1
+- List item 2
+
+## Details
+
+Final section with content.`;
+
+		const headings = extractSourceHeadings(content);
+
+		expect(headings).toHaveLength(3);
+		expect(headings[0]?.text).toBe("Main Title");
+		expect(headings[1]?.text).toBe("Overview");
+		expect(headings[2]?.text).toBe("Details");
+	});
+
+	test("extracts all heading levels from 1 to 6", () => {
+		const content = `# Level 1
+## Level 2
+### Level 3
+#### Level 4
+##### Level 5
+###### Level 6`;
+
+		const headings = extractSourceHeadings(content);
+
+		expect(headings).toHaveLength(6);
+		expect(headings[0]).toEqual({ text: "Level 1", level: 1, startLine: 1 });
+		expect(headings[1]).toEqual({ text: "Level 2", level: 2, startLine: 2 });
+		expect(headings[2]).toEqual({ text: "Level 3", level: 3, startLine: 3 });
+		expect(headings[3]).toEqual({ text: "Level 4", level: 4, startLine: 4 });
+		expect(headings[4]).toEqual({ text: "Level 5", level: 5, startLine: 5 });
+		expect(headings[5]).toEqual({ text: "Level 6", level: 6, startLine: 6 });
+	});
+
+	test("handles tilde code blocks (~~~)", () => {
+		const content = `# Real Heading
+
+~~~
+## Fake Heading
+~~~
+
+## Real Section`;
+
+		const headings = extractSourceHeadings(content);
+
+		expect(headings).toHaveLength(2);
+		expect(headings[0]?.text).toBe("Real Heading");
+		expect(headings[1]?.text).toBe("Real Section");
+	});
+
+	test("handles nested code blocks correctly", () => {
+		const content = `# Title
+
+\`\`\`markdown
+# Code Block Start
+\`\`\`markdown
+## Nested?
+\`\`\`
+# Code Block End
+\`\`\`
+
+## Real Heading`;
+
+		const headings = extractSourceHeadings(content);
+
+		// The outer code block should toggle in/out, inner backticks are just text
+		expect(headings.some((h) => h.text === "Real Heading")).toBe(true);
+	});
+});
+
+describe("suggestSectionMapping", () => {
+	test("maps semantically similar sections - overview/why group", () => {
+		const sourceHeadings = [
+			"Project Overview",
+			"Technical Details",
+			"Timeline",
+		];
+		const templateSections = ["Why This Matters", "Success Criteria", "Tasks"];
+
+		const mapping = suggestSectionMapping(sourceHeadings, templateSections);
+
+		expect(mapping.get("Why This Matters")).toBe("Project Overview");
+	});
+
+	test("maps semantically similar sections - requirements/criteria group", () => {
+		const sourceHeadings = ["Overview", "Requirements", "Next Steps"];
+		const templateSections = ["Why This Matters", "Success Criteria", "Tasks"];
+
+		const mapping = suggestSectionMapping(sourceHeadings, templateSections);
+
+		expect(mapping.get("Success Criteria")).toBe("Requirements");
+	});
+
+	test("maps semantically similar sections - timeline/tasks group", () => {
+		const sourceHeadings = ["Overview", "Goals", "Timeline"];
+		const templateSections = ["Why This Matters", "Success Criteria", "Tasks"];
+
+		const mapping = suggestSectionMapping(sourceHeadings, templateSections);
+
+		expect(mapping.get("Tasks")).toBe("Timeline");
+	});
+
+	test("returns null for template section with no matching source heading", () => {
+		const sourceHeadings = ["Random Section", "Unrelated Content"];
+		const templateSections = ["Why This Matters", "Success Criteria", "Tasks"];
+
+		const mapping = suggestSectionMapping(sourceHeadings, templateSections);
+
+		expect(mapping.get("Why This Matters")).toBeNull();
+		expect(mapping.get("Success Criteria")).toBeNull();
+		expect(mapping.get("Tasks")).toBeNull();
+	});
+
+	test("direct keyword overlap beats semantic matching", () => {
+		const sourceHeadings = ["Success Metrics", "Overview"];
+		const templateSections = ["Success Criteria", "Why This Matters"];
+
+		const mapping = suggestSectionMapping(sourceHeadings, templateSections);
+
+		// "Success Metrics" should match "Success Criteria" due to exact word "success"
+		expect(mapping.get("Success Criteria")).toBe("Success Metrics");
+	});
+
+	test("handles empty source headings array", () => {
+		const sourceHeadings: string[] = [];
+		const templateSections = ["Why This Matters", "Success Criteria", "Tasks"];
+
+		const mapping = suggestSectionMapping(sourceHeadings, templateSections);
+
+		expect(mapping.get("Why This Matters")).toBeNull();
+		expect(mapping.get("Success Criteria")).toBeNull();
+		expect(mapping.get("Tasks")).toBeNull();
+	});
+
+	test("handles empty template sections array", () => {
+		const sourceHeadings = ["Overview", "Requirements", "Timeline"];
+		const templateSections: string[] = [];
+
+		const mapping = suggestSectionMapping(sourceHeadings, templateSections);
+
+		expect(mapping.size).toBe(0);
+	});
+
+	test("is case insensitive", () => {
+		const sourceHeadings = ["PROJECT OVERVIEW", "REQUIREMENTS", "timeline"];
+		const templateSections = ["Why This Matters", "Success Criteria", "Tasks"];
+
+		const mapping = suggestSectionMapping(sourceHeadings, templateSections);
+
+		expect(mapping.get("Why This Matters")).toBe("PROJECT OVERVIEW");
+		expect(mapping.get("Success Criteria")).toBe("REQUIREMENTS");
+		expect(mapping.get("Tasks")).toBe("timeline");
+	});
+
+	test("handles punctuation in section names", () => {
+		const sourceHeadings = [
+			"Project Overview & Summary",
+			"Key Requirements!",
+			"Next Steps...",
+		];
+		const templateSections = ["Why This Matters", "Success Criteria", "Tasks"];
+
+		const mapping = suggestSectionMapping(sourceHeadings, templateSections);
+
+		// Punctuation should be stripped during normalization
+		expect(mapping.get("Why This Matters")).toBe("Project Overview & Summary");
+		expect(mapping.get("Success Criteria")).toBe("Key Requirements!");
+		expect(mapping.get("Tasks")).toBe("Next Steps...");
+	});
+
+	test("maps notes/details sections", () => {
+		const sourceHeadings = ["Overview", "Additional Notes", "Contact"];
+		const templateSections = [
+			"Why This Matters",
+			"Important Notes",
+			"Contact Information",
+		];
+
+		const mapping = suggestSectionMapping(sourceHeadings, templateSections);
+
+		expect(mapping.get("Important Notes")).toBe("Additional Notes");
+	});
+
+	test("prefers stronger matches when multiple options exist", () => {
+		const sourceHeadings = ["General Overview", "Project Summary", "Timeline"];
+		const templateSections = ["Why This Matters"];
+
+		const mapping = suggestSectionMapping(sourceHeadings, templateSections);
+
+		// Should pick the one with best keyword overlap
+		// Both have semantic matches, but we should get a deterministic result
+		const match = mapping.get("Why This Matters");
+		expect(match).not.toBeNull();
+		expect(sourceHeadings).toContain(match ?? "");
+	});
+
+	test("handles real-world booking template sections", () => {
+		const sourceHeadings = [
+			"Reservation Info",
+			"Payment Details",
+			"Hotel Contact",
+			"Additional Notes",
+		];
+		const templateSections = [
+			"Booking Details",
+			"Cost & Payment",
+			"Contact Information",
+			"Important Notes",
+		];
+
+		const mapping = suggestSectionMapping(sourceHeadings, templateSections);
+
+		// Contact should match (keyword overlap)
+		// Notes should match (keyword overlap + semantic group)
+		expect(mapping.get("Contact Information")).toBe("Hotel Contact");
+		expect(mapping.get("Important Notes")).toBe("Additional Notes");
+	});
+
+	test("matches action-oriented sections", () => {
+		const sourceHeadings = ["Next Steps", "Action Items", "To-Do List"];
+		const templateSections = ["Tasks", "Next Actions"];
+
+		const mapping = suggestSectionMapping(sourceHeadings, templateSections);
+
+		// Tasks should match action-oriented headings
+		const tasksMatch = mapping.get("Tasks");
+		expect(tasksMatch).not.toBeNull();
+		expect(["Next Steps", "Action Items", "To-Do List"]).toContain(
+			tasksMatch ?? "",
+		);
 	});
 });

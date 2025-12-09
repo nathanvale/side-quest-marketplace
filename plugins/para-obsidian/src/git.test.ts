@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import type { ParaObsidianConfig } from "./config";
 import { gitStatus } from "./git";
 
 function makeTmpDir(): string {
@@ -18,6 +19,17 @@ async function initGit(dir: string) {
 	await Bun.$`git commit -m init`.cwd(dir);
 }
 
+function makeConfig(vault: string): ParaObsidianConfig {
+	return {
+		vault,
+		templatesDir: path.join(vault, "templates"),
+		defaultDestinations: {},
+		suggestedTags: [],
+		frontmatterRules: {},
+		autoCommit: false,
+	};
+}
+
 describe("git helpers", () => {
 	it("reports clean/dirty status", async () => {
 		const dir = makeTmpDir();
@@ -28,5 +40,500 @@ describe("git helpers", () => {
 		fs.writeFileSync(path.join(dir, "file.txt"), "change");
 		const dirty = await gitStatus(dir);
 		expect(dirty.clean).toBe(false);
+	});
+});
+
+describe("getUncommittedFiles", () => {
+	it("returns unstaged new .md files (status ??)", async () => {
+		const { getUncommittedFiles } = await import("./git");
+		const dir = makeTmpDir();
+		await initGit(dir);
+
+		// Create new .md files (untracked)
+		fs.writeFileSync(path.join(dir, "note1.md"), "# Note 1");
+		fs.writeFileSync(path.join(dir, "note2.md"), "# Note 2");
+
+		const files = await getUncommittedFiles(dir);
+		expect(files).toContain("note1.md");
+		expect(files).toContain("note2.md");
+		expect(files).toHaveLength(2);
+	});
+
+	it("returns staged .md files (status A)", async () => {
+		const { getUncommittedFiles } = await import("./git");
+		const dir = makeTmpDir();
+		await initGit(dir);
+
+		// Create and stage a new file
+		fs.writeFileSync(path.join(dir, "staged.md"), "# Staged");
+		await Bun.$`git add staged.md`.cwd(dir);
+
+		const files = await getUncommittedFiles(dir);
+		expect(files).toContain("staged.md");
+		expect(files).toHaveLength(1);
+	});
+
+	it("returns modified .md files (status M)", async () => {
+		const { getUncommittedFiles } = await import("./git");
+		const dir = makeTmpDir();
+		await initGit(dir);
+
+		// Create and commit a file, then modify it
+		fs.writeFileSync(path.join(dir, "existing.md"), "# Original");
+		await Bun.$`git add existing.md`.cwd(dir);
+		await Bun.$`git commit -m "add existing"`.cwd(dir);
+
+		// Modify the file
+		fs.writeFileSync(path.join(dir, "existing.md"), "# Modified");
+
+		const files = await getUncommittedFiles(dir);
+		expect(files).toContain("existing.md");
+		expect(files).toHaveLength(1);
+	});
+
+	it("handles files with both staged and unstaged changes (status MM)", async () => {
+		const { getUncommittedFiles } = await import("./git");
+		const dir = makeTmpDir();
+		await initGit(dir);
+
+		// Create and commit a file
+		fs.writeFileSync(path.join(dir, "both.md"), "# Original");
+		await Bun.$`git add both.md`.cwd(dir);
+		await Bun.$`git commit -m "add both"`.cwd(dir);
+
+		// Modify and stage
+		fs.writeFileSync(path.join(dir, "both.md"), "# First change");
+		await Bun.$`git add both.md`.cwd(dir);
+
+		// Modify again without staging
+		fs.writeFileSync(path.join(dir, "both.md"), "# Second change");
+
+		const files = await getUncommittedFiles(dir);
+		expect(files).toContain("both.md");
+		expect(files).toHaveLength(1);
+	});
+
+	it("filters out non-.md files", async () => {
+		const { getUncommittedFiles } = await import("./git");
+		const dir = makeTmpDir();
+		await initGit(dir);
+
+		// Create mixed file types
+		fs.writeFileSync(path.join(dir, "note.md"), "# Note");
+		fs.writeFileSync(path.join(dir, "script.js"), "console.log('hi')");
+		fs.writeFileSync(path.join(dir, "data.json"), "{}");
+		fs.writeFileSync(path.join(dir, "readme.txt"), "text");
+
+		const files = await getUncommittedFiles(dir);
+		expect(files).toContain("note.md");
+		expect(files).not.toContain("script.js");
+		expect(files).not.toContain("data.json");
+		expect(files).not.toContain("readme.txt");
+		expect(files).toHaveLength(1);
+	});
+
+	it("returns empty array when working tree is clean", async () => {
+		const { getUncommittedFiles } = await import("./git");
+		const dir = makeTmpDir();
+		await initGit(dir);
+
+		const files = await getUncommittedFiles(dir);
+		expect(files).toEqual([]);
+	});
+
+	it("returns files from subdirectories with relative paths", async () => {
+		const { getUncommittedFiles } = await import("./git");
+		const dir = makeTmpDir();
+		await initGit(dir);
+
+		// Create subdirectory with notes
+		fs.mkdirSync(path.join(dir, "projects"), { recursive: true });
+		fs.writeFileSync(path.join(dir, "projects", "project1.md"), "# Project 1");
+
+		const files = await getUncommittedFiles(dir);
+		expect(files).toContain("projects/project1.md");
+		expect(files).toHaveLength(1);
+	});
+});
+
+describe("extractLinkedAttachments", () => {
+	it("extracts wikilink embeds ![[image.png]]", async () => {
+		const { extractLinkedAttachments } = await import("./git");
+		const vault = makeTmpDir();
+		fs.mkdirSync(path.join(vault, "attachments"), { recursive: true });
+
+		// Create note with wikilink embeds
+		const notePath = path.join(vault, "note.md");
+		fs.writeFileSync(
+			notePath,
+			"# Note\n![[attachments/screenshot.png]]\n![[attachments/diagram.jpg]]\n",
+		);
+
+		// Create the attachment files
+		fs.writeFileSync(path.join(vault, "attachments", "screenshot.png"), "");
+		fs.writeFileSync(path.join(vault, "attachments", "diagram.jpg"), "");
+
+		const attachments = extractLinkedAttachments(vault, "note.md");
+		expect(attachments).toContain("attachments/screenshot.png");
+		expect(attachments).toContain("attachments/diagram.jpg");
+		expect(attachments).toHaveLength(2);
+	});
+
+	it("extracts markdown embeds ![](path/to/file.png)", async () => {
+		const { extractLinkedAttachments } = await import("./git");
+		const vault = makeTmpDir();
+		fs.mkdirSync(path.join(vault, "images"), { recursive: true });
+
+		const notePath = path.join(vault, "note.md");
+		fs.writeFileSync(
+			notePath,
+			"# Note\n![screenshot](images/screen.png)\n![photo](images/photo.jpg)\n",
+		);
+
+		fs.writeFileSync(path.join(vault, "images", "screen.png"), "");
+		fs.writeFileSync(path.join(vault, "images", "photo.jpg"), "");
+
+		const attachments = extractLinkedAttachments(vault, "note.md");
+		expect(attachments).toContain("images/screen.png");
+		expect(attachments).toContain("images/photo.jpg");
+		expect(attachments).toHaveLength(2);
+	});
+
+	it("handles relative paths in embeds", async () => {
+		const { extractLinkedAttachments } = await import("./git");
+		const vault = makeTmpDir();
+		fs.mkdirSync(path.join(vault, "notes"), { recursive: true });
+		fs.mkdirSync(path.join(vault, "files"), { recursive: true });
+
+		// Note in subdirectory referencing attachment in another directory
+		const notePath = path.join(vault, "notes", "project.md");
+		fs.writeFileSync(notePath, "# Project\n![[../files/diagram.png]]\n");
+
+		fs.writeFileSync(path.join(vault, "files", "diagram.png"), "");
+
+		const attachments = extractLinkedAttachments(vault, "notes/project.md");
+		expect(attachments).toContain("files/diagram.png");
+	});
+
+	it("skips .md file links (notes, not attachments)", async () => {
+		const { extractLinkedAttachments } = await import("./git");
+		const vault = makeTmpDir();
+		const notePath = path.join(vault, "note.md");
+		fs.writeFileSync(
+			notePath,
+			"# Note\n![[other-note.md]]\n![[image.png]]\n[[linked-note.md]]\n",
+		);
+
+		// Create the files
+		fs.writeFileSync(path.join(vault, "other-note.md"), "");
+		fs.writeFileSync(path.join(vault, "linked-note.md"), "");
+		fs.writeFileSync(path.join(vault, "image.png"), "");
+
+		const attachments = extractLinkedAttachments(vault, "note.md");
+		expect(attachments).not.toContain("other-note.md");
+		expect(attachments).not.toContain("linked-note.md");
+		expect(attachments).toContain("image.png");
+		expect(attachments).toHaveLength(1);
+	});
+
+	it("only returns existing files", async () => {
+		const { extractLinkedAttachments } = await import("./git");
+		const vault = makeTmpDir();
+		const notePath = path.join(vault, "note.md");
+		fs.writeFileSync(notePath, "# Note\n![[exists.png]]\n![[missing.png]]\n");
+
+		// Only create one of the files
+		fs.writeFileSync(path.join(vault, "exists.png"), "");
+
+		const attachments = extractLinkedAttachments(vault, "note.md");
+		expect(attachments).toContain("exists.png");
+		expect(attachments).not.toContain("missing.png");
+		expect(attachments).toHaveLength(1);
+	});
+
+	it("returns empty array for note with no embeds", async () => {
+		const { extractLinkedAttachments } = await import("./git");
+		const vault = makeTmpDir();
+		const notePath = path.join(vault, "note.md");
+		fs.writeFileSync(notePath, "# Note\nJust text, no embeds.\n");
+
+		const attachments = extractLinkedAttachments(vault, "note.md");
+		expect(attachments).toEqual([]);
+	});
+
+	it("handles mixed wikilink and markdown embeds", async () => {
+		const { extractLinkedAttachments } = await import("./git");
+		const vault = makeTmpDir();
+		const notePath = path.join(vault, "note.md");
+		fs.writeFileSync(
+			notePath,
+			"# Note\n![[wiki.png]]\n![markdown](markdown.jpg)\n",
+		);
+
+		fs.writeFileSync(path.join(vault, "wiki.png"), "");
+		fs.writeFileSync(path.join(vault, "markdown.jpg"), "");
+
+		const attachments = extractLinkedAttachments(vault, "note.md");
+		expect(attachments).toContain("wiki.png");
+		expect(attachments).toContain("markdown.jpg");
+		expect(attachments).toHaveLength(2);
+	});
+
+	it("deduplicates attachment paths", async () => {
+		const { extractLinkedAttachments } = await import("./git");
+		const vault = makeTmpDir();
+		const notePath = path.join(vault, "note.md");
+		fs.writeFileSync(
+			notePath,
+			"# Note\n![[image.png]]\n![[image.png]]\n![alt](image.png)\n",
+		);
+
+		fs.writeFileSync(path.join(vault, "image.png"), "");
+
+		const attachments = extractLinkedAttachments(vault, "note.md");
+		expect(attachments).toContain("image.png");
+		expect(attachments).toHaveLength(1);
+	});
+});
+
+describe("commitNote", () => {
+	it("commits a single note with message 'chore: <note title>'", async () => {
+		const { commitNote } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		// Create a note
+		fs.writeFileSync(path.join(vault, "My Project Note.md"), "# My Project");
+
+		const result = await commitNote(makeConfig(vault), "My Project Note.md");
+
+		expect(result.committed).toBe(true);
+		expect(result.message).toBe("chore: My Project Note");
+		expect(result.files).toContain("My Project Note.md");
+
+		// Verify commit exists
+		const log = await Bun.$`git log --oneline -1`.cwd(vault).text();
+		expect(log).toContain("chore: My Project Note");
+	});
+
+	it("includes linked attachments in same commit", async () => {
+		const { commitNote } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		// Create note with attachment reference
+		const notePath = path.join(vault, "Project.md");
+		fs.writeFileSync(notePath, "# Project\n![[diagram.png]]\n");
+		fs.writeFileSync(path.join(vault, "diagram.png"), "image data");
+
+		const result = await commitNote(makeConfig(vault), "Project.md");
+
+		expect(result.committed).toBe(true);
+		expect(result.files).toContain("Project.md");
+		expect(result.files).toContain("diagram.png");
+		expect(result.files).toHaveLength(2);
+
+		// Verify both files are in the commit
+		const show = await Bun.$`git show --name-only --format=format:`
+			.cwd(vault)
+			.text();
+		expect(show).toContain("Project.md");
+		expect(show).toContain("diagram.png");
+	});
+
+	it("title extracted from filename without .md extension", async () => {
+		const { commitNote } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		fs.writeFileSync(
+			path.join(vault, "Build Garden Shed.md"),
+			"# Build Garden Shed",
+		);
+
+		const result = await commitNote(makeConfig(vault), "Build Garden Shed.md");
+
+		expect(result.message).toBe("chore: Build Garden Shed");
+	});
+
+	it("handles notes in subdirectories", async () => {
+		const { commitNote } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		fs.mkdirSync(path.join(vault, "projects"), { recursive: true });
+		fs.writeFileSync(
+			path.join(vault, "projects", "Website Redesign.md"),
+			"# Website Redesign",
+		);
+
+		const result = await commitNote(
+			makeConfig(vault),
+			"projects/Website Redesign.md",
+		);
+
+		expect(result.committed).toBe(true);
+		expect(result.message).toBe("chore: Website Redesign");
+		expect(result.files).toContain("projects/Website Redesign.md");
+	});
+
+	it("fails gracefully if note does not exist", async () => {
+		const { commitNote } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		await expect(
+			commitNote(makeConfig(vault), "nonexistent.md"),
+		).rejects.toThrow();
+	});
+
+	it("commits note with multiple attachments", async () => {
+		const { commitNote } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		const notePath = path.join(vault, "Research.md");
+		fs.writeFileSync(
+			notePath,
+			"# Research\n![[photo1.jpg]]\n![[photo2.jpg]]\n![[doc.pdf]]\n",
+		);
+		fs.writeFileSync(path.join(vault, "photo1.jpg"), "");
+		fs.writeFileSync(path.join(vault, "photo2.jpg"), "");
+		fs.writeFileSync(path.join(vault, "doc.pdf"), "");
+
+		const result = await commitNote(makeConfig(vault), "Research.md");
+
+		expect(result.files).toContain("Research.md");
+		expect(result.files).toContain("photo1.jpg");
+		expect(result.files).toContain("photo2.jpg");
+		expect(result.files).toContain("doc.pdf");
+		expect(result.files).toHaveLength(4);
+	});
+});
+
+describe("commitAllNotes", () => {
+	it("creates one commit per uncommitted .md file", async () => {
+		const { commitAllNotes } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		// Create multiple notes
+		fs.writeFileSync(path.join(vault, "Note 1.md"), "# Note 1");
+		fs.writeFileSync(path.join(vault, "Note 2.md"), "# Note 2");
+		fs.writeFileSync(path.join(vault, "Note 3.md"), "# Note 3");
+
+		const result = await commitAllNotes(makeConfig(vault));
+
+		expect(result.total).toBe(3);
+		expect(result.committed).toBe(3);
+		expect(result.results).toHaveLength(3);
+
+		// Verify 3 commits were created
+		const log = await Bun.$`git log --oneline`.cwd(vault).text();
+		const commits = log.trim().split("\n");
+		expect(commits.filter((c) => c.includes("chore:"))).toHaveLength(3);
+	});
+
+	it("returns accurate count of committed notes", async () => {
+		const { commitAllNotes } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		fs.writeFileSync(path.join(vault, "Alpha.md"), "# Alpha");
+		fs.writeFileSync(path.join(vault, "Beta.md"), "# Beta");
+
+		const result = await commitAllNotes(makeConfig(vault));
+
+		expect(result.total).toBe(2);
+		expect(result.committed).toBe(2);
+		expect(result.results).toHaveLength(2);
+		expect(
+			result.results.every((r: { committed: boolean }) => r.committed),
+		).toBe(true);
+	});
+
+	it("handles empty case (nothing to commit)", async () => {
+		const { commitAllNotes } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		// Clean working tree
+		const result = await commitAllNotes(makeConfig(vault));
+
+		expect(result.total).toBe(0);
+		expect(result.committed).toBe(0);
+		expect(result.results).toEqual([]);
+	});
+
+	it("commits notes with their attachments", async () => {
+		const { commitAllNotes } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		// Note 1 with attachment
+		fs.writeFileSync(path.join(vault, "Note 1.md"), "# Note 1\n![[img1.png]]");
+		fs.writeFileSync(path.join(vault, "img1.png"), "");
+
+		// Note 2 with attachment
+		fs.writeFileSync(path.join(vault, "Note 2.md"), "# Note 2\n![[img2.png]]");
+		fs.writeFileSync(path.join(vault, "img2.png"), "");
+
+		const result = await commitAllNotes(makeConfig(vault));
+
+		expect(result.total).toBe(2);
+		expect(result.committed).toBe(2);
+
+		// Verify each commit includes note + attachment
+		const note1Result = result.results.find((r: { files: string[] }) =>
+			r.files.includes("Note 1.md"),
+		);
+		expect(note1Result?.files).toContain("img1.png");
+
+		const note2Result = result.results.find((r: { files: string[] }) =>
+			r.files.includes("Note 2.md"),
+		);
+		expect(note2Result?.files).toContain("img2.png");
+	});
+
+	it("skips non-.md files", async () => {
+		const { commitAllNotes } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		// Create mixed files
+		fs.writeFileSync(path.join(vault, "Note.md"), "# Note");
+		fs.writeFileSync(path.join(vault, "script.js"), "console.log()");
+		fs.writeFileSync(path.join(vault, "data.json"), "{}");
+
+		const result = await commitAllNotes(makeConfig(vault));
+
+		expect(result.total).toBe(1); // Only the .md file
+		expect(result.committed).toBe(1);
+		expect(result.results[0]?.files).toContain("Note.md");
+	});
+
+	it("commits notes in subdirectories", async () => {
+		const { commitAllNotes } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		fs.mkdirSync(path.join(vault, "projects"), { recursive: true });
+		fs.mkdirSync(path.join(vault, "areas"), { recursive: true });
+
+		fs.writeFileSync(path.join(vault, "projects", "Project.md"), "# Project");
+		fs.writeFileSync(path.join(vault, "areas", "Area.md"), "# Area");
+		fs.writeFileSync(path.join(vault, "Root.md"), "# Root");
+
+		const result = await commitAllNotes(makeConfig(vault));
+
+		expect(result.total).toBe(3);
+		expect(result.committed).toBe(3);
+
+		const filePaths = result.results.flatMap(
+			(r: { files: string[] }) => r.files,
+		);
+		expect(filePaths).toContain("projects/Project.md");
+		expect(filePaths).toContain("areas/Area.md");
+		expect(filePaths).toContain("Root.md");
 	});
 });

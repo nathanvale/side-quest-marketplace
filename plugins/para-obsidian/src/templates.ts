@@ -249,6 +249,181 @@ export function getTemplateSections(template: TemplateInfo): string[] {
 	return sections;
 }
 
+/**
+ * Extract all headings from a markdown document.
+ *
+ * Returns heading text and level for intelligent section mapping.
+ * Used to analyze source documents for AI-powered note conversion.
+ *
+ * @param content - Raw markdown content
+ * @returns Array of headings with text, level (1-6), and line number
+ *
+ * @example
+ * ```typescript
+ * const headings = extractSourceHeadings(`
+ * # Main Title
+ * Some content
+ * ## Overview
+ * More content
+ * ## Requirements
+ * `);
+ * // Returns:
+ * // [
+ * //   { text: "Main Title", level: 1, startLine: 1 },
+ * //   { text: "Overview", level: 2, startLine: 3 },
+ * //   { text: "Requirements", level: 2, startLine: 5 }
+ * // ]
+ * ```
+ */
+export function extractSourceHeadings(content: string): Array<{
+	text: string;
+	level: number;
+	startLine: number;
+}> {
+	if (!content.trim()) return [];
+
+	const headings: Array<{ text: string; level: number; startLine: number }> =
+		[];
+	const lines = content.split("\n");
+	let inCodeBlock = false;
+
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+
+		// Track code block boundaries (``` or ~~~)
+		if (line && /^(`{3,}|~{3,})/.test(line.trim())) {
+			inCodeBlock = !inCodeBlock;
+			continue;
+		}
+
+		// Skip lines inside code blocks
+		if (inCodeBlock) continue;
+
+		// Match markdown headings: # to ######
+		const match = /^(#{1,6})\s+(.+)$/.exec(line ?? "");
+		if (match) {
+			const level = match[1]?.length ?? 0;
+			const text = match[2]?.trim() ?? "";
+
+			if (text) {
+				headings.push({
+					text,
+					level,
+					startLine: i + 1, // 1-indexed line numbers
+				});
+			}
+		}
+	}
+
+	return headings;
+}
+
+/**
+ * Suggest which source headings map to which template sections.
+ * Uses heuristic matching (keyword overlap, semantic similarity).
+ *
+ * @param sourceHeadings - Headings extracted from source document
+ * @param templateSections - Section names from the target template
+ * @returns Map of template section → suggested source heading (or null if no match)
+ *
+ * @example
+ * ```typescript
+ * const mapping = suggestSectionMapping(
+ *   ["Project Overview", "Technical Requirements", "Timeline"],
+ *   ["Why This Matters", "Success Criteria", "Tasks"]
+ * );
+ * // Returns Map:
+ * // "Why This Matters" → "Project Overview" (keyword: overview/matters)
+ * // "Success Criteria" → "Technical Requirements" (keyword: requirements/criteria)
+ * // "Tasks" → "Timeline" (keyword: timeline/tasks)
+ * ```
+ */
+export function suggestSectionMapping(
+	sourceHeadings: string[],
+	templateSections: string[],
+): Map<string, string | null> {
+	const mapping = new Map<string, string | null>();
+
+	// Normalize a string for matching (lowercase, remove punctuation, split into words)
+	const normalize = (text: string): string[] => {
+		return text
+			.toLowerCase()
+			.replace(/[^\w\s]/g, " ")
+			.split(/\s+/)
+			.filter((w) => w.length > 0);
+	};
+
+	// Semantic keyword groups (template section keywords → source heading keywords)
+	const semanticGroups: Array<[string[], string[]]> = [
+		// Description/Overview/About/Summary → Why/What/Description
+		[
+			["why", "what", "description", "summary", "matters", "purpose"],
+			["overview", "about", "description", "summary", "introduction", "intro"],
+		],
+		// Requirements/Criteria/Goals → Success/Goals/Criteria
+		[
+			["success", "criteria", "goals", "objectives", "outcomes"],
+			["requirements", "criteria", "goals", "objectives", "targets"],
+		],
+		// Tasks/Timeline/Plan/Steps → Tasks/Actions/Next Steps
+		[
+			["tasks", "actions", "steps", "next", "todos", "work"],
+			["timeline", "plan", "tasks", "steps", "schedule", "todos"],
+		],
+		// Notes/Details/Information → Notes/Details/Additional
+		[
+			["notes", "details", "additional", "information", "misc"],
+			["notes", "details", "information", "misc", "other"],
+		],
+	];
+
+	// For each template section, find the best matching source heading
+	for (const templateSection of templateSections) {
+		const templateWords = normalize(templateSection);
+		let bestMatch: string | null = null;
+		let bestScore = 0;
+
+		for (const sourceHeading of sourceHeadings) {
+			const sourceWords = normalize(sourceHeading);
+			let score = 0;
+
+			// Direct keyword overlap
+			for (const tw of templateWords) {
+				for (const sw of sourceWords) {
+					if (tw === sw) {
+						score += 2; // Direct match is strong signal
+					}
+				}
+			}
+
+			// Semantic group matching
+			for (const [templateKeywords, sourceKeywords] of semanticGroups) {
+				const templateHasKeyword = templateWords.some((w) =>
+					templateKeywords.includes(w),
+				);
+				const sourceHasKeyword = sourceWords.some((w) =>
+					sourceKeywords.includes(w),
+				);
+
+				if (templateHasKeyword && sourceHasKeyword) {
+					score += 1; // Semantic match is weaker signal
+				}
+			}
+
+			// Update best match if this is better
+			if (score > bestScore) {
+				bestScore = score;
+				bestMatch = sourceHeading;
+			}
+		}
+
+		// Only set mapping if we have a reasonable match (score > 0)
+		mapping.set(templateSection, bestScore > 0 ? bestMatch : null);
+	}
+
+	return mapping;
+}
+
 // ============================================================================
 // Date Substitution
 // ============================================================================

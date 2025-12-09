@@ -79,6 +79,8 @@ import { listDir, readFile } from "./fs";
 import {
 	assertGitRepo,
 	autoCommitChanges,
+	commitAllNotes,
+	commitNote,
 	ensureGitGuard,
 	gitStatus,
 } from "./git";
@@ -1943,28 +1945,83 @@ async function main(): Promise<void> {
 
 			case "git": {
 				const action = subcommand;
-				if (action !== "guard") {
-					console.error("git supports only 'guard'");
-					process.exit(1);
-				}
-				try {
-					await assertGitRepo(config.vault);
-					const status = await gitStatus(config.vault);
-					if (isJson) {
-						console.log(
-							JSON.stringify({ git: "ok", clean: status.clean }, null, 2),
-						);
-					} else {
-						console.log(color("cyan", `Git OK (clean=${status.clean})`));
+				if (action === "guard") {
+					try {
+						await assertGitRepo(config.vault);
+						const status = await gitStatus(config.vault);
+						if (isJson) {
+							console.log(
+								JSON.stringify({ git: "ok", clean: status.clean }, null, 2),
+							);
+						} else {
+							console.log(color("cyan", `Git OK (clean=${status.clean})`));
+						}
+					} catch (error) {
+						const message =
+							error instanceof Error ? error.message : "Git guard failed";
+						if (isJson) {
+							console.log(JSON.stringify({ git: "error", message }, null, 2));
+						} else {
+							console.error(message);
+						}
+						process.exit(1);
 					}
-				} catch (error) {
-					const message =
-						error instanceof Error ? error.message : "Git guard failed";
-					if (isJson) {
-						console.log(JSON.stringify({ git: "error", message }, null, 2));
-					} else {
-						console.error(message);
+				} else if (action === "commit") {
+					// para-obsidian git commit [file]
+					// If file is provided, commit that specific file
+					// Otherwise, commit all uncommitted .md files
+					const fileArg = args[3]; // para-obsidian git commit <file>
+					try {
+						if (fileArg) {
+							// Commit single file
+							const result = await commitNote(config, fileArg);
+							if (isJson) {
+								console.log(JSON.stringify(result, null, 2));
+							} else if (result.committed) {
+								console.log(color("green", `✓ ${result.message}`));
+								console.log(`  Files: ${result.files.join(", ")}`);
+							} else {
+								console.log(color("yellow", "Nothing to commit"));
+							}
+						} else {
+							// Commit all uncommitted files
+							const result = await commitAllNotes(config);
+							if (isJson) {
+								console.log(JSON.stringify(result, null, 2));
+							} else if (result.total === 0) {
+								console.log(color("cyan", "No uncommitted notes found"));
+							} else {
+								console.log(
+									color(
+										"green",
+										`✓ Committed ${result.committed} of ${result.total} notes`,
+									),
+								);
+								for (const r of result.results) {
+									if (r.committed) {
+										console.log(`  ${color("green", "✓")} ${r.message}`);
+									} else {
+										console.log(
+											`  ${color("yellow", "○")} ${r.message} (no changes)`,
+										);
+									}
+								}
+							}
+						}
+					} catch (error) {
+						const message =
+							error instanceof Error ? error.message : "Git commit failed";
+						if (isJson) {
+							console.log(
+								JSON.stringify({ error: message, committed: false }, null, 2),
+							);
+						} else {
+							console.error(color("red", message));
+						}
+						process.exit(1);
 					}
+				} else {
+					console.error("git supports 'guard' and 'commit'");
 					process.exit(1);
 				}
 				break;

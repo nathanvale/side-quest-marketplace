@@ -10,6 +10,7 @@ import {
 	buildConstraintSection,
 	buildCriticalRules,
 	buildExamplesSection,
+	buildSourceStructureSection,
 	buildStructuredPrompt,
 	DEFAULT_CRITICAL_RULES,
 	type PromptExample,
@@ -102,7 +103,9 @@ describe("buildStructuredPrompt", () => {
 
 		expect(prompt).toContain("CRITICAL RULES:");
 		expect(prompt).toContain("Extract values from the note content");
-		expect(prompt).toContain("Use null for missing/unknown values");
+		expect(prompt).toContain(
+			"For frontmatter (args): Use null for missing values",
+		);
 	});
 
 	test("allows custom critical rules", () => {
@@ -353,7 +356,9 @@ describe("buildCriticalRules", () => {
 		const rules = buildCriticalRules();
 
 		expect(rules).toContain("Extract values from the note content");
-		expect(rules).toContain("Use null for missing/unknown values");
+		expect(rules).toContain(
+			"For frontmatter (args): Use null for missing values",
+		);
 		expect(rules).toContain("Dates MUST be YYYY-MM-DD format");
 	});
 
@@ -464,17 +469,93 @@ describe("buildExamplesSection", () => {
 	});
 });
 
+describe("buildSourceStructureSection", () => {
+	test("formats source headings list", () => {
+		const result = buildSourceStructureSection(
+			["Project Overview", "Technical Requirements"],
+			["Why This Matters", "Success Criteria"],
+		);
+
+		expect(result).toContain("SOURCE DOCUMENT STRUCTURE:");
+		expect(result).toContain('"Project Overview"');
+		expect(result).toContain('"Technical Requirements"');
+	});
+
+	test("includes mapping guidance when provided", () => {
+		const mapping = new Map<string, string | null>([
+			["Why This Matters", "Project Overview"],
+			["Success Criteria", null], // no match, should generate
+		]);
+
+		const result = buildSourceStructureSection(
+			["Project Overview"],
+			["Why This Matters", "Success Criteria"],
+			mapping,
+		);
+
+		expect(result).toContain("SECTION MAPPING GUIDANCE:");
+		expect(result).toContain(
+			'"Why This Matters" ← extract from: "Project Overview"',
+		);
+		expect(result).toContain(
+			'"Success Criteria" ← generate based on context (no direct source match)',
+		);
+	});
+
+	test("handles empty source headings array", () => {
+		const result = buildSourceStructureSection([], ["Section 1"]);
+
+		// Function still outputs structure, just with no headings listed
+		expect(result).toContain("SOURCE DOCUMENT STRUCTURE:");
+		expect(result).toContain("The source document contains these sections:");
+		expect(result).toContain("SECTION MAPPING GUIDANCE:");
+		// No headings should be listed (no "- " lines for headings)
+		const lines = result.split("\n");
+		const headingLines = lines.filter((line) => line.trim().startsWith('- "'));
+		expect(headingLines.length).toBe(0);
+	});
+
+	test("shows general guidance when no mapping provided", () => {
+		const result = buildSourceStructureSection(
+			["Overview"],
+			["Description"],
+			undefined, // no mapping
+		);
+
+		expect(result).toContain("SECTION MAPPING GUIDANCE:");
+		expect(result).toContain(
+			"Extract content from relevant source sections or generate appropriate content for each template section.",
+		);
+		expect(result).toContain(
+			"Use the source headings as guidance, but adapt content to fit the template structure.",
+		);
+	});
+
+	test("handles section in template but not in mapping", () => {
+		const mapping = new Map<string, string | null>([["Section A", "Source A"]]);
+
+		const result = buildSourceStructureSection(
+			["Source A", "Source B"],
+			["Section A", "Section B"], // Section B not in mapping
+			mapping,
+		);
+
+		expect(result).toContain('"Section A" ← extract from: "Source A"');
+		expect(result).toContain('"Section B" ← determine from source content');
+	});
+});
+
 describe("DEFAULT_CRITICAL_RULES", () => {
 	test("has expected number of rules", () => {
-		// Rules 1-12 with sub-items for multi-line rules (10, 11, 12)
-		expect(DEFAULT_CRITICAL_RULES.length).toBe(20);
+		// Rules 1-14 with sub-items for multi-line rules (3, 6, 12, 13, 14)
+		expect(DEFAULT_CRITICAL_RULES.length).toBe(28);
 	});
 
 	test("includes rule numbers", () => {
 		const joined = DEFAULT_CRITICAL_RULES.join("\n");
 		expect(joined).toContain("1. Extract values");
-		expect(joined).toContain("2. Use null");
-		expect(joined).toContain('3. For "content"');
+		expect(joined).toContain("2. For frontmatter");
+		expect(joined).toContain("3. For body sections");
 	});
 
 	test("includes wikilink null handling rule", () => {

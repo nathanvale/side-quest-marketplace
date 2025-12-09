@@ -178,9 +178,12 @@ export function applyArgsToFrontmatter(
  *
  * Also handles unmatched optional prompts by replacing them with their defaults.
  *
- * **Wikilink handling**: If the template wraps a prompt in `[[...]]` and the
- * provided value also contains `[[...]]`, the brackets are stripped from the
- * value to prevent double-wrapping (e.g., `[[[[Home]]]]`).
+ * **Wikilink handling:**
+ * - If template wraps prompt in `[[...]]` and value contains `[[...]]`,
+ *   strips brackets from value to prevent `[[[[Home]]]]`
+ * - If value is a wikilink and prompt is unquoted in YAML frontmatter,
+ *   wraps value in quotes to produce valid YAML (`area: "[[Home]]"`)
+ *   This prevents YAML from parsing `[[Test Area]]` as nested arrays
  *
  * @param content - Template content with Templater prompts
  * @param args - Key-value pairs to substitute
@@ -200,10 +203,15 @@ export function applyArgsToFrontmatter(
  * applyArgsToTemplate(template3, {});
  * // 'URL: ' (default value used)
  *
- * // Wikilink normalization
- * const template4 = 'area: [[<% tp.system.prompt("Area") %>]]';
+ * // Wikilink in quoted template - strips brackets to prevent double-wrapping
+ * const template4 = 'area: "[[<% tp.system.prompt("Area") %>]]"';
  * applyArgsToTemplate(template4, { Area: '[[Home]]' });
- * // 'area: [[Home]]' (not [[[[Home]]]])
+ * // 'area: "[[Home]]"' (not [[[[Home]]]])
+ *
+ * // Wikilink in unquoted template - adds quotes for valid YAML
+ * const template5 = 'area: <% tp.system.prompt("Area") %>';
+ * applyArgsToTemplate(template5, { Area: '[[Work]]' });
+ * // 'area: "[[Work]]"' (quotes prevent YAML array parsing)
  * ```
  */
 export function applyArgsToTemplate(
@@ -230,7 +238,38 @@ export function applyArgsToTemplate(
 		);
 		const isWrappedInWikilinks =
 			output.includes(wrappedSingleArg) || wrappedDoubleArgPattern.test(output);
-		const effectiveValue = isWrappedInWikilinks ? stripWikilinks(value) : value;
+
+		// Determine effective value based on context:
+		// 1. If template wraps prompt in [[...]], strip [[...]] from value to prevent [[[[...]]]]
+		// 2. If value contains [[...]] and prompt is unquoted in YAML, wrap in quotes for valid YAML
+		let effectiveValue: string;
+		if (isWrappedInWikilinks) {
+			// Template has [[<% ... %>]], strip wikilinks from value
+			effectiveValue = stripWikilinks(value);
+		} else if (value.match(/^\[\[.+\]\]$/)) {
+			// Value is a wikilink and template doesn't wrap it
+			// Check if we're in a YAML context (frontmatter) and unquoted
+			// Pattern: "key: <% tp.system.prompt(...) %>" (unquoted)
+			const isInUnquotedYaml =
+				new RegExp(
+					`^\\s*\\w+:\\s*<% tp\\.system\\.prompt\\("${escapedKey}"`,
+					"m",
+				).test(output) ||
+				new RegExp(
+					`^\\s*\\w+:\\s*<% tp\\.system\\.prompt\\("${escapedKey}"\\s*,`,
+					"m",
+				).test(output);
+
+			if (isInUnquotedYaml) {
+				// Wrap wikilink in quotes to produce valid YAML
+				// area: [[Work]] → area: "[[Work]]"
+				effectiveValue = `"${value}"`;
+			} else {
+				effectiveValue = value;
+			}
+		} else {
+			effectiveValue = value;
+		}
 
 		output = output.replaceAll(singleArg, effectiveValue);
 		output = output.replace(doubleArg, effectiveValue);

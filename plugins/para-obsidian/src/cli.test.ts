@@ -400,7 +400,12 @@ tags: [project]
 
 		// Try to set an invalid status value - this should fail validation
 		const { stdout, exitCode } = await runCli(
-			["frontmatter", "set", "01 Projects/Test Project.md", "status=invalid_status_value"],
+			[
+				"frontmatter",
+				"set",
+				"01 Projects/Test Project.md",
+				"status=invalid_status_value",
+			],
 			{ PARA_VAULT: vault },
 		);
 

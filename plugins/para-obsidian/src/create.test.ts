@@ -5,6 +5,7 @@ import path from "node:path";
 
 import { loadConfig, type ParaObsidianConfig } from "./config";
 import { createFromTemplate, injectSections } from "./create";
+import { parseFrontmatter } from "./frontmatter";
 
 function makeTmpDir(): string {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "para-obsidian-"));
@@ -756,6 +757,42 @@ area: "[[<% tp.system.prompt("Area") %>]]"
 		expect(written).toContain('area: "[[]]"'); // empty wikilink
 		// Should NOT contain raw Templater patterns
 		expect(written).not.toContain("tp.system.prompt");
+	});
+
+	it("wraps wikilink values in quotes for unquoted YAML prompts", () => {
+		const vault = makeTmpDir();
+		const templatesDir = path.join(vault, "Templates");
+		// Template with unquoted prompt (like resource.md)
+		writeTemplate(
+			templatesDir,
+			"resource",
+			`---
+title: "<% tp.system.prompt("Resource title") %>"
+type: resource
+area: <% tp.system.prompt("Area (wikilink or empty)", "") %>
+---
+# <% tp.system.prompt("Resource title") %>`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		// Pass wikilink value - should be wrapped in quotes for valid YAML
+		const result = createFromTemplate(makeConfig(vault, templatesDir), {
+			template: "resource",
+			title: "Test Resource",
+			args: {
+				"Area (wikilink or empty)": "[[Test Area]]",
+			},
+		});
+
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+
+		// Should wrap in quotes to produce valid YAML
+		expect(written).toContain('area: "[[Test Area]]"');
+
+		// Parse the frontmatter to ensure it's not a nested array
+		const { attributes } = parseFrontmatter(written);
+		expect(attributes.area).toBe("[[Test Area]]");
+		expect(Array.isArray(attributes.area)).toBe(false);
 	});
 
 	it("strips wikilinks from values for double-arg prompts wrapped in wikilinks", () => {

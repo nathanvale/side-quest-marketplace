@@ -44,6 +44,10 @@ export interface PromptTemplate {
 	readonly criticalRules?: ReadonlyArray<string>;
 	/** Optional few-shot examples */
 	readonly examples?: ReadonlyArray<PromptExample>;
+	/** Optional source document headings for section mapping */
+	readonly sourceHeadings?: ReadonlyArray<string>;
+	/** Optional suggested mapping from template sections to source headings */
+	readonly sectionMapping?: ReadonlyMap<string, string | null>;
 }
 
 /**
@@ -54,20 +58,28 @@ export interface PromptTemplate {
  */
 export const DEFAULT_CRITICAL_RULES: ReadonlyArray<string> = [
 	"1. Extract values from the note content for BOTH frontmatter (args) AND body sections (content)",
-	"2. Use null for missing/unknown values in args - DO NOT invent data",
-	'3. For "content", use EXACT heading names from BODY SECTIONS TO FILL above',
-	"4. Omit content sections that have no relevant content to extract",
-	'5. String values must be properly quoted: "500" not 500',
-	'6. Dates MUST be YYYY-MM-DD format (e.g., "2025-12-26")',
-	"7. Enum values MUST match exactly from the validation rules",
-	"8. For content sections, preserve markdown formatting (lists, bold, links, etc.)",
-	"9. The title should be descriptive and based on the note content",
-	"10. For wikilink fields (area, project): Use literal null when no value exists",
+	"2. For frontmatter (args): Use null for missing values - DO NOT invent frontmatter data",
+	"3. For body sections (content): GENERATE appropriate content based on source context:",
+	"   - If source has matching content, extract and adapt it to the template section",
+	"   - If no matching content exists, generate relevant content based on available context",
+	"   - Use markdown formatting (lists, bold, etc.) appropriate to the section type",
+	"   - For action-oriented sections (Tasks, Next Steps), use task lists: - [ ] item",
+	'4. For "content", use EXACT heading names from BODY SECTIONS TO FILL above',
+	"5. Omit content sections that have no relevant content to extract or generate",
+	"6. When SECTION MAPPING GUIDANCE is provided, use it to find relevant source content:",
+	"   - 'extract from: X' means find content under heading X in the source",
+	"   - 'generate based on context' means create appropriate content from overall source context",
+	'7. String values must be properly quoted: "500" not 500',
+	'8. Dates MUST be YYYY-MM-DD format (e.g., "2025-12-26")',
+	"9. Enum values MUST match exactly from the validation rules",
+	"10. For content sections, preserve markdown formatting (lists, bold, links, etc.)",
+	"11. The title should be descriptive and based on the note content",
+	"12. For wikilink fields (area, project): Use literal null when no value exists",
 	'    - CORRECT: "area": null',
 	'    - WRONG: "area": "[[null]]" or "area": "null"',
-	'11. Tags MUST include required values from validation rules (check "includes" field)',
+	'13. Tags MUST include required values from validation rules (check "includes" field)',
 	'    - Example: area notes must include "area" in tags array',
-	"12. All field values must be valid YAML primitives:",
+	"14. All field values must be valid YAML primitives:",
 	'    - Strings: "value" (single string, NOT arrays unless field type is array)',
 	'    - Null: null (literal null, not "null" or [null])',
 	"    - Arrays only for 'tags' and explicit array fields",
@@ -81,10 +93,11 @@ export const DEFAULT_CRITICAL_RULES: ReadonlyArray<string> = [
  * Composes all prompt sections in the correct order:
  * 1. System role
  * 2. Source content
- * 3. Constraints (fields, validation, vault context, output schema)
- * 4. Critical rules
- * 5. Examples (if provided)
- * 6. Output instruction
+ * 3. Source structure (if provided)
+ * 4. Constraints (fields, validation, vault context, output schema)
+ * 5. Critical rules
+ * 6. Examples (if provided)
+ * 7. Output instruction
  *
  * @param template - Prompt template with all configuration
  * @returns Complete prompt string ready for LLM
@@ -96,6 +109,8 @@ export const DEFAULT_CRITICAL_RULES: ReadonlyArray<string> = [
  *   sourceContent: noteContent,
  *   constraints: constraintSet,
  *   criticalRules: DEFAULT_CRITICAL_RULES,
+ *   sourceHeadings: ['Overview', 'Requirements', 'Timeline'],
+ *   sectionMapping: new Map([['Why This Matters', 'Overview']]),
  * });
  * ```
  */
@@ -112,6 +127,18 @@ export function buildStructuredPrompt(template: PromptTemplate): string {
 	sections.push(template.sourceContent);
 	sections.push("---");
 	sections.push("");
+
+	// Source structure (if provided)
+	if (template.sourceHeadings && template.sourceHeadings.length > 0) {
+		sections.push(
+			buildSourceStructureSection(
+				template.sourceHeadings,
+				template.constraints.outputSchema.sections,
+				template.sectionMapping,
+			),
+		);
+		sections.push("");
+	}
 
 	// Constraints (fields, validation, vault context, output schema)
 	sections.push(buildConstraintSection(template.constraints));
@@ -130,6 +157,77 @@ export function buildStructuredPrompt(template: PromptTemplate): string {
 
 	// Output instruction
 	sections.push("OUTPUT (JSON only, no explanation, no markdown fences):");
+
+	return sections.join("\n");
+}
+
+/**
+ * Build source document structure section for the prompt.
+ * Shows the LLM what headings exist in the source document and how to map them.
+ *
+ * @param sourceHeadings - Headings from source document
+ * @param templateSections - Template sections that need to be filled
+ * @param sectionMapping - Optional mapping suggestions
+ * @returns Formatted source structure section
+ *
+ * @example
+ * ```typescript
+ * const section = buildSourceStructureSection(
+ *   ['Project Overview', 'Technical Requirements', 'Timeline'],
+ *   ['Why This Matters', 'Success Criteria', 'Tasks'],
+ *   new Map([
+ *     ['Why This Matters', 'Project Overview'],
+ *     ['Success Criteria', 'Technical Requirements'],
+ *     ['Tasks', null], // Generate based on context
+ *   ])
+ * );
+ * ```
+ */
+export function buildSourceStructureSection(
+	sourceHeadings: ReadonlyArray<string>,
+	templateSections: ReadonlyArray<string>,
+	sectionMapping?: ReadonlyMap<string, string | null>,
+): string {
+	const sections: string[] = [];
+
+	// Source document structure
+	sections.push("SOURCE DOCUMENT STRUCTURE:");
+	sections.push("The source document contains these sections:");
+	for (const heading of sourceHeadings) {
+		sections.push(`- "${heading}"`);
+	}
+	sections.push("");
+
+	// Section mapping guidance (if provided)
+	if (sectionMapping && sectionMapping.size > 0) {
+		sections.push("SECTION MAPPING GUIDANCE:");
+		sections.push(
+			"For each template section, extract content from the suggested source section, or generate appropriate content:",
+		);
+
+		for (const section of templateSections) {
+			const sourceSection = sectionMapping.get(section);
+			if (sourceSection === null) {
+				sections.push(
+					`- "${section}" ← generate based on context (no direct source match)`,
+				);
+			} else if (sourceSection !== undefined) {
+				sections.push(`- "${section}" ← extract from: "${sourceSection}"`);
+			} else {
+				// No mapping provided for this section - let LLM decide
+				sections.push(`- "${section}" ← determine from source content`);
+			}
+		}
+	} else {
+		// No explicit mapping - provide general guidance
+		sections.push("SECTION MAPPING GUIDANCE:");
+		sections.push(
+			"Extract content from relevant source sections or generate appropriate content for each template section.",
+		);
+		sections.push(
+			"Use the source headings as guidance, but adapt content to fit the template structure.",
+		);
+	}
 
 	return sections.join("\n");
 }

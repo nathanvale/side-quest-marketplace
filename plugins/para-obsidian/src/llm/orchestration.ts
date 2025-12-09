@@ -29,9 +29,11 @@ import { autoCommitChanges } from "../git";
 import { listAreas, listProjects, listTags } from "../indexer";
 import { DEFAULT_LLM_MODEL, type ExtractionResult } from "../llm";
 import {
+	extractSourceHeadings,
 	getTemplate,
 	getTemplateFields,
 	getTemplateSections,
+	suggestSectionMapping,
 } from "../templates";
 import { buildConstraintSet, type VaultContext } from "./constraints";
 import {
@@ -300,24 +302,33 @@ export async function convertNoteToTemplate(
 	const sections = getTemplateSections(templateInfo);
 	const rules = config.frontmatterRules?.[options.template];
 
-	// 4. Build constraints and prompt
+	// 4. Extract source document structure for intelligent mapping
+	const sourceHeadings = extractSourceHeadings(existingContent);
+	const sectionMapping = suggestSectionMapping(
+		sourceHeadings.map((h) => h.text),
+		sections,
+	);
+
+	// 5. Build constraints and prompt
 	const constraints = buildConstraintSet(fields, sections, rules, vaultContext);
 	const prompt = buildStructuredPrompt({
 		systemRole: `You are extracting structured data from an existing note to convert it to a "${options.template}" template.`,
 		sourceContent: existingContent,
 		constraints,
 		criticalRules: DEFAULT_CRITICAL_RULES,
+		sourceHeadings: sourceHeadings.map((h) => h.text),
+		sectionMapping,
 	});
 
-	// 5. Call LLM
+	// 6. Call LLM
 	const model = options.model ?? DEFAULT_LLM_MODEL;
 	const rawResponse = await callModel({ model: model as LLMModel, prompt });
 	const extracted = parseOllamaResponse(rawResponse);
 
-	// 5b. Normalize extracted args (strip wikilinks, handle nulls)
+	// 6b. Normalize extracted args (strip wikilinks, handle nulls)
 	extracted.args = normalizeExtractedArgs(extracted.args);
 
-	// 6. Dry run check
+	// 7. Dry run check
 	if (options.dryRun) {
 		return {
 			filePath: "[dry-run]",
@@ -327,7 +338,7 @@ export async function convertNoteToTemplate(
 		};
 	}
 
-	// 7. Create note from template
+	// 8. Create note from template
 	// Resolve title with fallbacks, rejecting "null" and "Untitled" as invalid
 	const isValidTitle = (t: unknown): t is string =>
 		typeof t === "string" && t !== "" && t !== "null" && t !== "Untitled";
@@ -354,7 +365,7 @@ export async function convertNoteToTemplate(
 		args: nonNullArgs,
 	});
 
-	// 8. Update frontmatter with extracted values
+	// 9. Update frontmatter with extracted values
 	// - Wikilink fields (project, area) get explicit null to overwrite bad template defaults
 	// - Other null values are skipped
 	// - Templater prompt keys are used to extract wikilink values, then skipped for direct frontmatter updates
@@ -423,14 +434,14 @@ export async function convertNoteToTemplate(
 		});
 	}
 
-	// 9. Replace H1 title placeholder with actual title
+	// 10. Replace H1 title placeholder with actual title
 	const noteTitle =
 		typeof extracted.args.title === "string"
 			? extracted.args.title
 			: (options.titleOverride ?? extracted.title);
 	replaceH1Title(config, result.filePath, noteTitle);
 
-	// 10. Replace content sections (not append)
+	// 11. Replace content sections (not append)
 	let sectionsInjected: string[] = [];
 	let sectionsSkipped: Array<{ heading: string; reason: string }> = [];
 
@@ -445,10 +456,10 @@ export async function convertNoteToTemplate(
 		sectionsSkipped = injectionResult.skipped;
 	}
 
-	// 11. Validate the result
+	// 12. Validate the result
 	const validation = validateFrontmatterFile(config, result.filePath);
 
-	// 12. Auto-commit if enabled
+	// 13. Auto-commit if enabled
 	if (config.autoCommit) {
 		await autoCommitChanges(
 			config,
@@ -552,7 +563,14 @@ export async function extractMetadata(
 	const sections = getTemplateSections(templateInfo);
 	const rules = config.frontmatterRules?.[options.template];
 
-	// 4. Build constraints and prompt
+	// 4. Extract source document structure for intelligent mapping
+	const sourceHeadings = extractSourceHeadings(existingContent);
+	const sectionMapping = suggestSectionMapping(
+		sourceHeadings.map((h) => h.text),
+		sections,
+	);
+
+	// 5. Build constraints and prompt
 	const constraints = buildConstraintSet(fields, sections, rules, vaultContext);
 
 	// If extractContent is false, add a critical rule to skip content extraction
@@ -569,22 +587,24 @@ export async function extractMetadata(
 		sourceContent: existingContent,
 		constraints,
 		criticalRules,
+		sourceHeadings: sourceHeadings.map((h) => h.text),
+		sectionMapping,
 	});
 
-	// 5. Call LLM
+	// 6. Call LLM
 	const model = options.model ?? DEFAULT_LLM_MODEL;
 	const rawResponse = await callModel({ model: model as LLMModel, prompt });
 	const extracted = parseOllamaResponse(rawResponse);
 
-	// 5b. Normalize extracted args (strip wikilinks, handle nulls)
+	// 6b. Normalize extracted args (strip wikilinks, handle nulls)
 	extracted.args = normalizeExtractedArgs(extracted.args);
 
-	// 5c. Normalize title (treat "null" string as "Untitled")
+	// 6c. Normalize title (treat "null" string as "Untitled")
 	if (extracted.title === "null" || extracted.title === "") {
 		extracted.title = "Untitled";
 	}
 
-	// 6. Apply arg overrides if provided
+	// 7. Apply arg overrides if provided
 	if (options.argOverrides) {
 		for (const [key, value] of Object.entries(options.argOverrides)) {
 			extracted.args[key] = value;

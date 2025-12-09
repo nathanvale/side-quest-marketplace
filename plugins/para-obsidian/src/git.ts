@@ -15,6 +15,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { spawnAndCollect } from "../../../core/src/spawn/index.js";
+import { discoverAttachments } from "./attachments";
 import type { ParaObsidianConfig } from "./config";
 import { resolveVaultPath } from "./fs";
 
@@ -90,6 +91,55 @@ export async function gitStatus(dir: string): Promise<{ clean: boolean }> {
 }
 
 /**
+ * Gets all uncommitted files in a directory (staged and unstaged).
+ *
+ * Uses git status --porcelain to find modified, added, and untracked files.
+ * Filters to only .md files and returns vault-relative paths.
+ *
+ * @param dir - Directory to check
+ * @returns Array of vault-relative paths to uncommitted .md files
+ *
+ * @example
+ * ```typescript
+ * const uncommitted = await getUncommittedFiles(config.vault);
+ * // Returns: ['Projects/My Project.md', '00_Inbox/New Note.md']
+ * ```
+ */
+export async function getUncommittedFiles(dir: string): Promise<string[]> {
+	const { stdout, exitCode } = await spawnAndCollect(
+		["git", "status", "--porcelain", "-uall"],
+		{ cwd: dir },
+	);
+	if (exitCode !== 0) throw new Error("git status failed");
+
+	// Split first, then filter empty lines
+	// Important: Don't trim() the whole stdout as it strips leading spaces
+	// from git status format (e.g., " M file.md" becomes "M file.md")
+	const lines = stdout.split("\n").filter((line) => line.length > 0);
+	const files: string[] = [];
+
+	for (const line of lines) {
+		// Porcelain format: XY PATH (2 status chars + 1 space + path)
+		// X = index status, Y = working tree status
+		// Status codes: M (modified), A (added), ?? (untracked), etc.
+		// Extract path after the "XY " prefix (3 chars)
+		// Use match to handle any leading whitespace/status combo
+		const match = line.match(/^.{2}\s(.+)$/);
+		let filePath = match?.[1];
+		// Git quotes filenames containing spaces, e.g. "Note 1.md"
+		// Strip surrounding quotes if present
+		if (filePath?.startsWith('"') && filePath.endsWith('"')) {
+			filePath = filePath.slice(1, -1);
+		}
+		if (filePath?.endsWith(".md")) {
+			files.push(filePath);
+		}
+	}
+
+	return files;
+}
+
+/**
  * Ensures the vault is inside a git repository and optionally clean.
  *
  * Throws if the vault is not in a git repo or has uncommitted changes.
@@ -103,8 +153,13 @@ export async function ensureGitGuard(
 	await assertGitRepo(config.vault);
 	const status = await gitStatus(config.vault);
 	if (!status.clean) {
+		const uncommitted = await getUncommittedFiles(config.vault);
+		const fileList =
+			uncommitted.length > 0
+				? `\nUncommitted files:\n${uncommitted.map((f: string) => `  - ${f}`).join("\n")}`
+				: "";
 		throw new Error(
-			"Vault has uncommitted changes. Commit or stash before writing.",
+			`Vault has uncommitted changes. Commit or stash before writing.${fileList}\n\nSuggestion: Run 'para-obsidian git commit'`,
 		);
 	}
 }
@@ -218,4 +273,202 @@ export async function autoCommitChanges(
 
 	const { committed } = await gitCommit(gitRoot, message);
 	return { committed, skipped: false, message, paths: normalizedPaths };
+}
+
+/**
+ * Extracts linked attachments from a note.
+ *
+ * Reads the note content and extracts embedded image/file links:
+ * - Wikilinks: ![[image.png]]
+ * - Markdown: ![](path/to/file.pdf)
+ *
+ * Resolves paths relative to vault and returns array of vault-relative
+ * paths to existing attachments. Skips .md files (those are notes, not attachments).
+ *
+ * @param vault - Absolute path to vault root
+ * @param notePath - Vault-relative path to note
+ * @returns Array of vault-relative paths to existing attachments
+ *
+ * @example
+ * ```typescript
+ * const attachments = extractLinkedAttachments(vault, 'Projects/My Project.md');
+ * // Returns: ['Projects/assets/diagram.png', 'Resources/document.pdf']
+ * ```
+ */
+export function extractLinkedAttachments(
+	vault: string,
+	notePath: string,
+): string[] {
+	const { absolute } = resolveVaultPath(vault, notePath);
+	if (!fs.existsSync(absolute)) return [];
+
+	const content = fs.readFileSync(absolute, "utf-8");
+	const noteDir = path.dirname(absolute);
+	const attachments: string[] = [];
+
+	// Match wikilink embeds: ![[file.ext]]
+	const wikilinkRegex = /!\[\[([^\]]+)\]\]/g;
+	let match: RegExpExecArray | null = wikilinkRegex.exec(content);
+	while (match !== null) {
+		const linkPath = match[1];
+		if (linkPath && !linkPath.endsWith(".md")) {
+			// Try resolving relative to note directory first
+			const resolved = path.resolve(noteDir, linkPath);
+			if (fs.existsSync(resolved)) {
+				const vaultRelative = path.relative(vault, resolved);
+				attachments.push(vaultRelative);
+			}
+		}
+		match = wikilinkRegex.exec(content);
+	}
+
+	// Match markdown embeds: ![alt](path/to/file.ext)
+	const markdownRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+	match = markdownRegex.exec(content);
+	while (match !== null) {
+		const linkPath = match[2];
+		if (linkPath && !linkPath.endsWith(".md")) {
+			// Try resolving relative to note directory
+			const resolved = path.resolve(noteDir, linkPath);
+			if (fs.existsSync(resolved)) {
+				const vaultRelative = path.relative(vault, resolved);
+				attachments.push(vaultRelative);
+			}
+		}
+		match = markdownRegex.exec(content);
+	}
+
+	// Deduplicate and return
+	return Array.from(new Set(attachments));
+}
+
+/**
+ * Result from committing a single note.
+ */
+export interface CommitNoteResult {
+	/** Whether commit was successful */
+	committed: boolean;
+	/** Commit message used */
+	message: string;
+	/** Files included in commit (note + attachments) */
+	files: string[];
+}
+
+/**
+ * Commits a single note with its linked attachments.
+ *
+ * Discovers attachments using:
+ * 1. extractLinkedAttachments (embedded links in note content)
+ * 2. discoverAttachments (folder-based discovery from attachments.ts)
+ *
+ * Stages the note and all discovered attachments, then commits with
+ * message: `chore: <note title>` (title from filename without .md).
+ *
+ * @param config - Para-obsidian configuration
+ * @param notePath - Vault-relative path to .md file
+ * @returns Commit result with status, message, and files
+ *
+ * @example
+ * ```typescript
+ * const result = await commitNote(config, 'Projects/My Project.md');
+ * if (result.committed) {
+ *   console.log(`Committed ${result.files.length} files`);
+ * }
+ * ```
+ */
+export async function commitNote(
+	config: ParaObsidianConfig,
+	notePath: string,
+): Promise<CommitNoteResult> {
+	await assertGitRepo(config.vault);
+	const gitRoot = await getGitRootForDir(config.vault);
+	if (!gitRoot) {
+		throw new Error("Vault must be inside a git repository.");
+	}
+
+	// Discover attachments using both methods
+	const linkedAttachments = extractLinkedAttachments(config.vault, notePath);
+	const folderAttachments = discoverAttachments(config.vault, notePath);
+	const allAttachments = Array.from(
+		new Set([...linkedAttachments, ...folderAttachments]),
+	);
+
+	// Resolve paths relative to git root
+	const realGitRoot = fs.realpathSync(gitRoot);
+	const filesToCommit: string[] = [];
+
+	// Add the note itself
+	const noteResolved = resolveVaultPath(config.vault, notePath);
+	const noteAbsolute = fs.realpathSync(noteResolved.absolute);
+	filesToCommit.push(path.relative(realGitRoot, noteAbsolute));
+
+	// Add all attachments
+	for (const attachment of allAttachments) {
+		const attachmentResolved = resolveVaultPath(config.vault, attachment);
+		if (fs.existsSync(attachmentResolved.absolute)) {
+			const attachmentAbsolute = fs.realpathSync(attachmentResolved.absolute);
+			filesToCommit.push(path.relative(realGitRoot, attachmentAbsolute));
+		}
+	}
+
+	// Stage files
+	await gitAdd(gitRoot, filesToCommit);
+
+	// Build commit message from note title (filename without .md)
+	const title = path.basename(notePath, ".md");
+	const message = `chore: ${title}`;
+
+	// Commit
+	const { committed } = await gitCommit(gitRoot, message);
+	return { committed, message, files: filesToCommit };
+}
+
+/**
+ * Result from committing all uncommitted notes.
+ */
+export interface CommitAllResult {
+	/** Total number of uncommitted notes found */
+	total: number;
+	/** Number of notes successfully committed */
+	committed: number;
+	/** Individual commit results for each note */
+	results: CommitNoteResult[];
+}
+
+/**
+ * Commits all uncommitted .md files in the vault.
+ *
+ * Gets all uncommitted .md files and calls commitNote for each.
+ * Each note is committed individually with its own commit message
+ * and discovered attachments.
+ *
+ * @param config - Para-obsidian configuration
+ * @returns Summary of commits (total, committed count, individual results)
+ *
+ * @example
+ * ```typescript
+ * const result = await commitAllNotes(config);
+ * console.log(`Committed ${result.committed} of ${result.total} notes`);
+ * ```
+ */
+export async function commitAllNotes(
+	config: ParaObsidianConfig,
+): Promise<CommitAllResult> {
+	const uncommitted = await getUncommittedFiles(config.vault);
+	const results: CommitNoteResult[] = [];
+	let committedCount = 0;
+
+	for (const notePath of uncommitted) {
+		const result = await commitNote(config, notePath);
+		results.push(result);
+		if (result.committed) {
+			committedCount++;
+		}
+	}
+
+	return {
+		total: uncommitted.length,
+		committed: committedCount,
+		results,
+	};
 }
