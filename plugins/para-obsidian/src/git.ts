@@ -17,7 +17,61 @@ import path from "node:path";
 import { spawnAndCollect } from "../../../core/src/spawn/index.js";
 import { discoverAttachments } from "./attachments";
 import type { ParaObsidianConfig } from "./config";
+import { DEFAULT_DESTINATIONS, DEFAULT_PARA_FOLDERS } from "./defaults";
 import { resolveVaultPath } from "./fs";
+
+/**
+ * Gets all PARA-managed folders from configuration.
+ *
+ * Combines folders from:
+ * - paraFolders (inbox, projects, areas, resources, archives)
+ * - defaultDestinations (Tasks, Daily Notes, Weekly Notes, etc.)
+ *
+ * @param config - Para-obsidian configuration
+ * @returns Set of unique folder names that para-obsidian manages
+ *
+ * @example
+ * ```typescript
+ * const folders = getManagedFolders(config);
+ * // Set { "00 Inbox", "01 Projects", "02 Areas", "Tasks", ... }
+ * ```
+ */
+export function getManagedFolders(config: ParaObsidianConfig): Set<string> {
+	const folders = new Set<string>();
+
+	// Add PARA folders (inbox, projects, areas, resources, archives)
+	const paraFolders = config.paraFolders ?? DEFAULT_PARA_FOLDERS;
+	for (const folder of Object.values(paraFolders)) {
+		folders.add(folder);
+	}
+
+	// Add destination folders (Tasks, Daily Notes, Weekly Notes, etc.)
+	const destinations = config.defaultDestinations ?? DEFAULT_DESTINATIONS;
+	for (const folder of Object.values(destinations)) {
+		folders.add(folder);
+	}
+
+	return folders;
+}
+
+/**
+ * Checks if a file path is within a PARA-managed folder.
+ *
+ * @param filePath - Vault-relative file path
+ * @param managedFolders - Set of managed folder names
+ * @returns true if file is in a managed folder
+ */
+export function isInManagedFolder(
+	filePath: string,
+	managedFolders: Set<string>,
+): boolean {
+	// Get the top-level folder from the path
+	const parts = filePath.split("/");
+	if (parts.length < 2) return false; // File at root level, not managed
+
+	const topFolder = parts[0];
+	return managedFolders.has(topFolder ?? "");
+}
 
 /**
  * Gets the git repository root for a given directory.
@@ -140,9 +194,11 @@ export async function getUncommittedFiles(dir: string): Promise<string[]> {
 }
 
 /**
- * Ensures the vault is inside a git repository and optionally clean.
+ * Ensures the vault is inside a git repository and has no uncommitted
+ * changes in PARA-managed folders.
  *
- * Throws if the vault is not in a git repo or has uncommitted changes.
+ * Only checks folders managed by para-obsidian (00 Inbox, 01 Projects, etc.).
+ * Files outside PARA folders (Templates/, _Sort/, etc.) are ignored.
  *
  * @param config - Loaded para-obsidian configuration
  * @throws Error when guard conditions are not met
@@ -151,15 +207,18 @@ export async function ensureGitGuard(
 	config: ParaObsidianConfig,
 ): Promise<void> {
 	await assertGitRepo(config.vault);
-	const status = await gitStatus(config.vault);
-	if (!status.clean) {
-		const uncommitted = await getUncommittedFiles(config.vault);
-		const fileList =
-			uncommitted.length > 0
-				? `\nUncommitted files:\n${uncommitted.map((f: string) => `  - ${f}`).join("\n")}`
-				: "";
+
+	// Get all uncommitted files and filter to PARA-managed folders only
+	const allUncommitted = await getUncommittedFiles(config.vault);
+	const managedFolders = getManagedFolders(config);
+	const uncommitted = allUncommitted.filter((file) =>
+		isInManagedFolder(file, managedFolders),
+	);
+
+	if (uncommitted.length > 0) {
+		const fileList = `\nUncommitted files:\n${uncommitted.map((f: string) => `  - ${f}`).join("\n")}`;
 		throw new Error(
-			`Vault has uncommitted changes. Commit or stash before writing.${fileList}\n\nSuggestion: Run 'para-obsidian git commit'`,
+			`Vault has uncommitted changes in PARA folders. Commit or stash before writing.${fileList}\n\nSuggestion: Run 'para-obsidian git commit'`,
 		);
 	}
 }
@@ -454,7 +513,14 @@ export interface CommitAllResult {
 export async function commitAllNotes(
 	config: ParaObsidianConfig,
 ): Promise<CommitAllResult> {
-	const uncommitted = await getUncommittedFiles(config.vault);
+	const allUncommitted = await getUncommittedFiles(config.vault);
+
+	// Filter to only PARA-managed folders
+	const managedFolders = getManagedFolders(config);
+	const uncommitted = allUncommitted.filter((file) =>
+		isInManagedFolder(file, managedFolders),
+	);
+
 	const results: CommitNoteResult[] = [];
 	let committedCount = 0;
 

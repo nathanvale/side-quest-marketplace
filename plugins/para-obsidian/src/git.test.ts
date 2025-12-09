@@ -417,10 +417,13 @@ describe("commitAllNotes", () => {
 		const vault = makeTmpDir();
 		await initGit(vault);
 
-		// Create multiple notes
-		fs.writeFileSync(path.join(vault, "Note 1.md"), "# Note 1");
-		fs.writeFileSync(path.join(vault, "Note 2.md"), "# Note 2");
-		fs.writeFileSync(path.join(vault, "Note 3.md"), "# Note 3");
+		// Create PARA folder structure
+		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
+
+		// Create multiple notes in PARA folder
+		fs.writeFileSync(path.join(vault, "00 Inbox", "Note 1.md"), "# Note 1");
+		fs.writeFileSync(path.join(vault, "00 Inbox", "Note 2.md"), "# Note 2");
+		fs.writeFileSync(path.join(vault, "00 Inbox", "Note 3.md"), "# Note 3");
 
 		const result = await commitAllNotes(makeConfig(vault));
 
@@ -439,8 +442,11 @@ describe("commitAllNotes", () => {
 		const vault = makeTmpDir();
 		await initGit(vault);
 
-		fs.writeFileSync(path.join(vault, "Alpha.md"), "# Alpha");
-		fs.writeFileSync(path.join(vault, "Beta.md"), "# Beta");
+		// Create PARA folder
+		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
+
+		fs.writeFileSync(path.join(vault, "00 Inbox", "Alpha.md"), "# Alpha");
+		fs.writeFileSync(path.join(vault, "00 Inbox", "Beta.md"), "# Beta");
 
 		const result = await commitAllNotes(makeConfig(vault));
 
@@ -470,13 +476,22 @@ describe("commitAllNotes", () => {
 		const vault = makeTmpDir();
 		await initGit(vault);
 
+		// Create PARA folder
+		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
+
 		// Note 1 with attachment
-		fs.writeFileSync(path.join(vault, "Note 1.md"), "# Note 1\n![[img1.png]]");
-		fs.writeFileSync(path.join(vault, "img1.png"), "");
+		fs.writeFileSync(
+			path.join(vault, "00 Inbox", "Note 1.md"),
+			"# Note 1\n![[img1.png]]",
+		);
+		fs.writeFileSync(path.join(vault, "00 Inbox", "img1.png"), "");
 
 		// Note 2 with attachment
-		fs.writeFileSync(path.join(vault, "Note 2.md"), "# Note 2\n![[img2.png]]");
-		fs.writeFileSync(path.join(vault, "img2.png"), "");
+		fs.writeFileSync(
+			path.join(vault, "00 Inbox", "Note 2.md"),
+			"# Note 2\n![[img2.png]]",
+		);
+		fs.writeFileSync(path.join(vault, "00 Inbox", "img2.png"), "");
 
 		const result = await commitAllNotes(makeConfig(vault));
 
@@ -485,14 +500,14 @@ describe("commitAllNotes", () => {
 
 		// Verify each commit includes note + attachment
 		const note1Result = result.results.find((r: { files: string[] }) =>
-			r.files.includes("Note 1.md"),
+			r.files.includes("00 Inbox/Note 1.md"),
 		);
-		expect(note1Result?.files).toContain("img1.png");
+		expect(note1Result?.files).toContain("00 Inbox/img1.png");
 
 		const note2Result = result.results.find((r: { files: string[] }) =>
-			r.files.includes("Note 2.md"),
+			r.files.includes("00 Inbox/Note 2.md"),
 		);
-		expect(note2Result?.files).toContain("img2.png");
+		expect(note2Result?.files).toContain("00 Inbox/img2.png");
 	});
 
 	it("skips non-.md files", async () => {
@@ -500,16 +515,22 @@ describe("commitAllNotes", () => {
 		const vault = makeTmpDir();
 		await initGit(vault);
 
+		// Create PARA folder
+		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
+
 		// Create mixed files
-		fs.writeFileSync(path.join(vault, "Note.md"), "# Note");
-		fs.writeFileSync(path.join(vault, "script.js"), "console.log()");
-		fs.writeFileSync(path.join(vault, "data.json"), "{}");
+		fs.writeFileSync(path.join(vault, "00 Inbox", "Note.md"), "# Note");
+		fs.writeFileSync(
+			path.join(vault, "00 Inbox", "script.js"),
+			"console.log()",
+		);
+		fs.writeFileSync(path.join(vault, "00 Inbox", "data.json"), "{}");
 
 		const result = await commitAllNotes(makeConfig(vault));
 
 		expect(result.total).toBe(1); // Only the .md file
 		expect(result.committed).toBe(1);
-		expect(result.results[0]?.files).toContain("Note.md");
+		expect(result.results[0]?.files).toContain("00 Inbox/Note.md");
 	});
 
 	it("commits notes in subdirectories", async () => {
@@ -517,12 +538,17 @@ describe("commitAllNotes", () => {
 		const vault = makeTmpDir();
 		await initGit(vault);
 
-		fs.mkdirSync(path.join(vault, "projects"), { recursive: true });
-		fs.mkdirSync(path.join(vault, "areas"), { recursive: true });
+		// Create PARA folder structure with nested dirs
+		fs.mkdirSync(path.join(vault, "01 Projects", "Work"), { recursive: true });
+		fs.mkdirSync(path.join(vault, "02 Areas"), { recursive: true });
+		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
 
-		fs.writeFileSync(path.join(vault, "projects", "Project.md"), "# Project");
-		fs.writeFileSync(path.join(vault, "areas", "Area.md"), "# Area");
-		fs.writeFileSync(path.join(vault, "Root.md"), "# Root");
+		fs.writeFileSync(
+			path.join(vault, "01 Projects", "Work", "Project.md"),
+			"# Project",
+		);
+		fs.writeFileSync(path.join(vault, "02 Areas", "Area.md"), "# Area");
+		fs.writeFileSync(path.join(vault, "00 Inbox", "Note.md"), "# Note");
 
 		const result = await commitAllNotes(makeConfig(vault));
 
@@ -532,8 +558,97 @@ describe("commitAllNotes", () => {
 		const filePaths = result.results.flatMap(
 			(r: { files: string[] }) => r.files,
 		);
-		expect(filePaths).toContain("projects/Project.md");
-		expect(filePaths).toContain("areas/Area.md");
-		expect(filePaths).toContain("Root.md");
+		expect(filePaths).toContain("01 Projects/Work/Project.md");
+		expect(filePaths).toContain("02 Areas/Area.md");
+		expect(filePaths).toContain("00 Inbox/Note.md");
+	});
+
+	it("ignores files outside PARA folders", async () => {
+		const { commitAllNotes } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		// Create PARA folder and non-PARA folders
+		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
+		fs.mkdirSync(path.join(vault, "Templates"), { recursive: true });
+		fs.mkdirSync(path.join(vault, "_Sort"), { recursive: true });
+
+		// Files in PARA folder should be committed
+		fs.writeFileSync(path.join(vault, "00 Inbox", "Note.md"), "# Note");
+
+		// Files outside PARA folders should be ignored
+		fs.writeFileSync(
+			path.join(vault, "Templates", "Template.md"),
+			"# Template",
+		);
+		fs.writeFileSync(path.join(vault, "_Sort", "Unsorted.md"), "# Unsorted");
+		fs.writeFileSync(path.join(vault, "Root.md"), "# Root");
+
+		const result = await commitAllNotes(makeConfig(vault));
+
+		// Only the file in 00 Inbox should be committed
+		expect(result.total).toBe(1);
+		expect(result.committed).toBe(1);
+		expect(result.results[0]?.files).toContain("00 Inbox/Note.md");
+	});
+});
+
+describe("ensureGitGuard", () => {
+	it("throws when PARA folders have uncommitted changes", async () => {
+		const { ensureGitGuard } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		// Create uncommitted file in PARA folder
+		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
+		fs.writeFileSync(path.join(vault, "00 Inbox", "Note.md"), "# Note");
+
+		await expect(ensureGitGuard(makeConfig(vault))).rejects.toThrow(
+			/uncommitted changes in PARA folders/,
+		);
+	});
+
+	it("allows non-PARA folders to have uncommitted changes", async () => {
+		const { ensureGitGuard } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		// Create uncommitted files ONLY in non-PARA folders
+		fs.mkdirSync(path.join(vault, "Templates"), { recursive: true });
+		fs.mkdirSync(path.join(vault, "_Sort"), { recursive: true });
+		fs.writeFileSync(
+			path.join(vault, "Templates", "Template.md"),
+			"# Template",
+		);
+		fs.writeFileSync(path.join(vault, "_Sort", "Unsorted.md"), "# Unsorted");
+		fs.writeFileSync(path.join(vault, "Root.md"), "# Root");
+
+		// Should NOT throw - no PARA folders have uncommitted changes
+		await expect(ensureGitGuard(makeConfig(vault))).resolves.toBeUndefined();
+	});
+
+	it("passes when PARA folders are clean", async () => {
+		const { ensureGitGuard } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		// Clean working tree
+		await expect(ensureGitGuard(makeConfig(vault))).resolves.toBeUndefined();
+	});
+
+	it("lists uncommitted PARA files in error message", async () => {
+		const { ensureGitGuard } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		fs.mkdirSync(path.join(vault, "01 Projects"), { recursive: true });
+		fs.writeFileSync(
+			path.join(vault, "01 Projects", "Project.md"),
+			"# Project",
+		);
+
+		await expect(ensureGitGuard(makeConfig(vault))).rejects.toThrow(
+			/01 Projects\/Project\.md/,
+		);
 	});
 });
