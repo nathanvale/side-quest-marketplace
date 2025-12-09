@@ -113,7 +113,10 @@ Content`,
 		);
 
 		const config = loadConfig({ cwd: testVault });
-		const result = validateFrontmatterFile(config, "🎫 Booking - Hotel Stay.md");
+		const result = validateFrontmatterFile(
+			config,
+			"🎫 Booking - Hotel Stay.md",
+		);
 
 		expect(result.valid).toBe(true);
 		expect(result.issues).toHaveLength(0);
@@ -150,10 +153,10 @@ Content`,
 	});
 
 	test("rejects invalid filename characters", () => {
-		const file = path.join(testVault, "Invalid/Name.md");
+		const _file = path.join(testVault, "Invalid/Name.md");
 		// Note: This test may fail on actual filesystems that don't allow /
 		// In practice, we test the validation logic itself
-		const config = loadConfig({ cwd: testVault });
+		const _config = loadConfig({ cwd: testVault });
 
 		// Create a valid file but test with invalid path
 		const validFile = path.join(testVault, "ValidName.md");
