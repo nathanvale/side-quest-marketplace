@@ -317,13 +317,15 @@ export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
  * These map to the PARA folder structure.
  */
 export const DEFAULT_DESTINATIONS: Record<string, string> = {
-	project: "01 Projects",
-	trip: "01 Projects",
-	area: "02 Areas",
-	resource: "03 Resources",
-	task: "Tasks",
-	daily: "Daily Notes",
-	"weekly-review": "Weekly Notes",
+	// Following PARA method: ALL notes go to inbox by default for organizing later
+	// Only explicit --dest flag should override this rule
+	project: "00 Inbox",
+	trip: "00 Inbox",
+	area: "00 Inbox",
+	resource: "00 Inbox",
+	task: "00 Inbox",
+	daily: "00 Inbox",
+	"weekly-review": "00 Inbox",
 	capture: "00 Inbox",
 	booking: "00 Inbox",
 	checklist: "00 Inbox",

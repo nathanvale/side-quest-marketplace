@@ -138,7 +138,7 @@ type: project
 
 		expect(exitCode).toBe(0);
 		const result = JSON.parse(stdout);
-		expect(result.filePath).toBe("01 Projects/Test Project.md");
+		expect(result.filePath).toBe("00 Inbox/Test Project.md");
 		expect(result.sectionsInjected).toBe(2);
 		expect(result.injectedHeadings).toContain("Why This Matters");
 		expect(result.injectedHeadings).toContain("Success Criteria");
@@ -311,7 +311,7 @@ type: project
 
 		expect(exitCode).toBe(0);
 		const result = JSON.parse(stdout);
-		expect(result.filePath).toBe("01 Projects/No Content Test.md");
+		expect(result.filePath).toBe("00 Inbox/No Content Test.md");
 		// No content injection fields when --content not provided
 		expect(result.sectionsInjected).toBeUndefined();
 	});

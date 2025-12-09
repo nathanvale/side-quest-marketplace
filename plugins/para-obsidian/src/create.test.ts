@@ -32,6 +32,7 @@ describe("createFromTemplate", () => {
 			`---
 title: "<% tp.system.prompt("title") %>"
 type: project
+template_version: 4
 ---
 Body`,
 		);
@@ -123,7 +124,7 @@ Area: <% tp.system.prompt("Area") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("01 Projects/Build Dashboard.md");
+		expect(result.filePath).toBe("00 Inbox/Build Dashboard.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		expect(written).toContain("title: Build Dashboard");
 		expect(written).toContain("target_completion: 2025-12-31");
@@ -159,7 +160,7 @@ Description: <% tp.system.prompt("Description") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("02 Areas/Engineering.md");
+		expect(result.filePath).toBe("00 Inbox/Engineering.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		expect(written).toContain("title: Engineering");
 		expect(written).toContain(
@@ -197,7 +198,7 @@ Topic: <% tp.system.prompt("Main topic") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("03 Resources/Refactoring UI.md");
+		expect(result.filePath).toBe("00 Inbox/Refactoring UI.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		expect(written).toContain("title: Refactoring UI");
 		expect(written).toContain("source: book");
@@ -235,7 +236,7 @@ Effort: <% tp.system.prompt("Effort (small/medium/large)") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("Tasks/Review PR.md");
+		expect(result.filePath).toBe("00 Inbox/Review PR.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		expect(written).toContain("title: Review PR");
 		expect(written).toContain("task_type: task");
@@ -275,7 +276,7 @@ Author: <% tp.system.prompt("Author (optional)", "") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("03 Resources/Building A Second Brain.md");
+		expect(result.filePath).toBe("00 Inbox/Building A Second Brain.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		expect(written).toContain("title: Building a Second Brain");
 		expect(written).toContain("source: book");
@@ -316,7 +317,7 @@ Source: <% tp.system.prompt("Source type") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("03 Resources/Quick Note.md");
+		expect(result.filePath).toBe("00 Inbox/Quick Note.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		expect(written).toContain("title: Quick Note");
 		expect(written).toContain("source: article");
@@ -325,7 +326,7 @@ Source: <% tp.system.prompt("Source type") %>`,
 		expect(written).toMatch(/author:\s*(""|''|$)/);
 	});
 
-	it("creates project in 01_Projects by default", () => {
+	it("creates project in 00 Inbox by default (PARA method)", () => {
 		const vault = makeTmpDir();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
@@ -344,13 +345,13 @@ Body`,
 			title: "My Project",
 		});
 
-		expect(result.filePath).toBe("01 Projects/My Project.md");
+		expect(result.filePath).toBe("00 Inbox/My Project.md");
 		expect(
-			fs.existsSync(path.join(vault, "01 Projects", "My Project.md")),
+			fs.existsSync(path.join(vault, "00 Inbox", "My Project.md")),
 		).toBe(true);
 	});
 
-	it("creates area in 02_Areas by default", () => {
+	it("creates area in 00 Inbox by default (PARA method)", () => {
 		const vault = makeTmpDir();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
@@ -369,11 +370,11 @@ Body`,
 			title: "Health",
 		});
 
-		expect(result.filePath).toBe("02 Areas/Health.md");
-		expect(fs.existsSync(path.join(vault, "02 Areas", "Health.md"))).toBe(true);
+		expect(result.filePath).toBe("00 Inbox/Health.md");
+		expect(fs.existsSync(path.join(vault, "00 Inbox", "Health.md"))).toBe(true);
 	});
 
-	it("creates resource in 03_Resources by default", () => {
+	it("creates resource in 00 Inbox by default (PARA method)", () => {
 		const vault = makeTmpDir();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
@@ -392,13 +393,13 @@ Body`,
 			title: "Atomic Habits",
 		});
 
-		expect(result.filePath).toBe("03 Resources/Atomic Habits.md");
+		expect(result.filePath).toBe("00 Inbox/Atomic Habits.md");
 		expect(
-			fs.existsSync(path.join(vault, "03 Resources", "Atomic Habits.md")),
+			fs.existsSync(path.join(vault, "00 Inbox", "Atomic Habits.md")),
 		).toBe(true);
 	});
 
-	it("creates task in Tasks by default", () => {
+	it("creates task in 00 Inbox by default (PARA method)", () => {
 		const vault = makeTmpDir();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
@@ -417,11 +418,11 @@ Body`,
 			title: "Review PR",
 		});
 
-		expect(result.filePath).toBe("Tasks/Review PR.md");
-		expect(fs.existsSync(path.join(vault, "Tasks", "Review PR.md"))).toBe(true);
+		expect(result.filePath).toBe("00 Inbox/Review PR.md");
+		expect(fs.existsSync(path.join(vault, "00 Inbox", "Review PR.md"))).toBe(true);
 	});
 
-	it("creates daily note in Daily Notes by default", () => {
+	it("creates daily note in 00 Inbox by default (PARA method)", () => {
 		const vault = makeTmpDir();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
@@ -440,9 +441,9 @@ Body`,
 			title: "2025-12-06",
 		});
 
-		expect(result.filePath).toBe("Daily Notes/2025-12-06.md");
+		expect(result.filePath).toBe("00 Inbox/2025-12-06.md");
 		expect(
-			fs.existsSync(path.join(vault, "Daily Notes", "2025-12-06.md")),
+			fs.existsSync(path.join(vault, "00 Inbox", "2025-12-06.md")),
 		).toBe(true);
 	});
 

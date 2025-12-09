@@ -15,6 +15,7 @@ cancellation_deadline:
 attachments: []
 tags:
   - booking
+template_version: 4
 ---
 
 # <% tp.system.prompt("Booking title") %>
@@ -55,19 +56,6 @@ tags:
 <!-- Check-in times, requirements, restrictions -->
 
 
-
-## Attachments
-
-<!-- Attachments are stored in frontmatter `attachments: []` array -->
-<!-- Add links as: "[[Attachments/filename.pdf]]" -->
-
-```dataview
-LIST
-FROM ""
-WHERE file = this.file
-FLATTEN attachments as attachment
-WHERE attachment
-```
 
 ---
 

@@ -407,18 +407,13 @@ export function createFromTemplate(
 		body = body.replace(/^#\s+null\s*$/m, `# ${displayTitle}`);
 	}
 
-	// Inject template_version if not present and configured
-	if (
-		attributes.template_version === undefined &&
-		config.templateVersions?.[options.template] !== undefined
-	) {
-		attributes.template_version = config.templateVersions[options.template];
-	}
-
 	// Inject title if not provided by args/template substitution
 	if (!attributes.title || attributes.title === "null") {
 		attributes.title = displayTitle;
 	}
+
+	// Template version should come from the template file itself, not config
+	// If template is missing template_version, warn but don't inject
 	const content = serializeFrontmatter(attributes, body);
 
 	// Create directory structure and write file
