@@ -10,7 +10,13 @@ import type { ParaObsidianConfig } from "../src/config";
 // Test helpers that mirror the MCP server implementation
 interface FrontmatterHint {
 	readonly allowedValues?: ReadonlyArray<string>;
-	readonly expectedType?: "string" | "date" | "array" | "wikilink" | "enum";
+	readonly expectedType?:
+		| "string"
+		| "date"
+		| "number"
+		| "array"
+		| "wikilink"
+		| "enum";
 	readonly examples?: ReadonlyArray<string>;
 	readonly description?: string;
 }

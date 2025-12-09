@@ -15,6 +15,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { ParaObsidianConfig } from "./config";
+import { DEFAULT_TITLE_PREFIXES } from "./defaults";
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter";
 import { resolveVaultPath } from "./fs";
 import { insertIntoNote, replaceSectionContent } from "./insert";
@@ -46,6 +47,39 @@ export interface InjectSectionsResult {
 	readonly injected: string[];
 	/** List of sections that were skipped with reasons. */
 	readonly skipped: Array<{ heading: string; reason: string }>;
+}
+
+/**
+ * Apply template-specific title prefix if configured, avoiding duplication.
+ *
+ * @param title - The base title
+ * @param template - Template name (e.g., "booking", "research")
+ * @param config - Para-obsidian configuration
+ * @returns Title with prefix applied if configured
+ *
+ * @example
+ * ```typescript
+ * applyTitlePrefix("Test Hotel", "booking", config); // "🎫 Booking - Test Hotel"
+ * applyTitlePrefix("Booking - Test Hotel", "booking", config); // "Booking - Test Hotel" (no duplication)
+ * ```
+ */
+function applyTitlePrefix(
+	title: string,
+	template: string,
+	config: ParaObsidianConfig,
+): string {
+	const prefix =
+		config.titlePrefixes?.[template] ?? DEFAULT_TITLE_PREFIXES[template];
+	if (!prefix) return title;
+
+	// Case-insensitive deduplication
+	const titleLower = title.toLowerCase();
+	const prefixLower = prefix.toLowerCase();
+	if (titleLower.startsWith(prefixLower)) {
+		return title;
+	}
+
+	return `${prefix} ${title}`;
 }
 
 /**
@@ -330,10 +364,17 @@ export function createFromTemplate(
 	const tpl = getTemplate(config, options.template);
 	if (!tpl) throw new Error(`Template not found: ${options.template}`);
 
+	// Apply template-specific title prefix (e.g., "🎫 Booking -" for booking template)
+	const displayTitle = applyTitlePrefix(
+		options.title,
+		options.template,
+		config,
+	);
+
 	// Resolve destination: explicit > config default > vault root
 	const destDir =
 		options.dest ?? config.defaultDestinations?.[options.template] ?? "";
-	const filename = titleToFilename(options.title);
+	const filename = titleToFilename(displayTitle);
 	const target = resolveVaultPath(config.vault, path.join(destDir, filename));
 
 	if (fs.existsSync(target.absolute)) {
@@ -344,17 +385,17 @@ export function createFromTemplate(
 	// 1. First, replace all date patterns (tp.date.now) with actual dates
 	// 2. Then, replace all prompt patterns (tp.system.prompt) with provided args
 	//    - Auto-detect the title prompt key (e.g., "Title", "Project title", "Resource title")
-	//    - Inject options.title using the detected key for automatic substitution
+	//    - Inject displayTitle using the detected key for automatic substitution
 	let filled = applyDateSubstitutions(tpl.content);
 	const titleKey = detectTitlePromptKey(tpl);
-	const argsWithTitle = { [titleKey]: options.title, ...options.args };
+	const argsWithTitle = { [titleKey]: displayTitle, ...options.args };
 	filled = applyArgsToTemplate(filled, argsWithTitle);
 
 	const { attributes: rawAttributes, body: rawBody } = parseFrontmatter(filled);
 
 	// Apply args to frontmatter fields with null placeholders
 	// This handles templates that use null instead of Templater prompts
-	const argsForFrontmatter = { title: options.title, ...options.args };
+	const argsForFrontmatter = { title: displayTitle, ...options.args };
 	const attributes = applyArgsToFrontmatter(
 		rawAttributes,
 		argsForFrontmatter,
@@ -363,7 +404,7 @@ export function createFromTemplate(
 	// Also replace null in the H1 title if present (# null → # My Title)
 	let body = rawBody;
 	if (body.match(/^#\s+null\s*$/m)) {
-		body = body.replace(/^#\s+null\s*$/m, `# ${options.title}`);
+		body = body.replace(/^#\s+null\s*$/m, `# ${displayTitle}`);
 	}
 
 	// Inject template_version if not present and configured
@@ -376,7 +417,7 @@ export function createFromTemplate(
 
 	// Inject title if not provided by args/template substitution
 	if (!attributes.title || attributes.title === "null") {
-		attributes.title = options.title;
+		attributes.title = displayTitle;
 	}
 	const content = serializeFrontmatter(attributes, body);
 

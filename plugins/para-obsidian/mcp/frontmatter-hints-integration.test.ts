@@ -15,7 +15,13 @@ import { readFrontmatterFile, updateFrontmatterFile } from "../src/frontmatter";
 // Test helper that mirrors the MCP server hint logic
 interface FrontmatterHint {
 	readonly allowedValues?: ReadonlyArray<string>;
-	readonly expectedType?: "string" | "date" | "array" | "wikilink" | "enum";
+	readonly expectedType?:
+		| "string"
+		| "date"
+		| "number"
+		| "array"
+		| "wikilink"
+		| "enum";
 	readonly examples?: ReadonlyArray<string>;
 	readonly description?: string;
 }

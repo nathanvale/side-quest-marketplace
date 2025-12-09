@@ -42,7 +42,7 @@ export interface FrontmatterRules {
  */
 export interface FieldRule {
 	/** The expected data type for this field. */
-	readonly type: "string" | "date" | "array" | "wikilink" | "enum";
+	readonly type: "string" | "date" | "number" | "array" | "wikilink" | "enum";
 	/** For enum types, the allowed values. */
 	readonly enum?: ReadonlyArray<string>;
 	/** For array types, values that must be present in the array. */
@@ -134,7 +134,7 @@ function resolveUserRc(): string {
 	return path.join(home, ".config", "para-obsidian", "config.json");
 }
 
-const PROJECT_RC = ".para-obsidianrc";
+const PROJECT_RC = ".paraobsidianrc";
 
 function resolveProjectRc(cwd: string): string | undefined {
 	const candidate = path.join(cwd, PROJECT_RC);
@@ -176,10 +176,8 @@ export interface LoadConfigOptions {
  * ```
  */
 export function loadConfig(
-	options: LoadConfigOptions = {},
+	_options: LoadConfigOptions = {},
 ): ParaObsidianConfig {
-	const cwd = options.cwd ?? process.cwd();
-
 	const envVault = process.env.PARA_VAULT;
 	if (!envVault || envVault.trim().length === 0) {
 		throw new Error("PARA_VAULT env is required to use para-obsidian.");

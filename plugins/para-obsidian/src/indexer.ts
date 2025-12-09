@@ -209,14 +209,15 @@ export function loadIndex(config: ParaObsidianConfig): VaultIndex | undefined {
  * ```
  */
 export function listAreas(config: ParaObsidianConfig): string[] {
-	const areasDir = resolveVaultPath(config.vault, "02_Areas");
+	const areasFolder = config.paraFolders?.areas ?? "02 Areas";
+	const areasDir = resolveVaultPath(config.vault, areasFolder);
 	const areas: string[] = [];
 
 	if (!fs.existsSync(areasDir.absolute)) {
 		return areas;
 	}
 
-	// Scan 02_Areas directory for .md files
+	// Scan areas directory for .md files
 	const files = fs.readdirSync(areasDir.absolute);
 	for (const file of files) {
 		if (file.endsWith(".md")) {
@@ -243,14 +244,15 @@ export function listAreas(config: ParaObsidianConfig): string[] {
  * ```
  */
 export function listProjects(config: ParaObsidianConfig): string[] {
-	const projectsDir = resolveVaultPath(config.vault, "01_Projects");
+	const projectsFolder = config.paraFolders?.projects ?? "01 Projects";
+	const projectsDir = resolveVaultPath(config.vault, projectsFolder);
 	const projects: string[] = [];
 
 	if (!fs.existsSync(projectsDir.absolute)) {
 		return projects;
 	}
 
-	// Scan 01_Projects directory for .md files
+	// Scan projects directory for .md files
 	const files = fs.readdirSync(projectsDir.absolute);
 	for (const file of files) {
 		if (file.endsWith(".md")) {

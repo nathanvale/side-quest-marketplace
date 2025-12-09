@@ -147,7 +147,13 @@ interface FrontmatterHint {
 	/** Allowed enum values for this field (if applicable). */
 	readonly allowedValues?: ReadonlyArray<string>;
 	/** Expected data type for this field. */
-	readonly expectedType?: "string" | "date" | "array" | "wikilink" | "enum";
+	readonly expectedType?:
+		| "string"
+		| "date"
+		| "number"
+		| "array"
+		| "wikilink"
+		| "enum";
 	/** Example values for this field. */
 	readonly examples?: ReadonlyArray<string>;
 	/** Human-readable description of the field. */
