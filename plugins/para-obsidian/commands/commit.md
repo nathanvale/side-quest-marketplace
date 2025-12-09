@@ -12,7 +12,9 @@ Commit uncommitted markdown files in your Obsidian vault.
 
 Run the para-obsidian CLI git commit command:
 
-!`cd "${CLAUDE_PLUGIN_ROOT}" && bun run src/cli.ts git commit $ARGUMENTS --format json`
+```bash
+bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts git commit $ARGUMENTS --format json
+```
 
 ## Usage Examples
 

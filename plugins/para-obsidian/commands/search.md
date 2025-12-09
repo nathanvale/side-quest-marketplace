@@ -12,7 +12,9 @@ Search your Obsidian vault for content related to: **$ARGUMENTS**
 
 Run the para-obsidian CLI semantic search command:
 
-!`cd "${CLAUDE_PLUGIN_ROOT}" && bun run src/cli.ts semantic $ARGUMENTS --format json`
+```bash
+bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts semantic $ARGUMENTS --format json
+```
 
 ## Usage Examples
 

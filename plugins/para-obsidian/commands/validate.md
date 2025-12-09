@@ -12,7 +12,9 @@ Validate frontmatter across all notes in your vault or specific directories.
 
 Run the para-obsidian CLI bulk validation command:
 
-!`cd "${CLAUDE_PLUGIN_ROOT}" && bun run src/cli.ts frontmatter validate-all $ARGUMENTS --format json`
+```bash
+bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts frontmatter validate-all $ARGUMENTS --format json
+```
 
 ## Usage Examples
 
