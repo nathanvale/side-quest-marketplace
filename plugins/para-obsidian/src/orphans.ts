@@ -297,3 +297,95 @@ export function findOrphans(
 		brokenLinks,
 	};
 }
+
+/**
+ * Suggested fix for a broken link.
+ */
+export interface LinkFix {
+	/** Original link text (without brackets) */
+	readonly from: string;
+	/** Suggested replacement */
+	readonly to: string;
+	/** Confidence level */
+	readonly confidence: "high" | "medium";
+	/** Reason for suggestion */
+	readonly reason: string;
+}
+
+/**
+ * Generates fix suggestions for broken links.
+ *
+ * Analyzes broken links and suggests rewrite-links commands:
+ * - High confidence: Link is a filename that exists in Attachments/
+ * - Medium confidence: Link basename matches a file in Attachments/
+ *
+ * @param vault - Absolute path to vault root
+ * @param brokenLinks - Array of broken links from findOrphans
+ * @returns Array of suggested fixes (deduplicated)
+ */
+export function suggestFixes(
+	vault: string,
+	brokenLinks: OrphanResult["brokenLinks"],
+): ReadonlyArray<LinkFix> {
+	const attachmentsDir = path.join(vault, "Attachments");
+	const attachmentFiles = new Set<string>();
+
+	// Build set of attachment filenames (lowercase for matching)
+	if (fs.existsSync(attachmentsDir)) {
+		for (const file of fs.readdirSync(attachmentsDir)) {
+			if (!file.startsWith(".")) {
+				attachmentFiles.add(file.toLowerCase());
+			}
+		}
+	}
+
+	const fixes = new Map<string, LinkFix>();
+
+	for (const { link } of brokenLinks) {
+		// Skip if already suggested
+		if (fixes.has(link)) continue;
+
+		// Skip links that already have Attachments/ prefix
+		if (link.startsWith("Attachments/")) continue;
+
+		// Check if link looks like a file (has extension)
+		const hasExtension = /\.[a-zA-Z0-9]+$/.test(link);
+		if (!hasExtension) continue;
+
+		const basename = path.basename(link).toLowerCase();
+
+		// High confidence: exact filename exists in Attachments/
+		if (attachmentFiles.has(basename)) {
+			// Find actual case-preserved filename
+			const actualFile = fs.readdirSync(attachmentsDir).find(
+				(f) => f.toLowerCase() === basename,
+			);
+			if (actualFile) {
+				fixes.set(link, {
+					from: link,
+					to: `Attachments/${actualFile}`,
+					confidence: "high",
+					reason: `File exists at Attachments/${actualFile}`,
+				});
+			}
+		}
+	}
+
+	return Array.from(fixes.values());
+}
+
+/**
+ * Formats suggested fixes as a ready-to-run CLI command.
+ *
+ * @param fixes - Array of link fixes
+ * @returns Formatted command string (empty if no fixes)
+ */
+export function formatFixCommand(fixes: ReadonlyArray<LinkFix>): string {
+	if (fixes.length === 0) return "";
+
+	const args = fixes
+		.map((f) => `  --from "${f.from}" --to "${f.to}"`)
+		.join(" \\\n");
+
+	return `para-obsidian rewrite-links \\\n${args}`;
+}

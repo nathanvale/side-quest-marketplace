@@ -105,7 +105,11 @@ import {
 	validateModel,
 } from "./llm";
 import { MIGRATIONS } from "./migrations";
-import { findOrphans } from "./orphans";
+import {
+	findOrphans,
+	formatFixCommand,
+	suggestFixes,
+} from "./orphans";
 import { type RewriteMapping, rewriteLinks } from "./rewrite-links";
 import { filterByFrontmatter, searchText } from "./search";
 import { semanticSearch } from "./semantic";
@@ -997,13 +1001,27 @@ async function main(): Promise<void> {
 					normalizeFlagValue(flags.dir),
 					config.defaultSearchDirs,
 				);
+				const suggest = flags.suggest === true || flags.suggest === "true";
 
 				const result = findOrphans(config.vault, { dirs });
 				const searchedDirs = dirs ?? config.defaultSearchDirs ?? ["."];
 
+				// Generate suggestions if requested
+				const fixes = suggest
+					? suggestFixes(config.vault, result.brokenLinks)
+					: [];
+
 				if (isJson) {
 					console.log(
-						JSON.stringify({ ...result, dirs: searchedDirs }, null, 2),
+						JSON.stringify(
+							{
+								...result,
+								dirs: searchedDirs,
+								...(suggest && { suggestedFixes: fixes }),
+							},
+							null,
+							2,
+						),
 					);
 				} else {
 					// Show which directories were searched
@@ -1031,6 +1049,7 @@ async function main(): Promise<void> {
 						for (const att of result.orphanAttachments) {
 							console.log(`  ${att}`);
 						}
+						console.log("");
 					}
 
 					if (
@@ -1038,6 +1057,27 @@ async function main(): Promise<void> {
 						result.orphanAttachments.length === 0
 					) {
 						console.log(emphasize.success("No orphans or broken links found!"));
+					}
+
+					// Show suggestions if requested
+					if (suggest && fixes.length > 0) {
+						console.log(
+							emphasize.success(`\n✨ Suggested fixes (${fixes.length}):`),
+						);
+						for (const fix of fixes) {
+							console.log(
+								`  ${emphasize.info(fix.from)} → ${emphasize.success(fix.to)}`,
+							);
+							console.log(`    ${fix.reason}`);
+						}
+						console.log("\n# Copy/paste to fix:");
+						console.log(formatFixCommand(fixes));
+					} else if (suggest && fixes.length === 0 && result.brokenLinks.length > 0) {
+						console.log(
+							emphasize.warn(
+								"\nNo auto-fixes available (broken links don't match existing attachments)",
+							),
+						);
 					}
 				}
 				break;
