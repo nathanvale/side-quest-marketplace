@@ -326,6 +326,23 @@ export function validateFrontmatter(
 		}
 	}
 
+	// Check oneOfRequired constraint (at least one field must have a value)
+	if (rules?.oneOfRequired && rules.oneOfRequired.length > 0) {
+		const hasAtLeastOne = rules.oneOfRequired.some((fieldName) => {
+			const value = attributes[fieldName];
+			if (value === undefined || value === null) return false;
+			if (typeof value === "string" && value.trim() === "") return false;
+			return true;
+		});
+		if (!hasAtLeastOne) {
+			const fieldList = rules.oneOfRequired.join(", ");
+			issues.push({
+				field: rules.oneOfRequired.join("|"),
+				message: `at least one of [${fieldList}] is required`,
+			});
+		}
+	}
+
 	return { valid: issues.length === 0, issues };
 }
 

@@ -11,6 +11,7 @@
  *
  * @module search
  */
+import fs from "node:fs";
 import path from "node:path";
 import { readTextFile } from "@sidequest/core/fs";
 import { ensureCommandAvailable, spawnAndCollect } from "@sidequest/core/spawn";
@@ -93,7 +94,10 @@ function resolveDirs(
 	const seen = new Set<string>();
 	for (const entry of dirs) {
 		const resolved = resolveVaultPath(root, entry).absolute;
-		seen.add(resolved);
+		// Only include directories that exist (silently skip missing)
+		if (fs.existsSync(resolved)) {
+			seen.add(resolved);
+		}
 	}
 	return Array.from(seen);
 }

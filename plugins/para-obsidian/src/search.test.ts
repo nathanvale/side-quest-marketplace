@@ -19,20 +19,22 @@ function writeFile(vault: string, rel: string, content: string) {
 describe("search", () => {
 	it("finds text with ripgrep", async () => {
 		const vault = makeTmpDir();
-		writeFile(vault, "note.md", "hello world");
+		// Put file in 00 Inbox (a default PARA folder) so defaultSearchDirs will find it
+		writeFile(vault, "00 Inbox/note.md", "hello world");
 		process.env.PARA_VAULT = vault;
 
 		const cfg = loadConfig({ cwd: vault });
 		const hits = await searchText(cfg, { query: "hello" });
 		expect(hits.length).toBe(1);
-		expect(hits[0]?.file).toBe("note.md");
+		expect(hits[0]?.file).toBe("00 Inbox/note.md");
 	});
 
 	it("filters by frontmatter and tag", async () => {
 		const vault = makeTmpDir();
+		// Put files in PARA folders so defaultSearchDirs will find them
 		writeFile(
 			vault,
-			"match.md",
+			"01 Projects/match.md",
 			`---
 type: project
 tags: [project, x]
@@ -41,7 +43,7 @@ tags: [project, x]
 		);
 		writeFile(
 			vault,
-			"skip.md",
+			"02 Areas/skip.md",
 			`---
 type: area
 tags: [area]
@@ -54,6 +56,6 @@ tags: [area]
 			frontmatter: { type: "project" },
 			tag: "project",
 		});
-		expect(matches).toEqual(["match.md"]);
+		expect(matches).toEqual(["01 Projects/match.md"]);
 	});
 });

@@ -51,8 +51,8 @@ export function cleanBrokenLinks(
 ): CleanLinksResult {
 	const { dryRun = false, dir = "." } = options;
 
-	// Find all broken links
-	const { brokenLinks } = findOrphans(vault, { dir });
+	// Find all broken links (wrap single dir in array for multi-dir API)
+	const { brokenLinks } = findOrphans(vault, { dirs: [dir] });
 
 	// Group by note
 	const linksByNote = new Map<string, Set<string>>();

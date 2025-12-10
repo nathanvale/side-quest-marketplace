@@ -36,6 +36,8 @@ export interface FrontmatterRules {
 	readonly required?: Record<string, FieldRule>;
 	/** Array of field names that are not allowed for this note type. */
 	readonly forbidden?: ReadonlyArray<string>;
+	/** Array of field names where at least one must have a value. */
+	readonly oneOfRequired?: ReadonlyArray<string>;
 }
 
 /**
@@ -218,6 +220,20 @@ export function loadConfig(
 			? envTemplatesDir
 			: merged.templatesDir) ?? path.join(vault, "Templates");
 
+	// Resolve PARA folders for defaults
+	const paraFolders = merged.paraFolders ?? DEFAULT_PARA_FOLDERS;
+	const defaultParaSearchFolders = merged.defaultParaSearchFolders ?? [
+		...DEFAULT_PARA_SEARCH_FOLDERS,
+	];
+
+	// Derive defaultSearchDirs from PARA folders if not explicitly set
+	// This ensures find-orphans, validate-all, etc. only search managed folders
+	const defaultSearchDirs =
+		merged.defaultSearchDirs ??
+		defaultParaSearchFolders
+			.map((shortName) => paraFolders[shortName])
+			.filter((dir): dir is string => dir !== undefined);
+
 	return {
 		...merged,
 		vault,
@@ -228,10 +244,9 @@ export function loadConfig(
 		defaultDestinations: merged.defaultDestinations ?? DEFAULT_DESTINATIONS,
 		availableModels: merged.availableModels ?? [...DEFAULT_AVAILABLE_MODELS],
 		defaultModel: merged.defaultModel ?? DEFAULT_MODEL,
-		paraFolders: merged.paraFolders ?? DEFAULT_PARA_FOLDERS,
-		defaultParaSearchFolders: merged.defaultParaSearchFolders ?? [
-			...DEFAULT_PARA_SEARCH_FOLDERS,
-		],
+		paraFolders,
+		defaultParaSearchFolders,
+		defaultSearchDirs,
 		titlePrefixes: merged.titlePrefixes ?? DEFAULT_TITLE_PREFIXES,
 	};
 }

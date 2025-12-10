@@ -205,6 +205,106 @@ Body`,
 		const resultWithoutArea = validateFrontmatter(attrsWithoutArea, rules);
 		expect(resultWithoutArea.valid).toBe(true);
 	});
+
+	it("passes oneOfRequired when area is present", () => {
+		const rules = {
+			required: {
+				title: { type: "string" },
+				area: { type: "wikilink", optional: true },
+				project: { type: "wikilink", optional: true },
+			},
+			oneOfRequired: ["area", "project"],
+		} as const;
+		const attrs = {
+			title: "Session 1",
+			area: "[[Psychotherapy]]",
+		};
+		const result = validateFrontmatter(attrs, rules);
+		expect(result.valid).toBe(true);
+	});
+
+	it("passes oneOfRequired when project is present", () => {
+		const rules = {
+			required: {
+				title: { type: "string" },
+				area: { type: "wikilink", optional: true },
+				project: { type: "wikilink", optional: true },
+			},
+			oneOfRequired: ["area", "project"],
+		} as const;
+		const attrs = {
+			title: "Session 1",
+			project: "[[My Project]]",
+		};
+		const result = validateFrontmatter(attrs, rules);
+		expect(result.valid).toBe(true);
+	});
+
+	it("passes oneOfRequired when both area and project are present", () => {
+		const rules = {
+			required: {
+				title: { type: "string" },
+				area: { type: "wikilink", optional: true },
+				project: { type: "wikilink", optional: true },
+			},
+			oneOfRequired: ["area", "project"],
+		} as const;
+		const attrs = {
+			title: "Session 1",
+			area: "[[Psychotherapy]]",
+			project: "[[My Project]]",
+		};
+		const result = validateFrontmatter(attrs, rules);
+		expect(result.valid).toBe(true);
+	});
+
+	it("fails oneOfRequired when neither area nor project is present", () => {
+		const rules = {
+			required: {
+				title: { type: "string" },
+				area: { type: "wikilink", optional: true },
+				project: { type: "wikilink", optional: true },
+			},
+			oneOfRequired: ["area", "project"],
+		} as const;
+		const attrs = {
+			title: "Session 1",
+		};
+		const result = validateFrontmatter(attrs, rules);
+		expect(result.valid).toBe(false);
+		expect(result.issues.some((i) => i.field === "area|project")).toBe(true);
+		expect(
+			result.issues.some((i) =>
+				i.message.includes("at least one of [area, project] is required"),
+			),
+		).toBe(true);
+	});
+
+	it("fails oneOfRequired when fields are null or empty", () => {
+		const rules = {
+			required: {
+				title: { type: "string" },
+				area: { type: "wikilink", optional: true },
+				project: { type: "wikilink", optional: true },
+			},
+			oneOfRequired: ["area", "project"],
+		} as const;
+		const attrsNull = {
+			title: "Session 1",
+			area: null,
+			project: null,
+		};
+		const resultNull = validateFrontmatter(attrsNull, rules);
+		expect(resultNull.valid).toBe(false);
+
+		const attrsEmpty = {
+			title: "Session 1",
+			area: "",
+			project: "   ",
+		};
+		const resultEmpty = validateFrontmatter(attrsEmpty, rules);
+		expect(resultEmpty.valid).toBe(false);
+	});
 });
 
 describe("frontmatter update", () => {

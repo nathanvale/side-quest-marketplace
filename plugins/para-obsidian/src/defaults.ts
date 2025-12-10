@@ -40,6 +40,8 @@ export const DEFAULT_SUGGESTED_TAGS = [
 	"finance",
 	"home",
 	"career",
+	"session",
+	"invoice",
 ] as const;
 
 export const DEFAULT_FRONTMATTER_RULES: NonNullable<
@@ -265,6 +267,49 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			tags: { type: "array", includes: ["project", "trip"] },
 		},
 	},
+	session: {
+		required: {
+			title: { type: "string" },
+			created: { type: "date" },
+			type: { type: "enum", enum: ["session"] },
+			session_date: { type: "date" },
+			area: { type: "wikilink", optional: true },
+			project: { type: "wikilink", optional: true },
+			provider: { type: "string" },
+			session_number: { type: "number", optional: true },
+			tags: { type: "array", includes: ["session"] },
+		},
+		oneOfRequired: ["area", "project"],
+	},
+	invoice: {
+		required: {
+			title: { type: "string" },
+			created: { type: "date" },
+			type: { type: "enum", enum: ["invoice"] },
+			invoice_date: { type: "date" },
+			area: { type: "wikilink", optional: true },
+			project: { type: "wikilink", optional: true },
+			provider: { type: "string" },
+			amount: { type: "number" },
+			currency: {
+				type: "enum",
+				enum: ["AUD", "USD", "EUR", "GBP", "JPY", "NZD", "SGD"],
+			},
+			status: {
+				type: "enum",
+				enum: ["unpaid", "paid", "pending"],
+			},
+			due_date: { type: "date", optional: true },
+			payment_date: { type: "date", optional: true },
+			attachments: {
+				type: "array",
+				optional: true,
+				description: "Wikilinks to invoice PDF in Attachments/ folder",
+			},
+			tags: { type: "array", includes: ["invoice"] },
+		},
+		oneOfRequired: ["area", "project"],
+	},
 };
 
 export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
@@ -281,6 +326,8 @@ export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
 	itinerary: 3,
 	"itinerary-day": 3,
 	research: 3,
+	session: 1,
+	invoice: 1,
 };
 
 /**
@@ -303,6 +350,8 @@ export const DEFAULT_DESTINATIONS: Record<string, string> = {
 	itinerary: "00 Inbox",
 	"itinerary-day": "00 Inbox",
 	research: "00 Inbox",
+	session: "00 Inbox",
+	invoice: "00 Inbox",
 	// Attachments folder (for git operations, not template destination)
 	attachments: "Attachments",
 };
@@ -376,4 +425,6 @@ export const DEFAULT_TITLE_PREFIXES: Partial<Record<string, string>> = {
 	trip: "✈️ ",
 	itinerary: "🗓️ ",
 	checklist: "✅ ",
+	session: "🧠 ",
+	invoice: "🧾 ",
 };

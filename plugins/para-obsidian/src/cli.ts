@@ -105,11 +105,7 @@ import {
 	validateModel,
 } from "./llm";
 import { MIGRATIONS } from "./migrations";
-import {
-	findOrphans,
-	formatFixCommand,
-	suggestFixes,
-} from "./orphans";
+import { findOrphans, formatFixCommand, suggestFixes } from "./orphans";
 import { type RewriteMapping, rewriteLinks } from "./rewrite-links";
 import { filterByFrontmatter, searchText } from "./search";
 import { semanticSearch } from "./semantic";
@@ -1072,7 +1068,11 @@ async function main(): Promise<void> {
 						}
 						console.log("\n# Copy/paste to fix:");
 						console.log(formatFixCommand(fixes));
-					} else if (suggest && fixes.length === 0 && result.brokenLinks.length > 0) {
+					} else if (
+						suggest &&
+						fixes.length === 0 &&
+						result.brokenLinks.length > 0
+					) {
 						console.log(
 							emphasize.warn(
 								"\nNo auto-fixes available (broken links don't match existing attachments)",
