@@ -74,6 +74,8 @@ export const DEFAULT_CRITICAL_RULES: ReadonlyArray<string> = [
 	"9. Enum values MUST match exactly from the validation rules",
 	"10. For content sections, preserve markdown formatting (lists, bold, links, etc.)",
 	"11. The title should be descriptive and based on the note content",
+	"    - NEVER use colons (:) in titles - they break YAML parsing",
+	"    - Use dashes (-) or parentheses instead: 'Activity Selection - Lake St Clair' not 'Activity Selection: Lake St Clair'",
 	"12. For wikilink fields (area, project): Use literal null when no value exists",
 	'    - CORRECT: "area": null',
 	'    - WRONG: "area": "[[null]]" or "area": "null"',

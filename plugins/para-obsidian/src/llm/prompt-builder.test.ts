@@ -547,8 +547,8 @@ describe("buildSourceStructureSection", () => {
 
 describe("DEFAULT_CRITICAL_RULES", () => {
 	test("has expected number of rules", () => {
-		// Rules 1-14 with sub-items for multi-line rules (3, 6, 12, 13, 14)
-		expect(DEFAULT_CRITICAL_RULES.length).toBe(28);
+		// Rules 1-14 with sub-items for multi-line rules (3, 6, 11, 12, 13, 14)
+		expect(DEFAULT_CRITICAL_RULES.length).toBe(30);
 	});
 
 	test("includes rule numbers", () => {
@@ -567,6 +567,12 @@ describe("DEFAULT_CRITICAL_RULES", () => {
 	test("includes required tag validation rule", () => {
 		const joined = DEFAULT_CRITICAL_RULES.join("\n");
 		expect(joined).toContain("Tags MUST include required values");
+	});
+
+	test("includes title formatting rule to prevent YAML-breaking colons", () => {
+		const joined = DEFAULT_CRITICAL_RULES.join("\n");
+		expect(joined).toContain("NEVER use colons (:) in titles");
+		expect(joined).toContain("they break YAML parsing");
 	});
 });
 
