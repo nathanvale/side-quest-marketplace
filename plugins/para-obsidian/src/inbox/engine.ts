@@ -1,0 +1,945 @@
+/**
+ * Inbox Processing Engine
+ *
+ * Factory function and implementation for the inbox processing engine.
+ * This is the main entry point for scan/execute/edit operations.
+ *
+ * @module inbox/engine
+ */
+
+import fs, { existsSync, mkdirSync, readdirSync } from "node:fs";
+import { basename, dirname, extname, join } from "node:path";
+import { moveFile } from "@sidequest/core/fs";
+import pLimit from "p-limit";
+import { loadConfig } from "../config";
+import { createFromTemplate, injectSections } from "../create";
+import { resolveVaultPath } from "../fs";
+import { ensureGitGuard } from "../git";
+import { createInboxError } from "./errors";
+import {
+	buildInboxPrompt,
+	type DocumentTypeResult,
+	type InboxVaultContext,
+	parseDetectionResponse,
+} from "./llm-detection";
+import { executeLogger, inboxLogger } from "./logger";
+import {
+	checkPdfToText,
+	combineHeuristics,
+	extractPdfText,
+} from "./pdf-processor";
+import { createRegistry, hashFile } from "./registry";
+import type {
+	Confidence,
+	ExecutionResult,
+	InboxAction,
+	InboxEngine,
+	InboxEngineConfig,
+	InboxSuggestion,
+} from "./types";
+
+// =============================================================================
+// Engine Factory
+// =============================================================================
+
+/**
+ * Creates a new inbox processing engine.
+ *
+ * The engine provides methods to:
+ * - Scan the inbox for items and generate suggestions
+ * - Execute approved suggestions (create notes, move attachments)
+ * - Edit suggestions with additional prompts
+ * - Generate markdown reports
+ *
+ * @param config - Engine configuration including vault path and options
+ * @returns InboxEngine instance
+ *
+ * @example
+ * ```typescript
+ * const engine = createInboxEngine({
+ *   vaultPath: "/path/to/vault",
+ *   inboxFolder: "00 Inbox",
+ * });
+ *
+ * const suggestions = await engine.scan();
+ * const results = await engine.execute(suggestions.map(s => s.id));
+ * ```
+ */
+export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
+	// Apply defaults to config
+	const resolvedConfig: Required<
+		Omit<InboxEngineConfig, "llmModel" | "concurrency">
+	> &
+		Pick<InboxEngineConfig, "llmModel" | "concurrency"> = {
+		vaultPath: config.vaultPath,
+		inboxFolder: config.inboxFolder ?? "00 Inbox",
+		attachmentsFolder: config.attachmentsFolder ?? "Attachments",
+		templatesFolder: config.templatesFolder ?? "Templates",
+		llmProvider: config.llmProvider ?? "haiku",
+		llmModel: config.llmModel,
+		concurrency: config.concurrency ?? {
+			pdfExtraction: 5,
+			llmCalls: 3,
+			fileIO: 10,
+		},
+	};
+
+	// In-memory cache of suggestions from last scan
+	// Used by execute() to look up suggestions by ID
+	const suggestionCache = new Map<string, InboxSuggestion>();
+
+	if (inboxLogger) {
+		inboxLogger.debug`Engine created vault=${resolvedConfig.vaultPath}`;
+	}
+
+	return {
+		scan,
+		execute,
+		editWithPrompt,
+		generateReport,
+	};
+
+	// =========================================================================
+	// Method Implementations
+	// =========================================================================
+
+	/**
+	 * Scan the inbox and generate suggestions for all items.
+	 *
+	 * @returns Array of suggestions for inbox items
+	 */
+	async function scan(): Promise<InboxSuggestion[]> {
+		const cid = crypto.randomUUID().slice(0, 8);
+
+		if (inboxLogger) {
+			inboxLogger.info`Scan started vault=${resolvedConfig.vaultPath} cid=${cid}`;
+		}
+
+		// Load the registry to check for already-processed items
+		const registry = createRegistry(resolvedConfig.vaultPath);
+		await registry.load();
+
+		// Get inbox folder path
+		const inboxPath = join(
+			resolvedConfig.vaultPath,
+			resolvedConfig.inboxFolder,
+		);
+
+		// List files in inbox
+		let files: string[];
+		try {
+			files = readdirSync(inboxPath);
+		} catch (_error) {
+			if (inboxLogger) {
+				inboxLogger.warn`Inbox folder not found: ${inboxPath}`;
+			}
+			return [];
+		}
+
+		// Filter to PDFs only (for now)
+		const pdfFiles = files.filter((f) => extname(f).toLowerCase() === ".pdf");
+
+		if (pdfFiles.length === 0) {
+			if (inboxLogger) {
+				inboxLogger.info`No PDFs found in inbox`;
+			}
+			return [];
+		}
+
+		// Check pdftotext availability
+		const pdfCheck = await checkPdfToText();
+		if (!pdfCheck.available) {
+			if (inboxLogger) {
+				inboxLogger.error`pdftotext not available: ${pdfCheck.error}`;
+			}
+			throw createInboxError("DEP_PDFTOTEXT_MISSING", {
+				cid,
+				operation: "scan",
+			});
+		}
+
+		// Get vault context for LLM (stub for now - could integrate with indexer)
+		const vaultContext: InboxVaultContext = {
+			areas: getVaultAreas(resolvedConfig.vaultPath),
+			projects: getVaultProjects(resolvedConfig.vaultPath),
+		};
+
+		// Create concurrency limiters
+		const pdfLimit = pLimit(resolvedConfig.concurrency?.pdfExtraction ?? 5);
+		const llmLimit = pLimit(resolvedConfig.concurrency?.llmCalls ?? 3);
+
+		// Process PDFs concurrently
+		const suggestionPromises = pdfFiles.map((filename) =>
+			pdfLimit(async () => {
+				const filePath = join(inboxPath, filename);
+
+				// Check if already processed via hash
+				try {
+					const hash = await hashFile(filePath);
+					if (registry.isProcessed(hash)) {
+						if (inboxLogger) {
+							inboxLogger.debug`Skipping already processed: ${filename}`;
+						}
+						return null; // Skip this file
+					}
+				} catch (_error) {
+					if (inboxLogger) {
+						inboxLogger.warn`Failed to hash file: ${filename}`;
+					}
+					return null;
+				}
+
+				// Extract text
+				let text: string;
+				try {
+					text = await extractPdfText(filePath, cid);
+				} catch (error) {
+					if (inboxLogger) {
+						inboxLogger.warn`Failed to extract PDF text: ${filename}`;
+					}
+					// Return error suggestion
+					const errorSuggestion: InboxSuggestion = {
+						id: crypto.randomUUID(),
+						source: join(resolvedConfig.inboxFolder, filename),
+						processor: "attachments",
+						confidence: "low",
+						action: "skip",
+						reason: `PDF text extraction failed: ${error instanceof Error ? error.message : "unknown error"}`,
+					};
+					suggestionCache.set(errorSuggestion.id, errorSuggestion);
+					return errorSuggestion;
+				}
+
+				// Run heuristic detection
+				const heuristicResult = combineHeuristics(filename, text);
+
+				// Run LLM detection (with its own rate limit)
+				let llmResult: DocumentTypeResult | null = null;
+				try {
+					await llmLimit(async () => {
+						const prompt = buildInboxPrompt({
+							content: text,
+							filename,
+							vaultContext,
+						});
+						const response = await callLLM(
+							prompt,
+							resolvedConfig.llmProvider,
+							resolvedConfig.llmModel,
+						);
+						llmResult = parseDetectionResponse(response);
+					});
+				} catch (error) {
+					if (inboxLogger) {
+						inboxLogger.warn`LLM detection failed: ${filename} - ${error instanceof Error ? error.message : "unknown"}`;
+					}
+				}
+
+				// Build suggestion
+				const suggestion = buildSuggestion(
+					filename,
+					resolvedConfig.inboxFolder,
+					heuristicResult,
+					llmResult,
+				);
+				suggestionCache.set(suggestion.id, suggestion);
+				return suggestion;
+			}),
+		);
+
+		const results = await Promise.all(suggestionPromises);
+		const suggestions = results.filter((s): s is InboxSuggestion => s !== null);
+
+		if (inboxLogger) {
+			inboxLogger.info`Scan complete suggestions=${suggestions.length} cid=${cid}`;
+		}
+
+		return suggestions;
+	}
+
+	/**
+	 * Execute approved suggestions.
+	 *
+	 * @param ids - IDs of suggestions to execute
+	 * @returns Array of execution results
+	 */
+	async function execute(ids: string[]): Promise<ExecutionResult[]> {
+		const cid = crypto.randomUUID().slice(0, 8);
+
+		if (inboxLogger) {
+			inboxLogger.info`Execute started count=${ids.length} cid=${cid}`;
+		}
+
+		if (ids.length === 0) {
+			return [];
+		}
+
+		// Warn if cache is empty - suggests scan() wasn't called
+		// Don't throw - let per-ID error handling return appropriate results
+		if (suggestionCache.size === 0) {
+			if (inboxLogger) {
+				inboxLogger.warn`Execute called with empty cache - did you forget to call scan()? cid=${cid}`;
+			}
+		}
+
+		// Git safety check: ensure vault is a git repo with clean working tree
+		try {
+			// Build minimal config for git guard without loading from disk
+			// This prevents test failures when PARA_VAULT points to a different location
+			const config = {
+				vault: resolvedConfig.vaultPath,
+			};
+			await ensureGitGuard(config);
+		} catch (error) {
+			throw createInboxError(
+				"SYS_UNEXPECTED",
+				{ cid, operation: "execute" },
+				error instanceof Error ? error.message : "Git safety check failed",
+			);
+		}
+
+		// Load the registry for updating after successful execution
+		const registry = createRegistry(resolvedConfig.vaultPath);
+		await registry.load();
+
+		const results: ExecutionResult[] = [];
+		let successes = 0;
+		let failures = 0;
+
+		for (const id of ids) {
+			// Look up suggestion by ID
+			const suggestion = suggestionCache.get(id);
+			if (!suggestion) {
+				results.push({
+					suggestionId: id,
+					success: false,
+					action: "skip",
+					error: `Suggestion not found: ${id}`,
+				});
+				failures++;
+				continue;
+			}
+
+			// Skip if action is skip
+			if (suggestion.action === "skip") {
+				results.push({
+					suggestionId: id,
+					success: true,
+					action: "skip",
+				});
+				successes++;
+				continue;
+			}
+
+			try {
+				const result = await executeSuggestion(
+					suggestion,
+					resolvedConfig,
+					registry,
+					cid,
+				);
+				results.push(result);
+				if (result.success) {
+					successes++;
+					// Save registry immediately after each successful execution
+					await registry.save();
+					if (executeLogger) {
+						executeLogger.debug`Registry saved after item=${id} ${cid}`;
+					}
+				} else {
+					failures++;
+				}
+			} catch (error) {
+				if (executeLogger) {
+					executeLogger.error`Execute failed id=${id} error=${error instanceof Error ? error.message : "unknown"}`;
+				}
+				results.push({
+					suggestionId: id,
+					success: false,
+					action: suggestion.action,
+					error: error instanceof Error ? error.message : "Unknown error",
+				});
+				failures++;
+			}
+		}
+
+		// Final save to ensure any edge cases are captured
+		// (This is now redundant but harmless as a safety net)
+		await registry.save();
+
+		if (inboxLogger) {
+			inboxLogger.info`Execute complete success=${successes} failed=${failures} cid=${cid}`;
+		}
+
+		return results;
+	}
+
+	/**
+	 * Re-process a suggestion with additional user instructions.
+	 *
+	 * @param id - Suggestion ID to edit
+	 * @param prompt - User's additional instructions
+	 * @returns Updated suggestion
+	 */
+	async function editWithPrompt(
+		id: string,
+		prompt: string,
+	): Promise<InboxSuggestion> {
+		const cid = crypto.randomUUID().slice(0, 8);
+
+		if (inboxLogger) {
+			inboxLogger.info`Edit started id=${id} prompt=${prompt} cid=${cid}`;
+		}
+
+		// Look up original suggestion
+		const original = suggestionCache.get(id);
+		if (!original) {
+			throw new Error(`Suggestion not found: ${id}`);
+		}
+
+		// Get source file path
+		const sourcePath = join(resolvedConfig.vaultPath, original.source);
+		const filename = basename(original.source);
+
+		// Extract text again for re-processing
+		let text: string;
+		try {
+			text = await extractPdfText(sourcePath, cid);
+		} catch (error) {
+			// Return original with error note if extraction fails
+			return {
+				...original,
+				reason: `Edit failed: ${error instanceof Error ? error.message : "extraction error"}`,
+			};
+		}
+
+		// Get vault context
+		const vaultContext: InboxVaultContext = {
+			areas: getVaultAreas(resolvedConfig.vaultPath),
+			projects: getVaultProjects(resolvedConfig.vaultPath),
+		};
+
+		// Build prompt with user hint
+		const llmPrompt = buildInboxPrompt({
+			content: text,
+			filename,
+			vaultContext,
+			userHint: prompt,
+		});
+
+		// Call LLM with user hint
+		let llmResult: DocumentTypeResult | null = null;
+		try {
+			const response = await callLLM(
+				llmPrompt,
+				resolvedConfig.llmProvider,
+				resolvedConfig.llmModel,
+			);
+			llmResult = parseDetectionResponse(response);
+		} catch (error) {
+			if (inboxLogger) {
+				inboxLogger.warn`LLM re-detection failed: ${error instanceof Error ? error.message : "unknown"}`;
+			}
+		}
+
+		// Run heuristics again
+		const heuristicResult = combineHeuristics(filename, text);
+
+		// Build updated suggestion
+		const updated = buildSuggestion(
+			filename,
+			resolvedConfig.inboxFolder,
+			heuristicResult,
+			llmResult,
+		);
+
+		// Preserve original ID and update cache
+		const finalSuggestion: InboxSuggestion = {
+			...updated,
+			id: original.id, // Keep original ID
+			reason: llmResult
+				? `Re-processed with hint: "${prompt}" → ${llmResult.reasoning ?? updated.reason}`
+				: `Re-processed with hint: "${prompt}" (LLM unavailable)`,
+		};
+
+		suggestionCache.set(id, finalSuggestion);
+
+		if (inboxLogger) {
+			inboxLogger.info`Edit complete id=${id} newConfidence=${finalSuggestion.confidence} cid=${cid}`;
+		}
+
+		return finalSuggestion;
+	}
+
+	/**
+	 * Generate a markdown report of suggestions.
+	 *
+	 * @param suggestions - Suggestions to include in report
+	 * @returns Markdown formatted report
+	 */
+	function generateReport(suggestions: InboxSuggestion[]): string {
+		const lines: string[] = [
+			"# Inbox Processing Report",
+			"",
+			`Generated: ${new Date().toISOString()}`,
+			`Vault: ${resolvedConfig.vaultPath}`,
+			"",
+		];
+
+		if (suggestions.length === 0) {
+			lines.push("No suggestions to report.");
+			return lines.join("\n");
+		}
+
+		// Group by confidence
+		const byConfidence = {
+			high: suggestions.filter((s) => s.confidence === "high"),
+			medium: suggestions.filter((s) => s.confidence === "medium"),
+			low: suggestions.filter((s) => s.confidence === "low"),
+		};
+
+		lines.push("## Summary");
+		lines.push("");
+		lines.push(`- Total suggestions: ${suggestions.length}`);
+		lines.push(`- High confidence: ${byConfidence.high.length}`);
+		lines.push(`- Medium confidence: ${byConfidence.medium.length}`);
+		lines.push(`- Low confidence: ${byConfidence.low.length}`);
+		lines.push("");
+
+		lines.push("## Suggestions");
+		lines.push("");
+
+		for (const suggestion of suggestions) {
+			const filename = suggestion.source.split("/").pop() ?? suggestion.source;
+			lines.push(`### ${filename}`);
+			lines.push("");
+			lines.push(`- **Action:** ${suggestion.action}`);
+			lines.push(`- **Confidence:** ${suggestion.confidence}`);
+			lines.push(`- **Processor:** ${suggestion.processor}`);
+			if (suggestion.suggestedTitle) {
+				lines.push(`- **Suggested Title:** ${suggestion.suggestedTitle}`);
+			}
+			if (suggestion.suggestedDestination) {
+				lines.push(
+					`- **Suggested Destination:** ${suggestion.suggestedDestination}`,
+				);
+			}
+			lines.push(`- **Reason:** ${suggestion.reason}`);
+			lines.push("");
+		}
+
+		return lines.join("\n");
+	}
+}
+
+// =============================================================================
+// Helper Functions
+// =============================================================================
+
+/**
+ * Get list of areas from vault (simple directory scan).
+ */
+function getVaultAreas(vaultPath: string): string[] {
+	const areasPath = join(vaultPath, "02 Areas");
+	try {
+		const entries = readdirSync(areasPath, { withFileTypes: true });
+		return entries
+			.filter((e) => e.isDirectory() || (e.isFile() && e.name.endsWith(".md")))
+			.map((e) => e.name.replace(/\.md$/, ""));
+	} catch {
+		return [];
+	}
+}
+
+/**
+ * Get list of projects from vault (simple directory scan).
+ */
+function getVaultProjects(vaultPath: string): string[] {
+	const projectsPath = join(vaultPath, "01 Projects");
+	try {
+		const entries = readdirSync(projectsPath, { withFileTypes: true });
+		return entries
+			.filter((e) => e.isDirectory() || (e.isFile() && e.name.endsWith(".md")))
+			.map((e) => e.name.replace(/\.md$/, ""));
+	} catch {
+		return [];
+	}
+}
+
+/**
+ * Call LLM using the @sidequest/core/llm abstraction.
+ */
+async function callLLM(
+	prompt: string,
+	provider: string,
+	model?: string,
+): Promise<string> {
+	// Import dynamically to avoid circular dependencies
+	const { callModel } = await import("@sidequest/core/llm");
+
+	// Determine the model to use based on provider
+	// Cast to satisfy the type - callModel will validate
+	const resolvedModel = (model ??
+		(provider === "haiku" ? "haiku" : "sonnet")) as
+		| "sonnet"
+		| "haiku"
+		| "qwen:7b"
+		| "qwen:14b"
+		| "qwen2.5:14b"
+		| "qwen-coder:17b"
+		| "qwen-coder:14b";
+
+	return callModel({
+		model: resolvedModel,
+		prompt,
+	});
+}
+
+/**
+ * Build a suggestion from heuristic and LLM results.
+ */
+function buildSuggestion(
+	filename: string,
+	inboxFolder: string,
+	heuristicResult: {
+		detected: boolean;
+		suggestedType?: string;
+		confidence: number;
+	},
+	llmResult: DocumentTypeResult | null,
+): InboxSuggestion {
+	const source = join(inboxFolder, filename);
+
+	// Determine confidence level
+	let confidence: Confidence;
+	let action: InboxAction;
+	let suggestedNoteType: string | undefined;
+	let suggestedArea: string | undefined;
+	let suggestedProject: string | undefined;
+	let extractedFields: Record<string, unknown> | undefined;
+	let reason: string;
+
+	// If LLM detected with high confidence
+	if (llmResult && llmResult.confidence >= 0.7) {
+		confidence = llmResult.confidence >= 0.9 ? "high" : "medium";
+		action = "create-note";
+		suggestedNoteType = llmResult.documentType;
+		suggestedArea = llmResult.suggestedArea ?? undefined;
+		suggestedProject = llmResult.suggestedProject ?? undefined;
+		extractedFields = llmResult.extractedFields ?? undefined;
+		reason =
+			llmResult.reasoning ??
+			`LLM detected ${llmResult.documentType} with ${(llmResult.confidence * 100).toFixed(0)}% confidence`;
+
+		// Boost confidence if heuristics agree
+		if (
+			heuristicResult.detected &&
+			heuristicResult.suggestedType === llmResult.documentType
+		) {
+			confidence = "high";
+			reason = `Heuristics and LLM agree: ${llmResult.documentType}`;
+		}
+	}
+	// If only heuristics detected
+	else if (heuristicResult.detected && heuristicResult.confidence > 0.5) {
+		confidence = heuristicResult.confidence >= 0.8 ? "medium" : "low";
+		action = "create-note";
+		suggestedNoteType = heuristicResult.suggestedType;
+		reason = `Heuristic detection: ${heuristicResult.suggestedType} (${(heuristicResult.confidence * 100).toFixed(0)}% confidence)`;
+	}
+	// Low confidence - needs review
+	else if (llmResult) {
+		confidence = "low";
+		action = llmResult.documentType === "generic" ? "skip" : "create-note";
+		suggestedNoteType = llmResult.documentType;
+		reason = `Low confidence LLM detection: ${llmResult.documentType}`;
+	}
+	// No detection
+	else {
+		confidence = "low";
+		action = "skip";
+		reason = "Unable to determine document type";
+	}
+
+	// Generate suggested title from filename
+	const suggestedTitle = generateTitle(
+		filename,
+		suggestedNoteType,
+		extractedFields,
+	);
+
+	return {
+		id: crypto.randomUUID(),
+		source,
+		processor: "attachments",
+		confidence,
+		action,
+		suggestedNoteType,
+		suggestedTitle,
+		suggestedArea,
+		suggestedProject,
+		extractedFields,
+		reason,
+	};
+}
+
+/**
+ * Generate a suggested title from filename and extracted data.
+ */
+function generateTitle(
+	filename: string,
+	noteType?: string,
+	fields?: Record<string, unknown>,
+): string {
+	// Try to use extracted provider and date
+	const provider = fields?.provider as string | undefined;
+	const date = fields?.date as string | undefined;
+
+	if (provider && date) {
+		const typeLabel = noteType ? capitalizeFirst(noteType) : "Document";
+		return `${typeLabel} - ${provider} - ${date}`;
+	}
+
+	if (provider) {
+		const typeLabel = noteType ? capitalizeFirst(noteType) : "Document";
+		return `${typeLabel} - ${provider}`;
+	}
+
+	// Fall back to cleaned filename
+	const name = basename(filename, extname(filename));
+	return name.replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Capitalize first letter of a string.
+ */
+function capitalizeFirst(s: string): string {
+	return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
+ * Execute a single suggestion.
+ *
+ * For create-note actions:
+ * 1. Move PDF to Attachments folder with dated name
+ * 2. Create note with template (TBD - for now just moves attachment)
+ * 3. Update registry
+ */
+async function executeSuggestion(
+	suggestion: InboxSuggestion,
+	config: {
+		vaultPath: string;
+		inboxFolder: string;
+		attachmentsFolder: string;
+		templatesFolder: string;
+	},
+	registry: ReturnType<typeof createRegistry>,
+	cid: string,
+): Promise<ExecutionResult> {
+	const sourcePath = join(config.vaultPath, suggestion.source);
+	const filename = basename(suggestion.source);
+
+	if (executeLogger) {
+		executeLogger.debug`Executing suggestion id=${suggestion.id} action=${suggestion.action} source=${filename} ${cid}`;
+	}
+
+	// Generate dated attachment name: YYYY-MM-DD-original-name.pdf
+	const today = new Date().toISOString().slice(0, 10);
+	const datedFilename = `${today}-${filename}`;
+	const attachmentDest = join(
+		config.vaultPath,
+		config.attachmentsFolder,
+		datedFilename,
+	);
+	const movedAttachmentPath = join(config.attachmentsFolder, datedFilename);
+
+	// Hash the SOURCE file BEFORE moving (needed for registry)
+	let hash: string;
+	try {
+		hash = await hashFile(sourcePath);
+	} catch (error) {
+		return {
+			suggestionId: suggestion.id,
+			success: false,
+			action: suggestion.action,
+			error: `Failed to hash source file: ${error instanceof Error ? error.message : "unknown"}`,
+		};
+	}
+
+	let createdNotePath: string | undefined;
+
+	// Create note FIRST if action is create-note (before moving attachment)
+	// This ensures the inbox item stays in place if note creation fails
+	if (
+		suggestion.action === "create-note" &&
+		suggestion.suggestedNoteType &&
+		suggestion.suggestedTitle
+	) {
+		try {
+			// Load para-obsidian config to get template info
+			const paraConfig = loadConfig();
+
+			// Build args from suggestion
+			const args: Record<string, string> = {};
+
+			// Add extracted fields as args
+			if (suggestion.extractedFields) {
+				for (const [key, value] of Object.entries(suggestion.extractedFields)) {
+					if (typeof value === "string") {
+						args[key] = value;
+					} else if (value !== null && value !== undefined) {
+						args[key] = String(value);
+					}
+				}
+			}
+
+			// Add area/project if suggested
+			if (suggestion.suggestedArea) {
+				args.Area = suggestion.suggestedArea;
+			}
+			if (suggestion.suggestedProject) {
+				args.Project = suggestion.suggestedProject;
+			}
+
+			// Create the note
+			const result = createFromTemplate(paraConfig, {
+				template: suggestion.suggestedNoteType,
+				title: suggestion.suggestedTitle,
+				dest: suggestion.suggestedDestination,
+				args,
+			});
+
+			createdNotePath = result.filePath;
+
+			if (executeLogger) {
+				executeLogger.info`Created note from template=${suggestion.suggestedNoteType} path=${createdNotePath} ${cid}`;
+			}
+		} catch (error) {
+			// Note creation failed - attachment stays in inbox for retry
+			if (executeLogger) {
+				executeLogger.error`Failed to create note: ${error instanceof Error ? error.message : "unknown"} - attachment remains in inbox for retry ${cid}`;
+			}
+			return {
+				suggestionId: suggestion.id,
+				success: false,
+				action: suggestion.action,
+				error: `Note creation failed: ${error instanceof Error ? error.message : "unknown"}. Attachment remains in inbox - fix the issue and retry.`,
+			};
+		}
+	}
+
+	// Now move the attachment (note creation succeeded or wasn't needed)
+	mkdirSync(dirname(attachmentDest), { recursive: true });
+
+	// TOCTOU protection: Check file still exists before moving
+	// File was hashed earlier, but could have been deleted by another process
+	if (!existsSync(sourcePath)) {
+		// ROLLBACK: If we created a note but source disappeared, delete the orphaned note
+		if (createdNotePath) {
+			try {
+				const { unlink } = await import("node:fs/promises");
+				await unlink(createdNotePath);
+				if (executeLogger) {
+					executeLogger.warn`Rolled back orphaned note after source file disappeared: ${createdNotePath} ${cid}`;
+				}
+			} catch (rollbackError) {
+				if (executeLogger) {
+					executeLogger.error`Failed to rollback note: ${rollbackError instanceof Error ? rollbackError.message : "unknown"} ${cid}`;
+				}
+			}
+		}
+
+		return {
+			suggestionId: suggestion.id,
+			success: false,
+			action: suggestion.action,
+			error: `Source file no longer exists: ${sourcePath}. It may have been moved or deleted by another process.`,
+		};
+	}
+
+	try {
+		await moveFile(sourcePath, attachmentDest);
+	} catch (error) {
+		// ROLLBACK: If we created a note but failed to move attachment, delete the orphaned note
+		if (createdNotePath) {
+			try {
+				const { unlink } = await import("node:fs/promises");
+				await unlink(createdNotePath);
+				if (executeLogger) {
+					executeLogger.warn`Rolled back orphaned note after move failure: ${createdNotePath} ${cid}`;
+				}
+			} catch (rollbackError) {
+				if (executeLogger) {
+					executeLogger.error`Failed to rollback note: ${rollbackError instanceof Error ? rollbackError.message : "unknown"} ${cid}`;
+				}
+			}
+		}
+
+		// Log the failure and return error
+		if (executeLogger) {
+			executeLogger.error`Failed to move attachment: ${error instanceof Error ? error.message : "unknown"} - ${createdNotePath ? "rolled back note, " : ""}attachment remains in inbox ${cid}`;
+		}
+
+		return {
+			suggestionId: suggestion.id,
+			success: false,
+			action: suggestion.action,
+			error: `Operation failed and ${createdNotePath ? "was rolled back" : "aborted"}: ${error instanceof Error ? error.message : "unknown"}. Attachment remains in inbox - fix the issue and retry.`,
+		};
+	}
+
+	// Inject attachment link into the note (if note was created)
+	if (createdNotePath) {
+		try {
+			const paraConfig = loadConfig();
+			const attachmentWikilink = `![[${movedAttachmentPath}]]`;
+			const injectionResult = injectSections(paraConfig, createdNotePath, {
+				Attachments: attachmentWikilink,
+			});
+
+			if (injectionResult.injected.length > 0) {
+				if (executeLogger) {
+					executeLogger.info`Injected attachment link into section=Attachments ${cid}`;
+				}
+			} else if (injectionResult.skipped.length > 0) {
+				// Section doesn't exist - append to end of file
+				if (executeLogger) {
+					executeLogger.warn`No Attachments section found - appending to end of file ${cid}`;
+				}
+				const target = resolveVaultPath(paraConfig.vault, createdNotePath);
+				const content = fs.readFileSync(target.absolute, "utf8");
+				const updatedContent = `${content.trimEnd()}\n\n## Attachments\n\n${attachmentWikilink}\n`;
+				fs.writeFileSync(target.absolute, updatedContent, "utf8");
+				if (executeLogger) {
+					executeLogger.info`Created Attachments section and added link ${cid}`;
+				}
+			}
+		} catch (error) {
+			if (executeLogger) {
+				executeLogger.warn`Failed to inject attachment link: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
+			}
+			// Don't fail - note and attachment move succeeded, just missing link
+		}
+	}
+
+	// Update registry - only reached if note creation succeeded (or wasn't needed)
+	registry.markProcessed({
+		sourceHash: hash,
+		sourcePath: suggestion.source,
+		processedAt: new Date().toISOString(),
+		createdNote: createdNotePath,
+		movedAttachment: movedAttachmentPath,
+	});
+
+	if (executeLogger) {
+		executeLogger.info`Executed suggestion id=${suggestion.id} movedTo=${datedFilename} createdNote=${createdNotePath ?? "none"} ${cid}`;
+	}
+
+	return {
+		suggestionId: suggestion.id,
+		success: true,
+		action: suggestion.action,
+		createdNote: createdNotePath,
+		movedAttachment: movedAttachmentPath,
+	};
+}

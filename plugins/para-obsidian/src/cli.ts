@@ -89,6 +89,12 @@ import {
 	gitStatus,
 } from "./git";
 import {
+	displayResults,
+	formatSuggestionsTable,
+	runInteractiveLoop,
+} from "./inbox/cli-adapter";
+import { createInboxEngine } from "./inbox/engine";
+import {
 	buildIndex,
 	listAreas,
 	listTags,
@@ -144,6 +150,7 @@ function printUsage(): void {
 		"  bun run src/cli.ts find-orphans [--dir path[,path2]] [--format md|json]",
 		"  bun run src/cli.ts rewrite-links --from <link> --to <link> [--dir path[,path2]] [--dry-run] [--format md|json]",
 		"  bun run src/cli.ts rewrite-links --mapping <file.json> [--dir path[,path2]] [--dry-run] [--format md|json]",
+		"  bun run src/cli.ts process-inbox [--auto] [--preview] [--dry-run] [--verbose] [--filter pattern] [--force] [--format md|json]",
 		"",
 		"Options:",
 		"  --format md|json  Output format (default: md)",
@@ -2485,6 +2492,187 @@ async function main(): Promise<void> {
 				} else {
 					console.error("git supports 'guard' and 'commit'");
 					process.exit(1);
+				}
+				break;
+			}
+
+			case "process-inbox": {
+				// Parse process-inbox specific flags
+				const autoMode = flags.auto === true;
+				const previewMode = flags.preview === true;
+				const dryRun = flags["dry-run"] === true;
+				// Verbose and force flags reserved for future use
+				const _verbose = flags.verbose === true;
+				const _force = flags.force === true;
+				const filterPattern =
+					typeof flags.filter === "string" ? flags.filter : undefined;
+
+				// Create engine with config
+				const engine = createInboxEngine({
+					vaultPath: config.vault,
+					inboxFolder: "00 Inbox",
+					attachmentsFolder: "Attachments",
+					templatesFolder: config.templatesDir,
+				});
+
+				// Scan inbox for suggestions
+				const suggestions = await engine.scan();
+
+				// Apply filter if provided
+				const filteredSuggestions = filterPattern
+					? suggestions.filter(
+							(s) =>
+								s.source.includes(filterPattern) ||
+								(s.suggestedTitle?.includes(filterPattern) ?? false),
+						)
+					: suggestions;
+
+				if (filteredSuggestions.length === 0) {
+					if (isJson) {
+						console.log(
+							JSON.stringify(
+								{ items: [], message: "No items to process" },
+								null,
+								2,
+							),
+						);
+					} else {
+						console.log(color("cyan", "No items to process in inbox"));
+					}
+					break;
+				}
+
+				// Preview mode: just display suggestions
+				if (previewMode) {
+					if (isJson) {
+						console.log(
+							JSON.stringify(
+								{
+									mode: "preview",
+									items: filteredSuggestions,
+									count: filteredSuggestions.length,
+								},
+								null,
+								2,
+							),
+						);
+					} else {
+						console.log(formatSuggestionsTable(filteredSuggestions));
+					}
+					break;
+				}
+
+				// Auto mode: process all without interaction
+				if (autoMode) {
+					if (dryRun) {
+						if (isJson) {
+							console.log(
+								JSON.stringify(
+									{
+										mode: "dry-run",
+										wouldProcess: filteredSuggestions.map((s) => s.id),
+										count: filteredSuggestions.length,
+									},
+									null,
+									2,
+								),
+							);
+						} else {
+							console.log(
+								color(
+									"cyan",
+									`[dry-run] Would process ${filteredSuggestions.length} items:`,
+								),
+							);
+							for (const suggestion of filteredSuggestions) {
+								console.log(`  - ${suggestion.source} → ${suggestion.action}`);
+							}
+						}
+						break;
+					}
+
+					// Execute all suggestions
+					const results = await engine.execute(
+						filteredSuggestions.map((s) => s.id),
+					);
+
+					// Aggregate results
+					const successes = results.filter((r) => r.success).length;
+					const failures = results.filter((r) => !r.success).length;
+
+					if (isJson) {
+						console.log(
+							JSON.stringify(
+								{
+									mode: "auto",
+									results: results,
+									successes,
+									failures,
+								},
+								null,
+								2,
+							),
+						);
+					} else {
+						console.log(
+							color(
+								"green",
+								`✓ Processed ${successes} of ${successes + failures} items`,
+							),
+						);
+						for (const result of results) {
+							if (result.success) {
+								console.log(`  ${color("green", "✓")} ${result.suggestionId}`);
+							} else {
+								console.log(
+									`  ${color("red", "✗")} ${result.suggestionId}: ${result.error}`,
+								);
+							}
+						}
+					}
+					break;
+				}
+
+				// Interactive mode: run the interactive approval loop
+				if (isJson) {
+					console.log(
+						JSON.stringify(
+							{
+								mode: "interactive",
+								items: filteredSuggestions,
+								count: filteredSuggestions.length,
+								help: "Interactive mode requires TTY - use --auto or --preview for non-interactive",
+							},
+							null,
+							2,
+						),
+					);
+				} else {
+					// Run interactive loop - returns approved IDs
+					const approvedIds = await runInteractiveLoop({
+						engine,
+						suggestions: filteredSuggestions,
+					});
+
+					// If user approved items, execute them
+					if (approvedIds.length > 0) {
+						if (dryRun) {
+							console.log(
+								color(
+									"cyan",
+									`\n[dry-run] Would execute ${approvedIds.length} item(s)`,
+								),
+							);
+						} else {
+							console.log(
+								emphasize.info(`\nExecuting ${approvedIds.length} item(s)...`),
+							);
+							const results = await engine.execute(approvedIds);
+							displayResults(results);
+						}
+					} else {
+						console.log(emphasize.info("\nNo items were approved."));
+					}
 				}
 				break;
 			}

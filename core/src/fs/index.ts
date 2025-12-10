@@ -161,3 +161,42 @@ export function fastHash(content: string): bigint | number {
 export function deepEquals(a: unknown, b: unknown, strict = false): boolean {
 	return Bun.deepEquals(a, b, strict);
 }
+
+/**
+ * Calculate SHA256 hash of a file's contents using Bun's native hashing.
+ * Useful for content-based deduplication and cache invalidation.
+ *
+ * @param filePath - Path to the file to hash
+ * @returns Hex-encoded SHA256 hash
+ */
+export async function sha256File(filePath: string): Promise<string> {
+	const file = Bun.file(filePath);
+	const buffer = await file.arrayBuffer();
+	const hasher = new Bun.CryptoHasher("sha256");
+	hasher.update(buffer);
+	return hasher.digest("hex");
+}
+
+/**
+ * Copy a file using Bun's native file API.
+ * Creates parent directories if they don't exist.
+ *
+ * @param src - Source file path
+ * @param dest - Destination file path
+ */
+export async function copyFile(src: string, dest: string): Promise<void> {
+	await Bun.write(dest, Bun.file(src));
+}
+
+/**
+ * Move a file (copy then delete source).
+ * Handles cross-filesystem moves where rename() would fail.
+ *
+ * @param src - Source file path
+ * @param dest - Destination file path
+ */
+export async function moveFile(src: string, dest: string): Promise<void> {
+	await copyFile(src, dest);
+	const { unlink } = await import("node:fs/promises");
+	await unlink(src);
+}

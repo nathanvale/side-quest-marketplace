@@ -1,0 +1,337 @@
+/**
+ * Inbox Processing Framework - LLM Detection
+ *
+ * Uses LLM to detect document type and extract structured fields from inbox items.
+ * Integrates with existing @sidequest/core/llm abstraction.
+ *
+ * @example
+ * ```typescript
+ * import { buildInboxPrompt, parseDetectionResponse, detectDocumentType } from "./llm-detection";
+ *
+ * const prompt = buildInboxPrompt({ content, filename, vaultContext });
+ * const response = await callLLM(prompt);
+ * const result = parseDetectionResponse(response);
+ * ```
+ */
+
+import { llmLogger } from "./logger";
+
+// Non-null assertion for logger
+const log = llmLogger as NonNullable<typeof llmLogger>;
+
+// =============================================================================
+// Types
+// =============================================================================
+
+/**
+ * Vault context for LLM to use in suggestions.
+ */
+export interface InboxVaultContext {
+	/** Available areas in the vault */
+	readonly areas: ReadonlyArray<string>;
+
+	/** Available projects in the vault */
+	readonly projects: ReadonlyArray<string>;
+
+	/** Optional suggested tags */
+	readonly suggestedTags?: ReadonlyArray<string>;
+}
+
+/**
+ * Options for building the inbox detection prompt.
+ */
+export interface InboxPromptOptions {
+	/** Extracted text content from the document */
+	readonly content: string;
+
+	/** Original filename */
+	readonly filename: string;
+
+	/** Vault context for suggestions */
+	readonly vaultContext: InboxVaultContext;
+
+	/** Optional user hint to guide detection */
+	readonly userHint?: string;
+}
+
+/**
+ * Extracted fields from a document.
+ * Keys vary by document type.
+ */
+export interface FieldExtractionResult {
+	// Common fields
+	readonly date?: string;
+	readonly provider?: string;
+
+	// Invoice fields
+	readonly amount?: string;
+	readonly currency?: string;
+	readonly invoiceNumber?: string;
+	readonly abn?: string;
+	readonly gst?: string;
+
+	// Booking fields
+	readonly bookingReference?: string;
+	readonly confirmationNumber?: string;
+	readonly departure?: string;
+	readonly arrival?: string;
+	readonly passenger?: string;
+	readonly checkIn?: string;
+	readonly checkOut?: string;
+
+	// Generic fields
+	readonly [key: string]: string | undefined;
+}
+
+/**
+ * Result of LLM document type detection.
+ */
+export interface DocumentTypeResult {
+	/** Detected document type */
+	readonly documentType:
+		| "invoice"
+		| "booking"
+		| "receipt"
+		| "session"
+		| "generic";
+
+	/** Confidence in the detection (0-1) */
+	readonly confidence: number;
+
+	/** Suggested area wikilink (e.g., "Health", "Travel") */
+	readonly suggestedArea?: string | null;
+
+	/** Suggested project wikilink (e.g., "2024 Tax Return") */
+	readonly suggestedProject?: string | null;
+
+	/** Extracted fields from the document */
+	readonly extractedFields?: FieldExtractionResult | null;
+
+	/** LLM's reasoning for the classification */
+	readonly reasoning?: string;
+}
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+/**
+ * Available document types for classification.
+ */
+const DOCUMENT_TYPES = [
+	"invoice",
+	"booking",
+	"receipt",
+	"session",
+	"generic",
+] as const;
+
+/**
+ * Example JSON response format for the prompt.
+ */
+const EXAMPLE_RESPONSE = {
+	documentType: "invoice",
+	confidence: 0.92,
+	suggestedArea: "Health",
+	suggestedProject: "Medical Expenses 2024",
+	extractedFields: {
+		amount: "$220 AUD",
+		provider: "Dr Smith Medical Practice",
+		date: "2024-12-01",
+		invoiceNumber: "INV-4480",
+	},
+	reasoning:
+		"Document contains TAX INVOICE header, ABN, amount due, and medical provider details",
+};
+
+// =============================================================================
+// Prompt Building
+// =============================================================================
+
+/**
+ * Build the LLM prompt for document type detection and field extraction.
+ *
+ * @param options - Prompt options including content, filename, and vault context
+ * @returns Formatted prompt string
+ */
+export function buildInboxPrompt(options: InboxPromptOptions): string {
+	const { content, filename, vaultContext, userHint } = options;
+
+	const areasSection =
+		vaultContext.areas.length > 0
+			? `Available areas in vault: ${vaultContext.areas.join(", ")}`
+			: "No areas defined in vault";
+
+	const projectsSection =
+		vaultContext.projects.length > 0
+			? `Available projects in vault: ${vaultContext.projects.join(", ")}`
+			: "No projects defined in vault";
+
+	const userHintSection = userHint ? `\nUser hint: "${userHint}"` : "";
+
+	return `You are analyzing a document from an inbox to determine its type and extract key information.
+
+## Document Information
+- Filename: ${filename}
+- Content preview (first 3000 chars):
+
+${content.slice(0, 3000)}
+
+## Available Document Types
+${DOCUMENT_TYPES.map((t) => `- ${t}`).join("\n")}
+
+## Vault Context
+${areasSection}
+${projectsSection}
+${userHintSection}
+
+## Task
+1. Determine the document type from the available types
+2. Estimate your confidence (0.0 to 1.0) in this classification
+3. Suggest an appropriate area from the vault (if any matches)
+4. Suggest an appropriate project from the vault (if any matches)
+5. Extract relevant fields based on document type
+
+## Response Format
+Respond with a JSON object ONLY (no markdown, no explanation outside JSON):
+
+${JSON.stringify(EXAMPLE_RESPONSE, null, 2)}
+
+## Field Extraction Guidelines
+- For invoices: amount, currency, provider, date, invoiceNumber, abn, gst
+- For bookings: date, provider, bookingReference, departure, arrival, passenger
+- For receipts: amount, currency, provider, date, category
+- For generic: any notable key-value pairs
+
+## Confidence Guidelines
+- 0.9-1.0: Very clear document type with multiple confirming signals
+- 0.7-0.9: Clear document type but some ambiguity
+- 0.5-0.7: Probable type but significant uncertainty
+- Below 0.5: Use "generic" type
+
+Respond with valid JSON only:`;
+}
+
+// =============================================================================
+// Response Parsing
+// =============================================================================
+
+/**
+ * Parse and validate the LLM detection response.
+ *
+ * @param response - Raw LLM response string
+ * @returns Parsed and validated detection result
+ * @throws Error if response is invalid JSON or missing required fields
+ */
+export function parseDetectionResponse(response: string): DocumentTypeResult {
+	// Strip markdown code blocks if present
+	let jsonStr = response.trim();
+
+	if (jsonStr.startsWith("```json")) {
+		jsonStr = jsonStr.slice(7);
+	} else if (jsonStr.startsWith("```")) {
+		jsonStr = jsonStr.slice(3);
+	}
+
+	if (jsonStr.endsWith("```")) {
+		jsonStr = jsonStr.slice(0, -3);
+	}
+
+	jsonStr = jsonStr.trim();
+
+	// Parse JSON
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(jsonStr);
+	} catch {
+		throw new Error(
+			`Invalid JSON response from LLM: ${response.slice(0, 100)}...`,
+		);
+	}
+
+	// Validate required fields
+	if (typeof parsed !== "object" || parsed === null) {
+		throw new Error("LLM response is not an object");
+	}
+
+	const obj = parsed as Record<string, unknown>;
+
+	if (typeof obj.documentType !== "string") {
+		throw new Error("Missing or invalid documentType in LLM response");
+	}
+
+	if (typeof obj.confidence !== "number") {
+		throw new Error("Missing or invalid confidence in LLM response");
+	}
+
+	// Validate document type
+	const validTypes = new Set(DOCUMENT_TYPES);
+	if (!validTypes.has(obj.documentType as (typeof DOCUMENT_TYPES)[number])) {
+		log.warn`Unknown document type from LLM: ${obj.documentType}, defaulting to generic`;
+		obj.documentType = "generic";
+	}
+
+	return {
+		documentType: obj.documentType as DocumentTypeResult["documentType"],
+		confidence: Math.max(0, Math.min(1, obj.confidence)),
+		suggestedArea: obj.suggestedArea as string | null | undefined,
+		suggestedProject: obj.suggestedProject as string | null | undefined,
+		extractedFields: obj.extractedFields as
+			| FieldExtractionResult
+			| null
+			| undefined,
+		reasoning: obj.reasoning as string | undefined,
+	};
+}
+
+// =============================================================================
+// Edit With Prompt Support
+// =============================================================================
+
+/**
+ * Build a follow-up prompt for editing a suggestion with user input.
+ *
+ * @param originalContent - Original document content
+ * @param previousResult - Previous detection result
+ * @param userPrompt - User's editing instructions
+ * @param vaultContext - Vault context
+ * @returns Follow-up prompt string
+ */
+export function buildEditPrompt(
+	originalContent: string,
+	previousResult: DocumentTypeResult,
+	userPrompt: string,
+	vaultContext: InboxVaultContext,
+): string {
+	const areasSection =
+		vaultContext.areas.length > 0
+			? `Available areas: ${vaultContext.areas.join(", ")}`
+			: "No areas defined";
+
+	const projectsSection =
+		vaultContext.projects.length > 0
+			? `Available projects: ${vaultContext.projects.join(", ")}`
+			: "No projects defined";
+
+	return `You previously analyzed this document and classified it as:
+- Type: ${previousResult.documentType}
+- Area: ${previousResult.suggestedArea ?? "none"}
+- Project: ${previousResult.suggestedProject ?? "none"}
+- Confidence: ${previousResult.confidence}
+
+The user has provided additional instructions:
+"${userPrompt}"
+
+## Vault Context
+${areasSection}
+${projectsSection}
+
+## Document Content (first 2000 chars)
+${originalContent.slice(0, 2000)}
+
+## Task
+Re-analyze the document considering the user's instructions.
+Provide an updated classification in the same JSON format.
+
+Respond with valid JSON only:`;
+}
