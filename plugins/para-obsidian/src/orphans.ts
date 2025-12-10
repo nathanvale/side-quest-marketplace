@@ -33,8 +33,8 @@ export interface OrphanResult {
  * Options for orphan detection.
  */
 export interface OrphanOptions {
-	/** Directory to scan for notes (default: entire vault) */
-	readonly dir?: string;
+	/** Directories to scan for notes (default: entire vault) */
+	readonly dirs?: ReadonlyArray<string>;
 }
 
 /**
@@ -46,9 +46,10 @@ export interface OrphanOptions {
  * - `[[Note|Alias]]` → `Note.md`
  * - `[[Note^block]]` → `Note.md`
  * - `[[Note]]` → `Note.md`
+ * - `[[Attachments/file.pdf]]` → `Attachments/file.pdf` (preserved)
  *
  * @param link - Raw wikilink content (without brackets)
- * @returns Normalized file path with .md extension
+ * @returns Normalized file path (with .md extension only if no extension present)
  */
 function normalizeWikilink(link: string): string {
 	// Remove everything after | (alias)
@@ -59,8 +60,10 @@ function normalizeWikilink(link: string): string {
 	normalized = normalized.split("^")[0] ?? normalized;
 	// Trim whitespace
 	normalized = normalized.trim();
-	// Add .md extension if not present
-	if (!normalized.endsWith(".md")) {
+	// Only add .md extension if the link has no file extension
+	// This preserves PDFs, images, and other attachments
+	const hasExtension = /\.[a-zA-Z0-9]+$/.test(normalized);
+	if (!hasExtension) {
 		normalized = `${normalized}.md`;
 	}
 	return normalized;
@@ -128,11 +131,81 @@ function extractWikilinks(
 }
 
 /**
+ * Builds an index of all files in the vault by their basename.
+ * Used for Obsidian-style flat-search wikilink resolution.
+ *
+ * @param vault - Absolute path to vault root
+ * @returns Map of lowercase basename to array of vault-relative paths
+ */
+function buildFileIndex(vault: string): Map<string, string[]> {
+	const index = new Map<string, string[]>();
+
+	function walkDir(currentDir: string): void {
+		try {
+			for (const entry of fs.readdirSync(currentDir)) {
+				// Skip hidden files/folders
+				if (entry.startsWith(".")) continue;
+
+				const fullPath = path.join(currentDir, entry);
+				const stat = fs.statSync(fullPath);
+
+				if (stat.isDirectory()) {
+					walkDir(fullPath);
+				} else if (stat.isFile()) {
+					const rel = path.relative(vault, fullPath);
+					const basename = path.basename(rel).toLowerCase();
+					const existing = index.get(basename) ?? [];
+					existing.push(rel);
+					index.set(basename, existing);
+				}
+			}
+		} catch {
+			// Skip directories we can't read
+		}
+	}
+
+	walkDir(vault);
+	return index;
+}
+
+/**
+ * Checks if a wikilink resolves to an existing file.
+ * Uses Obsidian-style resolution: first tries direct path, then vault-wide filename search.
+ *
+ * @param vault - Absolute path to vault root
+ * @param normalizedLink - Normalized wikilink path (with .md extension)
+ * @param fileIndex - Pre-built file index for vault-wide search
+ * @returns true if the link resolves to an existing file
+ */
+function wikilinkExists(
+	vault: string,
+	normalizedLink: string,
+	fileIndex: Map<string, string[]>,
+): boolean {
+	// First, try direct path resolution (e.g., [[Attachments/file.pdf]])
+	const { absolute: linkAbsolute } = resolveVaultPath(vault, normalizedLink);
+	if (fs.existsSync(linkAbsolute)) {
+		return true;
+	}
+
+	// If direct path fails, try Obsidian-style flat search by filename
+	// This handles cases like [[Note Title]] resolving to 01 Projects/Subfolder/Note Title.md
+	const basename = path.basename(normalizedLink).toLowerCase();
+	const matches = fileIndex.get(basename);
+
+	return matches !== undefined && matches.length > 0;
+}
+
+/**
  * Finds orphan attachments and broken links.
  *
  * Scans vault for:
  * - Files in Attachments/ not referenced by any note
  * - Wikilinks in notes pointing to non-existent files
+ *
+ * Uses Obsidian-style wikilink resolution:
+ * - First tries direct path from vault root
+ * - Falls back to vault-wide filename search (flat search)
  *
  * @param vault - Absolute path to vault root
  * @param options - Detection options
@@ -142,7 +215,10 @@ export function findOrphans(
 	vault: string,
 	options: OrphanOptions = {},
 ): OrphanResult {
-	const { dir = "." } = options;
+	const { dirs } = options;
+
+	// Build file index for vault-wide wikilink resolution
+	const fileIndex = buildFileIndex(vault);
 
 	// Get all attachments
 	const attachmentsDir = path.join(vault, "Attachments");
@@ -156,12 +232,6 @@ export function findOrphans(
 			}
 			allAttachments.add(`Attachments/${file}`);
 		}
-	}
-
-	// Get all notes in directory
-	const { absolute: dirAbsolute } = resolveVaultPath(vault, dir);
-	if (!fs.existsSync(dirAbsolute)) {
-		throw new Error(`Directory not found: ${dir}`);
 	}
 
 	const notes: string[] = [];
@@ -180,7 +250,15 @@ export function findOrphans(
 		}
 	}
 
-	walkDir(dirAbsolute);
+	// Walk each directory (or entire vault if no dirs specified)
+	const dirsToWalk = dirs && dirs.length > 0 ? dirs : ["."];
+	for (const dir of dirsToWalk) {
+		const { absolute: dirAbsolute } = resolveVaultPath(vault, dir);
+		if (fs.existsSync(dirAbsolute)) {
+			walkDir(dirAbsolute);
+		}
+		// Silently skip non-existent dirs (like validate-all does)
+	}
 
 	// Track referenced attachments and broken links
 	const referencedAttachments = new Set<string>();
@@ -202,12 +280,8 @@ export function findOrphans(
 				referencedAttachments.add(normalizedLink);
 			}
 
-			// Check if linked file exists (both attachments and note-to-note links)
-			const { absolute: linkAbsolute } = resolveVaultPath(
-				vault,
-				normalizedLink,
-			);
-			if (!fs.existsSync(linkAbsolute)) {
+			// Check if linked file exists using Obsidian-style resolution
+			if (!wikilinkExists(vault, normalizedLink, fileIndex)) {
 				brokenLinks.push({ note: notePath, link, location });
 			}
 		}

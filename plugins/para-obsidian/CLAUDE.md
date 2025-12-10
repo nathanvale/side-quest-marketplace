@@ -74,7 +74,7 @@ para-obsidian/
 │       ├── constraints.ts        # Constraint enforcement for deterministic extraction
 │       ├── prompt-builder.ts     # Composable prompt construction
 │       └── orchestration.ts      # High-level workflows (convert, suggest, batch)
-├── mcp/                           # MCP server (20 tools)
+├── mcp/                           # MCP server (22 tools)
 │   └── index.ts                  # mcpez-based MCP server (thin CLI wrapper)
 ├── STATUS.md                      # Development progress tracker
 ├── SPEC.md                        # Working specification
@@ -104,6 +104,8 @@ para-obsidian create --template <type> --source file.md --model haiku  # Use spe
 para-obsidian create --template <type> --source file.md --arg "priority=high"  # Override AI suggestions
 para-obsidian insert <file> <heading> <text>   # Insert under heading
 para-obsidian rename <old> <new> [--dry-run]   # Rename with link rewrite
+para-obsidian rewrite-links --from <old> --to <new> [--dry-run]  # Rewrite links without rename
+para-obsidian rewrite-links --mapping file.json [--dry-run]      # Batch rewrite via mapping file
 para-obsidian delete <file> [--dry-run]        # Delete with confirm
 para-obsidian frontmatter get <file>           # Extract frontmatter
 para-obsidian frontmatter validate <file>      # Validate against rules
@@ -136,11 +138,11 @@ para-obsidian templates                        # List template versions
 | `src/git.ts` | Git safety guards + auto-commit | 5.7 KB |
 | `src/indexer.ts` | Lightweight frontmatter/tag/heading index | 5.5 KB |
 | `src/migrations.ts` | Template version migration hooks | 9.3 KB |
-| `mcp/index.ts` | MCP server (20 tools, thin CLI wrapper) | 14.7 KB |
+| `mcp/index.ts` | MCP server (22 tools, thin CLI wrapper) | 14.7 KB |
 
 ---
 
-## MCP Tools (21 Total)
+## MCP Tools (22 Total)
 
 **Configuration:**
 - `config` — Load resolved configuration
@@ -157,6 +159,7 @@ para-obsidian templates                        # List template versions
 - `create` — Create from template with optional content injection (Templater substitution)
 - `insert` — Insert text under heading/block
 - `rename` — Rename with automatic link rewrite
+- `rewrite_links` — Rewrite link targets without renaming files (NEW!)
 - `delete` — Delete with confirmation
 
 **Frontmatter:**

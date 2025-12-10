@@ -106,6 +106,7 @@ import {
 } from "./llm";
 import { MIGRATIONS } from "./migrations";
 import { findOrphans } from "./orphans";
+import { type RewriteMapping, rewriteLinks } from "./rewrite-links";
 import { filterByFrontmatter, searchText } from "./search";
 import { semanticSearch } from "./semantic";
 import { getTemplate, getTemplateFields } from "./templates";
@@ -140,6 +141,9 @@ function printUsage(): void {
 		"  bun run src/cli.ts frontmatter apply-plan <plan.json> [--statuses s1,s2] [--dir path[,path2]] [--emit-plan filtered.json] [--dry-run] [--attachments paths] [--format md|json]",
 		"  bun run src/cli.ts frontmatter plan --interactive (prints summary/plan and exits non-interactively)",
 		"  bun run src/cli.ts git guard [--format md|json]",
+		"  bun run src/cli.ts find-orphans [--dir path[,path2]] [--format md|json]",
+		"  bun run src/cli.ts rewrite-links --from <link> --to <link> [--dir path[,path2]] [--dry-run] [--format md|json]",
+		"  bun run src/cli.ts rewrite-links --mapping <file.json> [--dir path[,path2]] [--dry-run] [--format md|json]",
 		"",
 		"Options:",
 		"  --format md|json  Output format (default: md)",
@@ -989,13 +993,23 @@ async function main(): Promise<void> {
 			}
 
 			case "find-orphans": {
-				const dir = subcommand ?? ".";
+				const dirs = parseDirs(
+					normalizeFlagValue(flags.dir),
+					config.defaultSearchDirs,
+				);
 
-				const result = findOrphans(config.vault, { dir });
+				const result = findOrphans(config.vault, { dirs });
+				const searchedDirs = dirs ?? config.defaultSearchDirs ?? ["."];
 
 				if (isJson) {
-					console.log(JSON.stringify(result, null, 2));
+					console.log(
+						JSON.stringify({ ...result, dirs: searchedDirs }, null, 2),
+					);
 				} else {
+					// Show which directories were searched
+					console.log(emphasize.info(`Searching: ${searchedDirs.join(", ")}`));
+					console.log("");
+
 					if (result.brokenLinks.length > 0) {
 						console.log(
 							emphasize.error(
@@ -1057,6 +1071,115 @@ async function main(): Promise<void> {
 
 				if (config.autoCommit && !dryRun && result.notesUpdated > 0) {
 					await commitAllNotes(config);
+				}
+				break;
+			}
+
+			case "rewrite-links": {
+				// Support multiple --from/--to pairs or a single pair
+				const fromValues = Array.isArray(flags.from)
+					? flags.from.filter((v): v is string => typeof v === "string")
+					: typeof flags.from === "string"
+						? [flags.from]
+						: [];
+				const toValues = Array.isArray(flags.to)
+					? flags.to.filter((v): v is string => typeof v === "string")
+					: typeof flags.to === "string"
+						? [flags.to]
+						: [];
+				const mappingFile =
+					typeof flags.mapping === "string" ? flags.mapping : undefined;
+				const dryRun = flags["dry-run"] === true || flags["dry-run"] === "true";
+				const dirs = parseDirs(
+					normalizeFlagValue(flags.dir),
+					config.defaultSearchDirs,
+				);
+
+				// Build mappings from either --from/--to pairs or --mapping file
+				let mappings: RewriteMapping[] = [];
+
+				if (mappingFile) {
+					// Load mappings from JSON file
+					const mappingPath = path.resolve(mappingFile);
+					if (!pathExistsSync(mappingPath)) {
+						console.error(`Mapping file not found: ${mappingPath}`);
+						process.exit(1);
+					}
+					try {
+						const raw = readTextFileSync(mappingPath);
+						const parsed = JSON.parse(raw) as Record<string, string>;
+						mappings = Object.entries(parsed).map(([fromLink, toLink]) => ({
+							from: fromLink,
+							to: toLink,
+						}));
+					} catch (error) {
+						console.error(
+							`Failed to parse mapping file: ${error instanceof Error ? error.message : String(error)}`,
+						);
+						process.exit(1);
+					}
+				} else if (fromValues.length > 0 && toValues.length > 0) {
+					// Pair up --from and --to values
+					if (fromValues.length !== toValues.length) {
+						console.error(
+							`Mismatched --from/--to pairs: got ${fromValues.length} --from and ${toValues.length} --to`,
+						);
+						process.exit(1);
+					}
+					for (let i = 0; i < fromValues.length; i++) {
+						mappings.push({ from: fromValues[i]!, to: toValues[i]! });
+					}
+				} else {
+					console.error(
+						"rewrite-links requires either --from and --to, or --mapping",
+					);
+					process.exit(1);
+				}
+
+				if (!dryRun) {
+					await ensureGitGuard(config);
+				}
+
+				const result = rewriteLinks(config.vault, mappings, { dryRun, dirs });
+
+				if (isJson) {
+					console.log(JSON.stringify({ ...result, dirs, dryRun }, null, 2));
+				} else {
+					console.log(
+						emphasize.info(`Searching: ${(dirs ?? ["."]).join(", ")}`),
+					);
+					console.log("");
+
+					if (result.linksRewritten === 0) {
+						console.log(emphasize.warn("No matching links found to rewrite."));
+					} else {
+						console.log(
+							emphasize.success(
+								`${dryRun ? "Would rewrite" : "Rewrote"} ${result.linksRewritten} link(s) in ${result.notesUpdated} note(s)`,
+							),
+						);
+
+						if (result.updates.length > 0) {
+							console.log("\nUpdated notes:");
+							for (const { note, rewrites } of result.updates) {
+								console.log(`  ${note}:`);
+								for (const r of rewrites) {
+									console.log(
+										`    ${r.location}: [[${r.from}]] → [[${r.to}]] (${r.count}x)`,
+									);
+								}
+							}
+						}
+					}
+				}
+
+				if (config.autoCommit && !dryRun && result.notesUpdated > 0) {
+					const changedFiles = result.updates.map((u) => u.note);
+					await autoCommitChanges(
+						config,
+						changedFiles,
+						`rewrite ${result.linksRewritten} link(s)`,
+					);
 				}
 				break;
 			}
