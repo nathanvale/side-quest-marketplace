@@ -145,7 +145,7 @@ type: project
 
 		// Verify file content
 		const written = fs.readFileSync(
-			path.join(vault, "01 Projects", "Test Project.md"),
+			path.join(vault, "00 Inbox", "Test Project.md"),
 			"utf8",
 		);
 		expect(written).toContain("This project addresses a critical need.");
@@ -232,7 +232,7 @@ type: project
 
 		// Verify only existing section was injected
 		const written = fs.readFileSync(
-			path.join(vault, "01 Projects", "Partial Test.md"),
+			path.join(vault, "00 Inbox", "Partial Test.md"),
 			"utf8",
 		);
 		expect(written).toContain("This will be injected");

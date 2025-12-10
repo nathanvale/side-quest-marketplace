@@ -307,10 +307,17 @@ export function validateFrontmatter(
 		}
 	}
 
-	// Check forbidden fields
+	// Check forbidden fields (ignore null or empty string values)
 	if (rules?.forbidden) {
 		for (const forbiddenField of rules.forbidden) {
-			if (forbiddenField in attributes) {
+			const value = attributes[forbiddenField];
+			// Only flag as invalid if field exists AND has a non-null, non-empty value
+			if (
+				forbiddenField in attributes &&
+				value !== null &&
+				value !== undefined &&
+				value !== ""
+			) {
 				issues.push({
 					field: forbiddenField,
 					message: "field not allowed for this note type",
