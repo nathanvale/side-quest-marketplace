@@ -1127,7 +1127,10 @@ async function main(): Promise<void> {
 				}
 
 				if (action === "prime") {
-					const dirs = parseDirs(positional[0]);
+					const dirs = parseDirs(
+						normalizeFlagValue(flags.dir) ?? positional[0],
+						config.defaultSearchDirs,
+					);
 					const index = buildIndex(config, dirs);
 					const path = saveIndex(config, index);
 					if (isJson) {
@@ -1785,10 +1788,16 @@ async function main(): Promise<void> {
 					}
 					const dryRun =
 						flags["dry-run"] === true || flags["dry-run"] === "true";
-					const forceVersion =
+					const forceVersionRaw =
 						typeof flags.force === "string"
 							? Number.parseInt(flags.force, 10)
 							: undefined;
+					if (forceVersionRaw !== undefined && !Number.isFinite(forceVersionRaw)) {
+						throw new Error(
+							`Invalid --force value: "${flags.force}" (must be a valid integer)`,
+						);
+					}
+					const forceVersion = forceVersionRaw;
 					const attachments = parseAttachments(normalizeFlags(flags));
 					if (!dryRun) {
 						await ensureGitGuard(config);
@@ -1832,10 +1841,16 @@ async function main(): Promise<void> {
 						normalizeFlagValue(flags.dir),
 						config.defaultSearchDirs,
 					);
-					const forceVersion =
+					const forceVersionRaw =
 						typeof flags.force === "string"
 							? Number.parseInt(flags.force, 10)
 							: undefined;
+					if (forceVersionRaw !== undefined && !Number.isFinite(forceVersionRaw)) {
+						throw new Error(
+							`Invalid --force value: "${flags.force}" (must be a valid integer)`,
+						);
+					}
+					const forceVersion = forceVersionRaw;
 					const type =
 						typeof flags.type === "string" && flags.type.trim().length > 0
 							? flags.type.trim()

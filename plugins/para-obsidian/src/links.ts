@@ -52,10 +52,15 @@ function replaceLinks(
 	fromName: string,
 	toName: string,
 ): { content: string; changes: number } {
+	// Escape regex metacharacters in fromName
+	const escapedFromName = fromName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 	// Match wikilinks: [[OldName]]
-	const wikilinkPattern = new RegExp(`\\[\\[${fromName}\\]\\]`, "g");
+	const wikilinkPattern = new RegExp(`\\[\\[${escapedFromName}\\]\\]`, "g");
 	// Match Markdown links: [text](OldName)
-	const mdLinkPattern = new RegExp(`\\[([^\\]]+)\\]\\(${fromName}\\)`, "g");
+	const mdLinkPattern = new RegExp(
+		`\\[([^\\]]+)\\]\\(${escapedFromName}\\)`,
+		"g",
+	);
 
 	let changes = 0;
 	let updated = content.replace(wikilinkPattern, () => {

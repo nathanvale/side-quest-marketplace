@@ -310,7 +310,10 @@ export async function autoCommitChanges(
 		new Set(
 			paths.map((p) => {
 				const resolved = resolveVaultPath(config.vault, p);
-				const absolute = fs.realpathSync(resolved.absolute);
+				// Use path.resolve instead of realpath for deleted files
+				const absolute = fs.existsSync(resolved.absolute)
+					? fs.realpathSync(resolved.absolute)
+					: path.resolve(resolved.absolute);
 				return path.relative(realGitRoot, absolute);
 			}),
 		),

@@ -444,13 +444,18 @@ export function validateFrontmatterFile(
 				field: "template_version",
 				message: `missing (expected ${expectedVersion})`,
 			});
-		} else if (
-			typeof templateVersion === "number" &&
-			templateVersion < expectedVersion
-		) {
+		} else if (typeof templateVersion === "number") {
+			if (templateVersion < expectedVersion) {
+				versionIssues.push({
+					field: "template_version",
+					message: `outdated (found ${templateVersion}, expected ${expectedVersion})`,
+				});
+			}
+		} else {
+			// Invalid type (string, NaN, etc.)
 			versionIssues.push({
 				field: "template_version",
-				message: `outdated (found ${templateVersion}, expected ${expectedVersion})`,
+				message: `invalid type (found ${typeof templateVersion}: ${JSON.stringify(templateVersion)}, expected number)`,
 			});
 		}
 	}
@@ -812,8 +817,8 @@ export function migrateTemplateVersion(
 		if (transformed.changes?.length) changes.push(...transformed.changes);
 	}
 
-	// Update template_version and write (as string for validation)
-	nextAttributes.template_version = String(expected);
+	// Update template_version and write (as number)
+	nextAttributes.template_version = expected;
 	const content = serializeFrontmatter(nextAttributes, nextBody);
 	if (!dryRun) {
 		const { absolute } = resolveVaultPath(config.vault, relative);

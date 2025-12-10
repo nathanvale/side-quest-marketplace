@@ -165,15 +165,15 @@ export function findOrphans(
 		const links = extractWikilinks(vault, notePath);
 
 		for (const { link, location } of links) {
-			// Check if it's an attachment link
+			// Track attachment references
 			if (link.startsWith("Attachments/")) {
 				referencedAttachments.add(link);
+			}
 
-				// Check if file exists
-				const { absolute: linkAbsolute } = resolveVaultPath(vault, link);
-				if (!fs.existsSync(linkAbsolute)) {
-					brokenLinks.push({ note: notePath, link, location });
-				}
+			// Check if linked file exists (both attachments and note-to-note links)
+			const { absolute: linkAbsolute } = resolveVaultPath(vault, link);
+			if (!fs.existsSync(linkAbsolute)) {
+				brokenLinks.push({ note: notePath, link, location });
 			}
 		}
 	}
