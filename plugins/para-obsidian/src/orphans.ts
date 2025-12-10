@@ -203,7 +203,10 @@ export function findOrphans(
 			}
 
 			// Check if linked file exists (both attachments and note-to-note links)
-			const { absolute: linkAbsolute } = resolveVaultPath(vault, normalizedLink);
+			const { absolute: linkAbsolute } = resolveVaultPath(
+				vault,
+				normalizedLink,
+			);
 			if (!fs.existsSync(linkAbsolute)) {
 				brokenLinks.push({ note: notePath, link, location });
 			}

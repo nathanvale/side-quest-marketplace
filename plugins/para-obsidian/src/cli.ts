@@ -1970,7 +1970,7 @@ async function main(): Promise<void> {
 					const dirs =
 						userSpecifiedDir !== undefined
 							? parseDirs(userSpecifiedDir, config.defaultSearchDirs)
-							: plan.dirs ?? config.defaultSearchDirs ?? [];
+							: (plan.dirs ?? config.defaultSearchDirs ?? []);
 
 					const attachments = parseAttachments(normalizeFlags(flags));
 					if (!dryRun) {
