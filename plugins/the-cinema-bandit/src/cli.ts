@@ -11,7 +11,8 @@
  *   bun run src/cli.ts session --session-id 116001
  *   bun run src/cli.ts pricing --session-id 116001
  *   bun run src/cli.ts movie --movie-url "/movies/wicked-for-good"
- *   bun run src/cli.ts ticket
+ *   bun run src/cli.ts ticket [--session-id 116001] [--seats H1,H2] [--dry-run]
+ *   bun run src/cli.ts send --session-id 116001 --seats H1,H2 --tickets "ADULT:1" [--dry-run]
  */
 
 import { join } from "node:path";
@@ -138,8 +139,8 @@ Usage:
   bun run src/cli.ts pricing --session-id <id>
   bun run src/cli.ts seats --session-id <id>
   bun run src/cli.ts movie --movie-url <slug>
-  bun run src/cli.ts ticket [--session-id <id>]
-  bun run src/cli.ts send --session-id <id> --seats <seats> --tickets <spec>
+  bun run src/cli.ts ticket [--session-id <id>] [--seats <seats>] [--dry-run]
+  bun run src/cli.ts send --session-id <id> --seats <seats> --tickets <spec> [--dry-run]
 
 Commands:
   movies     Scrape today's movies from homepage
@@ -172,6 +173,7 @@ Options:
   --format <type>      Output format: "json" (default) or "markdown"
                        JSON is machine-readable, markdown is human-readable
                        Shorthand: "md" is accepted for markdown
+                       Note: logs go to stderr when format=json
 
   --session-id <id>    Session ID from ticket URL
                        Required for: session, pricing, seats
@@ -188,6 +190,8 @@ Options:
   --tickets <spec>     Ticket selections in format "TYPE:quantity,TYPE:quantity"
                        Required for: send
                        Example: "ADULT:1,SENIOR:2"
+
+  --dry-run            Skip writes/emails; return structured output only
 
   --help               Show this help message
 
@@ -215,10 +219,12 @@ Examples:
 
   # Generate ticket with seats
   bun run src/cli.ts ticket --session-id 116001 --seats H1,H2
+  bun run src/cli.ts ticket --session-id 116001 --seats H1,H2 --dry-run
 
   # Send ticket email (scrapes data, generates ticket, emails)
   bun run src/cli.ts send --session-id 116135 --seats D5 --tickets "ADULT:1"
   bun run src/cli.ts send --session-id 116135 --seats "H1,H2" --tickets "ADULT:1,CHILD:1"
+  bun run src/cli.ts send --session-id 116135 --seats H1,H2 --tickets "ADULT:1" --dry-run
 
 Output:
   Default: JSON to stdout for easy parsing by slash commands.
