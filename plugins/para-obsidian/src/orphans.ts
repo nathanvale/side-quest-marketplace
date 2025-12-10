@@ -313,11 +313,114 @@ export interface LinkFix {
 }
 
 /**
+ * Calculates Levenshtein distance between two strings.
+ * Used for fuzzy matching of filenames and note titles.
+ */
+function levenshteinDistance(a: string, b: string): number {
+	const matrix: number[][] = [];
+
+	for (let i = 0; i <= b.length; i++) {
+		matrix[i] = [i];
+	}
+	for (let j = 0; j <= a.length; j++) {
+		matrix[0]![j] = j;
+	}
+
+	for (let i = 1; i <= b.length; i++) {
+		for (let j = 1; j <= a.length; j++) {
+			if (b.charAt(i - 1) === a.charAt(j - 1)) {
+				matrix[i]![j] = matrix[i - 1]![j - 1]!;
+			} else {
+				matrix[i]![j] = Math.min(
+					matrix[i - 1]![j - 1]! + 1, // substitution
+					matrix[i]![j - 1]! + 1, // insertion
+					matrix[i - 1]![j]! + 1, // deletion
+				);
+			}
+		}
+	}
+
+	return matrix[b.length]![a.length]!;
+}
+
+/**
+ * Calculates similarity score between two strings (0-1).
+ * Higher is more similar.
+ */
+function similarityScore(a: string, b: string): number {
+	const maxLen = Math.max(a.length, b.length);
+	if (maxLen === 0) return 1;
+	const distance = levenshteinDistance(a.toLowerCase(), b.toLowerCase());
+	return 1 - distance / maxLen;
+}
+
+/**
+ * Finds the best fuzzy match from candidates.
+ * Returns null if no match meets the threshold.
+ */
+function findBestMatch(
+	target: string,
+	candidates: string[],
+	threshold = 0.6,
+): { match: string; score: number } | null {
+	let bestMatch: string | null = null;
+	let bestScore = 0;
+
+	for (const candidate of candidates) {
+		const score = similarityScore(target, candidate);
+		if (score > bestScore && score >= threshold) {
+			bestScore = score;
+			bestMatch = candidate;
+		}
+	}
+
+	return bestMatch ? { match: bestMatch, score: bestScore } : null;
+}
+
+/**
+ * Builds an index of all markdown notes in the vault.
+ * Returns map of lowercase basename (without .md) to full vault-relative path.
+ */
+function buildNoteIndex(vault: string): Map<string, string> {
+	const index = new Map<string, string>();
+
+	function walkDir(currentDir: string): void {
+		try {
+			for (const entry of fs.readdirSync(currentDir)) {
+				if (entry.startsWith(".")) continue;
+
+				const fullPath = path.join(currentDir, entry);
+				const stat = fs.statSync(fullPath);
+
+				if (stat.isDirectory()) {
+					// Skip Attachments folder
+					if (entry !== "Attachments") {
+						walkDir(fullPath);
+					}
+				} else if (stat.isFile() && entry.endsWith(".md")) {
+					const rel = path.relative(vault, fullPath);
+					const basename = path.basename(entry, ".md").toLowerCase();
+					// Store first occurrence (prefer shorter paths)
+					if (!index.has(basename)) {
+						index.set(basename, rel);
+					}
+				}
+			}
+		} catch {
+			// Skip directories we can't read
+		}
+	}
+
+	walkDir(vault);
+	return index;
+}
+
+/**
  * Generates fix suggestions for broken links.
  *
  * Analyzes broken links and suggests rewrite-links commands:
- * - High confidence: Link is a filename that exists in Attachments/
- * - Medium confidence: Link basename matches a file in Attachments/
+ * - High confidence: Exact filename match in Attachments/ or note title match
+ * - Medium confidence: Fuzzy match (similar filename/title)
  *
  * @param vault - Absolute path to vault root
  * @param brokenLinks - Array of broken links from findOrphans
@@ -328,16 +431,22 @@ export function suggestFixes(
 	brokenLinks: OrphanResult["brokenLinks"],
 ): ReadonlyArray<LinkFix> {
 	const attachmentsDir = path.join(vault, "Attachments");
-	const attachmentFiles = new Set<string>();
+	const attachmentFiles: string[] = [];
+	const attachmentFilesLower = new Set<string>();
 
-	// Build set of attachment filenames (lowercase for matching)
+	// Build list of attachment filenames
 	if (fs.existsSync(attachmentsDir)) {
 		for (const file of fs.readdirSync(attachmentsDir)) {
 			if (!file.startsWith(".")) {
-				attachmentFiles.add(file.toLowerCase());
+				attachmentFiles.push(file);
+				attachmentFilesLower.add(file.toLowerCase());
 			}
 		}
 	}
+
+	// Build index of all notes
+	const noteIndex = buildNoteIndex(vault);
+	const noteBasenames = Array.from(noteIndex.keys());
 
 	const fixes = new Map<string, LinkFix>();
 
@@ -345,28 +454,85 @@ export function suggestFixes(
 		// Skip if already suggested
 		if (fixes.has(link)) continue;
 
-		// Skip links that already have Attachments/ prefix
-		if (link.startsWith("Attachments/")) continue;
-
 		// Check if link looks like a file (has extension)
 		const hasExtension = /\.[a-zA-Z0-9]+$/.test(link);
-		if (!hasExtension) continue;
 
-		const basename = path.basename(link).toLowerCase();
+		if (hasExtension) {
+			// === ATTACHMENT LINK ===
 
-		// High confidence: exact filename exists in Attachments/
-		if (attachmentFiles.has(basename)) {
-			// Find actual case-preserved filename
-			const actualFile = fs.readdirSync(attachmentsDir).find(
-				(f) => f.toLowerCase() === basename,
-			);
-			if (actualFile) {
-				fixes.set(link, {
-					from: link,
-					to: `Attachments/${actualFile}`,
-					confidence: "high",
-					reason: `File exists at Attachments/${actualFile}`,
-				});
+			// Skip links that already have Attachments/ prefix (file doesn't exist)
+			if (link.startsWith("Attachments/")) {
+				// Try fuzzy match for wrong filename in Attachments/
+				const linkedFilename = path.basename(link);
+				const fuzzy = findBestMatch(linkedFilename, attachmentFiles, 0.5);
+				if (fuzzy) {
+					fixes.set(link, {
+						from: link,
+						to: `Attachments/${fuzzy.match}`,
+						confidence: "medium",
+						reason: `Similar file: ${fuzzy.match} (${Math.round(fuzzy.score * 100)}% match)`,
+					});
+				}
+				continue;
+			}
+
+			const basename = path.basename(link).toLowerCase();
+
+			// High confidence: exact filename exists in Attachments/
+			if (attachmentFilesLower.has(basename)) {
+				const actualFile = attachmentFiles.find(
+					(f) => f.toLowerCase() === basename,
+				);
+				if (actualFile) {
+					fixes.set(link, {
+						from: link,
+						to: `Attachments/${actualFile}`,
+						confidence: "high",
+						reason: `File exists at Attachments/${actualFile}`,
+					});
+				}
+			} else {
+				// Medium confidence: fuzzy match
+				const fuzzy = findBestMatch(basename, attachmentFiles, 0.5);
+				if (fuzzy) {
+					fixes.set(link, {
+						from: link,
+						to: `Attachments/${fuzzy.match}`,
+						confidence: "medium",
+						reason: `Similar file: ${fuzzy.match} (${Math.round(fuzzy.score * 100)}% match)`,
+					});
+				}
+			}
+		} else {
+			// === NOTE LINK ===
+			const linkLower = link.toLowerCase();
+
+			// High confidence: exact note title match
+			if (noteIndex.has(linkLower)) {
+				const notePath = noteIndex.get(linkLower)!;
+				const noteTitle = path.basename(notePath, ".md");
+				// Only suggest if case differs
+				if (link !== noteTitle) {
+					fixes.set(link, {
+						from: link,
+						to: noteTitle,
+						confidence: "high",
+						reason: `Note exists: ${notePath}`,
+					});
+				}
+			} else {
+				// Medium confidence: fuzzy match note title
+				const fuzzy = findBestMatch(linkLower, noteBasenames, 0.5);
+				if (fuzzy) {
+					const notePath = noteIndex.get(fuzzy.match)!;
+					const noteTitle = path.basename(notePath, ".md");
+					fixes.set(link, {
+						from: link,
+						to: noteTitle,
+						confidence: "medium",
+						reason: `Similar note: ${notePath} (${Math.round(fuzzy.score * 100)}% match)`,
+					});
+				}
 			}
 		}
 	}

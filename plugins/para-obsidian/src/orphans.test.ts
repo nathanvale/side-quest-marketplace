@@ -208,74 +208,151 @@ describe("suggestFixes", () => {
 		fs.rmSync(vault, { recursive: true, force: true });
 	});
 
-	it("suggests fix from broken link array directly", () => {
-		// Test suggestFixes with manual broken link array (bypasses findOrphans)
-		writeFile(vault, "Attachments/document.pdf", "PDF content");
+	describe("attachment links", () => {
+		it("suggests fix from broken link array directly", () => {
+			writeFile(vault, "Attachments/document.pdf", "PDF content");
 
-		// Simulate a broken link that might come from a different source
-		const brokenLinks = [
-			{ note: "note.md", link: "document.pdf", location: "body" as const },
-		];
-		const fixes = suggestFixes(vault, brokenLinks);
+			const brokenLinks = [
+				{ note: "note.md", link: "document.pdf", location: "body" as const },
+			];
+			const fixes = suggestFixes(vault, brokenLinks);
 
-		expect(fixes).toHaveLength(1);
-		expect(fixes[0]?.from).toBe("document.pdf");
-		expect(fixes[0]?.to).toBe("Attachments/document.pdf");
-		expect(fixes[0]?.confidence).toBe("high");
+			expect(fixes).toHaveLength(1);
+			expect(fixes[0]?.from).toBe("document.pdf");
+			expect(fixes[0]?.to).toBe("Attachments/document.pdf");
+			expect(fixes[0]?.confidence).toBe("high");
+		});
+
+		it("does not suggest fix when file does not exist in Attachments", () => {
+			const brokenLinks = [
+				{
+					note: "note.md",
+					link: "nonexistent.pdf",
+					location: "body" as const,
+				},
+			];
+			const fixes = suggestFixes(vault, brokenLinks);
+
+			expect(fixes).toHaveLength(0);
+		});
+
+		it("deduplicates suggestions for same link", () => {
+			writeFile(vault, "Attachments/shared.pdf", "PDF content");
+			const brokenLinks = [
+				{ note: "note1.md", link: "shared.pdf", location: "body" as const },
+				{ note: "note2.md", link: "shared.pdf", location: "body" as const },
+			];
+			const fixes = suggestFixes(vault, brokenLinks);
+
+			expect(fixes).toHaveLength(1);
+		});
+
+		it("handles case-insensitive matching", () => {
+			writeFile(vault, "Attachments/Document.PDF", "PDF content");
+			const brokenLinks = [
+				{ note: "note.md", link: "document.pdf", location: "body" as const },
+			];
+			const fixes = suggestFixes(vault, brokenLinks);
+
+			expect(fixes).toHaveLength(1);
+			expect(fixes[0]?.to).toBe("Attachments/Document.PDF");
+		});
+
+		it("fuzzy matches similar attachment filenames", () => {
+			writeFile(vault, "Attachments/booking-confirmation.pdf", "PDF");
+			const brokenLinks = [
+				{
+					note: "note.md",
+					link: "booking-confrmation.pdf", // typo
+					location: "body" as const,
+				},
+			];
+			const fixes = suggestFixes(vault, brokenLinks);
+
+			expect(fixes).toHaveLength(1);
+			expect(fixes[0]?.to).toBe("Attachments/booking-confirmation.pdf");
+			expect(fixes[0]?.confidence).toBe("medium");
+		});
+
+		it("fuzzy matches wrong filename in Attachments/ prefix", () => {
+			writeFile(vault, "Attachments/receipt-2024.pdf", "PDF");
+			const brokenLinks = [
+				{
+					note: "note.md",
+					link: "Attachments/reciept-2024.pdf", // typo in path
+					location: "body" as const,
+				},
+			];
+			const fixes = suggestFixes(vault, brokenLinks);
+
+			expect(fixes).toHaveLength(1);
+			expect(fixes[0]?.to).toBe("Attachments/receipt-2024.pdf");
+			expect(fixes[0]?.confidence).toBe("medium");
+		});
 	});
 
-	it("does not suggest fix when file does not exist in Attachments", () => {
-		const brokenLinks = [
-			{ note: "note.md", link: "nonexistent.pdf", location: "body" as const },
-		];
-		const fixes = suggestFixes(vault, brokenLinks);
+	describe("note links", () => {
+		it("suggests fix for broken note link with exact case mismatch", () => {
+			writeFile(vault, "Projects/My Project.md", "content");
+			const brokenLinks = [
+				{
+					note: "note.md",
+					link: "my project", // wrong case
+					location: "body" as const,
+				},
+			];
+			const fixes = suggestFixes(vault, brokenLinks);
 
-		expect(fixes).toHaveLength(0);
-	});
+			expect(fixes).toHaveLength(1);
+			expect(fixes[0]?.to).toBe("My Project");
+			expect(fixes[0]?.confidence).toBe("high");
+		});
 
-	it("does not suggest fix for markdown note links (no extension)", () => {
-		const brokenLinks = [
-			{ note: "note.md", link: "Missing Note", location: "body" as const },
-		];
-		const fixes = suggestFixes(vault, brokenLinks);
+		it("fuzzy matches similar note titles", () => {
+			writeFile(vault, "Projects/2025 Camping Trip.md", "content");
+			const brokenLinks = [
+				{
+					note: "note.md",
+					link: "Camping Trip", // partial match
+					location: "body" as const,
+				},
+			];
+			const fixes = suggestFixes(vault, brokenLinks);
 
-		expect(fixes).toHaveLength(0);
-	});
+			expect(fixes).toHaveLength(1);
+			expect(fixes[0]?.to).toBe("2025 Camping Trip");
+			expect(fixes[0]?.confidence).toBe("medium");
+		});
 
-	it("does not suggest fix for links already with Attachments/ prefix", () => {
-		writeFile(vault, "Attachments/document.pdf", "PDF content");
-		const brokenLinks = [
-			{
-				note: "note.md",
-				link: "Attachments/wrong-name.pdf",
-				location: "body" as const,
-			},
-		];
-		const fixes = suggestFixes(vault, brokenLinks);
+		it("fuzzy matches note titles with typos", () => {
+			writeFile(vault, "Areas/Command Center.md", "content");
+			const brokenLinks = [
+				{
+					note: "note.md",
+					link: "Comand Center", // typo
+					location: "body" as const,
+				},
+			];
+			const fixes = suggestFixes(vault, brokenLinks);
 
-		expect(fixes).toHaveLength(0);
-	});
+			expect(fixes).toHaveLength(1);
+			expect(fixes[0]?.to).toBe("Command Center");
+			expect(fixes[0]?.confidence).toBe("medium");
+		});
 
-	it("deduplicates suggestions for same link", () => {
-		writeFile(vault, "Attachments/shared.pdf", "PDF content");
-		const brokenLinks = [
-			{ note: "note1.md", link: "shared.pdf", location: "body" as const },
-			{ note: "note2.md", link: "shared.pdf", location: "body" as const },
-		];
-		const fixes = suggestFixes(vault, brokenLinks);
+		it("does not suggest when no similar notes exist", () => {
+			writeFile(vault, "Projects/Unrelated.md", "content");
+			const brokenLinks = [
+				{
+					note: "note.md",
+					link: "Something Completely Different",
+					location: "body" as const,
+				},
+			];
+			const fixes = suggestFixes(vault, brokenLinks);
 
-		expect(fixes).toHaveLength(1);
-	});
-
-	it("handles case-insensitive matching", () => {
-		writeFile(vault, "Attachments/Document.PDF", "PDF content");
-		const brokenLinks = [
-			{ note: "note.md", link: "document.pdf", location: "body" as const },
-		];
-		const fixes = suggestFixes(vault, brokenLinks);
-
-		expect(fixes).toHaveLength(1);
-		expect(fixes[0]?.to).toBe("Attachments/Document.PDF");
+			expect(fixes).toHaveLength(0);
+		});
 	});
 });
 
