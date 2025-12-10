@@ -9,12 +9,12 @@
  * Parsed command-line arguments
  */
 export interface ParsedArgs {
-/** The subcommand (e.g., "movies", "session", "pricing") */
-command: string;
-/** Positional arguments after the command */
-positional: string[];
-/** Named flags (e.g., --session-id 116001) */
-flags: Record<string, string | boolean>;
+	/** The subcommand (e.g., "movies", "session", "pricing") */
+	command: string;
+	/** Positional arguments after the command */
+	positional: string[];
+	/** Named flags (e.g., --session-id 116001) */
+	flags: Record<string, string | boolean>;
 }
 
 /**

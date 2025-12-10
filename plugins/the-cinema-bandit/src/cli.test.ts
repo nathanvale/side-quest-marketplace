@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { parseArgs } from "./utils/args.ts";
 import { getStringFlag, parseTicketsFlag } from "./cli.ts";
+import { parseArgs } from "./utils/args.ts";
 
 describe("parseArgs", () => {
 	test("parses spaced flags", () => {

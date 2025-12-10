@@ -84,7 +84,9 @@ export function parseTicketsFlag(
 		const quantity = Number.parseInt(quantityStr ?? "", 10);
 
 		if (!type || Number.isNaN(quantity) || quantity < 0) {
-			throw new Error(`Invalid ticket format: "${part}". Expected --tickets "ADULT:1,SENIOR:2"`);
+			throw new Error(
+				`Invalid ticket format: "${part}". Expected --tickets "ADULT:1,SENIOR:2"`,
+			);
 		}
 
 		return { type: type.trim(), quantity };
@@ -551,7 +553,8 @@ async function main(): Promise<void> {
 				try {
 					ticketSelections = parseTicketsFlag(ticketsStr);
 				} catch (error) {
-					const message = error instanceof Error ? error.message : String(error);
+					const message =
+						error instanceof Error ? error.message : String(error);
 					outputError(format, message);
 				}
 
