@@ -43,6 +43,88 @@ describe("git helpers", () => {
 	});
 });
 
+describe("getUncommittedFilesAll", () => {
+	it("returns all file types (not just .md)", async () => {
+		const { getUncommittedFilesAll } = await import("./git");
+		const dir = makeTmpDir();
+		await initGit(dir);
+
+		// Create mixed file types
+		fs.writeFileSync(path.join(dir, "note.md"), "# Note");
+		fs.writeFileSync(path.join(dir, "doc.pdf"), "PDF data");
+		fs.writeFileSync(path.join(dir, "data.json"), "{}");
+		fs.writeFileSync(path.join(dir, "script.js"), "console.log()");
+
+		const files = await getUncommittedFilesAll(dir);
+		expect(files).toContain("note.md");
+		expect(files).toContain("doc.pdf");
+		expect(files).toContain("data.json");
+		expect(files).toContain("script.js");
+		expect(files).toHaveLength(4);
+	});
+
+	it("returns empty array when working tree is clean", async () => {
+		const { getUncommittedFilesAll } = await import("./git");
+		const dir = makeTmpDir();
+		await initGit(dir);
+
+		const files = await getUncommittedFilesAll(dir);
+		expect(files).toEqual([]);
+	});
+
+	it("returns files from subdirectories with relative paths", async () => {
+		const { getUncommittedFilesAll } = await import("./git");
+		const dir = makeTmpDir();
+		await initGit(dir);
+
+		// Create subdirectory with files
+		fs.mkdirSync(path.join(dir, "inbox"), { recursive: true });
+		fs.writeFileSync(path.join(dir, "inbox", "document.pdf"), "PDF");
+		fs.writeFileSync(path.join(dir, "inbox", "metadata.json"), "{}");
+
+		const files = await getUncommittedFilesAll(dir);
+		expect(files).toContain("inbox/document.pdf");
+		expect(files).toContain("inbox/metadata.json");
+		expect(files).toHaveLength(2);
+	});
+
+	it("handles staged and unstaged files", async () => {
+		const { getUncommittedFilesAll } = await import("./git");
+		const dir = makeTmpDir();
+		await initGit(dir);
+
+		// Create and stage a file
+		fs.writeFileSync(path.join(dir, "staged.pdf"), "PDF");
+		await Bun.$`git add staged.pdf`.cwd(dir);
+
+		// Create an unstaged file
+		fs.writeFileSync(path.join(dir, "unstaged.json"), "{}");
+
+		const files = await getUncommittedFilesAll(dir);
+		expect(files).toContain("staged.pdf");
+		expect(files).toContain("unstaged.json");
+		expect(files).toHaveLength(2);
+	});
+
+	it("handles modified existing files", async () => {
+		const { getUncommittedFilesAll } = await import("./git");
+		const dir = makeTmpDir();
+		await initGit(dir);
+
+		// Create and commit a file
+		fs.writeFileSync(path.join(dir, "existing.pdf"), "Original");
+		await Bun.$`git add existing.pdf`.cwd(dir);
+		await Bun.$`git commit -m "add pdf"`.cwd(dir);
+
+		// Modify the file
+		fs.writeFileSync(path.join(dir, "existing.pdf"), "Modified");
+
+		const files = await getUncommittedFilesAll(dir);
+		expect(files).toContain("existing.pdf");
+		expect(files).toHaveLength(1);
+	});
+});
+
 describe("getUncommittedFiles", () => {
 	it("returns unstaged new .md files (status ??)", async () => {
 		const { getUncommittedFiles } = await import("./git");
@@ -650,5 +732,86 @@ describe("ensureGitGuard", () => {
 		await expect(ensureGitGuard(makeConfig(vault))).rejects.toThrow(
 			/01 Projects\/Project\.md/,
 		);
+	});
+
+	it("allows PDFs in PARA folders by default (only checks .md)", async () => {
+		const { ensureGitGuard } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		// Create uncommitted PDF in PARA folder
+		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
+		fs.writeFileSync(path.join(vault, "00 Inbox", "document.pdf"), "PDF data");
+
+		// Should NOT throw - default only checks .md files
+		await expect(ensureGitGuard(makeConfig(vault))).resolves.toBeUndefined();
+	});
+
+	it("throws when checkAllFileTypes=true and PARA folders have uncommitted PDFs", async () => {
+		const { ensureGitGuard } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		// Create uncommitted PDF in PARA folder
+		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
+		fs.writeFileSync(path.join(vault, "00 Inbox", "document.pdf"), "PDF data");
+
+		// Should throw when checkAllFileTypes=true
+		await expect(
+			ensureGitGuard(makeConfig(vault), { checkAllFileTypes: true }),
+		).rejects.toThrow(/uncommitted changes in PARA folders/);
+	});
+
+	it("throws when checkAllFileTypes=true and PARA folders have uncommitted JSON", async () => {
+		const { ensureGitGuard } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		// Create uncommitted JSON in PARA folder
+		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
+		fs.writeFileSync(
+			path.join(vault, "00 Inbox", "metadata.json"),
+			'{"foo": "bar"}',
+		);
+
+		// Should throw when checkAllFileTypes=true
+		await expect(
+			ensureGitGuard(makeConfig(vault), { checkAllFileTypes: true }),
+		).rejects.toThrow(/uncommitted changes in PARA folders/);
+	});
+
+	it("checkAllFileTypes=true lists all uncommitted file types in error", async () => {
+		const { ensureGitGuard } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		// Create mixed uncommitted files in PARA folder
+		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
+		fs.writeFileSync(path.join(vault, "00 Inbox", "note.md"), "# Note");
+		fs.writeFileSync(path.join(vault, "00 Inbox", "doc.pdf"), "PDF");
+		fs.writeFileSync(path.join(vault, "00 Inbox", "data.json"), "{}");
+
+		const promise = ensureGitGuard(makeConfig(vault), {
+			checkAllFileTypes: true,
+		});
+
+		await expect(promise).rejects.toThrow(/00 Inbox\/note\.md/);
+		await expect(promise).rejects.toThrow(/00 Inbox\/doc\.pdf/);
+		await expect(promise).rejects.toThrow(/00 Inbox\/data\.json/);
+	});
+
+	it("checkAllFileTypes=true allows non-.md files outside PARA folders", async () => {
+		const { ensureGitGuard } = await import("./git");
+		const vault = makeTmpDir();
+		await initGit(vault);
+
+		// Create uncommitted PDF outside PARA folders
+		fs.mkdirSync(path.join(vault, "Templates"), { recursive: true });
+		fs.writeFileSync(path.join(vault, "Templates", "template.pdf"), "PDF");
+
+		// Should NOT throw - file is outside PARA folders
+		await expect(
+			ensureGitGuard(makeConfig(vault), { checkAllFileTypes: true }),
+		).resolves.toBeUndefined();
 	});
 });

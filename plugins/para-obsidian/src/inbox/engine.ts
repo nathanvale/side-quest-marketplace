@@ -283,13 +283,14 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		}
 
 		// Git safety check: ensure vault is a git repo with clean working tree
+		// Use checkAllFileTypes=true to prevent bypassing git guard with PDFs/JSON
 		try {
 			// Build minimal config for git guard without loading from disk
 			// This prevents test failures when PARA_VAULT points to a different location
 			const config = {
 				vault: resolvedConfig.vaultPath,
 			};
-			await ensureGitGuard(config);
+			await ensureGitGuard(config, { checkAllFileTypes: true });
 		} catch (error) {
 			throw createInboxError(
 				"SYS_UNEXPECTED",
@@ -718,6 +719,33 @@ function capitalizeFirst(s: string): string {
 }
 
 /**
+ * Generate a unique file path by appending a counter if the path already exists.
+ *
+ * @param basePath - The desired file path
+ * @returns Unique path (original or with -N suffix before extension)
+ *
+ * @example
+ * // If "2025-12-10-invoice.pdf" exists:
+ * generateUniquePath("/vault/Attachments/2025-12-10-invoice.pdf")
+ * // → "/vault/Attachments/2025-12-10-invoice-1.pdf"
+ */
+function generateUniquePath(basePath: string): string {
+	if (!existsSync(basePath)) {
+		return basePath;
+	}
+
+	const ext = extname(basePath);
+	const base = ext ? basePath.slice(0, -ext.length) : basePath;
+	let counter = 1;
+
+	while (existsSync(`${base}-${counter}${ext}`)) {
+		counter++;
+	}
+
+	return `${base}-${counter}${ext}`;
+}
+
+/**
  * Execute a single suggestion.
  *
  * For create-note actions:
@@ -746,12 +774,20 @@ async function executeSuggestion(
 	// Generate dated attachment name: YYYY-MM-DD-original-name.pdf
 	const today = new Date().toISOString().slice(0, 10);
 	const datedFilename = `${today}-${filename}`;
-	const attachmentDest = join(
+	const intendedAttachmentDest = join(
 		config.vaultPath,
 		config.attachmentsFolder,
 		datedFilename,
 	);
-	const movedAttachmentPath = join(config.attachmentsFolder, datedFilename);
+
+	// Generate unique path to prevent overwriting existing files
+	const attachmentDest = generateUniquePath(intendedAttachmentDest);
+	const actualFilename = basename(attachmentDest);
+	const movedAttachmentPath = join(config.attachmentsFolder, actualFilename);
+
+	if (attachmentDest !== intendedAttachmentDest && executeLogger) {
+		executeLogger.warn`File collision detected - using unique name: ${actualFilename} ${cid}`;
+	}
 
 	// Hash the SOURCE file BEFORE moving (needed for registry)
 	let hash: string;
