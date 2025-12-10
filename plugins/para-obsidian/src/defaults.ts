@@ -228,8 +228,6 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			project: { type: "wikilink" },
 			trip_date: { type: "date" },
 			day_number: { type: "string" },
-			location: { type: "string", optional: true },
-			accommodation: { type: "wikilink", optional: true },
 			energy_level: { type: "enum", enum: ["low", "medium", "high"] },
 			tags: { type: "array", includes: ["itinerary"] },
 		},
