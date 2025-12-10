@@ -9,12 +9,12 @@
  * Parsed command-line arguments
  */
 export interface ParsedArgs {
-	/** The subcommand (e.g., "movies", "session", "pricing") */
-	command: string;
-	/** Positional arguments after the command */
-	positional: string[];
-	/** Named flags (e.g., --session-id 116001) */
-	flags: Record<string, string>;
+/** The subcommand (e.g., "movies", "session", "pricing") */
+command: string;
+/** Positional arguments after the command */
+positional: string[];
+/** Named flags (e.g., --session-id 116001) */
+flags: Record<string, string | boolean>;
 }
 
 /**
@@ -38,24 +38,28 @@ export interface ParsedArgs {
 export function parseArgs(args: string[]): ParsedArgs {
 	const command = args[0] ?? "";
 	const positional: string[] = [];
-	const flags: Record<string, string> = {};
+	const flags: Record<string, string | boolean> = {};
 
 	let i = 1;
 	while (i < args.length) {
 		const arg = args[i] as string;
 
 		if (arg.startsWith("--")) {
-			// Handle --flag or --flag value
-			const key = arg.slice(2);
+			// Handle --flag, --flag value, or --flag=value
+			const [rawKey, inlineValue] = arg.slice(2).split("=");
+			const key = rawKey ?? "";
 			const nextArg = args[i + 1];
 
 			// Check if there's a value after the flag
-			if (nextArg && !nextArg.startsWith("--")) {
+			if (inlineValue !== undefined) {
+				flags[key] = inlineValue;
+				i++;
+			} else if (nextArg && !nextArg.startsWith("--")) {
 				flags[key] = nextArg;
 				i += 2;
 			} else {
 				// Boolean flag (no value)
-				flags[key] = "true";
+				flags[key] = true;
 				i++;
 			}
 		} else {

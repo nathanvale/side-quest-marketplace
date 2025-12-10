@@ -62,9 +62,71 @@ const EXAMPLE_TICKET: TicketData = {
 };
 
 /**
- * Prints usage information and exits
+ * Safely retrieves a string flag value.
  */
-function printUsage(): never {
+export function getStringFlag(
+	flags: Record<string, string | boolean>,
+	key: string,
+): string | undefined {
+	const value = flags[key];
+	return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * Parses ticket selections from a flag string in the format "TYPE:qty,TYPE:qty".
+ * Throws with contextual errors for invalid input.
+ */
+export function parseTicketsFlag(
+	ticketsStr: string,
+): Array<{ type: string; quantity: number }> {
+	const ticketSelections = ticketsStr.split(",").map((part) => {
+		const [type, quantityStr] = part.split(":");
+		const quantity = Number.parseInt(quantityStr ?? "", 10);
+
+		if (!type || Number.isNaN(quantity) || quantity < 0) {
+			throw new Error(`Invalid ticket format: "${part}". Expected --tickets "ADULT:1,SENIOR:2"`);
+		}
+
+		return { type: type.trim(), quantity };
+	});
+
+	const totalTickets = ticketSelections.reduce((sum, t) => sum + t.quantity, 0);
+	if (totalTickets === 0) {
+		throw new Error("Must have at least one ticket (non-zero quantity).");
+	}
+
+	return ticketSelections;
+}
+
+/**
+ * Emits an error in markdown or JSON form and exits with code 1.
+ */
+function outputError(
+	format: OutputFormat,
+	message: string,
+	details?: Record<string, unknown>,
+): never {
+	if (format === OutputFormat.JSON) {
+		console.log(
+			JSON.stringify({
+				success: false,
+				error: message,
+				...(details ? { details } : {}),
+			}),
+		);
+	} else {
+		console.error(`Error: ${message}`);
+		if (details) {
+			console.error(JSON.stringify(details, null, 2));
+		}
+	}
+	process.exit(1);
+}
+
+/**
+ * Prints usage information
+ */
+function printUsage(): void {
 	console.log(`
 Cinema Bandit CLI - Classic Cinemas Scraper
 
@@ -161,7 +223,6 @@ Output:
   Use --format markdown for human-readable output (reduces LLM tokens).
   JSON responses include a 'selectorsUsed' field for debugging.
 `);
-	process.exit(1);
 }
 
 /**
@@ -195,35 +256,36 @@ async function generateScrapedTicket(
 	sessionId: string,
 	client: Awaited<ReturnType<typeof createScraperClient>>,
 	seats?: string,
+	log: (message: string) => void = console.log,
 ): Promise<string> {
 	// Step 1: Scrape movies to find the one matching this sessionId
-	console.log("🎬 Scraping movies to find session...");
+	log("🎬 Scraping movies to find session...");
 	const moviesResult = await client.scrapeMovies();
 	const movie = moviesResult.movies.find((m) =>
 		m.sessionTimes.some((s) => s.sessionId === sessionId),
 	);
 
 	if (movie) {
-		console.log(`   Movie: ${movie.title}`);
-		console.log(`   Poster: ${movie.thumbnail ? "Found" : "Not found"}`);
+		log(`   Movie: ${movie.title}`);
+		log(`   Poster: ${movie.thumbnail ? "Found" : "Not found"}`);
 	} else {
-		console.log(`   Movie: Not found for session ${sessionId}`);
+		log(`   Movie: Not found for session ${sessionId}`);
 	}
 
 	// Step 2: Scrape session details (screen number, date/time)
-	console.log(`🔍 Scraping session ${sessionId}...`);
+	log(`🔍 Scraping session ${sessionId}...`);
 	const sessionResult = await client.scrapeSession(sessionId);
-	console.log(`   Screen: ${sessionResult.screenNumber ?? "Unknown"}`);
-	console.log(`   DateTime: ${sessionResult.dateTime ?? "Unknown"}`);
+	log(`   Screen: ${sessionResult.screenNumber ?? "Unknown"}`);
+	log(`   DateTime: ${sessionResult.dateTime ?? "Unknown"}`);
 
 	// Step 3: Scrape pricing
-	console.log("💰 Scraping pricing...");
+	log("💰 Scraping pricing...");
 	const pricingResult = await client.scrapePricing(sessionId);
 	const adultTicket = pricingResult.ticketTypes.find((t) => t.name === "ADULT");
 	const childTicket = pricingResult.ticketTypes.find((t) => t.name === "CHILD");
-	console.log(`   Adult: ${adultTicket?.price ?? "Unknown"}`);
-	console.log(`   Child: ${childTicket?.price ?? "Unknown"}`);
-	console.log(`   Booking Fee: ${pricingResult.bookingFee ?? "Unknown"}`);
+	log(`   Adult: ${adultTicket?.price ?? "Unknown"}`);
+	log(`   Child: ${childTicket?.price ?? "Unknown"}`);
+	log(`   Booking Fee: ${pricingResult.bookingFee ?? "Unknown"}`);
 
 	// Validate and calculate pricing using price-scraper
 	const scrapedPricing = validateScrapedPricing({
@@ -273,20 +335,38 @@ async function main(): Promise<void> {
 
 	if (args.length === 0 || args.includes("--help")) {
 		printUsage();
+		process.exit(0);
 	}
 
 	const { command, flags } = parseArgs(args);
-	const format = parseOutputFormat(flags.format);
+	const format = parseOutputFormat(
+		typeof flags.format === "string" ? flags.format : undefined,
+	);
+	const log = format === OutputFormat.JSON ? console.error : console.log;
+	const dryRun = flags["dry-run"] === true || flags["dry-run"] === "true";
 
 	// Handle ticket command without session-id (no scraping needed)
 	if (command === "ticket" && !flags["session-id"]) {
+		if (dryRun) {
+			if (format === OutputFormat.MARKDOWN) {
+				log("✅ Dry run: example ticket would be generated (Star Wars 1977)");
+			} else {
+				console.log(
+					JSON.stringify({
+						action: "ticket-example",
+						dryRun: true,
+						message: "Example ticket would be generated (no file written).",
+					}),
+				);
+			}
+			return;
+		}
+
 		const outputPath = await generateExampleTicket();
-		console.log("✅ Generated example ticket HTML (Star Wars 1977)");
-		console.log(`📄 Saved to: ${outputPath}`);
-		console.log("\nOpen the file in a browser to preview the ticket.");
-		console.log(
-			"\n💡 Tip: Use --session-id <id> to generate with live scraped data",
-		);
+		log("✅ Generated example ticket HTML (Star Wars 1977)");
+		log(`📄 Saved to: ${outputPath}`);
+		log("\nOpen the file in a browser to preview the ticket.");
+		log("\n💡 Tip: Use --session-id <id> to generate with live scraped data");
 		return;
 	}
 
@@ -311,10 +391,9 @@ async function main(): Promise<void> {
 			}
 
 			case "session": {
-				const sessionId = flags["session-id"];
+				const sessionId = getStringFlag(flags, "session-id");
 				if (!sessionId) {
-					console.error("Error: --session-id required for session command");
-					process.exit(1);
+					outputError(format, "--session-id required for session command");
 				}
 
 				const result = await client.scrapeSession(sessionId);
@@ -337,10 +416,9 @@ async function main(): Promise<void> {
 			}
 
 			case "pricing": {
-				const sessionId = flags["session-id"];
+				const sessionId = getStringFlag(flags, "session-id");
 				if (!sessionId) {
-					console.error("Error: --session-id required for pricing command");
-					process.exit(1);
+					outputError(format, "--session-id required for pricing command");
 				}
 
 				const result = await client.scrapePricing(sessionId);
@@ -363,10 +441,9 @@ async function main(): Promise<void> {
 			}
 
 			case "seats": {
-				const sessionId = flags["session-id"];
+				const sessionId = getStringFlag(flags, "session-id");
 				if (!sessionId) {
-					console.error("Error: --session-id required for seats command");
-					process.exit(1);
+					outputError(format, "--session-id required for seats command");
 				}
 
 				const result = await client.scrapeSeats(sessionId);
@@ -390,10 +467,9 @@ async function main(): Promise<void> {
 			}
 
 			case "movie": {
-				const movieUrl = flags["movie-url"];
+				const movieUrl = getStringFlag(flags, "movie-url");
 				if (!movieUrl) {
-					console.error("Error: --movie-url required for movie command");
-					process.exit(1);
+					outputError(format, "--movie-url required for movie command");
 				}
 
 				const result = await client.scrapeMovie(movieUrl);
@@ -422,68 +498,61 @@ async function main(): Promise<void> {
 
 			case "ticket": {
 				// If we're here, --session-id was provided (handled above otherwise)
-				const sessionId = flags["session-id"];
+				const sessionId = getStringFlag(flags, "session-id");
 				if (!sessionId) {
 					// Shouldn't happen, but just in case
 					const outputPath = await generateExampleTicket();
-					console.log("✅ Generated example ticket HTML");
-					console.log(`📄 Saved to: ${outputPath}`);
+					log("✅ Generated example ticket HTML");
+					log(`📄 Saved to: ${outputPath}`);
 					break;
 				}
 
-				const seats = flags.seats;
-				const outputPath = await generateScrapedTicket(
+				const seats = getStringFlag(flags, "seats");
+				const outputPath = dryRun
+					? undefined
+					: await generateScrapedTicket(sessionId, client, seats, log);
+
+				const ticketResponse = {
+					success: true,
 					sessionId,
-					client,
-					seats,
-				);
-				console.log("\n✅ Generated ticket HTML with live data");
-				console.log(`📄 Saved to: ${outputPath}`);
-				console.log("\nOpen the file in a browser to preview the ticket.");
+					seats: seats ?? "TBD",
+					outputPath: outputPath ?? "dry-run",
+					dryRun,
+				};
+
+				if (format === OutputFormat.MARKDOWN) {
+					log("\n✅ Generated ticket HTML with live data");
+					log(`📄 Saved to: ${outputPath ?? "(dry run - no file written)"}`);
+					log("\nOpen the file in a browser to preview the ticket.");
+				} else {
+					console.log(JSON.stringify(ticketResponse));
+				}
 				break;
 			}
 
 			case "send": {
-				const sessionId = flags["session-id"];
-				const seats = flags.seats;
-				const ticketsStr = flags.tickets;
+				const sessionId = getStringFlag(flags, "session-id");
+				const seats = getStringFlag(flags, "seats");
+				const ticketsStr = getStringFlag(flags, "tickets");
 
 				if (!sessionId) {
-					console.error("Error: --session-id required for send command");
-					process.exit(1);
+					outputError(format, "--session-id required for send command");
 				}
 				if (!seats) {
-					console.error("Error: --seats required for send command");
-					process.exit(1);
+					outputError(format, "--seats required for send command");
 				}
 				if (!ticketsStr) {
-					console.error("Error: --tickets required for send command");
-					console.error('Example: --tickets "ADULT:1,SENIOR:2"');
-					process.exit(1);
+					outputError(format, "--tickets required for send command", {
+						example: '--tickets "ADULT:1,SENIOR:2"',
+					});
 				}
 
-				// Parse ticket selections from format "ADULT:1,SENIOR:2"
-				const ticketSelections = ticketsStr.split(",").map((part) => {
-					const [type, quantityStr] = part.split(":");
-					const quantity = Number.parseInt(quantityStr ?? "", 10);
-
-					if (!type || Number.isNaN(quantity) || quantity < 0) {
-						console.error(`Error: Invalid ticket format: "${part}"`);
-						console.error('Expected format: --tickets "ADULT:1,SENIOR:2"');
-						process.exit(1);
-					}
-
-					return { type: type.trim(), quantity };
-				});
-
-				// Validate at least one ticket
-				const totalTickets = ticketSelections.reduce(
-					(sum, t) => sum + t.quantity,
-					0,
-				);
-				if (totalTickets === 0) {
-					console.error("Error: Must have at least one ticket");
-					process.exit(1);
+				let ticketSelections: Array<{ type: string; quantity: number }>;
+				try {
+					ticketSelections = parseTicketsFlag(ticketsStr);
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					outputError(format, message);
 				}
 
 				// Scrape movies to find the one matching this sessionId
@@ -531,11 +600,13 @@ async function main(): Promise<void> {
 
 				// Generate and send email
 				const html = generateTicketHtml(ticketData);
-				const messageId = await sendTicketEmail(
-					"hi@nathanvale.com",
-					ticketData.movieTitle,
-					html,
-				);
+				const messageId = dryRun
+					? "dry-run"
+					: await sendTicketEmail(
+							"hi@nathanvale.com",
+							ticketData.movieTitle,
+							html,
+						);
 
 				// Output response
 				if (format === OutputFormat.MARKDOWN) {
@@ -550,6 +621,9 @@ async function main(): Promise<void> {
 							totalAmount: pricing.totalAmount,
 						}),
 					);
+					if (dryRun) {
+						console.log("\nDry run: email not sent.");
+					}
 				} else {
 					console.log(
 						JSON.stringify({
@@ -565,6 +639,7 @@ async function main(): Promise<void> {
 								bookingFee: pricing.bookingFeeAmount,
 								totalAmount: pricing.totalAmountNumber,
 							},
+							dryRun,
 						}),
 					);
 				}
@@ -572,17 +647,16 @@ async function main(): Promise<void> {
 			}
 
 			default:
-				console.error(`Error: Unknown command "${command}"`);
-				console.error("Run with --help to see available commands");
-				process.exit(1);
+				outputError(format, `Unknown command "${command}"`, {
+					help: "Run with --help to see available commands",
+				});
 		}
 	} catch (error) {
 		if (error instanceof Error) {
-			console.error(`Scraping error: ${error.message}`);
+			outputError(format, `Scraping error: ${error.message}`);
 		} else {
-			console.error(`Scraping error: ${String(error)}`);
+			outputError(format, `Scraping error: ${String(error)}`);
 		}
-		process.exit(1);
 	} finally {
 		if (client) {
 			await client.close();
@@ -590,4 +664,6 @@ async function main(): Promise<void> {
 	}
 }
 
-main();
+if (import.meta.main) {
+	main();
+}
