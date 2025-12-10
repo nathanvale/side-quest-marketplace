@@ -38,6 +38,35 @@ export interface OrphanOptions {
 }
 
 /**
+ * Normalizes a wikilink by removing aliases, headings, and block references.
+ *
+ * Examples:
+ * - `[[Note#Heading|Alias]]` → `Note.md`
+ * - `[[Note#Heading]]` → `Note.md`
+ * - `[[Note|Alias]]` → `Note.md`
+ * - `[[Note^block]]` → `Note.md`
+ * - `[[Note]]` → `Note.md`
+ *
+ * @param link - Raw wikilink content (without brackets)
+ * @returns Normalized file path with .md extension
+ */
+function normalizeWikilink(link: string): string {
+	// Remove everything after | (alias)
+	let normalized = link.split("|")[0] ?? link;
+	// Remove everything after # (heading)
+	normalized = normalized.split("#")[0] ?? normalized;
+	// Remove everything after ^ (block reference)
+	normalized = normalized.split("^")[0] ?? normalized;
+	// Trim whitespace
+	normalized = normalized.trim();
+	// Add .md extension if not present
+	if (!normalized.endsWith(".md")) {
+		normalized = `${normalized}.md`;
+	}
+	return normalized;
+}
+
+/**
  * Extracts all wikilinks from note content.
  *
  * Finds wikilinks in both frontmatter and body.
@@ -165,13 +194,16 @@ export function findOrphans(
 		const links = extractWikilinks(vault, notePath);
 
 		for (const { link, location } of links) {
+			// Normalize wikilink (remove aliases, headings, blocks)
+			const normalizedLink = normalizeWikilink(link);
+
 			// Track attachment references
-			if (link.startsWith("Attachments/")) {
-				referencedAttachments.add(link);
+			if (normalizedLink.startsWith("Attachments/")) {
+				referencedAttachments.add(normalizedLink);
 			}
 
 			// Check if linked file exists (both attachments and note-to-note links)
-			const { absolute: linkAbsolute } = resolveVaultPath(vault, link);
+			const { absolute: linkAbsolute } = resolveVaultPath(vault, normalizedLink);
 			if (!fs.existsSync(linkAbsolute)) {
 				brokenLinks.push({ note: notePath, link, location });
 			}

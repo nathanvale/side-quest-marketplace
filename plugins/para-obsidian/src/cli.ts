@@ -1792,7 +1792,10 @@ async function main(): Promise<void> {
 						typeof flags.force === "string"
 							? Number.parseInt(flags.force, 10)
 							: undefined;
-					if (forceVersionRaw !== undefined && !Number.isFinite(forceVersionRaw)) {
+					if (
+						forceVersionRaw !== undefined &&
+						!Number.isFinite(forceVersionRaw)
+					) {
 						throw new Error(
 							`Invalid --force value: "${flags.force}" (must be a valid integer)`,
 						);
@@ -1845,7 +1848,10 @@ async function main(): Promise<void> {
 						typeof flags.force === "string"
 							? Number.parseInt(flags.force, 10)
 							: undefined;
-					if (forceVersionRaw !== undefined && !Number.isFinite(forceVersionRaw)) {
+					if (
+						forceVersionRaw !== undefined &&
+						!Number.isFinite(forceVersionRaw)
+					) {
 						throw new Error(
 							`Invalid --force value: "${flags.force}" (must be a valid integer)`,
 						);
@@ -1866,25 +1872,25 @@ async function main(): Promise<void> {
 						type,
 						migrate: MIGRATIONS,
 					});
+					// Get changed notes for attachment discovery and commit
+					const changed = result.results
+						.filter(
+							(r): r is (typeof result.results)[number] => r.updated === true,
+						)
+						.map((r) => r.relative);
+					// Only auto-discover attachments for changed notes
 					const autoAttachments =
 						attachments.length > 0
 							? attachments
-							: result.results.flatMap((r) =>
-									withAutoDiscoveredAttachments(config, r.relative, []),
+							: changed.flatMap((r) =>
+									withAutoDiscoveredAttachments(config, r, []),
 								);
-					if (config.autoCommit && !dryRun && result.updated > 0) {
-						const changed = result.results
-							.filter(
-								(r): r is (typeof result.results)[number] => r.updated === true,
-							)
-							.map((r) => r.relative);
-						if (changed.length > 0) {
-							await autoCommitChanges(
-								config,
-								[...changed, ...autoAttachments],
-								`migrate ${changed.length} note(s)`,
-							);
-						}
+					if (config.autoCommit && !dryRun && changed.length > 0) {
+						await autoCommitChanges(
+							config,
+							[...changed, ...autoAttachments],
+							`migrate ${changed.length} note(s)`,
+						);
 					}
 					if (isJson) {
 						console.log(
@@ -1940,10 +1946,6 @@ async function main(): Promise<void> {
 						"missing-version",
 						"current",
 					]) as VersionPlanStatus[];
-					const dirs = parseDirs(
-						normalizeFlagValue(flags.dir),
-						config.defaultSearchDirs,
-					);
 					const emitPlan =
 						typeof flags["emit-plan"] === "string"
 							? path.resolve(flags["emit-plan"])
@@ -1963,6 +1965,13 @@ async function main(): Promise<void> {
 						process.exit(1);
 					}
 
+					// Use plan.dirs unless user explicitly specified --dir
+					const userSpecifiedDir = normalizeFlagValue(flags.dir);
+					const dirs =
+						userSpecifiedDir !== undefined
+							? parseDirs(userSpecifiedDir, config.defaultSearchDirs)
+							: plan.dirs ?? config.defaultSearchDirs ?? [];
+
 					const attachments = parseAttachments(normalizeFlags(flags));
 					if (!dryRun) {
 						await ensureGitGuard(config);
@@ -1971,7 +1980,7 @@ async function main(): Promise<void> {
 						plan,
 						dryRun,
 						statuses,
-						dirs: dirs ?? [],
+						dirs,
 						migrate: MIGRATIONS,
 					});
 					const filteredPlan =
@@ -1979,7 +1988,7 @@ async function main(): Promise<void> {
 							? {
 									type: plan.type,
 									targetVersion: plan.targetVersion,
-									dirs: dirs ?? plan.dirs ?? [],
+									dirs,
 									entries: result.selected,
 									stats: {
 										total: result.selected.length,
