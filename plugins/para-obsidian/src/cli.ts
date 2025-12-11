@@ -59,16 +59,16 @@ async function collectMetricsSummary(): Promise<MetricsSummary | null> {
 }
 
 import {
-	color,
-	emphasize,
-	OutputFormat,
-	parseOutputFormat,
-} from "@sidequest/core/formatters";
-import {
 	pathExistsSync,
 	readTextFileSync,
 	writeTextFileSync,
 } from "@sidequest/core/fs";
+import {
+	color,
+	emphasize,
+	OutputFormat,
+	parseOutputFormat,
+} from "@sidequest/core/terminal";
 import { createSpinner } from "nanospinner";
 import { discoverAttachments } from "./attachments";
 import { cleanBrokenLinks } from "./clean-links";

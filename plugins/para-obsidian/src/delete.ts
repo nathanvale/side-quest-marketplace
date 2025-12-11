@@ -9,6 +9,7 @@
  */
 import path from "node:path";
 import { pathExistsSync, readDir } from "@sidequest/core/fs";
+import { spawnSyncCollect } from "@sidequest/core/spawn";
 
 import type { ParaObsidianConfig } from "./config";
 import { resolveVaultPath } from "./fs";
@@ -63,20 +64,16 @@ export function deleteFile(
 
 	if (!options.dryRun) {
 		// Delete the file/directory
-		const rm = Bun.spawnSync(["rm", "-rf", target.absolute]);
+		const rm = spawnSyncCollect(["rm", "-rf", target.absolute]);
 		if (rm.exitCode !== 0) {
-			const stderr =
-				typeof rm.stderr === "string"
-					? rm.stderr
-					: new TextDecoder().decode(rm.stderr ?? new Uint8Array());
-			throw new Error(`Failed to delete: ${stderr}`);
+			throw new Error(`Failed to delete: ${rm.stderr}`);
 		}
 
 		// Clean up empty parent directories up to vault root
 		let dir = path.dirname(target.absolute);
 		while (dir.startsWith(config.vault) && dir !== config.vault) {
 			if (readDir(dir).length === 0) {
-				Bun.spawnSync(["rmdir", dir]);
+				spawnSyncCollect(["rmdir", dir]);
 				dir = path.dirname(dir);
 			} else {
 				break;

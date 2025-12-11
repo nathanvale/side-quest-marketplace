@@ -11,7 +11,7 @@
  *
  * @module semantic
  */
-import { spawnAndCollect } from "../../../core/src/spawn/index.js";
+import { spawnAndCollect } from "@sidequest/core/spawn";
 import type { ParaObsidianConfig } from "./config";
 import { resolveVaultPath } from "./fs";
 import { checkKit, getKitMLErrorMessage } from "./kit-check";

@@ -14,6 +14,8 @@ import {
 	readTextFileSync,
 	writeTextFileSync,
 } from "@sidequest/core/fs";
+import { globFilesSync } from "@sidequest/core/glob";
+import { spawnSyncCollect } from "@sidequest/core/spawn";
 
 import type { ParaObsidianConfig } from "./config";
 import { resolveVaultPath } from "./fs";
@@ -88,10 +90,7 @@ function replaceLinks(
  * @returns Array of absolute paths to .md files
  */
 function listMarkdownFiles(root: string): string[] {
-	const glob = new Bun.Glob("**/*.md");
-	return Array.from(glob.scanSync({ cwd: root })).map((relPath) =>
-		path.join(root, relPath),
-	);
+	return globFilesSync("**/*.md", { cwd: root });
 }
 
 /**
@@ -159,13 +158,9 @@ export function renameWithLinkRewrite(
 	// Move the file if not dry-run
 	if (!options.dryRun) {
 		ensureDirSync(path.dirname(to.absolute));
-		const move = Bun.spawnSync(["mv", from.absolute, to.absolute]);
+		const move = spawnSyncCollect(["mv", from.absolute, to.absolute]);
 		if (move.exitCode !== 0) {
-			const stderr =
-				typeof move.stderr === "string"
-					? move.stderr
-					: new TextDecoder().decode(move.stderr ?? new Uint8Array());
-			throw new Error(`Failed to move file: ${stderr}`);
+			throw new Error(`Failed to move file: ${move.stderr}`);
 		}
 	}
 

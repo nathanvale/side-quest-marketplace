@@ -23,6 +23,7 @@ import {
 	readTextFileSync,
 	writeTextFileSync,
 } from "@sidequest/core/fs";
+import { spawnSyncCollect } from "@sidequest/core/spawn";
 
 import { resolveVaultPath } from "./fs";
 
@@ -187,13 +188,9 @@ export async function flattenAttachments(
 			}
 
 			// Move file
-			const mv = Bun.spawnSync(["mv", oldAbsolute, newAbsolute]);
+			const mv = spawnSyncCollect(["mv", oldAbsolute, newAbsolute]);
 			if (mv.exitCode !== 0) {
-				const stderr =
-					typeof mv.stderr === "string"
-						? mv.stderr
-						: new TextDecoder().decode(mv.stderr ?? new Uint8Array());
-				throw new Error(`Failed to move ${oldAbsolute}: ${stderr}`);
+				throw new Error(`Failed to move ${oldAbsolute}: ${mv.stderr}`);
 			}
 		}
 	}
@@ -322,7 +319,7 @@ function removeEmptyDirectories(vault: string, startDir: string): number {
 		}
 
 		if (isEmpty && dir !== absolute) {
-			Bun.spawnSync(["rmdir", dir]);
+			spawnSyncCollect(["rmdir", dir]);
 			removed++;
 			return true;
 		}

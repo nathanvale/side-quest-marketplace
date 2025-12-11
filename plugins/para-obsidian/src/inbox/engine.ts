@@ -16,7 +16,7 @@ import {
 	readTextFileSync,
 	writeTextFileSync,
 } from "@sidequest/core/fs";
-import { Glob } from "bun";
+import { globFilesSync } from "@sidequest/core/glob";
 import pLimit from "p-limit";
 import { loadConfig } from "../config";
 import { createFromTemplate, injectSections } from "../create";
@@ -643,15 +643,8 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 function getVaultAreas(vaultPath: string): string[] {
 	const areasPath = join(vaultPath, "02 Areas");
 	try {
-		const glob = new Glob("**/*.md");
-		const areas: string[] = [];
-
-		for (const file of glob.scanSync({ cwd: areasPath })) {
-			// Extract note name from path (e.g., "Psychotherapy/Psychotherapy.md" -> "Psychotherapy")
-			const name = basename(file, ".md");
-			areas.push(name);
-		}
-
+		const files = globFilesSync("**/*.md", { cwd: areasPath, absolute: false });
+		const areas = files.map((file) => basename(file, ".md"));
 		return [...new Set(areas)]; // Dedupe in case of same-named notes
 	} catch {
 		return [];
@@ -667,15 +660,11 @@ function getVaultAreas(vaultPath: string): string[] {
 function getVaultProjects(vaultPath: string): string[] {
 	const projectsPath = join(vaultPath, "01 Projects");
 	try {
-		const glob = new Glob("**/*.md");
-		const projects: string[] = [];
-
-		for (const file of glob.scanSync({ cwd: projectsPath })) {
-			// Extract note name from path (e.g., "Work/Build Garden Shed.md" -> "Build Garden Shed")
-			const name = basename(file, ".md");
-			projects.push(name);
-		}
-
+		const files = globFilesSync("**/*.md", {
+			cwd: projectsPath,
+			absolute: false,
+		});
+		const projects = files.map((file) => basename(file, ".md"));
 		return [...new Set(projects)]; // Dedupe in case of same-named notes
 	} catch {
 		return [];

@@ -13,6 +13,7 @@
  */
 import path from "node:path";
 import { pathExistsSync, readTextFile } from "@sidequest/core/fs";
+import { globFiles } from "@sidequest/core/glob";
 import { ensureCommandAvailable, spawnAndCollect } from "@sidequest/core/spawn";
 import { parse } from "yaml";
 
@@ -234,14 +235,9 @@ export async function filterByFrontmatter(
 	const matches: string[] = [];
 	const dirs = resolveDirs(config.vault, options.dir, config.defaultSearchDirs);
 
-	/** Recursively walks markdown files under a directory using Bun.Glob. */
+	/** Recursively walks markdown files under a directory using Core glob. */
 	async function walkMarkdownFiles(dir: string): Promise<string[]> {
-		const glob = new Bun.Glob("**/*.md");
-		const files: string[] = [];
-		for await (const match of glob.scan({ cwd: dir })) {
-			files.push(path.join(dir, match));
-		}
-		return files;
+		return globFiles("**/*.md", { cwd: dir });
 	}
 
 	/** Checks if a file's frontmatter matches all filters. */

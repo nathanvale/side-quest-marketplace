@@ -6,7 +6,7 @@
  */
 
 import { input } from "@inquirer/prompts";
-import { emphasize } from "@sidequest/core/formatters";
+import { emphasize } from "@sidequest/core/terminal";
 import { createSpinner } from "nanospinner";
 import type {
 	CLICommand,
