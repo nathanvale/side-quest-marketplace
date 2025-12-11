@@ -18,25 +18,25 @@
 
 // Re-export from terminal for backward compatibility
 export {
-	OutputFormat,
-	parseOutputFormat,
-	emphasize,
+	blue,
+	bold,
 	// Color utilities
 	color,
-	red,
-	green,
-	yellow,
-	blue,
 	cyan,
-	magenta,
-	gray,
 	dim,
-	bold,
+	emphasize,
 	// Semantic messages
 	error,
+	gray,
+	green,
+	info,
+	magenta,
+	OutputFormat,
+	parseOutputFormat,
+	red,
 	success,
 	warning,
-	info,
+	yellow,
 } from "../terminal/index.js";
 
 // Legacy colors object for existing code that uses colors.red, colors.green, etc.
