@@ -13,11 +13,11 @@ Development skills for building CLI tools with Bun, runtime workflows, and devel
 
 ---
 
-## Skills (5 Total, 4 Implemented)
+## Skills (8 Total, 8 Implemented)
 
 ### ✅ Implemented Skills
 
-#### 1. **Bun CLI Development** (Highest Priority)
+#### 1. **Bun CLI Development**
 - **SKILL.md:** `skills/bun-cli/SKILL.md` (progressively disclosed, ~470 lines)
 - **Content:** Argument parsing patterns, dual output formats, error handling, subcommands, testing
 - **Reference:** `skills/bun-cli/references/bun-cli-patterns.md`
@@ -83,6 +83,50 @@ Development skills for building CLI tools with Bun, runtime workflows, and devel
   - Applicable to tools, docs, code organization, workflows
   - ADHD-friendly patterns benefit everyone
   - Measurable improvements (< 10 min setup, < 5s feedback)
+
+#### 5. **MCP Development**
+- **SKILL.md:** `skills/mcp-development/SKILL.md`
+- **Content:** Model Context Protocol server development patterns
+- **Covers:**
+  - MCP server architecture and tool naming conventions
+  - Response format patterns (markdown/JSON)
+  - Error handling and validation
+  - Testing strategies for MCP tools
+
+#### 6. **Inbox Processing Expert**
+- **SKILL.md:** `skills/inbox-processing-expert/SKILL.md`
+- **Content:** Security-hardened automation framework for processing inbox items
+- **Covers:**
+  - Engine/interface separation architecture
+  - 7 P0 critical security patterns (TOCTOU, command injection, atomic writes)
+  - Suggestion-based processing (never mutate directly)
+  - Interactive CLI patterns
+  - 23-error taxonomy across 7 categories
+  - Structured logging with correlation IDs
+- **Key Points:**
+  - Production-grade security patterns
+  - Idempotency with SHA256 registry
+  - Confidence scoring (HIGH/MEDIUM/LOW)
+  - 246 tests across 10 files
+
+#### 7. **Observability** (NEW)
+- **SKILL.md:** `skills/observability/SKILL.md`
+- **Content:** Structured logging, correlation IDs, performance metrics, debugging workflows
+- **Covers:**
+  - Plugin logger factory pattern (@sidequest/core/logging)
+  - Hierarchical subsystem loggers (plugin → subsystem → submodule)
+  - Correlation ID patterns for request tracing
+  - Log levels best practices (DEBUG/INFO/WARN/ERROR)
+  - Automatic metrics collection (MetricsCollector)
+  - JSONL log analysis (grep, jq queries)
+  - Production debugging workflows
+- **Key Points:**
+  - LogTape + JSONL for machine-parseable logs
+  - File rotation (1 MiB, 5 files default)
+  - 8-character correlation IDs for tracing
+  - Performance metrics aggregation (min/max/avg, error rates)
+  - Centralized log location (~/.claude/logs/)
+  - Real-world examples from para-obsidian, cinema-bandit, kit
 
 ### 📋 Planned Skills (Phase 2+)
 
@@ -181,6 +225,31 @@ Each skill responds to natural language patterns:
 - "adhd-friendly"
 - "cognitive load"
 - "workflow optimization"
+
+**MCP Development triggers:**
+- "mcp server"
+- "model context protocol"
+- "mcp tools"
+- "mcp development"
+
+**Inbox Processing Expert triggers:**
+- "inbox processing"
+- "security patterns"
+- "TOCTOU"
+- "command injection"
+- "suggestion-based"
+- "correlation ids"
+
+**Observability triggers:**
+- "logging"
+- "observability"
+- "correlation id"
+- "structured logging"
+- "performance metrics"
+- "debugging"
+- "logtape"
+- "jsonl"
+- "@sidequest/core/logging"
 
 ---
 
@@ -292,6 +361,17 @@ All skills follow:
 
 ### Changelog
 
+- **v1.3.0** (2025-12-11) — Added Observability skill
+  - Added: Observability skill documenting @sidequest/core/logging
+  - Content: Structured logging, correlation IDs, performance metrics, debugging
+  - Covers: LogTape, JSONL, hierarchical loggers, MetricsCollector
+  - Real-world examples: para-obsidian, cinema-bandit, kit logging patterns
+  - Best practices: Log levels, grep/jq workflows, production debugging
+- **v1.2.0** (2025-12-11) — Added Inbox Processing Expert skill
+  - Added: Comprehensive inbox processing framework documentation
+  - Security: 7 P0 critical patterns (TOCTOU, command injection, atomic writes)
+  - Architecture: Engine/interface separation, suggestion-based processing
+  - Includes: Implementation checklist, 246 test coverage, error taxonomy
 - **v1.1.0** (2025-12-11) — Added Bun Filesystem Helpers
   - Added: Bun FS Helpers skill documenting @sidequest/core/fs
   - Content: Pure Bun-native filesystem utilities (zero node:fs)
@@ -313,6 +393,9 @@ All skills follow:
 | Bun Runtime Skill | `skills/bun-runtime/SKILL.md` |
 | Bun FS Helpers Skill | `skills/bun-fs-helpers/SKILL.md` |
 | DX Patterns Skill | `skills/dx-patterns/SKILL.md` |
+| MCP Development Skill | `skills/mcp-development/SKILL.md` |
+| Inbox Processing Expert Skill | `skills/inbox-processing-expert/SKILL.md` |
+| Observability Skill | `skills/observability/SKILL.md` |
 | CLI Patterns Reference | `skills/bun-cli/references/bun-cli-patterns.md` |
 | Roadmap | `ROADMAP.md` |
 | Plugin Config | `.claude-plugin/plugin.json` |

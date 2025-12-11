@@ -1,7 +1,7 @@
 {
 	"name": "dev-toolkit",
-	"version": "1.2.0",
-	"description": "Development skills for Bun CLI, runtime workflows, filesystem utilities, inbox processing, and developer experience patterns",
+	"version": "1.3.0",
+	"description": "Development skills for Bun CLI, runtime workflows, filesystem utilities, observability, inbox processing, and developer experience patterns",
 	"author": {
 		"name": "Nathan Vale",
 		"email": "hi@nathanvale.com"
@@ -14,6 +14,7 @@
 		"./skills/bun-fs-helpers",
 		"./skills/dx-patterns",
 		"./skills/mcp-development",
-		"./skills/inbox-processing-expert"
+		"./skills/inbox-processing-expert",
+		"./skills/observability"
 	]
 }
