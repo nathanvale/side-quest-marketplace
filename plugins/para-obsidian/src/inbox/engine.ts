@@ -31,7 +31,12 @@ import {
 	type InboxVaultContext,
 	parseDetectionResponse,
 } from "./llm-detection";
-import { executeLogger, inboxLogger } from "./logger";
+import {
+	createCorrelationId,
+	executeLogger,
+	inboxLogger,
+	initLoggerWithNotice,
+} from "./logger";
 import {
 	checkPdfToText,
 	combineHeuristics,
@@ -120,7 +125,9 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	 * @returns Array of suggestions for inbox items
 	 */
 	async function scan(options?: ScanOptions): Promise<InboxSuggestion[]> {
-		const cid = crypto.randomUUID().slice(0, 8);
+		await initLoggerWithNotice();
+		const startedAt = Date.now();
+		const cid = createCorrelationId();
 		const onProgress = options?.onProgress;
 
 		if (inboxLogger) {
@@ -143,7 +150,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			files = readDir(inboxPath);
 		} catch (_error) {
 			if (inboxLogger) {
-				inboxLogger.warn`Inbox folder not found: ${inboxPath}`;
+				inboxLogger.warn`Inbox folder not found: ${inboxPath} cid=${cid}`;
 			}
 			return [];
 		}
@@ -153,7 +160,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 
 		if (pdfFiles.length === 0) {
 			if (inboxLogger) {
-				inboxLogger.info`No PDFs found in inbox`;
+				inboxLogger.info`No PDFs found in inbox cid=${cid}`;
 			}
 			return [];
 		}
@@ -162,7 +169,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		const pdfCheck = await checkPdfToText();
 		if (!pdfCheck.available) {
 			if (inboxLogger) {
-				inboxLogger.error`pdftotext not available: ${pdfCheck.error}`;
+				inboxLogger.error`pdftotext not available: ${pdfCheck.error} cid=${cid}`;
 			}
 			throw createInboxError("DEP_PDFTOTEXT_MISSING", {
 				cid,
@@ -198,7 +205,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					const hash = await hashFile(filePath);
 					if (registry.isProcessed(hash)) {
 						if (inboxLogger) {
-							inboxLogger.debug`Skipping already processed: ${filename}`;
+							inboxLogger.debug`Skipping already processed: ${filename} cid=${cid}`;
 						}
 						if (onProgress) {
 							await onProgress({ ...progressBase, stage: "skip" });
@@ -207,7 +214,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					}
 				} catch (_error) {
 					if (inboxLogger) {
-						inboxLogger.warn`Failed to hash file: ${filename}`;
+						inboxLogger.warn`Failed to hash file: ${filename} cid=${cid}`;
 					}
 					if (onProgress) {
 						await onProgress({
@@ -228,7 +235,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					text = await extractPdfText(filePath, cid);
 				} catch (error) {
 					if (inboxLogger) {
-						inboxLogger.warn`Failed to extract PDF text: ${filename}`;
+						inboxLogger.warn`Failed to extract PDF text: ${filename} cid=${cid}`;
 					}
 					if (onProgress) {
 						await onProgress({
@@ -275,7 +282,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					});
 				} catch (error) {
 					if (inboxLogger) {
-						inboxLogger.warn`LLM detection failed: ${filename} - ${error instanceof Error ? error.message : "unknown"}`;
+						inboxLogger.warn`LLM detection failed: ${filename} - ${error instanceof Error ? error.message : "unknown"} cid=${cid}`;
 					}
 				}
 
@@ -296,9 +303,27 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 
 		const results = await Promise.all(suggestionPromises);
 		const suggestions = results.filter((s): s is InboxSuggestion => s !== null);
+		const durationMs = Date.now() - startedAt;
+
+		const confidenceCounts = suggestions.reduce(
+			(counts, suggestion) => {
+				counts[suggestion.confidence] += 1;
+				return counts;
+			},
+			{ high: 0, medium: 0, low: 0 },
+		);
+		const actionCounts = suggestions.reduce(
+			(counts, suggestion) => {
+				const key = suggestion.action;
+				counts[key] = (counts[key] ?? 0) + 1;
+				return counts;
+			},
+			{} as Record<string, number>,
+		);
 
 		if (inboxLogger) {
-			inboxLogger.info`Scan complete suggestions=${suggestions.length} cid=${cid}`;
+			inboxLogger.info`Scan complete suggestions=${suggestions.length} durationMs=${durationMs} cid=${cid}`;
+			inboxLogger.debug`Scan breakdown confidence=${JSON.stringify(confidenceCounts)} actions=${JSON.stringify(actionCounts)} durationMs=${durationMs} cid=${cid}`;
 		}
 
 		return suggestions;
@@ -315,7 +340,9 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		ids: string[],
 		options?: ExecuteOptions,
 	): Promise<ExecutionResult[]> {
-		const cid = crypto.randomUUID().slice(0, 8);
+		await initLoggerWithNotice();
+		const startedAt = Date.now();
+		const cid = createCorrelationId();
 		const onProgress = options?.onProgress;
 
 		if (inboxLogger) {
@@ -406,7 +433,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				}
 			} catch (error) {
 				if (executeLogger) {
-					executeLogger.error`Execute failed id=${id} error=${error instanceof Error ? error.message : "unknown"}`;
+					executeLogger.error`Execute failed id=${id} error=${error instanceof Error ? error.message : "unknown"} ${cid}`;
 				}
 				results.push({
 					suggestionId: id,
@@ -435,8 +462,10 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		// (This is now redundant but harmless as a safety net)
 		await registry.save();
 
+		const durationMs = Date.now() - startedAt;
 		if (inboxLogger) {
-			inboxLogger.info`Execute complete success=${successes} failed=${failures} cid=${cid}`;
+			inboxLogger.info`Execute complete success=${successes} failed=${failures} durationMs=${durationMs} cid=${cid}`;
+			inboxLogger.debug`Execute summary total=${total} success=${successes} failed=${failures} durationMs=${durationMs} cid=${cid}`;
 		}
 
 		return results;
@@ -453,7 +482,8 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		id: string,
 		prompt: string,
 	): Promise<InboxSuggestion> {
-		const cid = crypto.randomUUID().slice(0, 8);
+		await initLoggerWithNotice();
+		const cid = createCorrelationId();
 
 		if (inboxLogger) {
 			inboxLogger.info`Edit started id=${id} prompt=${prompt} cid=${cid}`;
@@ -506,7 +536,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			llmResult = parseDetectionResponse(response);
 		} catch (error) {
 			if (inboxLogger) {
-				inboxLogger.warn`LLM re-detection failed: ${error instanceof Error ? error.message : "unknown"}`;
+				inboxLogger.warn`LLM re-detection failed: ${error instanceof Error ? error.message : "unknown"} cid=${cid}`;
 			}
 		}
 

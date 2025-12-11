@@ -18,6 +18,7 @@
  * ```
  */
 
+import { join } from "node:path";
 import {
 	createCorrelationId as coreCreateCorrelationId,
 	createPluginLogger,
@@ -37,11 +38,31 @@ type InboxSubsystem = (typeof SUBSYSTEMS)[number];
 /**
  * Plugin logger factory result.
  */
+const logDirFromEnv =
+	process.env.PARA_OBSIDIAN_LOG_DIR ??
+	(process.env.PARA_VAULT
+		? join(process.env.PARA_VAULT, ".claude", "logs")
+		: undefined);
+
 const { initLogger, rootLogger, subsystemLoggers, logFile } =
 	createPluginLogger({
 		name: "para-obsidian",
 		subsystems: [...SUBSYSTEMS],
+		logDir: logDirFromEnv,
 	});
+
+let initLogged = false;
+
+/**
+ * Initialize logging and emit a one-time notice about the log file location.
+ */
+export async function initLoggerWithNotice(): Promise<void> {
+	await initLogger();
+	if (!initLogged && rootLogger) {
+		rootLogger.info`Logger initialized logFile=${logFile}`;
+		initLogged = true;
+	}
+}
 
 // =============================================================================
 // Exported Loggers

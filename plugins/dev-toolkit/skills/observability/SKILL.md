@@ -96,6 +96,8 @@ const {
 } = createPluginLogger({
   name: "my-plugin",           // kebab-case (used for log file)
   subsystems: ["scraper", "auth", "api"],
+  // Prefer vault-synced logs for user visibility:
+  // logDir: `${process.env.PARA_VAULT}/.claude/logs` or a plugin-specific env override
 });
 
 // Export for use across plugin
@@ -141,6 +143,7 @@ main();
 - Configures LogTape sinks and formatters
 - Logs initialization event (plugin, logDir, maxSize)
 - Safe to call multiple times (only initializes once)
+**Recommended:** Emit a one-time “logger initialized” INFO with `logFile`, `logDir`, and `lowestLevel` so users can confirm where JSONL is written (especially when overriding to a vault-synced path).
 
 ### Subsystem Logger Naming
 
@@ -148,7 +151,6 @@ main();
 
 | Plugin | Subsystems | Use Cases |
 |--------|------------|-----------|
-| **para-obsidian** | `inbox`, `pdf`, `llm`, `execute` | Inbox processing stages |
 | **cinema-bandit** | `scraper`, `pricing`, `auth`, `gmail` | Functional modules |
 | **kit** | `ast`, `semantic`, `git` | Tool categories |
 
@@ -247,6 +249,8 @@ executeLogger.info`Note created`, {
 jq 'select(.properties.template == "invoice")' ~/.claude/logs/para-obsidian.jsonl
 ```
 
+**PII safety:** When logs sync to cloud storage, mask or omit sensitive extracted fields (names, amounts, IDs) before logging. Prefer short summaries or hashed values over raw content.
+
 ### Log Level Convention Table
 
 | Level | Volume | Use Case | Example |
@@ -332,6 +336,8 @@ const summary = collector.getSummary();
 
 console.log(summary.toMarkdown());
 ```
+
+**Include summaries in CLI/JSON output:** After a run, return or print `{ metrics: summary, logFile }` so users and automation can locate performance data and the corresponding JSONL file.
 
 **Output:**
 ```
@@ -451,6 +457,8 @@ jq -s 'group_by(.level) |
 jq -r '."@timestamp" + " | " + .properties.cid + " | " + .message' \
   ~/.claude/logs/my-plugin.jsonl
 ```
+
+**Discipline:** Ensure every log in the flow carries `cid` (including skips, hash failures, LLM errors, and execute failures) so traces stay contiguous.
 
 ### Production Debugging Checklist
 

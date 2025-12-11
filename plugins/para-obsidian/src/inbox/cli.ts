@@ -1,10 +1,28 @@
 #!/usr/bin/env bun
+import { MetricsCollector } from "@sidequest/core/logging";
 import { createSpinner } from "nanospinner";
 import {
 	displayResults,
 	formatSuggestionsTable,
 	runInteractiveLoop,
 } from "./cli-adapter";
+import { createInboxEngine } from "./engine";
+import { initLoggerWithNotice, logFile } from "./logger";
+import type { InboxSuggestion } from "./types";
+
+async function printMetricsSummary(): Promise<void> {
+	try {
+		const collector = new MetricsCollector();
+		await collector.collect();
+		const summary = collector.getSummary();
+		console.log(
+			`Metrics: total=${summary.totalOperations ?? "?"}, failed=${summary.failedOperations ?? "?"}`,
+		);
+	} catch {
+		// Metrics are best-effort; ignore failures
+	}
+}
+
 /**
  * Interactive inbox processor CLI.
  *
@@ -12,8 +30,6 @@ import {
  *
  * Requires PARA_VAULT environment variable to be set.
  */
-import { createInboxEngine } from "./engine";
-import type { InboxSuggestion } from "./types";
 
 async function main() {
 	const vaultPath = process.env.PARA_VAULT;
@@ -26,6 +42,9 @@ async function main() {
 
 	console.log(`\n📥 Inbox Processor`);
 	console.log(`   Vault: ${vaultPath}\n`);
+
+	await initLoggerWithNotice();
+	console.log(`Logs: ${logFile}\n`);
 
 	const engine = createInboxEngine({
 		vaultPath,
@@ -145,6 +164,7 @@ async function main() {
 			text: `Executed ${results.length} item(s) in ${elapsed}s`,
 		});
 		displayResults(results);
+		await printMetricsSummary();
 	} else {
 		console.log("\nNo items approved for processing.\n");
 	}

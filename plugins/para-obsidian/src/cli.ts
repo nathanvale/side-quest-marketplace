@@ -14,6 +14,7 @@ import {
 	parseArgs,
 	parseKeyValuePairs,
 } from "@sidequest/core/cli";
+import { MetricsCollector } from "@sidequest/core/logging";
 
 /**
  * Normalize a flag value to single value (string or boolean).
@@ -43,6 +44,18 @@ function normalizeFlags(
 		}
 	}
 	return normalized;
+}
+
+type MetricsSummary = ReturnType<MetricsCollector["getSummary"]>;
+
+async function collectMetricsSummary(): Promise<MetricsSummary | null> {
+	try {
+		const collector = new MetricsCollector();
+		await collector.collect();
+		return collector.getSummary();
+	} catch {
+		return null;
+	}
 }
 
 import {
@@ -95,6 +108,7 @@ import {
 	runInteractiveLoop,
 } from "./inbox/cli-adapter";
 import { createInboxEngine } from "./inbox/engine";
+import { initLoggerWithNotice, logFile } from "./inbox/logger";
 import type { ExecutionResult, InboxSuggestion } from "./inbox/types";
 import {
 	buildIndex,
@@ -2499,6 +2513,19 @@ async function main(): Promise<void> {
 			}
 
 			case "process-inbox": {
+				await initLoggerWithNotice();
+				if (!isJson) {
+					console.log(emphasize.info(`Logs: ${logFile}`));
+				}
+				const withLogContext = <T extends object>(
+					payload: T,
+					metrics?: MetricsSummary | null,
+				) => ({
+					...payload,
+					logFile,
+					...(metrics ? { metrics } : {}),
+				});
+
 				// Parse process-inbox specific flags
 				const autoMode = flags.auto === true;
 				const previewMode = flags.preview === true;
@@ -2620,36 +2647,58 @@ async function main(): Promise<void> {
 					: suggestions;
 
 				if (filteredSuggestions.length === 0) {
+					const metrics = await collectMetricsSummary();
 					if (isJson) {
 						console.log(
 							JSON.stringify(
-								{ items: [], message: "No items to process" },
+								withLogContext(
+									{ items: [], message: "No items to process" },
+									metrics,
+								),
 								null,
 								2,
 							),
 						);
 					} else {
 						console.log(color("cyan", "No items to process in inbox"));
+						if (metrics) {
+							console.log(
+								emphasize.info(
+									`Metrics: total=${metrics.totalOperations ?? "?"}, failed=${metrics.failedOperations ?? "?"}`,
+								),
+							);
+						}
 					}
 					break;
 				}
 
 				// Preview mode: just display suggestions
 				if (previewMode) {
+					const metrics = await collectMetricsSummary();
 					if (isJson) {
 						console.log(
 							JSON.stringify(
-								{
-									mode: "preview",
-									items: filteredSuggestions,
-									count: filteredSuggestions.length,
-								},
+								withLogContext(
+									{
+										mode: "preview",
+										items: filteredSuggestions,
+										count: filteredSuggestions.length,
+									},
+									metrics,
+								),
 								null,
 								2,
 							),
 						);
 					} else {
 						console.log(formatSuggestionsTable(filteredSuggestions));
+						if (metrics) {
+							console.log(
+								emphasize.info(
+									`Metrics: total=${metrics.totalOperations ?? "?"}, failed=${metrics.failedOperations ?? "?"}`,
+								),
+							);
+						}
 					}
 					break;
 				}
@@ -2657,14 +2706,18 @@ async function main(): Promise<void> {
 				// Auto mode: process all without interaction
 				if (autoMode) {
 					if (dryRun) {
+						const metrics = await collectMetricsSummary();
 						if (isJson) {
 							console.log(
 								JSON.stringify(
-									{
-										mode: "dry-run",
-										wouldProcess: filteredSuggestions.map((s) => s.id),
-										count: filteredSuggestions.length,
-									},
+									withLogContext(
+										{
+											mode: "dry-run",
+											wouldProcess: filteredSuggestions.map((s) => s.id),
+											count: filteredSuggestions.length,
+										},
+										metrics,
+									),
 									null,
 									2,
 								),
@@ -2678,6 +2731,13 @@ async function main(): Promise<void> {
 							);
 							for (const suggestion of filteredSuggestions) {
 								console.log(`  - ${suggestion.source} → ${suggestion.action}`);
+							}
+							if (metrics) {
+								console.log(
+									emphasize.info(
+										`Metrics: total=${metrics.totalOperations ?? "?"}, failed=${metrics.failedOperations ?? "?"}`,
+									),
+								);
 							}
 						}
 						break;
@@ -2726,16 +2786,20 @@ async function main(): Promise<void> {
 					// Aggregate results
 					const successes = results.filter((r) => r.success).length;
 					const failures = results.filter((r) => !r.success).length;
+					const metrics = await collectMetricsSummary();
 
 					if (isJson) {
 						console.log(
 							JSON.stringify(
-								{
-									mode: "auto",
-									results: results,
-									successes,
-									failures,
-								},
+								withLogContext(
+									{
+										mode: "auto",
+										results: results,
+										successes,
+										failures,
+									},
+									metrics,
+								),
 								null,
 								2,
 							),
@@ -2756,20 +2820,31 @@ async function main(): Promise<void> {
 								);
 							}
 						}
+						if (metrics) {
+							console.log(
+								emphasize.info(
+									`Metrics: total=${metrics.totalOperations ?? "?"}, failed=${metrics.failedOperations ?? "?"}`,
+								),
+							);
+						}
 					}
 					break;
 				}
 
 				// Interactive mode: run the interactive approval loop
 				if (isJson) {
+					const metrics = await collectMetricsSummary();
 					console.log(
 						JSON.stringify(
-							{
-								mode: "interactive",
-								items: filteredSuggestions,
-								count: filteredSuggestions.length,
-								help: "Interactive mode requires TTY - use --auto or --preview for non-interactive",
-							},
+							withLogContext(
+								{
+									mode: "interactive",
+									items: filteredSuggestions,
+									count: filteredSuggestions.length,
+									help: "Interactive mode requires TTY - use --auto or --preview for non-interactive",
+								},
+								metrics,
+							),
 							null,
 							2,
 						),
@@ -2820,6 +2895,14 @@ async function main(): Promise<void> {
 								text: `Executed ${results.length} item(s) in ${elapsed}s`,
 							});
 							displayResults(results);
+							const metrics = await collectMetricsSummary();
+							if (metrics) {
+								console.log(
+									emphasize.info(
+										`Metrics: total=${metrics.totalOperations ?? "?"}, failed=${metrics.failedOperations ?? "?"}`,
+									),
+								);
+							}
 						}
 					} else {
 						console.log(emphasize.info("\nNo items were approved."));
