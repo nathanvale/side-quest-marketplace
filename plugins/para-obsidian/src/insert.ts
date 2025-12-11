@@ -8,6 +8,11 @@
  * @module insert
  */
 import fs from "node:fs";
+import {
+	pathExistsSync,
+	readTextFileSync,
+	writeTextFileSync,
+} from "@sidequest/core/fs";
 
 import type { ParaObsidianConfig } from "./config";
 import { resolveVaultPath } from "./fs";
@@ -155,11 +160,11 @@ export function insertIntoNote(
 	options: InsertOptions,
 ): { relative: string; mode: InsertMode } {
 	const target = resolveVaultPath(config.vault, options.file);
-	if (!fs.existsSync(target.absolute)) {
+	if (!pathExistsSync(target.absolute)) {
 		throw new Error(`File not found: ${options.file}`);
 	}
 
-	const raw = fs.readFileSync(target.absolute, "utf8");
+	const raw = readTextFileSync(target.absolute);
 	const lines = normalizeLines(raw);
 	const heading = findHeading(lines, options.heading);
 	if (!heading) {
@@ -197,7 +202,7 @@ export function insertIntoNote(
 	}
 
 	const updatedLines = insertAtIndex(lines, insertIndex, insertLines);
-	fs.writeFileSync(target.absolute, updatedLines.join("\n"), "utf8");
+	writeTextFileSync(target.absolute, updatedLines.join("\n"));
 
 	return { relative: target.relative, mode: options.mode };
 }

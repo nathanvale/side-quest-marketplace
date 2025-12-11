@@ -7,9 +7,8 @@
  *
  * @module templates
  */
-import fs from "node:fs";
 import path from "node:path";
-
+import { pathExistsSync, readDir, readTextFileSync } from "@sidequest/core/fs";
 import { addDays, format } from "date-fns";
 
 import type { ParaObsidianConfig } from "./config";
@@ -48,10 +47,9 @@ export interface TemplateInfo {
  */
 export function listTemplates(config: ParaObsidianConfig): TemplateInfo[] {
 	const dir = config.templatesDir;
-	if (!dir || !fs.existsSync(dir)) return [];
+	if (!dir || !pathExistsSync(dir)) return [];
 
-	const entries = fs
-		.readdirSync(dir)
+	const entries = readDir(dir)
 		.filter((f) => f.endsWith(".md"))
 		.sort();
 
@@ -60,7 +58,7 @@ export function listTemplates(config: ParaObsidianConfig): TemplateInfo[] {
 		const version =
 			config.templateVersions?.[name] ?? DEFAULT_TEMPLATE_VERSIONS[name] ?? 1;
 		const fullPath = path.join(dir, file);
-		const content = fs.readFileSync(fullPath, "utf8");
+		const content = readTextFileSync(fullPath);
 		return { name, path: fullPath, version, content };
 	});
 }

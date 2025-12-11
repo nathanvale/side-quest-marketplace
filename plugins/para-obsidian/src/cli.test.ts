@@ -2,12 +2,18 @@ import { describe, expect, it } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import {
+	ensureDirSync,
+	pathExistsSync,
+	writeTextFileSync,
+} from "@sidequest/core/fs";
 import { spawn } from "bun";
 
 import { loadConfig } from "./config";
 
 function makeTmpDir(): string {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "para-cli-test-"));
+	const dir = path.join(os.tmpdir(), `para-cli-test-${crypto.randomUUID()}`);
+	ensureDirSync(dir);
 	// Initialize git repo (required by CLI for writes)
 	Bun.spawnSync(["git", "init"], {
 		cwd: dir,
@@ -28,8 +34,8 @@ function makeTmpDir(): string {
 }
 
 function writeTemplate(dir: string, name: string, content: string) {
-	fs.mkdirSync(dir, { recursive: true });
-	fs.writeFileSync(path.join(dir, `${name}.md`), content, "utf8");
+	ensureDirSync(dir);
+	writeTextFileSync(path.join(dir, `${name}.md`), content);
 }
 
 function commitAll(vault: string) {

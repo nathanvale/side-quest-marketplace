@@ -11,6 +11,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { pathExistsSync, readDir, readTextFileSync } from "@sidequest/core/fs";
 
 import { parseFrontmatter } from "./frontmatter";
 import { resolveVaultPath } from "./fs";
@@ -83,7 +84,7 @@ function extractWikilinks(
 	notePath: string,
 ): ReadonlyArray<{ link: string; location: "frontmatter" | "body" }> {
 	const { absolute } = resolveVaultPath(vault, notePath);
-	const content = fs.readFileSync(absolute, "utf8");
+	const content = readTextFileSync(absolute);
 
 	let attributes: Record<string, unknown>;
 	let body: string;
@@ -142,16 +143,14 @@ function buildFileIndex(vault: string): Map<string, string[]> {
 
 	function walkDir(currentDir: string): void {
 		try {
-			for (const entry of fs.readdirSync(currentDir)) {
+			for (const entry of readDir(currentDir)) {
 				// Skip hidden files/folders
 				if (entry.startsWith(".")) continue;
 
 				const fullPath = path.join(currentDir, entry);
-				const stat = fs.statSync(fullPath);
-
-				if (stat.isDirectory()) {
+				if (isDirectory(fullPath)) {
 					walkDir(fullPath);
-				} else if (stat.isFile()) {
+				} else if (isFile(fullPath)) {
 					const rel = path.relative(vault, fullPath);
 					const basename = path.basename(rel).toLowerCase();
 					const existing = index.get(basename) ?? [];
@@ -184,7 +183,7 @@ function wikilinkExists(
 ): boolean {
 	// First, try direct path resolution (e.g., [[Attachments/file.pdf]])
 	const { absolute: linkAbsolute } = resolveVaultPath(vault, normalizedLink);
-	if (fs.existsSync(linkAbsolute)) {
+	if (pathExistsSync(linkAbsolute)) {
 		return true;
 	}
 
@@ -237,13 +236,11 @@ export function findOrphans(
 	const notes: string[] = [];
 
 	function walkDir(currentDir: string): void {
-		for (const entry of fs.readdirSync(currentDir)) {
+		for (const entry of readDir(currentDir)) {
 			const fullPath = path.join(currentDir, entry);
-			const stat = fs.statSync(fullPath);
-
-			if (stat.isDirectory()) {
+			if (isDirectory(fullPath)) {
 				walkDir(fullPath);
-			} else if (stat.isFile() && entry.endsWith(".md")) {
+			} else if (isFile(fullPath) && entry.endsWith(".md")) {
 				const rel = path.relative(vault, fullPath);
 				notes.push(rel);
 			}
@@ -254,7 +251,7 @@ export function findOrphans(
 	const dirsToWalk = dirs && dirs.length > 0 ? dirs : ["."];
 	for (const dir of dirsToWalk) {
 		const { absolute: dirAbsolute } = resolveVaultPath(vault, dir);
-		if (fs.existsSync(dirAbsolute)) {
+		if (pathExistsSync(dirAbsolute)) {
 			walkDir(dirAbsolute);
 		}
 		// Silently skip non-existent dirs (like validate-all does)
@@ -296,6 +293,14 @@ export function findOrphans(
 		orphanAttachments,
 		brokenLinks,
 	};
+}
+
+function isDirectory(target: string): boolean {
+	return Bun.spawnSync(["test", "-d", target]).exitCode === 0;
+}
+
+function isFile(target: string): boolean {
+	return Bun.spawnSync(["test", "-f", target]).exitCode === 0;
 }
 
 /**

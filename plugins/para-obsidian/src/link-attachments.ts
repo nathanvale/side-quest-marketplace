@@ -12,8 +12,14 @@
  *
  * @module link-attachments
  */
-import fs from "node:fs";
 import path from "node:path";
+import {
+	ensureDirSync,
+	pathExistsSync,
+	readDir,
+	readTextFileSync,
+	writeTextFileSync,
+} from "@sidequest/core/fs";
 
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter";
 import { resolveVaultPath } from "./fs";
@@ -157,30 +163,28 @@ export async function linkAttachmentsToNotes(
 
 	// Get all attachments
 	const attachmentsDir = path.join(vault, "Attachments");
-	if (!fs.existsSync(attachmentsDir)) {
+	if (!pathExistsSync(attachmentsDir)) {
 		return { totalLinks: 0, notesUpdated: 0, updates: [] };
 	}
 
-	const allAttachments = fs
-		.readdirSync(attachmentsDir)
-		.map((file) => `Attachments/${file}`);
+	const allAttachments = readDir(attachmentsDir).map(
+		(file) => `Attachments/${file}`,
+	);
 
 	// Get all notes in directory
 	const { absolute: dirAbsolute } = resolveVaultPath(vault, dir);
-	if (!fs.existsSync(dirAbsolute)) {
+	if (!pathExistsSync(dirAbsolute)) {
 		throw new Error(`Directory not found: ${dir}`);
 	}
 
 	const notes: string[] = [];
 
 	function walkDir(currentDir: string): void {
-		for (const entry of fs.readdirSync(currentDir)) {
+		for (const entry of readDir(currentDir)) {
 			const fullPath = path.join(currentDir, entry);
-			const stat = fs.statSync(fullPath);
-
-			if (stat.isDirectory()) {
+			if (isDirectory(fullPath)) {
 				walkDir(fullPath);
-			} else if (stat.isFile() && entry.endsWith(".md")) {
+			} else if (isFile(fullPath) && entry.endsWith(".md")) {
 				const rel = path.relative(vault, fullPath);
 				notes.push(rel);
 			}
@@ -204,7 +208,7 @@ export async function linkAttachmentsToNotes(
 
 		// Read current frontmatter
 		const { absolute: noteAbsolute } = resolveVaultPath(vault, notePath);
-		const content = fs.readFileSync(noteAbsolute, "utf8");
+		const content = readTextFileSync(noteAbsolute);
 		const { attributes } = parseFrontmatter(content);
 
 		// Get existing attachments
@@ -238,7 +242,8 @@ export async function linkAttachmentsToNotes(
 				attachments: updatedAttachments,
 			};
 			const updatedContent = serializeFrontmatter(updatedAttributes, body);
-			fs.writeFileSync(noteAbsolute, updatedContent, "utf8");
+			ensureDirSync(path.dirname(noteAbsolute));
+			writeTextFileSync(noteAbsolute, updatedContent);
 		}
 
 		updates.push({ note: notePath, attachments: newMatches });
@@ -250,4 +255,12 @@ export async function linkAttachmentsToNotes(
 		notesUpdated: updates.length,
 		updates,
 	};
+}
+
+function isDirectory(target: string): boolean {
+	return Bun.spawnSync(["test", "-d", target]).exitCode === 0;
+}
+
+function isFile(target: string): boolean {
+	return Bun.spawnSync(["test", "-f", target]).exitCode === 0;
 }

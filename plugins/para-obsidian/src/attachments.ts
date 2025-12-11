@@ -9,8 +9,8 @@
  *
  * @module attachments
  */
-import fs from "node:fs";
 import path from "node:path";
+import { pathExistsSync, readDir, readTextFileSync } from "@sidequest/core/fs";
 
 import { parseFrontmatter } from "./frontmatter";
 import { resolveVaultPath } from "./fs";
@@ -19,8 +19,8 @@ import { resolveVaultPath } from "./fs";
  * Safely lists directory contents, returning empty array if path doesn't exist.
  */
 function listDirSafe(dir: string): string[] {
-	if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return [];
-	return fs.readdirSync(dir);
+	if (!pathExistsSync(dir) || !isDirectory(dir)) return [];
+	return readDir(dir);
 }
 
 /**
@@ -38,7 +38,7 @@ export function discoverAttachmentsFromFrontmatter(
 	notePath: string,
 ): ReadonlyArray<string> {
 	const { absolute } = resolveVaultPath(vault, notePath);
-	const content = fs.readFileSync(absolute, "utf8");
+	const content = readTextFileSync(absolute);
 	const { attributes } = parseFrontmatter(content);
 
 	const attachments = attributes.attachments;
@@ -69,7 +69,7 @@ export function discoverAttachmentsFromBody(
 	notePath: string,
 ): ReadonlyArray<string> {
 	const { absolute } = resolveVaultPath(vault, notePath);
-	const content = fs.readFileSync(absolute, "utf8");
+	const content = readTextFileSync(absolute);
 	const { body } = parseFrontmatter(content);
 
 	// Match wikilinks starting with Attachments/
@@ -159,7 +159,7 @@ export function discoverLegacyAttachments(
 	for (const folder of candidates) {
 		for (const entry of listDirSafe(folder)) {
 			const full = path.join(folder, entry);
-			if (fs.statSync(full).isFile()) {
+			if (isFile(full)) {
 				const rel = path.relative(vault, full);
 				if (!rel.endsWith(".md")) found.push(rel);
 			}
@@ -169,7 +169,7 @@ export function discoverLegacyAttachments(
 	// Find same-directory files sharing the note's stem (non-Markdown)
 	for (const entry of listDirSafe(dir)) {
 		const full = path.join(dir, entry);
-		if (fs.statSync(full).isFile()) {
+		if (isFile(full)) {
 			if (entry.startsWith(stem) && !entry.endsWith(".md")) {
 				const rel = path.relative(vault, full);
 				found.push(rel);
@@ -179,4 +179,12 @@ export function discoverLegacyAttachments(
 
 	// Deduplicate and return
 	return Array.from(new Set(found));
+}
+
+function isDirectory(target: string): boolean {
+	return Bun.spawnSync(["test", "-d", target]).exitCode === 0;
+}
+
+function isFile(target: string): boolean {
+	return Bun.spawnSync(["test", "-f", target]).exitCode === 0;
 }

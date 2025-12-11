@@ -7,8 +7,8 @@
  *
  * @module delete
  */
-import fs from "node:fs";
 import path from "node:path";
+import { pathExistsSync, readDir } from "@sidequest/core/fs";
 
 import type { ParaObsidianConfig } from "./config";
 import { resolveVaultPath } from "./fs";
@@ -57,19 +57,26 @@ export function deleteFile(
 	}
 
 	const target = resolveVaultPath(config.vault, options.file);
-	if (!fs.existsSync(target.absolute)) {
+	if (!pathExistsSync(target.absolute)) {
 		throw new Error(`File not found: ${options.file}`);
 	}
 
 	if (!options.dryRun) {
 		// Delete the file/directory
-		fs.rmSync(target.absolute, { recursive: true, force: true });
+		const rm = Bun.spawnSync(["rm", "-rf", target.absolute]);
+		if (rm.exitCode !== 0) {
+			const stderr =
+				typeof rm.stderr === "string"
+					? rm.stderr
+					: new TextDecoder().decode(rm.stderr ?? new Uint8Array());
+			throw new Error(`Failed to delete: ${stderr}`);
+		}
 
 		// Clean up empty parent directories up to vault root
 		let dir = path.dirname(target.absolute);
 		while (dir.startsWith(config.vault) && dir !== config.vault) {
-			if (fs.readdirSync(dir).length === 0) {
-				fs.rmdirSync(dir);
+			if (readDir(dir).length === 0) {
+				Bun.spawnSync(["rmdir", dir]);
 				dir = path.dirname(dir);
 			} else {
 				break;

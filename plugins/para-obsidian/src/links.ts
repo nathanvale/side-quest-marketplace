@@ -7,8 +7,13 @@
  *
  * @module links
  */
-import fs from "node:fs";
 import path from "node:path";
+import {
+	ensureDirSync,
+	pathExistsSync,
+	readTextFileSync,
+	writeTextFileSync,
+} from "@sidequest/core/fs";
 
 import type { ParaObsidianConfig } from "./config";
 import { resolveVaultPath } from "./fs";
@@ -83,17 +88,10 @@ function replaceLinks(
  * @returns Array of absolute paths to .md files
  */
 function listMarkdownFiles(root: string): string[] {
-	const results: string[] = [];
-	const entries = fs.readdirSync(root, { withFileTypes: true });
-	for (const entry of entries) {
-		const full = path.join(root, entry.name);
-		if (entry.isDirectory()) {
-			results.push(...listMarkdownFiles(full));
-		} else if (entry.isFile() && entry.name.endsWith(".md")) {
-			results.push(full);
-		}
-	}
-	return results;
+	const glob = new Bun.Glob("**/*.md");
+	return Array.from(glob.scanSync({ cwd: root })).map((relPath) =>
+		path.join(root, relPath),
+	);
 }
 
 /**
@@ -130,10 +128,10 @@ export function renameWithLinkRewrite(
 	const to = resolveVaultPath(config.vault, options.to);
 
 	// Validate source and destination
-	if (!fs.existsSync(from.absolute)) {
+	if (!pathExistsSync(from.absolute)) {
 		throw new Error(`Source does not exist: ${options.from}`);
 	}
-	if (fs.existsSync(to.absolute)) {
+	if (pathExistsSync(to.absolute)) {
 		throw new Error(`Destination already exists: ${options.to}`);
 	}
 
@@ -145,10 +143,10 @@ export function renameWithLinkRewrite(
 	const rewrites: Array<{ file: string; changes: number }> = [];
 	const files = listMarkdownFiles(config.vault);
 	for (const file of files) {
-		const original = fs.readFileSync(file, "utf8");
+		const original = readTextFileSync(file);
 		const { content, changes } = replaceLinks(original, fromName, toName);
 		if (changes > 0 && !options.dryRun) {
-			fs.writeFileSync(file, content, "utf8");
+			writeTextFileSync(file, content);
 		}
 		if (changes > 0) {
 			rewrites.push({
@@ -160,8 +158,15 @@ export function renameWithLinkRewrite(
 
 	// Move the file if not dry-run
 	if (!options.dryRun) {
-		fs.mkdirSync(path.dirname(to.absolute), { recursive: true });
-		fs.renameSync(from.absolute, to.absolute);
+		ensureDirSync(path.dirname(to.absolute));
+		const move = Bun.spawnSync(["mv", from.absolute, to.absolute]);
+		if (move.exitCode !== 0) {
+			const stderr =
+				typeof move.stderr === "string"
+					? move.stderr
+					: new TextDecoder().decode(move.stderr ?? new Uint8Array());
+			throw new Error(`Failed to move file: ${stderr}`);
+		}
 	}
 
 	return { moved: !options.dryRun, rewrites };

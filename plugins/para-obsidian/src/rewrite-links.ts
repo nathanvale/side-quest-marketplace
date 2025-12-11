@@ -9,8 +9,12 @@
  *
  * @module rewrite-links
  */
-import fs from "node:fs";
 import path from "node:path";
+import {
+	readDir,
+	readTextFileSync,
+	writeTextFileSync,
+} from "@sidequest/core/fs";
 
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter";
 
@@ -166,15 +170,12 @@ function replaceLinksInFrontmatterValue(
 function listMarkdownFiles(root: string): string[] {
 	const results: string[] = [];
 	try {
-		const entries = fs.readdirSync(root, { withFileTypes: true });
-		for (const entry of entries) {
-			// Skip hidden files/folders
-			if (entry.name.startsWith(".")) continue;
-
-			const full = path.join(root, entry.name);
-			if (entry.isDirectory()) {
+		for (const entry of readDir(root)) {
+			if (entry.startsWith(".")) continue;
+			const full = path.join(root, entry);
+			if (isDirectory(full)) {
 				results.push(...listMarkdownFiles(full));
-			} else if (entry.isFile() && entry.name.endsWith(".md")) {
+			} else if (isFile(full) && entry.endsWith(".md")) {
 				results.push(full);
 			}
 		}
@@ -268,7 +269,7 @@ export function rewriteLinks(
 
 		let content: string;
 		try {
-			content = fs.readFileSync(filePath, "utf8");
+			content = readTextFileSync(filePath);
 		} catch {
 			continue; // Skip files we can't read
 		}
@@ -336,7 +337,7 @@ export function rewriteLinks(
 			}
 
 			if (!dryRun) {
-				fs.writeFileSync(filePath, updatedContent, "utf8");
+				writeTextFileSync(filePath, updatedContent);
 			}
 
 			updates.push({
@@ -351,4 +352,12 @@ export function rewriteLinks(
 		notesUpdated: updates.length,
 		updates,
 	};
+}
+
+function isDirectory(target: string): boolean {
+	return Bun.spawnSync(["test", "-d", target]).exitCode === 0;
+}
+
+function isFile(target: string): boolean {
+	return Bun.spawnSync(["test", "-f", target]).exitCode === 0;
 }

@@ -1,19 +1,26 @@
 import { describe, expect, it } from "bun:test";
-import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import {
+	ensureDirSync,
+	pathExistsSync,
+	readTextFileSync,
+	writeTextFileSync,
+} from "@sidequest/core/fs";
 
 import { loadConfig } from "./config";
 import { renameWithLinkRewrite } from "./links";
 
 function makeTmpDir(): string {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "para-obsidian-"));
+	const dir = path.join(os.tmpdir(), `para-obsidian-${crypto.randomUUID()}`);
+	ensureDirSync(dir);
+	return dir;
 }
 
 function writeFile(vault: string, rel: string, content: string) {
 	const full = path.join(vault, rel);
-	fs.mkdirSync(path.dirname(full), { recursive: true });
-	fs.writeFileSync(full, content, "utf8");
+	ensureDirSync(path.dirname(full));
+	writeTextFileSync(full, content);
 }
 
 describe("renameWithLinkRewrite", () => {
@@ -31,9 +38,9 @@ describe("renameWithLinkRewrite", () => {
 
 		expect(result.moved).toBe(true);
 		expect(result.rewrites[0]?.changes).toBe(1);
-		const updated = fs.readFileSync(path.join(vault, "other.md"), "utf8");
+		const updated = readTextFileSync(path.join(vault, "other.md"));
 		expect(updated.includes("[[new]]")).toBe(true);
-		expect(fs.existsSync(path.join(vault, "new.md"))).toBe(true);
+		expect(pathExistsSync(path.join(vault, "new.md"))).toBe(true);
 	});
 
 	it("supports dry-run", () => {
@@ -50,6 +57,6 @@ describe("renameWithLinkRewrite", () => {
 		});
 
 		expect(result.moved).toBe(false);
-		expect(fs.existsSync(path.join(vault, "old.md"))).toBe(true);
+		expect(pathExistsSync(path.join(vault, "old.md"))).toBe(true);
 	});
 });

@@ -14,6 +14,12 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import {
+	pathExistsSync,
+	readDir,
+	readTextFileSync,
+	writeJsonFileSync,
+} from "@sidequest/core/fs";
 
 import type { ParaObsidianConfig } from "./config";
 import { parseFrontmatter } from "./frontmatter";
@@ -67,12 +73,12 @@ function collectHeadings(content: string): string[] {
  */
 function walkMarkdownFiles(root: string, dir: string, out: string[]) {
 	const current = path.join(root, dir);
-	const entries = fs.readdirSync(current, { withFileTypes: true });
-	for (const entry of entries) {
-		if (entry.isDirectory()) {
-			walkMarkdownFiles(root, path.join(dir, entry.name), out);
-		} else if (entry.name.endsWith(".md")) {
-			out.push(path.join(dir, entry.name));
+	for (const entry of readDir(current)) {
+		const full = path.join(current, entry);
+		if (isDirectory(full)) {
+			walkMarkdownFiles(root, path.join(dir, entry), out);
+		} else if (isFile(full) && entry.endsWith(".md")) {
+			out.push(path.join(dir, entry));
 		}
 	}
 }
@@ -128,7 +134,7 @@ export function buildIndex(
 	const entries: IndexEntry[] = [];
 	for (const rel of uniqueFiles) {
 		const full = path.join(config.vault, rel);
-		const content = fs.readFileSync(full, "utf8");
+		const content = readTextFileSync(full);
 		const { attributes } = parseFrontmatter(content);
 		const tags = Array.isArray(attributes.tags)
 			? (attributes.tags as string[])
@@ -171,7 +177,7 @@ export function saveIndex(
 ): string {
 	const indexPath =
 		config.indexPath ?? path.join(config.vault, ".para-obsidian-index.json");
-	fs.writeFileSync(indexPath, JSON.stringify(index, null, 2), "utf8");
+	writeJsonFileSync(indexPath, index, 2);
 	return indexPath;
 }
 
@@ -194,9 +200,17 @@ export function saveIndex(
 export function loadIndex(config: ParaObsidianConfig): VaultIndex | undefined {
 	const indexPath =
 		config.indexPath ?? path.join(config.vault, ".para-obsidian-index.json");
-	if (!fs.existsSync(indexPath)) return undefined;
-	const raw = fs.readFileSync(indexPath, "utf8");
+	if (!pathExistsSync(indexPath)) return undefined;
+	const raw = readTextFileSync(indexPath);
 	return JSON.parse(raw) as VaultIndex;
+}
+
+function isDirectory(target: string): boolean {
+	return Bun.spawnSync(["test", "-d", target]).exitCode === 0;
+}
+
+function isFile(target: string): boolean {
+	return Bun.spawnSync(["test", "-f", target]).exitCode === 0;
 }
 
 /**

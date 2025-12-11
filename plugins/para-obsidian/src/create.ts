@@ -11,8 +11,12 @@
  *
  * @module create
  */
-import fs from "node:fs";
 import path from "node:path";
+import {
+	ensureDirSync,
+	pathExistsSync,
+	writeTextFileSync,
+} from "@sidequest/core/fs";
 
 import type { ParaObsidianConfig } from "./config";
 import { DEFAULT_TITLE_PREFIXES } from "./defaults";
@@ -377,7 +381,7 @@ export function createFromTemplate(
 	const filename = titleToFilename(displayTitle);
 	const target = resolveVaultPath(config.vault, path.join(destDir, filename));
 
-	if (fs.existsSync(target.absolute)) {
+	if (pathExistsSync(target.absolute)) {
 		throw new Error(`File already exists: ${target.relative}`);
 	}
 
@@ -417,8 +421,8 @@ export function createFromTemplate(
 	const content = serializeFrontmatter(attributes, body);
 
 	// Create directory structure and write file
-	fs.mkdirSync(path.dirname(target.absolute), { recursive: true });
-	fs.writeFileSync(target.absolute, content, "utf8");
+	ensureDirSync(path.dirname(target.absolute));
+	writeTextFileSync(target.absolute, content);
 
 	return { filePath: target.relative, content };
 }

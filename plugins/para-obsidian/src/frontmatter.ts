@@ -14,8 +14,12 @@
  *
  * @module frontmatter
  */
-import fs from "node:fs";
 import path from "node:path";
+import {
+	readDir,
+	readTextFileSync,
+	writeTextFileSync,
+} from "@sidequest/core/fs";
 
 import { parse, stringify } from "yaml";
 
@@ -724,7 +728,7 @@ export function updateFrontmatterFile(
 	if (updated) {
 		const content = serializeFrontmatter(next, body);
 		const { absolute } = resolveVaultPath(config.vault, relative);
-		fs.writeFileSync(absolute, content, "utf8");
+		writeTextFileSync(absolute, content);
 	}
 
 	return {
@@ -839,7 +843,7 @@ export function migrateTemplateVersion(
 	const content = serializeFrontmatter(nextAttributes, nextBody);
 	if (!dryRun) {
 		const { absolute } = resolveVaultPath(config.vault, relative);
-		fs.writeFileSync(absolute, content, "utf8");
+		writeTextFileSync(absolute, content);
 	}
 
 	return {
@@ -859,21 +863,29 @@ interface ListOptions {
 	readonly extensions?: ReadonlyArray<string>;
 }
 
+function isDirectory(target: string): boolean {
+	return Bun.spawnSync(["test", "-d", target]).exitCode === 0;
+}
+
+function isFile(target: string): boolean {
+	return Bun.spawnSync(["test", "-f", target]).exitCode === 0;
+}
+
 /**
  * Recursively lists all files in a directory matching extension filters.
  * Used internally for bulk operations like migrate-all.
  */
 function listFilesRecursive(root: string, options: ListOptions = {}): string[] {
 	const exts = options.extensions ?? [];
-	const entries = fs.readdirSync(root, { withFileTypes: true });
+	const entries = readDir(root);
 	const files: string[] = [];
 	for (const entry of entries) {
-		const full = path.join(root, entry.name);
-		if (entry.isDirectory()) {
+		const full = path.join(root, entry);
+		if (isDirectory(full)) {
 			files.push(...listFilesRecursive(full, options));
 		} else if (
-			entry.isFile() &&
-			(exts.length === 0 || exts.some((ext) => entry.name.endsWith(ext)))
+			isFile(full) &&
+			(exts.length === 0 || exts.some((ext) => entry.endsWith(ext)))
 		) {
 			files.push(full);
 		}
@@ -1073,7 +1085,7 @@ export function migrateAllTemplateVersions(
 		const relative = path.relative(config.vault, file);
 		try {
 			if (options.type) {
-				const content = fs.readFileSync(file, "utf8");
+				const content = readTextFileSync(file);
 				const { attributes } = parseFrontmatter(content);
 				if (attributes.type !== options.type) {
 					results.push({
@@ -1191,7 +1203,7 @@ export function planTemplateVersionBump(
 	for (const dir of resolvedDirs) {
 		for (const file of listFilesRecursive(dir, { extensions: [".md"] })) {
 			const relative = path.relative(config.vault, file);
-			const content = fs.readFileSync(file, "utf8");
+			const content = readTextFileSync(file);
 			const { attributes } = parseFrontmatter(content);
 			const noteType = attributes.type as string | undefined;
 

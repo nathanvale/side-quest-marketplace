@@ -13,6 +13,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { pathExistsSync } from "@sidequest/core/fs";
 
 import { spawnAndCollect } from "../../../core/src/spawn/index.js";
 import { discoverAttachments } from "./attachments";
@@ -110,10 +111,10 @@ export async function assertGitRepo(dir: string): Promise<void> {
 	}
 
 	// Verify the directory is actually under the git root (handles symlinks)
-	const realRoot = fs.existsSync(root)
-		? fs.realpathSync(root)
+	const realRoot = pathExistsSync(root)
+		? path.resolve(root)
 		: path.resolve(root);
-	const realDir = fs.existsSync(dir) ? fs.realpathSync(dir) : path.resolve(dir);
+	const realDir = pathExistsSync(dir) ? path.resolve(dir) : path.resolve(dir);
 	if (!realDir.startsWith(realRoot)) {
 		throw new Error("Vault must be inside a git repository for writes.");
 	}

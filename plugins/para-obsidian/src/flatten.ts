@@ -13,8 +13,14 @@
  *
  * @module flatten
  */
-import fs from "node:fs";
 import path from "node:path";
+import {
+	ensureDirSync,
+	pathExistsSync,
+	readDir,
+	readTextFileSync,
+	writeTextFileSync,
+} from "@sidequest/core/fs";
 
 import { resolveVaultPath } from "./fs";
 
@@ -107,20 +113,18 @@ export function discoverNestedAttachments(
 ): ReadonlyArray<string> {
 	const { absolute } = resolveVaultPath(vault, searchDir);
 
-	if (!fs.existsSync(absolute) || !fs.statSync(absolute).isDirectory()) {
+	if (!pathExistsSync(absolute) || !isDirectory(absolute)) {
 		return [];
 	}
 
 	const found: string[] = [];
 
 	function walkDir(dir: string): void {
-		for (const entry of fs.readdirSync(dir)) {
+		for (const entry of readDir(dir)) {
 			const fullPath = path.join(dir, entry);
-			const stat = fs.statSync(fullPath);
-
-			if (stat.isDirectory()) {
+			if (isDirectory(fullPath)) {
 				walkDir(fullPath);
-			} else if (stat.isFile() && !entry.endsWith(".md")) {
+			} else if (isFile(fullPath) && !entry.endsWith(".md")) {
 				const rel = path.relative(vault, fullPath);
 				found.push(rel);
 			}
@@ -176,12 +180,19 @@ export async function flattenAttachments(
 
 			// Ensure target directory exists
 			const newDir = path.dirname(newAbsolute);
-			if (!fs.existsSync(newDir)) {
-				fs.mkdirSync(newDir, { recursive: true });
+			if (!pathExistsSync(newDir)) {
+				ensureDirSync(newDir);
 			}
 
 			// Move file
-			fs.renameSync(oldAbsolute, newAbsolute);
+			const mv = Bun.spawnSync(["mv", oldAbsolute, newAbsolute]);
+			if (mv.exitCode !== 0) {
+				const stderr =
+					typeof mv.stderr === "string"
+						? mv.stderr
+						: new TextDecoder().decode(mv.stderr ?? new Uint8Array());
+				throw new Error(`Failed to move ${oldAbsolute}: ${stderr}`);
+			}
 		}
 	}
 
@@ -232,13 +243,11 @@ async function updateNoteReferences(
 
 	// Scan all markdown files in vault
 	function walkVault(dir: string): void {
-		for (const entry of fs.readdirSync(dir)) {
+		for (const entry of readDir(dir)) {
 			const fullPath = path.join(dir, entry);
-			const stat = fs.statSync(fullPath);
-
-			if (stat.isDirectory()) {
+			if (isDirectory(fullPath)) {
 				walkVault(fullPath);
-			} else if (stat.isFile() && entry.endsWith(".md")) {
+			} else if (isFile(fullPath) && entry.endsWith(".md")) {
 				const updated = updateNoteFile(fullPath, patterns, dryRun);
 				if (updated) notesUpdated++;
 			}
@@ -266,7 +275,7 @@ function updateNoteFile(
 	}>,
 	dryRun: boolean,
 ): boolean {
-	const content = fs.readFileSync(notePath, "utf8");
+	const content = readTextFileSync(notePath);
 	let updated = content;
 
 	for (const { regex, newPath } of patterns) {
@@ -275,7 +284,7 @@ function updateNoteFile(
 
 	if (updated !== content) {
 		if (!dryRun) {
-			fs.writeFileSync(notePath, updated, "utf8");
+			writeTextFileSync(notePath, updated);
 		}
 		return true;
 	}
@@ -295,16 +304,14 @@ function removeEmptyDirectories(vault: string, startDir: string): number {
 	let removed = 0;
 
 	function removeEmptyDirsRecursive(dir: string): boolean {
-		if (!fs.existsSync(dir)) return false;
+		if (!pathExistsSync(dir)) return false;
 
-		const entries = fs.readdirSync(dir);
+		const entries = readDir(dir);
 		let isEmpty = true;
 
 		for (const entry of entries) {
 			const fullPath = path.join(dir, entry);
-			const stat = fs.statSync(fullPath);
-
-			if (stat.isDirectory()) {
+			if (isDirectory(fullPath)) {
 				const wasRemoved = removeEmptyDirsRecursive(fullPath);
 				if (!wasRemoved) isEmpty = false;
 			} else {
@@ -313,7 +320,7 @@ function removeEmptyDirectories(vault: string, startDir: string): number {
 		}
 
 		if (isEmpty && dir !== absolute) {
-			fs.rmdirSync(dir);
+			Bun.spawnSync(["rmdir", dir]);
 			removed++;
 			return true;
 		}
@@ -333,4 +340,12 @@ function removeEmptyDirectories(vault: string, startDir: string): number {
  */
 function escapeRegex(str: string): string {
 	return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function isDirectory(target: string): boolean {
+	return Bun.spawnSync(["test", "-d", target]).exitCode === 0;
+}
+
+function isFile(target: string): boolean {
+	return Bun.spawnSync(["test", "-f", target]).exitCode === 0;
 }

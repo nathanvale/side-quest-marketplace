@@ -5,7 +5,11 @@
  *
  * @module clean-links
  */
-import fs from "node:fs";
+import {
+	pathExistsSync,
+	readTextFileSync,
+	writeTextFileSync,
+} from "@sidequest/core/fs";
 
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter";
 import { resolveVaultPath } from "./fs";
@@ -71,7 +75,10 @@ export function cleanBrokenLinks(
 
 	for (const [notePath, brokenSet] of linksByNote.entries()) {
 		const { absolute } = resolveVaultPath(vault, notePath);
-		const content = fs.readFileSync(absolute, "utf8");
+		if (!pathExistsSync(absolute)) {
+			continue;
+		}
+		const content = readTextFileSync(absolute);
 		const { attributes, body } = parseFrontmatter(content);
 
 		let linksRemoved = 0;
@@ -107,7 +114,7 @@ export function cleanBrokenLinks(
 		if (linksRemoved > 0) {
 			if (!dryRun) {
 				const updatedContent = serializeFrontmatter(updatedAttributes, body);
-				fs.writeFileSync(absolute, updatedContent, "utf8");
+				writeTextFileSync(absolute, updatedContent);
 			}
 
 			updates.push({ note: notePath, linksRemoved });

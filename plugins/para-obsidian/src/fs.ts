@@ -7,8 +7,8 @@
  *
  * @module fs
  */
-import fs from "node:fs";
 import path from "node:path";
+import { pathExistsSync, readDir, readTextFileSync } from "@sidequest/core/fs";
 
 /**
  * Represents a resolved path within the vault.
@@ -76,13 +76,13 @@ export function resolveVaultPath(vault: string, inputPath = "."): VaultPath {
  */
 export function listDir(vault: string, inputPath = "."): Array<string> {
 	const { absolute } = resolveVaultPath(vault, inputPath);
-	if (!fs.existsSync(absolute)) {
+	if (!pathExistsSync(absolute)) {
 		throw new Error(`Path does not exist: ${inputPath}`);
 	}
-	if (!fs.statSync(absolute).isDirectory()) {
+	if (!isDirectory(absolute)) {
 		throw new Error(`Not a directory: ${inputPath}`);
 	}
-	return fs.readdirSync(absolute).sort();
+	return readDir(absolute).slice().sort();
 }
 
 /**
@@ -101,11 +101,21 @@ export function listDir(vault: string, inputPath = "."): Array<string> {
  */
 export function readFile(vault: string, inputPath: string): string {
 	const { absolute } = resolveVaultPath(vault, inputPath);
-	if (!fs.existsSync(absolute)) {
+	if (!pathExistsSync(absolute)) {
 		throw new Error(`Path does not exist: ${inputPath}`);
 	}
-	if (!fs.statSync(absolute).isFile()) {
+	if (!isFile(absolute)) {
 		throw new Error(`Not a file: ${inputPath}`);
 	}
-	return fs.readFileSync(absolute, "utf8");
+	return readTextFileSync(absolute);
+}
+
+function isDirectory(target: string): boolean {
+	const result = Bun.spawnSync(["test", "-d", target]);
+	return result.exitCode === 0;
+}
+
+function isFile(target: string): boolean {
+	const result = Bun.spawnSync(["test", "-f", target]);
+	return result.exitCode === 0;
 }

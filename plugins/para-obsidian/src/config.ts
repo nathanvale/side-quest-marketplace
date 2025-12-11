@@ -12,6 +12,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { pathExistsSync, readTextFileSync } from "@sidequest/core/fs";
 
 import {
 	DEFAULT_AVAILABLE_MODELS,
@@ -127,9 +128,9 @@ export interface TemplateInfo {
  * @throws Error if file exists but cannot be parsed as JSON
  */
 function loadJsonIfExists<T>(filePath: string): Partial<T> | undefined {
-	if (!fs.existsSync(filePath)) return undefined;
+	if (!pathExistsSync(filePath)) return undefined;
 	try {
-		const raw = fs.readFileSync(filePath, "utf8");
+		const raw = readTextFileSync(filePath);
 		return JSON.parse(raw) as Partial<T>;
 	} catch (error) {
 		throw new Error(
@@ -152,7 +153,7 @@ const PROJECT_RC = ".paraobsidianrc";
 
 function resolveProjectRc(cwd: string): string | undefined {
 	const candidate = path.join(cwd, PROJECT_RC);
-	return fs.existsSync(candidate) ? candidate : undefined;
+	return pathExistsSync(candidate) ? candidate : undefined;
 }
 
 /**
