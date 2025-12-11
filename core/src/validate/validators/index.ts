@@ -3,7 +3,6 @@
  *
  * This module provides validators for different aspects of Claude Code plugins:
  * - agents-md: Agent markdown file validation with YAML frontmatter
- * - bootstrap-hook: SessionStart bootstrap hook validation
  * - commands-md: Command markdown files structure and frontmatter validation
  * - hooks.json structure and content validation
  * - marketplace.json structure and plugin registry validation
@@ -17,7 +16,6 @@
  */
 
 export { validateAgentsMd } from "./agents-md.ts";
-export { validateBootstrapHook } from "./bootstrap-hook.ts";
 export { validateCommandsMd } from "./commands-md.ts";
 export { validateHooksJson } from "./hooks-json.ts";
 export { validateMarketplaceJson } from "./marketplace-json.ts";

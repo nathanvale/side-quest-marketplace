@@ -15,14 +15,10 @@
 		"./hooks": "./src/hooks/index.ts",
 		"./formatters": "./src/formatters/output.ts",
 		"./llm": "./src/llm/index.ts",
-		"./validate": "./src/validate/session-start-hook.ts",
 		"./validate/types": "./src/validate/types.ts",
 		"./validate/runner": "./src/validate/runner.ts",
 		"./validate/reporter": "./src/validate/reporter.ts",
 		"./validate/validators": "./src/validate/validators/index.ts"
-	},
-	"bin": {
-		"validate-hooks": "./src/validate/session-start-hook.ts"
 	},
 	"scripts": {
 		"typecheck": "tsc --noEmit",

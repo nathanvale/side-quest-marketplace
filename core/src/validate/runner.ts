@@ -8,7 +8,6 @@ import { spawn } from "bun";
 import type { ValidationResult } from "./types.ts";
 import {
 	validateAgentsMd,
-	validateBootstrapHook,
 	validateCommandsMd,
 	validateHooksJson,
 	validateMarketplaceJson,
@@ -136,7 +135,6 @@ export async function validatePlugin(
 		// Run all validators in parallel
 		const [
 			agentsMdIssues,
-			bootstrapHookIssues,
 			commandsMdIssues,
 			hooksJsonIssues,
 			skillMdIssues,
@@ -147,7 +145,6 @@ export async function validatePlugin(
 			pluginStructureIssues,
 		] = await Promise.all([
 			validateAgentsMd(validatorOptions),
-			validateBootstrapHook(validatorOptions),
 			validateCommandsMd(validatorOptions),
 			validateHooksJson(validatorOptions),
 			validateSkillMd(validatorOptions),
@@ -161,7 +158,6 @@ export async function validatePlugin(
 		// 3. Aggregate all issues
 		allIssues.push(
 			...agentsMdIssues,
-			...bootstrapHookIssues,
 			...commandsMdIssues,
 			...hooksJsonIssues,
 			...skillMdIssues,
