@@ -27,21 +27,23 @@
 
 **Type:** Module (pure TypeScript) | **Runtime:** Bun | **Language:** TypeScript (strict mode)
 **Dependencies:** p-limit (concurrency), nanospinner (progress), @sidequest/core/fs (atomic writes)
-**Test Framework:** Bun test (201 tests passing)
+**Test Framework:** Bun test (246 tests passing, 10 test files)
 
 ### Directory Structure
 
 ```
 inbox/
+├── cli.ts                # Interactive CLI entry point (PARA_VAULT env var required)
 ├── types.ts              # Core types (InboxSuggestion, InboxEngine, etc.)
 ├── engine.ts             # Main engine factory (scan/execute/edit/report)
 ├── registry.ts           # Idempotency tracking (SHA256, file locking, atomic writes)
 ├── pdf-processor.ts      # PDF extraction + heuristics (security hardened)
 ├── llm-detection.ts      # AI type detection + field extraction
-├── cli-adapter.ts        # Interactive terminal UI
+├── cli-adapter.ts        # Interactive terminal UI (command loop, display)
 ├── errors.ts             # Error taxonomy (23 error codes)
 ├── logger.ts             # Structured logging with correlation IDs
-└── [*.test.ts]           # 201 comprehensive tests
+├── unique-path.ts        # Path collision detection and resolution
+└── [*.test.ts]           # 246 comprehensive tests (10 files)
 ```
 
 ---
@@ -101,6 +103,29 @@ const report = engine.generateReport(suggestions);
 | **HIGH** | Heuristics AND AI agree + target location exists + template available |
 | **MEDIUM** | AI detects type but filename/content ambiguous |
 | **LOW** | AI uncertain, content unclear, extraction failed |
+
+### CLI Usage
+
+**Required:** Set `PARA_VAULT` environment variable to your Obsidian vault path.
+
+```bash
+# Interactive inbox processor
+PARA_VAULT=/path/to/vault bun run src/inbox/cli.ts
+
+# Outputs:
+# 1. Scans inbox folder for unprocessed PDFs
+# 2. Displays suggestions table (id, confidence, action, title, reason)
+# 3. Interactive loop for approval:
+#    - 'a' = approve all HIGH confidence
+#    - 'e<N>' = edit suggestion with custom prompt
+#    - '<N>,<M>' = execute specific suggestions
+#    - 'q' = quit
+# 4. Generates markdown report on completion
+```
+
+**Environment Variables:**
+- `PARA_VAULT` (required) — Path to Obsidian vault
+- Optional: Override folder names via engine options (default: "00 Inbox", "Attachments", "Templates")
 
 ---
 
@@ -232,20 +257,23 @@ executeLogger.info`Note created path=${notePath} ${cid}`;
 ## Testing
 
 ```bash
-bun test src/inbox/                     # All inbox tests (201)
-bun test src/inbox/registry.test.ts     # Registry (28 tests)
-bun test src/inbox/pdf-processor.test.ts # PDF processing
-bun test src/inbox/engine.test.ts       # Engine integration
-bun test src/inbox/cli-adapter.test.ts  # CLI UX
+bun test src/inbox/                     # All inbox tests (246)
+bun test src/inbox/registry.test.ts     # Registry tests
+bun test src/inbox/pdf-processor.test.ts # PDF processing tests
+bun test src/inbox/engine.test.ts       # Engine integration tests
+bun test src/inbox/cli-adapter.test.ts  # CLI UX tests
 ```
 
-**Coverage:**
+**Coverage (246 tests across 10 files):**
 - Registry: Atomic writes, locking, validation, idempotency
 - PDF: Extraction, heuristics, TOCTOU, timeout handling
 - Engine: Scan, execute, edit, rollback on failure
 - CLI: Command parsing, display, prompt sanitization
 - Errors: All 23 error codes, recovery strategies
 - Logging: Correlation IDs, subsystem loggers
+- Types: Data structure validation
+- LLM Detection: Response parsing, field extraction
+- Unique Path: Path collision handling
 
 ---
 
@@ -355,6 +383,51 @@ while (true) {
 
 ---
 
+## Development Workflow
+
+**Testing:** Full test suite validates all critical patterns:
+```bash
+bun test plugins/para-obsidian/src/inbox/     # Run all 246 tests
+bun --filter para-obsidian test               # Run entire plugin tests
+```
+
+**Debugging Suggestions:** Enable correlation ID logging:
+```bash
+PARA_VAULT=/path/to/vault bun run src/inbox/cli.ts 2>&1 | \
+  grep -E "cid|error|TOCTOU"
+```
+
+**Adding New File Processors:**
+1. Create `new-processor.ts` extending `Processor` interface
+2. Implement `process()` returning suggestions
+3. Add tests in `new-processor.test.ts`
+4. Register in `engine.ts` processor queue
+5. Update this CLAUDE.md with new processor details
+
+---
+
+## Implementation Checklist
+
+When building inbox processors, ensure:
+
+- [ ] Engine/interface separation (UI-agnostic core)
+- [ ] Suggestion-based returns (never mutate directly)
+- [ ] Command injection prevention (array args only)
+- [ ] TOCTOU protection (stat before AND after)
+- [ ] Atomic writes (temp file + rename)
+- [ ] File locking for concurrent access
+- [ ] Process timeout handling (kill zombies)
+- [ ] Prompt sanitization (strip control chars)
+- [ ] Rollback on failure (delete orphans)
+- [ ] Confidence scoring (HIGH/MEDIUM/LOW)
+- [ ] SHA256 idempotency (content-based)
+- [ ] Error taxonomy (structured codes)
+- [ ] Correlation ID logging (debugging)
+- [ ] Interactive CLI (display → parse → execute)
+- [ ] Comprehensive tests (security, TOCTOU, idempotency)
+
+---
+
 ## Notes
 
 - Engine is UI-agnostic - same core powers CLI, web app, API
@@ -364,3 +437,5 @@ while (true) {
 - All errors include correlation IDs for debugging
 - Test suite uses `testHash()` helper to generate valid 64-char SHA256s
 - Security fixes implemented: 7 P0 critical + 8 P1 high priority
+- `unique-path.ts` handles filename collisions with `.1`, `.2` suffixes before extensions
+- CLI uses nanospinner for progress feedback with stage tracking (hash → extract → llm → done)
