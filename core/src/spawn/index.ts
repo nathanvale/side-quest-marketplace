@@ -1,5 +1,8 @@
 /**
- * Shared spawn utilities for bun-runner hooks.
+ * Spawn module - Process execution utilities for Bun
+ *
+ * Provides safe process spawning with proper stream handling, timeouts,
+ * and shell command execution. Uses Bun.spawn, Bun.spawnSync, and Bun.$ APIs.
  *
  * Why: Bun's process streams must be consumed in parallel with waiting for exit.
  * Reading stdout/stderr AFTER proc.exited can miss output due to a race condition
@@ -7,11 +10,33 @@
  * pattern across all spawn calls in the plugin.
  *
  * @see CLAUDE.md "Race Condition Fix" section for detailed explanation
+ *
+ * @example
+ * ```ts
+ * import {
+ *   spawnAndCollect,
+ *   spawnSyncCollect,
+ *   shellExec,
+ *   commandExists,
+ * } from "@sidequest/core/spawn";
+ *
+ * // Async spawn
+ * const { stdout } = await spawnAndCollect(["git", "status"]);
+ *
+ * // Sync spawn
+ * const { exitCode } = spawnSyncCollect(["ls", "-la"]);
+ *
+ * // Shell command (pipes, redirects, etc.)
+ * const { stdout } = await shellExec("ls -la | grep '.ts'");
+ *
+ * // Check if command exists
+ * if (commandExists("git")) { ... }
+ * ```
  */
 
 import { homedir } from "node:os";
 import path from "node:path";
-import { spawn } from "bun";
+import { $, spawn } from "bun";
 
 /**
  * Result of spawning a process and collecting its output.
@@ -227,4 +252,166 @@ export function spawnSyncCollect(
 		stderr,
 		exitCode: result.exitCode ?? 1,
 	};
+}
+
+// ============================================================================
+// Shell execution (Bun.$)
+// ============================================================================
+
+/** Options for shell execution */
+export interface ShellExecOptions {
+	/** Working directory for the command */
+	cwd?: string;
+	/** Environment variables to set */
+	env?: Record<string, string | undefined>;
+	/** Whether to throw on non-zero exit (default: true) */
+	throws?: boolean;
+}
+
+/**
+ * Execute a shell command using Bun.$ and collect output.
+ *
+ * This is the preferred way to run shell commands that need:
+ * - Pipes (|)
+ * - Redirects (>, <, >>)
+ * - Shell features (&&, ||, ;)
+ * - Environment variable expansion
+ *
+ * For simple commands without shell features, prefer spawnSyncCollect.
+ *
+ * @param command - Shell command to execute
+ * @param options - Optional execution options
+ * @returns Promise resolving to stdout, stderr, and exit code
+ *
+ * @example
+ * ```ts
+ * // Simple command with pipe
+ * const result = await shellExec("ls -la | grep '.ts'");
+ *
+ * // With custom working directory
+ * const result = await shellExec("git status", { cwd: "/path/to/repo" });
+ *
+ * // Throws on non-zero exit (default)
+ * try {
+ *   await shellExec("command-that-fails");
+ * } catch (error) {
+ *   console.error("Command failed");
+ * }
+ *
+ * // Don't throw on failure
+ * const result = await shellExec("command-that-might-fail", { throws: false });
+ * if (result.exitCode !== 0) {
+ *   console.log("Failed but we handled it");
+ * }
+ * ```
+ */
+export async function shellExec(
+	command: string,
+	options?: ShellExecOptions,
+): Promise<SpawnResult> {
+	const { cwd, env, throws = true } = options ?? {};
+
+	// Build shell with enhanced PATH for tool discovery
+	let shell = $`${command}`.env({
+		...process.env,
+		PATH: buildEnhancedPath(),
+		...env,
+	});
+
+	if (cwd) {
+		shell = shell.cwd(cwd);
+	}
+
+	if (!throws) {
+		shell = shell.nothrow();
+	}
+
+	// Capture output as text
+	shell = shell.quiet();
+
+	const result = await shell;
+
+	return {
+		stdout: result.stdout.toString(),
+		stderr: result.stderr.toString(),
+		exitCode: result.exitCode,
+	};
+}
+
+// ============================================================================
+// Command utilities
+// ============================================================================
+
+/**
+ * Check if a command exists on PATH.
+ *
+ * @param cmd - Command name to check
+ * @returns true if command is available
+ *
+ * @example
+ * ```ts
+ * if (commandExists("git")) {
+ *   console.log("Git is available");
+ * }
+ * ```
+ */
+export function commandExists(cmd: string): boolean {
+	return Bun.which(cmd) !== null;
+}
+
+/**
+ * Get the path to a command, or null if not found.
+ *
+ * Uses Bun.which to resolve the command location.
+ *
+ * @param cmd - Command name to resolve
+ * @returns Absolute path to the command or null
+ *
+ * @example
+ * ```ts
+ * const gitPath = whichCommand("git");
+ * // "/usr/bin/git" or null
+ * ```
+ */
+export function whichCommand(cmd: string): string | null {
+	return Bun.which(cmd);
+}
+
+/**
+ * Escape a string for safe use in shell commands.
+ *
+ * Wraps the string in single quotes and escapes any existing single quotes.
+ *
+ * @param arg - Argument to escape
+ * @returns Escaped argument safe for shell use
+ *
+ * @example
+ * ```ts
+ * const filename = "file with 'quotes' and spaces.txt";
+ * const escaped = escapeShellArg(filename);
+ * // "'file with '\\''quotes'\\'' and spaces.txt'"
+ *
+ * await shellExec(`rm ${escaped}`);
+ * ```
+ */
+export function escapeShellArg(arg: string): string {
+	// Replace single quotes with escaped version and wrap in single quotes
+	return `'${arg.replace(/'/g, "'\\''")}'`;
+}
+
+/**
+ * Escape multiple arguments for shell use.
+ *
+ * @param args - Arguments to escape
+ * @returns Space-separated escaped arguments
+ *
+ * @example
+ * ```ts
+ * const args = ["file 1.txt", "file 2.txt", "file's name.txt"];
+ * const escaped = escapeShellArgs(args);
+ * await shellExec(`rm ${escaped}`);
+ * ```
+ */
+export function escapeShellArgs(args: string[]): string {
+	return args.map(escapeShellArg).join(" ");
 }

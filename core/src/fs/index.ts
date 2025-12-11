@@ -493,56 +493,20 @@ export function statSync(filePath: string): {
 }
 
 // ============================================
-// BUN-SPECIFIC UTILITIES - Unique value-add
+// BUN-SPECIFIC UTILITIES - Re-exports from specialized modules
+// These are kept here for backwards compatibility
+// Prefer importing from @sidequest/core/hash and @sidequest/core/utils
 // ============================================
 
-/**
- * Calculate SHA256 hash of a string using Bun's native hashing.
- *
- * @param content - Content to hash
- * @returns Hexadecimal hash string
- */
-export function sha256(content: string): string {
-	const hasher = new Bun.CryptoHasher("sha256");
-	hasher.update(content);
-	return hasher.digest("hex");
-}
+// Re-export hash functions for backwards compatibility
+export {
+	fastHash,
+	sha256,
+	sha256File,
+} from "../hash/index.js";
 
-/**
- * Calculate SHA256 hash of a file's contents.
- *
- * @param filePath - Path to the file to hash
- * @returns Hex-encoded SHA256 hash
- */
-export async function sha256File(filePath: string): Promise<string> {
-	const buffer = await Bun.file(filePath).arrayBuffer();
-	const hasher = new Bun.CryptoHasher("sha256");
-	hasher.update(buffer);
-	return hasher.digest("hex");
-}
-
-/**
- * Calculate a fast non-cryptographic hash for cache keys.
- * Uses Bun.hash (xxHash64) which is much faster than SHA256.
- *
- * @param content - Content to hash
- * @returns Hash as bigint (or number for small values)
- */
-export function fastHash(content: string): bigint | number {
-	return Bun.hash(content);
-}
-
-/**
- * Deep equality check using Bun's native deepEquals.
- *
- * @param a - First value
- * @param b - Second value
- * @param strict - If true, don't allow undefined properties to match missing ones
- * @returns true if values are deeply equal
- */
-export function deepEquals(a: unknown, b: unknown, strict = false): boolean {
-	return Bun.deepEquals(a, b, strict);
-}
+// Re-export utils functions for backwards compatibility
+export { deepEquals, safeJsonParse } from "../utils/index.js";
 
 // ============================================
 // TEMP FILES - useful for CLI tools
@@ -766,20 +730,7 @@ export function writeLinesSync(filePath: string, lines: string[]): void {
 	writeFileSync(filePath, `${lines.join("\n")}\n`, "utf8");
 }
 
-/**
- * Safe JSON parse with fallback.
- *
- * @param content - JSON string to parse
- * @param fallback - Value to return on parse error
- * @returns Parsed JSON or fallback value
- */
-export function safeJsonParse<T>(content: string, fallback: T): T {
-	try {
-		return JSON.parse(content);
-	} catch {
-		return fallback;
-	}
-}
+// Note: safeJsonParse is re-exported from utils above for backwards compatibility
 
 // ============================================
 // RE-EXPORTS - convenience for common node:fs functions

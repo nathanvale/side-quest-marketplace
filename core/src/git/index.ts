@@ -123,3 +123,75 @@ export async function hasChangedFiles(extensions: string[]): Promise<boolean> {
 	const changedFiles = await getChangedFiles(extensions);
 	return changedFiles.length > 0;
 }
+
+// ============================================================================
+// Workspace utilities
+// ============================================================================
+
+/**
+ * Check if the current project is a Bun/npm workspace.
+ * Looks for `workspaces` field in package.json at specified path or cwd.
+ *
+ * Why: Some tools behave differently in workspaces vs standard projects.
+ * For example, `bun --filter '*' typecheck` runs typecheck in all packages,
+ * while `tsc --noEmit` only checks the current directory.
+ *
+ * @param rootPath - Optional root path to check (default: process.cwd())
+ * @returns true if package.json has a non-empty workspaces array
+ *
+ * @example
+ * ```ts
+ * if (await isWorkspaceProject()) {
+ *   // Run workspace-aware command
+ *   await spawnAndCollect(["bun", "--filter", "*", "test"]);
+ * } else {
+ *   await spawnAndCollect(["bun", "test"]);
+ * }
+ * ```
+ */
+export async function isWorkspaceProject(rootPath?: string): Promise<boolean> {
+	const { existsSync, readFileSync } = await import("node:fs");
+	const { join } = await import("node:path");
+
+	const pkgPath = join(rootPath ?? process.cwd(), "package.json");
+	if (!existsSync(pkgPath)) return false;
+
+	try {
+		const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+		return Array.isArray(pkg.workspaces) && pkg.workspaces.length > 0;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Get list of workspace packages from package.json workspaces field.
+ *
+ * @param rootPath - Optional root path (default: process.cwd())
+ * @returns Array of workspace glob patterns, or empty array if not a workspace
+ *
+ * @example
+ * ```ts
+ * const packages = await getWorkspacePackages();
+ * // ["packages/*", "apps/*"]
+ * ```
+ */
+export async function getWorkspacePackages(
+	rootPath?: string,
+): Promise<string[]> {
+	const { existsSync, readFileSync } = await import("node:fs");
+	const { join } = await import("node:path");
+
+	const pkgPath = join(rootPath ?? process.cwd(), "package.json");
+	if (!existsSync(pkgPath)) return [];
+
+	try {
+		const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+		if (Array.isArray(pkg.workspaces)) {
+			return pkg.workspaces;
+		}
+		return [];
+	} catch {
+		return [];
+	}
+}
