@@ -18,6 +18,8 @@
 		"./mcp": "./src/mcp/index.ts",
 		"./password": "./src/password/index.ts",
 		"./spawn": "./src/spawn/index.ts",
+		"./streams": "./src/streams/index.ts",
+		"./terminal": "./src/terminal/index.ts",
 		"./utils": "./src/utils/index.ts",
 		"./validate/types": "./src/validate/types.ts",
 		"./validate/runner": "./src/validate/runner.ts",

@@ -9,13 +9,8 @@ import {
 	ensureFileSync,
 	findProjectRoot,
 	findUpSync,
-	isDirectorySync,
-	isFileSync,
-	pathExistsSync,
 	readJsonFileOrDefault,
 	readLinesSync,
-	removeDir,
-	removeDirSync,
 	withTempDir,
 	withTempDirSync,
 	writeJsonFileAtomic,
@@ -171,67 +166,69 @@ describe("helper utilities", () => {
 });
 
 describe("path utilities", () => {
-	it("isDirectorySync returns true for directories", () => {
+	it("fs.statSync.isDirectory returns true for directories", () => {
 		const tmpDir = makeTmpDir();
-		expect(isDirectorySync(tmpDir)).toBe(true);
+		expect(fs.existsSync(tmpDir) && fs.statSync(tmpDir).isDirectory()).toBe(
+			true,
+		);
 		fs.rmSync(tmpDir, { recursive: true, force: true });
 	});
 
-	it("isDirectorySync returns false for files", () => {
-		const tmpDir = makeTmpDir();
-		const file = path.join(tmpDir, "file.txt");
-		fs.writeFileSync(file, "data");
-
-		expect(isDirectorySync(file)).toBe(false);
-
-		fs.rmSync(tmpDir, { recursive: true, force: true });
-	});
-
-	it("isFileSync returns true for files", () => {
+	it("fs.statSync.isDirectory returns false for files", () => {
 		const tmpDir = makeTmpDir();
 		const file = path.join(tmpDir, "file.txt");
 		fs.writeFileSync(file, "data");
 
-		expect(isFileSync(file)).toBe(true);
+		expect(fs.existsSync(file) && fs.statSync(file).isDirectory()).toBe(false);
 
 		fs.rmSync(tmpDir, { recursive: true, force: true });
 	});
 
-	it("isFileSync returns false for directories", () => {
+	it("fs.statSync.isFile returns true for files", () => {
 		const tmpDir = makeTmpDir();
-		expect(isFileSync(tmpDir)).toBe(false);
+		const file = path.join(tmpDir, "file.txt");
+		fs.writeFileSync(file, "data");
+
+		expect(fs.existsSync(file) && fs.statSync(file).isFile()).toBe(true);
+
 		fs.rmSync(tmpDir, { recursive: true, force: true });
 	});
 
-	it("pathExistsSync returns true for existing paths", () => {
+	it("fs.statSync.isFile returns false for directories", () => {
 		const tmpDir = makeTmpDir();
-		expect(pathExistsSync(tmpDir)).toBe(true);
+		expect(fs.existsSync(tmpDir) && fs.statSync(tmpDir).isFile()).toBe(false);
 		fs.rmSync(tmpDir, { recursive: true, force: true });
 	});
 
-	it("pathExistsSync returns false for non-existing paths", () => {
-		expect(pathExistsSync("/definitely/not/a/real/path")).toBe(false);
+	it("fs.existsSync returns true for existing paths", () => {
+		const tmpDir = makeTmpDir();
+		expect(fs.existsSync(tmpDir)).toBe(true);
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it("fs.existsSync returns false for non-existing paths", () => {
+		expect(fs.existsSync("/definitely/not/a/real/path")).toBe(false);
 	});
 });
 
 describe("directory removal", () => {
-	it("removeDir removes directory recursively", async () => {
+	it("fs.promises.rm removes directory recursively", async () => {
 		const tmpDir = makeTmpDir();
 		const nested = path.join(tmpDir, "nested");
 		fs.mkdirSync(nested);
 		fs.writeFileSync(path.join(nested, "file.txt"), "data");
 
-		await removeDir(tmpDir);
+		await fs.promises.rm(tmpDir, { recursive: true });
 		expect(fs.existsSync(tmpDir)).toBe(false);
 	});
 
-	it("removeDirSync removes directory recursively", () => {
+	it("fs.rmSync removes directory recursively", () => {
 		const tmpDir = makeTmpDir();
 		const nested = path.join(tmpDir, "nested");
 		fs.mkdirSync(nested);
 		fs.writeFileSync(path.join(nested, "file.txt"), "data");
 
-		removeDirSync(tmpDir);
+		fs.rmSync(tmpDir, { recursive: true });
 		expect(fs.existsSync(tmpDir)).toBe(false);
 	});
 });
