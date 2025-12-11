@@ -1,6 +1,7 @@
 ---
 name: inbox-processing-expert
-description: Expert guidance for building and maintaining the Para Obsidian inbox processing system - a security-hardened automation framework for processing PDFs and attachments with AI-powered metadata extraction. Use when building inbox processors, implementing security patterns (TOCTOU, command injection prevention, atomic writes), designing interactive CLIs with suggestion workflows, integrating LLM detection, implementing idempotency with SHA256 registries, or working with the para-obsidian inbox codebase. Covers engine/interface separation, suggestion-based architecture, confidence scoring, error taxonomy, structured logging, and testing patterns.
+description: Expert guidance for building and maintaining the Para Obsidian inbox processing system - a security-hardened automation framework for processing PDFs and attachments with AI-powered metadata extraction. Use when building inbox processors, implementing security patterns (TOCTOU, command injection prevention, atomic writes), designing interactive CLIs with suggestion workflows, integrating LLM detection, implementing idempotency with SHA256 registries, or working with the para-obsidian inbox codebase. Covers engine/interface separation, suggestion-based architecture, confidence scoring, error taxonomy, structured logging, and testing patterns. Useful when user mentions inbox automation, PDF processing, document classification, security-hardened file processing, or interactive CLI design.
+allowed-tools: Read, Grep, Glob
 ---
 
 # Inbox Processing Expert
@@ -12,9 +13,11 @@ Build security-hardened inbox automation with AI-powered metadata extraction fol
 - **[Architecture Overview](#architecture-overview)** - Engine/interface separation, suggestion-based design
 - **[Security Patterns](#security-patterns)** - P0 critical protections (TOCTOU, command injection, atomic writes)
 - **[Core Concepts](#core-concepts)** - Suggestions, confidence scoring, idempotency
+- **[Performance Characteristics](#performance-characteristics)** - Timing, concurrency limits, optimization
 - **[Interactive CLI](#interactive-cli)** - Terminal UI, command parsing, user feedback
 - **[Error Handling](#error-handling)** - 23-error taxonomy across 7 categories
 - **[Testing Strategy](#testing-strategy)** - 201 tests, coverage patterns
+- **[Common Questions](#common-questions)** - FAQ and troubleshooting
 - **[Related Skills](#related-skills)** - Bun CLI, Bun FS Helpers
 
 ---
@@ -265,6 +268,38 @@ await registry.save();
 - Filename changes don't break idempotency
 - Safe to re-run on same files
 - Registry tracks what was created from each source
+
+---
+
+## Performance Characteristics
+
+| Operation | Typical Time | Notes |
+|-----------|--------------|-------|
+| Scan (10 PDFs) | ~15-30s | Depends on LLM latency (3 concurrent) |
+| PDF extraction | ~500-2000ms | Per file, depends on size |
+| LLM detection | ~1-3s | Per file (haiku model) |
+| Execute (10 items) | ~2-5s | File I/O bound (10 concurrent) |
+| Registry load | ~10-50ms | Depends on size (1000 items = ~50ms) |
+
+### Concurrency Limits
+
+```typescript
+import pLimit from "p-limit";
+
+// PDF extraction: CPU-bound
+const pdfLimit = pLimit(5);
+
+// LLM calls: API rate limits
+const llmLimit = pLimit(3);
+
+// File I/O: Disk is fast
+const ioLimit = pLimit(10);
+```
+
+**Why limit concurrency:**
+- Prevent API rate limit errors
+- Avoid OOM from too many parallel operations
+- Balance throughput vs. resource usage
 
 ---
 
@@ -519,35 +554,112 @@ test("doesn't reprocess same file twice", async () => {
 
 ---
 
-## Performance Characteristics
+## Common Questions
 
-| Operation | Typical Time | Notes |
-|-----------|--------------|-------|
-| Scan (10 PDFs) | ~15-30s | Depends on LLM latency (3 concurrent) |
-| PDF extraction | ~500-2000ms | Per file, depends on size |
-| LLM detection | ~1-3s | Per file (haiku model) |
-| Execute (10 items) | ~2-5s | File I/O bound (10 concurrent) |
-| Registry load | ~10-50ms | Depends on size (1000 items = ~50ms) |
+### When should I use HIGH vs MEDIUM vs LOW confidence?
 
-### Concurrency Limits
+**HIGH confidence** requires all of:
+- LLM detection confidence > 0.8
+- Filename heuristics match LLM type
+- Target destination folder exists
+- Required template is available
+
+**MEDIUM confidence** when:
+- LLM is confident but heuristics disagree
+- Target location exists but some ambiguity
+- Most fields extracted successfully
+
+**LOW confidence** when:
+- LLM confidence < 0.5
+- Target location doesn't exist
+- Template missing
+- Extraction failed or incomplete
+
+### How do I handle files that fail processing?
+
+Use the error taxonomy to determine if recoverable:
 
 ```typescript
-import pLimit from "p-limit";
-
-// PDF extraction: CPU-bound
-const pdfLimit = pLimit(5);
-
-// LLM calls: API rate limits
-const llmLimit = pLimit(3);
-
-// File I/O: Disk is fast
-const ioLimit = pLimit(10);
+try {
+  await processPDF(file);
+} catch (error) {
+  if (error.recoverable) {
+    // Registry errors, user input errors - retry or skip
+    logger.warn`Recoverable error: ${error.code} ${cid}`;
+  } else {
+    // Dependency, extraction, validation errors - fatal
+    logger.error`Fatal error: ${error.code} ${cid}`;
+    throw error;
+  }
+}
 ```
 
-**Why limit concurrency:**
-- Prevent API rate limit errors
-- Avoid OOM from too many parallel operations
-- Balance throughput vs. resource usage
+### Should I process files in CI/CD or interactively?
+
+**Interactive mode** (CLI):
+- Review suggestions before executing
+- Edit with custom prompts
+- Handle MEDIUM/LOW confidence items
+
+**CI/CD mode** (future):
+- Auto-execute HIGH confidence only
+- Queue MEDIUM/LOW for manual review
+- Generate report for human oversight
+
+### How do I debug slow LLM calls?
+
+Check logs for correlation ID:
+
+```bash
+# Find all LLM calls for a scan
+grep "abc12345" ~/.claude/logs/para-obsidian.jsonl | grep "llm.call_duration_ms"
+
+# Average LLM latency
+jq 'select(.llm.call_duration_ms) | .llm.call_duration_ms' \
+  ~/.claude/logs/para-obsidian.jsonl | \
+  awk '{sum+=$1; count++} END {print sum/count " ms"}'
+```
+
+Optimization strategies:
+- Use faster model (haiku vs sonnet)
+- Reduce concurrency limit (less rate limiting)
+- Cache common vault context (areas, projects)
+
+### How do I prevent duplicate processing after renaming files?
+
+The registry uses SHA256 content hashing, not filenames:
+
+```typescript
+// File renamed from invoice-old.pdf → invoice-new.pdf
+const hash = await sha256File("invoice-new.pdf");
+
+// Registry still recognizes it by content
+if (registry.isProcessed(hash)) {
+  console.log("Already processed (content match)");
+}
+```
+
+Filename changes don't affect idempotency.
+
+### What happens if a file changes during processing (TOCTOU)?
+
+Pre- and post-checks detect tampering:
+
+```typescript
+// Before extraction
+const preStats = await stat(filePath);
+
+// Extract (could take 1-2 seconds)
+const text = await extractPdfText(filePath);
+
+// After extraction - verify unchanged
+const postStats = await stat(filePath);
+if (postStats.mtimeMs !== preStats.mtimeMs) {
+  throw createInboxError("EXT_PDF_TOCTOU", { cid, source: filePath });
+}
+```
+
+If file modified during processing, operation fails safely.
 
 ---
 
