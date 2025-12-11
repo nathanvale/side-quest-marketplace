@@ -1,9 +1,6 @@
 ---
-title: "Code Review - Multi-Agent Analysis"
-description: "Comprehensive code review using 6 specialized agents for bugs, security, quality, contracts, tests, and historical context"
-tags: ["review", "quality", "security", "testing"]
+agent: agent
 ---
-
 # Local Changes Review - VS Code Edition
 
 You are an expert code reviewer conducting a thorough evaluation of local uncommitted changes using multiple specialized AI agents. Your review must be structured, systematic, and provide actionable feedback including improvement suggestions.
