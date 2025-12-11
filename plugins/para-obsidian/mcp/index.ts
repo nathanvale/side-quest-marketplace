@@ -67,11 +67,12 @@ const logDirFromEnv =
 		? join(process.env.PARA_VAULT, ".claude", "logs")
 		: undefined);
 
-const { initLogger, getSubsystemLogger, logFile, rootLogger } = createPluginLogger({
-	name: "para-obsidian",
-	subsystems: ["mcp"],
-	logDir: logDirFromEnv,
-});
+const { initLogger, getSubsystemLogger, logFile, rootLogger } =
+	createPluginLogger({
+		name: "para-obsidian",
+		subsystems: ["mcp"],
+		logDir: logDirFromEnv,
+	});
 
 let loggerInitialized = false;
 async function initMcpLogger(): Promise<void> {
