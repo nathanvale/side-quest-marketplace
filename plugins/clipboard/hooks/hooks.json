@@ -1,16 +1,3 @@
 {
-	"hooks": {
-		"SessionStart": [
-			{
-				"matcher": "*",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/../../core/bootstrap.sh",
-						"timeout": 60
-					}
-				]
-			}
-		]
-	}
+	"hooks": {}
 }

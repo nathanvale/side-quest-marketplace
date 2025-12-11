@@ -1,18 +1,6 @@
 {
 	"description": "Atuin shell history integration hooks",
 	"hooks": {
-		"SessionStart": [
-			{
-				"matcher": "*",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/../../core/bootstrap.sh",
-						"timeout": 60
-					}
-				]
-			}
-		],
 		"PostToolUse": [
 			{
 				"matcher": "Bash",

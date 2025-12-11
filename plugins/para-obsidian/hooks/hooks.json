@@ -1,17 +1,4 @@
 {
 	"description": "Obsidian PARA method integration with CLI operations and MCP server",
-	"hooks": {
-		"SessionStart": [
-			{
-				"matcher": "*",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/../../core/bootstrap.sh",
-						"timeout": 60
-					}
-				]
-			}
-		]
-	}
+	"hooks": {}
 }

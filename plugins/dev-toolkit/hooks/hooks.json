@@ -1,17 +1,4 @@
 {
 	"description": "Development toolkit with Bun CLI, runtime workflows, and DX patterns",
-	"hooks": {
-		"SessionStart": [
-			{
-				"matcher": "*",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/../../core/bootstrap.sh",
-						"timeout": 60
-					}
-				]
-			}
-		]
-	}
+	"hooks": {}
 }
