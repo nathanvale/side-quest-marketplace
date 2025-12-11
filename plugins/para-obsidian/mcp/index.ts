@@ -15,6 +15,8 @@
  * 6. Return MCP response with isError flag
  */
 
+import { join } from "node:path";
+
 if (!process.env.MCPEZ_AUTO_START) {
 	process.env.MCPEZ_AUTO_START = "false";
 }
@@ -59,12 +61,28 @@ import { getTemplate, getTemplateFields } from "../src/templates";
 // Logging
 // ============================================================================
 
-const { initLogger, getSubsystemLogger } = createPluginLogger({
+const logDirFromEnv =
+	process.env.PARA_OBSIDIAN_LOG_DIR ??
+	(process.env.PARA_VAULT
+		? join(process.env.PARA_VAULT, ".claude", "logs")
+		: undefined);
+
+const { initLogger, getSubsystemLogger, logFile, rootLogger } = createPluginLogger({
 	name: "para-obsidian",
 	subsystems: ["mcp"],
+	logDir: logDirFromEnv,
 });
 
-initLogger().catch(console.error);
+let loggerInitialized = false;
+async function initMcpLogger(): Promise<void> {
+	await initLogger();
+	if (!loggerInitialized && rootLogger) {
+		rootLogger.info`Logger initialized logDir=${logDirFromEnv ?? "~/.claude/logs"} logFile=${logFile}`;
+		loggerInitialized = true;
+	}
+}
+
+initMcpLogger().catch(console.error);
 const mcpLogger = getSubsystemLogger("mcp");
 
 interface LogEntry {
@@ -96,6 +114,45 @@ function formatError(error: unknown, format: ResponseFormat): string {
 		return JSON.stringify({ error: message, isError: true }, null, 2);
 	}
 	return `**Error:** ${message}`;
+}
+
+function withLogFile(text: string, format: ResponseFormat): string {
+	if (!logFile) return text;
+
+	if (format === ResponseFormat.JSON) {
+		try {
+			const parsed = JSON.parse(text);
+			if (Array.isArray(parsed)) {
+				return JSON.stringify({ data: parsed, logFile }, null, 2);
+			}
+			if (parsed && typeof parsed === "object") {
+				return JSON.stringify({ ...parsed, logFile }, null, 2);
+			}
+		} catch {
+			// Fall through to wrapping below
+		}
+		return JSON.stringify({ data: text, logFile }, null, 2);
+	}
+
+	return `${text}\n\nLogs: ${logFile}`;
+}
+
+function respondText(format: ResponseFormat, text: string) {
+	return {
+		content: [{ type: "text" as const, text: withLogFile(text, format) }],
+	};
+}
+
+function respondError(format: ResponseFormat, error: unknown) {
+	return {
+		isError: true,
+		content: [
+			{
+				type: "text" as const,
+				text: withLogFile(formatError(error, format), format),
+			},
+		],
+	};
 }
 
 // ============================================================================
@@ -324,11 +381,7 @@ Configuration sources (precedence order):
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
-						{ type: "text" as const, text: JSON.stringify(config, null, 2) },
-					],
-				};
+				return respondText(format, JSON.stringify(config, null, 2));
 			}
 
 			const lines = [
@@ -349,9 +402,7 @@ Configuration sources (precedence order):
 				`**Frontmatter rules:** ${Object.keys(config.frontmatterRules ?? {}).length} types`,
 			);
 
-			return {
-				content: [{ type: "text" as const, text: lines.join("\n") }],
-			};
+			return respondText(format, lines.join("\n"));
 		} catch (error) {
 			log({
 				cid,
@@ -362,10 +413,7 @@ Configuration sources (precedence order):
 			const format = parseResponseFormat(
 				args.response_format as string | undefined,
 			);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -417,14 +465,7 @@ catalog display.`,
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: JSON.stringify({ templates }, null, 2),
-						},
-					],
-				};
+				return respondText(format, JSON.stringify({ templates }, null, 2));
 			}
 
 			const lines = ["## Template Versions", ""];
@@ -432,9 +473,7 @@ catalog display.`,
 				lines.push(`- **${tpl.name}:** v${tpl.version}`);
 			}
 
-			return {
-				content: [{ type: "text" as const, text: lines.join("\n") }],
-			};
+			return respondText(format, lines.join("\n"));
 		} catch (error) {
 			log({
 				cid,
@@ -445,10 +484,7 @@ catalog display.`,
 			const format = parseResponseFormat(
 				args.response_format as string | undefined,
 			);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -590,30 +626,26 @@ Example: For project template, shows you need:
 					}
 				}
 
-				return {
-					content: [
+				return respondText(
+					format,
+					JSON.stringify(
 						{
-							type: "text" as const,
-							text: JSON.stringify(
-								{
-									template: templateName,
-									version: template.version,
-									fields: {
-										required: enhancedRequired,
-										auto: autoFields.map((f) => f.key),
-										body: bodyFields.map((f) => f.key),
-									},
-									frontmatter_hints: frontmatterHints,
-									example: Object.fromEntries(
-										enhancedRequired.map((f) => [f.key, f.example ?? "..."]),
-									),
-								},
-								null,
-								2,
+							template: templateName,
+							version: template.version,
+							fields: {
+								required: enhancedRequired,
+								auto: autoFields.map((f) => f.key),
+								body: bodyFields.map((f) => f.key),
+							},
+							frontmatter_hints: frontmatterHints,
+							example: Object.fromEntries(
+								enhancedRequired.map((f) => [f.key, f.example ?? "..."]),
 							),
 						},
-					],
-				};
+						null,
+						2,
+					),
+				);
 			}
 
 			const lines = [
@@ -673,9 +705,7 @@ Example: For project template, shows you need:
 				lines.push("```");
 			}
 
-			return {
-				content: [{ type: "text" as const, text: lines.join("\n") }],
-			};
+			return respondText(format, lines.join("\n"));
 		} catch (error) {
 			log({
 				cid,
@@ -686,10 +716,7 @@ Example: For project template, shows you need:
 			const format = parseResponseFormat(
 				args.response_format as string | undefined,
 			);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -749,24 +776,10 @@ Note: Returns vault-relative paths.`,
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: JSON.stringify({ dir, entries }, null, 2),
-						},
-					],
-				};
+				return respondText(format, JSON.stringify({ dir, entries }, null, 2));
 			}
 
-			return {
-				content: [
-					{
-						type: "text" as const,
-						text: `## Files in ${dir}\n\n${entries.join("\n")}`,
-					},
-				],
-			};
+			return respondText(format, `## Files in ${dir}\n\n${entries.join("\n")}`);
 		} catch (error) {
 			log({
 				cid,
@@ -775,10 +788,7 @@ Note: Returns vault-relative paths.`,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -832,19 +842,10 @@ Note: Paths are vault-relative (e.g., "Projects/My Note.md").`,
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: JSON.stringify({ file, content }, null, 2),
-						},
-					],
-				};
+				return respondText(format, JSON.stringify({ file, content }, null, 2));
 			}
 
-			return {
-				content: [{ type: "text" as const, text: content }],
-			};
+			return respondText(format, content);
 		} catch (error) {
 			log({
 				cid,
@@ -853,10 +854,7 @@ Note: Paths are vault-relative (e.g., "Projects/My Note.md").`,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -977,14 +975,7 @@ Requires ripgrep (rg) to be installed.`,
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: JSON.stringify({ query, hits }, null, 2),
-						},
-					],
-				};
+				return respondText(format, JSON.stringify({ query, hits }, null, 2));
 			}
 
 			const lines = [`## Search Results: "${query}"`, ""];
@@ -996,9 +987,7 @@ Requires ripgrep (rg) to be installed.`,
 				}
 			}
 
-			return {
-				content: [{ type: "text" as const, text: lines.join("\n") }],
-			};
+			return respondText(format, lines.join("\n"));
 		} catch (error) {
 			log({
 				cid,
@@ -1007,10 +996,7 @@ Requires ripgrep (rg) to be installed.`,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -1083,14 +1069,7 @@ Falls back to text search if ML dependencies unavailable.`,
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: JSON.stringify({ query, hits }, null, 2),
-						},
-					],
-				};
+				return respondText(format, JSON.stringify({ query, hits }, null, 2));
 			}
 
 			const lines = [`## Semantic Search: "${query}"`, ""];
@@ -1106,9 +1085,7 @@ Falls back to text search if ML dependencies unavailable.`,
 				}
 			}
 
-			return {
-				content: [{ type: "text" as const, text: lines.join("\n") }],
-			};
+			return respondText(format, lines.join("\n"));
 		} catch (error) {
 			log({
 				cid,
@@ -1117,10 +1094,7 @@ Falls back to text search if ML dependencies unavailable.`,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -1187,28 +1161,20 @@ Index saved to .para-obsidian-index.json in vault root.`,
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: JSON.stringify(
-								{ indexPath: savedPath, count: index.entries.length },
-								null,
-								2,
-							),
-						},
-					],
-				};
+				return respondText(
+					format,
+					JSON.stringify(
+						{ indexPath: savedPath, count: index.entries.length },
+						null,
+						2,
+					),
+				);
 			}
 
-			return {
-				content: [
-					{
-						type: "text" as const,
-						text: `## Index Built\n\n**Entries:** ${index.entries.length}\n**Saved to:** \`${savedPath}\``,
-					},
-				],
-			};
+			return respondText(
+				format,
+				`## Index Built\n\n**Entries:** ${index.entries.length}\n**Saved to:** \`${savedPath}\``,
+			);
 		} catch (error) {
 			log({
 				cid,
@@ -1217,10 +1183,7 @@ Index saved to .para-obsidian-index.json in vault root.`,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -1323,14 +1286,10 @@ Requires index to exist (run para_index_prime first).`,
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: JSON.stringify({ count: results.length, results }, null, 2),
-						},
-					],
-				};
+				return respondText(
+					format,
+					JSON.stringify({ count: results.length, results }, null, 2),
+				);
 			}
 
 			const lines = ["## Index Query Results", ""];
@@ -1342,9 +1301,7 @@ Requires index to exist (run para_index_prime first).`,
 				}
 			}
 
-			return {
-				content: [{ type: "text" as const, text: lines.join("\n") }],
-			};
+			return respondText(format, lines.join("\n"));
 		} catch (error) {
 			log({
 				cid,
@@ -1353,10 +1310,7 @@ Requires index to exist (run para_index_prime first).`,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -1495,14 +1449,7 @@ Requires git repository with clean working tree.`,
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: JSON.stringify(result, null, 2),
-						},
-					],
-				};
+				return respondText(format, JSON.stringify(result, null, 2));
 			}
 
 			// Format markdown output
@@ -1519,9 +1466,7 @@ Requires git repository with clean working tree.`,
 				}
 			}
 
-			return {
-				content: [{ type: "text" as const, text: lines.join("\n") }],
-			};
+			return respondText(format, lines.join("\n"));
 		} catch (error) {
 			log({
 				cid,
@@ -1530,10 +1475,7 @@ Requires git repository with clean working tree.`,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -1601,24 +1543,13 @@ Requires git repository with clean working tree.`,
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: JSON.stringify(result, null, 2),
-						},
-					],
-				};
+				return respondText(format, JSON.stringify(result, null, 2));
 			}
 
-			return {
-				content: [
-					{
-						type: "text" as const,
-						text: `## Text Inserted\n\n**File:** ${result.relative}\n**Mode:** ${mode}\n**Heading:** "${heading}"`,
-					},
-				],
-			};
+			return respondText(
+				format,
+				`## Text Inserted\n\n**File:** ${result.relative}\n**Mode:** ${mode}\n**Heading:** "${heading}"`,
+			);
 		} catch (error) {
 			log({
 				cid,
@@ -1627,10 +1558,7 @@ Requires git repository with clean working tree.`,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -1697,14 +1625,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: JSON.stringify(result, null, 2),
-						},
-					],
-				};
+				return respondText(format, JSON.stringify(result, null, 2));
 			}
 
 			const verb = dryRun ? "Would rename" : "Renamed";
@@ -1716,9 +1637,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 				`**Link rewrites:** ${result.rewrites.length}`,
 			];
 
-			return {
-				content: [{ type: "text" as const, text: lines.join("\n") }],
-			};
+			return respondText(format, lines.join("\n"));
 		} catch (error) {
 			log({
 				cid,
@@ -1727,10 +1646,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -1798,25 +1714,14 @@ Requires git repository with clean working tree (unless dry-run).`,
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: JSON.stringify(result, null, 2),
-						},
-					],
-				};
+				return respondText(format, JSON.stringify(result, null, 2));
 			}
 
 			const verb = dryRun ? "Would delete" : "Deleted";
-			return {
-				content: [
-					{
-						type: "text" as const,
-						text: `## ${verb} File\n\n**Path:** ${result.relative}`,
-					},
-				],
-			};
+			return respondText(
+				format,
+				`## ${verb} File\n\n**Path:** ${result.relative}`,
+			);
 		} catch (error) {
 			log({
 				cid,
@@ -1825,10 +1730,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -1888,24 +1790,16 @@ Example output:
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: JSON.stringify({ file, frontmatter: attributes }, null, 2),
-						},
-					],
-				};
+				return respondText(
+					format,
+					JSON.stringify({ file, frontmatter: attributes }, null, 2),
+				);
 			}
 
-			return {
-				content: [
-					{
-						type: "text" as const,
-						text: `## Frontmatter: ${file}\n\n\`\`\`yaml\n${JSON.stringify(attributes, null, 2)}\n\`\`\``,
-					},
-				],
-			};
+			return respondText(
+				format,
+				`## Frontmatter: ${file}\n\n\`\`\`yaml\n${JSON.stringify(attributes, null, 2)}\n\`\`\``,
+			);
 		} catch (error) {
 			log({
 				cid,
@@ -1914,10 +1808,7 @@ Example output:
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -1979,22 +1870,18 @@ Validation rules configured per note type (project, area, resource, etc.).`,
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
+				return respondText(
+					format,
+					JSON.stringify(
 						{
-							type: "text" as const,
-							text: JSON.stringify(
-								{
-									file: result.relative,
-									valid: result.valid,
-									issues: result.issues,
-								},
-								null,
-								2,
-							),
+							file: result.relative,
+							valid: result.valid,
+							issues: result.issues,
 						},
-					],
-				};
+						null,
+						2,
+					),
+				);
 			}
 
 			const lines = [`## Validation: ${result.relative}`, ""];
@@ -2007,9 +1894,7 @@ Validation rules configured per note type (project, area, resource, etc.).`,
 				}
 			}
 
-			return {
-				content: [{ type: "text" as const, text: lines.join("\n") }],
-			};
+			return respondText(format, lines.join("\n"));
 		} catch (error) {
 			log({
 				cid,
@@ -2018,10 +1903,7 @@ Validation rules configured per note type (project, area, resource, etc.).`,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -2118,14 +2000,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: JSON.stringify(result, null, 2),
-						},
-					],
-				};
+				return respondText(format, JSON.stringify(result, null, 2));
 			}
 
 			const verb = dryRun ? "Would update" : "Updated";
@@ -2155,9 +2030,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 				}
 			}
 
-			return {
-				content: [{ type: "text" as const, text: lines.join("\n") }],
-			};
+			return respondText(format, lines.join("\n"));
 		} catch (error) {
 			log({
 				cid,
@@ -2166,10 +2039,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -2253,14 +2123,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: JSON.stringify(result, null, 2),
-						},
-					],
-				};
+				return respondText(format, JSON.stringify(result, null, 2));
 			}
 
 			const verb = dryRun ? "Would migrate" : "Migrated";
@@ -2278,9 +2141,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 				}
 			}
 
-			return {
-				content: [{ type: "text" as const, text: lines.join("\n") }],
-			};
+			return respondText(format, lines.join("\n"));
 		} catch (error) {
 			log({
 				cid,
@@ -2289,10 +2150,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -2392,14 +2250,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: JSON.stringify(result, null, 2),
-						},
-					],
-				};
+				return respondText(format, JSON.stringify(result, null, 2));
 			}
 
 			const verb = dryRun ? "Would migrate" : "Migrated";
@@ -2419,9 +2270,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 				}
 			}
 
-			return {
-				content: [{ type: "text" as const, text: lines.join("\n") }],
-			};
+			return respondText(format, lines.join("\n"));
 		} catch (error) {
 			log({
 				cid,
@@ -2430,10 +2279,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -2517,14 +2363,7 @@ Used for:
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: JSON.stringify(plan, null, 2),
-						},
-					],
-				};
+				return respondText(format, JSON.stringify(plan, null, 2));
 			}
 
 			const lines = [
@@ -2537,9 +2376,7 @@ Used for:
 				`**Type mismatch:** ${plan.typeMismatch}`,
 			];
 
-			return {
-				content: [{ type: "text" as const, text: lines.join("\n") }],
-			};
+			return respondText(format, lines.join("\n"));
 		} catch (error) {
 			log({
 				cid,
@@ -2548,10 +2385,7 @@ Used for:
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -2697,9 +2531,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 				}
 			}
 
-			return {
-				content: [{ type: "text" as const, text: lines.join("\n") }],
-			};
+			return respondText(format, lines.join("\n"));
 		} catch (error) {
 			log({
 				cid,
@@ -2708,10 +2540,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -2759,27 +2588,18 @@ tool(
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: JSON.stringify({ areas, count: areas.length }, null, 2),
-						},
-					],
-				};
+				return respondText(
+					format,
+					JSON.stringify({ areas, count: areas.length }, null, 2),
+				);
 			}
 
-			return {
-				content: [
-					{
-						type: "text" as const,
-						text:
-							areas.length > 0
-								? `# Existing Areas (${areas.length})\n\n${areas.map((a) => `- ${a}`).join("\n")}`
-								: "No areas found in 02_Areas/",
-					},
-				],
-			};
+			return respondText(
+				format,
+				areas.length > 0
+					? `# Existing Areas (${areas.length})\n\n${areas.map((a) => `- ${a}`).join("\n")}`
+					: "No areas found in 02_Areas/",
+			);
 		} catch (error) {
 			log({
 				cid,
@@ -2790,10 +2610,7 @@ tool(
 			const format = parseResponseFormat(
 				args.response_format as string | undefined,
 			);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -2855,17 +2672,12 @@ tool(
 				};
 			}
 
-			return {
-				content: [
-					{
-						type: "text" as const,
-						text:
-							projects.length > 0
-								? `# Existing Projects (${projects.length})\n\n${projects.map((p) => `- ${p}`).join("\n")}`
-								: "No projects found in 01_Projects/",
-					},
-				],
-			};
+			return respondText(
+				format,
+				projects.length > 0
+					? `# Existing Projects (${projects.length})\n\n${projects.map((p) => `- ${p}`).join("\n")}`
+					: "No projects found in 01_Projects/",
+			);
 		} catch (error) {
 			log({
 				cid,
@@ -2876,10 +2688,7 @@ tool(
 			const format = parseResponseFormat(
 				args.response_format as string | undefined,
 			);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -2937,17 +2746,12 @@ tool(
 				};
 			}
 
-			return {
-				content: [
-					{
-						type: "text" as const,
-						text:
-							tags.length > 0
-								? `# Suggested Tags (${tags.length})\n\n${tags.join(", ")}`
-								: "No suggested tags configured",
-					},
-				],
-			};
+			return respondText(
+				format,
+				tags.length > 0
+					? `# Suggested Tags (${tags.length})\n\n${tags.join(", ")}`
+					: "No suggested tags configured",
+			);
 		} catch (error) {
 			log({
 				cid,
@@ -2958,10 +2762,7 @@ tool(
 			const format = parseResponseFormat(
 				args.response_format as string | undefined,
 			);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -3009,27 +2810,18 @@ tool(
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: JSON.stringify({ tags, count: tags.length }, null, 2),
-						},
-					],
-				};
+				return respondText(
+					format,
+					JSON.stringify({ tags, count: tags.length }, null, 2),
+				);
 			}
 
-			return {
-				content: [
-					{
-						type: "text" as const,
-						text:
-							tags.length > 0
-								? `# Tags In Use (${tags.length})\n\n${tags.join(", ")}`
-								: "No tags found in vault",
-					},
-				],
-			};
+			return respondText(
+				format,
+				tags.length > 0
+					? `# Tags In Use (${tags.length})\n\n${tags.join(", ")}`
+					: "No tags found in vault",
+			);
 		} catch (error) {
 			log({
 				cid,
@@ -3040,10 +2832,7 @@ tool(
 			const format = parseResponseFormat(
 				args.response_format as string | undefined,
 			);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
@@ -3172,23 +2961,19 @@ Supports:
 			});
 
 			if (format === ResponseFormat.JSON) {
-				return {
-					content: [
+				return respondText(
+					format,
+					JSON.stringify(
 						{
-							type: "text" as const,
-							text: JSON.stringify(
-								{
-									dryRun,
-									linksRewritten: result.linksRewritten,
-									notesUpdated: result.notesUpdated,
-									updates: result.updates,
-								},
-								null,
-								2,
-							),
+							dryRun,
+							linksRewritten: result.linksRewritten,
+							notesUpdated: result.notesUpdated,
+							updates: result.updates,
 						},
-					],
-				};
+						null,
+						2,
+					),
+				);
 			}
 
 			const verb = dryRun ? "Would rewrite" : "Rewrote";
@@ -3215,9 +3000,7 @@ Supports:
 				}
 			}
 
-			return {
-				content: [{ type: "text" as const, text: lines.join("\n") }],
-			};
+			return respondText(format, lines.join("\n"));
 		} catch (error) {
 			log({
 				cid,
@@ -3226,10 +3009,7 @@ Supports:
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
-			return {
-				isError: true,
-				content: [{ type: "text" as const, text: formatError(error, format) }],
-			};
+			return respondError(format, error);
 		}
 	},
 );
