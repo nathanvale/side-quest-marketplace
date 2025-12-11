@@ -15,6 +15,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
+	isDirectorySync,
+	isFileSync,
 	pathExistsSync,
 	readDir,
 	readTextFileSync,
@@ -75,9 +77,9 @@ function walkMarkdownFiles(root: string, dir: string, out: string[]) {
 	const current = path.join(root, dir);
 	for (const entry of readDir(current)) {
 		const full = path.join(current, entry);
-		if (isDirectory(full)) {
+		if (isDirectorySync(full)) {
 			walkMarkdownFiles(root, path.join(dir, entry), out);
-		} else if (isFile(full) && entry.endsWith(".md")) {
+		} else if (isFileSync(full) && entry.endsWith(".md")) {
 			out.push(path.join(dir, entry));
 		}
 	}
@@ -203,14 +205,6 @@ export function loadIndex(config: ParaObsidianConfig): VaultIndex | undefined {
 	if (!pathExistsSync(indexPath)) return undefined;
 	const raw = readTextFileSync(indexPath);
 	return JSON.parse(raw) as VaultIndex;
-}
-
-function isDirectory(target: string): boolean {
-	return Bun.spawnSync(["test", "-d", target]).exitCode === 0;
-}
-
-function isFile(target: string): boolean {
-	return Bun.spawnSync(["test", "-f", target]).exitCode === 0;
 }
 
 /**

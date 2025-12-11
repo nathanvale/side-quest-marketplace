@@ -8,7 +8,13 @@
  * @module fs
  */
 import path from "node:path";
-import { pathExistsSync, readDir, readTextFileSync } from "@sidequest/core/fs";
+import {
+	isDirectorySync,
+	isFileSync,
+	pathExistsSync,
+	readDir,
+	readTextFileSync,
+} from "@sidequest/core/fs";
 
 /**
  * Represents a resolved path within the vault.
@@ -79,7 +85,7 @@ export function listDir(vault: string, inputPath = "."): Array<string> {
 	if (!pathExistsSync(absolute)) {
 		throw new Error(`Path does not exist: ${inputPath}`);
 	}
-	if (!isDirectory(absolute)) {
+	if (!isDirectorySync(absolute)) {
 		throw new Error(`Not a directory: ${inputPath}`);
 	}
 	return readDir(absolute).slice().sort();
@@ -104,18 +110,8 @@ export function readFile(vault: string, inputPath: string): string {
 	if (!pathExistsSync(absolute)) {
 		throw new Error(`Path does not exist: ${inputPath}`);
 	}
-	if (!isFile(absolute)) {
+	if (!isFileSync(absolute)) {
 		throw new Error(`Not a file: ${inputPath}`);
 	}
 	return readTextFileSync(absolute);
-}
-
-function isDirectory(target: string): boolean {
-	const result = Bun.spawnSync(["test", "-d", target]);
-	return result.exitCode === 0;
-}
-
-function isFile(target: string): boolean {
-	const result = Bun.spawnSync(["test", "-f", target]);
-	return result.exitCode === 0;
 }

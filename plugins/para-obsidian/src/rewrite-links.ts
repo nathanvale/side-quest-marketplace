@@ -11,6 +11,8 @@
  */
 import path from "node:path";
 import {
+	isDirectorySync,
+	isFileSync,
 	readDir,
 	readTextFileSync,
 	writeTextFileSync,
@@ -173,9 +175,9 @@ function listMarkdownFiles(root: string): string[] {
 		for (const entry of readDir(root)) {
 			if (entry.startsWith(".")) continue;
 			const full = path.join(root, entry);
-			if (isDirectory(full)) {
+			if (isDirectorySync(full)) {
 				results.push(...listMarkdownFiles(full));
-			} else if (isFile(full) && entry.endsWith(".md")) {
+			} else if (isFileSync(full) && entry.endsWith(".md")) {
 				results.push(full);
 			}
 		}
@@ -352,12 +354,4 @@ export function rewriteLinks(
 		notesUpdated: updates.length,
 		updates,
 	};
-}
-
-function isDirectory(target: string): boolean {
-	return Bun.spawnSync(["test", "-d", target]).exitCode === 0;
-}
-
-function isFile(target: string): boolean {
-	return Bun.spawnSync(["test", "-f", target]).exitCode === 0;
 }

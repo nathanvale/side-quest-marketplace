@@ -10,7 +10,13 @@
  * @module attachments
  */
 import path from "node:path";
-import { pathExistsSync, readDir, readTextFileSync } from "@sidequest/core/fs";
+import {
+	isDirectorySync,
+	isFileSync,
+	pathExistsSync,
+	readDir,
+	readTextFileSync,
+} from "@sidequest/core/fs";
 
 import { parseFrontmatter } from "./frontmatter";
 import { resolveVaultPath } from "./fs";
@@ -19,7 +25,7 @@ import { resolveVaultPath } from "./fs";
  * Safely lists directory contents, returning empty array if path doesn't exist.
  */
 function listDirSafe(dir: string): string[] {
-	if (!pathExistsSync(dir) || !isDirectory(dir)) return [];
+	if (!pathExistsSync(dir) || !isDirectorySync(dir)) return [];
 	return readDir(dir);
 }
 
@@ -159,7 +165,7 @@ export function discoverLegacyAttachments(
 	for (const folder of candidates) {
 		for (const entry of listDirSafe(folder)) {
 			const full = path.join(folder, entry);
-			if (isFile(full)) {
+			if (isFileSync(full)) {
 				const rel = path.relative(vault, full);
 				if (!rel.endsWith(".md")) found.push(rel);
 			}
@@ -169,7 +175,7 @@ export function discoverLegacyAttachments(
 	// Find same-directory files sharing the note's stem (non-Markdown)
 	for (const entry of listDirSafe(dir)) {
 		const full = path.join(dir, entry);
-		if (isFile(full)) {
+		if (isFileSync(full)) {
 			if (entry.startsWith(stem) && !entry.endsWith(".md")) {
 				const rel = path.relative(vault, full);
 				found.push(rel);
@@ -179,12 +185,4 @@ export function discoverLegacyAttachments(
 
 	// Deduplicate and return
 	return Array.from(new Set(found));
-}
-
-function isDirectory(target: string): boolean {
-	return Bun.spawnSync(["test", "-d", target]).exitCode === 0;
-}
-
-function isFile(target: string): boolean {
-	return Bun.spawnSync(["test", "-f", target]).exitCode === 0;
 }

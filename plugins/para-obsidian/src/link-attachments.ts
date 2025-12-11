@@ -15,6 +15,8 @@
 import path from "node:path";
 import {
 	ensureDirSync,
+	isDirectorySync,
+	isFileSync,
 	pathExistsSync,
 	readDir,
 	readTextFileSync,
@@ -182,9 +184,9 @@ export async function linkAttachmentsToNotes(
 	function walkDir(currentDir: string): void {
 		for (const entry of readDir(currentDir)) {
 			const fullPath = path.join(currentDir, entry);
-			if (isDirectory(fullPath)) {
+			if (isDirectorySync(fullPath)) {
 				walkDir(fullPath);
-			} else if (isFile(fullPath) && entry.endsWith(".md")) {
+			} else if (isFileSync(fullPath) && entry.endsWith(".md")) {
 				const rel = path.relative(vault, fullPath);
 				notes.push(rel);
 			}
@@ -255,12 +257,4 @@ export async function linkAttachmentsToNotes(
 		notesUpdated: updates.length,
 		updates,
 	};
-}
-
-function isDirectory(target: string): boolean {
-	return Bun.spawnSync(["test", "-d", target]).exitCode === 0;
-}
-
-function isFile(target: string): boolean {
-	return Bun.spawnSync(["test", "-f", target]).exitCode === 0;
 }

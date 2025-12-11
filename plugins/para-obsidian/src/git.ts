@@ -111,10 +111,9 @@ export async function assertGitRepo(dir: string): Promise<void> {
 	}
 
 	// Verify the directory is actually under the git root (handles symlinks)
-	const realRoot = pathExistsSync(root)
-		? path.resolve(root)
-		: path.resolve(root);
-	const realDir = pathExistsSync(dir) ? path.resolve(dir) : path.resolve(dir);
+	// Use realpathSync to resolve symlinks (e.g., /var -> /private/var on macOS)
+	const realRoot = pathExistsSync(root) ? fs.realpathSync(root) : root;
+	const realDir = pathExistsSync(dir) ? fs.realpathSync(dir) : dir;
 	if (!realDir.startsWith(realRoot)) {
 		throw new Error("Vault must be inside a git repository for writes.");
 	}

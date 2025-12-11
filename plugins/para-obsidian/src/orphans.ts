@@ -11,7 +11,13 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { pathExistsSync, readDir, readTextFileSync } from "@sidequest/core/fs";
+import {
+	isDirectorySync,
+	isFileSync,
+	pathExistsSync,
+	readDir,
+	readTextFileSync,
+} from "@sidequest/core/fs";
 
 import { parseFrontmatter } from "./frontmatter";
 import { resolveVaultPath } from "./fs";
@@ -148,9 +154,9 @@ function buildFileIndex(vault: string): Map<string, string[]> {
 				if (entry.startsWith(".")) continue;
 
 				const fullPath = path.join(currentDir, entry);
-				if (isDirectory(fullPath)) {
+				if (isDirectorySync(fullPath)) {
 					walkDir(fullPath);
-				} else if (isFile(fullPath)) {
+				} else if (isFileSync(fullPath)) {
 					const rel = path.relative(vault, fullPath);
 					const basename = path.basename(rel).toLowerCase();
 					const existing = index.get(basename) ?? [];
@@ -238,9 +244,9 @@ export function findOrphans(
 	function walkDir(currentDir: string): void {
 		for (const entry of readDir(currentDir)) {
 			const fullPath = path.join(currentDir, entry);
-			if (isDirectory(fullPath)) {
+			if (isDirectorySync(fullPath)) {
 				walkDir(fullPath);
-			} else if (isFile(fullPath) && entry.endsWith(".md")) {
+			} else if (isFileSync(fullPath) && entry.endsWith(".md")) {
 				const rel = path.relative(vault, fullPath);
 				notes.push(rel);
 			}
@@ -293,14 +299,6 @@ export function findOrphans(
 		orphanAttachments,
 		brokenLinks,
 	};
-}
-
-function isDirectory(target: string): boolean {
-	return Bun.spawnSync(["test", "-d", target]).exitCode === 0;
-}
-
-function isFile(target: string): boolean {
-	return Bun.spawnSync(["test", "-f", target]).exitCode === 0;
 }
 
 /**

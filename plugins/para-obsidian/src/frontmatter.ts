@@ -16,6 +16,8 @@
  */
 import path from "node:path";
 import {
+	isDirectorySync,
+	isFileSync,
 	readDir,
 	readTextFileSync,
 	writeTextFileSync,
@@ -863,14 +865,6 @@ interface ListOptions {
 	readonly extensions?: ReadonlyArray<string>;
 }
 
-function isDirectory(target: string): boolean {
-	return Bun.spawnSync(["test", "-d", target]).exitCode === 0;
-}
-
-function isFile(target: string): boolean {
-	return Bun.spawnSync(["test", "-f", target]).exitCode === 0;
-}
-
 /**
  * Recursively lists all files in a directory matching extension filters.
  * Used internally for bulk operations like migrate-all.
@@ -881,10 +875,10 @@ function listFilesRecursive(root: string, options: ListOptions = {}): string[] {
 	const files: string[] = [];
 	for (const entry of entries) {
 		const full = path.join(root, entry);
-		if (isDirectory(full)) {
+		if (isDirectorySync(full)) {
 			files.push(...listFilesRecursive(full, options));
 		} else if (
-			isFile(full) &&
+			isFileSync(full) &&
 			(exts.length === 0 || exts.some((ext) => entry.endsWith(ext)))
 		) {
 			files.push(full);

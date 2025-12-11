@@ -1,197 +1,500 @@
 /**
- * Pure Bun-native filesystem utilities.
+ * Filesystem utilities - hybrid Bun native + node:fs approach
  *
- * Zero node:fs dependencies - all operations use Bun primitives:
- * - Bun.file() / Bun.write() for file I/O
- * - Bun.spawn() / Bun.spawnSync() for shell commands (array args only, command-injection safe)
- * - Bun.CryptoHasher / Bun.hash() for hashing
- * - Bun.deepEquals() for deep equality checks
+ * Async operations use Bun.file()/Bun.write() for performance
+ * Sync operations use node:fs (native in Bun, no process spawning)
  *
- * Security guarantees:
- * - Command injection safe (shell commands use array arguments)
- * - TOCTOU protection available via stat() for critical operations
- * - Atomic writes pattern supported (temp file + rename)
+ * Bun-specific utilities (hashing, deepEquals) provide unique value-add.
  */
 
-export async function pathExists(path: string): Promise<boolean> {
-	const file = Bun.file(path);
-	return await file.exists();
+import {
+	appendFileSync,
+	existsSync,
+	copyFileSync as fsCopyFileSync,
+	renameSync as fsRenameSync,
+	unlinkSync as fsUnlinkSync,
+	mkdirSync,
+	statSync as nodeStatSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import {
+	appendFile,
+	copyFile as fsCopyFile,
+	rename as fsRename,
+	stat as fsStat,
+	unlink as fsUnlink,
+	mkdir,
+	readdir,
+	rm,
+} from "node:fs/promises";
+import path from "node:path";
+
+// ============================================
+// ASYNC OPERATIONS - Bun native where beneficial
+// ============================================
+
+/**
+ * Check if a path exists asynchronously.
+ *
+ * @param filePath - Path to check
+ * @returns true if path exists
+ */
+export async function pathExists(filePath: string): Promise<boolean> {
+	return Bun.file(filePath).exists();
 }
 
 /**
- * Check if a path exists synchronously using Bun-native test command.
+ * Read file contents asynchronously using Bun's native file API.
  *
- * @param path - Path to check
- * @returns true if path exists
+ * @param filePath - Path to file
+ * @returns File contents as string
+ * @throws Error if file doesn't exist
  */
-export function pathExistsSync(path: string): boolean {
-	const proc = Bun.spawnSync(["test", "-e", path]);
-	return proc.exitCode === 0;
-}
-
-export async function readTextFile(path: string): Promise<string> {
-	const file = Bun.file(path);
+export async function readTextFile(filePath: string): Promise<string> {
+	const file = Bun.file(filePath);
 	if (!(await file.exists())) {
-		throw new Error(`File not found: ${path}`);
+		throw new Error(`File not found: ${filePath}`);
 	}
 	return file.text();
 }
 
 /**
+ * Read JSON file asynchronously using Bun's native file API.
+ *
+ * @param filePath - Path to JSON file
+ * @returns Parsed JSON content
+ */
+export async function readJsonFile<T>(filePath: string): Promise<T> {
+	const file = Bun.file(filePath);
+	if (!(await file.exists())) {
+		throw new Error(`File not found: ${filePath}`);
+	}
+	return file.json();
+}
+
+/**
+ * Read binary file asynchronously using Bun's native file API.
+ *
+ * @param filePath - Path to file
+ * @returns File contents as ArrayBuffer
+ */
+export async function readBinaryFile(filePath: string): Promise<ArrayBuffer> {
+	return Bun.file(filePath).arrayBuffer();
+}
+
+/**
+ * Write text to a file asynchronously using Bun's native write.
+ *
+ * @param filePath - Path to file
+ * @param content - Content to write
+ */
+export async function writeTextFile(
+	filePath: string,
+	content: string,
+): Promise<void> {
+	await Bun.write(filePath, content);
+}
+
+/**
+ * Write JSON to a file asynchronously.
+ *
+ * @param filePath - Path to file
+ * @param value - Value to serialize as JSON
+ * @param space - Indentation spaces (default: 2)
+ */
+export async function writeJsonFile(
+	filePath: string,
+	value: unknown,
+	space = 2,
+): Promise<void> {
+	await Bun.write(filePath, `${JSON.stringify(value, null, space)}\n`);
+}
+
+/**
+ * Write binary data to a file asynchronously.
+ *
+ * @param filePath - Path to file
+ * @param content - Binary content to write
+ */
+export async function writeBinaryFile(
+	filePath: string,
+	content: ArrayBuffer | Uint8Array,
+): Promise<void> {
+	await Bun.write(filePath, content);
+}
+
+/**
+ * Ensure a directory exists, creating it if necessary.
+ *
+ * @param dirPath - Directory path
+ */
+export async function ensureDir(dirPath: string): Promise<void> {
+	await mkdir(dirPath, { recursive: true });
+}
+
+/**
+ * Ensure parent directory exists for a file path.
+ *
+ * @param filePath - File path
+ */
+export async function ensureParentDir(filePath: string): Promise<void> {
+	await mkdir(path.dirname(filePath), { recursive: true });
+}
+
+/**
+ * Copy a file using Bun's zero-copy optimization.
+ *
+ * @param src - Source file path
+ * @param dest - Destination file path
+ */
+export async function copyFile(src: string, dest: string): Promise<void> {
+	await Bun.write(dest, Bun.file(src));
+}
+
+/**
+ * Move/rename a file.
+ *
+ * @param src - Source file path
+ * @param dest - Destination file path
+ */
+export async function moveFile(src: string, dest: string): Promise<void> {
+	await fsRename(src, dest);
+}
+
+/**
+ * Rename a file (alias for moveFile).
+ *
+ * @param oldPath - Current file path
+ * @param newPath - New file path
+ */
+export async function rename(oldPath: string, newPath: string): Promise<void> {
+	await fsRename(oldPath, newPath);
+}
+
+/**
+ * Delete a file.
+ *
+ * @param filePath - File path to delete
+ */
+export async function unlink(filePath: string): Promise<void> {
+	await fsUnlink(filePath);
+}
+
+/**
+ * Remove a directory recursively.
+ *
+ * @param dirPath - Directory to remove
+ * @param options - Options (force: ignore errors)
+ */
+export async function removeDir(
+	dirPath: string,
+	options?: { recursive?: boolean; force?: boolean },
+): Promise<void> {
+	await rm(dirPath, { recursive: true, ...options });
+}
+
+/**
+ * List files in a directory asynchronously.
+ *
+ * @param dirPath - Directory path
+ * @returns Array of file/directory names
+ */
+export async function readDirAsync(dirPath: string): Promise<string[]> {
+	return readdir(dirPath);
+}
+
+/**
+ * List files in a directory recursively.
+ *
+ * @param dirPath - Directory path
+ * @returns Array of relative file paths
+ */
+export async function readDirRecursive(dirPath: string): Promise<string[]> {
+	return readdir(dirPath, { recursive: true }) as Promise<string[]>;
+}
+
+/**
+ * Append content to a file.
+ *
+ * @param filePath - Path to file
+ * @param content - Content to append
+ */
+export async function appendToFile(
+	filePath: string,
+	content: string,
+): Promise<void> {
+	await appendFile(filePath, content);
+}
+
+/**
+ * Get file info using Bun's file API.
+ *
+ * @param filePath - File path
+ * @returns Object with size, lastModified, and type
+ */
+export async function getFileInfo(
+	filePath: string,
+): Promise<{ size: number; lastModified: number; type: string }> {
+	const file = Bun.file(filePath);
+	if (!(await file.exists())) {
+		throw new Error(`File not found: ${filePath}`);
+	}
+	return {
+		size: file.size,
+		lastModified: file.lastModified,
+		type: file.type,
+	};
+}
+
+/**
+ * Get file statistics.
+ *
+ * @param filePath - File path
+ * @returns Object with size and mtimeMs
+ */
+export async function stat(
+	filePath: string,
+): Promise<{ size: number; mtimeMs: number }> {
+	const s = await fsStat(filePath);
+	return {
+		size: s.size,
+		mtimeMs: s.mtimeMs,
+	};
+}
+
+// ============================================
+// SYNC OPERATIONS - node:fs (native in Bun)
+// ============================================
+
+/**
+ * Check if a path exists synchronously.
+ *
+ * @param filePath - Path to check
+ * @returns true if path exists
+ */
+export function pathExistsSync(filePath: string): boolean {
+	return existsSync(filePath);
+}
+
+/**
  * Read file contents synchronously.
  *
- * Uses Bun.spawnSync with cat for synchronous reading.
- * Prefer async readTextFile when possible.
- *
- * @param path - Path to file
+ * @param filePath - Path to file
  * @returns File contents as string
  * @throws Error if file doesn't exist
  */
-export function readTextFileSync(path: string): string {
-	const proc = Bun.spawnSync(["cat", path]);
-	if (proc.exitCode !== 0) {
-		throw new Error(`File not found: ${path}`);
+export function readTextFileSync(filePath: string): string {
+	try {
+		return readFileSync(filePath, "utf8");
+	} catch (err) {
+		if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+			throw new Error(`File not found: ${filePath}`);
+		}
+		throw err;
 	}
-	return new TextDecoder().decode(proc.stdout);
-}
-
-export async function readJsonFile<T>(path: string): Promise<T> {
-	const text = await readTextFile(path);
-	return JSON.parse(text) as T;
 }
 
 /**
  * Read JSON file synchronously.
  *
- * @param path - Path to JSON file
+ * @param filePath - Path to JSON file
  * @returns Parsed JSON content
  */
-export function readJsonFileSync<T>(path: string): T {
-	const text = readTextFileSync(path);
+export function readJsonFileSync<T>(filePath: string): T {
+	const text = readTextFileSync(filePath);
 	return JSON.parse(text) as T;
 }
 
-export async function writeTextFile(
-	path: string,
-	contents: string,
-): Promise<void> {
-	await Bun.write(path, contents);
+/**
+ * Read binary file synchronously.
+ *
+ * @param filePath - Path to file
+ * @returns File contents as Buffer
+ */
+export function readBinaryFileSync(filePath: string): Buffer {
+	return readFileSync(filePath);
 }
 
 /**
- * Write text to a file synchronously using Bun.write.
+ * Write text to a file synchronously.
  *
- * Note: Bun.write is actually async, but we can use spawnSync for truly sync writes.
- *
- * @param path - Path to file
- * @param contents - Content to write
+ * @param filePath - Path to file
+ * @param content - Content to write
  */
-export function writeTextFileSync(path: string, contents: string): void {
-	// Use printf instead of echo to avoid newline issues
-	const proc = Bun.spawnSync([
-		"sh",
-		"-c",
-		`printf '%s' "$1" > "$2"`,
-		"sh",
-		contents,
-		path,
-	]);
-	if (proc.exitCode !== 0) {
-		throw new Error(`Failed to write file: ${path}`);
-	}
-}
-
-export async function writeJsonFile(
-	path: string,
-	value: unknown,
-	space = 2,
-): Promise<void> {
-	await writeTextFile(path, `${JSON.stringify(value, null, space)}\n`);
+export function writeTextFileSync(filePath: string, content: string): void {
+	writeFileSync(filePath, content, "utf8");
 }
 
 /**
  * Write JSON to a file synchronously.
  *
- * @param path - Path to file
+ * @param filePath - Path to file
  * @param value - Value to serialize as JSON
  * @param space - Indentation spaces (default: 2)
  */
 export function writeJsonFileSync(
-	path: string,
+	filePath: string,
 	value: unknown,
 	space = 2,
 ): void {
-	writeTextFileSync(path, `${JSON.stringify(value, null, space)}\n`);
+	writeFileSync(filePath, `${JSON.stringify(value, null, space)}\n`, "utf8");
 }
 
 /**
- * Ensure a directory exists, creating it if necessary.
- * Uses Bun-native spawn with mkdir -p.
+ * Write binary data to a file synchronously.
  *
- * @param path - Directory path
+ * @param filePath - Path to file
+ * @param content - Binary content to write
  */
-export async function ensureDir(path: string): Promise<void> {
-	const proc = Bun.spawn(["mkdir", "-p", path]);
-	await proc.exited;
-	if (proc.exitCode !== 0) {
-		throw new Error(`Failed to create directory: ${path}`);
-	}
+export function writeBinaryFileSync(
+	filePath: string,
+	content: Buffer | Uint8Array,
+): void {
+	writeFileSync(filePath, content);
 }
 
 /**
- * Ensure a directory exists synchronously using Bun-native spawnSync.
+ * Ensure a directory exists synchronously.
  *
- * @param path - Directory path
+ * @param dirPath - Directory path
  */
-export function ensureDirSync(path: string): void {
-	const proc = Bun.spawnSync(["mkdir", "-p", path]);
-	if (proc.exitCode !== 0) {
-		throw new Error(`Failed to create directory: ${path}`);
-	}
+export function ensureDirSync(dirPath: string): void {
+	mkdirSync(dirPath, { recursive: true });
+}
+
+/**
+ * Ensure parent directory exists synchronously.
+ *
+ * @param filePath - File path
+ */
+export function ensureParentDirSync(filePath: string): void {
+	mkdirSync(path.dirname(filePath), { recursive: true });
+}
+
+/**
+ * Copy a file synchronously.
+ *
+ * @param src - Source file path
+ * @param dest - Destination file path
+ */
+export function copyFileSync(src: string, dest: string): void {
+	fsCopyFileSync(src, dest);
+}
+
+/**
+ * Move/rename a file synchronously.
+ *
+ * @param src - Source file path
+ * @param dest - Destination file path
+ */
+export function moveFileSync(src: string, dest: string): void {
+	fsRenameSync(src, dest);
+}
+
+/**
+ * Rename a file synchronously (alias for moveFileSync).
+ *
+ * @param oldPath - Current file path
+ * @param newPath - New file path
+ */
+export function renameSync(oldPath: string, newPath: string): void {
+	fsRenameSync(oldPath, newPath);
+}
+
+/**
+ * Delete a file synchronously.
+ *
+ * @param filePath - File path to delete
+ */
+export function unlinkSync(filePath: string): void {
+	fsUnlinkSync(filePath);
+}
+
+/**
+ * Remove a directory recursively (sync).
+ *
+ * @param dirPath - Directory to remove
+ * @param options - Options (force: ignore errors)
+ */
+export function removeDirSync(
+	dirPath: string,
+	options?: { recursive?: boolean; force?: boolean },
+): void {
+	rmSync(dirPath, { recursive: true, ...options });
 }
 
 /**
  * List files in a directory synchronously.
- * Returns just the file/directory names, not full paths.
- * Uses Bun-native spawnSync with ls.
  *
- * @param path - Directory path
+ * @param dirPath - Directory path
  * @returns Array of file/directory names
  */
-export function readDir(path: string): string[] {
-	const proc = Bun.spawnSync(["ls", "-1", path]);
-	if (proc.exitCode !== 0) {
-		throw new Error(`Failed to read directory: ${path}`);
-	}
-	const output = new TextDecoder().decode(proc.stdout);
-	return output
-		.trim()
-		.split("\n")
-		.filter((s) => s.length > 0);
+export function readDir(dirPath: string): string[] {
+	return readdirSync(dirPath);
 }
 
 /**
- * List files in a directory asynchronously.
- * Returns just the file/directory names, not full paths.
- * Uses Bun-native spawn with ls.
+ * List files in a directory recursively (sync).
  *
- * @param path - Directory path
- * @returns Array of file/directory names
+ * @param dirPath - Directory path
+ * @returns Array of relative file paths
  */
-export async function readDirAsync(path: string): Promise<string[]> {
-	const proc = Bun.spawn(["ls", "-1", path]);
-	await proc.exited;
-	if (proc.exitCode !== 0) {
-		throw new Error(`Failed to read directory: ${path}`);
-	}
-	const output = new TextDecoder().decode(
-		await Bun.readableStreamToArrayBuffer(proc.stdout),
-	);
-	return output
-		.trim()
-		.split("\n")
-		.filter((s) => s.length > 0);
+export function readDirRecursiveSync(dirPath: string): string[] {
+	return readdirSync(dirPath, { recursive: true }) as string[];
 }
+
+/**
+ * Append content to a file synchronously.
+ *
+ * @param filePath - Path to file
+ * @param content - Content to append
+ */
+export function appendToFileSync(filePath: string, content: string): void {
+	appendFileSync(filePath, content, "utf8");
+}
+
+/**
+ * Check if path is a directory.
+ *
+ * @param filePath - Path to check
+ * @returns true if path is a directory
+ */
+export function isDirectorySync(filePath: string): boolean {
+	return existsSync(filePath) && nodeStatSync(filePath).isDirectory();
+}
+
+/**
+ * Check if path is a file.
+ *
+ * @param filePath - Path to check
+ * @returns true if path is a file
+ */
+export function isFileSync(filePath: string): boolean {
+	return existsSync(filePath) && nodeStatSync(filePath).isFile();
+}
+
+/**
+ * Get file statistics synchronously.
+ *
+ * @param filePath - File path
+ * @returns Stats object
+ */
+export function statSync(filePath: string): {
+	size: number;
+	mtimeMs: number;
+	isDirectory: () => boolean;
+	isFile: () => boolean;
+	isSymbolicLink: () => boolean;
+} {
+	return nodeStatSync(filePath);
+}
+
+// ============================================
+// BUN-SPECIFIC UTILITIES - Unique value-add
+// ============================================
 
 /**
  * Calculate SHA256 hash of a string using Bun's native hashing.
@@ -206,10 +509,21 @@ export function sha256(content: string): string {
 }
 
 /**
- * Calculate a fast non-cryptographic hash for cache keys.
+ * Calculate SHA256 hash of a file's contents.
  *
- * Uses Bun.hash (xxHash64) which is much faster than SHA256
- * but not suitable for security purposes.
+ * @param filePath - Path to the file to hash
+ * @returns Hex-encoded SHA256 hash
+ */
+export async function sha256File(filePath: string): Promise<string> {
+	const buffer = await Bun.file(filePath).arrayBuffer();
+	const hasher = new Bun.CryptoHasher("sha256");
+	hasher.update(buffer);
+	return hasher.digest("hex");
+}
+
+/**
+ * Calculate a fast non-cryptographic hash for cache keys.
+ * Uses Bun.hash (xxHash64) which is much faster than SHA256.
  *
  * @param content - Content to hash
  * @returns Hash as bigint (or number for small values)
@@ -230,107 +544,265 @@ export function deepEquals(a: unknown, b: unknown, strict = false): boolean {
 	return Bun.deepEquals(a, b, strict);
 }
 
+// ============================================
+// TEMP FILES - useful for CLI tools
+// ============================================
+
 /**
- * Calculate SHA256 hash of a file's contents using Bun's native hashing.
- * Useful for content-based deduplication and cache invalidation.
+ * Create a temporary directory with a unique name.
  *
- * @param filePath - Path to the file to hash
- * @returns Hex-encoded SHA256 hash
+ * @param prefix - Prefix for the directory name
+ * @returns Path to the created temp directory
  */
-export async function sha256File(filePath: string): Promise<string> {
-	const file = Bun.file(filePath);
-	const buffer = await file.arrayBuffer();
-	const hasher = new Bun.CryptoHasher("sha256");
-	hasher.update(buffer);
-	return hasher.digest("hex");
+export function createTempDir(prefix = "temp"): string {
+	const dir = path.join(
+		process.env.TMPDIR || "/tmp",
+		`${prefix}-${crypto.randomUUID()}`,
+	);
+	mkdirSync(dir, { recursive: true });
+	return dir;
 }
 
 /**
- * Copy a file using Bun's native file API.
- * Creates parent directories if they don't exist.
+ * Run a function with a temporary directory, cleaning up after.
  *
- * @param src - Source file path
- * @param dest - Destination file path
+ * @param fn - Async function that receives the temp directory path
+ * @param prefix - Prefix for the directory name
+ * @returns Result of the function
  */
-export async function copyFile(src: string, dest: string): Promise<void> {
-	await Bun.write(dest, Bun.file(src));
-}
-
-/**
- * Move a file (copy then delete source).
- * Handles cross-filesystem moves where rename() would fail.
- * Uses Bun-native spawn with rm.
- *
- * @param src - Source file path
- * @param dest - Destination file path
- */
-export async function moveFile(src: string, dest: string): Promise<void> {
-	await copyFile(src, dest);
-	const proc = Bun.spawn(["rm", src]);
-	await proc.exited;
-	if (proc.exitCode !== 0) {
-		throw new Error(`Failed to remove source file: ${src}`);
+export async function withTempDir<T>(
+	fn: (tempDir: string) => Promise<T>,
+	prefix = "temp",
+): Promise<T> {
+	const dir = createTempDir(prefix);
+	try {
+		return await fn(dir);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
 	}
 }
 
 /**
- * Rename/move a file atomically.
- * Uses Bun-native spawn with mv.
+ * Run a sync function with a temporary directory, cleaning up after.
  *
- * @param oldPath - Current file path
- * @param newPath - New file path
+ * @param fn - Sync function that receives the temp directory path
+ * @param prefix - Prefix for the directory name
+ * @returns Result of the function
  */
-export async function rename(oldPath: string, newPath: string): Promise<void> {
-	const proc = Bun.spawn(["mv", oldPath, newPath]);
-	await proc.exited;
-	if (proc.exitCode !== 0) {
-		throw new Error(`Failed to rename ${oldPath} to ${newPath}`);
+export function withTempDirSync<T>(
+	fn: (tempDir: string) => T,
+	prefix = "temp",
+): T {
+	const dir = createTempDir(prefix);
+	try {
+		return fn(dir);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
 	}
 }
 
 /**
- * Delete a file.
- * Uses Bun-native spawn with rm.
+ * Generate a temp file path (doesn't create the file).
  *
- * @param path - File path to delete
+ * @param prefix - Prefix for the file name
+ * @param ext - File extension
+ * @returns Path to the temp file
  */
-export async function unlink(path: string): Promise<void> {
-	const proc = Bun.spawn(["rm", path]);
-	await proc.exited;
-	if (proc.exitCode !== 0) {
-		throw new Error(`Failed to delete file: ${path}`);
+export function createTempFilePath(prefix = "temp", ext = ""): string {
+	const dir = process.env.TMPDIR || "/tmp";
+	return path.join(dir, `${prefix}-${crypto.randomUUID()}${ext}`);
+}
+
+// ============================================
+// ATOMIC WRITES - safe for concurrent access
+// ============================================
+
+/**
+ * Write text file atomically (write to temp, then rename).
+ * Safe for concurrent access and prevents partial writes.
+ *
+ * @param filePath - Target file path
+ * @param content - Content to write
+ */
+export async function writeTextFileAtomic(
+	filePath: string,
+	content: string,
+): Promise<void> {
+	const tempPath = `${filePath}.${crypto.randomUUID()}.tmp`;
+	await Bun.write(tempPath, content);
+	await fsRename(tempPath, filePath);
+}
+
+/**
+ * Write JSON file atomically.
+ *
+ * @param filePath - Target file path
+ * @param value - Value to serialize as JSON
+ * @param space - Indentation spaces (default: 2)
+ */
+export async function writeJsonFileAtomic(
+	filePath: string,
+	value: unknown,
+	space = 2,
+): Promise<void> {
+	await writeTextFileAtomic(
+		filePath,
+		`${JSON.stringify(value, null, space)}\n`,
+	);
+}
+
+/**
+ * Write text file atomically (sync version).
+ *
+ * @param filePath - Target file path
+ * @param content - Content to write
+ */
+export function writeTextFileSyncAtomic(
+	filePath: string,
+	content: string,
+): void {
+	const tempPath = `${filePath}.${crypto.randomUUID()}.tmp`;
+	writeFileSync(tempPath, content, "utf8");
+	fsRenameSync(tempPath, filePath);
+}
+
+/**
+ * Write JSON file atomically (sync version).
+ *
+ * @param filePath - Target file path
+ * @param value - Value to serialize as JSON
+ * @param space - Indentation spaces (default: 2)
+ */
+export function writeJsonFileSyncAtomic(
+	filePath: string,
+	value: unknown,
+	space = 2,
+): void {
+	writeTextFileSyncAtomic(filePath, `${JSON.stringify(value, null, space)}\n`);
+}
+
+// ============================================
+// ADDITIONAL HELPERS - useful for CLI tools
+// ============================================
+
+/**
+ * Read JSON file, returning default value if file doesn't exist or is invalid.
+ *
+ * @param filePath - Path to JSON file
+ * @param defaultValue - Value to return on error
+ * @returns Parsed JSON or default value
+ */
+export function readJsonFileOrDefault<T>(filePath: string, defaultValue: T): T {
+	if (!existsSync(filePath)) return defaultValue;
+	try {
+		return readJsonFileSync(filePath);
+	} catch {
+		return defaultValue;
 	}
 }
 
 /**
- * Delete a file synchronously.
- * Uses Bun-native spawnSync with rm.
+ * Find a file by walking up directories (like finding package.json).
  *
- * @param path - File path to delete
+ * @param filename - Name of file to find
+ * @param startDir - Directory to start search (default: cwd)
+ * @returns Full path to file, or null if not found
  */
-export function unlinkSync(path: string): void {
-	const proc = Bun.spawnSync(["rm", path]);
-	if (proc.exitCode !== 0) {
-		throw new Error(`Failed to delete file: ${path}`);
+export function findUpSync(
+	filename: string,
+	startDir = process.cwd(),
+): string | null {
+	let dir = startDir;
+	while (true) {
+		const filePath = path.join(dir, filename);
+		if (existsSync(filePath)) return filePath;
+		const parent = path.dirname(dir);
+		if (parent === dir) return null;
+		dir = parent;
 	}
 }
 
 /**
- * Get file statistics.
- * Returns size and modification time using Bun.file().
+ * Get project root (directory containing package.json).
  *
- * @param path - File path
- * @returns Object with size and mtimeMs
+ * @param startDir - Directory to start search (default: cwd)
+ * @returns Path to project root, or null if not found
  */
-export async function stat(
-	path: string,
-): Promise<{ size: number; mtimeMs: number }> {
-	const file = Bun.file(path);
-	if (!(await file.exists())) {
-		throw new Error(`File not found: ${path}`);
-	}
-	return {
-		size: file.size,
-		mtimeMs: file.lastModified,
-	};
+export function findProjectRoot(startDir = process.cwd()): string | null {
+	const pkgPath = findUpSync("package.json", startDir);
+	return pkgPath ? path.dirname(pkgPath) : null;
 }
+
+/**
+ * Ensure file exists with default content.
+ *
+ * @param filePath - Path to file
+ * @param defaultContent - Content to write if file doesn't exist
+ */
+export function ensureFileSync(filePath: string, defaultContent = ""): void {
+	if (!existsSync(filePath)) {
+		ensureParentDirSync(filePath);
+		writeFileSync(filePath, defaultContent, "utf8");
+	}
+}
+
+/**
+ * Read lines from a file as array (empty lines filtered out).
+ *
+ * @param filePath - Path to file
+ * @returns Array of non-empty lines
+ */
+export function readLinesSync(filePath: string): string[] {
+	return readTextFileSync(filePath).split("\n").filter(Boolean);
+}
+
+/**
+ * Write lines to a file.
+ *
+ * @param filePath - Path to file
+ * @param lines - Lines to write
+ */
+export function writeLinesSync(filePath: string, lines: string[]): void {
+	writeFileSync(filePath, `${lines.join("\n")}\n`, "utf8");
+}
+
+/**
+ * Safe JSON parse with fallback.
+ *
+ * @param content - JSON string to parse
+ * @param fallback - Value to return on parse error
+ * @returns Parsed JSON or fallback value
+ */
+export function safeJsonParse<T>(content: string, fallback: T): T {
+	try {
+		return JSON.parse(content);
+	} catch {
+		return fallback;
+	}
+}
+
+// ============================================
+// RE-EXPORTS - convenience for common node:fs functions
+// ============================================
+
+export {
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	writeFileSync,
+	rmSync,
+	fsCopyFileSync as nodeCopyFileSync,
+	fsRenameSync as nodeRenameSync,
+	fsUnlinkSync as nodeUnlinkSync,
+};
+
+export {
+	mkdir,
+	readdir,
+	rm,
+	fsCopyFile as nodeCopyFile,
+	fsRename as nodeRename,
+	fsUnlink as nodeUnlink,
+	fsStat as nodeStat,
+};

@@ -2,11 +2,7 @@ import { describe, expect, it } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import {
-	ensureDirSync,
-	pathExistsSync,
-	writeTextFileSync,
-} from "@sidequest/core/fs";
+import { ensureDirSync, writeTextFileSync } from "@sidequest/core/fs";
 import { spawn } from "bun";
 
 import { loadConfig } from "./config";
