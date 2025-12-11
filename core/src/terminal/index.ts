@@ -646,3 +646,59 @@ export function terminalHeight(): number {
 export function isMainScript(importMetaPath: string): boolean {
 	return importMetaPath === Bun.main;
 }
+
+// ============================================================================
+// Output format utilities (merged from formatters module)
+// ============================================================================
+
+/**
+ * Output format for CLI commands
+ *
+ * Supports dual output modes:
+ * - Markdown: Human-readable, optimized for Claude parsing (default)
+ * - JSON: Machine-readable, for programmatic consumption
+ */
+export enum OutputFormat {
+	MARKDOWN = "markdown",
+	JSON = "json",
+}
+
+/**
+ * Parse output format from CLI flag
+ *
+ * @param flag - Output format flag value
+ * @returns Parsed OutputFormat enum value
+ *
+ * @example
+ * ```ts
+ * parseOutputFormat("json");     // OutputFormat.JSON
+ * parseOutputFormat("markdown"); // OutputFormat.MARKDOWN
+ * parseOutputFormat("md");       // OutputFormat.MARKDOWN
+ * parseOutputFormat();           // OutputFormat.MARKDOWN (default)
+ * ```
+ */
+export function parseOutputFormat(flag?: string): OutputFormat {
+	if (flag === "json") return OutputFormat.JSON;
+	if (flag === "md" || flag === "markdown") return OutputFormat.MARKDOWN;
+	return OutputFormat.MARKDOWN;
+}
+
+/**
+ * Semantic text emphasis helpers
+ *
+ * Simple color wrappers for common semantic meanings.
+ *
+ * @example
+ * ```ts
+ * console.log(emphasize.success("Done!"));
+ * console.log(emphasize.error("Failed!"));
+ * console.log(emphasize.warn("Careful!"));
+ * ```
+ */
+export const emphasize = {
+	success: (text: string) => green(text),
+	info: (text: string) => cyan(text),
+	warn: (text: string) => yellow(text),
+	error: (text: string) => red(text),
+	dim: (text: string) => dim(text),
+};
