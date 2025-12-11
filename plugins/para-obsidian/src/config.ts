@@ -24,6 +24,8 @@ import {
 	DEFAULT_TEMPLATE_VERSIONS,
 	DEFAULT_TITLE_PREFIXES,
 } from "./defaults";
+import type { InboxConverter } from "./inbox/converters";
+import { DEFAULT_INBOX_CONVERTERS, mergeConverters } from "./inbox/converters";
 
 /**
  * Defines validation rules for frontmatter fields by note type.
@@ -98,6 +100,12 @@ export interface ParaObsidianConfig {
 	readonly defaultParaSearchFolders?: ReadonlyArray<string>;
 	/** Title prefixes for specific template types (e.g., "research" → "Research -"). */
 	readonly titlePrefixes?: Partial<Record<string, string>>;
+	/** Inbox converter overrides (merged with defaults). */
+	readonly inboxConverters?: ReadonlyArray<
+		Partial<InboxConverter> & { id: string }
+	>;
+	/** IDs of converters to disable. */
+	readonly disabledConverters?: ReadonlyArray<string>;
 }
 
 /**
@@ -248,6 +256,11 @@ export function loadConfig(
 		defaultParaSearchFolders,
 		defaultSearchDirs,
 		titlePrefixes: merged.titlePrefixes ?? DEFAULT_TITLE_PREFIXES,
+		inboxConverters: mergeConverters(
+			DEFAULT_INBOX_CONVERTERS,
+			merged.inboxConverters ?? [],
+			merged.disabledConverters ?? [],
+		),
 	};
 }
 

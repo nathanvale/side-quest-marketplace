@@ -13,7 +13,7 @@ Development skills for building CLI tools with Bun, runtime workflows, and devel
 
 ---
 
-## Skills (4 Total, 3 Implemented)
+## Skills (5 Total, 4 Implemented)
 
 ### ✅ Implemented Skills
 
@@ -51,7 +51,25 @@ Development skills for building CLI tools with Bun, runtime workflows, and devel
   - Faster than Node by design (Rust, JavaScriptCore)
   - Workspace protocol `workspace:*` for local deps
 
-#### 3. **Developer Experience (DX) Patterns**
+#### 3. **Bun Filesystem Helpers**
+- **SKILL.md:** `skills/bun-fs-helpers/SKILL.md`
+- **Content:** Pure Bun-native filesystem utilities from @sidequest/core/fs
+- **Covers:**
+  - File existence checks (pathExists, pathExistsSync)
+  - Reading/writing files (text and JSON, async and sync)
+  - Directory operations (ensureDir, readDir)
+  - File operations (copy, move, rename, delete)
+  - File stats and hashing (SHA256, xxHash64)
+  - TOCTOU protection patterns
+  - Migration guide from node:fs
+- **Key Points:**
+  - Zero node:fs dependencies
+  - Command injection safe (array args only)
+  - Token-efficient imports
+  - Performance characteristics documented
+  - Security guarantees (TOCTOU, atomic writes)
+
+#### 4. **Developer Experience (DX) Patterns**
 - **SKILL.md:** `skills/dx-patterns/SKILL.md`
 - **Content:** DX Framework, feedback loops, cognitive load, flow state, ADHD-friendly patterns
 - **Covers:**
@@ -102,6 +120,8 @@ plugins/dev-toolkit/
 │   │       └── review-cli.ts      # CLI reviewer (stub)
 │   ├── bun-runtime/
 │   │   └── SKILL.md               # Bun runtime workflows
+│   ├── bun-fs-helpers/
+│   │   └── SKILL.md               # Pure Bun-native filesystem utilities
 │   └── dx-patterns/
 │       └── SKILL.md               # Developer experience patterns
 ```
@@ -145,6 +165,14 @@ Each skill responds to natural language patterns:
 - "monorepo"
 - "bun workflows"
 - "bun performance"
+
+**Bun Filesystem Helpers triggers:**
+- "bun fs"
+- "filesystem helpers"
+- "@sidequest/core/fs"
+- "command injection safe"
+- "node:fs alternative"
+- "bun-native filesystem"
 
 **DX Patterns triggers:**
 - "developer experience"
@@ -257,13 +285,18 @@ All skills follow:
 
 ## Maintenance
 
-**Last Updated:** 2025-12-05
+**Last Updated:** 2025-12-11
 **Phase:** 1 (Foundation)
 **Next Review:** After all Phase 1 skills complete
 **Status:** ✅ Production-ready
 
 ### Changelog
 
+- **v1.1.0** (2025-12-11) — Added Bun Filesystem Helpers
+  - Added: Bun FS Helpers skill documenting @sidequest/core/fs
+  - Content: Pure Bun-native filesystem utilities (zero node:fs)
+  - Security: Command injection safe, TOCTOU protection patterns
+  - Migration: Complete guide from node:fs to Bun-native
 - **v1.0.0** (2025-12-05) — Phase 1 launch
   - Added: Bun CLI Development skill + references + scripts
   - Added: Bun Runtime Workflows skill
@@ -278,6 +311,7 @@ All skills follow:
 |----------|----------|
 | Bun CLI Skill | `skills/bun-cli/SKILL.md` |
 | Bun Runtime Skill | `skills/bun-runtime/SKILL.md` |
+| Bun FS Helpers Skill | `skills/bun-fs-helpers/SKILL.md` |
 | DX Patterns Skill | `skills/dx-patterns/SKILL.md` |
 | CLI Patterns Reference | `skills/bun-cli/references/bun-cli-patterns.md` |
 | Roadmap | `ROADMAP.md` |

@@ -14,6 +14,7 @@
  * ```
  */
 
+import type { InboxConverter } from "./converters";
 import { llmLogger } from "./logger";
 
 // Non-null assertion for logger
@@ -79,8 +80,8 @@ export interface FieldExtractionResult {
 	readonly checkIn?: string;
 	readonly checkOut?: string;
 
-	// Generic fields
-	readonly [key: string]: string | undefined;
+	// Allow additional fields from converters
+	readonly [key: string]: unknown;
 }
 
 /**
@@ -106,6 +107,9 @@ export interface DocumentTypeResult {
 
 	/** Extracted fields from the document */
 	readonly extractedFields?: FieldExtractionResult | null;
+
+	/** Suggested attachment filename description (e.g., "pv-foulkes-invoice-0004447") */
+	readonly suggestedFilenameDescription?: string | null;
 
 	/** LLM's reasoning for the classification */
 	readonly reasoning?: string;
@@ -134,8 +138,10 @@ const EXAMPLE_RESPONSE = {
 	confidence: 0.92,
 	suggestedArea: "Health",
 	suggestedProject: "Medical Expenses 2024",
+	suggestedFilenameDescription: "invoice-20241201-dr-smith-medical-practice",
 	extractedFields: {
-		amount: "$220 AUD",
+		amount: "220.00",
+		currency: "AUD",
 		provider: "Dr Smith Medical Practice",
 		date: "2024-12-01",
 		invoiceNumber: "INV-4480",
@@ -145,6 +151,33 @@ const EXAMPLE_RESPONSE = {
 };
 
 // =============================================================================
+// Converter Support
+// =============================================================================
+
+/**
+ * Build document type list from converters for LLM prompt
+ */
+function buildDocumentTypesFromConverters(
+	converters: readonly InboxConverter[],
+): string {
+	return converters
+		.filter((c) => c.enabled)
+		.map((c) => c.id)
+		.join(", ");
+}
+
+/**
+ * Build field extraction guidelines from converter
+ */
+function buildFieldGuidelinesFromConverter(converter: InboxConverter): string {
+	return converter.fields
+		.map(
+			(f) => `- ${f.name}: ${f.description}${f.required ? " (required)" : ""}`,
+		)
+		.join("\n");
+}
+
+// =============================================================================
 // Prompt Building
 // =============================================================================
 
@@ -152,9 +185,13 @@ const EXAMPLE_RESPONSE = {
  * Build the LLM prompt for document type detection and field extraction.
  *
  * @param options - Prompt options including content, filename, and vault context
+ * @param converters - Optional converters for dynamic document types and fields
  * @returns Formatted prompt string
  */
-export function buildInboxPrompt(options: InboxPromptOptions): string {
+export function buildInboxPrompt(
+	options: InboxPromptOptions,
+	converters?: readonly InboxConverter[],
+): string {
 	const { content, filename, vaultContext, userHint } = options;
 
 	const areasSection =
@@ -169,6 +206,33 @@ export function buildInboxPrompt(options: InboxPromptOptions): string {
 
 	const userHintSection = userHint ? `\nUser hint: "${userHint}"` : "";
 
+	// Use converters if provided, otherwise fall back to DOCUMENT_TYPES
+	const documentTypes = converters
+		? buildDocumentTypesFromConverters(converters)
+		: DOCUMENT_TYPES.map((t) => `- ${t}`).join("\n");
+
+	// Build field guidelines from converters if provided
+	let fieldGuidelines = `## Field Extraction Guidelines
+- For invoices: amount (numeric only, no symbols), currency (code only, e.g., AUD), provider, date, invoiceNumber, abn, gst
+- For bookings: date, provider, bookingReference, departure, arrival, passenger
+- For receipts: amount (numeric only, no symbols), currency (code only, e.g., AUD), provider, date, category
+- For generic: any notable key-value pairs
+
+**CRITICAL for currency fields:**
+- amount: Extract ONLY the numeric value (e.g., "220.00" not "$220 AUD")
+- currency: Extract ONLY the 3-letter currency code (e.g., "AUD" not "$" or "AUD $")`;
+
+	if (converters) {
+		const converterGuidelines = converters
+			.filter((c) => c.enabled)
+			.map((c) => `- For ${c.id}: ${buildFieldGuidelinesFromConverter(c)}`)
+			.join("\n");
+
+		if (converterGuidelines) {
+			fieldGuidelines = `## Field Extraction Guidelines\n${converterGuidelines}`;
+		}
+	}
+
 	return `You are analyzing a document from an inbox to determine its type and extract key information.
 
 ## Document Information
@@ -178,7 +242,7 @@ export function buildInboxPrompt(options: InboxPromptOptions): string {
 ${content.slice(0, 3000)}
 
 ## Available Document Types
-${DOCUMENT_TYPES.map((t) => `- ${t}`).join("\n")}
+${documentTypes}
 
 ## Vault Context
 ${areasSection}
@@ -188,20 +252,26 @@ ${userHintSection}
 ## Task
 1. Determine the document type from the available types
 2. Estimate your confidence (0.0 to 1.0) in this classification
-3. Suggest an appropriate area from the vault (if any matches)
-4. Suggest an appropriate project from the vault (if any matches)
+3. Suggest an appropriate area from the vault (if any matches) - return JUST the name without brackets
+4. Suggest an appropriate project from the vault (if any matches) - return JUST the name without brackets
 5. Extract relevant fields based on document type
+6. Generate a descriptive filename slug for the attachment (lowercase, hyphen-separated)
+   - For invoices: "invoice-" + date (YYYYMMDD) + "-" + provider name (e.g., "invoice-20250930-pv-foulkes")
+   - For bookings: Use provider + booking type + reference (e.g., "qantas-flight-qf123")
+   - For receipts: Use provider + "receipt" + date (e.g., "woolworths-receipt-20241201")
+   - Keep it concise (max 50 chars), use only a-z, 0-9, and hyphens
+
+**CRITICAL for area/project fields:**
+- suggestedArea: Return ONLY the area name (e.g., "Health" not "[[Health]]")
+- suggestedProject: Return ONLY the project name (e.g., "2025 Tassie Holiday" not "[[2025 Tassie Holiday]]")
+- Wikilink brackets will be added automatically - do NOT include them
 
 ## Response Format
 Respond with a JSON object ONLY (no markdown, no explanation outside JSON):
 
 ${JSON.stringify(EXAMPLE_RESPONSE, null, 2)}
 
-## Field Extraction Guidelines
-- For invoices: amount, currency, provider, date, invoiceNumber, abn, gst
-- For bookings: date, provider, bookingReference, departure, arrival, passenger
-- For receipts: amount, currency, provider, date, category
-- For generic: any notable key-value pairs
+${fieldGuidelines}
 
 ## Confidence Guidelines
 - 0.9-1.0: Very clear document type with multiple confirming signals
@@ -278,6 +348,10 @@ export function parseDetectionResponse(response: string): DocumentTypeResult {
 		suggestedProject: obj.suggestedProject as string | null | undefined,
 		extractedFields: obj.extractedFields as
 			| FieldExtractionResult
+			| null
+			| undefined,
+		suggestedFilenameDescription: obj.suggestedFilenameDescription as
+			| string
 			| null
 			| undefined,
 		reasoning: obj.reasoning as string | undefined,

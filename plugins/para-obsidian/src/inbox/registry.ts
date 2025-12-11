@@ -32,9 +32,14 @@
  * ```
  */
 
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
-import { rename } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import {
+	ensureDirSync,
+	pathExistsSync,
+	rename,
+	unlinkSync,
+	writeTextFileSync,
+} from "@sidequest/core/fs";
 import { createInboxError } from "./errors";
 import { executeLogger } from "./logger";
 import type { ProcessedItem, ProcessedRegistry } from "./types";
@@ -162,7 +167,7 @@ export async function hashFile(filePath: string): Promise<string> {
 async function acquireLock(lockPath: string): Promise<void> {
 	const startTime = Date.now();
 
-	while (existsSync(lockPath)) {
+	while (pathExistsSync(lockPath)) {
 		// Check if lock is stale (older than timeout)
 		try {
 			const lockContent = await Bun.file(lockPath).text();
@@ -197,9 +202,9 @@ async function acquireLock(lockPath: string): Promise<void> {
 
 	// Ensure parent directory exists before creating lock file
 	const lockDir = dirname(lockPath);
-	if (!existsSync(lockDir)) {
+	if (!pathExistsSync(lockDir)) {
 		try {
-			mkdirSync(lockDir, { recursive: true });
+			ensureDirSync(lockDir);
 		} catch {
 			// Directory can't be created (read-only fs, tests with fake paths, etc.)
 			// Gracefully skip locking - single process scenario is safe
@@ -212,7 +217,7 @@ async function acquireLock(lockPath: string): Promise<void> {
 
 	// Create lock file with timestamp
 	try {
-		writeFileSync(lockPath, String(Date.now()));
+		writeTextFileSync(lockPath, String(Date.now()));
 		log.debug("Lock acquired", { path: lockPath });
 	} catch {
 		// Lock file can't be created - gracefully degrade
@@ -302,7 +307,7 @@ export function createRegistry(vaultPath: string): RegistryManager {
 			items = new Map();
 
 			// Check if file exists
-			if (!existsSync(registryPath)) {
+			if (!pathExistsSync(registryPath)) {
 				log.debug("Registry file not found, starting fresh", {
 					path: registryPath,
 				});
@@ -379,8 +384,8 @@ export function createRegistry(vaultPath: string): RegistryManager {
 		try {
 			// Ensure parent directory exists
 			const dir = dirname(registryPath);
-			if (!existsSync(dir)) {
-				mkdirSync(dir, { recursive: true });
+			if (!pathExistsSync(dir)) {
+				ensureDirSync(dir);
 			}
 
 			// Build registry object

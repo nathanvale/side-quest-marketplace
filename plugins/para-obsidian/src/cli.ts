@@ -56,6 +56,7 @@ import {
 	readTextFileSync,
 	writeTextFileSync,
 } from "@sidequest/core/fs";
+import { createSpinner } from "nanospinner";
 import { discoverAttachments } from "./attachments";
 import { cleanBrokenLinks } from "./clean-links";
 import {
@@ -94,6 +95,7 @@ import {
 	runInteractiveLoop,
 } from "./inbox/cli-adapter";
 import { createInboxEngine } from "./inbox/engine";
+import type { ExecutionResult, InboxSuggestion } from "./inbox/types";
 import {
 	buildIndex,
 	listAreas,
@@ -2516,7 +2518,97 @@ async function main(): Promise<void> {
 				});
 
 				// Scan inbox for suggestions
-				const suggestions = await engine.scan();
+				let suggestions: InboxSuggestion[];
+				if (isJson) {
+					suggestions = await engine.scan();
+				} else {
+					const scanSpinner = createSpinner("Scanning inbox...").start();
+					const scanStarted = Date.now();
+					const scanState = {
+						total: 0,
+						processed: 0,
+						skipped: 0,
+						errors: 0,
+						currentFile: "",
+						stage: "hash" as
+							| "hash"
+							| "extract"
+							| "llm"
+							| "skip"
+							| "done"
+							| "error",
+						stageStartedAt: Date.now(),
+					};
+					const stageLabel = (stage: string): string => {
+						switch (stage) {
+							case "hash":
+								return "hashing";
+							case "extract":
+								return "extracting";
+							case "llm":
+								return "LLM";
+							case "skip":
+								return "skipped";
+							case "done":
+								return "done";
+							case "error":
+								return "error";
+							default:
+								return stage;
+						}
+					};
+					const updateScanText = () => {
+						const elapsedStage = (
+							(Date.now() - scanState.stageStartedAt) /
+							1000
+						).toFixed(1);
+						const totals = `Scanning ${scanState.processed}/${scanState.total || "?"} (skipped ${scanState.skipped}, errors ${scanState.errors})`;
+						const detail =
+							scanState.currentFile === ""
+								? ""
+								: ` | ${scanState.currentFile} ${stageLabel(scanState.stage)} ${elapsedStage}s`;
+						scanSpinner.update({ text: `${totals}${detail}` });
+					};
+					const scanTicker = setInterval(updateScanText, 500);
+					try {
+						suggestions = await engine.scan({
+							onProgress: ({ total, filename, stage, error }) => {
+								scanState.total = total;
+								if (stage === "skip") {
+									scanState.skipped += 1;
+									scanState.processed += 1;
+								} else if (stage === "done") {
+									scanState.processed += 1;
+								} else if (stage === "error") {
+									scanState.errors += 1;
+									scanState.processed += 1;
+								} else {
+									scanState.currentFile = filename;
+									scanState.stage = stage;
+									scanState.stageStartedAt = Date.now();
+								}
+								if (error) {
+									scanSpinner.update({
+										text: `Scanning ${scanState.processed}/${scanState.total || "?"} (skipped ${scanState.skipped}, errors ${scanState.errors + 1}) | ${filename} error - ${error}`,
+									});
+									return;
+								}
+								updateScanText();
+							},
+						});
+						clearInterval(scanTicker);
+						const elapsed = ((Date.now() - scanStarted) / 1000).toFixed(1);
+						scanSpinner.success({
+							text: `Scan complete (${scanState.processed}/${scanState.total || suggestions.length} scanned, skipped ${scanState.skipped}, errors ${scanState.errors}) in ${elapsed}s`,
+						});
+					} catch (error) {
+						clearInterval(scanTicker);
+						scanSpinner.error({
+							text: `Scan failed: ${error instanceof Error ? error.message : "unknown error"}`,
+						});
+						throw error;
+					}
+				}
 
 				// Apply filter if provided
 				const filteredSuggestions = filterPattern
@@ -2592,9 +2684,44 @@ async function main(): Promise<void> {
 					}
 
 					// Execute all suggestions
-					const results = await engine.execute(
-						filteredSuggestions.map((s) => s.id),
-					);
+					let results: ExecutionResult[];
+					if (isJson) {
+						results = await engine.execute(
+							filteredSuggestions.map((s) => s.id),
+						);
+					} else {
+						const execSpinner = createSpinner(
+							`Executing ${filteredSuggestions.length} item(s)...`,
+						).start();
+						const execStarted = Date.now();
+						results = await engine.execute(
+							filteredSuggestions.map((s) => s.id),
+							{
+								onProgress: ({
+									processed,
+									total,
+									suggestionId,
+									success,
+									error,
+								}) => {
+									const status = success
+										? color("green", "✓")
+										: color("red", "✗");
+									const detail = error ? ` - ${error}` : "";
+									execSpinner.update({
+										text: `${status} ${processed}/${total} ${suggestionId}${detail}`,
+									});
+									console.log(
+										`${status} ${processed}/${total} ${suggestionId}${detail}`,
+									);
+								},
+							},
+						);
+						const elapsed = ((Date.now() - execStarted) / 1000).toFixed(1);
+						execSpinner.success({
+							text: `Executed ${results.length} item(s) in ${elapsed}s`,
+						});
+					}
 
 					// Aggregate results
 					const successes = results.filter((r) => r.success).length;
@@ -2664,10 +2791,34 @@ async function main(): Promise<void> {
 								),
 							);
 						} else {
-							console.log(
-								emphasize.info(`\nExecuting ${approvedIds.length} item(s)...`),
-							);
-							const results = await engine.execute(approvedIds);
+							const execSpinner = createSpinner(
+								`Executing ${approvedIds.length} item(s)...`,
+							).start();
+							const execStarted = Date.now();
+							const results = await engine.execute(approvedIds, {
+								onProgress: ({
+									processed,
+									total,
+									suggestionId,
+									success,
+									error,
+								}) => {
+									const status = success
+										? color("green", "✓")
+										: color("red", "✗");
+									const detail = error ? ` - ${error}` : "";
+									execSpinner.update({
+										text: `${status} ${processed}/${total} ${suggestionId}${detail}`,
+									});
+									console.log(
+										`${status} ${processed}/${total} ${suggestionId}${detail}`,
+									);
+								},
+							});
+							const elapsed = ((Date.now() - execStarted) / 1000).toFixed(1);
+							execSpinner.success({
+								text: `Executed ${results.length} item(s) in ${elapsed}s`,
+							});
 							displayResults(results);
 						}
 					} else {

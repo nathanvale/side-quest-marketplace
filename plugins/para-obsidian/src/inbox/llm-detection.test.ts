@@ -68,8 +68,10 @@ describe("inbox/llm-detection", () => {
 				confidence: 0.9,
 				suggestedArea: "Health",
 				suggestedProject: null,
+				suggestedFilenameDescription: "dr-smith-invoice-001",
 				extractedFields: {
-					amount: "$220 AUD",
+					amount: "220.00",
+					currency: "AUD",
 					provider: "Dr Smith",
 					date: "2024-12-01",
 				},
@@ -81,7 +83,9 @@ describe("inbox/llm-detection", () => {
 			expect(result.documentType).toBe("invoice");
 			expect(result.confidence).toBe(0.9);
 			expect(result.suggestedArea).toBe("Health");
-			expect(result.extractedFields?.amount).toBe("$220 AUD");
+			expect(result.suggestedFilenameDescription).toBe("dr-smith-invoice-001");
+			expect(result.extractedFields?.amount).toBe("220.00");
+			expect(result.extractedFields?.currency).toBe("AUD");
 		});
 
 		test("should handle JSON wrapped in markdown code blocks", () => {

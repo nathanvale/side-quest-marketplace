@@ -7,6 +7,7 @@
 
 import { input } from "@inquirer/prompts";
 import { emphasize } from "@sidequest/core/formatters";
+import { createSpinner } from "nanospinner";
 import type {
 	CLICommand,
 	Confidence,
@@ -477,11 +478,11 @@ export async function runInteractiveLoop(
 				}
 
 				isProcessing = true;
-				console.log(
-					emphasize.info(
-						`\nRe-processing item ${command.id} with: "${command.prompt}"...`,
-					),
-				);
+				const editSpinner = createSpinner(
+					`Re-processing item ${command.id} with: "${command.prompt}"...`,
+				).start();
+				editSpinner.update({ text: "Extracting PDF + calling LLM..." });
+				const editStarted = Date.now();
 				try {
 					const updated = await engine.editWithPrompt(
 						targetSuggestion.id,
@@ -494,17 +495,14 @@ export async function runInteractiveLoop(
 					if (originalIndex >= 0) {
 						currentSuggestions[originalIndex] = updated;
 					}
-					console.log(
-						emphasize.success(
-							`Updated: ${updated.suggestedTitle} (${updated.confidence} confidence)`,
-						),
-					);
+					const elapsedMs = Date.now() - editStarted;
+					editSpinner.success({
+						text: `Updated item ${command.id} (${updated.confidence}) in ${Math.max(1, Math.round(elapsedMs))}ms`,
+					});
 				} catch (error) {
-					console.error(
-						emphasize.error(
-							`Failed to edit: ${error instanceof Error ? error.message : "unknown"}`,
-						),
-					);
+					editSpinner.error({
+						text: `Failed to edit item ${command.id}: ${error instanceof Error ? error.message : "unknown"}`,
+					});
 				} finally {
 					isProcessing = false;
 				}

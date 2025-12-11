@@ -129,6 +129,37 @@ export interface OrchestratorResult {
 // =============================================================================
 
 /**
+ * Progress update emitted during scanning for user feedback.
+ */
+export interface ScanProgress {
+	/** 1-based index of current file */
+	readonly index: number;
+
+	/** Total files being scanned */
+	readonly total: number;
+
+	/** Inbox filename (no path) */
+	readonly filename: string;
+
+	/** Current stage of processing */
+	readonly stage: "hash" | "extract" | "llm" | "skip" | "done" | "error";
+
+	/** Optional error message for failed stage */
+	readonly error?: string;
+}
+
+/**
+ * Options for scanning the inbox.
+ */
+export interface ScanOptions {
+	/**
+	 * Optional progress callback invoked per file and stage.
+	 * Useful for updating CLI spinners/status lines.
+	 */
+	readonly onProgress?: (progress: ScanProgress) => void | Promise<void>;
+}
+
+/**
  * Result of executing a single suggestion.
  */
 export interface ExecutionResult {
@@ -149,6 +180,40 @@ export interface ExecutionResult {
 
 	/** Error message if execution failed */
 	readonly error?: string;
+}
+
+/**
+ * Progress update emitted during execution for user feedback.
+ */
+export interface ExecuteProgress {
+	/** Number of items processed so far (1-based) */
+	readonly processed: number;
+
+	/** Total items requested */
+	readonly total: number;
+
+	/** Suggestion ID being processed */
+	readonly suggestionId: string;
+
+	/** Action being executed */
+	readonly action: InboxAction;
+
+	/** Whether the individual execution succeeded */
+	readonly success: boolean;
+
+	/** Error message when execution failed */
+	readonly error?: string;
+}
+
+/**
+ * Options for executing suggestions.
+ */
+export interface ExecuteOptions {
+	/**
+	 * Optional progress callback invoked after each item.
+	 * Useful for updating CLI spinners/status lines.
+	 */
+	readonly onProgress?: (progress: ExecuteProgress) => void | Promise<void>;
 }
 
 // =============================================================================
@@ -233,7 +298,7 @@ export interface InboxEngine {
 	 * Scan the inbox and generate suggestions for all items.
 	 * Does NOT execute anything - just returns suggestions.
 	 */
-	scan(): Promise<InboxSuggestion[]>;
+	scan(options?: ScanOptions): Promise<InboxSuggestion[]>;
 
 	/**
 	 * Re-process a suggestion with additional user instructions.
@@ -249,9 +314,10 @@ export interface InboxEngine {
 	 * Execute approved suggestions (create notes, move attachments).
 	 *
 	 * @param ids - IDs of suggestions to execute
+	 * @param options - Optional execution options (progress callbacks)
 	 * @returns Results for each execution
 	 */
-	execute(ids: string[]): Promise<ExecutionResult[]>;
+	execute(ids: string[], options?: ExecuteOptions): Promise<ExecutionResult[]>;
 
 	/**
 	 * Generate a markdown report of suggestions.

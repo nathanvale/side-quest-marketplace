@@ -81,47 +81,15 @@ export function generateFlatFilename(
 	const ext = path.extname(basename);
 	const nameWithoutExt = path.basename(basename, ext);
 
-	// Extract type hint from parent directory or filename
-	const typeHint = inferTypeFromPath(originalPath);
-
-	// Build descriptive name: timestamp-type-description.ext
+	// Build descriptive name: timestamp-description (NO extension in middle)
 	const description = nameWithoutExt
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/^-+|-+$/g, "");
 
-	const parts = [timestampPrefix];
-	if (typeHint) parts.push(typeHint);
-	parts.push(description);
+	const parts = [timestampPrefix, description];
 
 	return `${parts.join("-")}${ext}`;
-}
-
-/**
- * Infers attachment type from file path or extension.
- *
- * @param filePath - Path to the attachment
- * @returns Type hint (e.g., 'photo', 'map', 'booking', 'scan')
- */
-function inferTypeFromPath(filePath: string): string | null {
-	const lowerPath = filePath.toLowerCase();
-
-	// Type hints from directory names
-	if (lowerPath.includes("hikes") || lowerPath.includes("hike")) return "hike";
-	if (lowerPath.includes("booking")) return "booking";
-	if (lowerPath.includes("photo") || lowerPath.includes("image"))
-		return "photo";
-	if (lowerPath.includes("map")) return "map";
-	if (lowerPath.includes("scan")) return "scan";
-	if (lowerPath.includes("receipt")) return "receipt";
-
-	// Type hints from file extensions
-	const ext = path.extname(filePath).toLowerCase();
-	if ([".jpg", ".jpeg", ".png", ".heic"].includes(ext)) return "photo";
-	if (ext === ".pdf") return "pdf";
-	if ([".svg", ".ai"].includes(ext)) return "diagram";
-
-	return null;
 }
 
 /**

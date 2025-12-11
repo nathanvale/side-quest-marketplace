@@ -11,6 +11,7 @@
 		"@inquirer/prompts": "^8.0.2",
 		"@sidequest/core": "workspace:*",
 		"date-fns": "^4.1.0",
+		"nanospinner": "^1.2.2",
 		"p-limit": "^7.2.0",
 		"yaml": "^2.6.0"
 	},

@@ -7,14 +7,23 @@
  * @module inbox/engine
  */
 
-import fs, { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
-import { moveFile } from "@sidequest/core/fs";
+import {
+	ensureDirSync,
+	moveFile,
+	pathExistsSync,
+	readDir,
+	readTextFileSync,
+	writeTextFileSync,
+} from "@sidequest/core/fs";
+import { Glob } from "bun";
 import pLimit from "p-limit";
 import { loadConfig } from "../config";
 import { createFromTemplate, injectSections } from "../create";
+import { generateFlatFilename } from "../flatten";
 import { resolveVaultPath } from "../fs";
 import { ensureGitGuard } from "../git";
+import { DEFAULT_INBOX_CONVERTERS, mapFieldsToTemplate } from "./converters";
 import { createInboxError } from "./errors";
 import {
 	buildInboxPrompt,
@@ -31,11 +40,13 @@ import {
 import { createRegistry, hashFile } from "./registry";
 import type {
 	Confidence,
+	ExecuteOptions,
 	ExecutionResult,
 	InboxAction,
 	InboxEngine,
 	InboxEngineConfig,
 	InboxSuggestion,
+	ScanOptions,
 } from "./types";
 
 // =============================================================================
@@ -108,8 +119,9 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	 *
 	 * @returns Array of suggestions for inbox items
 	 */
-	async function scan(): Promise<InboxSuggestion[]> {
+	async function scan(options?: ScanOptions): Promise<InboxSuggestion[]> {
 		const cid = crypto.randomUUID().slice(0, 8);
+		const onProgress = options?.onProgress;
 
 		if (inboxLogger) {
 			inboxLogger.info`Scan started vault=${resolvedConfig.vaultPath} cid=${cid}`;
@@ -128,7 +140,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		// List files in inbox
 		let files: string[];
 		try {
-			files = readdirSync(inboxPath);
+			files = readDir(inboxPath);
 		} catch (_error) {
 			if (inboxLogger) {
 				inboxLogger.warn`Inbox folder not found: ${inboxPath}`;
@@ -169,16 +181,27 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		const llmLimit = pLimit(resolvedConfig.concurrency?.llmCalls ?? 3);
 
 		// Process PDFs concurrently
-		const suggestionPromises = pdfFiles.map((filename) =>
+		const suggestionPromises = pdfFiles.map((filename, index) =>
 			pdfLimit(async () => {
 				const filePath = join(inboxPath, filename);
+				const progressBase = {
+					index: index + 1,
+					total: pdfFiles.length,
+					filename,
+				} as const;
 
 				// Check if already processed via hash
 				try {
+					if (onProgress) {
+						await onProgress({ ...progressBase, stage: "hash" });
+					}
 					const hash = await hashFile(filePath);
 					if (registry.isProcessed(hash)) {
 						if (inboxLogger) {
 							inboxLogger.debug`Skipping already processed: ${filename}`;
+						}
+						if (onProgress) {
+							await onProgress({ ...progressBase, stage: "skip" });
 						}
 						return null; // Skip this file
 					}
@@ -186,16 +209,34 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					if (inboxLogger) {
 						inboxLogger.warn`Failed to hash file: ${filename}`;
 					}
+					if (onProgress) {
+						await onProgress({
+							...progressBase,
+							stage: "error",
+							error: "hash failed",
+						});
+					}
 					return null;
 				}
 
 				// Extract text
 				let text: string;
 				try {
+					if (onProgress) {
+						await onProgress({ ...progressBase, stage: "extract" });
+					}
 					text = await extractPdfText(filePath, cid);
 				} catch (error) {
 					if (inboxLogger) {
 						inboxLogger.warn`Failed to extract PDF text: ${filename}`;
+					}
+					if (onProgress) {
+						await onProgress({
+							...progressBase,
+							stage: "error",
+							error:
+								error instanceof Error ? error.message : "extraction failed",
+						});
 					}
 					// Return error suggestion
 					const errorSuggestion: InboxSuggestion = {
@@ -216,6 +257,9 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				// Run LLM detection (with its own rate limit)
 				let llmResult: DocumentTypeResult | null = null;
 				try {
+					if (onProgress) {
+						await onProgress({ ...progressBase, stage: "llm" });
+					}
 					await llmLimit(async () => {
 						const prompt = buildInboxPrompt({
 							content: text,
@@ -243,6 +287,9 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					llmResult,
 				);
 				suggestionCache.set(suggestion.id, suggestion);
+				if (onProgress) {
+					await onProgress({ ...progressBase, stage: "done" });
+				}
 				return suggestion;
 			}),
 		);
@@ -261,10 +308,15 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	 * Execute approved suggestions.
 	 *
 	 * @param ids - IDs of suggestions to execute
+	 * @param options - Optional execution options for progress reporting
 	 * @returns Array of execution results
 	 */
-	async function execute(ids: string[]): Promise<ExecutionResult[]> {
+	async function execute(
+		ids: string[],
+		options?: ExecuteOptions,
+	): Promise<ExecutionResult[]> {
 		const cid = crypto.randomUUID().slice(0, 8);
+		const onProgress = options?.onProgress;
 
 		if (inboxLogger) {
 			inboxLogger.info`Execute started count=${ids.length} cid=${cid}`;
@@ -306,6 +358,8 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		const results: ExecutionResult[] = [];
 		let successes = 0;
 		let failures = 0;
+		let processed = 0;
+		const total = ids.length;
 
 		for (const id of ids) {
 			// Look up suggestion by ID
@@ -361,6 +415,19 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					error: error instanceof Error ? error.message : "Unknown error",
 				});
 				failures++;
+			}
+
+			// Emit progress after each item for CLI feedback
+			processed++;
+			if (onProgress) {
+				await onProgress({
+					processed,
+					total,
+					suggestionId: id,
+					action: suggestion?.action ?? "skip",
+					success: results[results.length - 1]?.success ?? false,
+					error: results[results.length - 1]?.error,
+				});
 			}
 		}
 
@@ -538,30 +605,48 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 // =============================================================================
 
 /**
- * Get list of areas from vault (simple directory scan).
+ * Get list of areas from vault (recursive scan for all .md files).
+ *
+ * Scans 02 Areas/**\/*.md recursively to find area notes in subfolders.
+ * Example: "02 Areas/Psychotherapy/Psychotherapy.md" -> "Psychotherapy"
  */
 function getVaultAreas(vaultPath: string): string[] {
 	const areasPath = join(vaultPath, "02 Areas");
 	try {
-		const entries = readdirSync(areasPath, { withFileTypes: true });
-		return entries
-			.filter((e) => e.isDirectory() || (e.isFile() && e.name.endsWith(".md")))
-			.map((e) => e.name.replace(/\.md$/, ""));
+		const glob = new Glob("**/*.md");
+		const areas: string[] = [];
+
+		for (const file of glob.scanSync({ cwd: areasPath })) {
+			// Extract note name from path (e.g., "Psychotherapy/Psychotherapy.md" -> "Psychotherapy")
+			const name = basename(file, ".md");
+			areas.push(name);
+		}
+
+		return [...new Set(areas)]; // Dedupe in case of same-named notes
 	} catch {
 		return [];
 	}
 }
 
 /**
- * Get list of projects from vault (simple directory scan).
+ * Get list of projects from vault (recursive scan for all .md files).
+ *
+ * Scans 01 Projects/**\/*.md recursively to find project notes in subfolders.
+ * Example: "01 Projects/Work/Build Garden Shed.md" -> "Build Garden Shed"
  */
 function getVaultProjects(vaultPath: string): string[] {
 	const projectsPath = join(vaultPath, "01 Projects");
 	try {
-		const entries = readdirSync(projectsPath, { withFileTypes: true });
-		return entries
-			.filter((e) => e.isDirectory() || (e.isFile() && e.name.endsWith(".md")))
-			.map((e) => e.name.replace(/\.md$/, ""));
+		const glob = new Glob("**/*.md");
+		const projects: string[] = [];
+
+		for (const file of glob.scanSync({ cwd: projectsPath })) {
+			// Extract note name from path (e.g., "Work/Build Garden Shed.md" -> "Build Garden Shed")
+			const name = basename(file, ".md");
+			projects.push(name);
+		}
+
+		return [...new Set(projects)]; // Dedupe in case of same-named notes
 	} catch {
 		return [];
 	}
@@ -669,6 +754,11 @@ function buildSuggestion(
 		extractedFields,
 	);
 
+	// Use LLM-suggested filename description if available
+	const suggestedAttachmentName = llmResult?.suggestedFilenameDescription
+		? llmResult.suggestedFilenameDescription
+		: undefined;
+
 	return {
 		id: crypto.randomUUID(),
 		source,
@@ -680,6 +770,7 @@ function buildSuggestion(
 		suggestedArea,
 		suggestedProject,
 		extractedFields,
+		suggestedAttachmentName,
 		reason,
 	};
 }
@@ -730,7 +821,7 @@ function capitalizeFirst(s: string): string {
  * // → "/vault/Attachments/2025-12-10-invoice-1.pdf"
  */
 function generateUniquePath(basePath: string): string {
-	if (!existsSync(basePath)) {
+	if (!pathExistsSync(basePath)) {
 		return basePath;
 	}
 
@@ -738,7 +829,7 @@ function generateUniquePath(basePath: string): string {
 	const base = ext ? basePath.slice(0, -ext.length) : basePath;
 	let counter = 1;
 
-	while (existsSync(`${base}-${counter}${ext}`)) {
+	while (pathExistsSync(`${base}-${counter}${ext}`)) {
 		counter++;
 	}
 
@@ -771,9 +862,25 @@ async function executeSuggestion(
 		executeLogger.debug`Executing suggestion id=${suggestion.id} action=${suggestion.action} source=${filename} ${cid}`;
 	}
 
-	// Generate dated attachment name: YYYY-MM-DD-original-name.pdf
-	const today = new Date().toISOString().slice(0, 10);
-	const datedFilename = `${today}-${filename}`;
+	// Generate dated attachment name: YYYYMMDD-HHMM-description.ext
+	// Use LLM-suggested description if available, otherwise extract from filename
+	let datedFilename: string;
+	if (suggestion.suggestedAttachmentName) {
+		// LLM provided a clean description - use it directly
+		const ext = extname(suggestion.source);
+		const timestamp = new Date();
+		const year = timestamp.getFullYear();
+		const month = String(timestamp.getMonth() + 1).padStart(2, "0");
+		const day = String(timestamp.getDate()).padStart(2, "0");
+		const hour = String(timestamp.getHours()).padStart(2, "0");
+		const minute = String(timestamp.getMinutes()).padStart(2, "0");
+		const timestampPrefix = `${year}${month}${day}-${hour}${minute}`;
+		datedFilename = `${timestampPrefix}-${suggestion.suggestedAttachmentName}${ext}`;
+	} else {
+		// Fallback: extract description from messy filename
+		datedFilename = generateFlatFilename(suggestion.source);
+	}
+
 	const intendedAttachmentDest = join(
 		config.vaultPath,
 		config.attachmentsFolder,
@@ -815,11 +922,19 @@ async function executeSuggestion(
 			// Load para-obsidian config to get template info
 			const paraConfig = loadConfig();
 
-			// Build args from suggestion
-			const args: Record<string, string> = {};
+			// Build args from suggestion using converter field mappings
+			let args: Record<string, string> = {};
 
-			// Add extracted fields as args
-			if (suggestion.extractedFields) {
+			// Find converter for this note type to get field mappings
+			const converter = DEFAULT_INBOX_CONVERTERS.find(
+				(c) => c.id === suggestion.suggestedNoteType,
+			);
+
+			// Map extracted fields using converter (LLM keys → Templater prompts)
+			if (suggestion.extractedFields && converter) {
+				args = mapFieldsToTemplate(suggestion.extractedFields, converter);
+			} else if (suggestion.extractedFields) {
+				// Fallback: use raw field names if no converter found
 				for (const [key, value] of Object.entries(suggestion.extractedFields)) {
 					if (typeof value === "string") {
 						args[key] = value;
@@ -829,12 +944,15 @@ async function executeSuggestion(
 				}
 			}
 
-			// Add area/project if suggested
+			// Add area/project if suggested (use exact Templater prompt text as keys)
+			// Wrap in wikilink format [[...]] as required by frontmatter validation
 			if (suggestion.suggestedArea) {
-				args.Area = suggestion.suggestedArea;
+				args["Area (leave empty if using project)"] =
+					`[[${suggestion.suggestedArea}]]`;
 			}
 			if (suggestion.suggestedProject) {
-				args.Project = suggestion.suggestedProject;
+				args["Project (leave empty if using area)"] =
+					`[[${suggestion.suggestedProject}]]`;
 			}
 
 			// Create the note
@@ -865,11 +983,11 @@ async function executeSuggestion(
 	}
 
 	// Now move the attachment (note creation succeeded or wasn't needed)
-	mkdirSync(dirname(attachmentDest), { recursive: true });
+	ensureDirSync(dirname(attachmentDest));
 
 	// TOCTOU protection: Check file still exists before moving
 	// File was hashed earlier, but could have been deleted by another process
-	if (!existsSync(sourcePath)) {
+	if (!pathExistsSync(sourcePath)) {
 		// ROLLBACK: If we created a note but source disappeared, delete the orphaned note
 		if (createdNotePath) {
 			try {
@@ -943,9 +1061,9 @@ async function executeSuggestion(
 					executeLogger.warn`No Attachments section found - appending to end of file ${cid}`;
 				}
 				const target = resolveVaultPath(paraConfig.vault, createdNotePath);
-				const content = fs.readFileSync(target.absolute, "utf8");
+				const content = readTextFileSync(target.absolute);
 				const updatedContent = `${content.trimEnd()}\n\n## Attachments\n\n${attachmentWikilink}\n`;
-				fs.writeFileSync(target.absolute, updatedContent, "utf8");
+				writeTextFileSync(target.absolute, updatedContent);
 				if (executeLogger) {
 					executeLogger.info`Created Attachments section and added link ${cid}`;
 				}

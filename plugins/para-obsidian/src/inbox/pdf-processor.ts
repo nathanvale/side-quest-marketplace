@@ -20,9 +20,11 @@
  * ```
  */
 
-import { stat } from "node:fs/promises";
 import { basename } from "node:path";
+import { stat } from "@sidequest/core/fs";
 import { $ } from "bun";
+import type { InboxConverter } from "./converters";
+import { findBestConverter, scoreFilename } from "./converters";
 import { createInboxError, InboxError } from "./errors";
 import { pdfLogger } from "./logger";
 
@@ -73,12 +75,14 @@ export interface HeuristicResult {
 }
 
 // =============================================================================
-// Filename Patterns
+// Filename Patterns (DEPRECATED - Use converters instead)
 // =============================================================================
 
 /**
  * Patterns for detecting document type from filename.
  * Maps pattern to document type.
+ *
+ * @deprecated Use converters from ./converters.ts instead. This is kept for backwards compatibility.
  */
 const FILENAME_PATTERNS: ReadonlyArray<{
 	pattern: RegExp;
@@ -104,11 +108,13 @@ const FILENAME_PATTERNS: ReadonlyArray<{
 ];
 
 // =============================================================================
-// Content Markers
+// Content Markers (DEPRECATED - Use converters instead)
 // =============================================================================
 
 /**
  * Markers for detecting document type from content.
+ *
+ * @deprecated Use converters from ./converters.ts instead. This is kept for backwards compatibility.
  */
 const CONTENT_MARKERS: ReadonlyArray<{
 	marker: string | RegExp;
@@ -369,6 +375,28 @@ export async function extractPdfText(
 }
 
 // =============================================================================
+// Converter-Based Detection (NEW)
+// =============================================================================
+
+/**
+ * Detect document type using converter heuristics.
+ *
+ * @param filename - Filename to analyze
+ * @param content - Text content to analyze
+ * @param converters - Array of converters to match against
+ * @returns Detection result with type and confidence, or null if no match
+ */
+export function detectWithConverters(
+	filename: string,
+	content: string,
+	converters: readonly InboxConverter[],
+): { type: string; confidence: number } | null {
+	const match = findBestConverter(converters, filename, content);
+	if (!match) return null;
+	return { type: match.converter.id, confidence: match.score };
+}
+
+// =============================================================================
 // Heuristic Detection
 // =============================================================================
 
@@ -376,9 +404,46 @@ export async function extractPdfText(
  * Detect document type from filename patterns.
  *
  * @param filename - Filename to analyze (with or without path)
+ * @param converters - Optional array of converters to use instead of legacy patterns
  * @returns Detection result with type and confidence
  */
-export function detectByFilename(filename: string): HeuristicResult {
+export function detectByFilename(
+	filename: string,
+	converters?: readonly InboxConverter[],
+): HeuristicResult {
+	// If converters provided, use them
+	if (converters) {
+		const name = basename(filename);
+		let bestScore = 0;
+		let bestType = "";
+		const matchedPatterns: string[] = [];
+
+		for (const converter of converters) {
+			const score = scoreFilename(name, converter.heuristics.filenamePatterns);
+			if (score > bestScore) {
+				bestScore = score;
+				bestType = converter.id;
+				// Collect pattern info for debugging
+				matchedPatterns.push(`${converter.id}(${score.toFixed(2)})`);
+			}
+		}
+
+		if (bestScore === 0) {
+			return { detected: false, confidence: 0 };
+		}
+
+		// Normalize confidence (0-1 scale)
+		const confidence = Math.min(bestScore, 1.0);
+
+		return {
+			detected: true,
+			suggestedType: bestType,
+			confidence,
+			matchedPatterns,
+		};
+	}
+
+	// Legacy pattern-based detection
 	const name = basename(filename).toLowerCase();
 	const matches: Array<{ type: string; weight: number; pattern: string }> = [];
 
