@@ -235,11 +235,6 @@ export async function filterByFrontmatter(
 	const matches: string[] = [];
 	const dirs = resolveDirs(config.vault, options.dir, config.defaultSearchDirs);
 
-	/** Recursively walks markdown files under a directory using Core glob. */
-	async function walkMarkdownFiles(dir: string): Promise<string[]> {
-		return globFiles("**/*.md", { cwd: dir });
-	}
-
 	/** Checks if a file's frontmatter matches all filters. */
 	async function hasFrontmatter(filePath: string): Promise<boolean> {
 		const content = await readTextFile(filePath);
@@ -264,7 +259,7 @@ export async function filterByFrontmatter(
 
 	// Scan all directories and collect matching files
 	for (const dir of dirs) {
-		for (const file of await walkMarkdownFiles(dir)) {
+		for (const file of await globFiles("**/*.md", { cwd: dir })) {
 			if (await hasFrontmatter(file)) {
 				matches.push(path.relative(config.vault, file));
 			}

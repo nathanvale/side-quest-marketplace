@@ -15,13 +15,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-	isDirectorySync,
-	isFileSync,
 	pathExistsSync,
-	readDir,
 	readTextFileSync,
 	writeJsonFileSync,
 } from "@sidequest/core/fs";
+import { globFilesSync } from "@sidequest/core/glob";
 import { getErrorMessage } from "@sidequest/core/utils";
 
 import type { ParaObsidianConfig } from "./config";
@@ -68,25 +66,6 @@ function collectHeadings(content: string): string[] {
 }
 
 /**
- * Recursively walks a directory collecting Markdown file paths.
- *
- * @param root - Absolute path to the root directory
- * @param dir - Current subdirectory relative to root
- * @param out - Array to accumulate file paths
- */
-function walkMarkdownFiles(root: string, dir: string, out: string[]) {
-	const current = path.join(root, dir);
-	for (const entry of readDir(current)) {
-		const full = path.join(current, entry);
-		if (isDirectorySync(full)) {
-			walkMarkdownFiles(root, path.join(dir, entry), out);
-		} else if (isFileSync(full) && entry.endsWith(".md")) {
-			out.push(path.join(dir, entry));
-		}
-	}
-}
-
-/**
  * Builds a vault index by scanning directories for Markdown files.
  *
  * For each file, extracts:
@@ -119,9 +98,10 @@ export function buildIndex(
 	// Collect all Markdown files from specified directories
 	for (const entry of dirs) {
 		const resolved = resolveVaultPath(config.vault, entry).absolute;
-		const local: string[] = [];
-		walkMarkdownFiles(resolved, ".", local);
-		for (const rel of local) {
+		for (const rel of globFilesSync("**/*.md", {
+			cwd: resolved,
+			absolute: false,
+		})) {
 			const relativeToVault = path.relative(
 				config.vault,
 				path.join(resolved, rel),
@@ -329,8 +309,10 @@ export function scanTags(config: ParaObsidianConfig): string[] {
 
 	// Fallback: scan all markdown files
 	const vaultRoot = config.vault;
-	const markdownFiles: string[] = [];
-	walkMarkdownFiles(vaultRoot, "", markdownFiles);
+	const markdownFiles = globFilesSync("**/*.md", {
+		cwd: vaultRoot,
+		absolute: false,
+	});
 
 	for (const file of markdownFiles) {
 		const fullPath = path.join(vaultRoot, file);

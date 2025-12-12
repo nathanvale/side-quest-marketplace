@@ -15,13 +15,8 @@
  * @module frontmatter
  */
 import path from "node:path";
-import {
-	isDirectorySync,
-	isFileSync,
-	readDir,
-	readTextFileSync,
-	writeTextFileSync,
-} from "@sidequest/core/fs";
+import { readTextFileSync, writeTextFileSync } from "@sidequest/core/fs";
+import { globFilesSync } from "@sidequest/core/glob";
 import { getErrorMessage } from "@sidequest/core/utils";
 
 import { parse, stringify } from "yaml";
@@ -580,7 +575,7 @@ export function validateFrontmatterBulk(
 
 	// Collect all Markdown files from specified directories
 	const files = resolvedDirs.flatMap((dir) =>
-		listFilesRecursive(dir, { extensions: [".md"] }),
+		globFilesSync("**/*.md", { cwd: dir }),
 	);
 
 	// Initialize statistics tracking
@@ -860,34 +855,6 @@ export function migrateTemplateVersion(
 	};
 }
 
-/** Options for recursive file listing. */
-interface ListOptions {
-	/** File extensions to include (e.g., [".md"]). Empty means all files. */
-	readonly extensions?: ReadonlyArray<string>;
-}
-
-/**
- * Recursively lists all files in a directory matching extension filters.
- * Used internally for bulk operations like migrate-all.
- */
-function listFilesRecursive(root: string, options: ListOptions = {}): string[] {
-	const exts = options.extensions ?? [];
-	const entries = readDir(root);
-	const files: string[] = [];
-	for (const entry of entries) {
-		const full = path.join(root, entry);
-		if (isDirectorySync(full)) {
-			files.push(...listFilesRecursive(full, options));
-		} else if (
-			isFileSync(full) &&
-			(exts.length === 0 || exts.some((ext) => entry.endsWith(ext)))
-		) {
-			files.push(full);
-		}
-	}
-	return files;
-}
-
 /**
  * Options for bulk template version migration.
  */
@@ -1064,7 +1031,7 @@ export function migrateAllTemplateVersions(
 	);
 	const dryRun = options.dryRun ?? false;
 	const files = resolvedDirs.flatMap((dir) =>
-		listFilesRecursive(dir, { extensions: [".md"] }),
+		globFilesSync("**/*.md", { cwd: dir }),
 	);
 
 	const results: Array<
@@ -1196,7 +1163,7 @@ export function planTemplateVersionBump(
 	> = {};
 
 	for (const dir of resolvedDirs) {
-		for (const file of listFilesRecursive(dir, { extensions: [".md"] })) {
+		for (const file of globFilesSync("**/*.md", { cwd: dir })) {
 			const relative = path.relative(config.vault, file);
 			const content = readTextFileSync(file);
 			const { attributes } = parseFrontmatter(content);
