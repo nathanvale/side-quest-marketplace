@@ -13,6 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { pathExistsSync, readTextFileSync } from "@sidequest/core/fs";
+import { getErrorMessage } from "@sidequest/core/utils";
 
 import {
 	DEFAULT_AVAILABLE_MODELS,
@@ -134,7 +135,7 @@ function loadJsonIfExists<T>(filePath: string): Partial<T> | undefined {
 		return JSON.parse(raw) as Partial<T>;
 	} catch (error) {
 		throw new Error(
-			`Failed to parse config at ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+			`Failed to parse config at ${filePath}: ${getErrorMessage(error)}`,
 		);
 	}
 }

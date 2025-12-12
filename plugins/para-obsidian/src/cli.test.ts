@@ -1,33 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { ensureDirSync, writeTextFileSync } from "@sidequest/core/fs";
 import { spawn } from "bun";
 
 import { loadConfig } from "./config";
-
-function makeTmpDir(): string {
-	const dir = path.join(os.tmpdir(), `para-cli-test-${crypto.randomUUID()}`);
-	ensureDirSync(dir);
-	// Initialize git repo (required by CLI for writes)
-	Bun.spawnSync(["git", "init"], {
-		cwd: dir,
-		stdout: "ignore",
-		stderr: "ignore",
-	});
-	Bun.spawnSync(["git", "config", "user.email", "test@test.com"], {
-		cwd: dir,
-		stdout: "ignore",
-		stderr: "ignore",
-	});
-	Bun.spawnSync(["git", "config", "user.name", "Test"], {
-		cwd: dir,
-		stdout: "ignore",
-		stderr: "ignore",
-	});
-	return dir;
-}
+import { createTestVault } from "./test-utils";
 
 function writeTemplate(dir: string, name: string, content: string) {
 	ensureDirSync(dir);
@@ -75,7 +53,7 @@ describe("cli", () => {
 
 describe("cli convert (compat)", () => {
 	it("fails with a clear message when template is missing", async () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault({ gitInit: true });
 		const templatesDir = path.join(vault, "Templates");
 		fs.mkdirSync(templatesDir, { recursive: true });
 		writeTemplate(
@@ -100,7 +78,7 @@ type: task
 
 describe("cli create --content", () => {
 	it("creates note and injects content into sections", async () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault({ gitInit: true });
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -155,7 +133,7 @@ type: project
 	});
 
 	it("handles invalid JSON in --content flag", async () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault({ gitInit: true });
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -188,7 +166,7 @@ type: project
 	});
 
 	it("reports partial success when some headings missing", async () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault({ gitInit: true });
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -242,7 +220,7 @@ type: project
 	});
 
 	it("outputs markdown format by default with injection results", async () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault({ gitInit: true });
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -282,7 +260,7 @@ type: project
 	});
 
 	it("creates note without content when --content not provided", async () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault({ gitInit: true });
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -319,7 +297,7 @@ type: project
 	});
 
 	it("skips empty content values in --content", async () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault({ gitInit: true });
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -367,7 +345,7 @@ type: project
 
 describe("cli frontmatter set", () => {
 	it("shows 'Would update' when validation fails", async () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault({ gitInit: true });
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -423,7 +401,7 @@ tags: [project]
 	});
 
 	it("shows 'Updated' when set succeeds", async () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault({ gitInit: true });
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,

@@ -16,6 +16,7 @@
 import path from "node:path";
 import { pathExistsSync, readTextFileSync } from "@sidequest/core/fs";
 import { emphasize } from "@sidequest/core/terminal";
+import { getErrorMessage } from "@sidequest/core/utils";
 import { cleanBrokenLinks } from "../clean-links";
 import { autoCommitChanges, commitAllNotes, ensureGitGuard } from "../git";
 import { linkAttachmentsToNotes } from "../link-attachments";
@@ -312,9 +313,7 @@ export const handleRewriteLinks: CommandHandler = async (
 				to: toLink,
 			}));
 		} catch (error) {
-			console.error(
-				`Failed to parse mapping file: ${error instanceof Error ? error.message : String(error)}`,
-			);
+			console.error(`Failed to parse mapping file: ${getErrorMessage(error)}`);
 			return { success: false, exitCode: 1 };
 		}
 	} else if (fromValues.length > 0 && toValues.length > 0) {

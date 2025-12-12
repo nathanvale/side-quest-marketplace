@@ -1,25 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 
 import { findOrphans, formatFixCommand, suggestFixes } from "./orphans";
-
-function makeTmpDir(): string {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "orphans-"));
-}
-
-function writeFile(vault: string, rel: string, content: string) {
-	const full = path.join(vault, rel);
-	fs.mkdirSync(path.dirname(full), { recursive: true });
-	fs.writeFileSync(full, content, "utf8");
-}
+import { createTestVault, writeVaultFile } from "./test-utils";
 
 describe("findOrphans", () => {
 	let vault: string;
 
 	beforeEach(() => {
-		vault = makeTmpDir();
+		vault = createTestVault();
 	});
 
 	afterEach(() => {
@@ -29,9 +18,9 @@ describe("findOrphans", () => {
 	describe("attachment links", () => {
 		it("does not report PDF attachments as broken when correctly linked", () => {
 			// Create attachment
-			writeFile(vault, "Attachments/document.pdf", "PDF content");
+			writeVaultFile(vault, "Attachments/document.pdf", "PDF content");
 			// Create note linking to it
-			writeFile(
+			writeVaultFile(
 				vault,
 				"note.md",
 				`---
@@ -47,8 +36,8 @@ See [[Attachments/document.pdf]] for details.`,
 		});
 
 		it("does not report image attachments as broken when correctly linked", () => {
-			writeFile(vault, "Attachments/photo.png", "PNG content");
-			writeFile(vault, "note.md", "![[Attachments/photo.png]]");
+			writeVaultFile(vault, "Attachments/photo.png", "PNG content");
+			writeVaultFile(vault, "note.md", "![[Attachments/photo.png]]");
 
 			const result = findOrphans(vault);
 
@@ -57,8 +46,8 @@ See [[Attachments/document.pdf]] for details.`,
 		});
 
 		it("reports orphan attachments not referenced by any note", () => {
-			writeFile(vault, "Attachments/unused.pdf", "PDF content");
-			writeFile(vault, "note.md", "No links here");
+			writeVaultFile(vault, "Attachments/unused.pdf", "PDF content");
+			writeVaultFile(vault, "note.md", "No links here");
 
 			const result = findOrphans(vault);
 
@@ -66,7 +55,7 @@ See [[Attachments/document.pdf]] for details.`,
 		});
 
 		it("reports broken links to non-existent attachments", () => {
-			writeFile(vault, "note.md", "See [[Attachments/missing.pdf]]");
+			writeVaultFile(vault, "note.md", "See [[Attachments/missing.pdf]]");
 
 			const result = findOrphans(vault);
 
@@ -76,14 +65,14 @@ See [[Attachments/document.pdf]] for details.`,
 
 		it("handles various file extensions correctly", () => {
 			// Create various attachment types
-			writeFile(vault, "Attachments/doc.pdf", "content");
-			writeFile(vault, "Attachments/image.jpg", "content");
-			writeFile(vault, "Attachments/image.png", "content");
-			writeFile(vault, "Attachments/video.mp4", "content");
-			writeFile(vault, "Attachments/audio.mp3", "content");
+			writeVaultFile(vault, "Attachments/doc.pdf", "content");
+			writeVaultFile(vault, "Attachments/image.jpg", "content");
+			writeVaultFile(vault, "Attachments/image.png", "content");
+			writeVaultFile(vault, "Attachments/video.mp4", "content");
+			writeVaultFile(vault, "Attachments/audio.mp3", "content");
 
 			// Link to all of them
-			writeFile(
+			writeVaultFile(
 				vault,
 				"note.md",
 				`
@@ -104,7 +93,7 @@ See [[Attachments/document.pdf]] for details.`,
 
 	describe("markdown note links", () => {
 		it("reports broken links to non-existent notes", () => {
-			writeFile(vault, "note.md", "See [[Missing Note]] for details.");
+			writeVaultFile(vault, "note.md", "See [[Missing Note]] for details.");
 
 			const result = findOrphans(vault);
 
@@ -113,8 +102,8 @@ See [[Attachments/document.pdf]] for details.`,
 		});
 
 		it("does not report links to existing notes", () => {
-			writeFile(vault, "Target Note.md", "Target content");
-			writeFile(vault, "source.md", "Link to [[Target Note]]");
+			writeVaultFile(vault, "Target Note.md", "Target content");
+			writeVaultFile(vault, "source.md", "Link to [[Target Note]]");
 
 			const result = findOrphans(vault);
 
@@ -122,8 +111,8 @@ See [[Attachments/document.pdf]] for details.`,
 		});
 
 		it("handles links with aliases correctly", () => {
-			writeFile(vault, "Target.md", "content");
-			writeFile(vault, "source.md", "[[Target|My Alias]]");
+			writeVaultFile(vault, "Target.md", "content");
+			writeVaultFile(vault, "source.md", "[[Target|My Alias]]");
 
 			const result = findOrphans(vault);
 
@@ -131,8 +120,8 @@ See [[Attachments/document.pdf]] for details.`,
 		});
 
 		it("handles links with headings correctly", () => {
-			writeFile(vault, "Target.md", "# Section\ncontent");
-			writeFile(vault, "source.md", "[[Target#Section]]");
+			writeVaultFile(vault, "Target.md", "# Section\ncontent");
+			writeVaultFile(vault, "source.md", "[[Target#Section]]");
 
 			const result = findOrphans(vault);
 
@@ -140,8 +129,8 @@ See [[Attachments/document.pdf]] for details.`,
 		});
 
 		it("handles links with block references correctly", () => {
-			writeFile(vault, "Target.md", "content ^block1");
-			writeFile(vault, "source.md", "[[Target^block1]]");
+			writeVaultFile(vault, "Target.md", "content ^block1");
+			writeVaultFile(vault, "source.md", "[[Target^block1]]");
 
 			const result = findOrphans(vault);
 
@@ -151,7 +140,7 @@ See [[Attachments/document.pdf]] for details.`,
 
 	describe("frontmatter links", () => {
 		it("detects broken links in frontmatter arrays", () => {
-			writeFile(
+			writeVaultFile(
 				vault,
 				"note.md",
 				`---
@@ -168,7 +157,7 @@ Body content`,
 		});
 
 		it("detects broken links in frontmatter strings", () => {
-			writeFile(
+			writeVaultFile(
 				vault,
 				"note.md",
 				`---
@@ -186,8 +175,8 @@ Body content`,
 
 	describe("directory scoping", () => {
 		it("respects dirs option", () => {
-			writeFile(vault, "Projects/note.md", "[[Missing]]");
-			writeFile(vault, "Areas/note.md", "[[Also Missing]]");
+			writeVaultFile(vault, "Projects/note.md", "[[Missing]]");
+			writeVaultFile(vault, "Areas/note.md", "[[Also Missing]]");
 
 			const result = findOrphans(vault, { dirs: ["Projects"] });
 
@@ -201,7 +190,7 @@ describe("suggestFixes", () => {
 	let vault: string;
 
 	beforeEach(() => {
-		vault = makeTmpDir();
+		vault = createTestVault();
 	});
 
 	afterEach(() => {
@@ -210,7 +199,7 @@ describe("suggestFixes", () => {
 
 	describe("attachment links", () => {
 		it("suggests fix from broken link array directly", () => {
-			writeFile(vault, "Attachments/document.pdf", "PDF content");
+			writeVaultFile(vault, "Attachments/document.pdf", "PDF content");
 
 			const brokenLinks = [
 				{ note: "note.md", link: "document.pdf", location: "body" as const },
@@ -237,7 +226,7 @@ describe("suggestFixes", () => {
 		});
 
 		it("deduplicates suggestions for same link", () => {
-			writeFile(vault, "Attachments/shared.pdf", "PDF content");
+			writeVaultFile(vault, "Attachments/shared.pdf", "PDF content");
 			const brokenLinks = [
 				{ note: "note1.md", link: "shared.pdf", location: "body" as const },
 				{ note: "note2.md", link: "shared.pdf", location: "body" as const },
@@ -248,7 +237,7 @@ describe("suggestFixes", () => {
 		});
 
 		it("handles case-insensitive matching", () => {
-			writeFile(vault, "Attachments/Document.PDF", "PDF content");
+			writeVaultFile(vault, "Attachments/Document.PDF", "PDF content");
 			const brokenLinks = [
 				{ note: "note.md", link: "document.pdf", location: "body" as const },
 			];
@@ -259,7 +248,7 @@ describe("suggestFixes", () => {
 		});
 
 		it("fuzzy matches similar attachment filenames", () => {
-			writeFile(vault, "Attachments/booking-confirmation.pdf", "PDF");
+			writeVaultFile(vault, "Attachments/booking-confirmation.pdf", "PDF");
 			const brokenLinks = [
 				{
 					note: "note.md",
@@ -275,7 +264,7 @@ describe("suggestFixes", () => {
 		});
 
 		it("fuzzy matches wrong filename in Attachments/ prefix", () => {
-			writeFile(vault, "Attachments/receipt-2024.pdf", "PDF");
+			writeVaultFile(vault, "Attachments/receipt-2024.pdf", "PDF");
 			const brokenLinks = [
 				{
 					note: "note.md",
@@ -293,7 +282,7 @@ describe("suggestFixes", () => {
 
 	describe("note links", () => {
 		it("suggests fix for broken note link with exact case mismatch", () => {
-			writeFile(vault, "Projects/My Project.md", "content");
+			writeVaultFile(vault, "Projects/My Project.md", "content");
 			const brokenLinks = [
 				{
 					note: "note.md",
@@ -309,7 +298,7 @@ describe("suggestFixes", () => {
 		});
 
 		it("fuzzy matches similar note titles", () => {
-			writeFile(vault, "Projects/2025 Camping Trip.md", "content");
+			writeVaultFile(vault, "Projects/2025 Camping Trip.md", "content");
 			const brokenLinks = [
 				{
 					note: "note.md",
@@ -325,7 +314,7 @@ describe("suggestFixes", () => {
 		});
 
 		it("fuzzy matches note titles with typos", () => {
-			writeFile(vault, "Areas/Command Center.md", "content");
+			writeVaultFile(vault, "Areas/Command Center.md", "content");
 			const brokenLinks = [
 				{
 					note: "note.md",
@@ -341,7 +330,7 @@ describe("suggestFixes", () => {
 		});
 
 		it("does not suggest when no similar notes exist", () => {
-			writeFile(vault, "Projects/Unrelated.md", "content");
+			writeVaultFile(vault, "Projects/Unrelated.md", "content");
 			const brokenLinks = [
 				{
 					note: "note.md",

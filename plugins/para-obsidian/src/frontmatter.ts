@@ -22,6 +22,7 @@ import {
 	readTextFileSync,
 	writeTextFileSync,
 } from "@sidequest/core/fs";
+import { getErrorMessage } from "@sidequest/core/utils";
 
 import { parse, stringify } from "yaml";
 
@@ -647,7 +648,7 @@ export function validateFrontmatterBulk(
 				errors: [
 					{
 						field: "_validation",
-						message: error instanceof Error ? error.message : String(error),
+						message: getErrorMessage(error),
 					},
 				],
 			});
@@ -1120,7 +1121,7 @@ export function migrateAllTemplateVersions(
 				updated: false,
 				wouldChange: false,
 				dryRun,
-				error: error instanceof Error ? error.message : String(error),
+				error: getErrorMessage(error),
 			});
 		}
 	}
@@ -1397,7 +1398,7 @@ export function applyVersionPlan(
 				updated: false,
 				wouldChange: false,
 				dryRun,
-				error: error instanceof Error ? error.message : String(error),
+				error: getErrorMessage(error),
 			});
 		}
 	}

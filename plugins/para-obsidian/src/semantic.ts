@@ -12,6 +12,7 @@
  * @module semantic
  */
 import { spawnAndCollect } from "@sidequest/core/spawn";
+import { getErrorMessage } from "@sidequest/core/utils";
 import type { ParaObsidianConfig } from "./config";
 import { resolveVaultPath } from "./fs";
 import { checkKit, getKitMLErrorMessage } from "./kit-check";
@@ -167,9 +168,7 @@ async function runKitSemantic(
 		return results;
 	} catch (error) {
 		throw new Error(
-			`Failed to parse kit semantic output: ${
-				error instanceof Error ? error.message : String(error)
-			}`,
+			`Failed to parse kit semantic output: ${getErrorMessage(error)}`,
 		);
 	}
 }

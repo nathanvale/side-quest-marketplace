@@ -775,3 +775,38 @@ export function snakeCase(str: string): string {
 		.replace(/[-\s]+/g, "_")
 		.toLowerCase();
 }
+
+// ============================================================================
+// Error utilities
+// ============================================================================
+
+/**
+ * Extract error message from unknown error type
+ *
+ * Safe utility for extracting error messages in catch blocks where
+ * the error type is unknown. Handles Error instances and other types.
+ *
+ * @param error - Unknown error value (from catch block)
+ * @returns Human-readable error message
+ *
+ * @example
+ * ```ts
+ * try {
+ *   throw new Error("Something went wrong");
+ * } catch (error) {
+ *   console.error(getErrorMessage(error)); // "Something went wrong"
+ * }
+ *
+ * try {
+ *   throw "string error";
+ * } catch (error) {
+ *   console.error(getErrorMessage(error)); // "string error"
+ * }
+ * ```
+ */
+export function getErrorMessage(error: unknown): string {
+	if (error instanceof Error) {
+		return error.message;
+	}
+	return String(error);
+}

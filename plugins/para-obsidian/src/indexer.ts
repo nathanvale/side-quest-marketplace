@@ -22,6 +22,7 @@ import {
 	readTextFileSync,
 	writeJsonFileSync,
 } from "@sidequest/core/fs";
+import { getErrorMessage } from "@sidequest/core/utils";
 
 import type { ParaObsidianConfig } from "./config";
 import { parseFrontmatter } from "./frontmatter";
@@ -344,7 +345,12 @@ export function scanTags(config: ParaObsidianConfig): string[] {
 					}
 				}
 			}
-		} catch {}
+		} catch (error) {
+			// Skip files that can't be read (e.g., permission issues)
+			console.warn(
+				`scanTags: failed to read ${file}: ${getErrorMessage(error)}`,
+			);
+		}
 	}
 
 	return Array.from(tagSet).sort();

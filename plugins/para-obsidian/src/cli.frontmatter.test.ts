@@ -1,28 +1,19 @@
 import { describe, expect, it } from "bun:test";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { loadConfig } from "./config";
 import { validateFrontmatterFile } from "./frontmatter";
-
-function makeTmpDir(): string {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "para-obsidian-"));
-}
-
-function writeFile(relPath: string, content: string, vault: string) {
-	const full = path.join(vault, relPath);
-	fs.mkdirSync(path.dirname(full), { recursive: true });
-	fs.writeFileSync(full, content, "utf8");
-}
+import { createTestVault, writeVaultFile } from "./test-utils";
 
 describe("frontmatter file validation", () => {
 	it("validates a project frontmatter", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		fs.mkdirSync(templatesDir, { recursive: true });
 		process.env.PARA_VAULT = vault;
 
-		writeFile(
+		writeVaultFile(
+			vault,
 			"01_Projects/Test.md",
 			`---
 title: Test
@@ -36,7 +27,6 @@ template_version: 4
 tags: [project]
 ---
 Body`,
-			vault,
 		);
 
 		const cfg = loadConfig({ cwd: vault });
@@ -46,19 +36,19 @@ Body`,
 	});
 
 	it("reports issues for missing required fields", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		fs.mkdirSync(templatesDir, { recursive: true });
 		process.env.PARA_VAULT = vault;
 
-		writeFile(
+		writeVaultFile(
+			vault,
 			"01_Projects/Bad.md",
 			`---
 title: Bad
 type: project
 ---
 Body`,
-			vault,
 		);
 
 		const cfg = loadConfig({ cwd: vault });

@@ -1,23 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 
 import type { ParaObsidianConfig } from "./config";
 import { gitStatus } from "./git";
-
-function makeTmpDir(): string {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "para-obsidian-"));
-}
-
-async function initGit(dir: string) {
-	await Bun.$`git init`.cwd(dir);
-	await Bun.$`git config user.email "test@example.com"`.cwd(dir);
-	await Bun.$`git config user.name "Test"`.cwd(dir);
-	fs.writeFileSync(path.join(dir, ".gitignore"), "node_modules\n");
-	await Bun.$`git add .`.cwd(dir);
-	await Bun.$`git commit -m init`.cwd(dir);
-}
+import { createTestVault, initGitRepo } from "./test-utils";
 
 function makeConfig(vault: string): ParaObsidianConfig {
 	return {
@@ -32,8 +19,8 @@ function makeConfig(vault: string): ParaObsidianConfig {
 
 describe("git helpers", () => {
 	it("reports clean/dirty status", async () => {
-		const dir = makeTmpDir();
-		await initGit(dir);
+		const dir = createTestVault();
+		await initGitRepo(dir);
 		const clean = await gitStatus(dir);
 		expect(clean.clean).toBe(true);
 
@@ -46,8 +33,8 @@ describe("git helpers", () => {
 describe("getUncommittedFilesAll", () => {
 	it("returns all file types (not just .md)", async () => {
 		const { getUncommittedFilesAll } = await import("./git");
-		const dir = makeTmpDir();
-		await initGit(dir);
+		const dir = createTestVault();
+		await initGitRepo(dir);
 
 		// Create mixed file types
 		fs.writeFileSync(path.join(dir, "note.md"), "# Note");
@@ -65,8 +52,8 @@ describe("getUncommittedFilesAll", () => {
 
 	it("returns empty array when working tree is clean", async () => {
 		const { getUncommittedFilesAll } = await import("./git");
-		const dir = makeTmpDir();
-		await initGit(dir);
+		const dir = createTestVault();
+		await initGitRepo(dir);
 
 		const files = await getUncommittedFilesAll(dir);
 		expect(files).toEqual([]);
@@ -74,8 +61,8 @@ describe("getUncommittedFilesAll", () => {
 
 	it("returns files from subdirectories with relative paths", async () => {
 		const { getUncommittedFilesAll } = await import("./git");
-		const dir = makeTmpDir();
-		await initGit(dir);
+		const dir = createTestVault();
+		await initGitRepo(dir);
 
 		// Create subdirectory with files
 		fs.mkdirSync(path.join(dir, "inbox"), { recursive: true });
@@ -90,8 +77,8 @@ describe("getUncommittedFilesAll", () => {
 
 	it("handles staged and unstaged files", async () => {
 		const { getUncommittedFilesAll } = await import("./git");
-		const dir = makeTmpDir();
-		await initGit(dir);
+		const dir = createTestVault();
+		await initGitRepo(dir);
 
 		// Create and stage a file
 		fs.writeFileSync(path.join(dir, "staged.pdf"), "PDF");
@@ -108,8 +95,8 @@ describe("getUncommittedFilesAll", () => {
 
 	it("handles modified existing files", async () => {
 		const { getUncommittedFilesAll } = await import("./git");
-		const dir = makeTmpDir();
-		await initGit(dir);
+		const dir = createTestVault();
+		await initGitRepo(dir);
 
 		// Create and commit a file
 		fs.writeFileSync(path.join(dir, "existing.pdf"), "Original");
@@ -128,8 +115,8 @@ describe("getUncommittedFilesAll", () => {
 describe("getUncommittedFiles", () => {
 	it("returns unstaged new .md files (status ??)", async () => {
 		const { getUncommittedFiles } = await import("./git");
-		const dir = makeTmpDir();
-		await initGit(dir);
+		const dir = createTestVault();
+		await initGitRepo(dir);
 
 		// Create new .md files (untracked)
 		fs.writeFileSync(path.join(dir, "note1.md"), "# Note 1");
@@ -143,8 +130,8 @@ describe("getUncommittedFiles", () => {
 
 	it("returns staged .md files (status A)", async () => {
 		const { getUncommittedFiles } = await import("./git");
-		const dir = makeTmpDir();
-		await initGit(dir);
+		const dir = createTestVault();
+		await initGitRepo(dir);
 
 		// Create and stage a new file
 		fs.writeFileSync(path.join(dir, "staged.md"), "# Staged");
@@ -157,8 +144,8 @@ describe("getUncommittedFiles", () => {
 
 	it("returns modified .md files (status M)", async () => {
 		const { getUncommittedFiles } = await import("./git");
-		const dir = makeTmpDir();
-		await initGit(dir);
+		const dir = createTestVault();
+		await initGitRepo(dir);
 
 		// Create and commit a file, then modify it
 		fs.writeFileSync(path.join(dir, "existing.md"), "# Original");
@@ -175,8 +162,8 @@ describe("getUncommittedFiles", () => {
 
 	it("handles files with both staged and unstaged changes (status MM)", async () => {
 		const { getUncommittedFiles } = await import("./git");
-		const dir = makeTmpDir();
-		await initGit(dir);
+		const dir = createTestVault();
+		await initGitRepo(dir);
 
 		// Create and commit a file
 		fs.writeFileSync(path.join(dir, "both.md"), "# Original");
@@ -197,8 +184,8 @@ describe("getUncommittedFiles", () => {
 
 	it("filters out non-.md files", async () => {
 		const { getUncommittedFiles } = await import("./git");
-		const dir = makeTmpDir();
-		await initGit(dir);
+		const dir = createTestVault();
+		await initGitRepo(dir);
 
 		// Create mixed file types
 		fs.writeFileSync(path.join(dir, "note.md"), "# Note");
@@ -216,8 +203,8 @@ describe("getUncommittedFiles", () => {
 
 	it("returns empty array when working tree is clean", async () => {
 		const { getUncommittedFiles } = await import("./git");
-		const dir = makeTmpDir();
-		await initGit(dir);
+		const dir = createTestVault();
+		await initGitRepo(dir);
 
 		const files = await getUncommittedFiles(dir);
 		expect(files).toEqual([]);
@@ -225,8 +212,8 @@ describe("getUncommittedFiles", () => {
 
 	it("returns files from subdirectories with relative paths", async () => {
 		const { getUncommittedFiles } = await import("./git");
-		const dir = makeTmpDir();
-		await initGit(dir);
+		const dir = createTestVault();
+		await initGitRepo(dir);
 
 		// Create subdirectory with notes
 		fs.mkdirSync(path.join(dir, "projects"), { recursive: true });
@@ -241,7 +228,7 @@ describe("getUncommittedFiles", () => {
 describe("extractLinkedAttachments", () => {
 	it("extracts wikilink embeds ![[image.png]]", async () => {
 		const { extractLinkedAttachments } = await import("./git");
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		fs.mkdirSync(path.join(vault, "attachments"), { recursive: true });
 
 		// Create note with wikilink embeds
@@ -263,7 +250,7 @@ describe("extractLinkedAttachments", () => {
 
 	it("extracts markdown embeds ![](path/to/file.png)", async () => {
 		const { extractLinkedAttachments } = await import("./git");
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		fs.mkdirSync(path.join(vault, "images"), { recursive: true });
 
 		const notePath = path.join(vault, "note.md");
@@ -283,7 +270,7 @@ describe("extractLinkedAttachments", () => {
 
 	it("handles relative paths in embeds", async () => {
 		const { extractLinkedAttachments } = await import("./git");
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		fs.mkdirSync(path.join(vault, "notes"), { recursive: true });
 		fs.mkdirSync(path.join(vault, "files"), { recursive: true });
 
@@ -299,7 +286,7 @@ describe("extractLinkedAttachments", () => {
 
 	it("skips .md file links (notes, not attachments)", async () => {
 		const { extractLinkedAttachments } = await import("./git");
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const notePath = path.join(vault, "note.md");
 		fs.writeFileSync(
 			notePath,
@@ -320,7 +307,7 @@ describe("extractLinkedAttachments", () => {
 
 	it("only returns existing files", async () => {
 		const { extractLinkedAttachments } = await import("./git");
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const notePath = path.join(vault, "note.md");
 		fs.writeFileSync(notePath, "# Note\n![[exists.png]]\n![[missing.png]]\n");
 
@@ -335,7 +322,7 @@ describe("extractLinkedAttachments", () => {
 
 	it("returns empty array for note with no embeds", async () => {
 		const { extractLinkedAttachments } = await import("./git");
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const notePath = path.join(vault, "note.md");
 		fs.writeFileSync(notePath, "# Note\nJust text, no embeds.\n");
 
@@ -345,7 +332,7 @@ describe("extractLinkedAttachments", () => {
 
 	it("handles mixed wikilink and markdown embeds", async () => {
 		const { extractLinkedAttachments } = await import("./git");
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const notePath = path.join(vault, "note.md");
 		fs.writeFileSync(
 			notePath,
@@ -363,7 +350,7 @@ describe("extractLinkedAttachments", () => {
 
 	it("deduplicates attachment paths", async () => {
 		const { extractLinkedAttachments } = await import("./git");
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const notePath = path.join(vault, "note.md");
 		fs.writeFileSync(
 			notePath,
@@ -381,8 +368,8 @@ describe("extractLinkedAttachments", () => {
 describe("commitNote", () => {
 	it("commits a single note with message 'docs: <note title>'", async () => {
 		const { commitNote } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		// Create a note
 		fs.writeFileSync(path.join(vault, "My Project Note.md"), "# My Project");
@@ -400,8 +387,8 @@ describe("commitNote", () => {
 
 	it("includes linked attachments in same commit", async () => {
 		const { commitNote } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		// Create note with attachment reference
 		const notePath = path.join(vault, "Project.md");
@@ -425,8 +412,8 @@ describe("commitNote", () => {
 
 	it("title extracted from filename without .md extension", async () => {
 		const { commitNote } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		fs.writeFileSync(
 			path.join(vault, "Build Garden Shed.md"),
@@ -440,8 +427,8 @@ describe("commitNote", () => {
 
 	it("handles notes in subdirectories", async () => {
 		const { commitNote } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		fs.mkdirSync(path.join(vault, "projects"), { recursive: true });
 		fs.writeFileSync(
@@ -461,8 +448,8 @@ describe("commitNote", () => {
 
 	it("fails gracefully if note does not exist", async () => {
 		const { commitNote } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		await expect(
 			commitNote(makeConfig(vault), "nonexistent.md"),
@@ -471,8 +458,8 @@ describe("commitNote", () => {
 
 	it("commits note with multiple attachments", async () => {
 		const { commitNote } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		const notePath = path.join(vault, "Research.md");
 		fs.writeFileSync(
@@ -496,8 +483,8 @@ describe("commitNote", () => {
 describe("commitAllNotes", () => {
 	it("creates one commit per uncommitted .md file", async () => {
 		const { commitAllNotes } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		// Create PARA folder structure
 		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
@@ -521,8 +508,8 @@ describe("commitAllNotes", () => {
 
 	it("returns accurate count of committed notes", async () => {
 		const { commitAllNotes } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		// Create PARA folder
 		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
@@ -542,8 +529,8 @@ describe("commitAllNotes", () => {
 
 	it("handles empty case (nothing to commit)", async () => {
 		const { commitAllNotes } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		// Clean working tree
 		const result = await commitAllNotes(makeConfig(vault));
@@ -555,8 +542,8 @@ describe("commitAllNotes", () => {
 
 	it("commits notes with their attachments", async () => {
 		const { commitAllNotes } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		// Create PARA folder
 		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
@@ -594,8 +581,8 @@ describe("commitAllNotes", () => {
 
 	it("skips non-.md files", async () => {
 		const { commitAllNotes } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		// Create PARA folder
 		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
@@ -617,8 +604,8 @@ describe("commitAllNotes", () => {
 
 	it("commits notes in subdirectories", async () => {
 		const { commitAllNotes } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		// Create PARA folder structure with nested dirs
 		fs.mkdirSync(path.join(vault, "01 Projects", "Work"), { recursive: true });
@@ -647,8 +634,8 @@ describe("commitAllNotes", () => {
 
 	it("ignores files outside PARA folders", async () => {
 		const { commitAllNotes } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		// Create PARA folder and non-PARA folders
 		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
@@ -678,8 +665,8 @@ describe("commitAllNotes", () => {
 describe("ensureGitGuard", () => {
 	it("throws when PARA folders have uncommitted changes", async () => {
 		const { ensureGitGuard } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		// Create uncommitted file in PARA folder
 		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
@@ -692,8 +679,8 @@ describe("ensureGitGuard", () => {
 
 	it("allows non-PARA folders to have uncommitted changes", async () => {
 		const { ensureGitGuard } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		// Create uncommitted files ONLY in non-PARA folders
 		fs.mkdirSync(path.join(vault, "Templates"), { recursive: true });
@@ -711,8 +698,8 @@ describe("ensureGitGuard", () => {
 
 	it("passes when PARA folders are clean", async () => {
 		const { ensureGitGuard } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		// Clean working tree
 		await expect(ensureGitGuard(makeConfig(vault))).resolves.toBeUndefined();
@@ -720,8 +707,8 @@ describe("ensureGitGuard", () => {
 
 	it("lists uncommitted PARA files in error message", async () => {
 		const { ensureGitGuard } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		fs.mkdirSync(path.join(vault, "01 Projects"), { recursive: true });
 		fs.writeFileSync(
@@ -736,8 +723,8 @@ describe("ensureGitGuard", () => {
 
 	it("allows PDFs in PARA folders by default (only checks .md)", async () => {
 		const { ensureGitGuard } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		// Create uncommitted PDF in PARA folder
 		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
@@ -749,8 +736,8 @@ describe("ensureGitGuard", () => {
 
 	it("throws when checkAllFileTypes=true and PARA folders have uncommitted PDFs", async () => {
 		const { ensureGitGuard } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		// Create uncommitted PDF in PARA folder
 		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
@@ -764,8 +751,8 @@ describe("ensureGitGuard", () => {
 
 	it("throws when checkAllFileTypes=true and PARA folders have uncommitted JSON", async () => {
 		const { ensureGitGuard } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		// Create uncommitted JSON in PARA folder
 		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
@@ -782,8 +769,8 @@ describe("ensureGitGuard", () => {
 
 	it("checkAllFileTypes=true lists all uncommitted file types in error", async () => {
 		const { ensureGitGuard } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		// Create mixed uncommitted files in PARA folder
 		fs.mkdirSync(path.join(vault, "00 Inbox"), { recursive: true });
@@ -802,8 +789,8 @@ describe("ensureGitGuard", () => {
 
 	it("checkAllFileTypes=true allows non-.md files outside PARA folders", async () => {
 		const { ensureGitGuard } = await import("./git");
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		// Create uncommitted PDF outside PARA folders
 		fs.mkdirSync(path.join(vault, "Templates"), { recursive: true });

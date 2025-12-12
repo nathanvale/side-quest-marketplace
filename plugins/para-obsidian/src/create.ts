@@ -17,6 +17,7 @@ import {
 	pathExistsSync,
 	writeTextFileSync,
 } from "@sidequest/core/fs";
+import { getErrorMessage } from "@sidequest/core/utils";
 
 import type { ParaObsidianConfig } from "./config";
 import { DEFAULT_TITLE_PREFIXES } from "./defaults";
@@ -476,7 +477,7 @@ export function injectSections(
 		} catch (error) {
 			skipped.push({
 				heading,
-				reason: error instanceof Error ? error.message : String(error),
+				reason: getErrorMessage(error),
 			});
 		}
 	}
@@ -531,7 +532,7 @@ export function replaceSections(
 		} catch (error) {
 			skipped.push({
 				heading,
-				reason: error instanceof Error ? error.message : String(error),
+				reason: getErrorMessage(error),
 			});
 		}
 	}

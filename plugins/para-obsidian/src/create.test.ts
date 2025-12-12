@@ -1,15 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 
 import { loadConfig, type ParaObsidianConfig } from "./config";
 import { createFromTemplate, injectSections } from "./create";
 import { parseFrontmatter } from "./frontmatter";
-
-function makeTmpDir(): string {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "para-obsidian-"));
-}
+import { createTestVault } from "./test-utils";
 
 function writeTemplate(dir: string, name: string, content: string) {
 	fs.mkdirSync(dir, { recursive: true });
@@ -24,7 +20,7 @@ function makeConfig(vault: string, templatesDir: string): ParaObsidianConfig {
 
 describe("createFromTemplate", () => {
 	it("creates a file from template with args", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -51,7 +47,7 @@ Body`,
 	});
 
 	it("throws if template missing", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		process.env.PARA_VAULT = vault;
 		expect(() =>
@@ -63,7 +59,7 @@ Body`,
 	});
 
 	it("auto-injects Title arg from title option for uppercase Title prompts", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		// Template uses uppercase "Title" which matches real templates
 		writeTemplate(
@@ -91,7 +87,7 @@ type: capture
 	});
 
 	it("creates project with all required fields filled", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -134,7 +130,7 @@ Area: <% tp.system.prompt("Area") %>`,
 	});
 
 	it("creates area with all required fields filled", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -169,7 +165,7 @@ Description: <% tp.system.prompt("Description") %>`,
 	});
 
 	it("creates resource with all required fields filled", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -206,7 +202,7 @@ Topic: <% tp.system.prompt("Main topic") %>`,
 	});
 
 	it("creates task with all required fields filled", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -244,7 +240,7 @@ Effort: <% tp.system.prompt("Effort (small/medium/large)") %>`,
 	});
 
 	it("handles optional parameters with default values", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -287,7 +283,7 @@ Author: <% tp.system.prompt("Author (optional)", "") %>`,
 	});
 
 	it("handles optional parameters when not provided", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -327,7 +323,7 @@ Source: <% tp.system.prompt("Source type") %>`,
 	});
 
 	it("creates project in 00 Inbox by default (PARA method)", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -352,7 +348,7 @@ Body`,
 	});
 
 	it("creates area in 00 Inbox by default (PARA method)", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -375,7 +371,7 @@ Body`,
 	});
 
 	it("creates resource in 00 Inbox by default (PARA method)", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -400,7 +396,7 @@ Body`,
 	});
 
 	it("creates task in 00 Inbox by default (PARA method)", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -425,7 +421,7 @@ Body`,
 	});
 
 	it("creates daily note in 00 Inbox by default (PARA method)", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -450,7 +446,7 @@ Body`,
 	});
 
 	it("creates capture note in 00_Inbox by default", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -475,7 +471,7 @@ Body`,
 	});
 
 	it("explicit dest overrides default destination", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -504,7 +500,7 @@ Body`,
 
 	// Regression tests: real-world prompt keys (not just "Title")
 	it("auto-detects 'Resource title' prompt key from real templates", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		// Use the exact pattern from real vault templates
 		writeTemplate(
@@ -543,7 +539,7 @@ Source: <% tp.system.prompt("Source type (book/article/video/course/podcast/etc.
 	});
 
 	it("auto-detects 'Project title' prompt key from real templates", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -577,7 +573,7 @@ tags:
 	});
 
 	it("auto-detects 'Area title' prompt key from real templates", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -605,7 +601,7 @@ tags:
 	});
 
 	it("backward compatible with 'Title' prompt key", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		// This is the old pattern that should still work
 		writeTemplate(
@@ -631,7 +627,7 @@ type: capture
 	});
 
 	it("strips wikilinks from value when template already wraps prompt in [[...]]", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		// Template wraps Area prompt in [[...]]
 		writeTemplate(
@@ -664,7 +660,7 @@ tags:
 	});
 
 	it("preserves wikilinks in value when template does not wrap prompt", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		// Template does NOT wrap Area prompt in [[...]] but quotes the value
 		writeTemplate(
@@ -698,7 +694,7 @@ tags:
 	});
 
 	it("works with plain values when template wraps prompt in [[...]]", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		// Template wraps Area prompt in [[...]]
 		writeTemplate(
@@ -730,7 +726,7 @@ tags:
 	});
 
 	it("handles missing required args gracefully (replaces with empty string)", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		// Template with required prompt that won't have a value
 		writeTemplate(
@@ -763,7 +759,7 @@ area: "[[<% tp.system.prompt("Area") %>]]"
 	});
 
 	it("wraps wikilink values in quotes for unquoted YAML prompts", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		// Template with unquoted prompt (like resource.md)
 		writeTemplate(
@@ -799,7 +795,7 @@ area: <% tp.system.prompt("Area (wikilink or empty)", "") %>
 	});
 
 	it("strips wikilinks from values for double-arg prompts wrapped in wikilinks", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		// Template with double-arg prompt (with default) wrapped in wikilinks
 		// This is the pattern used by task.md for project/area fields
@@ -831,7 +827,7 @@ project: "[[<% tp.system.prompt("Project (optional)", "") %>]]"
 	});
 
 	it("replaces null placeholder in frontmatter with arg value", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -870,7 +866,7 @@ Body content`,
 	});
 
 	it("replaces YAML null (unquoted) placeholder in frontmatter", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -898,7 +894,7 @@ Body`,
 	});
 
 	it("does not replace non-null frontmatter values with args", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -935,7 +931,7 @@ describe("injectSections", () => {
 	}
 
 	it("injects content into multiple sections successfully", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		writeFile(
 			vault,
 			"Test Note.md",
@@ -974,7 +970,7 @@ title: Test Note
 	});
 
 	it("skips sections with empty content", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		writeFile(
 			vault,
 			"Test Note.md",
@@ -1010,7 +1006,7 @@ title: Test Note
 	});
 
 	it("skips sections with missing headings gracefully", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		writeFile(
 			vault,
 			"Test Note.md",
@@ -1041,7 +1037,7 @@ title: Test Note
 	});
 
 	it("handles multiline content correctly", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		writeFile(
 			vault,
 			"Test Note.md",
@@ -1077,7 +1073,7 @@ Some additional notes here.`;
 	});
 
 	it("reports all errors with details", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		writeFile(
 			vault,
 			"Test Note.md",
@@ -1109,7 +1105,7 @@ title: Test Note
 	});
 
 	it("returns empty arrays when no sections provided", () => {
-		const vault = makeTmpDir();
+		const vault = createTestVault();
 		writeFile(
 			vault,
 			"Test Note.md",

@@ -1,28 +1,15 @@
 import { describe, expect, it } from "bun:test";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 
 import type { ParaObsidianConfig } from "./config";
 import { autoCommitChanges } from "./git";
-
-function makeTmpDir(): string {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "para-obsidian-"));
-}
-
-async function initGit(dir: string) {
-	await Bun.$`git init`.cwd(dir);
-	await Bun.$`git config user.email "test@example.com"`.cwd(dir);
-	await Bun.$`git config user.name "Test"`.cwd(dir);
-	fs.writeFileSync(path.join(dir, ".gitignore"), "node_modules\n");
-	await Bun.$`git add .`.cwd(dir);
-	await Bun.$`git commit -m init`.cwd(dir);
-}
+import { createTestVault, initGitRepo } from "./test-utils";
 
 describe("autoCommitChanges", () => {
 	it("stages and commits when autoCommit is enabled", async () => {
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		const target = path.join(vault, "note.md");
 		fs.writeFileSync(target, "content", "utf8");
@@ -46,8 +33,8 @@ describe("autoCommitChanges", () => {
 	});
 
 	it("skips when autoCommit is disabled", async () => {
-		const vault = makeTmpDir();
-		await initGit(vault);
+		const vault = createTestVault();
+		await initGitRepo(vault);
 
 		fs.writeFileSync(path.join(vault, "note.md"), "content", "utf8");
 
