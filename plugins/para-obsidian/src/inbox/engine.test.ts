@@ -127,14 +127,29 @@ describe("inbox/engine", () => {
 
 		test("should ignore unsupported file types", async () => {
 			// Create files of types we don't have extractors for
-			writeFileSync(join(inboxPath, "notes.md"), "# Notes");
 			writeFileSync(join(inboxPath, "document.txt"), "text file");
 			writeFileSync(join(inboxPath, "data.csv"), "a,b,c");
+			writeFileSync(join(inboxPath, "archive.zip"), "fake zip");
 
 			const engine = createInboxEngine({ vaultPath: testVaultPath });
 			const suggestions = await engine.scan();
-			// Should have zero suggestions - no extractors for .md, .txt, .csv
+			// Should have zero suggestions - no extractors for .txt, .csv, .zip
 			expect(suggestions).toHaveLength(0);
+		});
+
+		test("should process markdown files", async () => {
+			// Create a markdown file - the markdown extractor will process it
+			writeFileSync(
+				join(inboxPath, "notes.md"),
+				"---\ntitle: Test\n---\n# Notes",
+			);
+
+			const engine = createInboxEngine({ vaultPath: testVaultPath });
+			const suggestions = await engine.scan();
+
+			// Markdown extractor processes .md files
+			expect(suggestions).toHaveLength(1);
+			expect(suggestions[0]?.source).toContain("notes.md");
 		});
 
 		test("should process image files with placeholder content", async () => {

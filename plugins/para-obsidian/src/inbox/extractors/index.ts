@@ -17,6 +17,14 @@ export {
 	readImageAsBase64,
 	VISION_EXTRACTION_PROMPT,
 } from "./image";
+export type { MarkdownExtension, MarkdownExtractionMetadata } from "./markdown";
+export {
+	createMarkdownInboxFile,
+	extractFrontmatterOnly,
+	isMarkdownExtension,
+	MARKDOWN_EXTENSIONS,
+	markdownExtractor,
+} from "./markdown";
 export { createInboxFile, pdfExtractor } from "./pdf";
 // Registry
 export {
