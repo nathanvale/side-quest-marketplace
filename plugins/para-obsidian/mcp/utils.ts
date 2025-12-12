@@ -7,44 +7,24 @@
  * @module mcp/utils
  */
 
-import { join } from "node:path";
+import type { ParaObsidianConfig } from "../src/config";
 import {
 	createCorrelationId,
-	createPluginLogger,
-} from "@sidequest/core/logging";
-import type { ParaObsidianConfig } from "../src/config";
+	getLogFile,
+	initLogger,
+	mcpLogger,
+} from "../src/logger";
 
 // ============================================================================
 // Logging
 // ============================================================================
-
-const logDirFromEnv =
-	process.env.PARA_OBSIDIAN_LOG_DIR ??
-	(process.env.PARA_VAULT
-		? join(process.env.PARA_VAULT, ".claude", "logs")
-		: undefined);
-
-const { initLogger, getSubsystemLogger, logFile, rootLogger } =
-	createPluginLogger({
-		name: "para-obsidian",
-		subsystems: ["mcp"],
-		logDir: logDirFromEnv,
-	});
-
-let loggerInitialized = false;
 
 /**
  * Initialize the MCP logger (called once at startup).
  */
 export async function initMcpLogger(): Promise<void> {
 	await initLogger();
-	if (!loggerInitialized && rootLogger) {
-		rootLogger.info`Logger initialized logDir=${logDirFromEnv ?? "~/.claude/logs"} logFile=${logFile}`;
-		loggerInitialized = true;
-	}
 }
-
-const mcpLogger = getSubsystemLogger("mcp");
 
 /** Log entry structure for MCP tool invocations. */
 export interface LogEntry {
@@ -57,18 +37,13 @@ export interface LogEntry {
  * Log an MCP tool event.
  */
 export function log(entry: LogEntry): void {
-	mcpLogger.info({ ...entry, timestamp: new Date().toISOString() });
+	if (mcpLogger) {
+		mcpLogger.info({ ...entry, timestamp: new Date().toISOString() });
+	}
 }
 
-/**
- * Get the current log file path.
- */
-export function getLogFile(): string | undefined {
-	return logFile;
-}
-
-// Re-export createCorrelationId for convenience
-export { createCorrelationId };
+// Re-export for convenience
+export { createCorrelationId, getLogFile };
 
 // ============================================================================
 // Response Formatting

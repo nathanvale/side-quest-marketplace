@@ -18,7 +18,6 @@ import {
 } from "@sidequest/core/llm";
 import type { ParaObsidianConfig } from "../config";
 import { createFromTemplate, replaceH1Title, replaceSections } from "../create";
-import { DEFAULT_TITLE_PREFIXES } from "../defaults";
 import {
 	readFrontmatterFile,
 	updateFrontmatterFile,
@@ -36,11 +35,16 @@ import {
 	getTemplateFields,
 	suggestSectionMapping,
 } from "../templates";
+import { applyTitlePrefix } from "../utils/title";
+import { stripWikilinks } from "../utils/wikilinks";
 import { buildConstraintSet, type VaultContext } from "./constraints";
 import {
 	buildStructuredPrompt,
 	DEFAULT_CRITICAL_RULES,
 } from "./prompt-builder";
+
+// Re-export for backward compatibility
+export { applyTitlePrefix } from "../utils/title";
 
 /**
  * Recursively flatten a nested array to extract the innermost string value.
@@ -63,73 +67,6 @@ export function flattenToString(value: unknown): string | null {
 	}
 	// For other types (number, boolean), convert to string
 	return String(value);
-}
-
-/**
- * Apply template-specific title prefix if configured, avoiding duplication.
- *
- * @param title - The base title to potentially prefix
- * @param template - Template name to look up prefix for
- * @param config - Para-obsidian configuration
- * @returns Title with prefix applied if needed, or original title
- *
- * @example
- * applyTitlePrefix("Christmas Day Hotels", "research", config)
- * // "Research - Christmas Day Hotels"
- *
- * applyTitlePrefix("Research - Hotels", "research", config)
- * // "Research - Hotels" (not duplicated)
- *
- * applyTitlePrefix("My Task", "task", config)
- * // "My Task" (no prefix for tasks)
- */
-export function applyTitlePrefix(
-	title: string,
-	template: string,
-	config: ParaObsidianConfig,
-): string {
-	// Get prefix from config or defaults
-	const prefix =
-		config.titlePrefixes?.[template] ?? DEFAULT_TITLE_PREFIXES[template];
-
-	if (!prefix) return title; // No prefix configured for this template
-
-	// Check if title already starts with the prefix (case-insensitive)
-	const titleLower = title.toLowerCase();
-	const prefixLower = prefix.toLowerCase();
-
-	if (titleLower.startsWith(prefixLower)) {
-		return title; // Already has prefix, don't duplicate
-	}
-
-	// Apply prefix with space
-	return `${prefix} ${title}`;
-}
-
-/**
- * Strip wikilink brackets from a value if present.
- * Templates already wrap values in [[...]], so AI responses with brackets cause double-wrapping.
- *
- * @example
- * stripWikilinks("[[Home]]") // "Home"
- * stripWikilinks("Home") // "Home"
- * stripWikilinks("[[]]") // null (empty wikilink)
- * stripWikilinks(null) // null
- */
-function stripWikilinks(value: string | null): string | null {
-	if (value === null || value === "null") return null;
-
-	let stripped = value.trim();
-
-	// Strip outer wikilink brackets if present
-	if (stripped.startsWith("[[") && stripped.endsWith("]]")) {
-		stripped = stripped.slice(2, -2).trim();
-	}
-
-	// Return null for empty values
-	if (stripped === "" || stripped === "null") return null;
-
-	return stripped;
 }
 
 /**

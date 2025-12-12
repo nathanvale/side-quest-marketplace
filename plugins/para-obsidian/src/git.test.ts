@@ -30,9 +30,9 @@ describe("git helpers", () => {
 	});
 });
 
-describe("getUncommittedFilesAll", () => {
+describe("getUncommittedFiles with allFileTypes", () => {
 	it("returns all file types (not just .md)", async () => {
-		const { getUncommittedFilesAll } = await import("./git");
+		const { getUncommittedFiles } = await import("./git");
 		const dir = createTestVault();
 		await initGitRepo(dir);
 
@@ -42,7 +42,7 @@ describe("getUncommittedFilesAll", () => {
 		fs.writeFileSync(path.join(dir, "data.json"), "{}");
 		fs.writeFileSync(path.join(dir, "script.js"), "console.log()");
 
-		const files = await getUncommittedFilesAll(dir);
+		const files = await getUncommittedFiles(dir, { allFileTypes: true });
 		expect(files).toContain("note.md");
 		expect(files).toContain("doc.pdf");
 		expect(files).toContain("data.json");
@@ -51,16 +51,16 @@ describe("getUncommittedFilesAll", () => {
 	});
 
 	it("returns empty array when working tree is clean", async () => {
-		const { getUncommittedFilesAll } = await import("./git");
+		const { getUncommittedFiles } = await import("./git");
 		const dir = createTestVault();
 		await initGitRepo(dir);
 
-		const files = await getUncommittedFilesAll(dir);
+		const files = await getUncommittedFiles(dir, { allFileTypes: true });
 		expect(files).toEqual([]);
 	});
 
 	it("returns files from subdirectories with relative paths", async () => {
-		const { getUncommittedFilesAll } = await import("./git");
+		const { getUncommittedFiles } = await import("./git");
 		const dir = createTestVault();
 		await initGitRepo(dir);
 
@@ -69,14 +69,14 @@ describe("getUncommittedFilesAll", () => {
 		fs.writeFileSync(path.join(dir, "inbox", "document.pdf"), "PDF");
 		fs.writeFileSync(path.join(dir, "inbox", "metadata.json"), "{}");
 
-		const files = await getUncommittedFilesAll(dir);
+		const files = await getUncommittedFiles(dir, { allFileTypes: true });
 		expect(files).toContain("inbox/document.pdf");
 		expect(files).toContain("inbox/metadata.json");
 		expect(files).toHaveLength(2);
 	});
 
 	it("handles staged and unstaged files", async () => {
-		const { getUncommittedFilesAll } = await import("./git");
+		const { getUncommittedFiles } = await import("./git");
 		const dir = createTestVault();
 		await initGitRepo(dir);
 
@@ -87,14 +87,14 @@ describe("getUncommittedFilesAll", () => {
 		// Create an unstaged file
 		fs.writeFileSync(path.join(dir, "unstaged.json"), "{}");
 
-		const files = await getUncommittedFilesAll(dir);
+		const files = await getUncommittedFiles(dir, { allFileTypes: true });
 		expect(files).toContain("staged.pdf");
 		expect(files).toContain("unstaged.json");
 		expect(files).toHaveLength(2);
 	});
 
 	it("handles modified existing files", async () => {
-		const { getUncommittedFilesAll } = await import("./git");
+		const { getUncommittedFiles } = await import("./git");
 		const dir = createTestVault();
 		await initGitRepo(dir);
 
@@ -106,7 +106,7 @@ describe("getUncommittedFilesAll", () => {
 		// Modify the file
 		fs.writeFileSync(path.join(dir, "existing.pdf"), "Modified");
 
-		const files = await getUncommittedFilesAll(dir);
+		const files = await getUncommittedFiles(dir, { allFileTypes: true });
 		expect(files).toContain("existing.pdf");
 		expect(files).toHaveLength(1);
 	});

@@ -23,6 +23,11 @@ import { createFromTemplate, injectSections } from "../create";
 import { resolveVaultPath } from "../fs";
 import { ensureGitGuard } from "../git";
 import { DEFAULT_INBOX_CONVERTERS, mapFieldsToTemplate } from "./converters";
+import {
+	generateFilename,
+	generateTitle,
+	generateUniquePath,
+} from "./engine-utils";
 import { createInboxError } from "./errors";
 import {
 	buildInboxPrompt,
@@ -52,41 +57,6 @@ import type {
 	InboxSuggestion,
 	ScanOptions,
 } from "./types";
-
-// =============================================================================
-// Utilities
-// =============================================================================
-
-/**
- * Generates a timestamp-based filename for an attachment.
- *
- * Format: YYYYMMDD-HHMM-description.ext
- *
- * @param originalPath - Original file path
- * @param timestamp - Optional timestamp (default: now)
- * @returns Generated filename
- */
-function generateFilename(originalPath: string, timestamp?: Date): string {
-	const ts = timestamp ?? new Date();
-	const year = ts.getFullYear();
-	const month = String(ts.getMonth() + 1).padStart(2, "0");
-	const day = String(ts.getDate()).padStart(2, "0");
-	const hour = String(ts.getHours()).padStart(2, "0");
-	const minute = String(ts.getMinutes()).padStart(2, "0");
-
-	const timestampPrefix = `${year}${month}${day}-${hour}${minute}`;
-
-	const file = basename(originalPath);
-	const ext = extname(file);
-	const nameWithoutExt = basename(file, ext);
-
-	const description = nameWithoutExt
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "");
-
-	return `${timestampPrefix}-${description}${ext}`;
-}
 
 // =============================================================================
 // Engine Factory
@@ -826,67 +796,6 @@ function buildSuggestion(
 		suggestedAttachmentName,
 		reason,
 	};
-}
-
-/**
- * Generate a suggested title from filename and extracted data.
- */
-function generateTitle(
-	filename: string,
-	noteType?: string,
-	fields?: Record<string, unknown>,
-): string {
-	// Try to use extracted provider and date
-	const provider = fields?.provider as string | undefined;
-	const date = fields?.date as string | undefined;
-
-	if (provider && date) {
-		const typeLabel = noteType ? capitalizeFirst(noteType) : "Document";
-		return `${typeLabel} - ${provider} - ${date}`;
-	}
-
-	if (provider) {
-		const typeLabel = noteType ? capitalizeFirst(noteType) : "Document";
-		return `${typeLabel} - ${provider}`;
-	}
-
-	// Fall back to cleaned filename
-	const name = basename(filename, extname(filename));
-	return name.replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
-}
-
-/**
- * Capitalize first letter of a string.
- */
-function capitalizeFirst(s: string): string {
-	return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-/**
- * Generate a unique file path by appending a counter if the path already exists.
- *
- * @param basePath - The desired file path
- * @returns Unique path (original or with -N suffix before extension)
- *
- * @example
- * // If "2025-12-10-invoice.pdf" exists:
- * generateUniquePath("/vault/Attachments/2025-12-10-invoice.pdf")
- * // → "/vault/Attachments/2025-12-10-invoice-1.pdf"
- */
-function generateUniquePath(basePath: string): string {
-	if (!pathExistsSync(basePath)) {
-		return basePath;
-	}
-
-	const ext = extname(basePath);
-	const base = ext ? basePath.slice(0, -ext.length) : basePath;
-	let counter = 1;
-
-	while (pathExistsSync(`${base}-${counter}${ext}`)) {
-		counter++;
-	}
-
-	return `${base}-${counter}${ext}`;
 }
 
 /**

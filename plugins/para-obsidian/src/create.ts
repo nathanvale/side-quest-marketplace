@@ -20,7 +20,6 @@ import {
 import { getErrorMessage } from "@sidequest/core/utils";
 
 import type { ParaObsidianConfig } from "./config";
-import { DEFAULT_TITLE_PREFIXES } from "./defaults";
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter";
 import { resolveVaultPath } from "./fs";
 import { insertIntoNote, replaceSectionContent } from "./insert";
@@ -29,6 +28,8 @@ import {
 	detectTitlePromptKey,
 	getTemplate,
 } from "./templates";
+import { applyTitlePrefix } from "./utils/title";
+import { stripWikilinksOrValue } from "./utils/wikilinks";
 
 /**
  * Options for creating a new note from a template.
@@ -52,39 +53,6 @@ export interface InjectSectionsResult {
 	readonly injected: string[];
 	/** List of sections that were skipped with reasons. */
 	readonly skipped: Array<{ heading: string; reason: string }>;
-}
-
-/**
- * Apply template-specific title prefix if configured, avoiding duplication.
- *
- * @param title - The base title
- * @param template - Template name (e.g., "booking", "research")
- * @param config - Para-obsidian configuration
- * @returns Title with prefix applied if configured
- *
- * @example
- * ```typescript
- * applyTitlePrefix("Test Hotel", "booking", config); // "🎫 Booking - Test Hotel"
- * applyTitlePrefix("Booking - Test Hotel", "booking", config); // "Booking - Test Hotel" (no duplication)
- * ```
- */
-function applyTitlePrefix(
-	title: string,
-	template: string,
-	config: ParaObsidianConfig,
-): string {
-	const prefix =
-		config.titlePrefixes?.[template] ?? DEFAULT_TITLE_PREFIXES[template];
-	if (!prefix) return title;
-
-	// Case-insensitive deduplication
-	const titleLower = title.toLowerCase();
-	const prefixLower = prefix.toLowerCase();
-	if (titleLower.startsWith(prefixLower)) {
-		return title;
-	}
-
-	return `${prefix} ${title}`;
 }
 
 /**
@@ -117,24 +85,6 @@ function titleToFilename(title: string): string {
 		})
 		.join(" ");
 	return `${cleaned}.md`;
-}
-
-/**
- * Strips wikilink brackets from a value if present.
- *
- * @param value - Value that may contain wikilink brackets
- * @returns Value with outer wikilink brackets removed
- *
- * @example
- * ```typescript
- * stripWikilinks('[[Home]]'); // 'Home'
- * stripWikilinks('Home'); // 'Home'
- * stripWikilinks('[[My Project]]'); // 'My Project'
- * ```
- */
-function stripWikilinks(value: string): string {
-	const match = value.match(/^\[\[(.+)\]\]$/);
-	return match?.[1] ?? value;
 }
 
 /**
@@ -284,7 +234,7 @@ export function applyArgsToTemplate(
 		let effectiveValue: string;
 		if (isWrappedInWikilinks) {
 			// Template has [[<% ... %>]], strip wikilinks from value
-			effectiveValue = stripWikilinks(value);
+			effectiveValue = stripWikilinksOrValue(value);
 		} else if (value.match(/^\[\[.+\]\]$/)) {
 			// Value is a wikilink and template doesn't wrap it
 			// Check if we're in a YAML context (frontmatter) and unquoted

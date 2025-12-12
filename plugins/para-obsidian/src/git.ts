@@ -144,70 +144,38 @@ export async function gitStatus(dir: string): Promise<{ clean: boolean }> {
 }
 
 /**
- * Gets all uncommitted files in a directory (staged and unstaged).
- *
- * Uses git status --porcelain to find modified, added, and untracked files.
- * Filters to only .md files and returns vault-relative paths.
- *
- * @param dir - Directory to check
- * @returns Array of vault-relative paths to uncommitted .md files
- *
- * @example
- * ```typescript
- * const uncommitted = await getUncommittedFiles(config.vault);
- * // Returns: ['Projects/My Project.md', '00_Inbox/New Note.md']
- * ```
+ * Options for getting uncommitted files.
  */
-export async function getUncommittedFiles(dir: string): Promise<string[]> {
-	const { stdout, exitCode } = await spawnAndCollect(
-		["git", "status", "--porcelain", "-uall"],
-		{ cwd: dir },
-	);
-	if (exitCode !== 0) throw new Error("git status failed");
-
-	// Split first, then filter empty lines
-	// Important: Don't trim() the whole stdout as it strips leading spaces
-	// from git status format (e.g., " M file.md" becomes "M file.md")
-	const lines = stdout.split("\n").filter((line) => line.length > 0);
-	const files: string[] = [];
-
-	for (const line of lines) {
-		// Porcelain format: XY PATH (2 status chars + 1 space + path)
-		// X = index status, Y = working tree status
-		// Status codes: M (modified), A (added), ?? (untracked), etc.
-		// Extract path after the "XY " prefix (3 chars)
-		// Use match to handle any leading whitespace/status combo
-		const match = line.match(/^.{2}\s(.+)$/);
-		let filePath = match?.[1];
-		// Git quotes filenames containing spaces, e.g. "Note 1.md"
-		// Strip surrounding quotes if present
-		if (filePath?.startsWith('"') && filePath.endsWith('"')) {
-			filePath = filePath.slice(1, -1);
-		}
-		if (filePath?.endsWith(".md")) {
-			files.push(filePath);
-		}
-	}
-
-	return files;
+export interface GetUncommittedFilesOptions {
+	/** If true, return all file types. If false (default), return only .md files. */
+	readonly allFileTypes?: boolean;
 }
 
 /**
- * Gets all uncommitted files in a directory (staged and unstaged), regardless of file type.
+ * Gets all uncommitted files in a directory (staged and unstaged).
  *
  * Uses git status --porcelain to find modified, added, and untracked files.
- * Returns vault-relative paths for ALL file types (not just .md).
+ * By default, filters to only .md files. Use `allFileTypes: true` to include all files.
  *
  * @param dir - Directory to check
- * @returns Array of vault-relative paths to all uncommitted files
+ * @param options - Options for filtering files
+ * @returns Array of vault-relative paths to uncommitted files
  *
  * @example
  * ```typescript
- * const uncommitted = await getUncommittedFilesAll(config.vault);
+ * // Get only markdown files (default)
+ * const mdFiles = await getUncommittedFiles(config.vault);
+ * // Returns: ['Projects/My Project.md', '00_Inbox/New Note.md']
+ *
+ * // Get all file types
+ * const allFiles = await getUncommittedFiles(config.vault, { allFileTypes: true });
  * // Returns: ['Projects/My Project.md', '00_Inbox/doc.pdf', '00_Inbox/data.json']
  * ```
  */
-export async function getUncommittedFilesAll(dir: string): Promise<string[]> {
+export async function getUncommittedFiles(
+	dir: string,
+	options?: GetUncommittedFilesOptions,
+): Promise<string[]> {
 	const { stdout, exitCode } = await spawnAndCollect(
 		["git", "status", "--porcelain", "-uall"],
 		{ cwd: dir },
@@ -219,6 +187,7 @@ export async function getUncommittedFilesAll(dir: string): Promise<string[]> {
 	// from git status format (e.g., " M file.md" becomes "M file.md")
 	const lines = stdout.split("\n").filter((line) => line.length > 0);
 	const files: string[] = [];
+	const allFileTypes = options?.allFileTypes ?? false;
 
 	for (const line of lines) {
 		// Porcelain format: XY PATH (2 status chars + 1 space + path)
@@ -233,7 +202,11 @@ export async function getUncommittedFilesAll(dir: string): Promise<string[]> {
 		if (filePath?.startsWith('"') && filePath.endsWith('"')) {
 			filePath = filePath.slice(1, -1);
 		}
-		if (filePath) {
+
+		if (!filePath) continue;
+
+		// Filter by file type if not including all
+		if (allFileTypes || filePath.endsWith(".md")) {
 			files.push(filePath);
 		}
 	}
@@ -270,9 +243,9 @@ export async function ensureGitGuard(
 
 	// Get all uncommitted files and filter to PARA-managed folders only
 	const checkAllTypes = options?.checkAllFileTypes ?? false;
-	const allUncommitted = checkAllTypes
-		? await getUncommittedFilesAll(config.vault)
-		: await getUncommittedFiles(config.vault);
+	const allUncommitted = await getUncommittedFiles(config.vault, {
+		allFileTypes: checkAllTypes,
+	});
 
 	const managedFolders = getManagedFolders(config);
 	const uncommitted = allUncommitted.filter((file) =>
