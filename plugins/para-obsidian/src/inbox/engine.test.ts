@@ -507,4 +507,201 @@ describe("inbox/engine", () => {
 			// NOT the intended name: ![[Attachments/2025-12-10-file.pdf]]
 		});
 	});
+
+	describe("challenge()", () => {
+		const challengeTestPath = join(
+			process.cwd(),
+			".test-scratch",
+			"challenge-test-vault",
+		);
+		const challengeInboxPath = join(challengeTestPath, "00 Inbox");
+		let originalParaVault: string | undefined;
+
+		beforeEach(async () => {
+			try {
+				rmSync(challengeTestPath, { recursive: true, force: true });
+			} catch {
+				// Ignore
+			}
+			mkdirSync(challengeInboxPath, { recursive: true });
+			mkdirSync(join(challengeTestPath, "01 Projects"), { recursive: true });
+			mkdirSync(join(challengeTestPath, "02 Areas"), { recursive: true });
+			mkdirSync(join(challengeTestPath, "Attachments"), { recursive: true });
+			await initGitRepo(challengeTestPath);
+
+			originalParaVault = process.env.PARA_VAULT;
+			process.env.PARA_VAULT = challengeTestPath;
+		});
+
+		afterEach(() => {
+			if (originalParaVault !== undefined) {
+				process.env.PARA_VAULT = originalParaVault;
+			} else {
+				delete process.env.PARA_VAULT;
+			}
+
+			try {
+				rmSync(challengeTestPath, { recursive: true, force: true });
+			} catch {
+				// Ignore
+			}
+		});
+
+		test("should throw error when suggestion not found", async () => {
+			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+
+			await expect(
+				engine.challenge("non-existent-id", "This is a booking"),
+			).rejects.toThrow("Suggestion not found: non-existent-id");
+		});
+
+		test("should preserve previousClassification in challenged suggestion", async () => {
+			// Create a markdown file in inbox (markdown extractor doesn't need pdftotext)
+			writeFileSync(
+				join(challengeInboxPath, "document.md"),
+				"---\ntitle: Test Document\ntype: invoice\n---\n# Invoice\nAmount: $100\nProvider: Test Co",
+			);
+
+			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+
+			// First scan to populate cache
+			const suggestions = await engine.scan();
+			expect(suggestions.length).toBeGreaterThan(0);
+
+			const original = suggestions[0];
+			if (!original) {
+				throw new Error("No suggestion returned from scan");
+			}
+
+			// Store original classification for comparison
+			const originalNoteType = original.suggestedNoteType;
+			const originalConfidence = original.confidence;
+			const originalReason = original.reason;
+
+			// Challenge the suggestion
+			const challenged = await engine.challenge(
+				original.id,
+				"This is actually a booking confirmation",
+			);
+
+			// Verify previousClassification is populated
+			expect(challenged.previousClassification).toBeDefined();
+			expect(challenged.previousClassification?.documentType).toBe(
+				originalNoteType,
+			);
+			expect(challenged.previousClassification?.confidence).toBe(
+				originalConfidence,
+			);
+			expect(challenged.previousClassification?.reason).toBe(originalReason);
+		});
+
+		test("should include hint in challenged suggestion", async () => {
+			// Create a markdown file
+			writeFileSync(
+				join(challengeInboxPath, "test.md"),
+				"# Some Content\n\nThis is a test document",
+			);
+
+			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+
+			// Scan to populate cache
+			const suggestions = await engine.scan();
+			expect(suggestions.length).toBeGreaterThan(0);
+
+			const original = suggestions[0];
+			if (!original) {
+				throw new Error("No suggestion returned from scan");
+			}
+
+			const hint = "This is a session note from therapy";
+			const challenged = await engine.challenge(original.id, hint);
+
+			// Verify hint is stored
+			expect(challenged.hint).toBe(hint);
+		});
+
+		test("should update reason with challenge context", async () => {
+			// Create a markdown file
+			writeFileSync(
+				join(challengeInboxPath, "meeting.md"),
+				"# Meeting Notes\n\nDiscussed project timeline",
+			);
+
+			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+
+			// Scan to populate cache
+			const suggestions = await engine.scan();
+			expect(suggestions.length).toBeGreaterThan(0);
+
+			const original = suggestions[0];
+			if (!original) {
+				throw new Error("No suggestion returned from scan");
+			}
+
+			const hint = "This should be in the Work area";
+			const challenged = await engine.challenge(original.id, hint);
+
+			// Reason should mention it was challenged
+			expect(challenged.reason).toContain("Challenged:");
+			expect(challenged.reason).toContain(hint);
+		});
+
+		test("should preserve original ID after challenge", async () => {
+			// Create a markdown file
+			writeFileSync(
+				join(challengeInboxPath, "note.md"),
+				"# Quick Note\n\nSome content here",
+			);
+
+			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+
+			// Scan to populate cache
+			const suggestions = await engine.scan();
+			expect(suggestions.length).toBeGreaterThan(0);
+
+			const original = suggestions[0];
+			if (!original) {
+				throw new Error("No suggestion returned from scan");
+			}
+
+			const challenged = await engine.challenge(
+				original.id,
+				"Reclassify as receipt",
+			);
+
+			// ID should remain the same
+			expect(challenged.id).toBe(original.id);
+		});
+
+		test("should update cache with challenged suggestion", async () => {
+			// Create a markdown file
+			writeFileSync(
+				join(challengeInboxPath, "file.md"),
+				"# File Content\n\nBody text",
+			);
+
+			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+
+			// Scan to populate cache
+			const suggestions = await engine.scan();
+			expect(suggestions.length).toBeGreaterThan(0);
+
+			const original = suggestions[0];
+			if (!original) {
+				throw new Error("No suggestion returned from scan");
+			}
+
+			// Challenge the suggestion
+			await engine.challenge(original.id, "This is a booking");
+
+			// Challenge again - should work because cache was updated
+			const rechallenged = await engine.challenge(
+				original.id,
+				"Actually it's an invoice",
+			);
+
+			// Should not throw and should have the second hint
+			expect(rechallenged.hint).toBe("Actually it's an invoice");
+		});
+	});
 });
