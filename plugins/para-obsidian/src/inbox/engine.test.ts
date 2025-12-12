@@ -125,15 +125,28 @@ describe("inbox/engine", () => {
 			expect(suggestions).toHaveLength(0);
 		});
 
-		test("should ignore non-PDF files", async () => {
-			// Create some non-PDF files
+		test("should ignore unsupported file types", async () => {
+			// Create files of types we don't have extractors for
 			writeFileSync(join(inboxPath, "notes.md"), "# Notes");
-			writeFileSync(join(inboxPath, "image.png"), "fake image");
 			writeFileSync(join(inboxPath, "document.txt"), "text file");
+			writeFileSync(join(inboxPath, "data.csv"), "a,b,c");
 
 			const engine = createInboxEngine({ vaultPath: testVaultPath });
 			const suggestions = await engine.scan();
+			// Should have zero suggestions - no extractors for .md, .txt, .csv
 			expect(suggestions).toHaveLength(0);
+		});
+
+		test("should process image files with placeholder content", async () => {
+			// Create an image file - the image extractor will process it
+			writeFileSync(join(inboxPath, "screenshot.png"), "fake image");
+
+			const engine = createInboxEngine({ vaultPath: testVaultPath });
+			const suggestions = await engine.scan();
+
+			// Image extractor processes images (placeholder until vision API configured)
+			expect(suggestions).toHaveLength(1);
+			expect(suggestions[0]?.source).toContain("screenshot.png");
 		});
 
 		test("should throw error when pdftotext not available", async () => {

@@ -150,17 +150,19 @@ export class ExtractorRegistry {
  *
  * Currently includes:
  * - PDF extractor (pdftotext)
+ * - Image extractor (Vision AI - placeholder until API configured)
  *
  * Future extractors:
- * - Image extractor (Gemini Vision)
- * - Markdown extractor (raw text)
+ * - Markdown extractor (frontmatter + content)
  */
 export function createDefaultRegistry(): ExtractorRegistry {
 	// Import here to avoid circular dependencies
 	const { pdfExtractor } = require("./pdf");
+	const { imageExtractor } = require("./image");
 
 	const registry = new ExtractorRegistry();
 	registry.register(pdfExtractor);
+	registry.register(imageExtractor);
 
 	return registry;
 }

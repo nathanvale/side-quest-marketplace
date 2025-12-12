@@ -6,9 +6,18 @@
  * @module extractors
  */
 
+export type { ImageExtension, ImageExtractionMetadata } from "./image";
 // Extractors
+export {
+	createImageInboxFile,
+	getMimeType,
+	IMAGE_EXTENSIONS,
+	imageExtractor,
+	isImageExtension,
+	readImageAsBase64,
+	VISION_EXTRACTION_PROMPT,
+} from "./image";
 export { createInboxFile, pdfExtractor } from "./pdf";
-
 // Registry
 export {
 	createDefaultRegistry,
@@ -16,7 +25,6 @@ export {
 	getDefaultRegistry,
 	resetDefaultRegistry,
 } from "./registry";
-
 // Types
 export type {
 	ContentExtractor,
