@@ -169,12 +169,22 @@ describe("inbox/types", () => {
 				}),
 				execute: async (_ids: string[]) => [],
 				generateReport: (_suggestions: InboxSuggestion[]) => "# Report",
+				challenge: async (_id: string, _hint: string) => ({
+					id: "test",
+					source: "/test",
+					processor: "attachments",
+					confidence: "high",
+					action: "create-note",
+					reason: "Re-classified",
+					challengeReason: "User challenged: re-classified",
+				}),
 			};
 
 			expect(mockEngine.scan).toBeDefined();
 			expect(mockEngine.editWithPrompt).toBeDefined();
 			expect(mockEngine.execute).toBeDefined();
 			expect(mockEngine.generateReport).toBeDefined();
+			expect(mockEngine.challenge).toBeDefined();
 		});
 	});
 

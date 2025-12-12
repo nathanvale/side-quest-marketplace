@@ -120,6 +120,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		scan,
 		execute,
 		editWithPrompt,
+		challenge,
 		generateReport,
 	};
 
@@ -598,6 +599,55 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		}
 
 		return finalSuggestion;
+	}
+
+	/**
+	 * Challenge a suggestion and re-classify with a user hint.
+	 * Preserves the previous classification for audit trail.
+	 *
+	 * @param id - Suggestion ID to challenge
+	 * @param hint - User's hint for re-classification
+	 * @returns Updated suggestion with previousClassification populated
+	 */
+	async function challenge(id: string, hint: string): Promise<InboxSuggestion> {
+		await initLoggerWithNotice();
+		const cid = createCorrelationId();
+
+		if (inboxLogger) {
+			inboxLogger.info`Challenge started id=${id} hint=${hint} cid=${cid}`;
+		}
+
+		// Look up original suggestion
+		const original = suggestionCache.get(id);
+		if (!original) {
+			throw new Error(`Suggestion not found: ${id}`);
+		}
+
+		// Store previous classification for audit trail
+		const previousClassification = {
+			documentType: original.suggestedNoteType,
+			confidence: original.confidence,
+			reason: original.reason,
+		};
+
+		// Re-process with hint using editWithPrompt
+		const updated = await editWithPrompt(id, hint);
+
+		// Create final suggestion with challenge metadata
+		const challengedSuggestion: InboxSuggestion = {
+			...updated,
+			hint,
+			previousClassification,
+			reason: `Challenged: "${hint}" → ${updated.reason}`,
+		};
+
+		suggestionCache.set(id, challengedSuggestion);
+
+		if (inboxLogger) {
+			inboxLogger.info`Challenge complete id=${id} oldType=${previousClassification.documentType} newType=${challengedSuggestion.suggestedNoteType} cid=${cid}`;
+		}
+
+		return challengedSuggestion;
 	}
 
 	/**

@@ -35,8 +35,15 @@ export type ProcessorType = "attachments" | "notes" | "images";
  * - rename: Rename the file
  * - link: Link to existing note
  * - skip: Do not process this item
+ * - challenge: Re-classify with user hint (triggers Stage 2 re-run)
  */
-export type InboxAction = "create-note" | "move" | "rename" | "link" | "skip";
+export type InboxAction =
+	| "create-note"
+	| "move"
+	| "rename"
+	| "link"
+	| "skip"
+	| "challenge";
 
 // =============================================================================
 // Suggestion Types
@@ -92,6 +99,18 @@ export interface InboxSuggestion {
 
 	/** Human-readable explanation of why this suggestion was made */
 	readonly reason: string;
+
+	// Challenge/feedback fields
+
+	/** User hint for re-classification (when action is 'challenge') */
+	readonly hint?: string;
+
+	/** Previous classification that was challenged (for audit trail) */
+	readonly previousClassification?: {
+		readonly documentType?: string;
+		readonly confidence: Confidence;
+		readonly reason: string;
+	};
 }
 
 /**
@@ -309,6 +328,20 @@ export interface InboxEngine {
 	 * @returns Updated suggestion
 	 */
 	editWithPrompt(id: string, prompt: string): Promise<InboxSuggestion>;
+
+	/**
+	 * Challenge a suggestion and re-classify with a user hint.
+	 * Preserves the previous classification for audit trail.
+	 *
+	 * This is the formal way to dispute an LLM classification.
+	 * The hint should explain why the current classification is wrong
+	 * (e.g., "This is actually a Medicare invoice, not a generic medical bill").
+	 *
+	 * @param id - Suggestion ID to challenge
+	 * @param hint - User's hint for re-classification
+	 * @returns Updated suggestion with previousClassification populated
+	 */
+	challenge(id: string, hint: string): Promise<InboxSuggestion>;
 
 	/**
 	 * Execute approved suggestions (create notes, move attachments).
