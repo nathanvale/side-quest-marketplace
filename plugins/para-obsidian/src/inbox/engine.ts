@@ -23,12 +23,12 @@ import { createFromTemplate, injectSections } from "../create";
 import { DEFAULT_PARA_FOLDERS } from "../defaults";
 import { resolveVaultPath } from "../fs";
 import { ensureGitGuard } from "../git";
-import { DEFAULT_INBOX_CONVERTERS, mapFieldsToTemplate } from "./converters";
 import {
-	generateFilename,
-	generateTitle,
-	generateUniquePath,
-} from "./engine-utils";
+	buildSuggestion,
+	DEFAULT_INBOX_CONVERTERS,
+	mapFieldsToTemplate,
+} from "./converters";
+import { generateFilename, generateUniquePath } from "./engine-utils";
 import { createInboxError } from "./errors";
 import {
 	buildInboxPrompt,
@@ -49,10 +49,8 @@ import {
 } from "./pdf-processor";
 import { createRegistry, hashFile } from "./registry";
 import type {
-	Confidence,
 	ExecuteOptions,
 	ExecutionResult,
-	InboxAction,
 	InboxEngine,
 	InboxEngineConfig,
 	InboxSuggestion,
@@ -297,12 +295,12 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				}
 
 				// Build suggestion
-				const suggestion = buildSuggestion(
+				const suggestion = buildSuggestion({
 					filename,
-					resolvedConfig.inboxFolder,
+					inboxFolder: resolvedConfig.inboxFolder,
 					heuristicResult,
 					llmResult,
-				);
+				});
 				suggestionCache.set(suggestion.id, suggestion);
 				if (onProgress) {
 					await onProgress({ ...progressBase, stage: "done" });
@@ -562,12 +560,12 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		const heuristicResult = combineHeuristics(filename, text);
 
 		// Build updated suggestion
-		const updated = buildSuggestion(
+		const updated = buildSuggestion({
 			filename,
-			resolvedConfig.inboxFolder,
+			inboxFolder: resolvedConfig.inboxFolder,
 			heuristicResult,
 			llmResult,
-		);
+		});
 
 		// Preserve original ID and update cache
 		const finalSuggestion: InboxSuggestion = {
@@ -740,100 +738,6 @@ async function callLLM(
 		model: resolvedModel,
 		prompt,
 	});
-}
-
-/**
- * Build a suggestion from heuristic and LLM results.
- */
-function buildSuggestion(
-	filename: string,
-	inboxFolder: string,
-	heuristicResult: {
-		detected: boolean;
-		suggestedType?: string;
-		confidence: number;
-	},
-	llmResult: DocumentTypeResult | null,
-): InboxSuggestion {
-	const source = join(inboxFolder, filename);
-
-	// Determine confidence level
-	let confidence: Confidence;
-	let action: InboxAction;
-	let suggestedNoteType: string | undefined;
-	let suggestedArea: string | undefined;
-	let suggestedProject: string | undefined;
-	let extractedFields: Record<string, unknown> | undefined;
-	let reason: string;
-
-	// If LLM detected with high confidence
-	if (llmResult && llmResult.confidence >= 0.7) {
-		confidence = llmResult.confidence >= 0.9 ? "high" : "medium";
-		action = "create-note";
-		suggestedNoteType = llmResult.documentType;
-		suggestedArea = llmResult.suggestedArea ?? undefined;
-		suggestedProject = llmResult.suggestedProject ?? undefined;
-		extractedFields = llmResult.extractedFields ?? undefined;
-		reason =
-			llmResult.reasoning ??
-			`LLM detected ${llmResult.documentType} with ${(llmResult.confidence * 100).toFixed(0)}% confidence`;
-
-		// Boost confidence if heuristics agree
-		if (
-			heuristicResult.detected &&
-			heuristicResult.suggestedType === llmResult.documentType
-		) {
-			confidence = "high";
-			reason = `Heuristics and LLM agree: ${llmResult.documentType}`;
-		}
-	}
-	// If only heuristics detected
-	else if (heuristicResult.detected && heuristicResult.confidence > 0.5) {
-		confidence = heuristicResult.confidence >= 0.8 ? "medium" : "low";
-		action = "create-note";
-		suggestedNoteType = heuristicResult.suggestedType;
-		reason = `Heuristic detection: ${heuristicResult.suggestedType} (${(heuristicResult.confidence * 100).toFixed(0)}% confidence)`;
-	}
-	// Low confidence - needs review
-	else if (llmResult) {
-		confidence = "low";
-		action = llmResult.documentType === "generic" ? "skip" : "create-note";
-		suggestedNoteType = llmResult.documentType;
-		reason = `Low confidence LLM detection: ${llmResult.documentType}`;
-	}
-	// No detection
-	else {
-		confidence = "low";
-		action = "skip";
-		reason = "Unable to determine document type";
-	}
-
-	// Generate suggested title from filename
-	const suggestedTitle = generateTitle(
-		filename,
-		suggestedNoteType,
-		extractedFields,
-	);
-
-	// Use LLM-suggested filename description if available
-	const suggestedAttachmentName = llmResult?.suggestedFilenameDescription
-		? llmResult.suggestedFilenameDescription
-		: undefined;
-
-	return {
-		id: crypto.randomUUID(),
-		source,
-		processor: "attachments",
-		confidence,
-		action,
-		suggestedNoteType,
-		suggestedTitle,
-		suggestedArea,
-		suggestedProject,
-		extractedFields,
-		suggestedAttachmentName,
-		reason,
-	};
 }
 
 /**

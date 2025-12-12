@@ -17,6 +17,9 @@ export {
 	scoreContent,
 	scoreFilename,
 } from "./loader";
+export type { HeuristicResult, SuggestionInput } from "./suggestion-builder";
+// Suggestion builder
+export { buildSuggestion } from "./suggestion-builder";
 // Types
 export type {
 	ConverterMatch,
