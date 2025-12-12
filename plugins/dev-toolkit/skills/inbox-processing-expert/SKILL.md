@@ -16,7 +16,7 @@ Build security-hardened inbox automation with AI-powered metadata extraction fol
 - **[Performance Characteristics](#performance-characteristics)** - Timing, concurrency limits, optimization
 - **[Interactive CLI](#interactive-cli)** - Terminal UI, command parsing, user feedback
 - **[Error Handling](#error-handling)** - 23-error taxonomy across 7 categories
-- **[Testing Strategy](#testing-strategy)** - 201 tests, coverage patterns
+- **[Testing Strategy](#testing-strategy)** - 246 tests, coverage patterns
 - **[Common Questions](#common-questions)** - FAQ and troubleshooting
 - **[Related Skills](#related-skills)** - Bun CLI, Bun FS Helpers
 
@@ -242,12 +242,12 @@ if (!templateExists(suggestedNoteType)) {
 **Use content hashing to prevent duplicate processing.**
 
 ```typescript
-import { sha256File } from "@sidequest/core/fs";
+import { hashFile, createRegistry } from "./registry";
 
 const registry = createRegistry(vaultPath);
 await registry.load();
 
-const hash = await sha256File(filePath);
+const hash = await hashFile(filePath);
 if (registry.isProcessed(hash)) {
   console.log("Already processed - skipping");
   return;
@@ -268,6 +268,71 @@ await registry.save();
 - Filename changes don't break idempotency
 - Safe to re-run on same files
 - Registry tracks what was created from each source
+
+### Converters Architecture
+
+**Extensible document type detection via converter configuration.**
+
+The converters module provides a pluggable architecture for detecting document types:
+
+```typescript
+import type { InboxConverter } from "./converters/types";
+
+const invoiceConverter: InboxConverter = {
+  id: "invoice",
+  displayName: "Invoice",
+  enabled: true,
+  priority: 90,  // Higher = checked first
+
+  heuristics: {
+    filenamePatterns: [
+      { pattern: "invoice|rechnung|factura", weight: 0.9 },
+      { pattern: "receipt|bill", weight: 0.7 },
+    ],
+    contentMarkers: [
+      { pattern: "total|amount due|subtotal", weight: 0.8 },
+      { pattern: "invoice number|inv[.#]", weight: 0.9 },
+    ],
+    threshold: 0.3,
+  },
+
+  fields: [
+    { name: "provider", type: "string", description: "Company name", required: true },
+    { name: "amount", type: "currency", description: "Total amount", required: true },
+    { name: "date", type: "date", description: "Invoice date", required: true },
+    { name: "invoiceNumber", type: "string", description: "Invoice #", required: false },
+  ],
+
+  extraction: {
+    promptHint: "Extract invoice details including provider, amount, and date.",
+    keyFields: ["provider", "amount"],
+  },
+
+  template: {
+    name: "Invoice",
+    fieldMappings: {
+      provider: "Provider",
+      amount: "Amount",
+      date: "Date",
+      invoiceNumber: "Invoice Number",
+    },
+  },
+
+  scoring: {
+    heuristicWeight: 0.3,
+    llmWeight: 0.7,
+    highThreshold: 0.85,
+    mediumThreshold: 0.6,
+  },
+};
+```
+
+**Key patterns:**
+- **Heuristics first:** Quick filename/content pattern matching (0ms)
+- **LLM second:** AI-powered extraction only for matched files (~1-3s)
+- **Field-driven:** Each converter defines extraction fields and template mappings
+- **Priority-based:** Higher priority converters are checked first
+- **Extensible:** Add new document types by creating converters
 
 ---
 
@@ -488,7 +553,7 @@ jq 'select(.llm.call_duration_ms) | .llm.call_duration_ms' \
 
 ## Testing Strategy
 
-### Coverage (201 Tests)
+### Coverage (246 Tests)
 
 - **Registry** (28 tests) - Atomic writes, locking, validation, idempotency
 - **PDF Processor** - Extraction, heuristics, TOCTOU, timeout handling
@@ -824,17 +889,26 @@ src/inbox/
 ├── pdf-processor.ts      # PDF extraction + heuristics
 ├── llm-detection.ts      # AI type detection + field extraction
 ├── cli-adapter.ts        # Interactive terminal UI
+├── cli.ts                # Interactive CLI entry point
 ├── errors.ts             # Error taxonomy (23 codes)
-├── logger.ts             # Structured logging
-└── [*.test.ts]           # 201 comprehensive tests
+├── logger.ts             # Structured logging with correlation IDs
+├── unique-path.ts        # Path collision detection and resolution
+├── converters/           # Document type detection configuration
+│   ├── types.ts          # InboxConverter interface definitions
+│   ├── defaults.ts       # Default converters (invoice, booking)
+│   ├── loader.ts         # Converter loading and merging
+│   └── index.ts          # Module exports
+└── [*.test.ts]           # 246 comprehensive tests (10 files)
 ```
 
 ### Key Dependencies
 
 - `p-limit` - Controlled concurrency
 - `nanospinner` - Progress indicators for CLI
-- `@sidequest/core/fs` - Atomic write utilities
+- `@sidequest/core/fs` - Atomic write utilities (ensureDirSync, moveFile, readTextFileSync)
+- `@sidequest/core/glob` - File globbing utilities (globFilesSync)
 - `pdftotext` - External CLI (brew install poppler)
+- `crypto.subtle` - SHA256 hashing (Bun native)
 
 ### Checklist: Building an Inbox Processor
 
@@ -852,10 +926,12 @@ src/inbox/
 - [ ] Error taxonomy (structured, recoverable flag)
 - [ ] Correlation ID logging (debugging)
 - [ ] Interactive CLI (display → parse → execute → update)
+- [ ] Converter-based detection (extensible document types)
+- [ ] Unique path handling (collision detection with .1, .2 suffixes)
 - [ ] Test coverage (security, TOCTOU, idempotency)
 
 ---
 
-**Last Updated:** 2025-12-11
+**Last Updated:** 2025-12-12
 **Status:** Production Reference Implementation
 **Related:** [Bun CLI](../bun-cli/SKILL.md), [Bun FS Helpers](../bun-fs-helpers/SKILL.md)
