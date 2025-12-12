@@ -16,11 +16,12 @@ const REGISTRY_FILE = ".inbox-processed.json";
 /**
  * Generate a valid 64-char hex string from a short test identifier.
  * This satisfies the SHA256 hash validation while keeping tests readable.
- * Uses underscore delimiter to prevent collisions (e.g., hash-100 vs hash-1000).
+ * Converts the identifier to hex and pads with zeros.
  */
 function testHash(shortId: string): string {
-	// Add delimiter before padding to prevent collisions
-	return `${shortId}_`.padEnd(64, "0");
+	// Convert shortId to hex string to ensure valid hash characters
+	const hexId = Buffer.from(shortId, "utf-8").toString("hex");
+	return hexId.padEnd(64, "0");
 }
 
 describe("inbox/registry", () => {

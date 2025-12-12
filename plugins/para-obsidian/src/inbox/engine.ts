@@ -20,6 +20,7 @@ import { globFilesSync } from "@sidequest/core/glob";
 import pLimit from "p-limit";
 import { loadConfig } from "../config";
 import { createFromTemplate, injectSections } from "../create";
+import { DEFAULT_PARA_FOLDERS } from "../defaults";
 import { resolveVaultPath } from "../fs";
 import { ensureGitGuard } from "../git";
 import { DEFAULT_INBOX_CONVERTERS, mapFieldsToTemplate } from "./converters";
@@ -182,9 +183,14 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		}
 
 		// Get vault context for LLM (stub for now - could integrate with indexer)
+		// Load para-obsidian config to get paraFolders mapping for vault context
+		const paraConfig = loadConfig();
 		const vaultContext: InboxVaultContext = {
-			areas: getVaultAreas(resolvedConfig.vaultPath),
-			projects: getVaultProjects(resolvedConfig.vaultPath),
+			areas: getVaultAreas(resolvedConfig.vaultPath, paraConfig.paraFolders),
+			projects: getVaultProjects(
+				resolvedConfig.vaultPath,
+				paraConfig.paraFolders,
+			),
 		};
 
 		// Create concurrency limiters
@@ -516,9 +522,17 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		}
 
 		// Get vault context
+		// Load para-obsidian config to get paraFolders mapping
+		const paraConfigForContext = loadConfig();
 		const vaultContext: InboxVaultContext = {
-			areas: getVaultAreas(resolvedConfig.vaultPath),
-			projects: getVaultProjects(resolvedConfig.vaultPath),
+			areas: getVaultAreas(
+				resolvedConfig.vaultPath,
+				paraConfigForContext.paraFolders,
+			),
+			projects: getVaultProjects(
+				resolvedConfig.vaultPath,
+				paraConfigForContext.paraFolders,
+			),
 		};
 
 		// Build prompt with user hint
@@ -641,11 +655,23 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 /**
  * Get list of areas from vault (recursive scan for all .md files).
  *
- * Scans 02 Areas/**\/*.md recursively to find area notes in subfolders.
- * Example: "02 Areas/Psychotherapy/Psychotherapy.md" -> "Psychotherapy"
+ * Uses config.paraFolders to determine the areas folder path.
+ * Falls back to DEFAULT_PARA_FOLDERS if not configured.
+ *
+ * @param vaultPath - Absolute path to vault root
+ * @param paraFolders - PARA folder mappings from config (optional)
+ * @returns Array of area names (without .md extension)
+ *
+ * @example
+ * // With config: "02 Areas/Psychotherapy/Psychotherapy.md" -> "Psychotherapy"
  */
-function getVaultAreas(vaultPath: string): string[] {
-	const areasPath = join(vaultPath, "02 Areas");
+function getVaultAreas(
+	vaultPath: string,
+	paraFolders?: Record<string, string>,
+): string[] {
+	const folders = paraFolders ?? DEFAULT_PARA_FOLDERS;
+	const areasFolder = folders.areas ?? "02 Areas";
+	const areasPath = join(vaultPath, areasFolder);
 	try {
 		const files = globFilesSync("**/*.md", { cwd: areasPath, absolute: false });
 		const areas = files.map((file) => basename(file, ".md"));
@@ -658,11 +684,23 @@ function getVaultAreas(vaultPath: string): string[] {
 /**
  * Get list of projects from vault (recursive scan for all .md files).
  *
- * Scans 01 Projects/**\/*.md recursively to find project notes in subfolders.
- * Example: "01 Projects/Work/Build Garden Shed.md" -> "Build Garden Shed"
+ * Uses config.paraFolders to determine the projects folder path.
+ * Falls back to DEFAULT_PARA_FOLDERS if not configured.
+ *
+ * @param vaultPath - Absolute path to vault root
+ * @param paraFolders - PARA folder mappings from config (optional)
+ * @returns Array of project names (without .md extension)
+ *
+ * @example
+ * // With config: "01 Projects/Work/Build Garden Shed.md" -> "Build Garden Shed"
  */
-function getVaultProjects(vaultPath: string): string[] {
-	const projectsPath = join(vaultPath, "01 Projects");
+function getVaultProjects(
+	vaultPath: string,
+	paraFolders?: Record<string, string>,
+): string[] {
+	const folders = paraFolders ?? DEFAULT_PARA_FOLDERS;
+	const projectsFolder = folders.projects ?? "01 Projects";
+	const projectsPath = join(vaultPath, projectsFolder);
 	try {
 		const files = globFilesSync("**/*.md", {
 			cwd: projectsPath,

@@ -108,16 +108,27 @@ export function generateTitle(
 }
 
 /**
+ * Generate a random suffix for unique path generation.
+ * Uses crypto.randomUUID() and takes first 6 characters for brevity.
+ */
+function generateRandomSuffix(): string {
+	return crypto.randomUUID().slice(0, 6);
+}
+
+/**
  * Generate a unique file path by appending a counter if the path already exists.
  *
+ * Uses a combination of counter and random suffix to prevent race conditions
+ * when multiple processes try to generate unique paths concurrently.
+ *
  * @param basePath - The desired file path
- * @returns Unique path (original or with -N suffix before extension)
+ * @returns Unique path (original or with -N-RANDOM suffix before extension)
  *
  * @example
  * ```typescript
  * // If "2025-12-10-invoice.pdf" exists:
  * generateUniquePath("/vault/Attachments/2025-12-10-invoice.pdf");
- * // → "/vault/Attachments/2025-12-10-invoice-1.pdf"
+ * // → "/vault/Attachments/2025-12-10-invoice-1-a3b2c1.pdf"
  * ```
  */
 export function generateUniquePath(basePath: string): string {
@@ -129,9 +140,13 @@ export function generateUniquePath(basePath: string): string {
 	const base = ext ? basePath.slice(0, -ext.length) : basePath;
 	let counter = 1;
 
-	while (pathExistsSync(`${base}-${counter}${ext}`)) {
+	// Add random suffix to prevent race conditions between concurrent processes
+	// Each process gets a unique path even if they check at the same time
+	const randomSuffix = generateRandomSuffix();
+
+	while (pathExistsSync(`${base}-${counter}-${randomSuffix}${ext}`)) {
 		counter++;
 	}
 
-	return `${base}-${counter}${ext}`;
+	return `${base}-${counter}-${randomSuffix}${ext}`;
 }

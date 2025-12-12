@@ -425,9 +425,33 @@ export function createRegistry(vaultPath: string): RegistryManager {
 	}
 
 	/**
+	 * Validate that a hash is a valid SHA256 hex string.
+	 * @param hash - Hash to validate
+	 * @returns true if valid 64-character hex string
+	 */
+	function isValidHash(hash: string): boolean {
+		return (
+			typeof hash === "string" &&
+			hash.length === 64 &&
+			/^[a-f0-9]+$/i.test(hash)
+		);
+	}
+
+	/**
 	 * Check if a hash has been processed.
+	 * Validates hash format before lookup to prevent silent failures with malformed hashes.
+	 *
+	 * @param hash - SHA256 hash to check (must be 64-char hex string)
+	 * @returns true if hash exists in registry, false if not found or invalid
 	 */
 	function isProcessed(hash: string): boolean {
+		if (!isValidHash(hash)) {
+			log.warn("isProcessed called with invalid hash", {
+				hashLength: hash?.length,
+				hashPrefix: hash?.slice(0, 10),
+			});
+			return false;
+		}
 		return items.has(hash);
 	}
 
