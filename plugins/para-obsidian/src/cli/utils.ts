@@ -7,6 +7,8 @@
  * @module cli/utils
  */
 
+import { discoverAttachments } from "../attachments";
+import type { ParaObsidianConfig } from "../config";
 import type { NormalizedFlags } from "./types";
 
 /**
@@ -190,4 +192,16 @@ export function parseArgOverrides(
 		}
 	}
 	return overrides;
+}
+
+/**
+ * Get attachments to include - use explicit list if provided, otherwise auto-discover
+ */
+export function withAutoDiscoveredAttachments(
+	config: ParaObsidianConfig,
+	note: string,
+	explicit: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+	if (explicit.length > 0) return explicit;
+	return discoverAttachments(config.vault, note);
 }

@@ -25,6 +25,24 @@ export {
 	handleTemplateFields,
 	handleTemplates,
 } from "./config";
+// Create commands
+export { handleCreate } from "./create";
+// Frontmatter commands
+export {
+	computeFrontmatterHints,
+	handleFrontmatter,
+	handleFrontmatterApplyPlan,
+	handleFrontmatterGet,
+	handleFrontmatterMigrate,
+	handleFrontmatterMigrateAll,
+	handleFrontmatterPlan,
+	handleFrontmatterSet,
+	handleFrontmatterValidate,
+	handleFrontmatterValidateAll,
+	suggestFieldsForType,
+} from "./frontmatter";
+// Git commands
+export { handleGit, handleInsert } from "./git";
 // Links commands
 export {
 	handleCleanBrokenLinks,
@@ -36,6 +54,8 @@ export {
 } from "./links";
 // Notes commands
 export { handleDelete, handleList, handleRead } from "./notes";
+// Process inbox commands
+export { handleProcessInbox } from "./process-inbox";
 // Search commands
 export { handleIndex, handleSearch, handleSemantic } from "./search";
 // Types
@@ -58,4 +78,5 @@ export {
 	parseFrontmatterFilters,
 	parseStatuses,
 	parseUnset,
+	withAutoDiscoveredAttachments,
 } from "./utils";
