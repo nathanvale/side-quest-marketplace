@@ -15,36 +15,24 @@ import {
 	parseKeyValuePairs,
 } from "@sidequest/core/cli";
 import { MetricsCollector } from "@sidequest/core/logging";
-
-/**
- * Normalize a flag value to single value (string or boolean).
- * If array, returns the first element. Otherwise returns as-is.
- */
-function normalizeFlagValue(
-	value: string | boolean | (string | boolean)[] | undefined,
-): string | boolean | undefined {
-	if (Array.isArray(value)) {
-		return value[0];
-	}
-	return value;
-}
-
-/**
- * Normalize flags record by converting all array values to their first element.
- * Used for functions that don't expect array flag values.
- */
-function normalizeFlags(
-	flags: Record<string, string | boolean | (string | boolean)[]>,
-): Record<string, string | boolean> {
-	const normalized: Record<string, string | boolean> = {};
-	for (const [key, value] of Object.entries(flags)) {
-		const norm = normalizeFlagValue(value);
-		if (norm !== undefined) {
-			normalized[key] = norm;
-		}
-	}
-	return normalized;
-}
+import {
+	handleConfig,
+	handleListAreas,
+	handleListTags,
+	handleScanTags,
+	handleTemplateFields,
+	handleTemplates,
+	matchesDir,
+	normalizeFlags,
+	normalizeFlagValue,
+	parseArgOverrides,
+	parseAttachments,
+	parseDirs,
+	parseFrontmatterFilters,
+	parseStatuses,
+	parseUnset,
+} from "./cli/index";
+import type { CommandContext } from "./cli/types";
 
 type MetricsSummary = ReturnType<MetricsCollector["getSummary"]>;
 
@@ -72,11 +60,7 @@ import {
 import { createSpinner } from "nanospinner";
 import { discoverAttachments } from "./attachments";
 import { cleanBrokenLinks } from "./clean-links";
-import {
-	listTemplateVersions,
-	loadConfig,
-	type ParaObsidianConfig,
-} from "./config";
+import { loadConfig, type ParaObsidianConfig } from "./config";
 import { createFromTemplate, replaceSections } from "./create";
 import { DEFAULT_AVAILABLE_MODELS, DEFAULT_MODEL } from "./defaults";
 import { deleteFile } from "./delete";
@@ -110,14 +94,7 @@ import {
 import { createInboxEngine } from "./inbox/engine";
 import { initLoggerWithNotice, logFile } from "./inbox/logger";
 import type { ExecutionResult, InboxSuggestion } from "./inbox/types";
-import {
-	buildIndex,
-	listAreas,
-	listTags,
-	loadIndex,
-	saveIndex,
-	scanTags,
-} from "./indexer";
+import { buildIndex, loadIndex, saveIndex } from "./indexer";
 import { type InsertMode, insertIntoNote } from "./insert";
 import { linkAttachmentsToNotes } from "./link-attachments";
 import { renameWithLinkRewrite } from "./links";
@@ -131,7 +108,6 @@ import { findOrphans, formatFixCommand, suggestFixes } from "./orphans";
 import { type RewriteMapping, rewriteLinks } from "./rewrite-links";
 import { filterByFrontmatter, searchText } from "./search";
 import { semanticSearch } from "./semantic";
-import { getTemplate, getTemplateFields } from "./templates";
 
 function printUsage(): void {
 	const lines = [
@@ -189,134 +165,6 @@ function printUsage(): void {
 	console.log(
 		lines.map((line) => (line === "" ? "" : color("cyan", line))).join("\n"),
 	);
-}
-
-function parseAttachments(flags: Record<string, string | boolean>): string[] {
-	const raw = flags.attachments;
-	if (typeof raw !== "string") return [];
-	return raw
-		.split(",")
-		.map((s) => s.trim())
-		.filter(Boolean);
-}
-
-function parseUnset(input: string | boolean | undefined): string[] {
-	if (typeof input !== "string") return [];
-	return input
-		.split(",")
-		.map((s) => s.trim())
-		.filter(Boolean);
-}
-
-function parseFrontmatterFilters(
-	flags: Record<string, string | boolean>,
-	additional: ReadonlyArray<string> = [],
-): Record<string, string> {
-	const filters: Record<string, string> = {};
-	const collect = (input: string) => {
-		const [rawKey, ...rest] = input.split("=");
-		if (!rawKey || rest.length === 0) return;
-		const key = rawKey.replace(/^frontmatter[._]/, "").trim();
-		const value = rest.join("=").trim();
-		if (!key || !value) return;
-		filters[key] = value;
-	};
-
-	if (typeof flags.frontmatter === "string") {
-		for (const part of flags.frontmatter.split(",")) {
-			if (part.trim().length > 0) collect(part);
-		}
-	}
-
-	for (const [k, v] of Object.entries(flags)) {
-		if (k.startsWith("frontmatter.") && typeof v === "string") {
-			collect(`${k.replace("frontmatter.", "")}=${v}`);
-		}
-	}
-
-	for (const part of additional) collect(part);
-	return filters;
-}
-
-function parseDirs(
-	value: string | boolean | undefined,
-	defaults?: ReadonlyArray<string>,
-): ReadonlyArray<string> | undefined {
-	if (typeof value !== "string") return defaults;
-	return value
-		.split(",")
-		.map((s) => s.trim())
-		.filter(Boolean);
-}
-
-function parseStatuses(
-	value: string | boolean | undefined,
-	defaults: ReadonlyArray<string>,
-): ReadonlyArray<string> {
-	if (typeof value !== "string") return defaults;
-	const parts = value
-		.split(",")
-		.map((s) => s.trim())
-		.filter(Boolean);
-	return parts.length > 0 ? parts : defaults;
-}
-
-function normalizePathFragment(input: string): string {
-	return input.replace(/\\/g, "/").replace(/\/+$/, "");
-}
-
-function matchesDir(file: string, dirs?: ReadonlyArray<string>): boolean {
-	if (!dirs || dirs.length === 0) return true;
-	const normalizedFile = normalizePathFragment(file);
-	return dirs.some((dir) => {
-		const normalizedDir = normalizePathFragment(dir);
-		return (
-			normalizedFile === normalizedDir ||
-			normalizedFile.startsWith(`${normalizedDir}/`)
-		);
-	});
-}
-
-/**
- * Parse --arg flags into key=value overrides.
- *
- * Handles both single string and array of strings from CLI parsing.
- * Supports values with embedded '=' signs (e.g., --arg "url=https://example.com/path?a=b")
- *
- * @param argFlags - Raw --arg flag value(s) from parseArgs
- * @returns Record mapping arg keys to their values
- *
- * @example
- * ```typescript
- * parseArgOverrides("priority=high")
- * // Returns: { priority: "high" }
- *
- * parseArgOverrides(["priority=high", "area=[[Work]]"])
- * // Returns: { priority: "high", area: "[[Work]]" }
- * ```
- */
-function parseArgOverrides(
-	argFlags: string | boolean | (string | boolean)[] | undefined,
-): Record<string, string> {
-	const overrides: Record<string, string> = {};
-
-	// Normalize to array of strings only
-	let stringFlags: string[];
-	if (typeof argFlags === "string") {
-		stringFlags = [argFlags];
-	} else if (Array.isArray(argFlags)) {
-		stringFlags = argFlags.filter((v): v is string => typeof v === "string");
-	} else {
-		stringFlags = [];
-	}
-
-	for (const arg of stringFlags) {
-		const [key, ...valueParts] = arg.split("=");
-		if (key && valueParts.length > 0) {
-			overrides[key] = valueParts.join("=");
-		}
-	}
-	return overrides;
 }
 
 async function handleCreateFromSource(options: {
@@ -657,239 +505,50 @@ async function main(): Promise<void> {
 		// Always load config early to ensure vault/env are valid.
 		const config = loadConfig();
 
+		// Build context for command handlers
+		const ctx: CommandContext = {
+			config,
+			positional,
+			flags: normalizeFlags(flags),
+			format,
+			isJson,
+			subcommand,
+		};
+
 		switch (command) {
 			case "config": {
-				if (isJson) {
-					console.log(JSON.stringify(config, null, 2));
-				} else {
-					console.log(emphasize.info(`Vault: ${config.vault}`));
-					console.log(emphasize.info(`Templates: ${config.templatesDir}`));
-					if (config.indexPath)
-						console.log(emphasize.info(`Index: ${config.indexPath}`));
-					if (config.autoCommit !== undefined) {
-						console.log(emphasize.info(`Auto-commit: ${config.autoCommit}`));
-						if (config.gitCommitMessageTemplate) {
-							console.log(
-								emphasize.info(
-									`Commit template: ${config.gitCommitMessageTemplate}`,
-								),
-							);
-						}
-					}
-				}
+				const result = await handleConfig(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
 
 			case "templates": {
-				const templates = listTemplateVersions(config);
-				if (isJson) {
-					console.log(
-						JSON.stringify(
-							{ templates, defaultSearchDirs: config.defaultSearchDirs },
-							null,
-							2,
-						),
-					);
-				} else {
-					for (const tpl of templates) {
-						console.log(emphasize.info(`${tpl.name}: v${tpl.version}`));
-					}
-				}
+				const result = await handleTemplates(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
 
 			case "list-areas": {
-				const areas = listAreas(config);
-				if (isJson) {
-					console.log(JSON.stringify({ areas, count: areas.length }, null, 2));
-				} else {
-					if (areas.length === 0) {
-						console.log(emphasize.warn("No areas found in 02_Areas/"));
-					} else {
-						console.log(emphasize.info(`Found ${areas.length} areas:`));
-						for (const area of areas) {
-							console.log(`  ${area}`);
-						}
-					}
-				}
+				const result = await handleListAreas(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
 
 			case "list-tags": {
-				const tags = listTags(config);
-				if (isJson) {
-					console.log(JSON.stringify({ tags, count: tags.length }, null, 2));
-				} else {
-					if (tags.length === 0) {
-						console.log(
-							emphasize.warn(
-								"No suggested tags configured (see suggestedTags in config)",
-							),
-						);
-					} else {
-						console.log(emphasize.info(`Configured tags (${tags.length}):`));
-						for (const tag of tags) {
-							console.log(`  ${tag}`);
-						}
-					}
-				}
+				const result = await handleListTags(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
 
 			case "scan-tags": {
-				const tags = scanTags(config);
-				if (isJson) {
-					console.log(JSON.stringify({ tags, count: tags.length }, null, 2));
-				} else {
-					if (tags.length === 0) {
-						console.log(emphasize.warn("No tags found in vault frontmatter"));
-					} else {
-						console.log(emphasize.info(`Tags in use (${tags.length}):`));
-						for (const tag of tags) {
-							console.log(`  ${tag}`);
-						}
-					}
-				}
+				const result = await handleScanTags(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
 
 			case "template-fields": {
-				const templateName = subcommand;
-				if (!templateName) {
-					console.error("template-fields requires <template> argument");
-					process.exit(1);
-				}
-
-				const template = getTemplate(config, templateName);
-				if (!template) {
-					console.error(`Template not found: ${templateName}`);
-					process.exit(1);
-				}
-
-				const fields = getTemplateFields(template);
-				const requiredFields = fields.filter(
-					(f) => !f.isAutoDate && f.inFrontmatter,
-				);
-				const autoFields = fields.filter((f) => f.isAutoDate);
-				const bodyFields = fields.filter(
-					(f) => !f.isAutoDate && !f.inFrontmatter,
-				);
-
-				if (isJson) {
-					// Build enhanced field info with type hints
-					const enhancedRequired = requiredFields.map((f) => {
-						const result: {
-							key: string;
-							type?: string;
-							example?: string;
-						} = { key: f.key };
-
-						// Check if template wraps this prompt in wikilinks
-						const promptPattern = `<% tp.system.prompt("${f.key}") %>`;
-						const isWrappedInWikilinks = template.content.includes(
-							`[[${promptPattern}]]`,
-						);
-
-						// Infer type and example from key name
-						if (f.key.toLowerCase().includes("date")) {
-							result.type = "date";
-							result.example = new Date().toISOString().split("T")[0];
-						} else if (
-							f.key.toLowerCase().includes("area") ||
-							f.key.toLowerCase().includes("project")
-						) {
-							result.type = "wikilink";
-							result.example = isWrappedInWikilinks
-								? "Note Name"
-								: "[[Note Name]]";
-						} else {
-							result.type = "string";
-						}
-
-						return result;
-					});
-
-					// Build frontmatter hints from config rules
-					const rules = config.frontmatterRules?.[templateName];
-					const frontmatterHints: Record<
-						string,
-						{
-							type: string;
-							values?: readonly string[];
-							default?: string;
-							required?: readonly string[];
-							suggested?: readonly string[];
-						}
-					> = {};
-
-					if (rules?.required) {
-						for (const [fieldName, rule] of Object.entries(rules.required)) {
-							if (rule.type === "enum" && rule.enum) {
-								frontmatterHints[fieldName] = {
-									type: "enum",
-									values: rule.enum,
-									default: rule.enum[0],
-								};
-							} else if (rule.type === "array" && rule.includes) {
-								frontmatterHints[fieldName] = {
-									type: "array",
-									required: rule.includes,
-									suggested: config.suggestedTags ?? [],
-								};
-							}
-						}
-					}
-
-					console.log(
-						JSON.stringify(
-							{
-								template: templateName,
-								version: template.version,
-								fields: {
-									required: enhancedRequired,
-									auto: autoFields.map((f) => f.key),
-									body: bodyFields.map((f) => f.key),
-								},
-								frontmatter_hints: frontmatterHints,
-								example: Object.fromEntries(
-									enhancedRequired.map((f) => [f.key, f.example ?? "..."]),
-								),
-							},
-							null,
-							2,
-						),
-					);
-				} else {
-					console.log(
-						emphasize.info(
-							`Template Fields: ${templateName} (v${template.version})`,
-						),
-					);
-					console.log("");
-
-					if (requiredFields.length > 0) {
-						console.log(emphasize.info("Required Fields (provide in args):"));
-						for (const f of requiredFields) {
-							console.log(`  - ${f.key}`);
-						}
-						console.log("");
-					}
-
-					if (autoFields.length > 0) {
-						console.log(emphasize.info("Auto-filled Fields:"));
-						for (const f of autoFields) {
-							console.log(`  - ${f.key}`);
-						}
-						console.log("");
-					}
-
-					if (bodyFields.length > 0) {
-						console.log(emphasize.info("Body Fields:"));
-						for (const f of bodyFields) {
-							console.log(`  - ${f.key}`);
-						}
-					}
-				}
+				const result = await handleTemplateFields(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
 
