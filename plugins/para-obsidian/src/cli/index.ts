@@ -25,6 +25,19 @@ export {
 	handleTemplateFields,
 	handleTemplates,
 } from "./config";
+// Links commands
+export {
+	handleCleanBrokenLinks,
+	handleFindOrphans,
+	handleFlattenAttachments,
+	handleLinkAttachments,
+	handleRename,
+	handleRewriteLinks,
+} from "./links";
+// Notes commands
+export { handleDelete, handleList, handleRead } from "./notes";
+// Search commands
+export { handleIndex, handleSearch, handleSemantic } from "./search";
 // Types
 export type {
 	CommandContext,

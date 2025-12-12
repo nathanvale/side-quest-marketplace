@@ -16,13 +16,24 @@ import {
 } from "@sidequest/core/cli";
 import { MetricsCollector } from "@sidequest/core/logging";
 import {
+	handleCleanBrokenLinks,
 	handleConfig,
+	handleDelete,
+	handleFindOrphans,
+	handleFlattenAttachments,
+	handleIndex,
+	handleLinkAttachments,
+	handleList,
 	handleListAreas,
 	handleListTags,
+	handleRead,
+	handleRename,
+	handleRewriteLinks,
 	handleScanTags,
+	handleSearch,
+	handleSemantic,
 	handleTemplateFields,
 	handleTemplates,
-	matchesDir,
 	normalizeFlags,
 	normalizeFlagValue,
 	parseArgOverrides,
@@ -59,12 +70,9 @@ import {
 } from "@sidequest/core/terminal";
 import { createSpinner } from "nanospinner";
 import { discoverAttachments } from "./attachments";
-import { cleanBrokenLinks } from "./clean-links";
 import { loadConfig, type ParaObsidianConfig } from "./config";
 import { createFromTemplate, replaceSections } from "./create";
 import { DEFAULT_AVAILABLE_MODELS, DEFAULT_MODEL } from "./defaults";
-import { deleteFile } from "./delete";
-import { flattenAttachments } from "./flatten";
 import {
 	applyVersionPlan,
 	migrateAllTemplateVersions,
@@ -77,7 +85,6 @@ import {
 	validateFrontmatterBulk,
 	validateFrontmatterFile,
 } from "./frontmatter";
-import { listDir, readFile } from "./fs";
 import {
 	assertGitRepo,
 	autoCommitChanges,
@@ -94,20 +101,13 @@ import {
 import { createInboxEngine } from "./inbox/engine";
 import { initLoggerWithNotice, logFile } from "./inbox/logger";
 import type { ExecutionResult, InboxSuggestion } from "./inbox/types";
-import { buildIndex, loadIndex, saveIndex } from "./indexer";
 import { type InsertMode, insertIntoNote } from "./insert";
-import { linkAttachmentsToNotes } from "./link-attachments";
-import { renameWithLinkRewrite } from "./links";
 import {
 	extractMetadata,
 	getWikilinkFieldsFromRules,
 	validateModel,
 } from "./llm";
 import { MIGRATIONS } from "./migrations";
-import { findOrphans, formatFixCommand, suggestFixes } from "./orphans";
-import { type RewriteMapping, rewriteLinks } from "./rewrite-links";
-import { filterByFrontmatter, searchText } from "./search";
-import { semanticSearch } from "./semantic";
 
 function printUsage(): void {
 	const lines = [
@@ -553,590 +553,74 @@ async function main(): Promise<void> {
 			}
 
 			case "rename": {
-				const from = subcommand;
-				const to = positional[0];
-				if (!from || !to) {
-					console.error("rename requires <from> <to>");
-					process.exit(1);
-				}
-				const dryRun = flags["dry-run"] === true || flags["dry-run"] === "true";
-				const attachments = parseAttachments(normalizeFlags(flags));
-				if (!dryRun) {
-					await ensureGitGuard(config);
-				}
-				const result = renameWithLinkRewrite(config, { from, to, dryRun });
-				if (config.autoCommit && !dryRun) {
-					const paths = [
-						from,
-						to,
-						...result.rewrites.map((r) => r.file),
-						...attachments,
-					];
-					await autoCommitChanges(config, paths, `rename ${from} → ${to}`);
-				}
-				if (isJson) {
-					console.log(JSON.stringify(result, null, 2));
-				} else {
-					console.log(
-						emphasize.info(
-							`${dryRun ? "Would rename" : "Renamed"} ${from} → ${to} (rewrites: ${result.rewrites.length})`,
-						),
-					);
-				}
+				const result = await handleRename(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
 
 			case "flatten-attachments": {
-				const dryRun = flags["dry-run"] === true || flags["dry-run"] === "true";
-				const removeEmptyDirs =
-					flags["remove-empty-dirs"] === true ||
-					flags["remove-empty-dirs"] === "true";
-
-				if (!dryRun) {
-					await ensureGitGuard(config);
-				}
-
-				const result = await flattenAttachments(config.vault, {
-					dryRun,
-					removeEmptyDirs,
-				});
-
-				if (isJson) {
-					console.log(JSON.stringify(result, null, 2));
-				} else {
-					console.log(
-						emphasize.success(
-							`${dryRun ? "Would flatten" : "Flattened"} ${result.attachmentsMoved} attachments`,
-						),
-					);
-					console.log(`  Notes updated: ${result.notesUpdated}`);
-					if (removeEmptyDirs) {
-						console.log(`  Empty dirs removed: ${result.emptyDirsRemoved}`);
-					}
-				}
-
-				if (config.autoCommit && !dryRun && result.attachmentsMoved > 0) {
-					// Commit all changes (moved files + updated note references)
-					await commitAllNotes(config);
-				}
+				const result = await handleFlattenAttachments(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
 
 			case "link-attachments": {
-				const dir = subcommand;
-				if (!dir) {
-					console.error(emphasize.error("Usage: link-attachments <directory>"));
-					console.error(
-						"Example: link-attachments '01 Projects/2025 Tassie Holiday'",
-					);
-					process.exit(1);
-				}
-
-				const dryRun = flags["dry-run"] === true || flags["dry-run"] === "true";
-				const threshold =
-					typeof flags.threshold === "number"
-						? flags.threshold
-						: typeof flags.threshold === "string"
-							? Number.parseFloat(flags.threshold)
-							: 0.3;
-
-				if (!dryRun) {
-					await ensureGitGuard(config);
-				}
-
-				const result = await linkAttachmentsToNotes(config.vault, dir, {
-					dryRun,
-					threshold,
-				});
-
-				if (isJson) {
-					console.log(JSON.stringify(result, null, 2));
-				} else {
-					console.log(
-						emphasize.success(
-							`${dryRun ? "Would link" : "Linked"} ${result.totalLinks} attachments to ${result.notesUpdated} notes`,
-						),
-					);
-					if (result.notesUpdated > 0) {
-						console.log("\nLinked attachments:");
-						for (const { note, attachments } of result.updates) {
-							console.log(`  ${note}:`);
-							for (const att of attachments) {
-								console.log(`    - ${att}`);
-							}
-						}
-					}
-				}
-
-				if (config.autoCommit && !dryRun && result.notesUpdated > 0) {
-					await commitAllNotes(config);
-				}
+				const result = await handleLinkAttachments(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
 
 			case "find-orphans": {
-				const dirs = parseDirs(
-					normalizeFlagValue(flags.dir),
-					config.defaultSearchDirs,
-				);
-				const suggest = flags.suggest === true || flags.suggest === "true";
-
-				const result = findOrphans(config.vault, { dirs });
-				const searchedDirs = dirs ?? config.defaultSearchDirs ?? ["."];
-
-				// Generate suggestions if requested
-				const fixes = suggest
-					? suggestFixes(config.vault, result.brokenLinks)
-					: [];
-
-				if (isJson) {
-					console.log(
-						JSON.stringify(
-							{
-								...result,
-								dirs: searchedDirs,
-								...(suggest && { suggestedFixes: fixes }),
-							},
-							null,
-							2,
-						),
-					);
-				} else {
-					// Show which directories were searched
-					console.log(emphasize.info(`Searching: ${searchedDirs.join(", ")}`));
-					console.log("");
-
-					if (result.brokenLinks.length > 0) {
-						console.log(
-							emphasize.error(
-								`Found ${result.brokenLinks.length} broken links:`,
-							),
-						);
-						for (const { note, link, location } of result.brokenLinks) {
-							console.log(`  ${note} (${location}): [[${link}]]`);
-						}
-						console.log("");
-					}
-
-					if (result.orphanAttachments.length > 0) {
-						console.log(
-							emphasize.warn(
-								`Found ${result.orphanAttachments.length} orphan attachments:`,
-							),
-						);
-						for (const att of result.orphanAttachments) {
-							console.log(`  ${att}`);
-						}
-						console.log("");
-					}
-
-					if (
-						result.brokenLinks.length === 0 &&
-						result.orphanAttachments.length === 0
-					) {
-						console.log(emphasize.success("No orphans or broken links found!"));
-					}
-
-					// Show suggestions if requested
-					if (suggest && fixes.length > 0) {
-						console.log(
-							emphasize.success(`\n✨ Suggested fixes (${fixes.length}):`),
-						);
-						for (const fix of fixes) {
-							console.log(
-								`  ${emphasize.info(fix.from)} → ${emphasize.success(fix.to)}`,
-							);
-							console.log(`    ${fix.reason}`);
-						}
-						console.log("\n# Copy/paste to fix:");
-						console.log(formatFixCommand(fixes));
-					} else if (
-						suggest &&
-						fixes.length === 0 &&
-						result.brokenLinks.length > 0
-					) {
-						console.log(
-							emphasize.warn(
-								"\nNo auto-fixes available (broken links don't match existing attachments)",
-							),
-						);
-					}
-				}
+				const result = await handleFindOrphans(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
 
 			case "clean-broken-links": {
-				const dir = subcommand ?? ".";
-				const dryRun = flags["dry-run"] === true || flags["dry-run"] === "true";
-
-				if (!dryRun) {
-					await ensureGitGuard(config);
-				}
-
-				const result = cleanBrokenLinks(config.vault, { dir, dryRun });
-
-				if (isJson) {
-					console.log(JSON.stringify(result, null, 2));
-				} else {
-					console.log(
-						emphasize.success(
-							`${dryRun ? "Would remove" : "Removed"} ${result.linksRemoved} broken links from ${result.notesUpdated} notes`,
-						),
-					);
-					if (result.notesUpdated > 0) {
-						console.log("\nUpdated notes:");
-						for (const { note, linksRemoved } of result.updates) {
-							console.log(`  ${note}: ${linksRemoved} links removed`);
-						}
-					}
-				}
-
-				if (config.autoCommit && !dryRun && result.notesUpdated > 0) {
-					await commitAllNotes(config);
-				}
+				const result = await handleCleanBrokenLinks(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
 
 			case "rewrite-links": {
-				// Support multiple --from/--to pairs or a single pair
-				const fromValues = Array.isArray(flags.from)
-					? flags.from.filter((v): v is string => typeof v === "string")
-					: typeof flags.from === "string"
-						? [flags.from]
-						: [];
-				const toValues = Array.isArray(flags.to)
-					? flags.to.filter((v): v is string => typeof v === "string")
-					: typeof flags.to === "string"
-						? [flags.to]
-						: [];
-				const mappingFile =
-					typeof flags.mapping === "string" ? flags.mapping : undefined;
-				const dryRun = flags["dry-run"] === true || flags["dry-run"] === "true";
-				const dirs = parseDirs(
-					normalizeFlagValue(flags.dir),
-					config.defaultSearchDirs,
-				);
-
-				// Build mappings from either --from/--to pairs or --mapping file
-				let mappings: RewriteMapping[] = [];
-
-				if (mappingFile) {
-					// Load mappings from JSON file
-					const mappingPath = path.resolve(mappingFile);
-					if (!pathExistsSync(mappingPath)) {
-						console.error(`Mapping file not found: ${mappingPath}`);
-						process.exit(1);
-					}
-					try {
-						const raw = readTextFileSync(mappingPath);
-						const parsed = JSON.parse(raw) as Record<string, string>;
-						mappings = Object.entries(parsed).map(([fromLink, toLink]) => ({
-							from: fromLink,
-							to: toLink,
-						}));
-					} catch (error) {
-						console.error(
-							`Failed to parse mapping file: ${error instanceof Error ? error.message : String(error)}`,
-						);
-						process.exit(1);
-					}
-				} else if (fromValues.length > 0 && toValues.length > 0) {
-					// Pair up --from and --to values
-					if (fromValues.length !== toValues.length) {
-						console.error(
-							`Mismatched --from/--to pairs: got ${fromValues.length} --from and ${toValues.length} --to`,
-						);
-						process.exit(1);
-					}
-					for (let i = 0; i < fromValues.length; i++) {
-						mappings.push({ from: fromValues[i]!, to: toValues[i]! });
-					}
-				} else {
-					console.error(
-						"rewrite-links requires either --from and --to, or --mapping",
-					);
-					process.exit(1);
-				}
-
-				if (!dryRun) {
-					await ensureGitGuard(config);
-				}
-
-				const result = rewriteLinks(config.vault, mappings, { dryRun, dirs });
-
-				if (isJson) {
-					console.log(JSON.stringify({ ...result, dirs, dryRun }, null, 2));
-				} else {
-					console.log(
-						emphasize.info(`Searching: ${(dirs ?? ["."]).join(", ")}`),
-					);
-					console.log("");
-
-					if (result.linksRewritten === 0) {
-						console.log(emphasize.warn("No matching links found to rewrite."));
-					} else {
-						console.log(
-							emphasize.success(
-								`${dryRun ? "Would rewrite" : "Rewrote"} ${result.linksRewritten} link(s) in ${result.notesUpdated} note(s)`,
-							),
-						);
-
-						if (result.updates.length > 0) {
-							console.log("\nUpdated notes:");
-							for (const { note, rewrites } of result.updates) {
-								console.log(`  ${note}:`);
-								for (const r of rewrites) {
-									console.log(
-										`    ${r.location}: [[${r.from}]] → [[${r.to}]] (${r.count}x)`,
-									);
-								}
-							}
-						}
-					}
-				}
-
-				if (config.autoCommit && !dryRun && result.notesUpdated > 0) {
-					const changedFiles = result.updates.map((u) => u.note);
-					await autoCommitChanges(
-						config,
-						changedFiles,
-						`rewrite ${result.linksRewritten} link(s)`,
-					);
-				}
+				const result = await handleRewriteLinks(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
 
 			case "delete": {
-				const file = subcommand;
-				if (!file) {
-					console.error("delete requires <file>");
-					process.exit(1);
-				}
-				const confirm = flags.confirm === true || flags.confirm === "true";
-				const dryRun = flags["dry-run"] === true || flags["dry-run"] === "true";
-				const attachments = parseAttachments(normalizeFlags(flags));
-				if (!dryRun) {
-					await ensureGitGuard(config);
-				}
-				const result = deleteFile(config, { file, confirm, dryRun });
-				if (config.autoCommit && !dryRun) {
-					await autoCommitChanges(
-						config,
-						[file, ...withAutoDiscoveredAttachments(config, file, attachments)],
-						`delete ${file}`,
-					);
-				}
-				if (isJson) {
-					console.log(JSON.stringify(result, null, 2));
-				} else {
-					console.log(
-						emphasize.warn(
-							`${dryRun ? "Would delete" : "Deleted"} ${result.relative}`,
-						),
-					);
-				}
+				const result = await handleDelete(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
 
 			case "list": {
-				const dir = subcommand ?? ".";
-				const entries = listDir(config.vault, dir);
-				if (isJson) {
-					console.log(JSON.stringify({ dir, entries }, null, 2));
-				} else {
-					console.log(entries.join("\n"));
-				}
+				const result = await handleList(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
 
 			case "read": {
-				const file = subcommand;
-				if (!file) {
-					console.error("read requires <file>");
-					process.exit(1);
-				}
-				const content = readFile(config.vault, file);
-				if (isJson) {
-					console.log(JSON.stringify({ file, content }, null, 2));
-				} else {
-					console.log(content);
-				}
+				const result = await handleRead(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
 
 			case "index": {
-				const action = subcommand;
-				if (!action) {
-					console.error("index requires an action (prime|query)");
-					process.exit(1);
-				}
-
-				if (action === "prime") {
-					const dirs = parseDirs(
-						normalizeFlagValue(flags.dir) ?? positional[0],
-						config.defaultSearchDirs,
-					);
-					const index = buildIndex(config, dirs);
-					const path = saveIndex(config, index);
-					if (isJson) {
-						console.log(
-							JSON.stringify(
-								{ indexPath: path, count: index.entries.length },
-								null,
-								2,
-							),
-						);
-					} else {
-						console.log(
-							emphasize.success(
-								`Indexed ${index.entries.length} files → ${path}`,
-							),
-						);
-					}
-					break;
-				}
-
-				if (action === "query") {
-					const tag = typeof flags.tag === "string" ? flags.tag : undefined;
-					const dirs = parseDirs(
-						normalizeFlagValue(flags.dir),
-						config.defaultSearchDirs,
-					);
-					const frontmatter = parseFrontmatterFilters(normalizeFlags(flags));
-					const index = loadIndex(config);
-					if (!index) {
-						console.error("Index not found. Run index prime first.");
-						process.exit(1);
-					}
-					const results = index.entries.filter((entry) => {
-						if (!matchesDir(entry.file, dirs)) return false;
-						if (tag && !entry.tags.includes(tag)) return false;
-						for (const [k, v] of Object.entries(frontmatter)) {
-							if (entry.frontmatter[k] !== v) return false;
-						}
-						return true;
-					});
-					if (isJson) {
-						console.log(
-							JSON.stringify({ count: results.length, results }, null, 2),
-						);
-					} else {
-						for (const r of results) console.log(r.file);
-					}
-					break;
-				}
-
-				console.error(`Unknown index action: ${action}`);
-				process.exit(1);
+				const result = await handleIndex(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
 
 			case "search": {
-				const query = subcommand;
-				if (!query) {
-					console.error("search requires <query>");
-					process.exit(1);
-				}
-				const tag = typeof flags.tag === "string" ? flags.tag : undefined;
-				const dirs = parseDirs(
-					normalizeFlagValue(flags.dir),
-					config.defaultSearchDirs,
-				);
-				const frontmatter = parseFrontmatterFilters(normalizeFlags(flags));
-				const globs =
-					typeof flags.glob === "string"
-						? flags.glob
-								.split(",")
-								.map((g: string) => g.trim())
-								.filter(Boolean)
-						: undefined;
-				const context =
-					typeof flags.context === "string"
-						? Number.parseInt(flags.context, 10)
-						: undefined;
-
-				const hasFrontmatterFilters =
-					Object.keys(frontmatter).length > 0 || Boolean(tag);
-				const fmMatches = hasFrontmatterFilters
-					? await filterByFrontmatter(config, { frontmatter, tag, dir: dirs })
-					: [];
-
-				const hits = await searchText(config, {
-					query,
-					dir: dirs,
-					regex: flags.regex === true || flags.regex === "true",
-					maxResults:
-						typeof flags["max-results"] === "string"
-							? Number.parseInt(flags["max-results"], 10)
-							: undefined,
-					glob: globs,
-					context,
-					allowedFiles: hasFrontmatterFilters ? fmMatches : undefined,
-				});
-
-				if (isJson) {
-					console.log(
-						JSON.stringify({ query, hits, frontmatter: fmMatches }, null, 2),
-					);
-				} else {
-					for (const hit of hits) {
-						console.log(
-							emphasize.info(`${hit.file}:${hit.line}: ${hit.snippet}`),
-						);
-					}
-					if (fmMatches.length > 0) {
-						console.log("\nFrontmatter matches:");
-						for (const f of fmMatches) console.log(emphasize.info(f));
-					}
-				}
+				const result = await handleSearch(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
 
 			case "semantic": {
-				const query = subcommand;
-				if (!query) {
-					console.error("semantic requires <query>");
-					process.exit(1);
-				}
-				// Parse --dir (explicit directory) or --para (PARA shortcuts)
-				const dir = parseDirs(normalizeFlagValue(flags.dir), undefined);
-				const para = typeof flags.para === "string" ? flags.para : undefined;
-				const limit =
-					typeof flags.limit === "string"
-						? Number.parseInt(flags.limit, 10)
-						: undefined;
-				try {
-					const hits = await semanticSearch(config, {
-						query,
-						dir,
-						para,
-						limit,
-					});
-					if (isJson) {
-						console.log(JSON.stringify({ query, hits }, null, 2));
-					} else {
-						if (hits.length === 0) {
-							console.log(emphasize.warn("No results found."));
-						} else {
-							for (const hit of hits) {
-								const line = hit.line ? `:${hit.line}` : "";
-								const score = hit.score.toFixed(3);
-								const dirLabel =
-									hit.dir && hit.dir !== "." ? `[${hit.dir}] ` : "";
-								console.log(
-									emphasize.info(
-										`${dirLabel}${hit.file}${line} (${score}) ${hit.snippet ?? ""}`.trim(),
-									),
-								);
-							}
-						}
-					}
-				} catch (error) {
-					const message =
-						error instanceof Error ? error.message : "semantic search failed";
-					console.error(message);
-					process.exit(1);
-				}
+				const result = await handleSemantic(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
 
