@@ -7,9 +7,9 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
 import type { MarkdownExtractionMetadata } from "./markdown";
 import {
 	createMarkdownInboxFile,
@@ -34,12 +34,11 @@ describe("markdownExtractor", () => {
 	let testDir: string;
 
 	beforeEach(() => {
-		testDir = join(tmpdir(), `markdown-extractor-test-${Date.now()}`);
-		mkdirSync(testDir, { recursive: true });
+		testDir = createTempDir("markdown-extractor-test-");
 	});
 
 	afterEach(() => {
-		rmSync(testDir, { recursive: true, force: true });
+		cleanupTestDir(testDir);
 	});
 
 	describe("metadata", () => {
@@ -525,12 +524,11 @@ describe("extractFrontmatterOnly", () => {
 	let testDir: string;
 
 	beforeEach(() => {
-		testDir = join(tmpdir(), `frontmatter-only-test-${Date.now()}`);
-		mkdirSync(testDir, { recursive: true });
+		testDir = createTempDir("frontmatter-only-test-");
 	});
 
 	afterEach(() => {
-		rmSync(testDir, { recursive: true, force: true });
+		cleanupTestDir(testDir);
 	});
 
 	test("should extract frontmatter from file", async () => {
@@ -567,12 +565,11 @@ describe("bug fixes", () => {
 	let testDir: string;
 
 	beforeEach(() => {
-		testDir = join(tmpdir(), `markdown-bugfix-test-${Date.now()}`);
-		mkdirSync(testDir, { recursive: true });
+		testDir = createTempDir("markdown-bugfix-test-");
 	});
 
 	afterEach(() => {
-		rmSync(testDir, { recursive: true, force: true });
+		cleanupTestDir(testDir);
 	});
 
 	describe("Windows line endings (CRLF)", () => {

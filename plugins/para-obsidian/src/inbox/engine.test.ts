@@ -6,9 +6,10 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnAndCollect } from "@sidequest/core/spawn";
+import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
 import { createInboxEngine } from "./engine";
 import { hashFile } from "./registry";
 import type { InboxEngineConfig, InboxSuggestion } from "./types";
@@ -89,20 +90,12 @@ describe("inbox/engine", () => {
 	});
 
 	describe("scan() with real filesystem", () => {
-		const testVaultPath = join(
-			process.cwd(),
-			".test-scratch",
-			"scan-test-vault",
-		);
-		const inboxPath = join(testVaultPath, "00 Inbox");
+		let testVaultPath: string;
+		let inboxPath: string;
 
 		beforeEach(() => {
-			// Clean up and create test directories
-			try {
-				rmSync(testVaultPath, { recursive: true, force: true });
-			} catch {
-				// Ignore if doesn't exist
-			}
+			testVaultPath = createTempDir("scan-test-vault-");
+			inboxPath = join(testVaultPath, "00 Inbox");
 			mkdirSync(inboxPath, { recursive: true });
 			// Create PARA folders for vault context
 			mkdirSync(join(testVaultPath, "01 Projects"), { recursive: true });
@@ -111,12 +104,7 @@ describe("inbox/engine", () => {
 		});
 
 		afterEach(() => {
-			// Clean up
-			try {
-				rmSync(testVaultPath, { recursive: true, force: true });
-			} catch {
-				// Ignore
-			}
+			cleanupTestDir(testVaultPath);
 		});
 
 		test("should return empty array for empty inbox folder", async () => {
@@ -214,20 +202,11 @@ describe("inbox/engine", () => {
 	});
 
 	describe("execute()", () => {
-		const executeTestPath = join(
-			process.cwd(),
-			".test-scratch",
-			"execute-test-vault",
-		);
+		let executeTestPath: string;
 		let originalParaVault: string | undefined;
 
 		beforeEach(async () => {
-			try {
-				rmSync(executeTestPath, { recursive: true, force: true });
-			} catch {
-				// Ignore
-			}
-			mkdirSync(executeTestPath, { recursive: true });
+			executeTestPath = createTempDir("execute-test-vault-");
 			// Initialize git repo with clean working tree for execute() safety checks
 			await initGitRepo(executeTestPath);
 
@@ -245,11 +224,7 @@ describe("inbox/engine", () => {
 				delete process.env.PARA_VAULT;
 			}
 
-			try {
-				rmSync(executeTestPath, { recursive: true, force: true });
-			} catch {
-				// Ignore
-			}
+			cleanupTestDir(executeTestPath);
 		});
 
 		test("should return a promise", () => {
@@ -388,20 +363,11 @@ describe("inbox/engine", () => {
 	});
 
 	describe("attachment collision handling", () => {
-		const collisionTestPath = join(
-			process.cwd(),
-			".test-scratch",
-			"collision-test-vault",
-		);
+		let collisionTestPath: string;
 		let originalParaVault: string | undefined;
 
 		beforeEach(async () => {
-			try {
-				rmSync(collisionTestPath, { recursive: true, force: true });
-			} catch {
-				// Ignore
-			}
-			mkdirSync(collisionTestPath, { recursive: true });
+			collisionTestPath = createTempDir("collision-test-vault-");
 			await initGitRepo(collisionTestPath);
 
 			originalParaVault = process.env.PARA_VAULT;
@@ -415,11 +381,7 @@ describe("inbox/engine", () => {
 				delete process.env.PARA_VAULT;
 			}
 
-			try {
-				rmSync(collisionTestPath, { recursive: true, force: true });
-			} catch {
-				// Ignore
-			}
+			cleanupTestDir(collisionTestPath);
 		});
 
 		test("should generate unique filename when collision occurs", async () => {
@@ -509,20 +471,13 @@ describe("inbox/engine", () => {
 	});
 
 	describe("challenge()", () => {
-		const challengeTestPath = join(
-			process.cwd(),
-			".test-scratch",
-			"challenge-test-vault",
-		);
-		const challengeInboxPath = join(challengeTestPath, "00 Inbox");
+		let challengeTestPath: string;
+		let challengeInboxPath: string;
 		let originalParaVault: string | undefined;
 
 		beforeEach(async () => {
-			try {
-				rmSync(challengeTestPath, { recursive: true, force: true });
-			} catch {
-				// Ignore
-			}
+			challengeTestPath = createTempDir("challenge-test-vault-");
+			challengeInboxPath = join(challengeTestPath, "00 Inbox");
 			mkdirSync(challengeInboxPath, { recursive: true });
 			mkdirSync(join(challengeTestPath, "01 Projects"), { recursive: true });
 			mkdirSync(join(challengeTestPath, "02 Areas"), { recursive: true });
@@ -540,11 +495,7 @@ describe("inbox/engine", () => {
 				delete process.env.PARA_VAULT;
 			}
 
-			try {
-				rmSync(challengeTestPath, { recursive: true, force: true });
-			} catch {
-				// Ignore
-			}
+			cleanupTestDir(challengeTestPath);
 		});
 
 		test("should throw error when suggestion not found", async () => {

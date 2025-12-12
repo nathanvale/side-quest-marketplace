@@ -7,9 +7,9 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
 import {
 	createImageInboxFile,
 	getImageFileSize,
@@ -26,12 +26,11 @@ describe("imageExtractor", () => {
 	let testDir: string;
 
 	beforeEach(() => {
-		testDir = join(tmpdir(), `image-extractor-test-${Date.now()}`);
-		mkdirSync(testDir, { recursive: true });
+		testDir = createTempDir("image-extractor-test-");
 	});
 
 	afterEach(() => {
-		rmSync(testDir, { recursive: true, force: true });
+		cleanupTestDir(testDir);
 	});
 
 	describe("metadata", () => {
@@ -315,12 +314,11 @@ describe("bug fixes", () => {
 	let testDir: string;
 
 	beforeEach(() => {
-		testDir = join(tmpdir(), `image-bugfix-test-${Date.now()}`);
-		mkdirSync(testDir, { recursive: true });
+		testDir = createTempDir("image-bugfix-test-");
 	});
 
 	afterEach(() => {
-		rmSync(testDir, { recursive: true, force: true });
+		cleanupTestDir(testDir);
 	});
 
 	describe("file existence validation", () => {

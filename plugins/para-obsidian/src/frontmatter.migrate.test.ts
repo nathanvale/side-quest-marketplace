@@ -1,7 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
+import {
+	createTempDir,
+	readTestFile,
+	writeTestFile,
+} from "@sidequest/core/testing";
 
 import type { ParaObsidianConfig } from "./config";
 import {
@@ -12,20 +14,10 @@ import {
 } from "./frontmatter";
 import { MIGRATIONS } from "./migrations";
 
-function makeVault(): string {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "para-migrate-"));
-}
-
-function writeNote(vault: string, rel: string, content: string) {
-	const abs = path.join(vault, rel);
-	fs.mkdirSync(path.dirname(abs), { recursive: true });
-	fs.writeFileSync(abs, content, "utf8");
-}
-
 describe("migrateTemplateVersion", () => {
 	it("sets missing template_version to expected", () => {
-		const vault = makeVault();
-		writeNote(
+		const vault = createTempDir("para-migrate-");
+		writeTestFile(
 			vault,
 			"note.md",
 			`---
@@ -46,13 +38,13 @@ Body`,
 		expect(result.updated).toBe(true);
 		expect(result.toVersion).toBe(3);
 		expect(result.wouldChange).toBe(true);
-		const content = fs.readFileSync(path.join(vault, "note.md"), "utf8");
+		const content = readTestFile(vault, "note.md");
 		expect(content).toMatch(/template_version:\s*["']?3["']?/);
 	});
 
 	it("migrates all notes under a directory", () => {
-		const vault = makeVault();
-		writeNote(
+		const vault = createTempDir("para-migrate-");
+		writeTestFile(
 			vault,
 			"note.md",
 			`---
@@ -62,7 +54,7 @@ template_version: 1
 ---
 Body`,
 		);
-		writeNote(
+		writeTestFile(
 			vault,
 			"skip.md",
 			`---
@@ -83,13 +75,13 @@ Body`,
 		expect(summary.updated).toBe(2);
 		expect(summary.skipped).toBe(0);
 		expect(summary.changes.length).toBeGreaterThanOrEqual(0);
-		const migrated = fs.readFileSync(path.join(vault, "note.md"), "utf8");
+		const migrated = readTestFile(vault, "note.md");
 		expect(migrated).toMatch(/template_version:\s*["']?3["']?/);
 	});
 
 	it("updates outdated version", () => {
-		const vault = makeVault();
-		writeNote(
+		const vault = createTempDir("para-migrate-");
+		writeTestFile(
 			vault,
 			"note.md",
 			`---
@@ -112,13 +104,13 @@ Body`,
 		expect(result.toVersion).toBe(3);
 		expect(result.wouldChange).toBe(true);
 		expect(Array.isArray(result.changes ?? [])).toBe(true);
-		const content = fs.readFileSync(path.join(vault, "note.md"), "utf8");
+		const content = readTestFile(vault, "note.md");
 		expect(content).toMatch(/template_version:\s*["']?3["']?/);
 	});
 
 	it("fills defaults for task migration", () => {
-		const vault = makeVault();
-		writeNote(
+		const vault = createTempDir("para-migrate-");
+		writeTestFile(
 			vault,
 			"task.md",
 			`---
@@ -139,7 +131,7 @@ Body`,
 		});
 		expect(result.toVersion).toBe(3);
 		expect((result.changes ?? []).length).toBeGreaterThan(0);
-		const content = fs.readFileSync(path.join(vault, "task.md"), "utf8");
+		const content = readTestFile(vault, "task.md");
 		expect(content).toContain("status:");
 		expect(content).toContain("effort:");
 		expect(content).toContain("task_type:");
@@ -147,8 +139,8 @@ Body`,
 	});
 
 	it("applies a plan to migrate only outdated files", () => {
-		const vault = makeVault();
-		writeNote(
+		const vault = createTempDir("para-migrate-");
+		writeTestFile(
 			vault,
 			"project.md",
 			`---
@@ -158,7 +150,7 @@ template_version: 1
 ---
 Body`,
 		);
-		writeNote(
+		writeTestFile(
 			vault,
 			"project-current.md",
 			`---
@@ -186,18 +178,15 @@ Body`,
 
 		expect(result.updated).toBe(1);
 		expect(result.errors).toBe(0);
-		const migrated = fs.readFileSync(path.join(vault, "project.md"), "utf8");
+		const migrated = readTestFile(vault, "project.md");
 		expect(migrated).toMatch(/template_version:\s*["']?3["']?/);
-		const untouched = fs.readFileSync(
-			path.join(vault, "project-current.md"),
-			"utf8",
-		);
+		const untouched = readTestFile(vault, "project-current.md");
 		expect(untouched).toMatch(/template_version:\s*["']?3["']?/);
 	});
 
 	it("skips entries when status filter excludes them", () => {
-		const vault = makeVault();
-		writeNote(
+		const vault = createTempDir("para-migrate-");
+		writeTestFile(
 			vault,
 			"project.md",
 			`---
@@ -230,8 +219,8 @@ Body`,
 	});
 
 	it("throws when type missing", () => {
-		const vault = makeVault();
-		writeNote(
+		const vault = createTempDir("para-migrate-");
+		writeTestFile(
 			vault,
 			"note.md",
 			`---

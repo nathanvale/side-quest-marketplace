@@ -5,9 +5,11 @@
  * and receiving helpful enum suggestions and type hints in the response.
  */
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
+import {
+	cleanupTestDir,
+	createTempDir,
+	writeTestFile,
+} from "@sidequest/core/testing";
 import type { ParaObsidianConfig } from "../src/config";
 import { loadConfig } from "../src/config";
 import { readFrontmatterFile, updateFrontmatterFile } from "../src/frontmatter";
@@ -155,21 +157,18 @@ describe("frontmatter_set integration with hints", () => {
 
 	beforeEach(() => {
 		// Create temporary vault
-		testVault = fs.mkdtempSync(path.join(os.tmpdir(), "para-test-"));
+		testVault = createTempDir("para-test-");
 		process.env.PARA_VAULT = testVault;
 	});
 
 	afterEach(() => {
 		// Cleanup
 		process.env.PARA_VAULT = originalEnv;
-		if (fs.existsSync(testVault)) {
-			fs.rmSync(testVault, { recursive: true, force: true });
-		}
+		cleanupTestDir(testVault);
 	});
 
 	test("provides enum hints when setting project status", () => {
 		// Create a test project note
-		const notePath = path.join(testVault, "My Project.md");
 		const initialContent = `---
 title: My Project
 type: project
@@ -188,7 +187,7 @@ tags:
 
 Content here.`;
 
-		fs.writeFileSync(notePath, initialContent, "utf8");
+		writeTestFile(testVault, "My Project.md", initialContent);
 
 		const config = loadConfig();
 		const response = simulateFrontmatterSetResponse(config, "My Project.md", {
@@ -207,7 +206,6 @@ Content here.`;
 	});
 
 	test("provides enum hints when setting task priority", () => {
-		const notePath = path.join(testVault, "My Task.md");
 		const initialContent = `---
 title: My Task
 type: task
@@ -225,7 +223,7 @@ tags:
 
 Task details.`;
 
-		fs.writeFileSync(notePath, initialContent, "utf8");
+		writeTestFile(testVault, "My Task.md", initialContent);
 
 		const config = loadConfig();
 		const response = simulateFrontmatterSetResponse(config, "My Task.md", {
@@ -240,7 +238,6 @@ Task details.`;
 	});
 
 	test("provides hints for multiple fields", () => {
-		const notePath = path.join(testVault, "My Task.md");
 		const initialContent = `---
 title: My Task
 type: task
@@ -256,7 +253,7 @@ tags:
 
 # My Task`;
 
-		fs.writeFileSync(notePath, initialContent, "utf8");
+		writeTestFile(testVault, "My Task.md", initialContent);
 
 		const config = loadConfig();
 		const response = simulateFrontmatterSetResponse(config, "My Task.md", {
@@ -279,7 +276,6 @@ tags:
 	});
 
 	test("provides array hints for tags field", () => {
-		const notePath = path.join(testVault, "My Project.md");
 		const initialContent = `---
 title: My Project
 type: project
@@ -296,7 +292,7 @@ tags:
 
 # My Project`;
 
-		fs.writeFileSync(notePath, initialContent, "utf8");
+		writeTestFile(testVault, "My Project.md", initialContent);
 
 		const config = loadConfig();
 		const response = simulateFrontmatterSetResponse(config, "My Project.md", {
@@ -309,7 +305,6 @@ tags:
 	});
 
 	test("provides date hints for date fields", () => {
-		const notePath = path.join(testVault, "My Project.md");
 		const initialContent = `---
 title: My Project
 type: project
@@ -326,7 +321,7 @@ tags:
 
 # My Project`;
 
-		fs.writeFileSync(notePath, initialContent, "utf8");
+		writeTestFile(testVault, "My Project.md", initialContent);
 
 		const config = loadConfig();
 		const response = simulateFrontmatterSetResponse(config, "My Project.md", {
@@ -341,7 +336,6 @@ tags:
 	});
 
 	test("provides wikilink hints for link fields", () => {
-		const notePath = path.join(testVault, "My Project.md");
 		const initialContent = `---
 title: My Project
 type: project
@@ -358,7 +352,7 @@ tags:
 
 # My Project`;
 
-		fs.writeFileSync(notePath, initialContent, "utf8");
+		writeTestFile(testVault, "My Project.md", initialContent);
 
 		const config = loadConfig();
 		const response = simulateFrontmatterSetResponse(config, "My Project.md", {
@@ -371,7 +365,6 @@ tags:
 	});
 
 	test("provides hints for resource source_type field", () => {
-		const notePath = path.join(testVault, "My Resource.md");
 		const initialContent = `---
 title: My Resource
 type: resource
@@ -383,7 +376,7 @@ tags:
 
 # My Resource`;
 
-		fs.writeFileSync(notePath, initialContent, "utf8");
+		writeTestFile(testVault, "My Resource.md", initialContent);
 
 		const config = loadConfig();
 		const response = simulateFrontmatterSetResponse(config, "My Resource.md", {
@@ -399,7 +392,6 @@ tags:
 	});
 
 	test("no hints for unknown fields", () => {
-		const notePath = path.join(testVault, "My Project.md");
 		const initialContent = `---
 title: My Project
 type: project
@@ -416,7 +408,7 @@ tags:
 
 # My Project`;
 
-		fs.writeFileSync(notePath, initialContent, "utf8");
+		writeTestFile(testVault, "My Project.md", initialContent);
 
 		const config = loadConfig();
 		const response = simulateFrontmatterSetResponse(config, "My Project.md", {

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { createTempDir } from "@sidequest/core/testing";
 import type { ParaObsidianConfig } from "../src/config";
 
 /**
@@ -39,7 +39,7 @@ interface TestVault {
  * Creates a temporary test vault with PARA structure
  */
 function createTestVault(): TestVault {
-	const path = mkdtempSync(join(tmpdir(), "para-test-"));
+	const path = createTempDir("para-test-");
 
 	// Create PARA directories
 	mkdirSync(join(path, "01_Projects"), { recursive: true });

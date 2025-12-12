@@ -1,25 +1,13 @@
 import { describe, expect, it } from "bun:test";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
+import { createTempDir, writeTestFile } from "@sidequest/core/testing";
 
 import type { ParaObsidianConfig } from "./config";
 import { planTemplateVersionBump } from "./frontmatter";
 
-function makeVault(): string {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "para-plan-"));
-}
-
-function writeNote(vault: string, rel: string, content: string) {
-	const abs = path.join(vault, rel);
-	fs.mkdirSync(path.dirname(abs), { recursive: true });
-	fs.writeFileSync(abs, content, "utf8");
-}
-
 describe("planTemplateVersionBump", () => {
 	it("summarizes outdated and current template versions by type", () => {
-		const vault = makeVault();
-		writeNote(
+		const vault = createTempDir("para-plan-");
+		writeTestFile(
 			vault,
 			"note.md",
 			`---
@@ -29,7 +17,7 @@ template_version: 1
 ---
 Body`,
 		);
-		writeNote(
+		writeTestFile(
 			vault,
 			"skip.md",
 			`---
@@ -39,7 +27,7 @@ template_version: 2
 ---
 Body`,
 		);
-		writeNote(
+		writeTestFile(
 			vault,
 			"missing.md",
 			`---

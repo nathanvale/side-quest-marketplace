@@ -5,12 +5,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
 import { createRegistry, hashFile } from "./registry";
 import type { ProcessedItem, ProcessedRegistry } from "./types";
 
-const TEST_DIR = "/tmp/inbox-registry-test";
 const REGISTRY_FILE = ".inbox-processed.json";
 
 /**
@@ -25,12 +25,14 @@ function testHash(shortId: string): string {
 }
 
 describe("inbox/registry", () => {
+	let TEST_DIR: string;
+
 	beforeEach(() => {
-		mkdirSync(TEST_DIR, { recursive: true });
+		TEST_DIR = createTempDir("inbox-registry-test-");
 	});
 
 	afterEach(() => {
-		rmSync(TEST_DIR, { recursive: true, force: true });
+		cleanupTestDir(TEST_DIR);
 	});
 
 	// =========================================================================

@@ -3,8 +3,12 @@
  */
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
+import {
+	cleanupTestDir,
+	createTempDir,
+	writeTestFile,
+} from "@sidequest/core/testing";
 import { loadConfig } from "./config";
 import { validateFrontmatterFile } from "./frontmatter";
 
@@ -13,12 +17,13 @@ describe("filename validation", () => {
 	const originalEnv = process.env.PARA_VAULT;
 
 	beforeEach(() => {
-		testVault = fs.mkdtempSync(path.join(os.tmpdir(), "para-test-"));
+		testVault = createTempDir("para-test-");
 		process.env.PARA_VAULT = testVault;
 
 		// Create .paraobsidianrc with title prefixes
-		fs.writeFileSync(
-			path.join(testVault, ".paraobsidianrc"),
+		writeTestFile(
+			testVault,
+			".paraobsidianrc",
 			JSON.stringify({
 				titlePrefixes: {
 					booking: "🎫 Booking -",
@@ -26,21 +31,20 @@ describe("filename validation", () => {
 					trip: "✈️ Trip -",
 				},
 			}),
-			"utf8",
 		);
 	});
 
 	afterEach(() => {
 		process.env.PARA_VAULT = originalEnv;
 		if (fs.existsSync(testVault)) {
-			fs.rmSync(testVault, { recursive: true, force: true });
+			cleanupTestDir(testVault);
 		}
 	});
 
 	test("accepts Title Case filenames", () => {
-		const file = path.join(testVault, "My Project Note.md");
-		fs.writeFileSync(
-			file,
+		writeTestFile(
+			testVault,
+			"My Project Note.md",
 			`---
 title: My Project Note
 type: project
@@ -53,7 +57,6 @@ template_version: 4
 tags: [project]
 ---
 Content`,
-			"utf8",
 		);
 
 		const config = loadConfig({ cwd: testVault });
@@ -64,9 +67,9 @@ Content`,
 	});
 
 	test("rejects lowercase filenames", () => {
-		const file = path.join(testVault, "my project note.md");
-		fs.writeFileSync(
-			file,
+		writeTestFile(
+			testVault,
+			"my project note.md",
 			`---
 title: My Project Note
 type: project
@@ -79,7 +82,6 @@ template_version: 4
 tags: [project]
 ---
 Content`,
-			"utf8",
 		);
 
 		const config = loadConfig({ cwd: testVault });
@@ -92,9 +94,9 @@ Content`,
 	});
 
 	test("accepts emoji prefixes in filenames", () => {
-		const file = path.join(testVault, "🎫 Booking - Hotel Stay.md");
-		fs.writeFileSync(
-			file,
+		writeTestFile(
+			testVault,
+			"🎫 Booking - Hotel Stay.md",
 			`---
 title: Hotel Stay
 type: booking
@@ -109,7 +111,6 @@ template_version: 4
 tags: [booking]
 ---
 Content`,
-			"utf8",
 		);
 
 		const config = loadConfig({ cwd: testVault });
@@ -123,9 +124,9 @@ Content`,
 	});
 
 	test("requires expected prefix for booking type", () => {
-		const file = path.join(testVault, "Hotel Stay.md");
-		fs.writeFileSync(
-			file,
+		writeTestFile(
+			testVault,
+			"Hotel Stay.md",
 			`---
 title: Hotel Stay
 type: booking
@@ -140,7 +141,6 @@ template_version: 4
 tags: [booking]
 ---
 Content`,
-			"utf8",
 		);
 
 		const config = loadConfig({ cwd: testVault });
@@ -159,9 +159,9 @@ Content`,
 		const _config = loadConfig({ cwd: testVault });
 
 		// Create a valid file but test with invalid path
-		const validFile = path.join(testVault, "ValidName.md");
-		fs.writeFileSync(
-			validFile,
+		writeTestFile(
+			testVault,
+			"ValidName.md",
 			`---
 title: ValidName
 type: project
@@ -174,7 +174,6 @@ template_version: 4
 tags: [project]
 ---
 Content`,
-			"utf8",
 		);
 
 		// The validation logic checks the filename string itself
@@ -185,9 +184,9 @@ Content`,
 	});
 
 	test("allows files without type-specific prefix if no prefix configured", () => {
-		const file = path.join(testVault, "My Project.md");
-		fs.writeFileSync(
-			file,
+		writeTestFile(
+			testVault,
+			"My Project.md",
 			`---
 title: My Project
 type: project
@@ -200,7 +199,6 @@ template_version: 4
 tags: [project]
 ---
 Content`,
-			"utf8",
 		);
 
 		const config = loadConfig({ cwd: testVault });

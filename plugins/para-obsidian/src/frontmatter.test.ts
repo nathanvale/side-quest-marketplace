@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
+import { createTempDir, writeTestFile } from "@sidequest/core/testing";
 import type { ParaObsidianConfig } from "./config";
 import {
 	parseFrontmatter,
@@ -83,17 +83,16 @@ describe("frontmatter validation", () => {
 	});
 
 	it("flags missing or outdated template_version", () => {
-		const vault = fs.mkdtempSync(path.join(os.tmpdir(), "para-fm-"));
-		const notePath = path.join(vault, "note.md");
-		fs.writeFileSync(
-			notePath,
+		const vault = createTempDir("para-fm-");
+		writeTestFile(
+			vault,
+			"note.md",
 			`---
 type: project
 title: Test
 created: 2024-01-01
 ---
 Body`,
-			"utf8",
 		);
 
 		const config: ParaObsidianConfig = {
@@ -308,16 +307,15 @@ Body`,
 });
 
 describe("frontmatter update", () => {
-	const makeVault = () =>
-		fs.mkdtempSync(path.join(os.tmpdir(), "para-fm-update-"));
+	const makeVault = () => createTempDir("para-fm-update-");
 
 	it("sets and unsets keys while preserving body", () => {
 		const vault = makeVault();
 		const notePath = path.join(vault, "note.md");
-		fs.writeFileSync(
-			notePath,
+		writeTestFile(
+			vault,
+			"note.md",
 			"---\ntitle: Start\nstatus: draft\nold: keep\n---\n\nBody text",
-			"utf8",
 		);
 
 		const config: ParaObsidianConfig = { vault };
@@ -347,7 +345,7 @@ describe("frontmatter update", () => {
 
 describe("bulk frontmatter validation", () => {
 	const makeVault = () => {
-		const vault = fs.mkdtempSync(path.join(os.tmpdir(), "para-fm-bulk-"));
+		const vault = createTempDir("para-fm-bulk-");
 
 		// Create test directory structure
 		const projectsDir = path.join(vault, "01_Projects");
@@ -537,17 +535,17 @@ Body`,
 	});
 
 	it("handles validation errors gracefully", () => {
-		const vault = fs.mkdtempSync(path.join(os.tmpdir(), "para-fm-bulk-"));
+		const vault = createTempDir("para-fm-bulk-");
 
 		// Create file with invalid YAML
-		fs.writeFileSync(
-			path.join(vault, "broken.md"),
+		writeTestFile(
+			vault,
+			"broken.md",
 			`---
 type: project
 invalid: [unclosed
 ---
 Body`,
-			"utf8",
 		);
 
 		const config: ParaObsidianConfig = {

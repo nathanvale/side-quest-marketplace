@@ -7,8 +7,9 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { extname, join } from "node:path";
+import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
 
 /**
  * Local copy of generateUniquePath for testing.
@@ -31,23 +32,14 @@ function generateUniquePath(basePath: string): string {
 }
 
 describe("generateUniquePath", () => {
-	const testDir = join(process.cwd(), ".test-scratch", "unique-path-test");
+	let testDir: string;
 
 	beforeEach(() => {
-		try {
-			rmSync(testDir, { recursive: true, force: true });
-		} catch {
-			// Ignore
-		}
-		mkdirSync(testDir, { recursive: true });
+		testDir = createTempDir("unique-path-test-");
 	});
 
 	afterEach(() => {
-		try {
-			rmSync(testDir, { recursive: true, force: true });
-		} catch {
-			// Ignore
-		}
+		cleanupTestDir(testDir);
 	});
 
 	test("should return original path if file does not exist", () => {
