@@ -31,6 +31,11 @@ import {
 import { generateFilename, generateUniquePath } from "./engine-utils";
 import { createInboxError } from "./errors";
 import {
+	createInboxFile,
+	getDefaultRegistry,
+	type InboxFile,
+} from "./extractors";
+import {
 	buildInboxPrompt,
 	type DocumentTypeResult,
 	type InboxVaultContext,
@@ -158,12 +163,20 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			return [];
 		}
 
-		// Filter to PDFs only (for now)
-		const pdfFiles = files.filter((f) => extname(f).toLowerCase() === ".pdf");
+		// Get extractor registry and filter to supported files
+		const extractorRegistry = getDefaultRegistry();
+		const supportedExtensions = new Set(
+			extractorRegistry.getSupportedExtensions(),
+		);
 
-		if (pdfFiles.length === 0) {
+		// Convert to InboxFile and filter to supported formats
+		const supportedFiles: InboxFile[] = files
+			.map((f) => createInboxFile(join(inboxPath, f)))
+			.filter((f) => supportedExtensions.has(f.extension));
+
+		if (supportedFiles.length === 0) {
 			if (inboxLogger) {
-				inboxLogger.info`No PDFs found in inbox cid=${cid}`;
+				inboxLogger.info`No supported files found in inbox cid=${cid}`;
 			}
 			return [];
 		}
@@ -192,16 +205,18 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		};
 
 		// Create concurrency limiters
-		const pdfLimit = pLimit(resolvedConfig.concurrency?.pdfExtraction ?? 5);
+		const extractionLimit = pLimit(
+			resolvedConfig.concurrency?.pdfExtraction ?? 5,
+		);
 		const llmLimit = pLimit(resolvedConfig.concurrency?.llmCalls ?? 3);
 
-		// Process PDFs concurrently
-		const suggestionPromises = pdfFiles.map((filename, index) =>
-			pdfLimit(async () => {
-				const filePath = join(inboxPath, filename);
+		// Process supported files concurrently
+		const suggestionPromises = supportedFiles.map((file, index) =>
+			extractionLimit(async () => {
+				const { path: filePath, filename } = file;
 				const progressBase = {
 					index: index + 1,
-					total: pdfFiles.length,
+					total: supportedFiles.length,
 					filename,
 				} as const;
 
