@@ -34,7 +34,7 @@ export interface FieldConstraint {
 	/** Field key (exact prompt text from template) */
 	readonly key: string;
 	/** Detected field type */
-	readonly type: "string" | "date" | "array" | "wikilink" | "enum";
+	readonly type: "string" | "number" | "date" | "array" | "wikilink" | "enum";
 	/** Whether this field is required */
 	readonly required: boolean;
 	/** For enum types, the allowed values */

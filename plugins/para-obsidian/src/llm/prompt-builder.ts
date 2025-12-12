@@ -1,6 +1,13 @@
 /**
  * Composable prompt builder for LLM-based note conversion.
  *
+ * NOTE: This is a domain-specific version that builds on similar patterns
+ * from @sidequest/core/llm but with PARA-specific enhancements:
+ * - Extended PromptTemplate with sourceHeadings and sectionMapping
+ * - buildSourceStructureSection() for capturing source document structure
+ * - Enhanced DEFAULT_CRITICAL_RULES (14 rules) for Obsidian/Dataview compatibility
+ * - PARA-specific wikilink and YAML formatting guidance
+ *
  * Provides declarative, reusable prompt construction that can be used for:
  * - Full conversion (existing behavior)
  * - Field suggestions (lighter extraction)

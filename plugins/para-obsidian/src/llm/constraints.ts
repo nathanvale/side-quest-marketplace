@@ -1,8 +1,15 @@
 /**
- * LLM prompt constraints builder.
+ * LLM prompt constraints builder for para-obsidian.
  *
  * This module extracts and formats constraints from template definitions
  * and frontmatter rules to guide LLM extraction with deterministic prompts.
+ *
+ * NOTE: This is a domain-specific version that builds on similar patterns
+ * from @sidequest/core/llm but with PARA-specific enhancements:
+ * - Imports from local config/templates modules (not core types)
+ * - Wikilinks MUST be quoted (for YAML validity with Obsidian/Dataview)
+ * - Number type support for priority fields
+ * - PARA-specific vault context (areas, projects, resources)
  *
  * Key improvements over llm.ts formatRules():
  * - Inline enum values with field descriptions

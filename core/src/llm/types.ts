@@ -12,7 +12,7 @@
  */
 export interface FieldRule {
 	/** The expected data type for this field. */
-	readonly type: "string" | "date" | "array" | "wikilink" | "enum";
+	readonly type: "string" | "number" | "date" | "array" | "wikilink" | "enum";
 	/** For enum types, the allowed values. */
 	readonly enum?: ReadonlyArray<string>;
 	/** For array types, values that must be present in the array. */
