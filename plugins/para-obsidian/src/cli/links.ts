@@ -5,7 +5,6 @@
  *
  * Commands:
  * - rename: Rename a note and update all links to it
- * - flatten-attachments: Move all attachments to a flat structure
  * - link-attachments: Link orphan attachments to notes
  * - find-orphans: Find broken links and orphan attachments
  * - clean-broken-links: Remove broken links from notes
@@ -18,7 +17,6 @@ import path from "node:path";
 import { pathExistsSync, readTextFileSync } from "@sidequest/core/fs";
 import { emphasize } from "@sidequest/core/terminal";
 import { cleanBrokenLinks } from "../clean-links";
-import { flattenAttachments } from "../flatten";
 import { autoCommitChanges, commitAllNotes, ensureGitGuard } from "../git";
 import { linkAttachmentsToNotes } from "../link-attachments";
 import { renameWithLinkRewrite } from "../links";
@@ -69,49 +67,6 @@ export const handleRename: CommandHandler = async (
 				`${dryRun ? "Would rename" : "Renamed"} ${from} → ${to} (rewrites: ${result.rewrites.length})`,
 			),
 		);
-	}
-
-	return { success: true };
-};
-
-/**
- * Handle the 'flatten-attachments' command.
- */
-export const handleFlattenAttachments: CommandHandler = async (
-	ctx: CommandContext,
-): Promise<CommandResult> => {
-	const { config, flags, isJson } = ctx;
-
-	const dryRun = flags["dry-run"] === true || flags["dry-run"] === "true";
-	const removeEmptyDirs =
-		flags["remove-empty-dirs"] === true ||
-		flags["remove-empty-dirs"] === "true";
-
-	if (!dryRun) {
-		await ensureGitGuard(config);
-	}
-
-	const result = await flattenAttachments(config.vault, {
-		dryRun,
-		removeEmptyDirs,
-	});
-
-	if (isJson) {
-		console.log(JSON.stringify(result, null, 2));
-	} else {
-		console.log(
-			emphasize.success(
-				`${dryRun ? "Would flatten" : "Flattened"} ${result.attachmentsMoved} attachments`,
-			),
-		);
-		console.log(`  Notes updated: ${result.notesUpdated}`);
-		if (removeEmptyDirs) {
-			console.log(`  Empty dirs removed: ${result.emptyDirsRemoved}`);
-		}
-	}
-
-	if (config.autoCommit && !dryRun && result.attachmentsMoved > 0) {
-		await commitAllNotes(config);
 	}
 
 	return { success: true };

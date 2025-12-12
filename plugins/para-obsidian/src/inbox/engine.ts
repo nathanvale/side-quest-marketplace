@@ -20,7 +20,6 @@ import { globFilesSync } from "@sidequest/core/glob";
 import pLimit from "p-limit";
 import { loadConfig } from "../config";
 import { createFromTemplate, injectSections } from "../create";
-import { generateFlatFilename } from "../flatten";
 import { resolveVaultPath } from "../fs";
 import { ensureGitGuard } from "../git";
 import { DEFAULT_INBOX_CONVERTERS, mapFieldsToTemplate } from "./converters";
@@ -53,6 +52,41 @@ import type {
 	InboxSuggestion,
 	ScanOptions,
 } from "./types";
+
+// =============================================================================
+// Utilities
+// =============================================================================
+
+/**
+ * Generates a timestamp-based filename for an attachment.
+ *
+ * Format: YYYYMMDD-HHMM-description.ext
+ *
+ * @param originalPath - Original file path
+ * @param timestamp - Optional timestamp (default: now)
+ * @returns Generated filename
+ */
+function generateFilename(originalPath: string, timestamp?: Date): string {
+	const ts = timestamp ?? new Date();
+	const year = ts.getFullYear();
+	const month = String(ts.getMonth() + 1).padStart(2, "0");
+	const day = String(ts.getDate()).padStart(2, "0");
+	const hour = String(ts.getHours()).padStart(2, "0");
+	const minute = String(ts.getMinutes()).padStart(2, "0");
+
+	const timestampPrefix = `${year}${month}${day}-${hour}${minute}`;
+
+	const file = basename(originalPath);
+	const ext = extname(file);
+	const nameWithoutExt = basename(file, ext);
+
+	const description = nameWithoutExt
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+
+	return `${timestampPrefix}-${description}${ext}`;
+}
 
 // =============================================================================
 // Engine Factory
@@ -897,7 +931,7 @@ async function executeSuggestion(
 		datedFilename = `${timestampPrefix}-${suggestion.suggestedAttachmentName}${ext}`;
 	} else {
 		// Fallback: extract description from messy filename
-		datedFilename = generateFlatFilename(suggestion.source);
+		datedFilename = generateFilename(suggestion.source);
 	}
 
 	const intendedAttachmentDest = join(

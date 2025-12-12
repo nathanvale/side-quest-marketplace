@@ -19,7 +19,6 @@ import {
 	handleCreate,
 	handleDelete,
 	handleFindOrphans,
-	handleFlattenAttachments,
 	handleFrontmatter,
 	handleGit,
 	handleIndex,
@@ -166,12 +165,6 @@ async function main(): Promise<void> {
 
 			case "rename": {
 				const result = await handleRename(ctx);
-				if (!result.success) process.exit(result.exitCode ?? 1);
-				break;
-			}
-
-			case "flatten-attachments": {
-				const result = await handleFlattenAttachments(ctx);
 				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}

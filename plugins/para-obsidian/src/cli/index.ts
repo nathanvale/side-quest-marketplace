@@ -47,7 +47,6 @@ export { handleGit, handleInsert } from "./git";
 export {
 	handleCleanBrokenLinks,
 	handleFindOrphans,
-	handleFlattenAttachments,
 	handleLinkAttachments,
 	handleRename,
 	handleRewriteLinks,
