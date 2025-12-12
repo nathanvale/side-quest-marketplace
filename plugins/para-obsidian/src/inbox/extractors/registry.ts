@@ -123,25 +123,33 @@ export class ExtractorRegistry {
 	}
 
 	/**
-	 * Check availability of all extractors.
+	 * Check availability of all extractors in parallel.
 	 *
 	 * @returns Map of extractor ID to availability result
 	 */
 	async checkAllAvailability(): Promise<
 		Map<string, { available: boolean; error?: string }>
 	> {
-		const results = new Map<string, { available: boolean; error?: string }>();
+		const extractors = [...this.extractors.values()];
 
-		for (const extractor of this.extractors.values()) {
+		// Run all checks in parallel for better performance
+		const checkPromises = extractors.map(async (extractor) => {
 			if (extractor.checkAvailability) {
-				results.set(extractor.id, await extractor.checkAvailability());
-			} else {
-				// If no check method, assume available
-				results.set(extractor.id, { available: true });
+				const result = await extractor.checkAvailability();
+				return { id: extractor.id, result };
 			}
+			// If no check method, assume available
+			return { id: extractor.id, result: { available: true } };
+		});
+
+		const results = await Promise.all(checkPromises);
+
+		const resultMap = new Map<string, { available: boolean; error?: string }>();
+		for (const { id, result } of results) {
+			resultMap.set(id, result);
 		}
 
-		return results;
+		return resultMap;
 	}
 }
 
@@ -152,17 +160,52 @@ export class ExtractorRegistry {
  * - PDF extractor (pdftotext)
  * - Image extractor (Vision AI - placeholder until API configured)
  * - Markdown extractor (frontmatter + content)
+ *
+ * Uses dynamic ESM imports to enable tree-shaking and graceful failure.
+ * If an extractor fails to load, the registry continues with the others.
  */
-export function createDefaultRegistry(): ExtractorRegistry {
-	// Import here to avoid circular dependencies
-	const { pdfExtractor } = require("./pdf");
-	const { imageExtractor } = require("./image");
-	const { markdownExtractor } = require("./markdown");
-
+export async function createDefaultRegistry(): Promise<ExtractorRegistry> {
 	const registry = new ExtractorRegistry();
-	registry.register(pdfExtractor);
-	registry.register(imageExtractor);
-	registry.register(markdownExtractor);
+
+	// Load extractors in parallel with individual error handling
+	const extractorLoaders = [
+		{
+			name: "pdf",
+			load: async () => {
+				const mod = await import("./pdf");
+				return mod.pdfExtractor;
+			},
+		},
+		{
+			name: "image",
+			load: async () => {
+				const mod = await import("./image");
+				return mod.imageExtractor;
+			},
+		},
+		{
+			name: "markdown",
+			load: async () => {
+				const mod = await import("./markdown");
+				return mod.markdownExtractor;
+			},
+		},
+	];
+
+	const results = await Promise.allSettled(
+		extractorLoaders.map(async ({ name, load }) => {
+			const extractor = await load();
+			return { name, extractor };
+		}),
+	);
+
+	// Register successful loads, log failures
+	for (const result of results) {
+		if (result.status === "fulfilled") {
+			registry.register(result.value.extractor);
+		}
+		// Failed loads are silently skipped - caller can check registry.size
+	}
 
 	return registry;
 }
@@ -177,9 +220,9 @@ let defaultRegistry: ExtractorRegistry | null = null;
  * Get the default registry instance (singleton).
  * Creates it on first access with default extractors.
  */
-export function getDefaultRegistry(): ExtractorRegistry {
+export async function getDefaultRegistry(): Promise<ExtractorRegistry> {
 	if (!defaultRegistry) {
-		defaultRegistry = createDefaultRegistry();
+		defaultRegistry = await createDefaultRegistry();
 	}
 	return defaultRegistry;
 }

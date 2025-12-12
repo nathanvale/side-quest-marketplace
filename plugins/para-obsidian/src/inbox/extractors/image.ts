@@ -13,7 +13,8 @@
  * @module extractors/image
  */
 
-import { readFile, stat } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, readFile, stat } from "node:fs/promises";
 import { basename, extname } from "node:path";
 import type { ContentExtractor, ExtractedContent, InboxFile } from "./types";
 
@@ -30,6 +31,9 @@ export const IMAGE_EXTENSIONS = [
 ] as const;
 
 export type ImageExtension = (typeof IMAGE_EXTENSIONS)[number];
+
+/** Maximum file size for image extraction (50MB) */
+export const MAX_IMAGE_SIZE_BYTES = 50 * 1024 * 1024;
 
 /**
  * Image-specific metadata from extraction.
@@ -68,31 +72,82 @@ export function getMimeType(extension: string): string {
 
 /**
  * Check if an extension is a supported image format.
+ * Case-insensitive comparison.
  */
 export function isImageExtension(ext: string): ext is ImageExtension {
-	return IMAGE_EXTENSIONS.includes(ext.toLowerCase() as ImageExtension);
+	const normalizedExt = ext.toLowerCase() as ImageExtension;
+	return IMAGE_EXTENSIONS.includes(normalizedExt);
+}
+
+/**
+ * Check if a file exists and is readable.
+ *
+ * @param filePath - Path to file
+ * @returns true if file exists and is readable
+ */
+async function fileExists(filePath: string): Promise<boolean> {
+	try {
+		await access(filePath, constants.R_OK);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 /**
  * Read image file as base64 for API calls.
+ * Includes file existence and size validation.
  *
  * @param filePath - Path to image file
  * @returns Base64-encoded image data
+ * @throws Error if file doesn't exist, is too large, or can't be read
  */
 export async function readImageAsBase64(filePath: string): Promise<string> {
-	const buffer = await readFile(filePath);
-	return buffer.toString("base64");
+	// Check file exists first (TOCTOU mitigation - fail fast)
+	if (!(await fileExists(filePath))) {
+		throw new Error(`Image file not found: ${filePath}`);
+	}
+
+	// Check file size before reading
+	const stats = await stat(filePath);
+	if (stats.size > MAX_IMAGE_SIZE_BYTES) {
+		throw new Error(
+			`Image file too large: ${stats.size} bytes exceeds ${MAX_IMAGE_SIZE_BYTES} byte limit`,
+		);
+	}
+
+	// Read file - may still fail due to TOCTOU, but we've minimized the window
+	try {
+		const buffer = await readFile(filePath);
+		return buffer.toString("base64");
+	} catch (error) {
+		throw new Error(
+			`Failed to read image file: ${filePath} - ${error instanceof Error ? error.message : "unknown error"}`,
+		);
+	}
 }
 
 /**
- * Get image file stats.
+ * Get image file stats with existence validation.
  *
  * @param filePath - Path to image file
  * @returns File size in bytes
+ * @throws Error if file doesn't exist or can't be read
  */
 export async function getImageFileSize(filePath: string): Promise<number> {
-	const stats = await stat(filePath);
-	return stats.size;
+	// Check file exists first
+	if (!(await fileExists(filePath))) {
+		throw new Error(`Image file not found: ${filePath}`);
+	}
+
+	try {
+		const stats = await stat(filePath);
+		return stats.size;
+	} catch (error) {
+		throw new Error(
+			`Failed to get file stats: ${filePath} - ${error instanceof Error ? error.message : "unknown error"}`,
+		);
+	}
 }
 
 /**
@@ -159,7 +214,29 @@ export const imageExtractor: ContentExtractor = {
 
 	async extract(file: InboxFile, _cid: string): Promise<ExtractedContent> {
 		const startTime = Date.now();
-		const fileSize = await getImageFileSize(file.path);
+
+		// Validate file exists before processing (TOCTOU mitigation)
+		if (!(await fileExists(file.path))) {
+			throw new Error(`Image file not found: ${file.path}`);
+		}
+
+		// Get file size with validation
+		let fileSize: number;
+		try {
+			fileSize = await getImageFileSize(file.path);
+		} catch (error) {
+			throw new Error(
+				`Failed to read image file: ${file.path} - ${error instanceof Error ? error.message : "unknown error"}`,
+			);
+		}
+
+		// Check file size limit
+		if (fileSize > MAX_IMAGE_SIZE_BYTES) {
+			throw new Error(
+				`Image file too large: ${file.filename} is ${Math.round(fileSize / 1024 / 1024)}MB, max is ${Math.round(MAX_IMAGE_SIZE_BYTES / 1024 / 1024)}MB`,
+			);
+		}
+
 		const mimeType = getMimeType(file.extension);
 
 		// TODO: Implement actual vision API call using VISION_EXTRACTION_PROMPT

@@ -562,3 +562,294 @@ Body content
 		expect(attributes).toEqual({});
 	});
 });
+
+describe("bug fixes", () => {
+	let testDir: string;
+
+	beforeEach(() => {
+		testDir = join(tmpdir(), `markdown-bugfix-test-${Date.now()}`);
+		mkdirSync(testDir, { recursive: true });
+	});
+
+	afterEach(() => {
+		rmSync(testDir, { recursive: true, force: true });
+	});
+
+	describe("Windows line endings (CRLF)", () => {
+		test("should handle Windows line endings in frontmatter", async () => {
+			const mdPath = join(testDir, "windows-crlf.md");
+			// Write file with explicit \r\n line endings
+			writeFileSync(
+				mdPath,
+				"---\r\ntitle: Windows Note\r\ntags:\r\n  - test\r\n---\r\n# Content\r\n\r\nBody text.\r\n",
+			);
+
+			const file: InboxFile = {
+				path: mdPath,
+				extension: ".md",
+				filename: "windows-crlf.md",
+			};
+
+			const result = await markdownExtractor.extract(file, "test-cid");
+			const md = getMdMetadata(result.metadata);
+
+			expect(md?.title).toBe("Windows Note");
+			expect(md?.tags).toEqual(["test"]);
+			expect(result.text).toContain("Body text.");
+		});
+
+		test("should handle mixed line endings", async () => {
+			const mdPath = join(testDir, "mixed-endings.md");
+			// Mix of \r\n and \n
+			writeFileSync(
+				mdPath,
+				"---\r\ntitle: Mixed\n---\nContent\r\nMore content\n",
+			);
+
+			const file: InboxFile = {
+				path: mdPath,
+				extension: ".md",
+				filename: "mixed-endings.md",
+			};
+
+			const result = await markdownExtractor.extract(file, "test-cid");
+			const md = getMdMetadata(result.metadata);
+
+			expect(md?.title).toBe("Mixed");
+			expect(result.text).toContain("Content");
+			expect(result.text).toContain("More content");
+		});
+	});
+
+	describe("H1 extraction from code blocks", () => {
+		test("should NOT extract H1 from inside fenced code block", async () => {
+			const mdPath = join(testDir, "h1-in-code.md");
+			writeFileSync(
+				mdPath,
+				`---
+tags: [test]
+---
+Some intro text.
+
+\`\`\`markdown
+# This is NOT a title
+It's example code.
+\`\`\`
+
+# Real Title
+
+More content.
+`,
+			);
+
+			const file: InboxFile = {
+				path: mdPath,
+				extension: ".md",
+				filename: "h1-in-code.md",
+			};
+
+			const result = await markdownExtractor.extract(file, "test-cid");
+			const md = getMdMetadata(result.metadata);
+
+			// Should extract "Real Title", not "This is NOT a title"
+			expect(md?.title).toBe("Real Title");
+		});
+
+		test("should extract H1 when no code blocks present", async () => {
+			const mdPath = join(testDir, "no-code-blocks.md");
+			writeFileSync(mdPath, "# First Title\n\nContent here.");
+
+			const file: InboxFile = {
+				path: mdPath,
+				extension: ".md",
+				filename: "no-code-blocks.md",
+			};
+
+			const result = await markdownExtractor.extract(file, "test-cid");
+			const md = getMdMetadata(result.metadata);
+
+			expect(md?.title).toBe("First Title");
+		});
+
+		test("should handle multiple code blocks", async () => {
+			const mdPath = join(testDir, "multiple-code-blocks.md");
+			writeFileSync(
+				mdPath,
+				`\`\`\`
+# Fake Title 1
+\`\`\`
+
+\`\`\`python
+# Fake Title 2
+\`\`\`
+
+# Actual Title
+
+\`\`\`
+# Another fake
+\`\`\`
+`,
+			);
+
+			const file: InboxFile = {
+				path: mdPath,
+				extension: ".md",
+				filename: "multiple-code-blocks.md",
+			};
+
+			const result = await markdownExtractor.extract(file, "test-cid");
+			const md = getMdMetadata(result.metadata);
+
+			expect(md?.title).toBe("Actual Title");
+		});
+	});
+
+	describe("tag extraction", () => {
+		test("should NOT split tags on spaces (only commas)", async () => {
+			const mdPath = join(testDir, "spaced-tags.md");
+			writeFileSync(
+				mdPath,
+				`---
+tags: multi word tag, another tag
+---
+Content
+`,
+			);
+
+			const file: InboxFile = {
+				path: mdPath,
+				extension: ".md",
+				filename: "spaced-tags.md",
+			};
+
+			const result = await markdownExtractor.extract(file, "test-cid");
+			const md = getMdMetadata(result.metadata);
+
+			// Should preserve "multi word tag" as a single tag
+			expect(md?.tags).toEqual(["multi word tag", "another tag"]);
+		});
+
+		test("should handle tags with leading/trailing whitespace", async () => {
+			const mdPath = join(testDir, "whitespace-tags.md");
+			writeFileSync(
+				mdPath,
+				`---
+tags: "  tag1  ,  tag2  ,  tag3  "
+---
+Content
+`,
+			);
+
+			const file: InboxFile = {
+				path: mdPath,
+				extension: ".md",
+				filename: "whitespace-tags.md",
+			};
+
+			const result = await markdownExtractor.extract(file, "test-cid");
+			const md = getMdMetadata(result.metadata);
+
+			// Should trim whitespace from each tag
+			expect(md?.tags).toEqual(["tag1", "tag2", "tag3"]);
+		});
+	});
+
+	describe("file read validation", () => {
+		test("should throw descriptive error for non-existent file", async () => {
+			const file: InboxFile = {
+				path: join(testDir, "does-not-exist.md"),
+				extension: ".md",
+				filename: "does-not-exist.md",
+			};
+
+			await expect(markdownExtractor.extract(file, "test-cid")).rejects.toThrow(
+				/Failed to read markdown file/,
+			);
+		});
+
+		test("should include file path in error message", async () => {
+			const nonExistentPath = join(testDir, "missing-file.md");
+			const file: InboxFile = {
+				path: nonExistentPath,
+				extension: ".md",
+				filename: "missing-file.md",
+			};
+
+			try {
+				await markdownExtractor.extract(file, "test-cid");
+				throw new Error("Should have thrown");
+			} catch (error) {
+				expect((error as Error).message).toContain(nonExistentPath);
+			}
+		});
+	});
+
+	describe("word count edge cases", () => {
+		test("should handle text starting with whitespace", async () => {
+			const mdPath = join(testDir, "leading-whitespace.md");
+			writeFileSync(mdPath, "   one two three");
+
+			const file: InboxFile = {
+				path: mdPath,
+				extension: ".md",
+				filename: "leading-whitespace.md",
+			};
+
+			const result = await markdownExtractor.extract(file, "test-cid");
+			const md = getMdMetadata(result.metadata);
+
+			// Should correctly count 3 words, not 4 (with empty string from leading space)
+			expect(md?.wordCount).toBe(3);
+		});
+
+		test("should handle text with multiple consecutive spaces", async () => {
+			const mdPath = join(testDir, "multi-space.md");
+			writeFileSync(mdPath, "one    two     three");
+
+			const file: InboxFile = {
+				path: mdPath,
+				extension: ".md",
+				filename: "multi-space.md",
+			};
+
+			const result = await markdownExtractor.extract(file, "test-cid");
+			const md = getMdMetadata(result.metadata);
+
+			expect(md?.wordCount).toBe(3);
+		});
+
+		test("should handle empty file", async () => {
+			const mdPath = join(testDir, "empty.md");
+			writeFileSync(mdPath, "");
+
+			const file: InboxFile = {
+				path: mdPath,
+				extension: ".md",
+				filename: "empty.md",
+			};
+
+			const result = await markdownExtractor.extract(file, "test-cid");
+			const md = getMdMetadata(result.metadata);
+
+			expect(md?.wordCount).toBe(0);
+			expect(md?.hasBody).toBe(false);
+		});
+
+		test("should handle whitespace-only file", async () => {
+			const mdPath = join(testDir, "whitespace-only.md");
+			writeFileSync(mdPath, "   \n\n   \t   ");
+
+			const file: InboxFile = {
+				path: mdPath,
+				extension: ".md",
+				filename: "whitespace-only.md",
+			};
+
+			const result = await markdownExtractor.extract(file, "test-cid");
+			const md = getMdMetadata(result.metadata);
+
+			expect(md?.wordCount).toBe(0);
+			expect(md?.hasBody).toBe(false);
+		});
+	});
+});

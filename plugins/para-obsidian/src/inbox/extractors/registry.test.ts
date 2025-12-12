@@ -431,12 +431,60 @@ describe("extractors/registry", () => {
 				expect(results.get("simple")).toEqual({ available: true });
 				expect(results.get("complex")).toEqual({ available: true });
 			});
+
+			test("should run availability checks in parallel", async () => {
+				const registry = new ExtractorRegistry();
+				const startTimes: number[] = [];
+
+				registry.register({
+					id: "slow1",
+					displayName: "Slow Extractor 1",
+					extensions: [".slow1"],
+					canHandle: () => false,
+					extract: async () => ({
+						text: "",
+						source: "text" as const,
+						filePath: "/test",
+					}),
+					checkAvailability: async () => {
+						startTimes.push(Date.now());
+						await new Promise((resolve) => setTimeout(resolve, 50));
+						return { available: true };
+					},
+				});
+
+				registry.register({
+					id: "slow2",
+					displayName: "Slow Extractor 2",
+					extensions: [".slow2"],
+					canHandle: () => false,
+					extract: async () => ({
+						text: "",
+						source: "text" as const,
+						filePath: "/test",
+					}),
+					checkAvailability: async () => {
+						startTimes.push(Date.now());
+						await new Promise((resolve) => setTimeout(resolve, 50));
+						return { available: true };
+					},
+				});
+
+				const start = Date.now();
+				await registry.checkAllAvailability();
+				const elapsed = Date.now() - start;
+
+				// If parallel, should take ~50ms. If sequential, would take ~100ms
+				expect(elapsed).toBeLessThan(90);
+				// Both should have started at roughly the same time
+				expect(Math.abs(startTimes[0]! - startTimes[1]!)).toBeLessThan(30);
+			});
 		});
 	});
 
 	describe("createDefaultRegistry", () => {
-		test("should create registry with default extractors", () => {
-			const registry = createDefaultRegistry();
+		test("should create registry with default extractors", async () => {
+			const registry = await createDefaultRegistry();
 
 			expect(registry.size).toBe(3);
 			expect(registry.get("pdf")).toBeDefined();
@@ -444,15 +492,15 @@ describe("extractors/registry", () => {
 			expect(registry.get("markdown")).toBeDefined();
 		});
 
-		test("should support PDF files", () => {
-			const registry = createDefaultRegistry();
+		test("should support PDF files", async () => {
+			const registry = await createDefaultRegistry();
 			const file = createTestFile("invoice.pdf", ".pdf");
 
 			expect(registry.canHandle(file)).toBe(true);
 		});
 
-		test("should support image files", () => {
-			const registry = createDefaultRegistry();
+		test("should support image files", async () => {
+			const registry = await createDefaultRegistry();
 
 			expect(registry.canHandle(createTestFile("photo.png", ".png"))).toBe(
 				true,
@@ -465,8 +513,8 @@ describe("extractors/registry", () => {
 			);
 		});
 
-		test("should support markdown files", () => {
-			const registry = createDefaultRegistry();
+		test("should support markdown files", async () => {
+			const registry = await createDefaultRegistry();
 
 			expect(registry.canHandle(createTestFile("notes.md", ".md"))).toBe(true);
 			expect(
@@ -474,9 +522,9 @@ describe("extractors/registry", () => {
 			).toBe(true);
 		});
 
-		test("should create new registry each time", () => {
-			const registry1 = createDefaultRegistry();
-			const registry2 = createDefaultRegistry();
+		test("should create new registry each time", async () => {
+			const registry1 = await createDefaultRegistry();
+			const registry2 = await createDefaultRegistry();
 
 			expect(registry1).not.toBe(registry2);
 		});
@@ -487,15 +535,15 @@ describe("extractors/registry", () => {
 			resetDefaultRegistry();
 		});
 
-		test("should return singleton registry", () => {
-			const registry1 = getDefaultRegistry();
-			const registry2 = getDefaultRegistry();
+		test("should return singleton registry", async () => {
+			const registry1 = await getDefaultRegistry();
+			const registry2 = await getDefaultRegistry();
 
 			expect(registry1).toBe(registry2);
 		});
 
-		test("should have default extractors", () => {
-			const registry = getDefaultRegistry();
+		test("should have default extractors", async () => {
+			const registry = await getDefaultRegistry();
 
 			expect(registry.size).toBe(3);
 			expect(registry.get("pdf")).toBeDefined();
@@ -505,10 +553,10 @@ describe("extractors/registry", () => {
 	});
 
 	describe("resetDefaultRegistry", () => {
-		test("should reset singleton to null", () => {
-			const registry1 = getDefaultRegistry();
+		test("should reset singleton to null", async () => {
+			const registry1 = await getDefaultRegistry();
 			resetDefaultRegistry();
-			const registry2 = getDefaultRegistry();
+			const registry2 = await getDefaultRegistry();
 
 			expect(registry1).not.toBe(registry2);
 		});

@@ -165,7 +165,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		}
 
 		// Get extractor registry and filter to supported files
-		const extractorRegistry = getDefaultRegistry();
+		const extractorRegistry = await getDefaultRegistry();
 		const supportedExtensions = new Set(
 			extractorRegistry.getSupportedExtensions(),
 		);
@@ -608,22 +608,48 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	 * @param id - Suggestion ID to challenge
 	 * @param hint - User's hint for re-classification
 	 * @returns Updated suggestion with previousClassification populated
+	 * @throws InboxError with USR_INVALID_ITEM_ID if suggestion not found
+	 * @throws InboxError with USR_EDIT_PROMPT_EMPTY if hint is empty
 	 */
 	async function challenge(id: string, hint: string): Promise<InboxSuggestion> {
 		await initLoggerWithNotice();
 		const cid = createCorrelationId();
 
+		// Input validation
+		const trimmedId = id?.trim() ?? "";
+		const trimmedHint = hint?.trim() ?? "";
+
+		if (!trimmedId) {
+			throw createInboxError("USR_INVALID_ITEM_ID", {
+				cid,
+				itemId: id ?? "",
+				operation: "challenge",
+			});
+		}
+
+		if (!trimmedHint) {
+			throw createInboxError("USR_EDIT_PROMPT_EMPTY", {
+				cid,
+				itemId: trimmedId,
+				operation: "challenge",
+			});
+		}
+
 		if (inboxLogger) {
-			inboxLogger.info`Challenge started id=${id} hint=${hint} cid=${cid}`;
+			inboxLogger.info`Challenge started id=${trimmedId} cid=${cid}`;
 		}
 
 		// Look up original suggestion
-		const original = suggestionCache.get(id);
+		const original = suggestionCache.get(trimmedId);
 		if (!original) {
-			throw new Error(`Suggestion not found: ${id}`);
+			throw createInboxError("USR_INVALID_ITEM_ID", {
+				cid,
+				itemId: trimmedId,
+				operation: "challenge",
+			});
 		}
 
-		// Store previous classification for audit trail
+		// Store previous classification for audit trail BEFORE any mutation
 		const previousClassification = {
 			documentType: original.suggestedNoteType,
 			confidence: original.confidence,
@@ -631,20 +657,31 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		};
 
 		// Re-process with hint using editWithPrompt
-		const updated = await editWithPrompt(id, hint);
+		// If this fails, we haven't mutated anything yet
+		let updated: InboxSuggestion;
+		try {
+			updated = await editWithPrompt(trimmedId, trimmedHint);
+		} catch (error) {
+			// Log failure without exposing full error details
+			if (inboxLogger) {
+				inboxLogger.warn`Challenge re-classification failed id=${trimmedId} cid=${cid}`;
+			}
+			throw error;
+		}
 
 		// Create final suggestion with challenge metadata
+		// Only mutate cache after successful re-classification
 		const challengedSuggestion: InboxSuggestion = {
 			...updated,
-			hint,
+			hint: trimmedHint,
 			previousClassification,
-			reason: `Challenged: "${hint}" → ${updated.reason}`,
+			reason: `Challenged: "${trimmedHint}" → ${updated.reason}`,
 		};
 
-		suggestionCache.set(id, challengedSuggestion);
+		suggestionCache.set(trimmedId, challengedSuggestion);
 
 		if (inboxLogger) {
-			inboxLogger.info`Challenge complete id=${id} oldType=${previousClassification.documentType} newType=${challengedSuggestion.suggestedNoteType} cid=${cid}`;
+			inboxLogger.info`Challenge complete id=${trimmedId} oldType=${previousClassification.documentType} newType=${challengedSuggestion.suggestedNoteType} cid=${cid}`;
 		}
 
 		return challengedSuggestion;

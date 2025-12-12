@@ -59,6 +59,7 @@ export function isMarkdownExtension(ext: string): ext is MarkdownExtension {
 
 /**
  * Extract title from frontmatter or first heading.
+ * Excludes H1 headings inside code blocks.
  */
 function extractTitle(
 	attributes: Record<string, unknown>,
@@ -69,8 +70,10 @@ function extractTitle(
 		return attributes.title.trim();
 	}
 
-	// Try first H1 heading
-	const h1Match = body.match(/^#\s+(.+)$/m);
+	// Try first H1 heading, but exclude code blocks
+	// Remove fenced code blocks before searching for H1
+	const bodyWithoutCodeBlocks = body.replace(/```[\s\S]*?```/g, "");
+	const h1Match = bodyWithoutCodeBlocks.match(/^#\s+(.+)$/m);
 	if (h1Match?.[1]) {
 		return h1Match[1].trim();
 	}
@@ -80,6 +83,7 @@ function extractTitle(
 
 /**
  * Extract tags from frontmatter.
+ * Handles both array format and comma-separated string format.
  */
 function extractTags(attributes: Record<string, unknown>): readonly string[] {
 	const tags = attributes.tags;
@@ -89,8 +93,11 @@ function extractTags(attributes: Record<string, unknown>): readonly string[] {
 	}
 
 	if (typeof tags === "string") {
-		// Handle comma-separated or space-separated tags
-		return tags.split(/[,\s]+/).filter(Boolean);
+		// Handle comma-separated tags only (not whitespace, which would split multi-word tags)
+		return tags
+			.split(",")
+			.map((t) => t.trim())
+			.filter(Boolean);
 	}
 
 	return [];
@@ -170,11 +177,21 @@ export const markdownExtractor: ContentExtractor = {
 	async extract(file: InboxFile, _cid: string): Promise<ExtractedContent> {
 		const startTime = Date.now();
 
-		// Read file content
-		const rawContent = await readFile(file.path, "utf-8");
+		// Read file content with validation
+		let rawContent: string;
+		try {
+			rawContent = await readFile(file.path, "utf-8");
+		} catch (error) {
+			throw new Error(
+				`Failed to read markdown file: ${file.path} - ${error instanceof Error ? error.message : "unknown error"}`,
+			);
+		}
+
+		// Normalize Windows line endings to Unix
+		const normalizedContent = rawContent.replace(/\r\n/g, "\n");
 
 		// Parse frontmatter
-		const { attributes, body } = parseFrontmatter(rawContent);
+		const { attributes, body } = parseFrontmatter(normalizedContent);
 		const hasFrontmatter = Object.keys(attributes).length > 0;
 
 		// Extract metadata

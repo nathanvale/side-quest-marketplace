@@ -552,7 +552,55 @@ describe("inbox/engine", () => {
 
 			await expect(
 				engine.challenge("non-existent-id", "This is a booking"),
-			).rejects.toThrow("Suggestion not found: non-existent-id");
+			).rejects.toThrow("Item ID not found");
+		});
+
+		test("should throw error when id is empty", async () => {
+			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+
+			await expect(engine.challenge("", "This is a booking")).rejects.toThrow(
+				"Item ID not found",
+			);
+		});
+
+		test("should throw error when id is whitespace only", async () => {
+			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+
+			await expect(
+				engine.challenge("   ", "This is a booking"),
+			).rejects.toThrow("Item ID not found");
+		});
+
+		test("should throw error when hint is empty", async () => {
+			// Create a file to get a valid suggestion first
+			writeFileSync(
+				join(challengeInboxPath, "test-hint.md"),
+				"# Test\nSome content",
+			);
+
+			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+			const suggestions = await engine.scan();
+			const validId = suggestions[0]?.id ?? "test";
+
+			await expect(engine.challenge(validId, "")).rejects.toThrow(
+				"Edit command requires a prompt",
+			);
+		});
+
+		test("should throw error when hint is whitespace only", async () => {
+			// Create a file to get a valid suggestion first
+			writeFileSync(
+				join(challengeInboxPath, "test-hint2.md"),
+				"# Test\nSome content",
+			);
+
+			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+			const suggestions = await engine.scan();
+			const validId = suggestions[0]?.id ?? "test";
+
+			await expect(engine.challenge(validId, "   ")).rejects.toThrow(
+				"Edit command requires a prompt",
+			);
 		});
 
 		test("should preserve previousClassification in challenged suggestion", async () => {
