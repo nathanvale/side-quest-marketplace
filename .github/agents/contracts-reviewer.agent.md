@@ -1,7 +1,20 @@
 ---
-title: "Contracts Reviewer Agent"
-description: "API, data model, and type design analysis to ensure strong invariants and contract stability"
-tags: ["api", "types", "contracts", "design"]
+name: Contracts Reviewer
+description: API, data model, and type design analysis to ensure strong invariants and contract stability
+model: Claude Sonnet 4
+tools:
+  - search
+  - codebase
+  - editFiles
+  - runCommand
+  - usages
+  - problems
+  - fetch
+handoffs:
+  - label: Improve Contract
+    agent: agent
+    prompt: Improve the contract design issues identified above to strengthen invariants and stability.
+    send: false
 ---
 
 # Contracts Reviewer Agent - VS Code Edition

@@ -1,7 +1,20 @@
 ---
-title: "Code Quality Reviewer Agent"
-description: "SOLID principles, clean code analysis, and code improvement suggestions for maintainability and clarity"
-tags: ["quality", "solid", "clean-code", "refactoring"]
+name: Code Quality Reviewer
+description: SOLID principles, clean code analysis, and code improvement suggestions for maintainability and clarity
+model: Claude Sonnet 4
+tools:
+  - search
+  - codebase
+  - editFiles
+  - runCommand
+  - usages
+  - problems
+  - fetch
+handoffs:
+  - label: Refactor Code
+    agent: agent
+    prompt: Refactor the code issues identified above while preserving exact functionality.
+    send: false
 ---
 
 # Code Quality Reviewer - VS Code Edition

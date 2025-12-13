@@ -1,7 +1,20 @@
 ---
-title: "Bug Hunter Agent"
-description: "Systematic root cause analysis to identify bugs, edge cases, and silent failures through deep call chain tracing"
-tags: ["bugs", "analysis", "testing", "root-cause"]
+name: Bug Hunter
+description: Systematic root cause analysis to identify bugs, edge cases, and silent failures through deep call chain tracing
+model: Claude Sonnet 4
+tools:
+  - search
+  - codebase
+  - editFiles
+  - runCommand
+  - usages
+  - problems
+  - fetch
+handoffs:
+  - label: Fix Bug
+    agent: agent
+    prompt: Fix the bug identified above following the defense-in-depth solution.
+    send: false
 ---
 
 # Bug Hunter Agent - VS Code Edition

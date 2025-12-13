@@ -1,7 +1,20 @@
 ---
-title: "Test Coverage Reviewer Agent"
-description: "Behavioral test coverage analysis to ensure adequate testing of critical paths and edge cases"
-tags: ["testing", "coverage", "quality-assurance"]
+name: Test Coverage Reviewer
+description: Behavioral test coverage analysis to ensure adequate testing of critical paths and edge cases
+model: Claude Sonnet 4
+tools:
+  - search
+  - codebase
+  - editFiles
+  - runCommand
+  - usages
+  - problems
+  - fetch
+handoffs:
+  - label: Add Tests
+    agent: agent
+    prompt: Add the missing tests identified above to improve coverage of critical paths.
+    send: false
 ---
 
 # Test Coverage Reviewer Agent - VS Code Edition

@@ -1,7 +1,20 @@
 ---
-title: "Security Auditor Agent"
-description: "OWASP-focused security vulnerability analysis to identify injection attacks, authentication issues, and data exposure risks"
-tags: ["security", "owasp", "vulnerabilities", "audit"]
+name: Security Auditor
+description: OWASP-focused security vulnerability analysis to identify injection attacks, authentication issues, and data exposure risks
+model: Claude Sonnet 4
+tools:
+  - search
+  - codebase
+  - editFiles
+  - runCommand
+  - usages
+  - problems
+  - fetch
+handoffs:
+  - label: Fix Vulnerability
+    agent: agent
+    prompt: Fix the security vulnerability identified above following secure coding best practices.
+    send: false
 ---
 
 # Security Auditor Agent - VS Code Edition
