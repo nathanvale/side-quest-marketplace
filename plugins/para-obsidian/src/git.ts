@@ -15,9 +15,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathExistsSync } from "@sidequest/core/fs";
 import { spawnAndCollect } from "@sidequest/core/spawn";
-import { discoverAttachments } from "./attachments";
-import type { ParaObsidianConfig } from "./config";
-import { DEFAULT_DESTINATIONS, DEFAULT_PARA_FOLDERS } from "./defaults";
+import { discoverAttachments } from "./attachments/index";
+import { DEFAULT_DESTINATIONS, DEFAULT_PARA_FOLDERS } from "./config/defaults";
+import type { ParaObsidianConfig } from "./config/index";
 import { resolveVaultPath } from "./fs";
 
 /**

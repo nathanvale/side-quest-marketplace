@@ -9,8 +9,8 @@ import {
 	createTempDir,
 	writeTestFile,
 } from "@sidequest/core/testing";
-import { loadConfig } from "./config";
-import { validateFrontmatterFile } from "./frontmatter";
+import { loadConfig } from "./config/index";
+import { validateFrontmatterFile } from "./frontmatter/index";
 
 describe("filename validation", () => {
 	let testVault: string;

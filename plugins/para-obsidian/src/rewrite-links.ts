@@ -18,7 +18,7 @@ import {
 	writeTextFileSync,
 } from "@sidequest/core/fs";
 
-import { parseFrontmatter, serializeFrontmatter } from "./frontmatter";
+import { parseFrontmatter, serializeFrontmatter } from "./frontmatter/index";
 
 /**
  * A single link rewrite mapping.

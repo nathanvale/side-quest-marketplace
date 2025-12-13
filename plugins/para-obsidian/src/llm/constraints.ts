@@ -20,8 +20,8 @@
  * @module llm/constraints
  */
 
-import type { FieldRule, FrontmatterRules } from "../config";
-import type { TemplateField } from "../templates";
+import type { FieldRule, FrontmatterRules } from "../config/index";
+import type { TemplateField } from "../templates/index";
 
 /**
  * Vault context for guiding LLM extraction.

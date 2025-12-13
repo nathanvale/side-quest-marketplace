@@ -8,7 +8,7 @@ import type {
 	FieldRule,
 	FrontmatterRules,
 	ParaObsidianConfig,
-} from "../config";
+} from "../config/index";
 
 // =============================================================================
 // Parse Types

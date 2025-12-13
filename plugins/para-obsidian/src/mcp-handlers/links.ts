@@ -14,8 +14,8 @@ import {
 	respondError,
 	respondText,
 } from "../../mcp/utils";
-import { loadConfig } from "../config";
-import { type RewriteMapping, rewriteLinks } from "../rewrite-links";
+import { loadConfig } from "../config/index";
+import { type RewriteMapping, rewriteLinks } from "../links/rewrite";
 
 // ============================================================================
 // Rewrite Links Tool

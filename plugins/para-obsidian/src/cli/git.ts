@@ -14,8 +14,8 @@ import {
 	commitNote,
 	ensureGitGuard,
 	gitStatus,
-} from "../git";
-import { type InsertMode, insertIntoNote } from "../insert";
+} from "../git/index";
+import { type InsertMode, insertIntoNote } from "../notes/insert";
 import type { CommandHandler } from "./types";
 import { normalizeFlags, parseAttachments } from "./utils";
 

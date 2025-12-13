@@ -2,7 +2,7 @@
  * Tests for extractSourceHeadings() function.
  */
 import { describe, expect, test } from "bun:test";
-import { extractSourceHeadings } from "./templates";
+import { extractSourceHeadings } from "./index";
 
 describe("extractSourceHeadings", () => {
 	test("extracts simple headings", () => {

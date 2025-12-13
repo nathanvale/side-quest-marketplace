@@ -17,7 +17,7 @@ import {
 	respondError,
 	respondText,
 } from "../../mcp/utils";
-import { loadConfig } from "../config";
+import { loadConfig } from "../config/index";
 import {
 	applyVersionPlan,
 	migrateAllTemplateVersions,
@@ -27,8 +27,8 @@ import {
 	updateFrontmatterFile,
 	type VersionPlanStatus,
 	validateFrontmatterFile,
-} from "../frontmatter";
-import { MIGRATIONS } from "../migrations";
+} from "../frontmatter/index";
+import { MIGRATIONS } from "../templates/migrations";
 
 // ============================================================================
 // Frontmatter Get Tool

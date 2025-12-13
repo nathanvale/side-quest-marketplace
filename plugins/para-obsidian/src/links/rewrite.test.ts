@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import fs from "node:fs";
-
-import { rewriteLinks } from "./rewrite-links";
-import { createTestVault, readVaultFile, writeVaultFile } from "./test-utils";
+import { createTestVault, readVaultFile, writeVaultFile } from "../test-utils";
+import { rewriteLinks } from "./rewrite";
 
 describe("rewriteLinks", () => {
 	let vault: string;

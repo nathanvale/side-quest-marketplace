@@ -11,7 +11,7 @@ import {
 	writeTextFileSync,
 } from "@sidequest/core/fs";
 import { emphasize } from "@sidequest/core/terminal";
-import type { ParaObsidianConfig } from "../config";
+import type { ParaObsidianConfig } from "../config/index";
 import {
 	applyVersionPlan,
 	migrateAllTemplateVersions,
@@ -23,9 +23,9 @@ import {
 	validateFrontmatter,
 	validateFrontmatterBulk,
 	validateFrontmatterFile,
-} from "../frontmatter";
-import { autoCommitChanges, ensureGitGuard } from "../git";
-import { MIGRATIONS } from "../migrations";
+} from "../frontmatter/index";
+import { autoCommitChanges, ensureGitGuard } from "../git/index";
+import { MIGRATIONS } from "../templates/migrations";
 import type { CommandContext, CommandResult } from "./types";
 import {
 	normalizeFlags,

@@ -2,9 +2,9 @@ import { describe, expect, it } from "bun:test";
 import path from "node:path";
 import { pathExistsSync, readTextFileSync } from "@sidequest/core/fs";
 
-import { loadConfig } from "./config";
-import { renameWithLinkRewrite } from "./links";
-import { createTestVault, writeVaultFile } from "./test-utils";
+import { loadConfig } from "../config/index";
+import { createTestVault, writeVaultFile } from "../test-utils";
+import { renameWithLinkRewrite } from "./index";
 
 describe("renameWithLinkRewrite", () => {
 	it("renames file and rewrites wikilinks", () => {

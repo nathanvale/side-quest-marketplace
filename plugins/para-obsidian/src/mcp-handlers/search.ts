@@ -14,9 +14,9 @@ import {
 	respondError,
 	respondText,
 } from "../../mcp/utils";
-import { loadConfig } from "../config";
-import { filterByFrontmatter, searchText } from "../search";
-import { semanticSearch } from "../semantic";
+import { loadConfig } from "../config/index";
+import { filterByFrontmatter, searchText } from "../search/index";
+import { semanticSearch } from "../search/semantic";
 
 // ============================================================================
 // Helper: Parse key=value pairs

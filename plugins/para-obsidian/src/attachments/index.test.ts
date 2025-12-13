@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { createTempDir, writeTestFile } from "@sidequest/core/testing";
 
-import { discoverAttachments } from "./attachments";
+import { discoverAttachments } from "./index";
 
 describe("discoverAttachments", () => {
 	it("finds sibling assets folders and stem files", () => {

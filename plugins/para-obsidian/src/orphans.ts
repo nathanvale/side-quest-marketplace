@@ -19,7 +19,7 @@ import {
 	readTextFileSync,
 } from "@sidequest/core/fs";
 
-import { parseFrontmatter } from "./frontmatter";
+import { parseFrontmatter } from "./frontmatter/index";
 import { resolveVaultPath } from "./fs";
 
 /**

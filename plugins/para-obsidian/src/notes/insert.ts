@@ -14,8 +14,8 @@ import {
 	writeTextFileSync,
 } from "@sidequest/core/fs";
 
-import type { ParaObsidianConfig } from "./config";
-import { resolveVaultPath } from "./fs";
+import type { ParaObsidianConfig } from "../config/index";
+import { resolveVaultPath } from "../fs";
 
 /**
  * Insertion mode relative to a heading's content.

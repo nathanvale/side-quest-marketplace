@@ -21,11 +21,11 @@ import {
 	respondError,
 	respondText,
 } from "../../mcp/utils";
-import { loadConfig } from "../config";
-import { deleteFile } from "../delete";
+import { loadConfig } from "../config/index";
 import { listDir, readFile } from "../fs";
-import { type InsertMode, insertIntoNote } from "../insert";
-import { renameWithLinkRewrite } from "../links";
+import { renameWithLinkRewrite } from "../links/index";
+import { deleteFile } from "../notes/delete";
+import { type InsertMode, insertIntoNote } from "../notes/insert";
 
 // ============================================================================
 // List Tool

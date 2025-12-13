@@ -17,8 +17,8 @@ import { globFiles } from "@sidequest/core/glob";
 import { ensureCommandAvailable, spawnAndCollect } from "@sidequest/core/spawn";
 import { parse } from "yaml";
 
-import type { ParaObsidianConfig } from "./config";
-import { resolveVaultPath } from "./fs";
+import type { ParaObsidianConfig } from "../config/index";
+import { resolveVaultPath } from "../fs";
 
 /**
  * Options for text search operations.

@@ -6,7 +6,7 @@
 
 import { writeTextFileSync } from "@sidequest/core/fs";
 
-import type { ParaObsidianConfig } from "../config";
+import type { ParaObsidianConfig } from "../config/index";
 import { resolveVaultPath } from "../fs";
 import { serializeFrontmatter } from "./parse";
 import type {

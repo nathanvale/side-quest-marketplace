@@ -3,8 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { ParaObsidianConfig } from "../config/index";
-import { createTestVault, initGitRepo } from "../test-utils";
 import { autoCommitChanges } from "../git";
+import { createTestVault, initGitRepo } from "../test-utils";
 
 describe("autoCommitChanges", () => {
 	it("stages and commits when autoCommit is enabled", async () => {

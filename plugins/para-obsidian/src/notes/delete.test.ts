@@ -2,9 +2,9 @@ import { describe, expect, it } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 
-import { loadConfig } from "./config";
+import { loadConfig } from "../config/index";
+import { createTestVault, writeVaultFile } from "../test-utils";
 import { deleteFile } from "./delete";
-import { createTestVault, writeVaultFile } from "./test-utils";
 
 describe("deleteFile", () => {
 	it("deletes a file when confirmed", () => {

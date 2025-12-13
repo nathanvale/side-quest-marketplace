@@ -40,8 +40,8 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
+import { executeLogger } from "../logger";
 import { createInboxError } from "./errors";
-import { executeLogger } from "./logger";
 import type { ProcessedItem, ProcessedRegistry } from "./types";
 
 // =============================================================================

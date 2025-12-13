@@ -4,7 +4,7 @@ import path from "node:path";
 import { ensureDirSync, writeTextFileSync } from "@sidequest/core/fs";
 import { spawn } from "bun";
 
-import { loadConfig } from "./config";
+import { loadConfig } from "./config/index";
 import { createTestVault } from "./test-utils";
 
 function writeTemplate(dir: string, name: string, content: string) {

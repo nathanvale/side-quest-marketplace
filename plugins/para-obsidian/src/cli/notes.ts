@@ -7,9 +7,9 @@
  */
 
 import { emphasize } from "@sidequest/core/terminal";
-import { deleteFile } from "../delete";
 import { listDir, readFile } from "../fs";
-import { autoCommitChanges, ensureGitGuard } from "../git";
+import { autoCommitChanges, ensureGitGuard } from "../git/index";
+import { deleteFile } from "../notes/delete";
 import type { CommandHandler } from "./types";
 import { normalizeFlags, parseAttachments } from "./utils";
 

@@ -15,9 +15,9 @@
  */
 
 import { emphasize } from "@sidequest/core/terminal";
-import { listTemplateVersions } from "../config";
+import { listTemplateVersions } from "../config/index";
 import { listAreas, listTags, scanTags } from "../indexer";
-import { getTemplate, getTemplateFields } from "../templates";
+import { getTemplate, getTemplateFields } from "../templates/index";
 import type { CommandContext, CommandHandler, CommandResult } from "./types";
 
 /**

@@ -14,8 +14,8 @@
  * ```
  */
 
+import { llmLogger } from "../logger";
 import type { InboxConverter } from "./converters";
-import { llmLogger } from "./logger";
 
 // Non-null assertion for logger
 const log = llmLogger as NonNullable<typeof llmLogger>;

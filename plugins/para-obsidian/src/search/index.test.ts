@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 
-import { loadConfig } from "./config";
-import { filterByFrontmatter, searchText } from "./search";
-import { createTestVault, writeVaultFile } from "./test-utils";
+import { loadConfig } from "../config/index";
+import { createTestVault, writeVaultFile } from "../test-utils";
+import { filterByFrontmatter, searchText } from "./index";
 
 describe("search", () => {
 	it("finds text with ripgrep", async () => {

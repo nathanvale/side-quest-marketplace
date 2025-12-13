@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import fs from "node:fs";
-import { loadConfig } from "./config";
+import { loadConfig } from "./config/index";
 import { buildIndex, loadIndex, saveIndex } from "./indexer";
 import { createTestVault, writeVaultFile } from "./test-utils";
 

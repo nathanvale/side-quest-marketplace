@@ -20,9 +20,9 @@ import {
 import { getErrorMessage } from "@sidequest/core/utils";
 
 import type { ParaObsidianConfig } from "./config";
-import { parseFrontmatter, serializeFrontmatter } from "./frontmatter";
+import { parseFrontmatter, serializeFrontmatter } from "./frontmatter/index";
 import { resolveVaultPath } from "./fs";
-import { insertIntoNote, replaceSectionContent } from "./insert";
+import { insertIntoNote, replaceSectionContent } from "./notes/insert";
 import {
 	applyDateSubstitutions,
 	detectTitlePromptKey,
@@ -491,4 +491,4 @@ export function replaceSections(
 }
 
 // Re-export for convenience
-export { replaceH1Title } from "./insert";
+export { replaceH1Title } from "./notes/insert";

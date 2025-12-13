@@ -1,10 +1,9 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
-
-import { loadConfig } from "./config";
+import { createTestVault } from "../test-utils";
 import { DEFAULT_FRONTMATTER_RULES, DEFAULT_SUGGESTED_TAGS } from "./defaults";
-import { createTestVault } from "./test-utils";
+import { loadConfig } from "./index";
 
 const originalEnv = { ...process.env };
 

@@ -18,8 +18,8 @@ import {
 	respondError,
 	respondText,
 } from "../../mcp/utils";
-import { listTemplateVersions, loadConfig } from "../config";
-import { getTemplate, getTemplateFields } from "../templates";
+import { listTemplateVersions, loadConfig } from "../config/index";
+import { getTemplate, getTemplateFields } from "../templates/index";
 
 // ============================================================================
 // Configuration Tool

@@ -8,7 +8,7 @@
  */
 
 import type { OutputFormat } from "@sidequest/core/terminal";
-import type { ParaObsidianConfig } from "../config";
+import type { ParaObsidianConfig } from "../config/index";
 
 /**
  * Parsed CLI flags with normalized values.

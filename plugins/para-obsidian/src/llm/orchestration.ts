@@ -16,25 +16,29 @@ import {
 	type LLMModel,
 	parseOllamaResponse,
 } from "@sidequest/core/llm";
-import type { ParaObsidianConfig } from "../config";
-import { createFromTemplate, replaceH1Title, replaceSections } from "../create";
+import type { ParaObsidianConfig } from "../config/index";
 import {
 	readFrontmatterFile,
 	updateFrontmatterFile,
 	type ValidationIssue,
 	validateFrontmatterFile,
-} from "../frontmatter";
+} from "../frontmatter/index";
 import { readFile } from "../fs";
-import { autoCommitChanges } from "../git";
+import { autoCommitChanges } from "../git/index";
 import { listAreas, listProjects, listTags } from "../indexer";
 import { DEFAULT_LLM_MODEL, type ExtractionResult } from "../llm";
+import {
+	createFromTemplate,
+	replaceH1Title,
+	replaceSections,
+} from "../notes/create";
 import {
 	extractSourceHeadings,
 	getEditableSections,
 	getTemplate,
 	getTemplateFields,
 	suggestSectionMapping,
-} from "../templates";
+} from "../templates/index";
 import { applyTitlePrefix } from "../utils/title";
 import { stripWikilinks } from "../utils/wikilinks";
 import { buildConstraintSet, type VaultContext } from "./constraints";

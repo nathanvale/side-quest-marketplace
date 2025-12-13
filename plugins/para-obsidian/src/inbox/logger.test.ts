@@ -6,9 +6,9 @@ import {
 	inboxLogger,
 	llmLogger,
 	pdfLogger,
-} from "./logger";
+} from "../logger";
 
-describe("inbox/logger", () => {
+describe("logger", () => {
 	describe("subsystem loggers", () => {
 		test("should export inbox logger", () => {
 			expect(inboxLogger).toBeDefined();

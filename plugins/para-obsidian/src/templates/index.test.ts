@@ -9,7 +9,7 @@ import {
 	getTemplateSections,
 	suggestSectionMapping,
 	type TemplateInfo,
-} from "./templates";
+} from "./index";
 
 describe("convertTemplaterFormat", () => {
 	test("converts YYYY-MM-DD to yyyy-MM-dd", () => {

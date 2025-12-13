@@ -5,14 +5,14 @@ import {
 	writeTestFile,
 } from "@sidequest/core/testing";
 
-import type { ParaObsidianConfig } from "./config";
+import type { ParaObsidianConfig } from "./config/index";
 import {
 	applyVersionPlan,
 	migrateAllTemplateVersions,
 	migrateTemplateVersion,
 	planTemplateVersionBump,
-} from "./frontmatter";
-import { MIGRATIONS } from "./migrations";
+} from "./frontmatter/index";
+import { MIGRATIONS } from "./templates/migrations";
 
 describe("migrateTemplateVersion", () => {
 	it("sets missing template_version to expected", () => {

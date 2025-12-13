@@ -17,12 +17,16 @@ import path from "node:path";
 import { pathExistsSync, readTextFileSync } from "@sidequest/core/fs";
 import { emphasize } from "@sidequest/core/terminal";
 import { getErrorMessage } from "@sidequest/core/utils";
-import { cleanBrokenLinks } from "../clean-links";
-import { autoCommitChanges, commitAllNotes, ensureGitGuard } from "../git";
-import { linkAttachmentsToNotes } from "../link-attachments";
-import { renameWithLinkRewrite } from "../links";
-import { findOrphans, formatFixCommand, suggestFixes } from "../orphans";
-import { type RewriteMapping, rewriteLinks } from "../rewrite-links";
+import { linkAttachmentsToNotes } from "../attachments/link";
+import {
+	autoCommitChanges,
+	commitAllNotes,
+	ensureGitGuard,
+} from "../git/index";
+import { cleanBrokenLinks } from "../links/clean";
+import { renameWithLinkRewrite } from "../links/index";
+import { findOrphans, formatFixCommand, suggestFixes } from "../links/orphans";
+import { type RewriteMapping, rewriteLinks } from "../links/rewrite";
 import type { CommandContext, CommandHandler, CommandResult } from "./types";
 import { normalizeFlagValue, parseAttachments, parseDirs } from "./utils";
 

@@ -5,14 +5,14 @@
 import { MetricsCollector } from "@sidequest/core/logging";
 import { color, emphasize } from "@sidequest/core/terminal";
 import { createSpinner } from "nanospinner";
+import type { ExecutionResult, InboxSuggestion } from "../inbox";
 import {
+	createInboxEngine,
 	displayResults,
 	formatSuggestionsTable,
 	runInteractiveLoop,
-} from "../inbox/cli-adapter";
-import { createInboxEngine } from "../inbox/engine";
-import { initLoggerWithNotice, logFile } from "../inbox/logger";
-import type { ExecutionResult, InboxSuggestion } from "../inbox/types";
+} from "../inbox";
+import { getLogFile, initLoggerWithNotice } from "../logger";
 import type { CommandContext, CommandResult } from "./types";
 
 type MetricsSummary = ReturnType<MetricsCollector["getSummary"]>;
@@ -36,7 +36,7 @@ function withLogContext<T extends object>(
 ) {
 	return {
 		...payload,
-		logFile,
+		logFile: getLogFile(),
 		...(metrics ? { metrics } : {}),
 	};
 }
@@ -73,7 +73,7 @@ export async function handleProcessInbox(
 
 	await initLoggerWithNotice();
 	if (!isJson) {
-		console.log(emphasize.info(`Logs: ${logFile}`));
+		console.log(emphasize.info(`Logs: ${getLogFile()}`));
 	}
 
 	// Parse process-inbox specific flags

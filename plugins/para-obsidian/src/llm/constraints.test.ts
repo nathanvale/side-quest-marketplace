@@ -5,12 +5,12 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import type { FrontmatterRules } from "../config";
+import type { FrontmatterRules } from "../config/index";
 import {
 	getTemplateFields,
 	getTemplateSections,
 	type TemplateInfo,
-} from "../templates";
+} from "../templates/index";
 import {
 	buildConstraintSet,
 	formatConstraintSet,

@@ -11,8 +11,8 @@ import path from "node:path";
 import { pathExistsSync, readDir } from "@sidequest/core/fs";
 import { spawnSyncCollect } from "@sidequest/core/spawn";
 
-import type { ParaObsidianConfig } from "./config";
-import { resolveVaultPath } from "./fs";
+import type { ParaObsidianConfig } from "../config/index";
+import { resolveVaultPath } from "../fs";
 
 /**
  * Options for deleting a file.

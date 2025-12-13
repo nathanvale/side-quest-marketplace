@@ -40,7 +40,7 @@ export {
 } from "./llm/prompt-builder";
 
 // Import default model from centralized defaults
-import { DEFAULT_MODEL } from "./defaults";
+import { DEFAULT_MODEL } from "./config/defaults";
 
 /** Default LLM model for extraction tasks (re-exported from defaults.ts) */
 export const DEFAULT_LLM_MODEL = DEFAULT_MODEL;

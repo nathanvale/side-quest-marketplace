@@ -7,8 +7,8 @@
  * @module utils/title
  */
 
-import type { ParaObsidianConfig } from "../config";
-import { DEFAULT_TITLE_PREFIXES } from "../defaults";
+import { DEFAULT_TITLE_PREFIXES } from "../config/defaults";
+import type { ParaObsidianConfig } from "../config/index";
 
 /**
  * Apply template-specific title prefix if configured, avoiding duplication.

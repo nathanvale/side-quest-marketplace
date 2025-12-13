@@ -120,3 +120,21 @@ export const executeLogger = subsystemLoggers.execute!;
  * Create a correlation ID for request tracing.
  */
 export const createCorrelationId = coreCreateCorrelationId;
+
+/**
+ * Initialize logging and emit a one-time notice about the log file location.
+ * Useful for CLI commands that want to inform users where logs are being written.
+ */
+export async function initLoggerWithNotice(): Promise<void> {
+	await initLogger();
+}
+
+/**
+ * All subsystem loggers as a typed object.
+ */
+export const loggers = {
+	inbox: inboxLogger,
+	pdf: pdfLogger,
+	llm: llmLogger,
+	execute: executeLogger,
+} as const;

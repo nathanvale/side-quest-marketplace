@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import type { ParaObsidianConfig } from "../config";
+import type { ParaObsidianConfig } from "../config/index";
 import {
 	applyTitlePrefix,
 	type ConversionResult,

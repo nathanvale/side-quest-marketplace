@@ -8,16 +8,16 @@
 
 import { parseKeyValuePairs } from "@sidequest/core/cli";
 import { emphasize } from "@sidequest/core/terminal";
-import type { ParaObsidianConfig } from "../config";
-import { createFromTemplate, replaceSections } from "../create";
-import { DEFAULT_AVAILABLE_MODELS, DEFAULT_MODEL } from "../defaults";
-import { updateFrontmatterFile } from "../frontmatter";
-import { autoCommitChanges, ensureGitGuard } from "../git";
+import { DEFAULT_AVAILABLE_MODELS, DEFAULT_MODEL } from "../config/defaults";
+import type { ParaObsidianConfig } from "../config/index";
+import { updateFrontmatterFile } from "../frontmatter/index";
+import { autoCommitChanges, ensureGitGuard } from "../git/index";
 import {
 	extractMetadata,
 	getWikilinkFieldsFromRules,
 	validateModel,
 } from "../llm";
+import { createFromTemplate, replaceSections } from "../notes/create";
 import type { CommandHandler } from "./types";
 import { normalizeFlags, parseArgOverrides, parseAttachments } from "./utils";
 

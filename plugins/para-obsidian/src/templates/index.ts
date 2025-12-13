@@ -10,9 +10,8 @@
 import path from "node:path";
 import { pathExistsSync, readDir, readTextFileSync } from "@sidequest/core/fs";
 import { addDays, format } from "date-fns";
-
-import type { ParaObsidianConfig } from "./config";
-import { DEFAULT_TEMPLATE_VERSIONS } from "./defaults";
+import { DEFAULT_TEMPLATE_VERSIONS } from "../config/defaults";
+import type { ParaObsidianConfig } from "../config/index";
 
 /**
  * Information about a template file.

@@ -39,7 +39,7 @@ import {
 	normalizeFlags,
 } from "./cli/index";
 import type { CommandContext } from "./cli/types";
-import { loadConfig } from "./config";
+import { loadConfig } from "./config/index";
 
 function printUsage(): void {
 	const lines = [

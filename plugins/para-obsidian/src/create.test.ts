@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { loadConfig, type ParaObsidianConfig } from "./config";
 import { createFromTemplate, injectSections } from "./create";
-import { parseFrontmatter } from "./frontmatter";
+import { parseFrontmatter } from "./frontmatter/index";
 import { createTestVault } from "./test-utils";
 
 function writeTemplate(dir: string, name: string, content: string) {

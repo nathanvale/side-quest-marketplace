@@ -14,7 +14,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathExistsSync, readTextFileSync } from "@sidequest/core/fs";
 import { getErrorMessage } from "@sidequest/core/utils";
-
+import type { InboxConverter } from "../inbox";
+import { DEFAULT_INBOX_CONVERTERS, mergeConverters } from "../inbox";
 import {
 	DEFAULT_AVAILABLE_MODELS,
 	DEFAULT_DESTINATIONS,
@@ -26,8 +27,6 @@ import {
 	DEFAULT_TEMPLATE_VERSIONS,
 	DEFAULT_TITLE_PREFIXES,
 } from "./defaults";
-import type { InboxConverter } from "./inbox/converters";
-import { DEFAULT_INBOX_CONVERTERS, mergeConverters } from "./inbox/converters";
 
 /**
  * Defines validation rules for frontmatter fields by note type.

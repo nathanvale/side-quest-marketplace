@@ -1,13 +1,13 @@
 #!/usr/bin/env bun
 import { MetricsCollector } from "@sidequest/core/logging";
 import { createSpinner } from "nanospinner";
+import { getLogFile, initLoggerWithNotice } from "../logger";
 import {
 	displayResults,
 	formatSuggestionsTable,
 	runInteractiveLoop,
 } from "./cli-adapter";
 import { createInboxEngine } from "./engine";
-import { initLoggerWithNotice, logFile } from "./logger";
 import type { InboxSuggestion } from "./types";
 
 async function printMetricsSummary(): Promise<void> {
@@ -44,7 +44,7 @@ async function main() {
 	console.log(`   Vault: ${vaultPath}\n`);
 
 	await initLoggerWithNotice();
-	console.log(`Logs: ${logFile}\n`);
+	console.log(`Logs: ${getLogFile()}\n`);
 
 	const engine = createInboxEngine({
 		vaultPath,

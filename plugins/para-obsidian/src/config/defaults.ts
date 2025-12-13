@@ -10,7 +10,7 @@
  *
  * @module defaults
  */
-import type { ParaObsidianConfig } from "./config";
+import type { ParaObsidianConfig } from "./index";
 
 /**
  * Default suggested tags for autocompletion and validation.

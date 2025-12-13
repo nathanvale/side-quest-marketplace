@@ -12,9 +12,9 @@ import type {
 	FieldRule,
 	FrontmatterRules,
 	ParaObsidianConfig,
-} from "../config";
+} from "../config/index";
 import { readFile, resolveVaultPath } from "../fs";
-import { getManagedFolders } from "../git";
+import { getManagedFolders } from "../git/index";
 import { parseFrontmatter } from "./parse";
 import type {
 	BulkValidationFileResult,

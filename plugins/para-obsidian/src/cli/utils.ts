@@ -7,8 +7,8 @@
  * @module cli/utils
  */
 
-import { discoverAttachments } from "../attachments";
-import type { ParaObsidianConfig } from "../config";
+import { discoverAttachments } from "../attachments/index";
+import type { ParaObsidianConfig } from "../config/index";
 import type { NormalizedFlags } from "./types";
 
 /**

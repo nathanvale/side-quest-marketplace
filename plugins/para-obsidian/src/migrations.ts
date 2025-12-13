@@ -14,7 +14,7 @@ import type {
 	MigrationFn,
 	MigrationHooks,
 	MigrationResult,
-} from "./frontmatter";
+} from "./frontmatter/index";
 
 /**
  * Ensures required tags are present in the tags array.

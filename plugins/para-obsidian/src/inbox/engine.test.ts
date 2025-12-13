@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { spawnAndCollect } from "@sidequest/core/spawn";
 import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
 import { createInboxEngine } from "./engine";
-import { hashFile } from "./registry";
+import { hashFile } from "./processed-registry";
 import type { InboxEngineConfig, InboxSuggestion } from "./types";
 
 /**

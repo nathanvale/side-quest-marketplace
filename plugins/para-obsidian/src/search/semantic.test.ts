@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import type { ParaObsidianConfig } from "./config";
+import type { ParaObsidianConfig } from "../config/index";
 import {
 	resolvePARAFolders,
 	type SemanticHit,

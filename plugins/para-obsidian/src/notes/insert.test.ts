@@ -5,7 +5,7 @@ import {
 	writeTestFile,
 } from "@sidequest/core/testing";
 
-import type { ParaObsidianConfig } from "./config";
+import type { ParaObsidianConfig } from "../config/index";
 import { insertIntoNote } from "./insert";
 
 describe("insertIntoNote", () => {

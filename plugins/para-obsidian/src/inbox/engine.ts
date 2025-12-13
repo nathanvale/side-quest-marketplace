@@ -18,11 +18,17 @@ import {
 } from "@sidequest/core/fs";
 import { globFilesSync } from "@sidequest/core/glob";
 import pLimit from "p-limit";
-import { loadConfig } from "../config";
-import { createFromTemplate, injectSections } from "../create";
-import { DEFAULT_PARA_FOLDERS } from "../defaults";
+import { DEFAULT_PARA_FOLDERS } from "../config/defaults";
+import { loadConfig } from "../config/index";
 import { resolveVaultPath } from "../fs";
-import { ensureGitGuard } from "../git";
+import { ensureGitGuard } from "../git/index";
+import {
+	createCorrelationId,
+	executeLogger,
+	inboxLogger,
+	initLoggerWithNotice,
+} from "../logger";
+import { createFromTemplate, injectSections } from "../notes/create";
 import {
 	buildSuggestion,
 	DEFAULT_INBOX_CONVERTERS,
@@ -42,17 +48,11 @@ import {
 	parseDetectionResponse,
 } from "./llm-detection";
 import {
-	createCorrelationId,
-	executeLogger,
-	inboxLogger,
-	initLoggerWithNotice,
-} from "./logger";
-import {
 	checkPdfToText,
 	combineHeuristics,
 	extractPdfText,
 } from "./pdf-processor";
-import { createRegistry, hashFile } from "./registry";
+import { createRegistry, hashFile } from "./processed-registry";
 import type {
 	ExecuteOptions,
 	ExecutionResult,

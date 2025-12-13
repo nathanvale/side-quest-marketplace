@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { createTempDir, writeTestFile } from "@sidequest/core/testing";
 
-import type { ParaObsidianConfig } from "./config";
-import { planTemplateVersionBump } from "./frontmatter";
+import type { ParaObsidianConfig } from "./config/index";
+import { planTemplateVersionBump } from "./frontmatter/index";
 
 describe("planTemplateVersionBump", () => {
 	it("summarizes outdated and current template versions by type", () => {

@@ -9,7 +9,7 @@ import { readTextFileSync, writeTextFileSync } from "@sidequest/core/fs";
 import { globFilesSync } from "@sidequest/core/glob";
 import { getErrorMessage } from "@sidequest/core/utils";
 
-import type { ParaObsidianConfig } from "../config";
+import type { ParaObsidianConfig } from "../config/index";
 import { resolveVaultPath } from "../fs";
 import { parseFrontmatter, serializeFrontmatter } from "./parse";
 import type {

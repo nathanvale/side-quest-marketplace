@@ -23,10 +23,10 @@
 import { basename } from "node:path";
 import { stat } from "@sidequest/core/fs";
 import { $ } from "bun";
+import { pdfLogger } from "../logger";
 import type { InboxConverter } from "./converters";
 import { findBestConverter, scoreFilename } from "./converters";
 import { createInboxError, InboxError } from "./errors";
-import { pdfLogger } from "./logger";
 
 // Non-null assertion for logger (we know it exists since we defined the subsystem)
 const log = pdfLogger as NonNullable<typeof pdfLogger>;

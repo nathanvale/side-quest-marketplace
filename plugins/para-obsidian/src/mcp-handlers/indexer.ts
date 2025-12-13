@@ -14,7 +14,7 @@ import {
 	respondError,
 	respondText,
 } from "../../mcp/utils";
-import { loadConfig } from "../config";
+import { loadConfig } from "../config/index";
 import {
 	buildIndex,
 	listAreas,
