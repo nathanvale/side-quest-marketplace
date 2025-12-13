@@ -25,7 +25,12 @@ import { stat } from "@sidequest/core/fs";
 import { $ } from "bun";
 import { pdfLogger } from "../logger";
 import type { InboxConverter } from "./converters";
-import { findBestConverter, scoreFilename } from "./converters";
+import {
+	DEFAULT_INBOX_CONVERTERS,
+	findBestConverter,
+	scoreContent,
+	scoreFilename,
+} from "./converters";
 import { createInboxError, InboxError } from "./errors";
 
 // Non-null assertion for logger (we know it exists since we defined the subsystem)
@@ -73,78 +78,6 @@ export interface HeuristicResult {
 	/** Patterns that matched */
 	readonly matchedPatterns?: string[];
 }
-
-// =============================================================================
-// Filename Patterns (DEPRECATED - Use converters instead)
-// =============================================================================
-
-/**
- * Patterns for detecting document type from filename.
- * Maps pattern to document type.
- *
- * @deprecated Use converters from ./converters.ts instead. This is kept for backwards compatibility.
- */
-const FILENAME_PATTERNS: ReadonlyArray<{
-	pattern: RegExp;
-	type: string;
-	weight: number;
-}> = [
-	// Invoice patterns
-	{ pattern: /invoice/i, type: "invoice", weight: 1.0 },
-	{ pattern: /tax[_-]?invoice/i, type: "invoice", weight: 1.0 },
-	{ pattern: /receipt/i, type: "invoice", weight: 0.8 },
-	{ pattern: /bill/i, type: "invoice", weight: 0.6 },
-	{ pattern: /statement/i, type: "invoice", weight: 0.5 },
-
-	// Booking patterns
-	{ pattern: /booking/i, type: "booking", weight: 1.0 },
-	{ pattern: /reservation/i, type: "booking", weight: 1.0 },
-	{ pattern: /confirmation/i, type: "booking", weight: 0.7 },
-	{ pattern: /itinerary/i, type: "booking", weight: 0.9 },
-	{ pattern: /e[_-]?ticket/i, type: "booking", weight: 1.0 },
-	{ pattern: /boarding[_-]?pass/i, type: "booking", weight: 1.0 },
-	{ pattern: /flight/i, type: "booking", weight: 0.8 },
-	{ pattern: /hotel/i, type: "booking", weight: 0.7 },
-];
-
-// =============================================================================
-// Content Markers (DEPRECATED - Use converters instead)
-// =============================================================================
-
-/**
- * Markers for detecting document type from content.
- *
- * @deprecated Use converters from ./converters.ts instead. This is kept for backwards compatibility.
- */
-const CONTENT_MARKERS: ReadonlyArray<{
-	marker: string | RegExp;
-	type: string;
-	weight: number;
-}> = [
-	// Invoice markers
-	{ marker: /TAX\s+INVOICE/i, type: "invoice", weight: 1.0 },
-	{ marker: /Invoice\s+Number/i, type: "invoice", weight: 0.9 },
-	{ marker: /Invoice\s+#/i, type: "invoice", weight: 0.9 },
-	{ marker: /Amount\s+Due/i, type: "invoice", weight: 0.7 },
-	{ marker: /Total\s+Amount/i, type: "invoice", weight: 0.6 },
-	{ marker: /ABN[:.\s]/i, type: "invoice", weight: 0.8 }, // Australian Business Number
-	{ marker: /GST/i, type: "invoice", weight: 0.5 },
-	{ marker: /Subtotal/i, type: "invoice", weight: 0.4 },
-
-	// Booking markers
-	{ marker: /Flight\s+Confirmation/i, type: "booking", weight: 1.0 },
-	{ marker: /Booking\s+Reference/i, type: "booking", weight: 1.0 },
-	{ marker: /Confirmation\s+Number/i, type: "booking", weight: 0.9 },
-	{ marker: /Hotel\s+Reservation/i, type: "booking", weight: 1.0 },
-	{ marker: /Check-?in/i, type: "booking", weight: 0.6 },
-	{ marker: /Check-?out/i, type: "booking", weight: 0.6 },
-	{ marker: /Passenger/i, type: "booking", weight: 0.7 },
-	{ marker: /Departure/i, type: "booking", weight: 0.5 },
-	{ marker: /Arrival/i, type: "booking", weight: 0.5 },
-	{ marker: /E-?Ticket/i, type: "booking", weight: 0.9 },
-	{ marker: /Boarding\s+Pass/i, type: "booking", weight: 1.0 },
-	{ marker: /Flight\s+Number/i, type: "booking", weight: 0.8 },
-];
 
 // =============================================================================
 // pdftotext Check
@@ -401,150 +334,87 @@ export function detectWithConverters(
 // =============================================================================
 
 /**
- * Detect document type from filename patterns.
+ * Detect document type from filename patterns using modern converter system.
  *
  * @param filename - Filename to analyze (with or without path)
- * @param converters - Optional array of converters to use instead of legacy patterns
+ * @param converters - Optional array of converters to use (default: DEFAULT_INBOX_CONVERTERS)
  * @returns Detection result with type and confidence
  */
 export function detectByFilename(
 	filename: string,
 	converters?: readonly InboxConverter[],
 ): HeuristicResult {
-	// If converters provided, use them
-	if (converters) {
-		const name = basename(filename);
-		let bestScore = 0;
-		let bestType = "";
-		const matchedPatterns: string[] = [];
+	// Use default converters if none provided
+	const activeConverters = converters ?? DEFAULT_INBOX_CONVERTERS;
+	const name = basename(filename);
+	let bestScore = 0;
+	let bestType = "";
+	const matchedPatterns: string[] = [];
 
-		for (const converter of converters) {
-			const score = scoreFilename(name, converter.heuristics.filenamePatterns);
-			if (score > bestScore) {
-				bestScore = score;
-				bestType = converter.id;
-				// Collect pattern info for debugging
-				matchedPatterns.push(`${converter.id}(${score.toFixed(2)})`);
-			}
-		}
-
-		if (bestScore === 0) {
-			return { detected: false, confidence: 0 };
-		}
-
-		// Normalize confidence (0-1 scale)
-		const confidence = Math.min(bestScore, 1.0);
-
-		return {
-			detected: true,
-			suggestedType: bestType,
-			confidence,
-			matchedPatterns,
-		};
-	}
-
-	// Legacy pattern-based detection
-	const name = basename(filename).toLowerCase();
-	const matches: Array<{ type: string; weight: number; pattern: string }> = [];
-
-	for (const { pattern, type, weight } of FILENAME_PATTERNS) {
-		if (pattern.test(name)) {
-			matches.push({ type, weight, pattern: pattern.source });
+	for (const converter of activeConverters) {
+		const score = scoreFilename(name, converter.heuristics.filenamePatterns);
+		if (score > bestScore) {
+			bestScore = score;
+			bestType = converter.id;
+			// Collect pattern info for debugging
+			matchedPatterns.push(`${converter.id}(${score.toFixed(2)})`);
 		}
 	}
 
-	if (matches.length === 0) {
+	if (bestScore === 0) {
 		return { detected: false, confidence: 0 };
 	}
 
-	// Group by type and sum weights
-	const typeScores = new Map<string, number>();
-	for (const match of matches) {
-		const current = typeScores.get(match.type) ?? 0;
-		typeScores.set(match.type, current + match.weight);
-	}
-
-	// Find best type
-	let bestType = "";
-	let bestScore = 0;
-	for (const [type, score] of typeScores) {
-		if (score > bestScore) {
-			bestType = type;
-			bestScore = score;
-		}
-	}
-
-	// Normalize confidence (cap at 1.0)
-	const confidence = Math.min(bestScore / 2, 1.0);
+	// Normalize confidence (0-1 scale)
+	const confidence = Math.min(bestScore, 1.0);
 
 	return {
 		detected: true,
 		suggestedType: bestType,
 		confidence,
-		matchedPatterns: matches.map((m) => m.pattern),
+		matchedPatterns,
 	};
 }
 
 /**
- * Detect document type from content markers.
+ * Detect document type from content markers using modern converter system.
  *
  * @param content - Text content to analyze
+ * @param converters - Optional array of converters to use (default: DEFAULT_INBOX_CONVERTERS)
  * @returns Detection result with type and confidence
  */
-export function detectByContent(content: string): HeuristicResult {
-	const matches: Array<{ type: string; weight: number; marker: string }> = [];
-	let hasStrongSignal = false;
+export function detectByContent(
+	content: string,
+	converters?: readonly InboxConverter[],
+): HeuristicResult {
+	// Use default converters if none provided
+	const activeConverters = converters ?? DEFAULT_INBOX_CONVERTERS;
+	let bestScore = 0;
+	let bestType = "";
+	const matchedPatterns: string[] = [];
 
-	for (const { marker, type, weight } of CONTENT_MARKERS) {
-		const regex = typeof marker === "string" ? new RegExp(marker, "i") : marker;
-		const match = content.match(regex);
-		if (match) {
-			matches.push({
-				type,
-				weight,
-				marker: match[0],
-			});
-			if (weight >= 0.9) {
-				hasStrongSignal = true;
-			}
+	for (const converter of activeConverters) {
+		const score = scoreContent(content, converter.heuristics.contentMarkers);
+		if (score > bestScore) {
+			bestScore = score;
+			bestType = converter.id;
+			// Collect pattern info for debugging
+			matchedPatterns.push(`${converter.id}(${score.toFixed(2)})`);
 		}
 	}
 
-	if (matches.length === 0) {
+	if (bestScore === 0) {
 		return { detected: false, confidence: 0 };
 	}
 
-	// Group by type and sum weights
-	const typeScores = new Map<string, number>();
-	for (const match of matches) {
-		const current = typeScores.get(match.type) ?? 0;
-		typeScores.set(match.type, current + match.weight);
-	}
-
-	// Find best type
-	let bestType = "";
-	let bestScore = 0;
-	for (const [type, score] of typeScores) {
-		if (score > bestScore) {
-			bestType = type;
-			bestScore = score;
-		}
-	}
-
-	// Confidence based on match count and weights
-	// More markers = higher confidence
-	let confidence = Math.min(bestScore / 3, 1.0);
-
-	// CRITICAL: Penalize confidence if no strong signal present
-	if (!hasStrongSignal && confidence > 0.5) {
-		confidence *= 0.6; // 40% penalty for weak-only detection
-	}
+	// Normalize confidence (0-1 scale)
+	const confidence = Math.min(bestScore, 1.0);
 
 	return {
 		detected: true,
 		suggestedType: bestType,
 		confidence,
-		matchedPatterns: matches.map((m) => m.marker),
+		matchedPatterns,
 	};
 }
 
