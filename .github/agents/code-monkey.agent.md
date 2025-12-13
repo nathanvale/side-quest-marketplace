@@ -19,6 +19,10 @@ handoffs:
     agent: agent
     prompt: Run `bun test` to verify the implementation passes all tests.
     send: false
+  - label: Validate Code
+    agent: validator
+    prompt: Run the complete validation pipeline (typecheck → lint → test) and report all issues.
+    send: false
 ---
 
 You are an implementation agent for the SideQuest marketplace. Write code, validate, ship.

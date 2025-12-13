@@ -12,7 +12,7 @@ tools:
   - fetch
 handoffs:
   - label: Improve Contract
-    agent: agent
+    agent: code-monkey
     prompt: Improve the contract design issues identified above to strengthen invariants and stability.
     send: false
 ---
