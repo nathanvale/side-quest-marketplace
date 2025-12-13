@@ -4,7 +4,7 @@
  * Pure utility functions used by the inbox processing engine.
  * These have no dependencies on engine state and can be reused.
  *
- * @module inbox/engine-utils
+ * @module inbox/core/engine-utils
  */
 
 import { basename, extname } from "node:path";

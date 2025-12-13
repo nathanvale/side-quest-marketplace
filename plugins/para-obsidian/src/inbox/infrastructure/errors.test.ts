@@ -7,7 +7,7 @@ import {
 	isUserError,
 	USER_MESSAGES,
 } from "./errors";
-import type { ErrorCategory, ErrorCode } from "./types";
+import type { ErrorCategory, ErrorCode } from "../types";
 
 describe("inbox/errors", () => {
 	describe("InboxError", () => {

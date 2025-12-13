@@ -34,8 +34,8 @@ import {
 	DEFAULT_INBOX_CONVERTERS,
 	mapFieldsToTemplate,
 } from "./converters";
-import { generateFilename, generateUniquePath } from "./engine-utils";
-import { createInboxError } from "./errors";
+import { generateFilename, generateUniquePath } from "./core/engine-utils";
+import { createInboxError } from "./infrastructure/errors";
 import {
 	createInboxFile,
 	getDefaultRegistry,
@@ -51,8 +51,8 @@ import {
 	checkPdfToText,
 	combineHeuristics,
 	extractPdfText,
-} from "./pdf-processor";
-import { createRegistry, hashFile } from "./processed-registry";
+} from "./detection/pdf-processor";
+import { createRegistry, hashFile } from "./infrastructure/processed-registry";
 import type {
 	ExecuteOptions,
 	ExecutionResult,

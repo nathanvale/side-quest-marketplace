@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { InboxError } from "./errors";
+import { InboxError } from "../infrastructure/errors";
 import {
 	checkPdfToText,
 	detectByContent,

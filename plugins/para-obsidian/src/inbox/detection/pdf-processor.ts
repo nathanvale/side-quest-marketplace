@@ -23,15 +23,15 @@
 import { basename } from "node:path";
 import { stat } from "@sidequest/core/fs";
 import { $ } from "bun";
-import { pdfLogger } from "../logger";
-import type { InboxConverter } from "./converters";
+import { pdfLogger } from "../../logger";
+import type { InboxConverter } from "../converters";
 import {
 	DEFAULT_INBOX_CONVERTERS,
 	findBestConverter,
 	scoreContent,
 	scoreFilename,
-} from "./converters";
-import { createInboxError, InboxError } from "./errors";
+} from "../converters";
+import { createInboxError, InboxError } from "../infrastructure/errors";
 
 // Non-null assertion for logger (we know it exists since we defined the subsystem)
 const log = pdfLogger as NonNullable<typeof pdfLogger>;
@@ -48,6 +48,12 @@ const MAX_TEXT_SIZE = 10 * 1024 * 1024;
 
 /** Timeout for pdftotext extraction in milliseconds (30 seconds) */
 const EXTRACTION_TIMEOUT = 30_000;
+
+/** Chunk size for streaming text extraction (1MB) */
+const STREAM_CHUNK_SIZE = 1024 * 1024;
+
+/** Memory pressure warning threshold (8MB) */
+const MEMORY_WARNING_THRESHOLD = 8 * 1024 * 1024;
 
 // =============================================================================
 // Types
@@ -77,6 +83,22 @@ export interface HeuristicResult {
 
 	/** Patterns that matched */
 	readonly matchedPatterns?: string[];
+}
+
+/**
+ * Performance metrics for PDF extraction.
+ */
+export interface ExtractionMetrics {
+	/** Extraction duration in milliseconds */
+	readonly durationMs: number;
+	/** Original file size in bytes */
+	readonly fileSizeBytes: number;
+	/** Extracted text length in characters */
+	readonly textLength: number;
+	/** Peak memory usage during extraction */
+	readonly peakMemoryBytes: number;
+	/** Whether memory pressure was detected */
+	readonly memoryPressure: boolean;
 }
 
 // =============================================================================
@@ -210,6 +232,8 @@ export async function extractPdfText(
 		const reader = proc.stdout.getReader();
 		const chunks: Uint8Array[] = [];
 		let totalSize = 0;
+		let peakMemory = 0;
+		let memoryPressure = false;
 
 		try {
 			while (true) {
@@ -217,6 +241,14 @@ export async function extractPdfText(
 				if (done) break;
 
 				totalSize += value.length;
+				peakMemory = Math.max(peakMemory, totalSize);
+
+				// Check for memory pressure
+				if (totalSize > MEMORY_WARNING_THRESHOLD) {
+					memoryPressure = true;
+					log.warn`PDF extraction memory pressure detected size=${totalSize} threshold=${MEMORY_WARNING_THRESHOLD} ${cid}`;
+				}
+
 				if (totalSize > MAX_TEXT_SIZE) {
 					throw createInboxError("EXT_PDF_TOO_LARGE", {
 						cid,
@@ -227,6 +259,11 @@ export async function extractPdfText(
 					});
 				}
 				chunks.push(value);
+
+				// Periodic progress logging for large files
+				if (chunks.length % 100 === 0 && totalSize > STREAM_CHUNK_SIZE) {
+					log.debug`PDF extraction progress size=${totalSize} chunks=${chunks.length} ${cid}`;
+				}
 			}
 		} finally {
 			reader.releaseLock();
@@ -244,12 +281,22 @@ export async function extractPdfText(
 		const text = new TextDecoder().decode(combined).trim();
 		const durationMs = Date.now() - startTime;
 
-		log.info`PDF extraction complete source=${basename(filePath)} textLength=${text.length} durationMs=${durationMs} ${cid}`;
+		// Create performance metrics
+		const metrics: ExtractionMetrics = {
+			durationMs,
+			fileSizeBytes: preExtractionStats.size,
+			textLength: text.length,
+			peakMemoryBytes: peakMemory,
+			memoryPressure,
+		};
+
+		log.info`PDF extraction complete source=${basename(filePath)} textLength=${text.length} durationMs=${durationMs} peakMemory=${peakMemory} pressure=${memoryPressure} ${cid}`;
 
 		if (text.length === 0) {
 			throw createInboxError("EXT_PDF_EMPTY", {
 				cid,
 				source: filePath,
+				metrics,
 			});
 		}
 
@@ -339,19 +386,31 @@ export function detectWithConverters(
  * @param filename - Filename to analyze (with or without path)
  * @param converters - Optional array of converters to use (default: DEFAULT_INBOX_CONVERTERS)
  * @returns Detection result with type and confidence
+ * @throws Error if filename is empty or invalid
  */
 export function detectByFilename(
 	filename: string,
 	converters?: readonly InboxConverter[],
 ): HeuristicResult {
+	// Input validation
+	if (!filename || typeof filename !== "string" || filename.trim().length === 0) {
+		throw new Error("Invalid filename: must be a non-empty string");
+	}
+
 	// Use default converters if none provided
 	const activeConverters = converters ?? DEFAULT_INBOX_CONVERTERS;
-	const name = basename(filename);
+	if (activeConverters.length === 0) {
+		return { detected: false, confidence: 0 };
+	}
+
+	const name = basename(filename.trim());
 	let bestScore = 0;
 	let bestType = "";
 	const matchedPatterns: string[] = [];
 
 	for (const converter of activeConverters) {
+		if (!converter?.heuristics?.filenamePatterns) continue;
+
 		const score = scoreFilename(name, converter.heuristics.filenamePatterns);
 		if (score > bestScore) {
 			bestScore = score;
@@ -382,19 +441,36 @@ export function detectByFilename(
  * @param content - Text content to analyze
  * @param converters - Optional array of converters to use (default: DEFAULT_INBOX_CONVERTERS)
  * @returns Detection result with type and confidence
+ * @throws Error if content is invalid
  */
 export function detectByContent(
 	content: string,
 	converters?: readonly InboxConverter[],
 ): HeuristicResult {
+	// Input validation
+	if (typeof content !== "string") {
+		throw new Error("Invalid content: must be a string");
+	}
+
 	// Use default converters if none provided
 	const activeConverters = converters ?? DEFAULT_INBOX_CONVERTERS;
+	if (activeConverters.length === 0 || content.length === 0) {
+		return { detected: false, confidence: 0 };
+	}
+
+	// Optimize for large content by limiting analysis to first portion
+	const analysisContent = content.length > 10000
+		? content.slice(0, 10000) // First 10KB should contain relevant markers
+		: content;
+
 	let bestScore = 0;
 	let bestType = "";
 	const matchedPatterns: string[] = [];
 
 	for (const converter of activeConverters) {
-		const score = scoreContent(content, converter.heuristics.contentMarkers);
+		if (!converter?.heuristics?.contentMarkers) continue;
+
+		const score = scoreContent(analysisContent, converter.heuristics.contentMarkers);
 		if (score > bestScore) {
 			bestScore = score;
 			bestType = converter.id;

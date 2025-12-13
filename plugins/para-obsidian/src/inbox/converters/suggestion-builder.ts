@@ -9,7 +9,7 @@
  */
 
 import { join } from "node:path";
-import { generateTitle } from "../engine-utils";
+import { generateTitle } from "../core/engine-utils";
 import type { DocumentTypeResult } from "../llm-detection";
 import type {
 	Confidence,

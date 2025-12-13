@@ -48,9 +48,9 @@ export {
 	generateFilename,
 	generateTitle,
 	generateUniquePath,
-} from "./engine-utils";
+} from "./core/engine-utils";
 // Errors
-export { createInboxError, InboxError } from "./errors";
+export { createInboxError, InboxError } from "./infrastructure/errors";
 export type {
 	ContentExtractor,
 	ExtractedContent,
@@ -100,10 +100,10 @@ export {
 	checkPdfToText,
 	combineHeuristics,
 	extractPdfText,
-} from "./pdf-processor";
-export type { RegistryManager } from "./processed-registry";
+} from "./detection/pdf-processor";
+export type { RegistryManager } from "./infrastructure/processed-registry";
 // Processed Registry
-export { createRegistry, hashFile } from "./processed-registry";
+export { createRegistry, hashFile } from "./infrastructure/processed-registry";
 // Types
 export type {
 	Confidence,

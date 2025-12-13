@@ -40,9 +40,9 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
-import { executeLogger } from "../logger";
+import { executeLogger } from "../../logger";
 import { createInboxError } from "./errors";
-import type { ProcessedItem, ProcessedRegistry } from "./types";
+import type { ProcessedItem, ProcessedRegistry } from "../types";
 
 // =============================================================================
 // Constants

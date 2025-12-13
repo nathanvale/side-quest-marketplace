@@ -41,7 +41,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { executeLogger } from "../logger";
-import { createInboxError } from "./errors";
+import { createInboxError } from "./infrastructure/errors";
 import type { ProcessedItem, ProcessedRegistry } from "./types";
 
 // =============================================================================

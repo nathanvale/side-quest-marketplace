@@ -8,7 +8,7 @@
  * - User-friendly messages for terminal display
  */
 
-import type { ErrorCategory, ErrorCode, ErrorContext } from "./types";
+import type { ErrorCategory, ErrorCode, ErrorContext } from "../types";
 
 // =============================================================================
 // Error Metadata Mapping
