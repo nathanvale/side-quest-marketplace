@@ -49,42 +49,85 @@ para-obsidian/
 │   ├── cli/                   # Modular CLI handlers (12 modules)
 │   │   ├── config.ts         # Config display and management
 │   │   ├── create.ts         # Note creation with AI extraction
-│   │   ├── frontmatter.ts    # Frontmatter operations (get/set/validate/migrate)
+│   │   ├── frontmatter/      # Frontmatter operations (7 submodules)
+│   │   │   ├── get.ts        # Get frontmatter values
+│   │   │   ├── set.ts        # Set/edit frontmatter
+│   │   │   ├── validate.ts   # Validation commands
+│   │   │   ├── migrate.ts    # Migration commands
+│   │   │   ├── plan.ts       # Plan commands
+│   │   │   ├── hints.ts      # Field suggestion helpers
+│   │   │   └── index.ts      # Main dispatcher
 │   │   ├── git.ts            # Git auto-commit integration
 │   │   ├── links.ts          # Link rewriting (rename/move operations)
 │   │   ├── notes.ts          # Basic note operations (list/read)
 │   │   ├── process-inbox.ts  # Inbox processing entry point
 │   │   ├── search.ts         # Search operations (text/semantic)
 │   │   └── utils.ts          # Shared CLI utilities
-│   ├── inbox/                 # Inbox processing framework (246 tests)
-│   │   ├── engine.ts         # Core processing engine
-│   │   ├── registry.ts       # Idempotency tracking (SHA256, file locking)
-│   │   ├── pdf-processor.ts  # PDF extraction + heuristics
-│   │   ├── llm-detection.ts  # AI type detection + field extraction
-│   │   ├── cli-adapter.ts    # Interactive terminal UI
-│   │   ├── errors.ts         # Error taxonomy (23 error codes)
-│   │   ├── converters/       # Format converters (extensible system)
-│   │   └── CLAUDE.md         # Inbox module documentation
+│   ├── inbox/                 # Inbox processing framework (479 tests)
+│   │   ├── classify/         # Document classification & converters
+│   │   │   ├── converters/   # Template-specific converters
+│   │   │   ├── detection/    # PDF extraction + heuristics
+│   │   │   └── llm-classifier.ts # AI type detection + field extraction
+│   │   ├── core/             # Core engine + utilities
+│   │   │   ├── engine.ts     # Processing engine (crash-safe atomic operations)
+│   │   │   └── engine-utils.ts # Filename generation utilities
+│   │   ├── execute/          # Suggestion execution
+│   │   │   ├── executor.ts   # Main execution coordinator
+│   │   │   ├── note-creator.ts # Note creation from suggestions
+│   │   │   └── attachment-mover.ts # Attachment handling
+│   │   ├── registry/         # Idempotency tracking
+│   │   │   └── processed-registry.ts # SHA256-based deduplication
+│   │   ├── scan/             # Content extraction
+│   │   │   └── extractors/   # Pluggable extractor system
+│   │   ├── shared/           # Shared utilities
+│   │   │   ├── errors.ts     # Error taxonomy (23 error codes)
+│   │   │   └── logger.ts     # Structured logging
+│   │   └── ui/               # User interface
+│   │       └── cli-adapter.ts # Interactive terminal UI
+│   ├── attachments/           # Attachment operations
+│   │   ├── index.ts          # Attachment discovery and linking
+│   │   └── link.ts           # Attachment link utilities
+│   ├── config/                # Configuration management
+│   │   ├── index.ts          # Configuration loader
+│   │   └── defaults.ts       # Default templates and rules
+│   ├── frontmatter/           # Frontmatter operations
+│   │   ├── parse.ts          # YAML frontmatter parsing
+│   │   ├── validate.ts       # Frontmatter validation
+│   │   ├── migrate.ts        # Template migration
+│   │   └── update.ts         # Frontmatter updates
+│   ├── git/                   # Git operations
+│   │   └── index.ts          # Git guard and auto-commit
+│   ├── links/                 # Link operations
+│   │   ├── index.ts          # Link utilities
+│   │   ├── rewrite.ts        # Link rewriting for rename/move
+│   │   ├── orphans.ts        # Orphaned link detection
+│   │   └── clean.ts          # Link cleanup
 │   ├── llm/                   # LLM integration utilities
+│   │   ├── client.ts         # LLM client abstraction
 │   │   ├── orchestration.ts  # AI workflow orchestration
 │   │   ├── prompt-builder.ts # Structured prompt generation
 │   │   └── constraints.ts    # Field constraints for extraction
-│   ├── attachments.ts         # Attachment discovery and linking
-│   ├── config.ts              # Configuration loader
-│   ├── create.ts              # Note creation engine
-│   ├── defaults.ts            # Default templates and rules
-│   ├── delete.ts              # Safe note deletion
-│   ├── frontmatter.ts         # Frontmatter parsing/validation (41KB, core module)
-│   ├── git.ts                 # Git operations
-│   ├── indexer.ts             # Lightweight vault indexing
-│   ├── insert.ts              # Content insertion (heading/block)
-│   ├── links.ts               # Link utilities
-│   ├── migrations.ts          # Template versioning and migration
-│   ├── orphans.ts             # Orphaned note detection
-│   ├── rewrite-links.ts       # Link rewriting for rename/move
-│   ├── search.ts              # Text search with filters
-│   ├── semantic.ts            # Kit-powered semantic search
-│   └── templates.ts           # Template loading and processing
+│   ├── notes/                 # Note operations
+│   │   ├── create.ts         # Note creation engine
+│   │   ├── delete.ts         # Safe note deletion
+│   │   └── insert.ts         # Content insertion (heading/block)
+│   ├── search/                # Search operations
+│   │   ├── index.ts          # Text search with filters
+│   │   ├── indexer.ts        # Lightweight vault indexing
+│   │   └── semantic.ts       # Kit-powered semantic search
+│   ├── shared/                # Shared utilities
+│   │   ├── fs.ts             # Filesystem utilities
+│   │   └── logger.ts         # Structured logging
+│   ├── templates/             # Template operations
+│   │   ├── index.ts          # Template loading and processing
+│   │   └── migrations.ts     # Template versioning and migration
+│   ├── testing/               # Test utilities
+│   │   └── utils.ts          # Test helpers
+│   ├── utils/                 # General utilities
+│   │   ├── title.ts          # Title formatting
+│   │   └── wikilinks.ts      # Wikilink parsing
+│   ├── cli.ts                 # Main CLI entry point
+│   └── indexer.ts             # Vault indexer (deprecated, use search/indexer.ts)
 ├── mcp/
 │   ├── index.ts               # MCP server (20 tools, 78KB)
 │   ├── frontmatter-hints.ts   # AI-powered frontmatter suggestions
