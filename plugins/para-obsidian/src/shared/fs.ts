@@ -115,3 +115,81 @@ export function readFile(vault: string, inputPath: string): string {
 	}
 	return readTextFileSync(absolute);
 }
+
+/**
+ * Options for directory walking.
+ */
+export interface WalkDirectoryOptions {
+	/** Directory names to skip (e.g., ["node_modules", ".git"]) */
+	readonly skipDirs?: ReadonlyArray<string>;
+	/** Whether to skip hidden files/directories (starting with "."). Defaults to true. */
+	readonly skipHidden?: boolean;
+}
+
+/**
+ * Callback function for file visitor.
+ * @param fullPath - Absolute path to the file
+ * @param relativePath - Path relative to the root directory
+ * @param entry - Filename (basename)
+ */
+export type FileVisitor = (
+	fullPath: string,
+	relativePath: string,
+	entry: string,
+) => void;
+
+/**
+ * Recursively walks a directory tree and calls a visitor function for each file.
+ *
+ * This is a generic utility to avoid duplicating recursive directory walking
+ * logic across multiple modules. It handles:
+ * - Skipping hidden files/directories (configurable)
+ * - Skipping specified directories
+ * - Error handling for unreadable directories
+ *
+ * @param rootDir - Absolute path to the root directory to walk
+ * @param onFile - Callback function called for each file found
+ * @param options - Walk options (skipDirs, skipHidden)
+ *
+ * @example
+ * ```typescript
+ * const files: string[] = [];
+ * walkDirectory('/vault', (fullPath, relativePath, entry) => {
+ *   if (entry.endsWith('.md')) {
+ *     files.push(relativePath);
+ *   }
+ * }, { skipDirs: ['Attachments'] });
+ * ```
+ */
+export function walkDirectory(
+	rootDir: string,
+	onFile: FileVisitor,
+	options: WalkDirectoryOptions = {},
+): void {
+	const { skipDirs = [], skipHidden = true } = options;
+	const skipDirSet = new Set(skipDirs);
+
+	function walk(currentDir: string): void {
+		try {
+			for (const entry of readDir(currentDir)) {
+				// Skip hidden files/folders if configured
+				if (skipHidden && entry.startsWith(".")) continue;
+
+				// Skip specified directories
+				if (skipDirSet.has(entry)) continue;
+
+				const fullPath = path.join(currentDir, entry);
+				if (isDirectorySync(fullPath)) {
+					walk(fullPath);
+				} else if (isFileSync(fullPath)) {
+					const relativePath = path.relative(rootDir, fullPath);
+					onFile(fullPath, relativePath, entry);
+				}
+			}
+		} catch {
+			// Skip directories we can't read (permission issues, etc.)
+		}
+	}
+
+	walk(rootDir);
+}

@@ -14,11 +14,11 @@ import {
 	readTextFileSync,
 	writeTextFileSync,
 } from "@sidequest/core/fs";
-import { globFilesSync } from "@sidequest/core/glob";
 import { spawnSyncCollect } from "@sidequest/core/spawn";
 
 import type { ParaObsidianConfig } from "../config/index";
 import { resolveVaultPath } from "../shared/fs";
+import { listMarkdownFiles } from "./shared";
 
 /**
  * Options for renaming a note with link rewriting.
@@ -81,16 +81,6 @@ function replaceLinks(
 	});
 
 	return { content: updated, changes };
-}
-
-/**
- * Recursively lists all Markdown files in a directory.
- *
- * @param root - Directory to scan
- * @returns Array of absolute paths to .md files
- */
-function listMarkdownFiles(root: string): string[] {
-	return globFilesSync("**/*.md", { cwd: root });
 }
 
 /**

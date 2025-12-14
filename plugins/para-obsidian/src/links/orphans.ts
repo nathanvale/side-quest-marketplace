@@ -11,16 +11,10 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import {
-	isDirectorySync,
-	isFileSync,
-	pathExistsSync,
-	readDir,
-	readTextFileSync,
-} from "@sidequest/core/fs";
+import { pathExistsSync, readTextFileSync } from "@sidequest/core/fs";
 
 import { parseFrontmatter } from "../frontmatter/index";
-import { resolveVaultPath } from "../shared/fs";
+import { resolveVaultPath, walkDirectory } from "../shared/fs";
 
 /**
  * Result of orphan detection.
@@ -147,29 +141,14 @@ function extractWikilinks(
 function buildFileIndex(vault: string): Map<string, string[]> {
 	const index = new Map<string, string[]>();
 
-	function walkDir(currentDir: string): void {
-		try {
-			for (const entry of readDir(currentDir)) {
-				// Skip hidden files/folders
-				if (entry.startsWith(".")) continue;
+	walkDirectory(vault, (fullPath) => {
+		const rel = path.relative(vault, fullPath);
+		const basename = path.basename(rel).toLowerCase();
+		const existing = index.get(basename) ?? [];
+		existing.push(rel);
+		index.set(basename, existing);
+	});
 
-				const fullPath = path.join(currentDir, entry);
-				if (isDirectorySync(fullPath)) {
-					walkDir(fullPath);
-				} else if (isFileSync(fullPath)) {
-					const rel = path.relative(vault, fullPath);
-					const basename = path.basename(rel).toLowerCase();
-					const existing = index.get(basename) ?? [];
-					existing.push(rel);
-					index.set(basename, existing);
-				}
-			}
-		} catch {
-			// Skip directories we can't read
-		}
-	}
-
-	walkDir(vault);
 	return index;
 }
 
@@ -241,24 +220,17 @@ export function findOrphans(
 
 	const notes: string[] = [];
 
-	function walkDir(currentDir: string): void {
-		for (const entry of readDir(currentDir)) {
-			const fullPath = path.join(currentDir, entry);
-			if (isDirectorySync(fullPath)) {
-				walkDir(fullPath);
-			} else if (isFileSync(fullPath) && entry.endsWith(".md")) {
-				const rel = path.relative(vault, fullPath);
-				notes.push(rel);
-			}
-		}
-	}
-
 	// Walk each directory (or entire vault if no dirs specified)
 	const dirsToWalk = dirs && dirs.length > 0 ? dirs : ["."];
 	for (const dir of dirsToWalk) {
 		const { absolute: dirAbsolute } = resolveVaultPath(vault, dir);
 		if (pathExistsSync(dirAbsolute)) {
-			walkDir(dirAbsolute);
+			walkDirectory(dirAbsolute, (fullPath) => {
+				if (fullPath.endsWith(".md")) {
+					const rel = path.relative(vault, fullPath);
+					notes.push(rel);
+				}
+			});
 		}
 		// Silently skip non-existent dirs (like validate-all does)
 	}
@@ -387,34 +359,21 @@ function findBestMatch(
 function buildNoteIndex(vault: string): Map<string, string> {
 	const index = new Map<string, string>();
 
-	function walkDir(currentDir: string): void {
-		try {
-			for (const entry of fs.readdirSync(currentDir)) {
-				if (entry.startsWith(".")) continue;
-
-				const fullPath = path.join(currentDir, entry);
-				const stat = fs.statSync(fullPath);
-
-				if (stat.isDirectory()) {
-					// Skip Attachments folder
-					if (entry !== "Attachments") {
-						walkDir(fullPath);
-					}
-				} else if (stat.isFile() && entry.endsWith(".md")) {
-					const rel = path.relative(vault, fullPath);
-					const basename = path.basename(entry, ".md").toLowerCase();
-					// Store first occurrence (prefer shorter paths)
-					if (!index.has(basename)) {
-						index.set(basename, rel);
-					}
+	walkDirectory(
+		vault,
+		(fullPath) => {
+			if (fullPath.endsWith(".md")) {
+				const rel = path.relative(vault, fullPath);
+				const basename = path.basename(fullPath, ".md").toLowerCase();
+				// Store first occurrence (prefer shorter paths)
+				if (!index.has(basename)) {
+					index.set(basename, rel);
 				}
 			}
-		} catch {
-			// Skip directories we can't read
-		}
-	}
+		},
+		{ skipDirs: ["Attachments"] },
+	);
 
-	walkDir(vault);
 	return index;
 }
 

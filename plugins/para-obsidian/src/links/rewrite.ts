@@ -10,15 +10,10 @@
  * @module rewrite-links
  */
 import path from "node:path";
-import {
-	isDirectorySync,
-	isFileSync,
-	readDir,
-	readTextFileSync,
-	writeTextFileSync,
-} from "@sidequest/core/fs";
+import { readTextFileSync, writeTextFileSync } from "@sidequest/core/fs";
 
 import { parseFrontmatter, serializeFrontmatter } from "../frontmatter/index";
+import { listMarkdownFiles } from "./shared";
 
 /**
  * A single link rewrite mapping.
@@ -164,27 +159,6 @@ function replaceLinksInFrontmatterValue(
 	}
 
 	return { value, changed: false };
-}
-
-/**
- * Recursively lists all Markdown files in a directory.
- */
-function listMarkdownFiles(root: string): string[] {
-	const results: string[] = [];
-	try {
-		for (const entry of readDir(root)) {
-			if (entry.startsWith(".")) continue;
-			const full = path.join(root, entry);
-			if (isDirectorySync(full)) {
-				results.push(...listMarkdownFiles(full));
-			} else if (isFileSync(full) && entry.endsWith(".md")) {
-				results.push(full);
-			}
-		}
-	} catch {
-		// Skip directories we can't read
-	}
-	return results;
 }
 
 /**
