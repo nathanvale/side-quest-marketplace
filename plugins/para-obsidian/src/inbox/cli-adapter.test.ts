@@ -6,7 +6,7 @@ import {
 	getHelpText,
 	parseCommand,
 } from "./cli-adapter";
-import type { InboxSuggestion } from "./types";
+import { createSuggestionId, type InboxSuggestion } from "./types";
 
 describe("inbox/cli-adapter", () => {
 	describe("parseCommand", () => {
@@ -144,7 +144,7 @@ describe("inbox/cli-adapter", () => {
 
 	describe("formatSuggestion", () => {
 		const baseSuggestion: InboxSuggestion = {
-			id: "abc123",
+			id: createSuggestionId("abc12300-0000-4000-8000-000000000001"),
 			source: "/vault/Inbox/invoice-2024.pdf",
 			processor: "attachments",
 			confidence: "high",
@@ -192,7 +192,7 @@ describe("inbox/cli-adapter", () => {
 
 		test("should handle suggestion without optional fields", () => {
 			const minimalSuggestion: InboxSuggestion = {
-				id: "xyz789",
+				id: createSuggestionId("xyz78900-0000-4000-8000-000000000002"),
 				source: "/vault/Inbox/random-file.md",
 				processor: "notes",
 				confidence: "low",
@@ -209,7 +209,7 @@ describe("inbox/cli-adapter", () => {
 	describe("formatSuggestionsTable", () => {
 		const suggestions: InboxSuggestion[] = [
 			{
-				id: "1",
+				id: createSuggestionId("11111111-0000-4000-8000-000000000003"),
 				source: "/vault/Inbox/invoice.pdf",
 				processor: "attachments",
 				confidence: "high",
@@ -218,7 +218,7 @@ describe("inbox/cli-adapter", () => {
 				reason: "Detected invoice",
 			},
 			{
-				id: "2",
+				id: createSuggestionId("22222222-0000-4000-8000-000000000004"),
 				source: "/vault/Inbox/note.md",
 				processor: "notes",
 				confidence: "medium",

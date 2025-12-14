@@ -14,6 +14,7 @@ import type {
 	ExecutionResult,
 	InboxEngine,
 	InboxSuggestion,
+	SuggestionId,
 } from "./types";
 
 // =============================================================================
@@ -319,16 +320,16 @@ export interface InteractiveOptions {
  */
 export async function runInteractiveLoop(
 	options: InteractiveOptions,
-): Promise<string[]> {
+): Promise<SuggestionId[]> {
 	const { engine, suggestions } = options;
-	const approved = new Set<string>();
-	const skipped = new Set<string>();
+	const approved = new Set<SuggestionId>();
+	const skipped = new Set<SuggestionId>();
 	const currentSuggestions = [...suggestions];
 	let isProcessing = false;
 
 	// Create stable ID-to-suggestion map and original index mapping
-	const suggestionById = new Map<string, InboxSuggestion>();
-	const originalIndices = new Map<string, number>();
+	const suggestionById = new Map<SuggestionId, InboxSuggestion>();
+	const originalIndices = new Map<SuggestionId, number>();
 	for (const [i, s] of currentSuggestions.entries()) {
 		suggestionById.set(s.id, s);
 		originalIndices.set(s.id, i + 1); // Store 1-based display index

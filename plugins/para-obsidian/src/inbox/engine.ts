@@ -35,12 +35,18 @@ import {
 	mapFieldsToTemplate,
 } from "./converters";
 import { generateFilename, generateUniquePath } from "./core/engine-utils";
-import { createInboxError } from "./infrastructure/errors";
+import {
+	checkPdfToText,
+	combineHeuristics,
+	extractPdfText,
+} from "./detection/pdf-processor";
 import {
 	createInboxFile,
 	getDefaultRegistry,
 	type InboxFile,
 } from "./extractors";
+import { createInboxError } from "./infrastructure/errors";
+import { createRegistry, hashFile } from "./infrastructure/processed-registry";
 import {
 	buildInboxPrompt,
 	type DocumentTypeResult,
@@ -48,18 +54,14 @@ import {
 	parseDetectionResponse,
 } from "./llm-detection";
 import {
-	checkPdfToText,
-	combineHeuristics,
-	extractPdfText,
-} from "./detection/pdf-processor";
-import { createRegistry, hashFile } from "./infrastructure/processed-registry";
-import type {
-	ExecuteOptions,
-	ExecutionResult,
-	InboxEngine,
-	InboxEngineConfig,
-	InboxSuggestion,
-	ScanOptions,
+	createSuggestionId,
+	type ExecuteOptions,
+	type ExecutionResult,
+	type InboxEngine,
+	type InboxEngineConfig,
+	type InboxSuggestion,
+	type ScanOptions,
+	type SuggestionId,
 } from "./types";
 
 // =============================================================================
@@ -271,7 +273,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					}
 					// Return error suggestion
 					const errorSuggestion: InboxSuggestion = {
-						id: crypto.randomUUID(),
+						id: createSuggestionId(crypto.randomUUID()),
 						source: join(resolvedConfig.inboxFolder, filename),
 						processor: "attachments",
 						confidence: "low",
@@ -361,7 +363,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	 * @returns Array of execution results
 	 */
 	async function execute(
-		ids: string[],
+		ids: SuggestionId[],
 		options?: ExecuteOptions,
 	): Promise<ExecutionResult[]> {
 		await initLoggerWithNotice();
@@ -503,7 +505,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	 * @returns Updated suggestion
 	 */
 	async function editWithPrompt(
-		id: string,
+		id: SuggestionId,
 		prompt: string,
 	): Promise<InboxSuggestion> {
 		await initLoggerWithNotice();
@@ -611,40 +613,34 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	 * @throws InboxError with USR_INVALID_ITEM_ID if suggestion not found
 	 * @throws InboxError with USR_EDIT_PROMPT_EMPTY if hint is empty
 	 */
-	async function challenge(id: string, hint: string): Promise<InboxSuggestion> {
+	async function challenge(
+		id: SuggestionId,
+		hint: string,
+	): Promise<InboxSuggestion> {
 		await initLoggerWithNotice();
 		const cid = createCorrelationId();
 
 		// Input validation
-		const trimmedId = id?.trim() ?? "";
 		const trimmedHint = hint?.trim() ?? "";
-
-		if (!trimmedId) {
-			throw createInboxError("USR_INVALID_ITEM_ID", {
-				cid,
-				itemId: id ?? "",
-				operation: "challenge",
-			});
-		}
 
 		if (!trimmedHint) {
 			throw createInboxError("USR_EDIT_PROMPT_EMPTY", {
 				cid,
-				itemId: trimmedId,
+				itemId: id,
 				operation: "challenge",
 			});
 		}
 
 		if (inboxLogger) {
-			inboxLogger.info`Challenge started id=${trimmedId} cid=${cid}`;
+			inboxLogger.info`Challenge started id=${id} cid=${cid}`;
 		}
 
 		// Look up original suggestion
-		const original = suggestionCache.get(trimmedId);
+		const original = suggestionCache.get(id);
 		if (!original) {
 			throw createInboxError("USR_INVALID_ITEM_ID", {
 				cid,
-				itemId: trimmedId,
+				itemId: id,
 				operation: "challenge",
 			});
 		}
@@ -660,11 +656,11 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		// If this fails, we haven't mutated anything yet
 		let updated: InboxSuggestion;
 		try {
-			updated = await editWithPrompt(trimmedId, trimmedHint);
+			updated = await editWithPrompt(id, trimmedHint);
 		} catch (error) {
 			// Log failure without exposing full error details
 			if (inboxLogger) {
-				inboxLogger.warn`Challenge re-classification failed id=${trimmedId} cid=${cid}`;
+				inboxLogger.warn`Challenge re-classification failed id=${id} cid=${cid}`;
 			}
 			throw error;
 		}
@@ -678,10 +674,10 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			reason: `Challenged: "${trimmedHint}" → ${updated.reason}`,
 		};
 
-		suggestionCache.set(trimmedId, challengedSuggestion);
+		suggestionCache.set(id, challengedSuggestion);
 
 		if (inboxLogger) {
-			inboxLogger.info`Challenge complete id=${trimmedId} oldType=${previousClassification.documentType} newType=${challengedSuggestion.suggestedNoteType} cid=${cid}`;
+			inboxLogger.info`Challenge complete id=${id} oldType=${previousClassification.documentType} newType=${challengedSuggestion.suggestedNoteType} cid=${cid}`;
 		}
 
 		return challengedSuggestion;

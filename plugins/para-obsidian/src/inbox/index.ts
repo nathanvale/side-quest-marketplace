@@ -40,8 +40,6 @@ export {
 	scoreContent,
 	scoreFilename,
 } from "./converters";
-// Engine
-export { createInboxEngine } from "./engine";
 // Engine utilities
 export {
 	capitalizeFirst,
@@ -49,8 +47,14 @@ export {
 	generateTitle,
 	generateUniquePath,
 } from "./core/engine-utils";
-// Errors
-export { createInboxError, InboxError } from "./infrastructure/errors";
+// PDF processor
+export {
+	checkPdfToText,
+	combineHeuristics,
+	extractPdfText,
+} from "./detection/pdf-processor";
+// Engine
+export { createInboxEngine } from "./engine";
 export type {
 	ContentExtractor,
 	ExtractedContent,
@@ -84,6 +88,11 @@ export {
 	resetDefaultRegistry,
 	VISION_EXTRACTION_PROMPT,
 } from "./extractors";
+// Errors
+export { createInboxError, InboxError } from "./infrastructure/errors";
+export type { RegistryManager } from "./infrastructure/processed-registry";
+// Processed Registry
+export { createRegistry, hashFile } from "./infrastructure/processed-registry";
 export type {
 	DocumentTypeResult,
 	FieldExtractionResult,
@@ -95,15 +104,6 @@ export {
 	buildInboxPrompt,
 	parseDetectionResponse,
 } from "./llm-detection";
-// PDF processor
-export {
-	checkPdfToText,
-	combineHeuristics,
-	extractPdfText,
-} from "./detection/pdf-processor";
-export type { RegistryManager } from "./infrastructure/processed-registry";
-// Processed Registry
-export { createRegistry, hashFile } from "./infrastructure/processed-registry";
 // Types
 export type {
 	Confidence,
@@ -123,4 +123,7 @@ export type {
 	ProcessorType,
 	ScanOptions,
 	ScanProgress,
+	SuggestionId,
 } from "./types";
+// SuggestionId utilities
+export { createSuggestionId, isValidSuggestionId } from "./types";

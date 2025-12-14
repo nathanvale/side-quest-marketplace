@@ -11,11 +11,12 @@
 import { join } from "node:path";
 import { generateTitle } from "../core/engine-utils";
 import type { DocumentTypeResult } from "../llm-detection";
-import type {
-	Confidence,
-	InboxAction,
-	InboxSuggestion,
-	ProcessorType,
+import {
+	type Confidence,
+	createSuggestionId,
+	type InboxAction,
+	type InboxSuggestion,
+	type ProcessorType,
 } from "../types";
 
 // =============================================================================
@@ -142,7 +143,7 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 		: undefined;
 
 	return {
-		id: crypto.randomUUID(),
+		id: createSuggestionId(crypto.randomUUID()),
 		source,
 		processor,
 		confidence,

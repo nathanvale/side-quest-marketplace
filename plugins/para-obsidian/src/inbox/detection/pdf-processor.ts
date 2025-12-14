@@ -393,7 +393,11 @@ export function detectByFilename(
 	converters?: readonly InboxConverter[],
 ): HeuristicResult {
 	// Input validation
-	if (!filename || typeof filename !== "string" || filename.trim().length === 0) {
+	if (
+		!filename ||
+		typeof filename !== "string" ||
+		filename.trim().length === 0
+	) {
 		throw new Error("Invalid filename: must be a non-empty string");
 	}
 
@@ -459,9 +463,10 @@ export function detectByContent(
 	}
 
 	// Optimize for large content by limiting analysis to first portion
-	const analysisContent = content.length > 10000
-		? content.slice(0, 10000) // First 10KB should contain relevant markers
-		: content;
+	const analysisContent =
+		content.length > 10000
+			? content.slice(0, 10000) // First 10KB should contain relevant markers
+			: content;
 
 	let bestScore = 0;
 	let bestType = "";
@@ -470,7 +475,10 @@ export function detectByContent(
 	for (const converter of activeConverters) {
 		if (!converter?.heuristics?.contentMarkers) continue;
 
-		const score = scoreContent(analysisContent, converter.heuristics.contentMarkers);
+		const score = scoreContent(
+			analysisContent,
+			converter.heuristics.contentMarkers,
+		);
 		if (score > bestScore) {
 			bestScore = score;
 			bestType = converter.id;

@@ -1,24 +1,27 @@
 import { describe, expect, test } from "bun:test";
-import type {
-	Confidence,
-	ErrorCategory,
-	ErrorCode,
-	ErrorContext,
-	ExecutionResult,
-	InboxAction,
-	InboxEngine,
-	InboxEngineConfig,
-	InboxSuggestion,
-	ProcessedRegistry,
-	ProcessorResult,
-	ProcessorType,
+import {
+	type Confidence,
+	createSuggestionId,
+	type ErrorCategory,
+	type ErrorCode,
+	type ErrorContext,
+	type ExecutionResult,
+	type InboxAction,
+	type InboxEngine,
+	type InboxEngineConfig,
+	type InboxSuggestion,
+	type ProcessedRegistry,
+	type ProcessorResult,
+	type ProcessorType,
+	type SuggestionId,
 } from "./types";
 
 describe("inbox/types", () => {
 	describe("InboxSuggestion", () => {
 		test("should have all required fields for a complete suggestion", () => {
+			const testId = createSuggestionId("abc12300-0000-4000-8000-000000000001");
 			const suggestion: InboxSuggestion = {
-				id: "abc123",
+				id: testId,
 				source: "/vault/00 Inbox/invoice-001.pdf",
 				processor: "attachments",
 				confidence: "high",
@@ -38,7 +41,7 @@ describe("inbox/types", () => {
 				reason: "Detected invoice pattern in filename and content",
 			};
 
-			expect(suggestion.id).toBe("abc123");
+			expect(suggestion.id).toBe(testId);
 			expect(suggestion.processor).toBe("attachments");
 			expect(suggestion.confidence).toBe("high");
 			expect(suggestion.action).toBe("create-note");
@@ -47,7 +50,7 @@ describe("inbox/types", () => {
 
 		test("should allow minimal suggestion for skip action", () => {
 			const suggestion: InboxSuggestion = {
-				id: "def456",
+				id: createSuggestionId("def45600-0000-4000-8000-000000000002"),
 				source: "/vault/00 Inbox/random.txt",
 				processor: "notes",
 				confidence: "low",
@@ -67,7 +70,7 @@ describe("inbox/types", () => {
 				itemsScanned: 5,
 				suggestions: [
 					{
-						id: "1",
+						id: createSuggestionId("11111111-0000-4000-8000-000000000001"),
 						source: "/vault/00 Inbox/file1.pdf",
 						processor: "attachments",
 						confidence: "high",
@@ -89,7 +92,9 @@ describe("inbox/types", () => {
 	describe("ExecutionResult", () => {
 		test("should track successful execution", () => {
 			const result: ExecutionResult = {
-				suggestionId: "abc123",
+				suggestionId: createSuggestionId(
+					"abc12300-0000-4000-8000-000000000003",
+				),
 				success: true,
 				action: "create-note",
 				createdNote: "/vault/03 Resources/Receipts/Invoice Dec 2024.md",
@@ -102,7 +107,9 @@ describe("inbox/types", () => {
 
 		test("should track failed execution", () => {
 			const result: ExecutionResult = {
-				suggestionId: "def456",
+				suggestionId: createSuggestionId(
+					"def45600-0000-4000-8000-000000000004",
+				),
 				success: false,
 				action: "create-note",
 				error: "Template not found: invoice.md",
@@ -157,26 +164,26 @@ describe("inbox/types", () => {
 	describe("InboxEngine interface", () => {
 		test("should define the engine contract", () => {
 			// This test validates the interface shape at compile time
+			const testId = createSuggestionId("12345678-0000-4000-8000-000000000005");
 			const mockEngine: InboxEngine = {
 				scan: async () => [],
-				editWithPrompt: async (_id: string, _prompt: string) => ({
-					id: "test",
+				editWithPrompt: async (_id: SuggestionId, _prompt: string) => ({
+					id: testId,
 					source: "/test",
 					processor: "attachments",
 					confidence: "medium",
 					action: "create-note",
 					reason: "Updated",
 				}),
-				execute: async (_ids: string[]) => [],
+				execute: async (_ids: SuggestionId[]) => [],
 				generateReport: (_suggestions: InboxSuggestion[]) => "# Report",
-				challenge: async (_id: string, _hint: string) => ({
-					id: "test",
+				challenge: async (_id: SuggestionId, _hint: string) => ({
+					id: testId,
 					source: "/test",
 					processor: "attachments",
 					confidence: "high",
 					action: "create-note",
 					reason: "Re-classified",
-					challengeReason: "User challenged: re-classified",
 				}),
 			};
 
@@ -192,7 +199,7 @@ describe("inbox/types", () => {
 		test("should capture error context for debugging", () => {
 			const context: ErrorContext = {
 				source: "/vault/00 Inbox/file.pdf",
-				itemId: "abc123",
+				itemId: createSuggestionId("abc12300-0000-4000-8000-000000000006"),
 				operation: "pdf-extraction",
 				cid: "corr-xyz",
 				additionalData: { fileSize: 1024 },
