@@ -13,7 +13,7 @@
 
 ```
 ui/
-└── index.ts              # Barrel exports from ../cli-adapter.ts (pending move)
+└── index.ts              # Barrel exports (re-exports from ../cli.ts)
 ```
 
 ## Key Exports
@@ -32,15 +32,15 @@ ui/
 ## Commands
 
 Supported user commands:
-- `approve <id>` - Approve suggestion
-- `skip <id>` - Skip suggestion
-- `edit <id> <prompt>` - Re-classify with custom prompt
-- `approve-all high` - Auto-approve high confidence
-- `quit` - Exit interactive loop
+- `a` - Approve all suggestions
+- `1,2,5` - Approve specific suggestion numbers
+- `e3 prompt` - Edit suggestion #3 with custom prompt
+- `s3` - Skip suggestion #3
+- `q` - Quit interactive loop
+- `h` or `?` - Show help
 
-## Future Work
+## Security
 
-- Move cli-adapter.ts → ui/cli-adapter.ts
-- Move cli.ts → ui/cli.ts
-- Extract formatters.ts for display logic
-- Extract prompts.ts for input handling
+- Prompt sanitization (removes code blocks, injection patterns)
+- Length limits (500 chars)
+- Logs when sanitization modifies input

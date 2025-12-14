@@ -14,30 +14,29 @@
 ```
 classify/
 ├── index.ts              # Barrel exports
-├── llm-classifier.ts     # Re-exported from ../llm-detection.ts (pending move)
-├── pdf-classifier.ts     # Re-exported from ../detection/ (pending move)
-└── converters/           # Re-exported from ../converters/ (pending move)
-    ├── defaults.ts      # Default document type configs
-    ├── loader.ts        # Load custom converters
+├── llm-classifier.ts     # LLM-based document classification
+├── llm-classifier.test.ts
+├── detection/            # Content processors
+│   ├── pdf-processor.ts  # PDF extraction + heuristics
+│   └── pdf-processor.test.ts
+└── converters/           # Type-specific conversion logic
+    ├── index.ts          # Barrel exports
+    ├── defaults.ts       # Built-in document type configs
+    ├── loader.ts         # Converter matching logic
     ├── suggestion-builder.ts  # Build suggestions from classification
-    └── types.ts         # Converter interfaces
+    ├── types.ts          # Converter interfaces
+    └── *.test.ts         # Tests
 ```
 
 ## Key Exports
 
-- `createLLMDetector()` - Create LLM-based classifier
-- `processPdfDocument()` - Classify PDF documents
-- `loadConverters()` - Load document type configs
-- `createConverterSuggestion()` - Build suggestions from classification
+- `buildInboxPrompt()` - Build LLM prompt with vault context
+- `parseDetectionResponse()` - Parse LLM classification response
+- `extractPdfText()` - Extract text from PDF files
+- `combineHeuristics()` - Apply pattern-based classification
+- `buildSuggestion()` - Create suggestion from classification result
 - `DEFAULT_CONVERTERS` - Built-in document types
 
 ## Mental Model
 
 **"I want to figure out what a file is"** → Use classify module
-
-## Future Work
-
-- Move llm-detection.ts → llm-classifier.ts
-- Move detection/ → classify/
-- Move converters/ → classify/converters/
-- Add heuristics.ts for pattern matching

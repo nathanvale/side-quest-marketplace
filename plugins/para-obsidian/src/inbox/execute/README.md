@@ -13,7 +13,7 @@
 
 ```
 execute/
-├── index.ts              # Barrel exports
+├── index.ts              # Barrel exports (re-exports from core/operations)
 └── README.md             # This file
 ```
 
@@ -28,19 +28,17 @@ execute/
 
 ## Architecture Decision
 
-The execution logic remains in `../engine.ts` as a single orchestrator by design:
+Execution logic lives in `core/operations/` as a single orchestrator by design:
 
 1. **Atomicity**: Registry saves must be sequential to prevent conflicts
 2. **Rollback**: Note creation + attachment move are transactional (if move fails, note is rolled back)
 3. **Git safety**: Execute checks git status once before processing batch
 
-Splitting into separate files would add complexity without benefit since:
-- The `executeSuggestion()` function is already well-isolated
-- Registry operations require coordination
-- Error handling needs holistic view
+## Actual Implementation
 
-## Current Location
+Execution logic in `core/operations/`:
+- `execute-suggestion.ts` - Per-suggestion executor
+- `report.ts` - Markdown report generation
 
-Execution logic in `../engine.ts`:
-- `execute()` - Main execution orchestration (~100 lines)
-- `executeSuggestion()` - Per-suggestion execution (~200 lines)
+Orchestration in `core/engine.ts`:
+- `execute()` - Main execution loop with registry coordination

@@ -13,28 +13,32 @@
 ```
 scan/
 ├── index.ts              # Barrel exports
-└── extractors/           # Re-exported from ../extractors/ (pending move)
-    ├── pdf.ts           # PDF text extraction
-    ├── image.ts         # Image → text via vision models
-    ├── markdown.ts      # Frontmatter extraction
-    ├── registry.ts      # Extractor registry
-    └── types.ts         # Extraction interfaces
+└── extractors/           # File type handlers
+    ├── index.ts          # Barrel exports + createInboxFile
+    ├── index.test.ts     # Integration tests
+    ├── pdf.ts            # PDF text extraction
+    ├── image.ts          # Image vision extraction (placeholder)
+    ├── image.test.ts     # Image extractor tests
+    ├── markdown.ts       # Frontmatter + content extraction
+    ├── markdown.test.ts  # Markdown extractor tests
+    ├── registry.ts       # Extractor registry pattern
+    ├── registry.test.ts  # Registry tests
+    └── types.ts          # Extraction interfaces
 ```
 
 ## Key Exports
 
-- `createInboxFile()` - Create file handle for processing
-- `pdfExtractor` - Extract text from PDFs
-- `imageExtractor` - Extract text from images
-- `markdownExtractor` - Extract frontmatter from markdown
-- `ExtractorRegistry` - Manage extractors
+- `createInboxFile()` - Create file handle with extracted content
+- `getDefaultRegistry()` - Get registry with all built-in extractors
+- `InboxFile` - File representation with metadata and content
+- `ExtractorRegistry` - Manage extractors by extension
 
 ## Mental Model
 
 **"I want to read files from the inbox"** → Use scan module
 
-## Future Work
+## Supported File Types
 
-- Move extractors physically into this folder
-- Add scanner.ts for directory orchestration
-- Split large extractor files if needed
+- `.pdf` - PDF text extraction via pdftotext
+- `.md` - Markdown frontmatter + body extraction
+- `.png`, `.jpg`, `.jpeg` - Image vision extraction (placeholder)
