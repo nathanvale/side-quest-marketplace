@@ -56,11 +56,33 @@ export type InboxAction =
 export type SuggestionId = string & { readonly __brand: "SuggestionId" };
 
 /**
- * Create a branded suggestion ID from a UUID string.
- * Use this when generating new IDs or converting from external sources.
+ * Create a branded suggestion ID.
+ * 
+ * When called without arguments, generates a new UUID v4 using crypto.randomUUID().
+ * When called with a string, validates it's a proper UUID v4 format.
+ * 
+ * @param uuid - Optional UUID v4 string. If omitted, generates a new UUID.
+ * @throws Error if uuid is provided but not a valid UUID v4 format
+ * 
+ * @example
+ * ```typescript
+ * // Generate new ID
+ * const newId = createSuggestionId();
+ * 
+ * // Convert existing UUID
+ * const existingId = createSuggestionId("abc12300-0000-4000-8000-000000000001");
+ * ```
  */
-export function createSuggestionId(uuid: string): SuggestionId {
-	return uuid as SuggestionId;
+export function createSuggestionId(uuid?: string): SuggestionId {
+	// Generate new UUID if not provided (uses Bun/Node built-in crypto)
+	const id = uuid ?? crypto.randomUUID();
+	
+	if (!isValidSuggestionId(id)) {
+		throw new Error(
+			`Invalid suggestion ID format: "${id}". Must be a valid UUID v4.`,
+		);
+	}
+	return id as SuggestionId;
 }
 
 /**
@@ -75,6 +97,16 @@ export function isValidSuggestionId(id: string): id is SuggestionId {
 // =============================================================================
 // Suggestion Types
 // =============================================================================
+
+/**
+ * Source of the detection that created this suggestion.
+ * Helps users understand if LLM contributed to the classification.
+ */
+export type DetectionSource =
+	| "llm+heuristic" // Both LLM and heuristics detected same type (highest confidence)
+	| "llm" // LLM detected (heuristics didn't match or didn't detect)
+	| "heuristic" // Only heuristics detected (LLM failed or disagreed)
+	| "none"; // Neither detected (skip suggestion)
 
 /**
  * Base fields shared by all suggestion types.
@@ -92,6 +124,9 @@ interface BaseSuggestion {
 
 	/** Confidence level in this suggestion */
 	readonly confidence: Confidence;
+
+	/** Source of detection: llm+heuristic, llm, heuristic, or none */
+	readonly detectionSource: DetectionSource;
 
 	/** Human-readable explanation of why this suggestion was made */
 	readonly reason: string;
@@ -301,13 +336,32 @@ export interface OrchestratorResult {
 }
 
 // =============================================================================
+// Confidence Thresholds (Constants)
+// =============================================================================
+
+/**
+ * Confidence threshold constants for classification decisions.
+ * These define the boundaries between confidence levels.
+ */
+export const CONFIDENCE_THRESHOLDS = {
+	/** Minimum confidence for HIGH classification (LLM ≥90% or LLM+heuristic agreement) */
+	HIGH: 0.9,
+	/** Minimum confidence for MEDIUM classification (LLM ≥70%) */
+	MEDIUM: 0.7,
+	/** Minimum confidence for heuristic-only classification */
+	HEURISTIC_MIN: 0.5,
+	/** Minimum confidence for heuristic MEDIUM classification */
+	HEURISTIC_MEDIUM: 0.8,
+} as const;
+
+// =============================================================================
 // Execution Types
 // =============================================================================
 
 /**
- * Progress update emitted during scanning for user feedback.
+ * Base fields for all scan progress updates.
  */
-export interface ScanProgress {
+interface ScanProgressBase {
 	/** 1-based index of current file */
 	readonly index: number;
 
@@ -316,13 +370,75 @@ export interface ScanProgress {
 
 	/** Inbox filename (no path) */
 	readonly filename: string;
-
-	/** Current stage of processing */
-	readonly stage: "hash" | "extract" | "llm" | "skip" | "done" | "error";
-
-	/** Optional error message for failed stage */
-	readonly error?: string;
 }
+
+/**
+ * Progress update during hash calculation stage.
+ */
+export interface HashingProgress extends ScanProgressBase {
+	readonly stage: "hash";
+}
+
+/**
+ * Progress update during content extraction stage.
+ */
+export interface ExtractingProgress extends ScanProgressBase {
+	readonly stage: "extract";
+}
+
+/**
+ * Progress update during LLM classification stage.
+ */
+export interface LLMProgress extends ScanProgressBase {
+	readonly stage: "llm";
+	/** LLM model being used (required during llm stage) */
+	readonly model: string;
+}
+
+/**
+ * Progress update when file is skipped (already processed).
+ */
+export interface SkippedProgress extends ScanProgressBase {
+	readonly stage: "skip";
+}
+
+/**
+ * Progress update when file processing completes successfully.
+ */
+export interface DoneProgress extends ScanProgressBase {
+	readonly stage: "done";
+	/** Running count of LLM failures (for detecting service unavailability) */
+	readonly llmFailures?: number;
+}
+
+/**
+ * Progress update when file processing fails.
+ */
+export interface ErrorProgress extends ScanProgressBase {
+	readonly stage: "error";
+	/** Error message describing the failure (required for error stage) */
+	readonly error: string;
+}
+
+/**
+ * Progress update emitted during scanning for user feedback.
+ * Discriminated union based on `stage` field for type-safe handling.
+ *
+ * Each stage has its specific required fields:
+ * - hash: Just base fields
+ * - extract: Just base fields
+ * - llm: Requires `model` field
+ * - skip: Just base fields
+ * - done: Optional `llmFailures` count
+ * - error: Requires `error` message
+ */
+export type ScanProgress =
+	| HashingProgress
+	| ExtractingProgress
+	| LLMProgress
+	| SkippedProgress
+	| DoneProgress
+	| ErrorProgress;
 
 /**
  * Options for scanning the inbox.
@@ -336,17 +452,22 @@ export interface ScanOptions {
 }
 
 /**
- * Result of executing a single suggestion.
+ * Base fields for all execution results.
  */
-export interface ExecutionResult {
+interface ExecutionResultBase {
 	/** ID of the suggestion that was executed */
 	readonly suggestionId: SuggestionId;
 
-	/** Whether execution succeeded */
-	readonly success: boolean;
-
 	/** Action that was attempted */
 	readonly action: InboxAction;
+}
+
+/**
+ * Successful execution result.
+ * Contains paths to created/moved files.
+ */
+export interface SuccessfulExecutionResult extends ExecutionResultBase {
+	readonly success: true;
 
 	/** Path to created note (if action was create-note) */
 	readonly createdNote?: string;
@@ -354,12 +475,37 @@ export interface ExecutionResult {
 	/** Path to moved attachment (if applicable) */
 	readonly movedAttachment?: string;
 
-	/** Error message if execution failed */
-	readonly error?: string;
-
 	/** Warning message if operation partially succeeded */
 	readonly warning?: string;
 }
+
+/**
+ * Failed execution result.
+ * Contains error message describing the failure.
+ */
+export interface FailedExecutionResult extends ExecutionResultBase {
+	readonly success: false;
+
+	/** Error message describing why execution failed (required for failures) */
+	readonly error: string;
+}
+
+/**
+ * Result of executing a single suggestion.
+ * Discriminated union based on `success` field for type-safe error handling.
+ *
+ * Use pattern matching to handle success/failure:
+ * ```typescript
+ * if (result.success) {
+ *   // TypeScript knows createdNote exists here
+ *   console.log(result.createdNote);
+ * } else {
+ *   // TypeScript knows error is defined here
+ *   console.error(result.error);
+ * }
+ * ```
+ */
+export type ExecutionResult = SuccessfulExecutionResult | FailedExecutionResult;
 
 /**
  * Progress update emitted during execution for user feedback.
@@ -469,6 +615,17 @@ export interface ProcessedRegistry {
 // =============================================================================
 
 /**
+ * LLM client function signature for classification.
+ * Takes a prompt, provider, and optional model override.
+ * Returns the LLM response as a string.
+ */
+export type LLMClientFunction = (
+	prompt: string,
+	provider: string,
+	model?: string,
+) => Promise<string>;
+
+/**
  * Configuration for the inbox engine.
  */
 export interface InboxEngineConfig {
@@ -489,6 +646,13 @@ export interface InboxEngineConfig {
 
 	/** LLM model override */
 	readonly llmModel?: string;
+
+	/**
+	 * Optional LLM client function for dependency injection.
+	 * If provided, this will be used instead of the default callLLM.
+	 * Useful for testing with fast mock responses.
+	 */
+	readonly llmClient?: LLMClientFunction;
 
 	/** Concurrency limits */
 	readonly concurrency?: {
@@ -674,3 +838,34 @@ export type CLICommand =
 	| { type: "quit" }
 	| { type: "help" }
 	| { type: "invalid"; input: string };
+
+// =============================================================================
+// Validation Functions
+// =============================================================================
+
+/**
+ * Validates InboxEngineConfig for runtime safety.
+ * Ensures required directories exist and concurrency limits are valid.
+ */
+export function validateInboxEngineConfig(config: InboxEngineConfig): InboxEngineConfig {
+	// Validate that required directories exist
+	if (!config.vaultPath || typeof config.vaultPath !== 'string') {
+		throw new Error('InboxEngineConfig: vaultPath is required and must be a string');
+	}
+	
+	// Validate concurrency limits
+	if (config.concurrency) {
+		const { concurrency } = config;
+		if (concurrency.pdfExtraction !== undefined && concurrency.pdfExtraction <= 0) {
+			throw new Error('InboxEngineConfig: concurrency.pdfExtraction must be positive');
+		}
+		if (concurrency.llmCalls !== undefined && concurrency.llmCalls <= 0) {
+			throw new Error('InboxEngineConfig: concurrency.llmCalls must be positive');
+		}
+		if (concurrency.fileIO !== undefined && concurrency.fileIO <= 0) {
+			throw new Error('InboxEngineConfig: concurrency.fileIO must be positive');
+		}
+	}
+	
+	return config;
+}

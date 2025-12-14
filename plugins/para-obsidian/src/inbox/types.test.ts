@@ -39,6 +39,7 @@ describe("inbox/types", () => {
 				},
 				suggestedAttachmentName: "2024-12-01-invoice-001.pdf",
 				attachmentLink: "[[Attachments/2024-12-01-invoice-001.pdf]]",
+				detectionSource: "llm+heuristic",
 				reason: "Detected invoice pattern in filename and content",
 			};
 
@@ -56,6 +57,7 @@ describe("inbox/types", () => {
 				processor: "notes",
 				confidence: "low",
 				action: "skip",
+				detectionSource: "none",
 				reason: "Unsupported file type",
 			};
 
@@ -78,6 +80,7 @@ describe("inbox/types", () => {
 						action: "create-note",
 						suggestedNoteType: "invoice",
 						suggestedTitle: "Invoice",
+						detectionSource: "llm",
 						reason: "Invoice detected",
 					},
 				],
@@ -178,6 +181,7 @@ describe("inbox/types", () => {
 					action: "create-note",
 					suggestedNoteType: "document",
 					suggestedTitle: "Updated Document",
+					detectionSource: "llm",
 					reason: "Updated",
 				}),
 				execute: async (_ids: SuggestionId[]) => [],
@@ -190,6 +194,7 @@ describe("inbox/types", () => {
 					action: "create-note",
 					suggestedNoteType: "document",
 					suggestedTitle: "Re-classified Document",
+					detectionSource: "llm",
 					reason: "Re-classified",
 				}),
 			};

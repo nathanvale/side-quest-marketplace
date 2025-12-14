@@ -7,8 +7,8 @@
  * @module classify/classifiers/migrations
  */
 
-import type { InboxConverter } from "../../converters/types";
 import { CURRENT_SCHEMA_VERSION } from "../registry";
+import type { InboxConverter } from "../types";
 import type { Migration, MigrationResult } from "./migrate";
 
 // Re-export types

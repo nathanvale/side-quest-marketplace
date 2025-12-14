@@ -7,7 +7,7 @@
  * @module classify/classifiers/migrations/migrate
  */
 
-import type { InboxConverter } from "../../converters/types";
+import type { InboxConverter } from "../types";
 
 /**
  * Migration function signature.

@@ -37,8 +37,6 @@ export {
 	scoreContent,
 	scoreFilename,
 } from "./classify";
-// Converter types
-export type { TemplateConfig } from "./classify/converters/types";
 // LLM Detection types
 export type {
 	DocumentTypeResult,
@@ -59,7 +57,7 @@ export {
 // =============================================================================
 // Execute - Applying approved suggestions
 // =============================================================================
-export type { ExecutionResult } from "./execute";
+// ExecutionResult now exported from ./types (discriminated union)
 // Legacy exports removed - now exported from ./classify above
 // =============================================================================
 // Registry - Tracking processed items
@@ -119,11 +117,19 @@ export {
 // =============================================================================
 export type {
 	Confidence,
+	DetectionSource,
+	DoneProgress,
+	ErrorProgress,
 	ExecuteOptions,
+	ExecutionResult,
+	ExtractingProgress,
+	FailedExecutionResult,
+	HashingProgress,
 	InboxAction,
 	InboxEngine,
 	InboxEngineConfig,
 	InboxSuggestion,
+	LLMProgress,
 	MigrationRecord,
 	OrchestratorResult,
 	ProcessedItem,
@@ -134,14 +140,18 @@ export type {
 	RegistryMetadata,
 	ScanOptions,
 	ScanProgress,
+	SkippedProgress,
+	SuccessfulExecutionResult,
 	SuggestionId,
 } from "./types";
 
-// SuggestionId utilities and enum
+// SuggestionId utilities, enum, and constants
 export {
+	CONFIDENCE_THRESHOLDS,
 	createSuggestionId,
 	isValidSuggestionId,
 	RegistryVersion,
+	validateInboxEngineConfig,
 } from "./types";
 // =============================================================================
 // UI - Terminal interaction
@@ -150,6 +160,7 @@ export type { InteractiveOptions } from "./ui";
 export {
 	displayResults,
 	formatConfidence,
+	formatDetectionSource,
 	formatSuggestion,
 	formatSuggestionsTable,
 	getHelpText,

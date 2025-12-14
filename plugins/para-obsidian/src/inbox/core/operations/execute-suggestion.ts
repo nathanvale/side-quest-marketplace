@@ -22,9 +22,9 @@ import { createFromTemplate, injectSections } from "../../../notes/create";
 import { resolveVaultPath } from "../../../shared/fs";
 import { executeLogger } from "../../../shared/logger";
 import {
-	DEFAULT_INBOX_CONVERTERS,
+	DEFAULT_CLASSIFIERS,
 	mapFieldsToTemplate,
-} from "../../classify/converters";
+} from "../../classify/classifiers";
 import {
 	type createRegistry,
 	hashFile,
@@ -148,7 +148,7 @@ export async function executeSuggestion(
 			let args: Record<string, string> = {};
 
 			// Find converter for this note type to get field mappings
-			const converter = DEFAULT_INBOX_CONVERTERS.find(
+			const converter = DEFAULT_CLASSIFIERS.find(
 				(c) => c.id === suggestion.suggestedNoteType,
 			);
 

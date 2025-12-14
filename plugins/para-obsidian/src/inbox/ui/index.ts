@@ -7,6 +7,7 @@ export type { InteractiveOptions } from "./cli-adapter";
 export {
 	displayResults,
 	formatConfidence,
+	formatDetectionSource,
 	formatSuggestion,
 	formatSuggestionsTable,
 	getHelpText,

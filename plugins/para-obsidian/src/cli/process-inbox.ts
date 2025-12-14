@@ -5,6 +5,7 @@
 import { MetricsCollector } from "@sidequest/core/logging";
 import { color, emphasize } from "@sidequest/core/terminal";
 import { createSpinner } from "nanospinner";
+import { DEFAULT_MODEL } from "../config/defaults";
 import type { ExecutionResult, InboxSuggestion } from "../inbox";
 import {
 	createInboxEngine,
@@ -45,14 +46,14 @@ function withLogContext<T extends object>(
 /**
  * Get stage label for display
  */
-function stageLabel(stage: string): string {
+function stageLabel(stage: string, model?: string): string {
 	switch (stage) {
 		case "hash":
 			return "hashing";
 		case "extract":
 			return "extracting";
 		case "llm":
-			return "LLM";
+			return model ? `LLM (${model})` : "LLM";
 		case "skip":
 			return "skipped";
 		case "done":
@@ -87,12 +88,18 @@ export async function handleProcessInbox(
 	const filterPattern =
 		typeof flags.filter === "string" ? flags.filter : undefined;
 
+	// Get LLM model from env or default (uses DEFAULT_MODEL from config/defaults.ts)
+	// TODO: Get llmModel from config when inbox config is added to ParaObsidianConfig
+	const llmModel = process.env.PARA_LLM_MODEL || DEFAULT_MODEL;
+
 	// Create engine with config
 	const engine = createInboxEngine({
 		vaultPath: config.vault,
 		inboxFolder: "00 Inbox",
 		attachmentsFolder: "Attachments",
 		templatesFolder: config.templatesDir,
+		llmProvider: llmModel, // Pass the model as provider
+		llmModel: llmModel, // Also pass as explicit model
 	});
 
 	// Scan inbox for suggestions
@@ -100,7 +107,7 @@ export async function handleProcessInbox(
 	if (isJson) {
 		suggestions = await engine.scan();
 	} else {
-		suggestions = await scanWithSpinner(engine);
+		suggestions = await scanWithSpinner(engine, llmModel);
 	}
 
 	// Apply filter if provided
@@ -137,6 +144,7 @@ export async function handleProcessInbox(
  */
 async function scanWithSpinner(
 	engine: ReturnType<typeof createInboxEngine>,
+	llmModel: string,
 ): Promise<InboxSuggestion[]> {
 	const scanSpinner = createSpinner("Scanning inbox...").start();
 	const scanStarted = Date.now();
@@ -145,6 +153,7 @@ async function scanWithSpinner(
 		processed: 0,
 		skipped: 0,
 		errors: 0,
+		llmFailures: 0,
 		currentFile: "",
 		stage: "hash" as "hash" | "extract" | "llm" | "skip" | "done" | "error",
 		stageStartedAt: Date.now(),
@@ -159,46 +168,76 @@ async function scanWithSpinner(
 		const detail =
 			scanState.currentFile === ""
 				? ""
-				: ` | ${scanState.currentFile} ${stageLabel(scanState.stage)} ${elapsedStage}s`;
+				: ` | ${scanState.currentFile} ${stageLabel(scanState.stage, scanState.stage === "llm" ? llmModel : undefined)} ${elapsedStage}s`;
 		scanSpinner.update({ text: `${totals}${detail}` });
 	};
 
 	const scanTicker = setInterval(updateScanText, 500);
 
+	// Ensure cleanup on SIGINT (Ctrl+C)
+	const cleanup = () => {
+		clearInterval(scanTicker);
+		scanSpinner.error({ text: "Scan interrupted" });
+	};
+	process.on("SIGINT", cleanup);
+
 	try {
 		const suggestions = await engine.scan({
-			onProgress: ({ total, filename, stage, error }) => {
+			onProgress: (progress) => {
+				const { total, filename, stage } = progress;
 				scanState.total = total;
 				if (stage === "skip") {
 					scanState.skipped += 1;
 					scanState.processed += 1;
 				} else if (stage === "done") {
 					scanState.processed += 1;
+					// Track running LLM failure count (only on DoneProgress)
+					if (progress.llmFailures !== undefined) {
+						scanState.llmFailures = progress.llmFailures;
+					}
 				} else if (stage === "error") {
 					scanState.errors += 1;
 					scanState.processed += 1;
+					// Error message is required on ErrorProgress
+					scanSpinner.update({
+						text: `Scanning ${scanState.processed}/${scanState.total || "?"} (skipped ${scanState.skipped}, errors ${scanState.errors}) | ${filename} error - ${progress.error}`,
+					});
+					return;
 				} else {
 					scanState.currentFile = filename;
 					scanState.stage = stage;
 					scanState.stageStartedAt = Date.now();
 				}
-				if (error) {
-					scanSpinner.update({
-						text: `Scanning ${scanState.processed}/${scanState.total || "?"} (skipped ${scanState.skipped}, errors ${scanState.errors + 1}) | ${filename} error - ${error}`,
-					});
-					return;
-				}
 				updateScanText();
 			},
 		});
 		clearInterval(scanTicker);
+		process.removeListener("SIGINT", cleanup);
 		const elapsed = ((Date.now() - scanStarted) / 1000).toFixed(1);
 		scanSpinner.success({
 			text: `Scan complete (${scanState.processed}/${scanState.total || suggestions.length} scanned, skipped ${scanState.skipped}, errors ${scanState.errors}) in ${elapsed}s`,
 		});
+
+		// Warn if LLM service appears unavailable
+		const filesAttempted = scanState.processed - scanState.skipped;
+		if (scanState.llmFailures > 0 && scanState.llmFailures >= filesAttempted) {
+			console.log(
+				color(
+					"yellow",
+					`⚠ LLM service unavailable (${scanState.llmFailures} failures). Using heuristic-only classification.`,
+				),
+			);
+			console.log(
+				emphasize.info(
+					`Check LLM provider (${llmModel}) - may need authentication or the service may be down.`,
+				),
+			);
+		}
+
 		return suggestions;
 	} catch (error) {
 		clearInterval(scanTicker);
+		process.removeListener("SIGINT", cleanup);
 		scanSpinner.error({
 			text: `Scan failed: ${error instanceof Error ? error.message : "unknown error"}`,
 		});

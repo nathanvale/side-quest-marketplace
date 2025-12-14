@@ -7,8 +7,8 @@
  * @module classify/classifiers/registry
  */
 
-import { findBestConverter } from "../converters/loader";
-import type { ConverterMatch, InboxConverter } from "../converters/types";
+import { findBestConverter } from "./loader";
+import type { ConverterMatch, InboxConverter } from "./types";
 
 /**
  * Current schema version for converters.

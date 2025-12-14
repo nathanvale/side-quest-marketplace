@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { InboxConverter } from "../converters/types";
 import { ClassifierRegistry, CURRENT_SCHEMA_VERSION } from "./registry";
+import type { InboxConverter } from "./types";
 
 // Test fixture: minimal valid converter
 const createTestConverter = (

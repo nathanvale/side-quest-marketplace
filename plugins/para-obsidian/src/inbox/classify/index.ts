@@ -1,54 +1,80 @@
 /**
  * Classification functionality for determining document types and extracting fields
+ *
+ * @module classify
  */
 
-export type { Migration, MigrationFn, MigrationResult } from "./classifiers";
-// Classifier registry and migrations
-export {
-	ClassifierRegistry,
-	CURRENT_SCHEMA_VERSION,
-	getAvailableMigrations,
-	needsMigration,
-	runMigrations,
-} from "./classifiers";
+// =============================================================================
+// Classifier System (new modular architecture)
+// =============================================================================
 
-export {
-	findBestConverter,
-	mapFieldsToTemplate,
-	mergeConverters,
-	scoreContent,
-	scoreFilename,
-} from "./converters";
-export { DEFAULT_INBOX_CONVERTERS } from "./converters/defaults";
-export type {
-	HeuristicResult,
-	SuggestionInput,
-} from "./converters/suggestion-builder";
-export { buildSuggestion } from "./converters/suggestion-builder";
-// Re-export converters functionality
+// Registry and migrations
+// Suggestion builder
+// Types
 export type {
 	ConverterMatch,
 	ExtractionConfig,
 	FieldDefinition,
 	HeuristicConfig,
 	HeuristicPattern,
+	HeuristicResult,
 	InboxConverter,
+	Migration,
+	MigrationFn,
+	MigrationResult,
+	RequirementLevel,
 	ScoringConfig,
+	SuggestionInput,
 	TemplateConfig,
-} from "./converters/types";
-// Re-export PDF processing from detection folder
+} from "./classifiers";
+// Classifier definitions (one file per type)
+// Loader utilities
+export {
+	bookingClassifier,
+	buildSuggestion,
+	ClassifierRegistry,
+	CURRENT_SCHEMA_VERSION,
+	DEFAULT_CLASSIFIERS,
+	findBestConverter,
+	getAvailableMigrations,
+	invoiceClassifier,
+	mapFieldsToTemplate,
+	mergeConverters,
+	needsMigration,
+	runMigrations,
+	scoreContent,
+	scoreFilename,
+} from "./classifiers";
+
+// =============================================================================
+// Legacy exports (deprecated, use classifiers instead)
+// =============================================================================
+
+/**
+ * @deprecated Use DEFAULT_CLASSIFIERS from ./classifiers instead
+ */
+export { DEFAULT_INBOX_CONVERTERS } from "./converters/defaults";
+
+// =============================================================================
+// Detection (PDF processing, heuristics)
+// =============================================================================
+
 export {
 	checkPdfToText,
 	combineHeuristics,
 	extractPdfText,
 } from "./detection/pdf-processor";
+
+// =============================================================================
+// LLM Classifier
+// =============================================================================
+
 export type {
 	DocumentTypeResult,
 	FieldExtractionResult,
 	InboxPromptOptions,
 	InboxVaultContext,
 } from "./llm-classifier";
-// Re-export LLM detection functionality
 export {
 	buildEditPrompt,
 	buildInboxPrompt,

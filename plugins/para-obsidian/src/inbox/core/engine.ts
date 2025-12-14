@@ -18,11 +18,10 @@ import {
 	inboxLogger,
 	initLoggerWithNotice,
 } from "../../shared/logger";
-import { buildSuggestion } from "../classify/converters";
+import { buildSuggestion } from "../classify/classifiers";
 import {
 	checkPdfToText,
 	combineHeuristics,
-	extractPdfText,
 } from "../classify/detection/pdf-processor";
 import {
 	buildInboxPrompt,
@@ -32,6 +31,7 @@ import {
 import { createRegistry, hashFile } from "../registry/processed-registry";
 import {
 	createInboxFile,
+	type ExtractorRegistry,
 	getDefaultRegistry,
 	type InboxFile,
 } from "../scan/extractors";
@@ -47,6 +47,7 @@ import {
 	isCreateNoteSuggestion,
 	type ScanOptions,
 	type SuggestionId,
+	validateInboxEngineConfig,
 } from "../types";
 import { callLLM } from "./llm";
 import { executeSuggestion } from "./operations";
@@ -69,6 +70,7 @@ import { getVaultAreas, getVaultProjects, type VaultContext } from "./vault";
  *
  * @param config - Engine configuration including vault path and options
  * @returns InboxEngine instance
+ * @throws Error if configuration is invalid
  *
  * @example
  * ```typescript
@@ -82,26 +84,32 @@ import { getVaultAreas, getVaultProjects, type VaultContext } from "./vault";
  * ```
  */
 export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
+	// Validate configuration before proceeding
+	validateInboxEngineConfig(config);
 	// Apply defaults to config
 	// Note: fileIO concurrency is defined but execution is sequential by design
 	// to ensure registry saves are atomic and don't conflict. The config option
 	// is preserved for future parallel execution support.
 	const resolvedConfig: Required<
-		Omit<InboxEngineConfig, "llmModel" | "concurrency">
+		Omit<InboxEngineConfig, "llmModel" | "concurrency" | "llmClient">
 	> &
-		Pick<InboxEngineConfig, "llmModel" | "concurrency"> = {
+		Pick<InboxEngineConfig, "llmModel" | "concurrency" | "llmClient"> = {
 		vaultPath: config.vaultPath,
 		inboxFolder: config.inboxFolder ?? "00 Inbox",
 		attachmentsFolder: config.attachmentsFolder ?? "Attachments",
 		templatesFolder: config.templatesFolder ?? "Templates",
 		llmProvider: config.llmProvider ?? "haiku",
 		llmModel: config.llmModel,
+		llmClient: config.llmClient,
 		concurrency: config.concurrency ?? {
 			pdfExtraction: 5,
 			llmCalls: 3,
 			fileIO: 10,
 		},
 	};
+
+	// Use injected LLM client if provided, otherwise use real callLLM
+	const llmClient = resolvedConfig.llmClient ?? callLLM;
 
 	// In-memory cache of suggestions from last scan
 	// Used by execute() to look up suggestions by ID
@@ -140,7 +148,10 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	 * Find and filter supported files in the inbox.
 	 * @internal
 	 */
-	async function findSupportedFiles(cid: string): Promise<InboxFile[] | null> {
+	async function findSupportedFiles(cid: string): Promise<{
+		files: InboxFile[];
+		extractorRegistry: ExtractorRegistry;
+	} | null> {
 		const inboxPath = join(
 			resolvedConfig.vaultPath,
 			resolvedConfig.inboxFolder,
@@ -175,7 +186,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			return null;
 		}
 
-		return supportedFiles;
+		return { files: supportedFiles, extractorRegistry };
 	}
 
 	/**
@@ -211,20 +222,55 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	}
 
 	/**
+	 * Context for processing a single inbox file.
+	 * Groups related parameters for cleaner function signatures.
+	 */
+	interface ProcessFileContext {
+		/** The inbox file to process */
+		file: InboxFile;
+		/** 0-based index in the file list */
+		index: number;
+		/** Total number of files being processed */
+		total: number;
+		/** Registry for tracking processed files */
+		registry: ReturnType<typeof createRegistry>;
+		/** Registry of available content extractors */
+		extractorRegistry: ExtractorRegistry;
+		/** Vault context for LLM prompts (areas, projects) */
+		vaultContext: VaultContext;
+		/** Concurrency limiter for extraction operations */
+		extractionLimit: ReturnType<typeof pLimit>;
+		/** Concurrency limiter for LLM calls */
+		llmLimit: ReturnType<typeof pLimit>;
+		/** Optional progress callback */
+		onProgress?: ScanOptions["onProgress"];
+		/** Correlation ID for logging */
+		cid: string;
+		/** Running statistics for LLM calls */
+		llmStats: { successes: number; failures: number };
+	}
+
+	/**
 	 * Process a single inbox file: hash check, extraction, LLM detection, suggestion building.
 	 * @internal
 	 */
 	async function processSingleFile(
-		file: InboxFile,
-		index: number,
-		total: number,
-		registry: ReturnType<typeof createRegistry>,
-		vaultContext: VaultContext,
-		extractionLimit: ReturnType<typeof pLimit>,
-		llmLimit: ReturnType<typeof pLimit>,
-		onProgress: ScanOptions["onProgress"],
-		cid: string,
+		ctx: ProcessFileContext,
 	): Promise<InboxSuggestion | null> {
+		const {
+			file,
+			index,
+			total,
+			registry,
+			extractorRegistry,
+			vaultContext,
+			extractionLimit,
+			llmLimit,
+			onProgress,
+			cid,
+			llmStats,
+		} = ctx;
+
 		return extractionLimit(async () => {
 			const { path: filePath, filename } = file;
 			const progressBase = {
@@ -262,16 +308,33 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				return null;
 			}
 
-			// Extract text
+			// Find the right extractor for this file type
+			const extractorMatch = extractorRegistry.findExtractor(file);
+			if (!extractorMatch) {
+				if (inboxLogger) {
+					inboxLogger.warn`No extractor found for: ${filename} cid=${cid}`;
+				}
+				if (onProgress) {
+					await onProgress({
+						...progressBase,
+						stage: "error",
+						error: "no extractor available",
+					});
+				}
+				return null;
+			}
+
+			// Extract text using the appropriate extractor
 			let text: string;
 			try {
 				if (onProgress) {
 					await onProgress({ ...progressBase, stage: "extract" });
 				}
-				text = await extractPdfText(filePath, cid);
+				const extracted = await extractorMatch.extractor.extract(file, cid);
+				text = extracted.text;
 			} catch (error) {
 				if (inboxLogger) {
-					inboxLogger.warn`Failed to extract PDF text: ${filename} cid=${cid}`;
+					inboxLogger.warn`Failed to extract content: ${filename} cid=${cid}`;
 				}
 				if (onProgress) {
 					await onProgress({
@@ -282,12 +345,13 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				}
 				// Return error suggestion
 				const errorSuggestion: InboxSuggestion = {
-					id: createSuggestionId(crypto.randomUUID()),
+					id: createSuggestionId(),
 					source: join(resolvedConfig.inboxFolder, filename),
 					processor: "attachments",
 					confidence: "low",
 					action: "skip",
-					reason: `PDF text extraction failed: ${error instanceof Error ? error.message : "unknown error"}`,
+					detectionSource: "none",
+					reason: `Content extraction failed: ${error instanceof Error ? error.message : "unknown error"}`,
 				};
 				suggestionCache.set(errorSuggestion.id, errorSuggestion);
 				return errorSuggestion;
@@ -295,30 +359,51 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 
 			// Run heuristic detection
 			const heuristicResult = combineHeuristics(filename, text);
+			if (inboxLogger) {
+				inboxLogger.debug`Heuristic result file=${filename} detected=${heuristicResult.detected} type=${heuristicResult.suggestedType ?? "none"} confidence=${heuristicResult.confidence.toFixed(2)} cid=${cid}`;
+			}
 
 			// Run LLM detection (with its own rate limit)
+			const llmModel = resolvedConfig.llmModel ?? resolvedConfig.llmProvider;
 			let llmResult: DocumentTypeResult | null = null;
 			try {
 				if (onProgress) {
-					await onProgress({ ...progressBase, stage: "llm" });
+					await onProgress({
+						...progressBase,
+						stage: "llm",
+						model: llmModel,
+					});
 				}
-				await llmLimit(async () => {
+				if (inboxLogger) {
+					inboxLogger.debug`LLM starting file=${filename} model=${llmModel} cid=${cid}`;
+				}
+				llmResult = await llmLimit(async () => {
 					const prompt = buildInboxPrompt({
 						content: text,
 						filename,
 						vaultContext,
 					});
-					const response = await callLLM(
+					const response = await llmClient(
 						prompt,
 						resolvedConfig.llmProvider,
 						resolvedConfig.llmModel,
 					);
-					llmResult = parseDetectionResponse(response);
+					if (inboxLogger) {
+						inboxLogger.debug`LLM raw response file=${filename} length=${response.length} preview=${response.slice(0, 200).replace(/\n/g, " ")} cid=${cid}`;
+					}
+					const result = parseDetectionResponse(response);
+					if (inboxLogger) {
+						inboxLogger.info`LLM success file=${filename} type=${result.documentType} confidence=${result.confidence.toFixed(2)} area=${result.suggestedArea ?? "none"} cid=${cid}`;
+					}
+					return result;
 				});
+				llmStats.successes += 1;
 			} catch (error) {
 				if (inboxLogger) {
 					inboxLogger.warn`LLM detection failed: ${filename} - ${error instanceof Error ? error.message : "unknown"} cid=${cid}`;
 				}
+				llmStats.failures += 1;
+				llmResult = null;
 			}
 
 			// Build suggestion
@@ -328,9 +413,33 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				heuristicResult,
 				llmResult,
 			});
+
+			// Log the final suggestion source
+			if (inboxLogger) {
+				const llmConfidence = llmResult?.confidence ?? 0;
+				const llmType = llmResult?.documentType ?? "none";
+				const source =
+					llmResult !== null && llmConfidence >= 0.7
+						? heuristicResult.detected &&
+							heuristicResult.suggestedType === llmType
+							? "llm+heuristic"
+							: "llm"
+						: heuristicResult.detected
+							? "heuristic"
+							: "none";
+				const noteType = isCreateNoteSuggestion(suggestion)
+					? suggestion.suggestedNoteType
+					: "n/a";
+				inboxLogger.info`Suggestion built file=${filename} action=${suggestion.action} confidence=${suggestion.confidence} type=${noteType} source=${source} reason=${suggestion.reason} cid=${cid}`;
+			}
+
 			suggestionCache.set(suggestion.id, suggestion);
 			if (onProgress) {
-				await onProgress({ ...progressBase, stage: "done" });
+				await onProgress({
+					...progressBase,
+					stage: "done",
+					llmFailures: llmStats.failures,
+				});
 			}
 			return suggestion;
 		});
@@ -344,6 +453,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		suggestions: InboxSuggestion[],
 		durationMs: number,
 		cid: string,
+		llmStats: { successes: number; failures: number },
 	): void {
 		const confidenceCounts = suggestions.reduce(
 			(counts, suggestion) => {
@@ -362,8 +472,13 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		);
 
 		if (inboxLogger) {
-			inboxLogger.info`Scan complete suggestions=${suggestions.length} durationMs=${durationMs} cid=${cid}`;
+			inboxLogger.info`Scan complete suggestions=${suggestions.length} durationMs=${durationMs} llmSuccesses=${llmStats.successes} llmFailures=${llmStats.failures} cid=${cid}`;
 			inboxLogger.debug`Scan breakdown confidence=${JSON.stringify(confidenceCounts)} actions=${JSON.stringify(actionCounts)} durationMs=${durationMs} cid=${cid}`;
+
+			// Warn if LLM appears unavailable
+			if (llmStats.failures > 0 && llmStats.successes === 0) {
+				inboxLogger.warn`LLM service unavailable: all ${llmStats.failures} calls failed. Suggestions are heuristic-only. cid=${cid}`;
+			}
 		}
 	}
 
@@ -378,6 +493,9 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		const cid = createCorrelationId();
 		const onProgress = options?.onProgress;
 
+		// Track LLM failures to detect service unavailability
+		const llmStats = { successes: 0, failures: 0 };
+
 		// Clear stale suggestions from previous scans to prevent memory leaks
 		suggestionCache.clear();
 
@@ -388,11 +506,12 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		// Load registry and clean up staging
 		const registry = await loadAndCleanRegistry(cid);
 
-		// Find supported files
-		const supportedFiles = await findSupportedFiles(cid);
-		if (!supportedFiles) {
+		// Find supported files and get extractor registry
+		const findResult = await findSupportedFiles(cid);
+		if (!findResult) {
 			return [];
 		}
+		const { files: supportedFiles, extractorRegistry } = findResult;
 
 		// Validate dependencies
 		await validateDependencies(cid);
@@ -408,24 +527,26 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 
 		// Process files concurrently
 		const suggestionPromises = supportedFiles.map((file, index) =>
-			processSingleFile(
+			processSingleFile({
 				file,
 				index,
-				supportedFiles.length,
+				total: supportedFiles.length,
 				registry,
+				extractorRegistry,
 				vaultContext,
 				extractionLimit,
 				llmLimit,
 				onProgress,
 				cid,
-			),
+				llmStats,
+			}),
 		);
 
 		const results = await Promise.all(suggestionPromises);
 		const suggestions = results.filter((s): s is InboxSuggestion => s !== null);
 		const durationMs = Date.now() - startedAt;
 
-		logScanStatistics(suggestions, durationMs, cid);
+		logScanStatistics(suggestions, durationMs, cid, llmStats);
 
 		return suggestions;
 	}
@@ -548,13 +669,16 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			// Emit progress after each item for CLI feedback
 			processed++;
 			if (onProgress) {
+				const lastResult = results[results.length - 1];
+				// Extract error from failed result using discriminated union pattern
+				const progressError = lastResult && !lastResult.success ? lastResult.error : undefined;
 				await onProgress({
 					processed,
 					total,
 					suggestionId: id,
 					action: suggestion?.action ?? "skip",
-					success: results[results.length - 1]?.success ?? false,
-					error: results[results.length - 1]?.error,
+					success: lastResult?.success ?? false,
+					error: progressError,
 				});
 			}
 		}
@@ -600,10 +724,21 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		const sourcePath = join(resolvedConfig.vaultPath, original.source);
 		const filename = basename(original.source);
 
+		// Get extractor registry and find appropriate extractor
+		const extractorRegistry = await getDefaultRegistry();
+		const file = createInboxFile(sourcePath);
+		const extractorMatch = extractorRegistry.findExtractor(file);
+
 		// Extract text again for re-processing
 		let text: string;
 		try {
-			text = await extractPdfText(sourcePath, cid);
+			if (!extractorMatch) {
+				throw new Error(
+					`No extractor available for file type: ${file.extension}`,
+				);
+			}
+			const extracted = await extractorMatch.extractor.extract(file, cid);
+			text = extracted.text;
 		} catch (error) {
 			// Return original with error note if extraction fails
 			return {
@@ -637,7 +772,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		// Call LLM with user hint
 		let llmResult: DocumentTypeResult | null = null;
 		try {
-			const response = await callLLM(
+			const response = await llmClient(
 				llmPrompt,
 				resolvedConfig.llmProvider,
 				resolvedConfig.llmModel,
@@ -752,6 +887,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			action: "challenge",
 			hint: trimmedHint,
 			previousClassification,
+			detectionSource: updated.detectionSource,
 			reason: `Challenged: "${trimmedHint}" → ${updated.reason}`,
 		};
 

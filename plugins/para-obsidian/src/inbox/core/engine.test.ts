@@ -19,6 +19,7 @@ import {
 	isCreateNoteSuggestion,
 } from "../types";
 import { createInboxEngine } from "./engine";
+import { createTestLLMClient } from "./llm/client";
 
 /**
  * Initialize a git repository with a clean working tree.
@@ -38,9 +39,21 @@ async function initGitRepo(dir: string): Promise<void> {
 	});
 }
 
+/**
+ * Create test engine with injected test LLM client for fast testing.
+ * This avoids calling real LLM APIs during tests.
+ */
+function createTestEngine(config: Omit<InboxEngineConfig, "llmClient">) {
+	return createInboxEngine({
+		...config,
+		llmClient: createTestLLMClient(),
+	});
+}
+
 describe("inbox/engine", () => {
 	const testConfig: InboxEngineConfig = {
 		vaultPath: "/test/vault",
+		llmClient: createTestLLMClient(),
 	};
 
 	describe("createInboxEngine", () => {
@@ -50,7 +63,7 @@ describe("inbox/engine", () => {
 		});
 
 		test("should create engine with minimal config", () => {
-			const engine = createInboxEngine({ vaultPath: "/minimal" });
+			const engine = createTestEngine({ vaultPath: "/minimal" });
 			expect(engine).toBeDefined();
 		});
 
@@ -114,7 +127,7 @@ describe("inbox/engine", () => {
 		});
 
 		test("should return empty array for empty inbox folder", async () => {
-			const engine = createInboxEngine({ vaultPath: testVaultPath });
+			const engine = createTestEngine({ vaultPath: testVaultPath });
 			const suggestions = await engine.scan();
 			expect(suggestions).toHaveLength(0);
 		});
@@ -125,7 +138,7 @@ describe("inbox/engine", () => {
 			writeFileSync(join(inboxPath, "data.csv"), "a,b,c");
 			writeFileSync(join(inboxPath, "archive.zip"), "fake zip");
 
-			const engine = createInboxEngine({ vaultPath: testVaultPath });
+			const engine = createTestEngine({ vaultPath: testVaultPath });
 			const suggestions = await engine.scan();
 			// Should have zero suggestions - no extractors for .txt, .csv, .zip
 			expect(suggestions).toHaveLength(0);
@@ -138,7 +151,7 @@ describe("inbox/engine", () => {
 				"---\ntitle: Test\n---\n# Notes",
 			);
 
-			const engine = createInboxEngine({ vaultPath: testVaultPath });
+			const engine = createTestEngine({ vaultPath: testVaultPath });
 			const suggestions = await engine.scan();
 
 			// Markdown extractor processes .md files
@@ -150,7 +163,7 @@ describe("inbox/engine", () => {
 			// Create an image file - the image extractor will process it
 			writeFileSync(join(inboxPath, "screenshot.png"), "fake image");
 
-			const engine = createInboxEngine({ vaultPath: testVaultPath });
+			const engine = createTestEngine({ vaultPath: testVaultPath });
 			const suggestions = await engine.scan();
 
 			// Image extractor processes images (placeholder until vision API configured)
@@ -162,7 +175,7 @@ describe("inbox/engine", () => {
 			// Create a minimal PDF file
 			writeFileSync(join(inboxPath, "test.pdf"), "%PDF-1.4 fake content");
 
-			const engine = createInboxEngine({ vaultPath: testVaultPath });
+			const engine = createTestEngine({ vaultPath: testVaultPath });
 
 			// When pdftotext is missing, scan() should throw DEP_PDFTOTEXT_MISSING error
 			try {
@@ -199,7 +212,7 @@ describe("inbox/engine", () => {
 			writeFileSync(registryPath, JSON.stringify(registryData, null, 2));
 
 			// Scan should skip this file
-			const engine = createInboxEngine({ vaultPath: testVaultPath });
+			const engine = createTestEngine({ vaultPath: testVaultPath });
 			const suggestions = await engine.scan();
 
 			// Should return empty - file is already processed
@@ -213,7 +226,7 @@ describe("inbox/engine", () => {
 				"---\ntitle: First\n---\n# First",
 			);
 
-			const engine = createInboxEngine({ vaultPath: testVaultPath });
+			const engine = createTestEngine({ vaultPath: testVaultPath });
 			const firstSuggestions = await engine.scan();
 			expect(firstSuggestions).toHaveLength(1);
 			const firstId = firstSuggestions[0]?.id;
@@ -265,13 +278,13 @@ describe("inbox/engine", () => {
 		});
 
 		test("should return a promise", () => {
-			const engine = createInboxEngine({ vaultPath: executeTestPath });
+			const engine = createTestEngine({ vaultPath: executeTestPath });
 			const result = engine.execute([]);
 			expect(result).toBeInstanceOf(Promise);
 		});
 
 		test("should resolve to an array of execution results", async () => {
-			const engine = createInboxEngine({ vaultPath: executeTestPath });
+			const engine = createTestEngine({ vaultPath: executeTestPath });
 			// Execute with non-existent IDs - should return error results
 			const results = await engine.execute([
 				createSuggestionId("11111111-0000-4000-8000-000000000001"),
@@ -280,12 +293,16 @@ describe("inbox/engine", () => {
 			expect(Array.isArray(results)).toBe(true);
 			// Should have 2 results with errors (suggestion not found)
 			expect(results).toHaveLength(2);
-			expect(results[0]?.success).toBe(false);
-			expect(results[0]?.error).toContain("not found");
+			const firstResult = results[0];
+			expect(firstResult?.success).toBe(false);
+			// Use type narrowing for discriminated union
+			if (firstResult && !firstResult.success) {
+				expect(firstResult.error).toContain("not found");
+			}
 		});
 
 		test("should return empty array for empty input", async () => {
-			const engine = createInboxEngine({ vaultPath: executeTestPath });
+			const engine = createTestEngine({ vaultPath: executeTestPath });
 			const results = await engine.execute([]);
 			expect(results).toHaveLength(0);
 		});
@@ -310,7 +327,7 @@ describe("inbox/engine", () => {
 			});
 
 			// Create engine
-			const engine = createInboxEngine({ vaultPath: executeTestPath });
+			const engine = createTestEngine({ vaultPath: executeTestPath });
 
 			// LIMITATION: suggestionCache is internal to engine closure
 			// We cannot directly inject test suggestions without:
@@ -324,8 +341,12 @@ describe("inbox/engine", () => {
 			]);
 
 			expect(results).toHaveLength(1);
-			expect(results[0]?.success).toBe(false);
-			expect(results[0]?.error).toContain("Suggestion not found");
+			const result = results[0];
+			expect(result?.success).toBe(false);
+			// Use type narrowing for discriminated union
+			if (result && !result.success) {
+				expect(result.error).toContain("Suggestion not found");
+			}
 
 			// The full happy path would be:
 			// 1. scan() populates cache with real suggestions
@@ -395,6 +416,7 @@ describe("inbox/engine", () => {
 				action: "create-note",
 				suggestedNoteType: "invoice",
 				suggestedTitle: "Test Document",
+				detectionSource: "llm+heuristic",
 				reason: "Matched invoice pattern",
 			};
 			const report = engine.generateReport([mockSuggestion]);
@@ -549,7 +571,7 @@ describe("inbox/engine", () => {
 		});
 
 		test("should throw error when suggestion not found", async () => {
-			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+			const engine = createTestEngine({ vaultPath: challengeTestPath });
 			const nonExistentId = createSuggestionId(
 				"aaaaaaaa-0000-4000-8000-000000000001",
 			);
@@ -560,7 +582,7 @@ describe("inbox/engine", () => {
 		});
 
 		test("should throw error when id is empty", async () => {
-			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+			const engine = createTestEngine({ vaultPath: challengeTestPath });
 			// Empty string cast to SuggestionId to test validation
 			const emptyId = createSuggestionId(
 				"00000000-0000-4000-8000-000000000000",
@@ -574,7 +596,7 @@ describe("inbox/engine", () => {
 		});
 
 		test("should throw error when id is whitespace only", async () => {
-			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+			const engine = createTestEngine({ vaultPath: challengeTestPath });
 			// Use a valid-format ID that won't exist in cache
 			const nonExistentId = createSuggestionId(
 				"bbbbbbbb-0000-4000-8000-000000000002",
@@ -592,7 +614,7 @@ describe("inbox/engine", () => {
 				"# Test\nSome content",
 			);
 
-			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+			const engine = createTestEngine({ vaultPath: challengeTestPath });
 			const suggestions = await engine.scan();
 			const validId =
 				suggestions[0]?.id ??
@@ -610,7 +632,7 @@ describe("inbox/engine", () => {
 				"# Test\nSome content",
 			);
 
-			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+			const engine = createTestEngine({ vaultPath: challengeTestPath });
 			const suggestions = await engine.scan();
 			const validId =
 				suggestions[0]?.id ??
@@ -628,7 +650,7 @@ describe("inbox/engine", () => {
 				"---\ntitle: Test Document\ntype: invoice\n---\n# Invoice\nAmount: $100\nProvider: Test Co",
 			);
 
-			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+			const engine = createTestEngine({ vaultPath: challengeTestPath });
 
 			// First scan to populate cache
 			const suggestions = await engine.scan();
@@ -670,7 +692,7 @@ describe("inbox/engine", () => {
 				"# Some Content\n\nThis is a test document",
 			);
 
-			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+			const engine = createTestEngine({ vaultPath: challengeTestPath });
 
 			// Scan to populate cache
 			const suggestions = await engine.scan();
@@ -695,7 +717,7 @@ describe("inbox/engine", () => {
 				"# Meeting Notes\n\nDiscussed project timeline",
 			);
 
-			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+			const engine = createTestEngine({ vaultPath: challengeTestPath });
 
 			// Scan to populate cache
 			const suggestions = await engine.scan();
@@ -721,7 +743,7 @@ describe("inbox/engine", () => {
 				"# Quick Note\n\nSome content here",
 			);
 
-			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+			const engine = createTestEngine({ vaultPath: challengeTestPath });
 
 			// Scan to populate cache
 			const suggestions = await engine.scan();
@@ -748,7 +770,7 @@ describe("inbox/engine", () => {
 				"# File Content\n\nBody text",
 			);
 
-			const engine = createInboxEngine({ vaultPath: challengeTestPath });
+			const engine = createTestEngine({ vaultPath: challengeTestPath });
 
 			// Scan to populate cache
 			const suggestions = await engine.scan();

@@ -25,13 +25,13 @@ import { stat } from "@sidequest/core/fs";
 import { $ } from "bun";
 import { pdfLogger } from "../../../shared/logger";
 import { createInboxError, InboxError } from "../../shared/errors";
-import type { InboxConverter } from "../converters";
+import type { InboxConverter } from "../classifiers";
 import {
-	DEFAULT_INBOX_CONVERTERS,
+	DEFAULT_CLASSIFIERS,
 	findBestConverter,
 	scoreContent,
 	scoreFilename,
-} from "../converters";
+} from "../classifiers";
 
 // Non-null assertion for logger (we know it exists since we defined the subsystem)
 const log = pdfLogger as NonNullable<typeof pdfLogger>;
@@ -393,7 +393,7 @@ export function detectWithConverters(
  * Detect document type from filename patterns using modern converter system.
  *
  * @param filename - Filename to analyze (with or without path)
- * @param converters - Optional array of converters to use (default: DEFAULT_INBOX_CONVERTERS)
+ * @param converters - Optional array of converters to use (default: DEFAULT_CLASSIFIERS)
  * @returns Detection result with type and confidence
  * @throws Error if filename is empty or invalid
  */
@@ -411,7 +411,7 @@ export function detectByFilename(
 	}
 
 	// Use default converters if none provided
-	const activeConverters = converters ?? DEFAULT_INBOX_CONVERTERS;
+	const activeConverters = converters ?? DEFAULT_CLASSIFIERS;
 	if (activeConverters.length === 0) {
 		return { detected: false, confidence: 0 };
 	}
@@ -452,7 +452,7 @@ export function detectByFilename(
  * Detect document type from content markers using modern converter system.
  *
  * @param content - Text content to analyze
- * @param converters - Optional array of converters to use (default: DEFAULT_INBOX_CONVERTERS)
+ * @param converters - Optional array of converters to use (default: DEFAULT_CLASSIFIERS)
  * @returns Detection result with type and confidence
  * @throws Error if content is invalid
  */
@@ -466,7 +466,7 @@ export function detectByContent(
 	}
 
 	// Use default converters if none provided
-	const activeConverters = converters ?? DEFAULT_INBOX_CONVERTERS;
+	const activeConverters = converters ?? DEFAULT_CLASSIFIERS;
 	if (activeConverters.length === 0 || content.length === 0) {
 		return { detected: false, confidence: 0 };
 	}

@@ -8,7 +8,7 @@
  * @module llm/model-router
  */
 
-import { spawnAndCollect } from "../spawn/index.js";
+import { spawnWithTimeout } from "../spawn/index.js";
 
 /** Claude model identifiers */
 export type ClaudeModel = "sonnet" | "haiku";
@@ -103,35 +103,28 @@ export async function callClaudeHeadless(
 	timeoutMs: number = DEFAULT_LLM_TIMEOUT_MS,
 ): Promise<string> {
 	try {
-		// Create a timeout promise
-		const timeoutPromise = new Promise<never>((_, reject) => {
-			setTimeout(() => {
-				reject(
-					new Error(
-						`Claude CLI call timed out after ${timeoutMs}ms. Try using --model haiku for faster responses.`,
-					),
-				);
-			}, timeoutMs);
-		});
+		// Use spawnWithTimeout for proper process cleanup on timeout
+		const result = await spawnWithTimeout(
+			[
+				"claude",
+				"-p",
+				prompt,
+				"--output-format",
+				"json",
+				"--model",
+				model,
+				"--tools",
+				'""',
+			],
+			timeoutMs,
+			{ cwd: process.cwd() },
+		);
 
-		// Race between the actual call and timeout
-		const result = await Promise.race([
-			spawnAndCollect(
-				[
-					"claude",
-					"-p",
-					prompt,
-					"--output-format",
-					"json",
-					"--model",
-					model,
-					"--tools",
-					'""',
-				],
-				{ cwd: process.cwd() },
-			),
-			timeoutPromise,
-		]);
+		if (result.timedOut) {
+			throw new Error(
+				`Claude CLI call timed out after ${timeoutMs}ms. Try using --model haiku for faster responses.`,
+			);
+		}
 
 		if (result.exitCode !== 0) {
 			throw new Error(

@@ -13,9 +13,9 @@ import { loadConfig } from "../../config/index";
 import { createFromTemplate } from "../../notes/create";
 import type { executeLogger } from "../../shared/logger";
 import {
-	DEFAULT_INBOX_CONVERTERS,
+	DEFAULT_CLASSIFIERS,
 	mapFieldsToTemplate,
-} from "../classify/converters";
+} from "../classify/classifiers";
 import type { InboxSuggestion } from "../types";
 import type { NoteCreationResult } from "./types";
 
@@ -56,7 +56,7 @@ export async function createNoteFromSuggestion(
 		let args: Record<string, string> = {};
 
 		// Find converter for this note type to get field mappings
-		const converter = DEFAULT_INBOX_CONVERTERS.find(
+		const converter = DEFAULT_CLASSIFIERS.find(
 			(c) => c.id === suggestion.suggestedNoteType,
 		);
 

@@ -14,7 +14,7 @@
  * ```
  */
 
-import type { InboxConverter } from "./converters";
+import type { InboxConverter } from "./classifiers";
 
 // =============================================================================
 // Types

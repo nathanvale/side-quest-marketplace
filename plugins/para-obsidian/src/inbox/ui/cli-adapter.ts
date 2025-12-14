@@ -11,6 +11,7 @@ import { createSpinner } from "nanospinner";
 import type {
 	CLICommand,
 	Confidence,
+	DetectionSource,
 	ExecutionResult,
 	InboxEngine,
 	InboxSuggestion,
@@ -181,6 +182,28 @@ export function formatConfidence(confidence: Confidence): string {
 }
 
 /**
+ * Format detection source with icon.
+ * Shows whether LLM contributed to the classification.
+ *
+ * @param source - Detection source type
+ * @returns Formatted string with icon
+ */
+export function formatDetectionSource(source: DetectionSource): string {
+	switch (source) {
+		case "llm+heuristic":
+			return emphasize.success("🤖✓"); // LLM and heuristics agree
+		case "llm":
+			return emphasize.info("🤖"); // LLM only
+		case "heuristic":
+			return emphasize.warn("📋"); // Heuristic only (LLM failed/disagreed)
+		case "none":
+			return emphasize.dim("—"); // Neither detected
+		default:
+			return emphasize.dim("?");
+	}
+}
+
+/**
  * Extract filename from a path.
  */
 function getFilename(path: string): string {
@@ -201,10 +224,11 @@ export function formatSuggestion(
 ): string {
 	const filename = getFilename(suggestion.source);
 	const confidence = formatConfidence(suggestion.confidence);
+	const sourceIcon = formatDetectionSource(suggestion.detectionSource);
 	const lines: string[] = [];
 
-	// Main line: index, confidence, filename, action
-	const mainLine = `${emphasize.info(`[${index}]`)} ${confidence} ${emphasize.info(filename)} → ${suggestion.action}`;
+	// Main line: index, confidence, source icon, filename, action
+	const mainLine = `${emphasize.info(`[${index}]`)} ${confidence} ${sourceIcon} ${emphasize.info(filename)} → ${suggestion.action}`;
 	lines.push(mainLine);
 
 	// Details on subsequent lines (only for create-note suggestions)

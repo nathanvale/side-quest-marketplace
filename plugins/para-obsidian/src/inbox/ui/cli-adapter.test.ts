@@ -152,6 +152,7 @@ describe("inbox/cli-adapter", () => {
 			suggestedNoteType: "invoice",
 			suggestedTitle: "Invoice from Acme Corp",
 			suggestedArea: "Finance",
+			detectionSource: "llm+heuristic",
 			reason: "PDF filename contains 'invoice' pattern",
 		};
 
@@ -197,6 +198,7 @@ describe("inbox/cli-adapter", () => {
 				processor: "notes",
 				confidence: "low",
 				action: "skip",
+				detectionSource: "none",
 				reason: "Could not determine type",
 			};
 			const result = formatSuggestion(minimalSuggestion, 2);
@@ -214,6 +216,7 @@ describe("inbox/cli-adapter", () => {
 				action: "create-note",
 				suggestedNoteType: "invoice",
 				suggestedTitle: "Unknown Invoice",
+				detectionSource: "heuristic",
 				reason: "Detected invoice pattern but missing key fields",
 				extractionWarnings: [
 					"Could not find invoice date",
@@ -242,6 +245,7 @@ describe("inbox/cli-adapter", () => {
 				action: "create-note",
 				suggestedNoteType: "invoice",
 				suggestedTitle: "Invoice 2024",
+				detectionSource: "llm+heuristic",
 				reason: "Detected invoice",
 			},
 			{
@@ -251,6 +255,7 @@ describe("inbox/cli-adapter", () => {
 				confidence: "medium",
 				action: "move",
 				suggestedDestination: "/vault/Resources",
+				detectionSource: "heuristic",
 				reason: "Detected note",
 			},
 		];

@@ -5,14 +5,14 @@
  * This is Stage 5 of the inbox processing pipeline - the conversion layer
  * that maps classification results to actionable suggestions.
  *
- * @module converters/suggestion-builder
+ * @module classifiers/suggestion-builder
  */
 
 import { join } from "node:path";
 import { generateTitle } from "../../core/engine-utils";
 import {
-	type Confidence,
 	CONFIDENCE_THRESHOLDS,
+	type Confidence,
 	createSuggestionId,
 	type InboxAction,
 	type InboxSuggestion,
@@ -80,7 +80,7 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 
 	const source = join(inboxFolder, filename);
 
-	// Determine confidence level and detection source
+	// Determine confidence level
 	let confidence: Confidence;
 	let action: InboxAction;
 	let suggestedNoteType: string | undefined;
@@ -92,7 +92,8 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 
 	// If LLM detected with high confidence (using CONFIDENCE_THRESHOLDS for consistency)
 	if (llmResult && llmResult.confidence >= CONFIDENCE_THRESHOLDS.MEDIUM) {
-		confidence = llmResult.confidence >= CONFIDENCE_THRESHOLDS.HIGH ? "high" : "medium";
+		confidence =
+			llmResult.confidence >= CONFIDENCE_THRESHOLDS.HIGH ? "high" : "medium";
 		action = "create-note";
 		suggestedNoteType = llmResult.documentType;
 		suggestedArea = llmResult.suggestedArea ?? undefined;
@@ -114,8 +115,14 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 		}
 	}
 	// If only heuristics detected (using CONFIDENCE_THRESHOLDS for consistency)
-	else if (heuristicResult.detected && heuristicResult.confidence > CONFIDENCE_THRESHOLDS.HEURISTIC_MIN) {
-		confidence = heuristicResult.confidence >= CONFIDENCE_THRESHOLDS.HEURISTIC_MEDIUM ? "medium" : "low";
+	else if (
+		heuristicResult.detected &&
+		heuristicResult.confidence > CONFIDENCE_THRESHOLDS.HEURISTIC_MIN
+	) {
+		confidence =
+			heuristicResult.confidence >= CONFIDENCE_THRESHOLDS.HEURISTIC_MEDIUM
+				? "medium"
+				: "low";
 		action = "create-note";
 		suggestedNoteType = heuristicResult.suggestedType;
 		reason = `Heuristic detection: ${heuristicResult.suggestedType} (${(heuristicResult.confidence * 100).toFixed(0)}% confidence)`;
@@ -162,6 +169,7 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 			source,
 			processor,
 			confidence,
+			detectionSource,
 			action: "create-note" as const,
 			suggestedNoteType: suggestedNoteType ?? "generic",
 			suggestedTitle: suggestedTitle ?? filename,
@@ -170,7 +178,6 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 			extractedFields,
 			suggestedAttachmentName,
 			extractionWarnings,
-			detectionSource,
 			reason,
 		};
 	}
@@ -181,9 +188,9 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 		source,
 		processor,
 		confidence,
+		detectionSource,
 		action: "skip" as const,
 		extractionWarnings,
-		detectionSource,
 		reason,
 	};
 }
