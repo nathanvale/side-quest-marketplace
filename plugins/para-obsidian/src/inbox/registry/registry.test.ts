@@ -8,12 +8,12 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
-import { createRegistry, hashFile } from "./registry/processed-registry";
 import {
 	type ProcessedItem,
 	type ProcessedRegistry,
 	RegistryVersion,
-} from "./types";
+} from "../types";
+import { createRegistry, hashFile } from "./processed-registry";
 
 const REGISTRY_FILE = ".inbox-processed.json";
 

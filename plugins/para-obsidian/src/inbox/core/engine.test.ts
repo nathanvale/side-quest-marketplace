@@ -10,15 +10,15 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnAndCollect } from "@sidequest/core/spawn";
 import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
-import { createInboxEngine } from "./engine";
-import { hashFile } from "./registry/processed-registry";
+import { hashFile } from "../registry/processed-registry";
 import {
 	createSuggestionId,
 	type InboxEngineConfig,
 	type InboxSuggestion,
 	isChallengeSuggestion,
 	isCreateNoteSuggestion,
-} from "./types";
+} from "../types";
+import { createInboxEngine } from "./engine";
 
 /**
  * Initialize a git repository with a clean working tree.

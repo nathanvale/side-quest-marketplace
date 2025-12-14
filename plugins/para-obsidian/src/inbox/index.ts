@@ -46,16 +46,16 @@ export type {
 	InboxPromptOptions,
 	InboxVaultContext,
 } from "./classify/llm-classifier";
+// =============================================================================
+// Engine - Main processing pipeline
+// =============================================================================
+export { createInboxEngine } from "./core/engine";
 export {
 	capitalizeFirst,
 	generateFilename,
 	generateTitle,
 	generateUniquePath,
 } from "./core/engine-utils";
-// =============================================================================
-// Engine - Main processing pipeline (will be moved to execute/)
-// =============================================================================
-export { createInboxEngine } from "./engine";
 // =============================================================================
 // Execute - Applying approved suggestions
 // =============================================================================

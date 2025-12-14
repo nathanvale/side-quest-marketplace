@@ -194,27 +194,39 @@ export async function extractPdfText(
 	// Extract text with timeout
 	const startTime = Date.now();
 	let proc: ReturnType<typeof Bun.spawn> | null = null;
-	let timeoutId: Timer | null = null;
 
 	try {
-		// Set up timeout that will kill the subprocess
-		timeoutId = setTimeout(() => {
-			if (proc && !proc.killed) {
-				log.warn`PDF extraction timeout, killing subprocess ${cid}`;
-				proc.kill();
-			}
-		}, EXTRACTION_TIMEOUT);
-
 		// Spawn pdftotext subprocess
 		proc = Bun.spawn(["pdftotext", "-layout", filePath, "-"], {
 			stdout: "pipe",
 			stderr: "pipe",
 		});
 
-		// Wait for extraction to complete
-		const exitCode = await proc.exited;
-		clearTimeout(timeoutId);
-		timeoutId = null;
+		// Race the process exit against timeout
+		const result = await Promise.race([
+			proc.exited.then((code) => ({ type: "exit" as const, code })),
+			new Promise<{ type: "timeout" }>((resolve) =>
+				setTimeout(() => resolve({ type: "timeout" }), EXTRACTION_TIMEOUT),
+			),
+		]);
+
+		// Handle timeout
+		if (result.type === "timeout") {
+			log.warn`PDF extraction timeout, killing subprocess ${cid}`;
+			proc.kill();
+			// Give it a moment to die gracefully
+			await Promise.race([
+				proc.exited,
+				new Promise((resolve) => setTimeout(resolve, 1000)),
+			]);
+			throw createInboxError("EXT_PDF_TIMEOUT", {
+				cid,
+				source: filePath,
+				timeout: EXTRACTION_TIMEOUT,
+			});
+		}
+
+		const exitCode = result.code;
 
 		if (exitCode !== 0) {
 			const stderr =
@@ -345,9 +357,6 @@ export async function extractPdfText(
 		});
 	} finally {
 		// Safety net: ensure subprocess is killed on any exit path
-		if (timeoutId !== null) {
-			clearTimeout(timeoutId);
-		}
 		if (proc && !proc.killed) {
 			proc.kill();
 		}

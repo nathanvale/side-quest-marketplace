@@ -18,41 +18,40 @@ import {
 } from "@sidequest/core/fs";
 import { globFilesSync } from "@sidequest/core/glob";
 import pLimit from "p-limit";
-import { DEFAULT_PARA_FOLDERS } from "../config/defaults";
-import { loadConfig } from "../config/index";
-import { ensureGitGuard } from "../git/index";
-import { createFromTemplate, injectSections } from "../notes/create";
-import { resolveVaultPath } from "../shared/fs";
+import { DEFAULT_PARA_FOLDERS } from "../../config/defaults";
+import { loadConfig } from "../../config/index";
+import { ensureGitGuard } from "../../git/index";
+import { createFromTemplate, injectSections } from "../../notes/create";
+import { resolveVaultPath } from "../../shared/fs";
 import {
 	createCorrelationId,
 	executeLogger,
 	inboxLogger,
 	initLoggerWithNotice,
-} from "../shared/logger";
+} from "../../shared/logger";
 import {
 	buildSuggestion,
 	DEFAULT_INBOX_CONVERTERS,
 	mapFieldsToTemplate,
-} from "./classify/converters";
+} from "../classify/converters";
 import {
 	checkPdfToText,
 	combineHeuristics,
 	extractPdfText,
-} from "./classify/detection/pdf-processor";
+} from "../classify/detection/pdf-processor";
 import {
 	buildInboxPrompt,
 	type DocumentTypeResult,
 	type InboxVaultContext,
 	parseDetectionResponse,
-} from "./classify/llm-classifier";
-import { generateFilename, generateUniquePath } from "./core/engine-utils";
-import { createRegistry, hashFile } from "./registry/processed-registry";
+} from "../classify/llm-classifier";
+import { createRegistry, hashFile } from "../registry/processed-registry";
 import {
 	createInboxFile,
 	getDefaultRegistry,
 	type InboxFile,
-} from "./scan/extractors";
-import { createInboxError } from "./shared/errors";
+} from "../scan/extractors";
+import { createInboxError } from "../shared/errors";
 import {
 	type ChallengeSuggestion,
 	createSuggestionId,
@@ -65,7 +64,8 @@ import {
 	isMoveSuggestion,
 	type ScanOptions,
 	type SuggestionId,
-} from "./types";
+} from "../types";
+import { generateFilename, generateUniquePath } from "./engine-utils";
 
 // =============================================================================
 // Engine Factory
