@@ -12,7 +12,7 @@ import {
 } from "@sidequest/core/fs";
 
 import { parseFrontmatter, serializeFrontmatter } from "../frontmatter/index";
-import { resolveVaultPath } from "../fs";
+import { resolveVaultPath } from "../shared/fs";
 import { findOrphans } from "./orphans";
 
 /**

@@ -22,10 +22,10 @@ import {
 import { globFilesSync } from "@sidequest/core/glob";
 import { getErrorMessage } from "@sidequest/core/utils";
 
-import type { ParaObsidianConfig } from "./config/index";
-import { parseFrontmatter } from "./frontmatter/index";
-import { resolveVaultPath } from "./fs";
-import { getManagedFolders } from "./git/index";
+import type { ParaObsidianConfig } from "../config/index";
+import { parseFrontmatter } from "../frontmatter/index";
+import { getManagedFolders } from "../git/index";
+import { resolveVaultPath } from "../shared/fs";
 
 /**
  * Indexed metadata for a single Markdown file.

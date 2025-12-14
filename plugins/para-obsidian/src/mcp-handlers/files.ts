@@ -22,10 +22,10 @@ import {
 	respondText,
 } from "../../mcp/utils";
 import { loadConfig } from "../config/index";
-import { listDir, readFile } from "../fs";
 import { renameWithLinkRewrite } from "../links/index";
 import { deleteFile } from "../notes/delete";
 import { type InsertMode, insertIntoNote } from "../notes/insert";
+import { listDir, readFile } from "../shared/fs";
 
 // ============================================================================
 // List Tool

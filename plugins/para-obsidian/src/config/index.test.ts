@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
-import { createTestVault } from "../test-utils";
+import { createTestVault } from "../testing/utils";
 import { DEFAULT_FRONTMATTER_RULES, DEFAULT_SUGGESTED_TAGS } from "./defaults";
 import { loadConfig } from "./index";
 

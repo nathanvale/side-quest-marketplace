@@ -10,7 +10,7 @@ import {
 	DEFAULT_OLLAMA_URL,
 	parseOllamaResponse,
 	validateModel,
-} from "./llm";
+} from "../client";
 
 describe("parseOllamaResponse", () => {
 	test("parses valid JSON response", () => {

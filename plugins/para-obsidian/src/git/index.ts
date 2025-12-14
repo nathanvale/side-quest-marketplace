@@ -18,7 +18,7 @@ import { spawnAndCollect } from "@sidequest/core/spawn";
 import { discoverAttachments } from "../attachments/index";
 import { DEFAULT_DESTINATIONS, DEFAULT_PARA_FOLDERS } from "../config/defaults";
 import type { ParaObsidianConfig } from "../config/index";
-import { resolveVaultPath } from "../fs";
+import { resolveVaultPath } from "../shared/fs";
 
 /**
  * Unescapes git's C-style quoted paths.

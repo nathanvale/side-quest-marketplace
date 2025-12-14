@@ -13,7 +13,7 @@ import {
 	runInteractiveLoop,
 } from "../inbox";
 import { isCreateNoteSuggestion } from "../inbox/types";
-import { getLogFile, initLoggerWithNotice } from "../logger";
+import { getLogFile, initLoggerWithNotice } from "../shared/logger";
 import type { CommandContext, CommandResult } from "./types";
 
 type MetricsSummary = ReturnType<MetricsCollector["getSummary"]>;

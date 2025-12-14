@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { loadConfig } from "../config/index";
-import { createTestVault, writeVaultFile } from "../test-utils";
+import { createTestVault, writeVaultFile } from "../testing/utils";
 import { deleteFile } from "./delete";
 
 describe("deleteFile", () => {

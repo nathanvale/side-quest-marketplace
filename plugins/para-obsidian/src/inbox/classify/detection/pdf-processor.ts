@@ -23,7 +23,7 @@
 import { basename } from "node:path";
 import { stat } from "@sidequest/core/fs";
 import { $ } from "bun";
-import { pdfLogger } from "../../../logger";
+import { pdfLogger } from "../../../shared/logger";
 import { createInboxError, InboxError } from "../../shared/errors";
 import type { InboxConverter } from "../converters";
 import {

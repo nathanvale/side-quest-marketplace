@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import fs from "node:fs";
-import { loadConfig } from "./config/index";
-import { buildIndex, loadIndex, saveIndex } from "./indexer";
-import { createTestVault, writeVaultFile } from "./test-utils";
+import { loadConfig } from "../../config/index";
+import { createTestVault, writeVaultFile } from "../../testing/utils";
+import { buildIndex, loadIndex, saveIndex } from "../indexer";
 
 describe("indexer", () => {
 	it("builds and loads an index", () => {

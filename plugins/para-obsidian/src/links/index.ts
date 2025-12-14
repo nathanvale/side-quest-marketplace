@@ -18,7 +18,7 @@ import { globFilesSync } from "@sidequest/core/glob";
 import { spawnSyncCollect } from "@sidequest/core/spawn";
 
 import type { ParaObsidianConfig } from "../config/index";
-import { resolveVaultPath } from "../fs";
+import { resolveVaultPath } from "../shared/fs";
 
 /**
  * Options for renaming a note with link rewriting.

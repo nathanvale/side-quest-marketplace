@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import fs from "node:fs";
-import { createTestVault, writeVaultFile } from "../test-utils";
+import { createTestVault, writeVaultFile } from "../testing/utils";
 import { findOrphans, formatFixCommand, suggestFixes } from "./orphans";
 
 describe("findOrphans", () => {

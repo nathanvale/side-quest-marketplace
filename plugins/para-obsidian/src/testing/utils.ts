@@ -6,7 +6,7 @@
  *
  * @example
  * ```ts
- * import { createTestVault, writeVaultFile, setupTestVault } from "./test-utils";
+ * import { createTestVault, writeVaultFile, setupTestVault } from "./testing/utils";
  *
  * // Create an isolated test vault
  * const vault = createTestVault();

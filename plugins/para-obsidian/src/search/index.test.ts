@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { loadConfig } from "../config/index";
-import { createTestVault, writeVaultFile } from "../test-utils";
+import { createTestVault, writeVaultFile } from "../testing/utils";
 import { filterByFrontmatter, searchText } from "./index";
 
 describe("search", () => {

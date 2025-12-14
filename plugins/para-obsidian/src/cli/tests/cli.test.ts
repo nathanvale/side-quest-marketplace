@@ -4,8 +4,8 @@ import path from "node:path";
 import { ensureDirSync, writeTextFileSync } from "@sidequest/core/fs";
 import { spawn } from "bun";
 
-import { loadConfig } from "./config/index";
-import { createTestVault } from "./test-utils";
+import { loadConfig } from "../../config/index";
+import { createTestVault } from "../../testing/utils";
 
 function writeTemplate(dir: string, name: string, content: string) {
 	ensureDirSync(dir);
@@ -22,7 +22,8 @@ async function runCli(
 	args: string[],
 	env: Record<string, string>,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-	const cliPath = path.join(import.meta.dir, "cli.ts");
+	// Navigate two directories up from tests/ to get to src/cli.ts
+	const cliPath = path.join(import.meta.dir, "..", "..", "cli.ts");
 	const proc = spawn({
 		cmd: ["bun", "run", cliPath, ...args],
 		env: { ...process.env, ...env },

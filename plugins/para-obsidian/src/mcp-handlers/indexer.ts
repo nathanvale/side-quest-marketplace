@@ -23,7 +23,7 @@ import {
 	loadIndex,
 	saveIndex,
 	scanTags,
-} from "../indexer";
+} from "../search/indexer";
 
 // ============================================================================
 // Helper: Parse key=value pairs

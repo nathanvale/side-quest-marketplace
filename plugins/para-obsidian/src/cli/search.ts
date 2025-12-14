@@ -7,8 +7,8 @@
  */
 
 import { emphasize } from "@sidequest/core/terminal";
-import { buildIndex, loadIndex, saveIndex } from "../indexer";
 import { filterByFrontmatter, searchText } from "../search/index";
+import { buildIndex, loadIndex, saveIndex } from "../search/indexer";
 import { semanticSearch } from "../search/semantic";
 import type { CommandHandler } from "./types";
 import {

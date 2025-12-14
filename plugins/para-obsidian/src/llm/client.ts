@@ -15,32 +15,32 @@ export type {
 	ConstraintSet,
 	FieldConstraint,
 	VaultContext,
-} from "./llm/constraints";
-export { buildConstraintSet } from "./llm/constraints";
+} from "./constraints";
+export { buildConstraintSet } from "./constraints";
 export type {
 	BatchConvertOptions,
 	ConversionResult,
 	ConvertNoteOptions,
 	ExtractMetadataOptions,
 	SuggestFieldValuesOptions,
-} from "./llm/orchestration";
+} from "./orchestration";
 export {
 	batchConvert,
 	convertNoteToTemplate,
 	extractMetadata,
 	getWikilinkFieldsFromRules,
 	suggestFieldValues,
-} from "./llm/orchestration";
-export type { PromptExample, PromptTemplate } from "./llm/prompt-builder";
+} from "./orchestration";
+export type { PromptExample, PromptTemplate } from "./prompt-builder";
 export {
 	buildCriticalRules,
 	buildExamplesSection,
 	buildStructuredPrompt,
 	DEFAULT_CRITICAL_RULES,
-} from "./llm/prompt-builder";
+} from "./prompt-builder";
 
 // Import default model from centralized defaults
-import { DEFAULT_MODEL } from "./config/defaults";
+import { DEFAULT_MODEL } from "../config/defaults";
 
 /** Default LLM model for extraction tasks (re-exported from defaults.ts) */
 export const DEFAULT_LLM_MODEL = DEFAULT_MODEL;

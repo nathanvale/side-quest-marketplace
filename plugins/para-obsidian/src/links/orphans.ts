@@ -20,7 +20,7 @@ import {
 } from "@sidequest/core/fs";
 
 import { parseFrontmatter } from "../frontmatter/index";
-import { resolveVaultPath } from "../fs";
+import { resolveVaultPath } from "../shared/fs";
 
 /**
  * Result of orphan detection.

@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import fs from "node:fs";
-import { createTestVault, readVaultFile, writeVaultFile } from "../test-utils";
+import {
+	createTestVault,
+	readVaultFile,
+	writeVaultFile,
+} from "../testing/utils";
 import { rewriteLinks } from "./rewrite";
 
 describe("rewriteLinks", () => {

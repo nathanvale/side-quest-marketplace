@@ -13,8 +13,8 @@ import type {
 	FrontmatterRules,
 	ParaObsidianConfig,
 } from "../config/index";
-import { readFile, resolveVaultPath } from "../fs";
 import { getManagedFolders } from "../git/index";
+import { readFile, resolveVaultPath } from "../shared/fs";
 import { parseFrontmatter } from "./parse";
 import type {
 	BulkValidationFileResult,

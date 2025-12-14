@@ -12,7 +12,7 @@ import { pathExistsSync, readDir } from "@sidequest/core/fs";
 import { spawnSyncCollect } from "@sidequest/core/spawn";
 
 import type { ParaObsidianConfig } from "../config/index";
-import { resolveVaultPath } from "../fs";
+import { resolveVaultPath } from "../shared/fs";
 
 /**
  * Options for deleting a file.

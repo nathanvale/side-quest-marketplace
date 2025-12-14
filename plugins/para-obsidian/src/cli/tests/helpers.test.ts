@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { parseArgOverrides } from "./cli-helpers";
+import { parseArgOverrides } from "../helpers";
 
 describe("parseArgOverrides", () => {
 	test("parses simple key=value pairs", () => {

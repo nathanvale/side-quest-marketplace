@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { computeFrontmatterHints, suggestFieldsForType } from "./cli";
-import type { ParaObsidianConfig } from "./config/index";
+import { computeFrontmatterHints, suggestFieldsForType } from "../../cli";
+import type { ParaObsidianConfig } from "../../config/index";
 
 describe("frontmatter suggestions", () => {
 	it("returns allowed fields and enums for known type", () => {

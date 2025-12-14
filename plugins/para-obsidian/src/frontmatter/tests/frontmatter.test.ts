@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 import { createTempDir, writeTestFile } from "@sidequest/core/testing";
-import type { ParaObsidianConfig } from "./config/index";
+import type { ParaObsidianConfig } from "../../config/index";
 import {
 	parseFrontmatter,
 	serializeFrontmatter,
@@ -10,7 +10,7 @@ import {
 	validateFrontmatter,
 	validateFrontmatterBulk,
 	validateFrontmatterFile,
-} from "./frontmatter/index";
+} from "../index";
 
 describe("frontmatter parsing", () => {
 	it("parses frontmatter and body", () => {

@@ -3,7 +3,7 @@ import path from "node:path";
 import { pathExistsSync, readTextFileSync } from "@sidequest/core/fs";
 
 import { loadConfig } from "../config/index";
-import { createTestVault, writeVaultFile } from "../test-utils";
+import { createTestVault, writeVaultFile } from "../testing/utils";
 import { renameWithLinkRewrite } from "./index";
 
 describe("renameWithLinkRewrite", () => {

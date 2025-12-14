@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { ParaObsidianConfig } from "../config/index";
-import { createTestVault, initGitRepo } from "../test-utils";
+import { createTestVault, initGitRepo } from "../testing/utils";
 import { autoCommitChanges } from "./index";
 
 describe("autoCommitChanges", () => {

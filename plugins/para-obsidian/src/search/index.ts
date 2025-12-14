@@ -18,7 +18,7 @@ import { ensureCommandAvailable, spawnAndCollect } from "@sidequest/core/spawn";
 import { parse } from "yaml";
 
 import type { ParaObsidianConfig } from "../config/index";
-import { resolveVaultPath } from "../fs";
+import { resolveVaultPath } from "../shared/fs";
 
 /**
  * Options for text search operations.

@@ -19,7 +19,7 @@ import {
 } from "@sidequest/core/fs";
 
 import { parseFrontmatter } from "../frontmatter/index";
-import { resolveVaultPath } from "../fs";
+import { resolveVaultPath } from "../shared/fs";
 
 /**
  * Safely lists directory contents, returning empty array if path doesn't exist.

@@ -10,7 +10,7 @@ import { globFilesSync } from "@sidequest/core/glob";
 import { getErrorMessage } from "@sidequest/core/utils";
 
 import type { ParaObsidianConfig } from "../config/index";
-import { resolveVaultPath } from "../fs";
+import { resolveVaultPath } from "../shared/fs";
 import { parseFrontmatter, serializeFrontmatter } from "./parse";
 import type {
 	ApplyVersionPlanOptions,

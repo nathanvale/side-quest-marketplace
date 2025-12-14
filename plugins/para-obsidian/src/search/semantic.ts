@@ -14,8 +14,8 @@
 import { spawnAndCollect } from "@sidequest/core/spawn";
 import { getErrorMessage } from "@sidequest/core/utils";
 import type { ParaObsidianConfig } from "../config/index";
-import { resolveVaultPath } from "../fs";
-import { checkKit, getKitMLErrorMessage } from "../kit-check";
+import { resolveVaultPath } from "../shared/fs";
+import { checkKit, getKitMLErrorMessage } from "./kit-check";
 
 /**
  * A single semantic search result.

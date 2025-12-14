@@ -2,9 +2,9 @@ import { describe, expect, it } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 
-import { loadConfig } from "./config/index";
-import { renameWithLinkRewrite } from "./links/index";
-import { createTestVault, writeVaultFile } from "./test-utils";
+import { loadConfig } from "../../config/index";
+import { renameWithLinkRewrite } from "../../links/index";
+import { createTestVault, writeVaultFile } from "../../testing/utils";
 
 describe("cli rename helper", () => {
 	it("renames and rewrites links", () => {

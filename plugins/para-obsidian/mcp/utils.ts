@@ -13,7 +13,7 @@ import {
 	getLogFile,
 	initLogger,
 	mcpLogger,
-} from "../src/logger";
+} from "../src/shared/logger";
 
 // ============================================================================
 // Logging

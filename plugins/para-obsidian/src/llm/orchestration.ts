@@ -23,15 +23,14 @@ import {
 	type ValidationIssue,
 	validateFrontmatterFile,
 } from "../frontmatter/index";
-import { readFile } from "../fs";
 import { autoCommitChanges } from "../git/index";
-import { listAreas, listProjects, listTags } from "../indexer";
-import { DEFAULT_LLM_MODEL, type ExtractionResult } from "../llm";
 import {
 	createFromTemplate,
 	replaceH1Title,
 	replaceSections,
 } from "../notes/create";
+import { listAreas, listProjects, listTags } from "../search/indexer";
+import { readFile } from "../shared/fs";
 import {
 	extractSourceHeadings,
 	getEditableSections,
@@ -41,6 +40,7 @@ import {
 } from "../templates/index";
 import { applyTitlePrefix } from "../utils/title";
 import { stripWikilinks } from "../utils/wikilinks";
+import { DEFAULT_LLM_MODEL, type ExtractionResult } from "./client";
 import { buildConstraintSet, type VaultContext } from "./constraints";
 import {
 	buildStructuredPrompt,

@@ -16,7 +16,7 @@ import {
 	extractMetadata,
 	getWikilinkFieldsFromRules,
 	validateModel,
-} from "../llm";
+} from "../llm/client";
 import { createFromTemplate, replaceSections } from "../notes/create";
 import type { CommandHandler } from "./types";
 import { normalizeFlags, parseArgOverrides, parseAttachments } from "./utils";

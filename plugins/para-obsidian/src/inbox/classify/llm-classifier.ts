@@ -14,7 +14,7 @@
  * ```
  */
 
-import { llmLogger } from "../../logger";
+import { llmLogger } from "../../shared/logger";
 import type { InboxConverter } from "./converters";
 
 // Non-null assertion for logger

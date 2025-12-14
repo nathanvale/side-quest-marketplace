@@ -15,7 +15,7 @@ import {
 } from "@sidequest/core/fs";
 
 import type { ParaObsidianConfig } from "../config/index";
-import { resolveVaultPath } from "../fs";
+import { resolveVaultPath } from "../shared/fs";
 
 /**
  * Insertion mode relative to a heading's content.

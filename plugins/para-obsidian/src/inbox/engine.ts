@@ -20,15 +20,15 @@ import { globFilesSync } from "@sidequest/core/glob";
 import pLimit from "p-limit";
 import { DEFAULT_PARA_FOLDERS } from "../config/defaults";
 import { loadConfig } from "../config/index";
-import { resolveVaultPath } from "../fs";
 import { ensureGitGuard } from "../git/index";
+import { createFromTemplate, injectSections } from "../notes/create";
+import { resolveVaultPath } from "../shared/fs";
 import {
 	createCorrelationId,
 	executeLogger,
 	inboxLogger,
 	initLoggerWithNotice,
-} from "../logger";
-import { createFromTemplate, injectSections } from "../notes/create";
+} from "../shared/logger";
 import {
 	buildSuggestion,
 	DEFAULT_INBOX_CONVERTERS,

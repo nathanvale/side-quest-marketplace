@@ -6,7 +6,7 @@ import {
 	inboxLogger,
 	llmLogger,
 	pdfLogger,
-} from "../logger";
+} from "../shared/logger";
 
 describe("logger", () => {
 	describe("subsystem loggers", () => {

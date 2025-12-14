@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { MetricsCollector } from "@sidequest/core/logging";
 import { createSpinner } from "nanospinner";
-import { getLogFile, initLoggerWithNotice } from "../logger";
+import { getLogFile, initLoggerWithNotice } from "../shared/logger";
 import { createInboxEngine } from "./engine";
 import type { InboxSuggestion } from "./types";
 import {

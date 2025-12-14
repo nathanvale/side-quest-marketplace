@@ -1,9 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
-
-import { listDir, readFile, resolveVaultPath } from "./fs";
-import { createTestVault } from "./test-utils";
+import { createTestVault } from "../../testing/utils";
+import { listDir, readFile, resolveVaultPath } from "../fs";
 
 describe("fs helpers", () => {
 	it("resolves vault-relative paths", () => {

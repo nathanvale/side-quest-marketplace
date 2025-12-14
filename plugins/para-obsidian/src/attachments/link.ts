@@ -24,7 +24,7 @@ import {
 } from "@sidequest/core/fs";
 
 import { parseFrontmatter, serializeFrontmatter } from "../frontmatter/index";
-import { resolveVaultPath } from "../fs";
+import { resolveVaultPath } from "../shared/fs";
 
 /**
  * Result of linking attachments to a single note.
