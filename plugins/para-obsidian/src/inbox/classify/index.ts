@@ -2,6 +2,16 @@
  * Classification functionality for determining document types and extracting fields
  */
 
+export type { Migration, MigrationFn, MigrationResult } from "./classifiers";
+// Classifier registry and migrations
+export {
+	ClassifierRegistry,
+	CURRENT_SCHEMA_VERSION,
+	getAvailableMigrations,
+	needsMigration,
+	runMigrations,
+} from "./classifiers";
+
 export {
 	findBestConverter,
 	mapFieldsToTemplate,

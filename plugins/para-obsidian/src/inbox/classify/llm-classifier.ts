@@ -14,11 +14,7 @@
  * ```
  */
 
-import { llmLogger } from "../../shared/logger";
 import type { InboxConverter } from "./converters";
-
-// Non-null assertion for logger
-const log = llmLogger as NonNullable<typeof llmLogger>;
 
 // =============================================================================
 // Types
@@ -88,13 +84,12 @@ export interface FieldExtractionResult {
  * Result of LLM document type detection.
  */
 export interface DocumentTypeResult {
-	/** Detected document type */
-	readonly documentType:
-		| "invoice"
-		| "booking"
-		| "receipt"
-		| "session"
-		| "generic";
+	/**
+	 * Detected document type.
+	 * Matches an InboxConverter id (e.g., 'invoice', 'booking').
+	 * Falls back to 'generic' if no converter matches.
+	 */
+	readonly documentType: string;
 
 	/** Confidence in the detection (0-1) */
 	readonly confidence: number;
@@ -123,9 +118,10 @@ export interface DocumentTypeResult {
 // =============================================================================
 
 /**
- * Available document types for classification.
+ * Default document types for fallback when no converters provided.
+ * @deprecated Use converters instead. This will be removed in a future version.
  */
-const DOCUMENT_TYPES = [
+const DEFAULT_DOCUMENT_TYPES = [
 	"invoice",
 	"booking",
 	"receipt",
@@ -211,10 +207,10 @@ export function buildInboxPrompt(
 
 	const userHintSection = userHint ? `\nUser hint: "${userHint}"` : "";
 
-	// Use converters if provided, otherwise fall back to DOCUMENT_TYPES
+	// Use converters if provided, otherwise fall back to DEFAULT_DOCUMENT_TYPES
 	const documentTypes = converters
 		? buildDocumentTypesFromConverters(converters)
-		: DOCUMENT_TYPES.map((t) => `- ${t}`).join("\n");
+		: DEFAULT_DOCUMENT_TYPES.map((t) => `- ${t}`).join("\n");
 
 	// Build field guidelines from converters if provided
 	let fieldGuidelines = `## Field Extraction Guidelines
@@ -347,12 +343,10 @@ export function parseDetectionResponse(response: string): DocumentTypeResult {
 		throw new Error("Missing or invalid confidence in LLM response");
 	}
 
-	// Validate document type
-	const validTypes = new Set(DOCUMENT_TYPES);
-	if (!validTypes.has(obj.documentType as (typeof DOCUMENT_TYPES)[number])) {
-		log.warn`Unknown document type from LLM: ${obj.documentType}, defaulting to generic`;
-		obj.documentType = "generic";
-	}
+	// Document type validation is lenient - any string is accepted.
+	// The caller should validate against their registered converters.
+	// If no match, they can fall back to 'generic'.
+	const documentType = String(obj.documentType).toLowerCase();
 
 	// Parse extraction warnings (ensure it's an array of strings)
 	let extractionWarnings: readonly string[] | undefined;
@@ -363,7 +357,7 @@ export function parseDetectionResponse(response: string): DocumentTypeResult {
 	}
 
 	return {
-		documentType: obj.documentType as DocumentTypeResult["documentType"],
+		documentType,
 		confidence: Math.max(0, Math.min(1, obj.confidence)),
 		suggestedArea: obj.suggestedArea as string | null | undefined,
 		suggestedProject: obj.suggestedProject as string | null | undefined,

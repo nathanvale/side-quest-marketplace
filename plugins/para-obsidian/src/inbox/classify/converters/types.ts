@@ -84,8 +84,17 @@ export interface ScoringConfig {
 /**
  * Complete inbox converter configuration.
  * Defines how to detect, extract, and create notes for a document type.
+ *
+ * @remarks Schema versioning enables future migrations when converter structure changes.
+ * Increment version when making breaking changes to converter configuration.
  */
 export interface InboxConverter {
+	/**
+	 * Schema version for migration support.
+	 * Current version: 1
+	 * Increment when making breaking changes to converter structure.
+	 */
+	readonly schemaVersion: number;
 	/** Unique identifier (e.g., 'invoice', 'booking') */
 	readonly id: string;
 	/** Human-readable name for display */

@@ -4,6 +4,7 @@ import type { InboxConverter } from "./types";
  * Invoice converter for receipts, bills, statements, tax invoices
  */
 const INVOICE_CONVERTER: InboxConverter = {
+	schemaVersion: 1,
 	id: "invoice",
 	displayName: "Invoice",
 	enabled: true,
@@ -124,6 +125,7 @@ const INVOICE_CONVERTER: InboxConverter = {
  * Booking converter for travel, accommodation, dining reservations
  */
 const BOOKING_CONVERTER: InboxConverter = {
+	schemaVersion: 1,
 	id: "booking",
 	displayName: "Booking",
 	enabled: true,

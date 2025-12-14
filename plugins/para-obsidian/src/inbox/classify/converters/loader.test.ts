@@ -263,6 +263,7 @@ describe("mergeConverters", () => {
 
 	test("adds new converter from overrides", () => {
 		const newConverter: InboxConverter = {
+			schemaVersion: 1,
 			id: "receipt",
 			displayName: "Receipt",
 			enabled: true,
