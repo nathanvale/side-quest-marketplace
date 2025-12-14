@@ -2,13 +2,13 @@
 import { MetricsCollector } from "@sidequest/core/logging";
 import { createSpinner } from "nanospinner";
 import { getLogFile, initLoggerWithNotice } from "../logger";
+import { createInboxEngine } from "./engine";
+import type { InboxSuggestion } from "./types";
 import {
 	displayResults,
 	formatSuggestionsTable,
 	runInteractiveLoop,
-} from "./cli-adapter";
-import { createInboxEngine } from "./engine";
-import type { InboxSuggestion } from "./types";
+} from "./ui/cli-adapter";
 
 async function printMetricsSummary(): Promise<void> {
 	try {

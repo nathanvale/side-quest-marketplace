@@ -13,7 +13,7 @@
 
 import { readFile } from "node:fs/promises";
 import { basename, extname } from "node:path";
-import { parseFrontmatter } from "../../frontmatter";
+import { parseFrontmatter } from "../../../frontmatter/parse";
 import type { ContentExtractor, ExtractedContent, InboxFile } from "./types";
 
 /** Supported markdown extensions */

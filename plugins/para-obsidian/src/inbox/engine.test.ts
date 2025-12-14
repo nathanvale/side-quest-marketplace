@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { spawnAndCollect } from "@sidequest/core/spawn";
 import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
 import { createInboxEngine } from "./engine";
-import { hashFile } from "./infrastructure/processed-registry";
+import { hashFile } from "./registry/processed-registry";
 import {
 	createSuggestionId,
 	type InboxEngineConfig,
@@ -525,7 +525,7 @@ describe("inbox/engine", () => {
 
 			await expect(
 				engine.challenge(nonExistentId, "This is a booking"),
-			).rejects.toThrow("Item ID not found");
+			).rejects.toThrow("Invalid item ID");
 		});
 
 		test("should throw error when id is empty", async () => {
@@ -539,7 +539,7 @@ describe("inbox/engine", () => {
 			// So an empty-looking but valid-format ID will still fail with "not found"
 			await expect(
 				engine.challenge(emptyId, "This is a booking"),
-			).rejects.toThrow("Item ID not found");
+			).rejects.toThrow("Invalid item ID");
 		});
 
 		test("should throw error when id is whitespace only", async () => {
@@ -551,7 +551,7 @@ describe("inbox/engine", () => {
 
 			await expect(
 				engine.challenge(nonExistentId, "This is a booking"),
-			).rejects.toThrow("Item ID not found");
+			).rejects.toThrow("Invalid item ID");
 		});
 
 		test("should throw error when hint is empty", async () => {
@@ -568,7 +568,7 @@ describe("inbox/engine", () => {
 				createSuggestionId("cccccccc-0000-4000-8000-000000000003");
 
 			await expect(engine.challenge(validId, "")).rejects.toThrow(
-				"Edit command requires a prompt",
+				"Edit prompt cannot be empty",
 			);
 		});
 
@@ -586,7 +586,7 @@ describe("inbox/engine", () => {
 				createSuggestionId("dddddddd-0000-4000-8000-000000000004");
 
 			await expect(engine.challenge(validId, "   ")).rejects.toThrow(
-				"Edit command requires a prompt",
+				"Edit prompt cannot be empty",
 			);
 		});
 
@@ -650,7 +650,6 @@ describe("inbox/engine", () => {
 				throw new Error("No suggestion returned from scan");
 			}
 
-
 			const hint = "This is a session note from therapy";
 			const challenged = await engine.challenge(original.id, hint);
 
@@ -675,7 +674,6 @@ describe("inbox/engine", () => {
 			if (!original) {
 				throw new Error("No suggestion returned from scan");
 			}
-
 
 			const hint = "This should be in the Work area";
 			const challenged = await engine.challenge(original.id, hint);
@@ -703,7 +701,6 @@ describe("inbox/engine", () => {
 				throw new Error("No suggestion returned from scan");
 			}
 
-
 			const challenged = await engine.challenge(
 				original.id,
 				"Reclassify as receipt",
@@ -730,7 +727,6 @@ describe("inbox/engine", () => {
 			if (!original) {
 				throw new Error("No suggestion returned from scan");
 			}
-
 
 			// Challenge the suggestion
 			await engine.challenge(original.id, "This is a booking");

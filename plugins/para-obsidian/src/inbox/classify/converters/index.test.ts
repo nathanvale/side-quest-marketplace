@@ -13,7 +13,7 @@ import { describe, expect, test } from "bun:test";
 // Import all exports from the converters module
 // =============================================================================
 
-import { isCreateNoteSuggestion } from "../types";
+import { isCreateNoteSuggestion } from "../../types";
 import {
 	// Suggestion builder
 	buildSuggestion,

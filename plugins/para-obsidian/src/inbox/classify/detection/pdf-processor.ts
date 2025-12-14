@@ -23,7 +23,8 @@
 import { basename } from "node:path";
 import { stat } from "@sidequest/core/fs";
 import { $ } from "bun";
-import { pdfLogger } from "../../logger";
+import { pdfLogger } from "../../../logger";
+import { createInboxError, InboxError } from "../../shared/errors";
 import type { InboxConverter } from "../converters";
 import {
 	DEFAULT_INBOX_CONVERTERS,
@@ -31,7 +32,6 @@ import {
 	scoreContent,
 	scoreFilename,
 } from "../converters";
-import { createInboxError, InboxError } from "../infrastructure/errors";
 
 // Non-null assertion for logger (we know it exists since we defined the subsystem)
 const log = pdfLogger as NonNullable<typeof pdfLogger>;

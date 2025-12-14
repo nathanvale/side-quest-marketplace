@@ -4,7 +4,7 @@ import {
 	type DocumentTypeResult,
 	type FieldExtractionResult,
 	parseDetectionResponse,
-} from "./llm-detection";
+} from "./llm-classifier";
 
 describe("inbox/llm-detection", () => {
 	describe("buildInboxPrompt", () => {

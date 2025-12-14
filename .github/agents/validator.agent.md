@@ -3,7 +3,7 @@ name: validator
 description: Validates code changes using TypeScript, Biome linting, and Bun tests. Runs validation pipeline and reports issues.
 model: Claude Sonnet 4
 tools:
-  ['edit/editFiles', 'search', 'usages', 'problems', 'fetch']
+  ['biome-runner/*', 'bun-runner/*', 'tsc-runner/*', 'usages']
 handoffs:
   - label: Fix Issues
     agent: agent

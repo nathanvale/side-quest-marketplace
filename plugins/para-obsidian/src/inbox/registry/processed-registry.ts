@@ -13,7 +13,7 @@
  *
  * @example
  * ```typescript
- * import { createRegistry, hashFile } from "./registry";
+ * import { createRegistry, hashFile } from "./processed-registry";
  *
  * const registry = createRegistry("/path/to/vault");
  * await registry.load();
@@ -40,13 +40,13 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
-import { executeLogger } from "../logger";
-import { createInboxError } from "./infrastructure/errors";
+import { executeLogger } from "../../logger";
+import { createInboxError } from "../shared/errors";
 import {
 	type ProcessedItem,
 	type ProcessedRegistry,
 	RegistryVersion,
-} from "./types";
+} from "../types";
 
 // =============================================================================
 // Constants

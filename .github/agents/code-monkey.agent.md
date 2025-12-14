@@ -3,13 +3,7 @@ name: Code Monkey
 description: Implementation agent for SideQuest plugins. Use when writing TypeScript code, MCP servers, or plugin features.
 model: Claude Sonnet 4
 tools:
-  - search
-  - codebase
-  - editFiles
-  - runCommand
-  - usages
-  - problems
-  - fetch
+  ['edit/editFiles', 'search', 'runCommands', 'GitKraken/*', 'biome-runner/*', 'bun-runner/*', 'git-intelligence/*', 'kit/*', 'tsc-runner/*', 'usages', 'problems', 'changes', 'fetch']
 handoffs:
   - label: Review Code
     agent: agent

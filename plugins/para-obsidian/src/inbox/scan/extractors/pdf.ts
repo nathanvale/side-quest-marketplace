@@ -8,7 +8,10 @@
  */
 
 import { basename, extname } from "node:path";
-import { checkPdfToText, extractPdfText } from "../detection/pdf-processor";
+import {
+	checkPdfToText,
+	extractPdfText,
+} from "../../classify/detection/pdf-processor";
 import type { ContentExtractor, ExtractedContent, InboxFile } from "./types";
 
 /**

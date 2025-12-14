@@ -9,15 +9,15 @@
  */
 
 import { join } from "node:path";
-import { generateTitle } from "../core/engine-utils";
-import type { DocumentTypeResult } from "../llm-detection";
+import { generateTitle } from "../../core/engine-utils";
 import {
 	type Confidence,
 	createSuggestionId,
 	type InboxAction,
 	type InboxSuggestion,
 	type ProcessorType,
-} from "../types";
+} from "../../types";
+import type { DocumentTypeResult } from "../llm-classifier";
 
 // =============================================================================
 // Types

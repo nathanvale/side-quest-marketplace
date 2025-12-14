@@ -7,8 +7,8 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import type { DocumentTypeResult } from "../llm-detection";
-import { isCreateNoteSuggestion } from "../types";
+import { isCreateNoteSuggestion } from "../../types";
+import type { DocumentTypeResult } from "../llm-classifier";
 import {
 	buildSuggestion,
 	type HeuristicResult,

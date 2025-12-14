@@ -2,22 +2,14 @@
  * Inbox Processing Framework
  *
  * Main entry point for inbox processing functionality.
- * Re-exports all public APIs from submodules.
+ * Re-exports all public APIs from domain-organized submodules.
  *
  * @module inbox
  */
 
-export type { InteractiveOptions } from "./cli-adapter";
-// CLI Adapter
-export {
-	displayResults,
-	formatConfidence,
-	formatSuggestion,
-	formatSuggestionsTable,
-	getHelpText,
-	parseCommand,
-	runInteractiveLoop,
-} from "./cli-adapter";
+// =============================================================================
+// Classify - Document classification and field extraction
+// =============================================================================
 export type {
 	ConverterMatch,
 	ExtractionConfig,
@@ -28,46 +20,63 @@ export type {
 	InboxConverter,
 	ScoringConfig,
 	SuggestionInput,
-	TemplateConfig,
-} from "./converters";
-// Converters (re-export from subdomain)
+} from "./classify";
 export {
+	buildEditPrompt,
+	buildInboxPrompt,
 	buildSuggestion,
-	DEFAULT_INBOX_CONVERTERS,
-	findBestConverter,
+	checkPdfToText,
+	combineHeuristics,
+	DEFAULT_INBOX_CONVERTERS as DEFAULT_CONVERTERS,
+	extractPdfText as extractPdfContent,
+	extractPdfText,
+	findBestConverter as findConverterMatch,
 	mapFieldsToTemplate,
 	mergeConverters,
+	parseDetectionResponse,
 	scoreContent,
 	scoreFilename,
-} from "./converters";
-// Engine utilities
+} from "./classify";
+// Converter types
+export type { TemplateConfig } from "./classify/converters/types";
+// LLM Detection types
+export type {
+	DocumentTypeResult,
+	FieldExtractionResult,
+	InboxPromptOptions,
+	InboxVaultContext,
+} from "./classify/llm-classifier";
 export {
 	capitalizeFirst,
 	generateFilename,
 	generateTitle,
 	generateUniquePath,
 } from "./core/engine-utils";
-// PDF processor
-export {
-	checkPdfToText,
-	combineHeuristics,
-	extractPdfText,
-} from "./detection/pdf-processor";
-// Engine
+// =============================================================================
+// Engine - Main processing pipeline (will be moved to execute/)
+// =============================================================================
 export { createInboxEngine } from "./engine";
+// =============================================================================
+// Execute - Applying approved suggestions
+// =============================================================================
+export type { ExecutionResult } from "./execute";
+// Legacy exports removed - now exported from ./classify above
+// =============================================================================
+// Registry - Tracking processed items
+// =============================================================================
+export type { RegistryManager } from "./registry";
+export { createRegistry, hashFile } from "./registry";
+// =============================================================================
+// Scan - Content extraction from files
+// =============================================================================
 export type {
 	ContentExtractor,
 	ExtractedContent,
 	ExtractedMetadata,
 	ExtractionSource,
 	ExtractorMatch,
-	ImageExtension,
-	ImageExtractionMetadata,
 	InboxFile,
-	MarkdownExtension,
-	MarkdownExtractionMetadata,
-} from "./extractors";
-// Extractors (re-export from subdomain)
+} from "./scan";
 export {
 	createDefaultRegistry,
 	createImageInboxFile,
@@ -87,31 +96,30 @@ export {
 	readImageAsBase64,
 	resetDefaultRegistry,
 	VISION_EXTRACTION_PROMPT,
-} from "./extractors";
-// Errors
-export { createInboxError, InboxError } from "./infrastructure/errors";
-export type { RegistryManager } from "./infrastructure/processed-registry";
-// Processed Registry
-export { createRegistry, hashFile } from "./infrastructure/processed-registry";
+} from "./scan";
+// Extractor types from their specific modules
 export type {
-	DocumentTypeResult,
-	FieldExtractionResult,
-	InboxPromptOptions,
-	InboxVaultContext,
-} from "./llm-detection";
-// LLM Detection
+	ImageExtension,
+	ImageExtractionMetadata,
+	MarkdownExtension,
+	MarkdownExtractionMetadata,
+} from "./scan/extractors";
+export type { ErrorCategory, ErrorCode, ErrorContext } from "./shared";
+// =============================================================================
+// Shared - Errors and utilities
+// =============================================================================
 export {
-	buildInboxPrompt,
-	parseDetectionResponse,
-} from "./llm-detection";
-// Types
+	createInboxError,
+	InboxError,
+	isInboxError,
+	isRecoverableError,
+} from "./shared";
+// =============================================================================
+// Types - All type definitions
+// =============================================================================
 export type {
 	Confidence,
-	ErrorCategory,
-	ErrorCode,
-	ErrorContext,
 	ExecuteOptions,
-	ExecutionResult,
 	InboxAction,
 	InboxEngine,
 	InboxEngineConfig,
@@ -120,6 +128,7 @@ export type {
 	OrchestratorResult,
 	ProcessedItem,
 	ProcessedRegistry,
+	ProcessInboxOptions,
 	ProcessorResult,
 	ProcessorType,
 	RegistryMetadata,
@@ -127,9 +136,23 @@ export type {
 	ScanProgress,
 	SuggestionId,
 } from "./types";
+
 // SuggestionId utilities and enum
 export {
 	createSuggestionId,
 	isValidSuggestionId,
 	RegistryVersion,
 } from "./types";
+// =============================================================================
+// UI - Terminal interaction
+// =============================================================================
+export type { InteractiveOptions } from "./ui";
+export {
+	displayResults,
+	formatConfidence,
+	formatSuggestion,
+	formatSuggestionsTable,
+	getHelpText,
+	parseCommand,
+	runInteractiveLoop,
+} from "./ui";

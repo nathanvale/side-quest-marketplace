@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { createSuggestionId, type InboxSuggestion } from "../types";
 import {
 	formatConfidence,
 	formatSuggestion,
@@ -6,7 +7,6 @@ import {
 	getHelpText,
 	parseCommand,
 } from "./cli-adapter";
-import { createSuggestionId, type InboxSuggestion } from "./types";
 
 describe("inbox/cli-adapter", () => {
 	describe("parseCommand", () => {

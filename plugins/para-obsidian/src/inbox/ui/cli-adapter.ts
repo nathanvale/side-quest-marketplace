@@ -15,8 +15,8 @@ import type {
 	InboxEngine,
 	InboxSuggestion,
 	SuggestionId,
-} from "./types";
-import { isCreateNoteSuggestion } from "./types";
+} from "../types";
+import { isCreateNoteSuggestion } from "../types";
 
 // =============================================================================
 // Command Parsing

@@ -15,7 +15,10 @@ import path from "node:path";
 import { pathExistsSync, readTextFileSync } from "@sidequest/core/fs";
 import { getErrorMessage } from "@sidequest/core/utils";
 import type { InboxConverter } from "../inbox";
-import { DEFAULT_INBOX_CONVERTERS, mergeConverters } from "../inbox";
+import {
+	DEFAULT_CONVERTERS as DEFAULT_INBOX_CONVERTERS,
+	mergeConverters,
+} from "../inbox";
 import {
 	DEFAULT_AVAILABLE_MODELS,
 	DEFAULT_DESTINATIONS,

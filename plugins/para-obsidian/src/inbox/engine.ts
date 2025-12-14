@@ -33,26 +33,26 @@ import {
 	buildSuggestion,
 	DEFAULT_INBOX_CONVERTERS,
 	mapFieldsToTemplate,
-} from "./converters";
-import { generateFilename, generateUniquePath } from "./core/engine-utils";
+} from "./classify/converters";
 import {
 	checkPdfToText,
 	combineHeuristics,
 	extractPdfText,
-} from "./detection/pdf-processor";
-import {
-	createInboxFile,
-	getDefaultRegistry,
-	type InboxFile,
-} from "./extractors";
-import { createInboxError } from "./infrastructure/errors";
-import { createRegistry, hashFile } from "./infrastructure/processed-registry";
+} from "./classify/detection/pdf-processor";
 import {
 	buildInboxPrompt,
 	type DocumentTypeResult,
 	type InboxVaultContext,
 	parseDetectionResponse,
-} from "./llm-detection";
+} from "./classify/llm-classifier";
+import { generateFilename, generateUniquePath } from "./core/engine-utils";
+import { createRegistry, hashFile } from "./registry/processed-registry";
+import {
+	createInboxFile,
+	getDefaultRegistry,
+	type InboxFile,
+} from "./scan/extractors";
+import { createInboxError } from "./shared/errors";
 import {
 	type ChallengeSuggestion,
 	createSuggestionId,
