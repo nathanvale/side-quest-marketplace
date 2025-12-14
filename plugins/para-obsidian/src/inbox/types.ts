@@ -353,6 +353,9 @@ export interface ExecutionResult {
 
 	/** Error message if execution failed */
 	readonly error?: string;
+
+	/** Warning message if operation partially succeeded */
+	readonly warning?: string;
 }
 
 /**
@@ -435,6 +438,12 @@ export interface ProcessedItem {
 
 	/** Path to moved attachment (if any) */
 	readonly movedAttachment?: string;
+
+	/** Flag indicating note is orphaned in staging (Layer 4 cleanup marker) */
+	readonly orphanedInStaging?: boolean;
+
+	/** Flag indicating operation is still in progress (Layer 2 tracking) */
+	readonly inProgress?: boolean;
 }
 
 /**

@@ -133,6 +133,27 @@ export interface RegistryManager {
 	 * @returns ProcessedItem if found, undefined otherwise
 	 */
 	getItem(hash: string): ProcessedItem | undefined;
+
+	/**
+	 * Get all processed items.
+	 *
+	 * @returns Array of all processed items
+	 */
+	getAllItems(): ProcessedItem[];
+
+	/**
+	 * Mark an operation as in-progress (Layer 2 defense).
+	 *
+	 * @param item - Item with inProgress flag
+	 */
+	markInProgress(item: ProcessedItem & { inProgress?: boolean }): void;
+
+	/**
+	 * Clear in-progress flag for a hash.
+	 *
+	 * @param hash - SHA256 hash to clear
+	 */
+	clearInProgress(hash: string): void;
 }
 
 // =============================================================================
@@ -512,11 +533,56 @@ export function createRegistry(vaultPath: string): RegistryManager {
 		return items.get(hash);
 	}
 
+	/**
+	 * Get all processed items.
+	 */
+	function getAllItems(): ProcessedItem[] {
+		return Array.from(items.values());
+	}
+
+	/**
+	 * Mark operation as in-progress.
+	 */
+	function markInProgress(
+		item: ProcessedItem & { inProgress?: boolean },
+	): void {
+		items.set(item.sourceHash, item as ProcessedItem);
+		log.debug("Item marked in-progress", {
+			hash: `${item.sourceHash.slice(0, 8)}...`,
+			path: item.sourcePath,
+		});
+	}
+
+	/**
+	 * Clear in-progress flag for a hash.
+	 */
+	function clearInProgress(hash: string): void {
+		const item = items.get(hash);
+		if (item) {
+			const updated: ProcessedItem = {
+				sourceHash: item.sourceHash,
+				sourcePath: item.sourcePath,
+				processedAt: item.processedAt,
+				createdNote: item.createdNote,
+				movedAttachment: item.movedAttachment,
+				orphanedInStaging: item.orphanedInStaging,
+				inProgress: false,
+			};
+			items.set(hash, updated);
+			log.debug("Cleared in-progress flag", {
+				hash: `${hash.slice(0, 8)}...`,
+			});
+		}
+	}
+
 	return {
 		load,
 		save,
 		isProcessed,
 		markProcessed,
 		getItem,
+		getAllItems,
+		markInProgress,
+		clearInProgress,
 	};
 }
