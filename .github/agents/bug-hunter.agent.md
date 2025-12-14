@@ -1,7 +1,7 @@
 ---
 name: Bug Hunter
 description: Systematic root cause analysis to identify bugs, edge cases, and silent failures through deep call chain tracing
-model: Claude Sonnet 4
+model: Claude Opus 4.5 (Preview)
 tools:
   - search
   - codebase
