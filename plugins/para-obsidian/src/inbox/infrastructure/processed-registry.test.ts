@@ -8,7 +8,11 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
-import type { ProcessedItem, ProcessedRegistry } from "../types";
+import {
+	type ProcessedItem,
+	type ProcessedRegistry,
+	RegistryVersion,
+} from "../types";
 import { createRegistry, hashFile } from "./processed-registry";
 
 const REGISTRY_FILE = ".inbox-processed.json";
@@ -137,7 +141,7 @@ describe("inbox/registry", () => {
 
 		test("should load existing registry from disk", async () => {
 			const existingRegistry: ProcessedRegistry = {
-				version: 1,
+				version: RegistryVersion.V1,
 				items: [
 					{
 						sourceHash: testHash("abc123"),
@@ -218,14 +222,14 @@ describe("inbox/registry", () => {
 			const saved = JSON.parse(
 				await Bun.file(join(TEST_DIR, REGISTRY_FILE)).text(),
 			) as ProcessedRegistry;
-			expect(saved.version).toBe(1);
+			expect(saved.version).toBe(RegistryVersion.V1);
 			expect(saved.items).toHaveLength(1);
 			expect(saved.items[0]?.sourceHash).toBe(testHash("hash123"));
 		});
 
 		test("should overwrite existing registry file", async () => {
 			const existingRegistry: ProcessedRegistry = {
-				version: 1,
+				version: RegistryVersion.V1,
 				items: [
 					{
 						sourceHash: testHash("old"),
@@ -302,7 +306,7 @@ describe("inbox/registry", () => {
 
 		test("should return true for hash loaded from disk", async () => {
 			const existingRegistry: ProcessedRegistry = {
-				version: 1,
+				version: RegistryVersion.V1,
 				items: [
 					{
 						sourceHash: testHash("disk-hash"),
@@ -404,7 +408,7 @@ describe("inbox/registry", () => {
 				createdNote: "/notes/disk.md",
 			};
 			const existingRegistry: ProcessedRegistry = {
-				version: 1,
+				version: RegistryVersion.V1,
 				items: [item],
 			};
 			writeFileSync(
@@ -426,7 +430,7 @@ describe("inbox/registry", () => {
 	describe("concurrent access", () => {
 		test("should handle multiple registries reading same file", async () => {
 			const existingRegistry: ProcessedRegistry = {
-				version: 1,
+				version: RegistryVersion.V1,
 				items: [
 					{
 						sourceHash: testHash("shared"),
@@ -481,7 +485,7 @@ describe("inbox/registry", () => {
 	describe("edge cases", () => {
 		test("should handle empty items array in registry", async () => {
 			const emptyRegistry: ProcessedRegistry = {
-				version: 1,
+				version: RegistryVersion.V1,
 				items: [],
 			};
 			writeFileSync(

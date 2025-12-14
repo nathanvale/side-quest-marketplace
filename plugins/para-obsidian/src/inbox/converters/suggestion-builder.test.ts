@@ -8,6 +8,7 @@
 
 import { describe, expect, test } from "bun:test";
 import type { DocumentTypeResult } from "../llm-detection";
+import { isCreateNoteSuggestion } from "../types";
 import {
 	buildSuggestion,
 	type HeuristicResult,
@@ -73,7 +74,9 @@ describe("converters/suggestion-builder", () => {
 
 				expect(result.confidence).toBe("high");
 				expect(result.action).toBe("create-note");
-				expect(result.suggestedNoteType).toBe("invoice");
+				if (isCreateNoteSuggestion(result)) {
+					expect(result.suggestedNoteType).toBe("invoice");
+				}
 			});
 
 			test("should use LLM result with high confidence (0.7-0.9) → MEDIUM", () => {
@@ -88,7 +91,9 @@ describe("converters/suggestion-builder", () => {
 
 				expect(result.confidence).toBe("medium");
 				expect(result.action).toBe("create-note");
-				expect(result.suggestedNoteType).toBe("booking");
+				if (isCreateNoteSuggestion(result)) {
+					expect(result.suggestedNoteType).toBe("booking");
+				}
 			});
 
 			test("should extract suggestedArea from LLM result", () => {
@@ -101,7 +106,10 @@ describe("converters/suggestion-builder", () => {
 
 				const result = buildSuggestion(input);
 
-				expect(result.suggestedArea).toBe("Health");
+				expect(result.action).toBe("create-note");
+				if (isCreateNoteSuggestion(result)) {
+					expect(result.suggestedArea).toBe("Health");
+				}
 			});
 
 			test("should extract suggestedProject from LLM result", () => {
@@ -114,7 +122,10 @@ describe("converters/suggestion-builder", () => {
 
 				const result = buildSuggestion(input);
 
-				expect(result.suggestedProject).toBe("2024 Tax Return");
+				expect(result.action).toBe("create-note");
+				if (isCreateNoteSuggestion(result)) {
+					expect(result.suggestedProject).toBe("2024 Tax Return");
+				}
 			});
 
 			test("should extract extractedFields from LLM result", () => {
@@ -131,11 +142,14 @@ describe("converters/suggestion-builder", () => {
 
 				const result = buildSuggestion(input);
 
-				expect(result.extractedFields).toEqual({
-					amount: "$150.00",
-					provider: "Dr Smith",
-					date: "2024-01-15",
-				});
+				expect(result.action).toBe("create-note");
+				if (isCreateNoteSuggestion(result)) {
+					expect(result.extractedFields).toEqual({
+						amount: "$150.00",
+						provider: "Dr Smith",
+						date: "2024-01-15",
+					});
+				}
 			});
 
 			test("should use LLM reasoning if provided", () => {
@@ -176,9 +190,12 @@ describe("converters/suggestion-builder", () => {
 
 				const result = buildSuggestion(input);
 
-				expect(result.suggestedAttachmentName).toBe(
-					"dr-smith-invoice-jan-2024",
-				);
+				expect(result.action).toBe("create-note");
+				if (isCreateNoteSuggestion(result)) {
+					expect(result.suggestedAttachmentName).toBe(
+						"dr-smith-invoice-jan-2024",
+					);
+				}
 			});
 		});
 
@@ -218,7 +235,10 @@ describe("converters/suggestion-builder", () => {
 				const result = buildSuggestion(input);
 
 				expect(result.confidence).toBe("medium"); // No boost
-				expect(result.suggestedNoteType).toBe("invoice"); // Uses LLM
+				expect(result.action).toBe("create-note");
+				if (isCreateNoteSuggestion(result)) {
+					expect(result.suggestedNoteType).toBe("invoice"); // Uses LLM
+				}
 			});
 
 			test("should NOT boost when heuristics not detected", () => {
@@ -254,7 +274,9 @@ describe("converters/suggestion-builder", () => {
 
 				expect(result.confidence).toBe("medium");
 				expect(result.action).toBe("create-note");
-				expect(result.suggestedNoteType).toBe("booking");
+				if (isCreateNoteSuggestion(result)) {
+					expect(result.suggestedNoteType).toBe("booking");
+				}
 				expect(result.reason).toContain("Heuristic detection: booking");
 				expect(result.reason).toContain("85%");
 			});
@@ -273,7 +295,9 @@ describe("converters/suggestion-builder", () => {
 
 				expect(result.confidence).toBe("low");
 				expect(result.action).toBe("create-note");
-				expect(result.suggestedNoteType).toBe("receipt");
+				if (isCreateNoteSuggestion(result)) {
+					expect(result.suggestedNoteType).toBe("receipt");
+				}
 			});
 
 			test("should prefer LLM over heuristics when LLM confidence ≥0.7", () => {
@@ -292,7 +316,10 @@ describe("converters/suggestion-builder", () => {
 				const result = buildSuggestion(input);
 
 				// LLM takes precedence even with lower confidence than heuristics
-				expect(result.suggestedNoteType).toBe("invoice");
+				expect(result.action).toBe("create-note");
+				if (isCreateNoteSuggestion(result)) {
+					expect(result.suggestedNoteType).toBe("invoice");
+				}
 			});
 
 			test("should use heuristics when LLM confidence <0.7", () => {
@@ -311,7 +338,10 @@ describe("converters/suggestion-builder", () => {
 				const result = buildSuggestion(input);
 
 				// Heuristics take over because LLM is below threshold
-				expect(result.suggestedNoteType).toBe("booking");
+				expect(result.action).toBe("create-note");
+				if (isCreateNoteSuggestion(result)) {
+					expect(result.suggestedNoteType).toBe("booking");
+				}
 				expect(result.confidence).toBe("low"); // 0.7 < 0.8, so low
 			});
 		});
@@ -333,7 +363,9 @@ describe("converters/suggestion-builder", () => {
 
 				expect(result.confidence).toBe("low");
 				expect(result.action).toBe("create-note");
-				expect(result.suggestedNoteType).toBe("session");
+				if (isCreateNoteSuggestion(result)) {
+					expect(result.suggestedNoteType).toBe("session");
+				}
 				expect(result.reason).toContain("Low confidence LLM detection");
 			});
 
@@ -353,7 +385,6 @@ describe("converters/suggestion-builder", () => {
 
 				expect(result.confidence).toBe("low");
 				expect(result.action).toBe("skip");
-				expect(result.suggestedNoteType).toBe("generic");
 			});
 		});
 
@@ -371,7 +402,6 @@ describe("converters/suggestion-builder", () => {
 
 				expect(result.confidence).toBe("low");
 				expect(result.action).toBe("skip");
-				expect(result.suggestedNoteType).toBeUndefined();
 				expect(result.reason).toBe("Unable to determine document type");
 			});
 
@@ -442,7 +472,10 @@ describe("converters/suggestion-builder", () => {
 
 				const result = buildSuggestion(input);
 
-				expect(result.suggestedTitle).toBeDefined();
+				expect(result.action).toBe("create-note");
+				if (isCreateNoteSuggestion(result)) {
+					expect(result.suggestedTitle).toBeDefined();
+				}
 			});
 		});
 
@@ -457,7 +490,10 @@ describe("converters/suggestion-builder", () => {
 
 				const result = buildSuggestion(input);
 
-				expect(result.suggestedArea).toBeUndefined();
+				expect(result.action).toBe("create-note");
+				if (isCreateNoteSuggestion(result)) {
+					expect(result.suggestedArea).toBeUndefined();
+				}
 			});
 
 			test("should handle null suggestedProject in LLM result", () => {
@@ -470,7 +506,10 @@ describe("converters/suggestion-builder", () => {
 
 				const result = buildSuggestion(input);
 
-				expect(result.suggestedProject).toBeUndefined();
+				expect(result.action).toBe("create-note");
+				if (isCreateNoteSuggestion(result)) {
+					expect(result.suggestedProject).toBeUndefined();
+				}
 			});
 
 			test("should handle null extractedFields in LLM result", () => {
@@ -483,7 +522,10 @@ describe("converters/suggestion-builder", () => {
 
 				const result = buildSuggestion(input);
 
-				expect(result.extractedFields).toBeUndefined();
+				expect(result.action).toBe("create-note");
+				if (isCreateNoteSuggestion(result)) {
+					expect(result.extractedFields).toBeUndefined();
+				}
 			});
 
 			test("should handle confidence exactly at 0.7 threshold", () => {
@@ -498,7 +540,10 @@ describe("converters/suggestion-builder", () => {
 
 				// 0.7 should trigger LLM path (>= 0.7)
 				expect(result.confidence).toBe("medium");
-				expect(result.suggestedNoteType).toBe("invoice");
+				expect(result.action).toBe("create-note");
+				if (isCreateNoteSuggestion(result)) {
+					expect(result.suggestedNoteType).toBe("invoice");
+				}
 			});
 
 			test("should handle confidence exactly at 0.9 threshold", () => {
@@ -545,7 +590,9 @@ describe("converters/suggestion-builder", () => {
 
 				// 0.51 should trigger heuristic path
 				expect(result.action).toBe("create-note");
-				expect(result.suggestedNoteType).toBe("invoice");
+				if (isCreateNoteSuggestion(result)) {
+					expect(result.suggestedNoteType).toBe("invoice");
+				}
 			});
 		});
 	});

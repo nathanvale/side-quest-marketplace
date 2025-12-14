@@ -142,18 +142,31 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 		? llmResult.suggestedFilenameDescription
 		: undefined;
 
+	// Return properly typed discriminated union based on action
+	if (action === "create-note") {
+		return {
+			id: createSuggestionId(crypto.randomUUID()),
+			source,
+			processor,
+			confidence,
+			action: "create-note" as const,
+			suggestedNoteType: suggestedNoteType ?? "generic",
+			suggestedTitle: suggestedTitle ?? filename,
+			suggestedArea,
+			suggestedProject,
+			extractedFields,
+			suggestedAttachmentName,
+			reason,
+		};
+	}
+
+	// Skip action - no suggestedNoteType or suggestedTitle
 	return {
 		id: createSuggestionId(crypto.randomUUID()),
 		source,
 		processor,
 		confidence,
-		action,
-		suggestedNoteType,
-		suggestedTitle,
-		suggestedArea,
-		suggestedProject,
-		extractedFields,
-		suggestedAttachmentName,
+		action: "skip" as const,
 		reason,
 	};
 }

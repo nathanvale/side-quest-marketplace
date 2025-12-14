@@ -116,14 +116,20 @@ export type {
 	InboxEngine,
 	InboxEngineConfig,
 	InboxSuggestion,
+	MigrationRecord,
 	OrchestratorResult,
 	ProcessedItem,
 	ProcessedRegistry,
 	ProcessorResult,
 	ProcessorType,
+	RegistryMetadata,
 	ScanOptions,
 	ScanProgress,
 	SuggestionId,
 } from "./types";
-// SuggestionId utilities
-export { createSuggestionId, isValidSuggestionId } from "./types";
+// SuggestionId utilities and enum
+export {
+	createSuggestionId,
+	isValidSuggestionId,
+	RegistryVersion,
+} from "./types";

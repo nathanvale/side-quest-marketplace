@@ -12,6 +12,7 @@ import {
 	formatSuggestionsTable,
 	runInteractiveLoop,
 } from "../inbox";
+import { isCreateNoteSuggestion } from "../inbox/types";
 import { getLogFile, initLoggerWithNotice } from "../logger";
 import type { CommandContext, CommandResult } from "./types";
 
@@ -107,7 +108,9 @@ export async function handleProcessInbox(
 		? suggestions.filter(
 				(s) =>
 					s.source.includes(filterPattern) ||
-					(s.suggestedTitle?.includes(filterPattern) ?? false),
+					(isCreateNoteSuggestion(s) &&
+						s.suggestedTitle?.includes(filterPattern)) ||
+					false,
 			)
 		: suggestions;
 

@@ -42,7 +42,11 @@ import {
 import { dirname, join } from "node:path";
 import { executeLogger } from "../logger";
 import { createInboxError } from "./infrastructure/errors";
-import type { ProcessedItem, ProcessedRegistry } from "./types";
+import {
+	type ProcessedItem,
+	type ProcessedRegistry,
+	RegistryVersion,
+} from "./types";
 
 // =============================================================================
 // Constants
@@ -52,7 +56,7 @@ import type { ProcessedItem, ProcessedRegistry } from "./types";
 const REGISTRY_FILE = ".inbox-processed.json";
 
 /** Current registry schema version */
-const REGISTRY_VERSION = 1 as const;
+const REGISTRY_VERSION = RegistryVersion.V1;
 
 /** Lock file acquisition timeout (30 seconds) */
 const LOCK_TIMEOUT = 30_000;

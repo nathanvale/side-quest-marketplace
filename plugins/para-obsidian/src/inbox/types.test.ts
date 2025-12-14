@@ -13,6 +13,7 @@ import {
 	type ProcessedRegistry,
 	type ProcessorResult,
 	type ProcessorType,
+	RegistryVersion,
 	type SuggestionId,
 } from "./types";
 
@@ -59,7 +60,7 @@ describe("inbox/types", () => {
 			};
 
 			expect(suggestion.action).toBe("skip");
-			expect(suggestion.suggestedTitle).toBeUndefined();
+			// SkipSuggestion doesn't have suggestedTitle field (type safety!)
 		});
 	});
 
@@ -75,6 +76,8 @@ describe("inbox/types", () => {
 						processor: "attachments",
 						confidence: "high",
 						action: "create-note",
+						suggestedNoteType: "invoice",
+						suggestedTitle: "Invoice",
 						reason: "Invoice detected",
 					},
 				],
@@ -123,7 +126,7 @@ describe("inbox/types", () => {
 	describe("ProcessedRegistry", () => {
 		test("should track processed items with hashes", () => {
 			const registry: ProcessedRegistry = {
-				version: 1,
+				version: RegistryVersion.V1,
 				items: [
 					{
 						sourceHash: "sha256-abc123...",
@@ -173,6 +176,8 @@ describe("inbox/types", () => {
 					processor: "attachments",
 					confidence: "medium",
 					action: "create-note",
+					suggestedNoteType: "document",
+					suggestedTitle: "Updated Document",
 					reason: "Updated",
 				}),
 				execute: async (_ids: SuggestionId[]) => [],
@@ -183,6 +188,8 @@ describe("inbox/types", () => {
 					processor: "attachments",
 					confidence: "high",
 					action: "create-note",
+					suggestedNoteType: "document",
+					suggestedTitle: "Re-classified Document",
 					reason: "Re-classified",
 				}),
 			};

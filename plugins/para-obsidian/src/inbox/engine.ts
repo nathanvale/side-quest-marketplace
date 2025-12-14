@@ -54,12 +54,17 @@ import {
 	parseDetectionResponse,
 } from "./llm-detection";
 import {
+	type ChallengeSuggestion,
 	createSuggestionId,
 	type ExecuteOptions,
 	type ExecutionResult,
 	type InboxEngine,
 	type InboxEngineConfig,
 	type InboxSuggestion,
+	isCreateNoteSuggestion,
+	isLinkSuggestion,
+	isMoveSuggestion,
+	isRenameSuggestion,
 	type ScanOptions,
 	type SuggestionId,
 } from "./types";
@@ -647,7 +652,9 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 
 		// Store previous classification for audit trail BEFORE any mutation
 		const previousClassification = {
-			documentType: original.suggestedNoteType,
+			documentType: isCreateNoteSuggestion(original)
+				? original.suggestedNoteType
+				: undefined,
 			confidence: original.confidence,
 			reason: original.reason,
 		};
@@ -667,8 +674,12 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 
 		// Create final suggestion with challenge metadata
 		// Only mutate cache after successful re-classification
-		const challengedSuggestion: InboxSuggestion = {
-			...updated,
+		const challengedSuggestion: ChallengeSuggestion = {
+			id: updated.id,
+			source: updated.source,
+			processor: updated.processor,
+			confidence: updated.confidence,
+			action: "challenge",
 			hint: trimmedHint,
 			previousClassification,
 			reason: `Challenged: "${trimmedHint}" → ${updated.reason}`,
@@ -677,7 +688,10 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		suggestionCache.set(id, challengedSuggestion);
 
 		if (inboxLogger) {
-			inboxLogger.info`Challenge complete id=${id} oldType=${previousClassification.documentType} newType=${challengedSuggestion.suggestedNoteType} cid=${cid}`;
+			const newType = isCreateNoteSuggestion(updated)
+				? updated.suggestedNoteType
+				: undefined;
+			inboxLogger.info`Challenge complete id=${id} oldType=${previousClassification.documentType} newType=${newType} cid=${cid}`;
 		}
 
 		return challengedSuggestion;
@@ -728,10 +742,13 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			lines.push(`- **Action:** ${suggestion.action}`);
 			lines.push(`- **Confidence:** ${suggestion.confidence}`);
 			lines.push(`- **Processor:** ${suggestion.processor}`);
-			if (suggestion.suggestedTitle) {
+			if (isCreateNoteSuggestion(suggestion) && suggestion.suggestedTitle) {
 				lines.push(`- **Suggested Title:** ${suggestion.suggestedTitle}`);
 			}
-			if (suggestion.suggestedDestination) {
+			if (
+				(isCreateNoteSuggestion(suggestion) || isMoveSuggestion(suggestion)) &&
+				suggestion.suggestedDestination
+			) {
 				lines.push(
 					`- **Suggested Destination:** ${suggestion.suggestedDestination}`,
 				);
@@ -867,7 +884,18 @@ async function executeSuggestion(
 	// Generate dated attachment name: YYYYMMDD-HHMM-description.ext
 	// Use LLM-suggested description if available, otherwise extract from filename
 	let datedFilename: string;
-	if (suggestion.suggestedAttachmentName) {
+	let suggestedName: string | undefined;
+	if (isCreateNoteSuggestion(suggestion)) {
+		suggestedName = suggestion.suggestedAttachmentName;
+	} else if (isMoveSuggestion(suggestion)) {
+		suggestedName = suggestion.suggestedAttachmentName;
+	} else if (isRenameSuggestion(suggestion)) {
+		suggestedName = suggestion.suggestedAttachmentName;
+	} else if (isLinkSuggestion(suggestion)) {
+		suggestedName = suggestion.suggestedAttachmentName;
+	}
+
+	if (suggestedName) {
 		// LLM provided a clean description - use it directly
 		const ext = extname(suggestion.source);
 		const timestamp = new Date();
@@ -877,7 +905,7 @@ async function executeSuggestion(
 		const hour = String(timestamp.getHours()).padStart(2, "0");
 		const minute = String(timestamp.getMinutes()).padStart(2, "0");
 		const timestampPrefix = `${year}${month}${day}-${hour}${minute}`;
-		datedFilename = `${timestampPrefix}-${suggestion.suggestedAttachmentName}${ext}`;
+		datedFilename = `${timestampPrefix}-${suggestedName}${ext}`;
 	} else {
 		// Fallback: extract description from messy filename
 		datedFilename = generateFilename(suggestion.source);

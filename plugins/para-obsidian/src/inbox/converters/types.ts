@@ -9,6 +9,15 @@ export interface HeuristicPattern {
 }
 
 /**
+ * Requirement level for extracted fields.
+ * More expressive than boolean for validation logic.
+ */
+export type RequirementLevel =
+	| "required" // Must be present for valid extraction
+	| "optional" // Nice to have, extraction succeeds without it
+	| "conditional"; // Required only in certain contexts
+
+/**
  * Field definition for LLM extraction
  */
 export interface FieldDefinition {
@@ -18,8 +27,12 @@ export interface FieldDefinition {
 	readonly type: "string" | "date" | "currency" | "number";
 	/** Human-readable description for LLM prompt */
 	readonly description: string;
-	/** Whether field is required for valid extraction */
-	readonly required: boolean;
+	/** Requirement level for this field */
+	readonly requirement: RequirementLevel;
+	/** For conditional fields: what condition must be met */
+	readonly conditionalOn?: string;
+	/** Human-readable description of the condition */
+	readonly conditionalDescription?: string;
 }
 
 /**

@@ -16,6 +16,7 @@ import type {
 	InboxSuggestion,
 	SuggestionId,
 } from "./types";
+import { isCreateNoteSuggestion } from "./types";
 
 // =============================================================================
 // Command Parsing
@@ -206,16 +207,12 @@ export function formatSuggestion(
 	const mainLine = `${emphasize.info(`[${index}]`)} ${confidence} ${emphasize.info(filename)} → ${suggestion.action}`;
 	lines.push(mainLine);
 
-	// Details on subsequent lines
-	if (suggestion.suggestedTitle) {
+	// Details on subsequent lines (only for create-note suggestions)
+	if (isCreateNoteSuggestion(suggestion)) {
 		lines.push(`    Title: ${suggestion.suggestedTitle}`);
-	}
-
-	if (suggestion.suggestedArea) {
-		lines.push(`    Area: ${suggestion.suggestedArea}`);
-	}
-
-	if (suggestion.suggestedNoteType) {
+		if (suggestion.suggestedArea) {
+			lines.push(`    Area: ${suggestion.suggestedArea}`);
+		}
 		lines.push(`    Type: ${suggestion.suggestedNoteType}`);
 	}
 

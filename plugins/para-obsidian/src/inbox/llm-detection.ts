@@ -172,7 +172,8 @@ function buildDocumentTypesFromConverters(
 function buildFieldGuidelinesFromConverter(converter: InboxConverter): string {
 	return converter.fields
 		.map(
-			(f) => `- ${f.name}: ${f.description}${f.required ? " (required)" : ""}`,
+			(f) =>
+				`- ${f.name}: ${f.description}${f.requirement === "required" ? " (required)" : ""}`,
 		)
 		.join("\n");
 }

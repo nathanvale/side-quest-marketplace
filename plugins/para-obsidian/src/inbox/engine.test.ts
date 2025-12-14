@@ -16,6 +16,8 @@ import {
 	createSuggestionId,
 	type InboxEngineConfig,
 	type InboxSuggestion,
+	isChallengeSuggestion,
+	isCreateNoteSuggestion,
 } from "./types";
 
 /**
@@ -360,6 +362,7 @@ describe("inbox/engine", () => {
 				processor: "attachments",
 				confidence: "high",
 				action: "create-note",
+				suggestedNoteType: "invoice",
 				suggestedTitle: "Test Document",
 				reason: "Matched invoice pattern",
 			};
@@ -605,8 +608,10 @@ describe("inbox/engine", () => {
 				throw new Error("No suggestion returned from scan");
 			}
 
-			// Store original classification for comparison
-			const originalNoteType = original.suggestedNoteType;
+			// Store original classification for comparison (works for any suggestion type)
+			const originalNoteType = isCreateNoteSuggestion(original)
+				? original.suggestedNoteType
+				: undefined;
 			const originalConfidence = original.confidence;
 			const originalReason = original.reason;
 
@@ -645,11 +650,12 @@ describe("inbox/engine", () => {
 				throw new Error("No suggestion returned from scan");
 			}
 
+
 			const hint = "This is a session note from therapy";
 			const challenged = await engine.challenge(original.id, hint);
 
 			// Verify hint is stored
-			expect(challenged.hint).toBe(hint);
+			if (isChallengeSuggestion(challenged)) expect(challenged.hint).toBe(hint);
 		});
 
 		test("should update reason with challenge context", async () => {
@@ -669,6 +675,7 @@ describe("inbox/engine", () => {
 			if (!original) {
 				throw new Error("No suggestion returned from scan");
 			}
+
 
 			const hint = "This should be in the Work area";
 			const challenged = await engine.challenge(original.id, hint);
@@ -695,6 +702,7 @@ describe("inbox/engine", () => {
 			if (!original) {
 				throw new Error("No suggestion returned from scan");
 			}
+
 
 			const challenged = await engine.challenge(
 				original.id,
@@ -723,6 +731,7 @@ describe("inbox/engine", () => {
 				throw new Error("No suggestion returned from scan");
 			}
 
+
 			// Challenge the suggestion
 			await engine.challenge(original.id, "This is a booking");
 
@@ -733,7 +742,8 @@ describe("inbox/engine", () => {
 			);
 
 			// Should not throw and should have the second hint
-			expect(rechallenged.hint).toBe("Actually it's an invoice");
+			if (isChallengeSuggestion(rechallenged))
+				expect(rechallenged.hint).toBe("Actually it's an invoice");
 		});
 	});
 });

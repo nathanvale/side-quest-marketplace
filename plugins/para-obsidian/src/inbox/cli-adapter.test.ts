@@ -214,6 +214,7 @@ describe("inbox/cli-adapter", () => {
 				processor: "attachments",
 				confidence: "high",
 				action: "create-note",
+				suggestedNoteType: "invoice",
 				suggestedTitle: "Invoice 2024",
 				reason: "Detected invoice",
 			},
@@ -223,6 +224,7 @@ describe("inbox/cli-adapter", () => {
 				processor: "notes",
 				confidence: "medium",
 				action: "move",
+				suggestedDestination: "/vault/Resources",
 				reason: "Detected note",
 			},
 		];

@@ -272,7 +272,12 @@ describe("mergeConverters", () => {
 				contentMarkers: [],
 			},
 			fields: [
-				{ name: "title", type: "string", description: "Title", required: true },
+				{
+					name: "title",
+					type: "string",
+					description: "Title",
+					requirement: "required",
+				},
 			],
 			extraction: { promptHint: "Extract receipt", keyFields: ["title"] },
 			template: { name: "receipt", fieldMappings: { title: "Receipt title" } },

@@ -13,6 +13,7 @@ import { describe, expect, test } from "bun:test";
 // Import all exports from the converters module
 // =============================================================================
 
+import { isCreateNoteSuggestion } from "../types";
 import {
 	// Suggestion builder
 	buildSuggestion,
@@ -236,16 +237,20 @@ describe("converters/index", () => {
 			});
 
 			expect(suggestion.confidence).toBe("high");
-			expect(suggestion.suggestedNoteType).toBe("invoice");
 
-			// 3. Map fields to template
-			if (match && suggestion.extractedFields) {
-				const mapped = mapFieldsToTemplate(
-					suggestion.extractedFields,
-					match.converter,
-				);
-				expect(mapped["Invoice title"]).toBe("Medical Invoice");
-				expect(mapped.Amount).toBe("$150.00");
+			// Verify action-specific fields using type guard
+			if (isCreateNoteSuggestion(suggestion)) {
+				expect(suggestion.suggestedNoteType).toBe("invoice");
+
+				// 3. Map fields to template
+				if (match && suggestion.extractedFields) {
+					const mapped = mapFieldsToTemplate(
+						suggestion.extractedFields,
+						match.converter,
+					);
+					expect(mapped["Invoice title"]).toBe("Medical Invoice");
+					expect(mapped.Amount).toBe("$150.00");
+				}
 			}
 		});
 
