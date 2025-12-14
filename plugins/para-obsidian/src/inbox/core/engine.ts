@@ -124,31 +124,23 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	// =========================================================================
 
 	/**
-	 * Scan the inbox and generate suggestions for all items.
-	 *
-	 * @returns Array of suggestions for inbox items
+	 * Load registry and clean up orphaned staging files.
+	 * @internal
 	 */
-	async function scan(options?: ScanOptions): Promise<InboxSuggestion[]> {
-		await initLoggerWithNotice();
-		const startedAt = Date.now();
-		const cid = createCorrelationId();
-		const onProgress = options?.onProgress;
-
-		// Clear stale suggestions from previous scans to prevent memory leaks
-		suggestionCache.clear();
-
-		if (inboxLogger) {
-			inboxLogger.info`Scan started vault=${resolvedConfig.vaultPath} cid=${cid}`;
-		}
-
-		// Load the registry to check for already-processed items
+	async function loadAndCleanRegistry(
+		cid: string,
+	): Promise<ReturnType<typeof createRegistry>> {
 		const registry = createRegistry(resolvedConfig.vaultPath);
 		await registry.load();
-
-		// Layer 4: Detect and clean up orphaned staging files from interrupted operations
 		await cleanupOrphanedStaging(resolvedConfig.vaultPath, registry, cid);
+		return registry;
+	}
 
-		// Get inbox folder path
+	/**
+	 * Find and filter supported files in the inbox.
+	 * @internal
+	 */
+	async function findSupportedFiles(cid: string): Promise<InboxFile[] | null> {
 		const inboxPath = join(
 			resolvedConfig.vaultPath,
 			resolvedConfig.inboxFolder,
@@ -162,7 +154,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			if (inboxLogger) {
 				inboxLogger.warn`Inbox folder not found: ${inboxPath} cid=${cid}`;
 			}
-			return [];
+			return null;
 		}
 
 		// Get extractor registry and filter to supported files
@@ -180,10 +172,17 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			if (inboxLogger) {
 				inboxLogger.info`No supported files found in inbox cid=${cid}`;
 			}
-			return [];
+			return null;
 		}
 
-		// Check pdftotext availability
+		return supportedFiles;
+	}
+
+	/**
+	 * Validate PDF extraction dependencies are available.
+	 * @internal
+	 */
+	async function validateDependencies(cid: string): Promise<void> {
 		const pdfCheck = await checkPdfToText();
 		if (!pdfCheck.available) {
 			if (inboxLogger) {
@@ -194,142 +193,158 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				operation: "scan",
 			});
 		}
+	}
 
-		// Get vault context for LLM (stub for now - could integrate with indexer)
-		// Load para-obsidian config to get paraFolders mapping for vault context
+	/**
+	 * Build vault context for LLM prompts.
+	 * @internal
+	 */
+	function buildVaultContext(): VaultContext {
 		const paraConfig = loadConfig();
-		const vaultContext: VaultContext = {
+		return {
 			areas: getVaultAreas(resolvedConfig.vaultPath, paraConfig.paraFolders),
 			projects: getVaultProjects(
 				resolvedConfig.vaultPath,
 				paraConfig.paraFolders,
 			),
 		};
+	}
 
-		// Create concurrency limiters
-		const extractionLimit = pLimit(
-			resolvedConfig.concurrency?.pdfExtraction ?? 5,
-		);
-		const llmLimit = pLimit(resolvedConfig.concurrency?.llmCalls ?? 3);
+	/**
+	 * Process a single inbox file: hash check, extraction, LLM detection, suggestion building.
+	 * @internal
+	 */
+	async function processSingleFile(
+		file: InboxFile,
+		index: number,
+		total: number,
+		registry: ReturnType<typeof createRegistry>,
+		vaultContext: VaultContext,
+		extractionLimit: ReturnType<typeof pLimit>,
+		llmLimit: ReturnType<typeof pLimit>,
+		onProgress: ScanOptions["onProgress"],
+		cid: string,
+	): Promise<InboxSuggestion | null> {
+		return extractionLimit(async () => {
+			const { path: filePath, filename } = file;
+			const progressBase = {
+				index: index + 1,
+				total,
+				filename,
+			} as const;
 
-		// Process supported files concurrently
-		const suggestionPromises = supportedFiles.map((file, index) =>
-			extractionLimit(async () => {
-				const { path: filePath, filename } = file;
-				const progressBase = {
-					index: index + 1,
-					total: supportedFiles.length,
-					filename,
-				} as const;
-
-				// Check if already processed via hash
-				try {
-					if (onProgress) {
-						await onProgress({ ...progressBase, stage: "hash" });
-					}
-					const hash = await hashFile(filePath);
-					if (registry.isProcessed(hash)) {
-						if (inboxLogger) {
-							inboxLogger.debug`Skipping already processed: ${filename} cid=${cid}`;
-						}
-						if (onProgress) {
-							await onProgress({ ...progressBase, stage: "skip" });
-						}
-						return null; // Skip this file
-					}
-				} catch (_error) {
+			// Check if already processed via hash
+			try {
+				if (onProgress) {
+					await onProgress({ ...progressBase, stage: "hash" });
+				}
+				const hash = await hashFile(filePath);
+				if (registry.isProcessed(hash)) {
 					if (inboxLogger) {
-						inboxLogger.warn`Failed to hash file: ${filename} cid=${cid}`;
+						inboxLogger.debug`Skipping already processed: ${filename} cid=${cid}`;
 					}
 					if (onProgress) {
-						await onProgress({
-							...progressBase,
-							stage: "error",
-							error: "hash failed",
-						});
+						await onProgress({ ...progressBase, stage: "skip" });
 					}
 					return null;
 				}
-
-				// Extract text
-				let text: string;
-				try {
-					if (onProgress) {
-						await onProgress({ ...progressBase, stage: "extract" });
-					}
-					text = await extractPdfText(filePath, cid);
-				} catch (error) {
-					if (inboxLogger) {
-						inboxLogger.warn`Failed to extract PDF text: ${filename} cid=${cid}`;
-					}
-					if (onProgress) {
-						await onProgress({
-							...progressBase,
-							stage: "error",
-							error:
-								error instanceof Error ? error.message : "extraction failed",
-						});
-					}
-					// Return error suggestion
-					const errorSuggestion: InboxSuggestion = {
-						id: createSuggestionId(crypto.randomUUID()),
-						source: join(resolvedConfig.inboxFolder, filename),
-						processor: "attachments",
-						confidence: "low",
-						action: "skip",
-						reason: `PDF text extraction failed: ${error instanceof Error ? error.message : "unknown error"}`,
-					};
-					suggestionCache.set(errorSuggestion.id, errorSuggestion);
-					return errorSuggestion;
+			} catch (_error) {
+				if (inboxLogger) {
+					inboxLogger.warn`Failed to hash file: ${filename} cid=${cid}`;
 				}
-
-				// Run heuristic detection
-				const heuristicResult = combineHeuristics(filename, text);
-
-				// Run LLM detection (with its own rate limit)
-				let llmResult: DocumentTypeResult | null = null;
-				try {
-					if (onProgress) {
-						await onProgress({ ...progressBase, stage: "llm" });
-					}
-					await llmLimit(async () => {
-						const prompt = buildInboxPrompt({
-							content: text,
-							filename,
-							vaultContext,
-						});
-						const response = await callLLM(
-							prompt,
-							resolvedConfig.llmProvider,
-							resolvedConfig.llmModel,
-						);
-						llmResult = parseDetectionResponse(response);
-					});
-				} catch (error) {
-					if (inboxLogger) {
-						inboxLogger.warn`LLM detection failed: ${filename} - ${error instanceof Error ? error.message : "unknown"} cid=${cid}`;
-					}
-				}
-
-				// Build suggestion
-				const suggestion = buildSuggestion({
-					filename,
-					inboxFolder: resolvedConfig.inboxFolder,
-					heuristicResult,
-					llmResult,
-				});
-				suggestionCache.set(suggestion.id, suggestion);
 				if (onProgress) {
-					await onProgress({ ...progressBase, stage: "done" });
+					await onProgress({
+						...progressBase,
+						stage: "error",
+						error: "hash failed",
+					});
 				}
-				return suggestion;
-			}),
-		);
+				return null;
+			}
 
-		const results = await Promise.all(suggestionPromises);
-		const suggestions = results.filter((s): s is InboxSuggestion => s !== null);
-		const durationMs = Date.now() - startedAt;
+			// Extract text
+			let text: string;
+			try {
+				if (onProgress) {
+					await onProgress({ ...progressBase, stage: "extract" });
+				}
+				text = await extractPdfText(filePath, cid);
+			} catch (error) {
+				if (inboxLogger) {
+					inboxLogger.warn`Failed to extract PDF text: ${filename} cid=${cid}`;
+				}
+				if (onProgress) {
+					await onProgress({
+						...progressBase,
+						stage: "error",
+						error: error instanceof Error ? error.message : "extraction failed",
+					});
+				}
+				// Return error suggestion
+				const errorSuggestion: InboxSuggestion = {
+					id: createSuggestionId(crypto.randomUUID()),
+					source: join(resolvedConfig.inboxFolder, filename),
+					processor: "attachments",
+					confidence: "low",
+					action: "skip",
+					reason: `PDF text extraction failed: ${error instanceof Error ? error.message : "unknown error"}`,
+				};
+				suggestionCache.set(errorSuggestion.id, errorSuggestion);
+				return errorSuggestion;
+			}
 
+			// Run heuristic detection
+			const heuristicResult = combineHeuristics(filename, text);
+
+			// Run LLM detection (with its own rate limit)
+			let llmResult: DocumentTypeResult | null = null;
+			try {
+				if (onProgress) {
+					await onProgress({ ...progressBase, stage: "llm" });
+				}
+				await llmLimit(async () => {
+					const prompt = buildInboxPrompt({
+						content: text,
+						filename,
+						vaultContext,
+					});
+					const response = await callLLM(
+						prompt,
+						resolvedConfig.llmProvider,
+						resolvedConfig.llmModel,
+					);
+					llmResult = parseDetectionResponse(response);
+				});
+			} catch (error) {
+				if (inboxLogger) {
+					inboxLogger.warn`LLM detection failed: ${filename} - ${error instanceof Error ? error.message : "unknown"} cid=${cid}`;
+				}
+			}
+
+			// Build suggestion
+			const suggestion = buildSuggestion({
+				filename,
+				inboxFolder: resolvedConfig.inboxFolder,
+				heuristicResult,
+				llmResult,
+			});
+			suggestionCache.set(suggestion.id, suggestion);
+			if (onProgress) {
+				await onProgress({ ...progressBase, stage: "done" });
+			}
+			return suggestion;
+		});
+	}
+
+	/**
+	 * Log scan statistics.
+	 * @internal
+	 */
+	function logScanStatistics(
+		suggestions: InboxSuggestion[],
+		durationMs: number,
+		cid: string,
+	): void {
 		const confidenceCounts = suggestions.reduce(
 			(counts, suggestion) => {
 				counts[suggestion.confidence] += 1;
@@ -350,6 +365,67 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			inboxLogger.info`Scan complete suggestions=${suggestions.length} durationMs=${durationMs} cid=${cid}`;
 			inboxLogger.debug`Scan breakdown confidence=${JSON.stringify(confidenceCounts)} actions=${JSON.stringify(actionCounts)} durationMs=${durationMs} cid=${cid}`;
 		}
+	}
+
+	/**
+	 * Scan the inbox and generate suggestions for all items.
+	 *
+	 * @returns Array of suggestions for inbox items
+	 */
+	async function scan(options?: ScanOptions): Promise<InboxSuggestion[]> {
+		await initLoggerWithNotice();
+		const startedAt = Date.now();
+		const cid = createCorrelationId();
+		const onProgress = options?.onProgress;
+
+		// Clear stale suggestions from previous scans to prevent memory leaks
+		suggestionCache.clear();
+
+		if (inboxLogger) {
+			inboxLogger.info`Scan started vault=${resolvedConfig.vaultPath} cid=${cid}`;
+		}
+
+		// Load registry and clean up staging
+		const registry = await loadAndCleanRegistry(cid);
+
+		// Find supported files
+		const supportedFiles = await findSupportedFiles(cid);
+		if (!supportedFiles) {
+			return [];
+		}
+
+		// Validate dependencies
+		await validateDependencies(cid);
+
+		// Build vault context
+		const vaultContext = buildVaultContext();
+
+		// Create concurrency limiters
+		const extractionLimit = pLimit(
+			resolvedConfig.concurrency?.pdfExtraction ?? 5,
+		);
+		const llmLimit = pLimit(resolvedConfig.concurrency?.llmCalls ?? 3);
+
+		// Process files concurrently
+		const suggestionPromises = supportedFiles.map((file, index) =>
+			processSingleFile(
+				file,
+				index,
+				supportedFiles.length,
+				registry,
+				vaultContext,
+				extractionLimit,
+				llmLimit,
+				onProgress,
+				cid,
+			),
+		);
+
+		const results = await Promise.all(suggestionPromises);
+		const suggestions = results.filter((s): s is InboxSuggestion => s !== null);
+		const durationMs = Date.now() - startedAt;
+
+		logScanStatistics(suggestions, durationMs, cid);
 
 		return suggestions;
 	}

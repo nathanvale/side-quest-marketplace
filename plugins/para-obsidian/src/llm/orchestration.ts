@@ -16,7 +16,7 @@ import {
 	type LLMModel,
 	parseOllamaResponse,
 } from "@sidequest/core/llm";
-import type { ParaObsidianConfig } from "../config/index";
+import type { FrontmatterRules, ParaObsidianConfig } from "../config/index";
 import {
 	readFrontmatterFile,
 	updateFrontmatterFile,
@@ -37,6 +37,7 @@ import {
 	getTemplate,
 	getTemplateFields,
 	suggestSectionMapping,
+	type TemplateField,
 } from "../templates/index";
 import { applyTitlePrefix } from "../utils/title";
 import { stripWikilinks } from "../utils/wikilinks";
@@ -235,6 +236,280 @@ export interface ConvertNoteOptions {
 	dryRun?: boolean;
 }
 
+// =============================================================================
+// Conversion Helper Functions (Internal)
+// =============================================================================
+
+/**
+ * Read source content from a file, combining frontmatter and body.
+ * @internal
+ */
+function readSourceContent(
+	config: ParaObsidianConfig,
+	sourceFile: string,
+): string {
+	try {
+		const { body, attributes } = readFrontmatterFile(config, sourceFile);
+		return Object.keys(attributes).length > 0
+			? `Existing frontmatter:\n${JSON.stringify(attributes, null, 2)}\n\nBody:\n${body}`
+			: body;
+	} catch {
+		// File might not have frontmatter, read as plain text
+		return readFile(config.vault, sourceFile);
+	}
+}
+
+/**
+ * Template context for LLM extraction.
+ * @internal
+ */
+interface TemplateContext {
+	templateInfo: ReturnType<typeof getTemplate>;
+	fields: TemplateField[];
+	sections: string[];
+	rules: FrontmatterRules | undefined;
+	sourceHeadings: Array<{ text: string }>;
+	sectionMapping: Map<string, string | null>;
+}
+
+/**
+ * Build template and vault context for conversion.
+ * @internal
+ */
+function buildConversionContext(
+	config: ParaObsidianConfig,
+	template: string,
+	existingContent: string,
+): { vaultContext: VaultContext; templateContext: TemplateContext } {
+	const vaultContext: VaultContext = {
+		areas: listAreas(config),
+		projects: listProjects(config),
+		suggestedTags: listTags(config),
+	};
+
+	const templateInfo = getTemplate(config, template);
+	if (!templateInfo) {
+		throw new Error(`Template "${template}" not found`);
+	}
+
+	const fields = getTemplateFields(templateInfo);
+	const sections = getEditableSections(templateInfo);
+	const rules = config.frontmatterRules?.[template];
+
+	const sourceHeadings = extractSourceHeadings(existingContent);
+	const sectionMapping = suggestSectionMapping(
+		sourceHeadings.map((h) => h.text),
+		sections,
+	);
+
+	return {
+		vaultContext,
+		templateContext: {
+			templateInfo,
+			fields,
+			sections,
+			rules,
+			sourceHeadings,
+			sectionMapping,
+		},
+	};
+}
+
+/**
+ * Call LLM to extract structured data from source content.
+ * @internal
+ */
+async function extractWithLLM(
+	existingContent: string,
+	template: string,
+	model: string,
+	vaultContext: VaultContext,
+	templateContext: TemplateContext,
+): Promise<ExtractionResult> {
+	const constraints = buildConstraintSet(
+		templateContext.fields,
+		templateContext.sections,
+		templateContext.rules,
+		vaultContext,
+	);
+	const prompt = buildStructuredPrompt({
+		systemRole: `You are extracting structured data from an existing note to convert it to a "${template}" template.`,
+		sourceContent: existingContent,
+		constraints,
+		criticalRules: DEFAULT_CRITICAL_RULES,
+		sourceHeadings: templateContext.sourceHeadings.map((h) => h.text),
+		sectionMapping: templateContext.sectionMapping,
+	});
+
+	const rawResponse = await callModel({ model: model as LLMModel, prompt });
+	const extracted = parseOllamaResponse(rawResponse);
+
+	// Normalize extracted args (strip wikilinks, handle nulls)
+	extracted.args = normalizeExtractedArgs(extracted.args);
+
+	return extracted;
+}
+
+/**
+ * Resolve the title from extracted data with fallbacks.
+ * @internal
+ */
+function resolveTitle(
+	extracted: ExtractionResult,
+	options: ConvertNoteOptions,
+	config: ParaObsidianConfig,
+): string {
+	const isValidTitle = (t: unknown): t is string =>
+		typeof t === "string" && t !== "" && t !== "null" && t !== "Untitled";
+
+	const baseTitle =
+		options.titleOverride ??
+		(isValidTitle(extracted.title) ? extracted.title : null) ??
+		(isValidTitle(extracted.args.title) ? extracted.args.title : null) ??
+		extracted.title;
+
+	// Apply template-specific prefix (e.g., "Research -", "Booking -")
+	return applyTitlePrefix(baseTitle, options.template, config);
+}
+
+/**
+ * Build frontmatter updates from extracted args.
+ * Handles wikilink fields, Templater prompt keys, and template version.
+ * @internal
+ */
+function buildFrontmatterUpdates(
+	extracted: ExtractionResult,
+	rules: FrontmatterRules | undefined,
+	config: ParaObsidianConfig,
+	template: string,
+): Record<string, unknown> {
+	const frontmatterUpdates: Record<string, unknown> = {};
+
+	// Track which wikilink fields we've seen values for
+	// Only include fields that are defined in this template's schema
+	const templateWikilinkFields = getWikilinkFieldsFromRules(rules);
+	const wikilinkFieldsFound: Record<string, string | null> = {};
+	for (const field of templateWikilinkFields) {
+		wikilinkFieldsFound[field] = null;
+	}
+
+	// Helper to check if a key refers to a wikilink field defined in this template
+	const getWikilinkFieldName = (k: string): string | null => {
+		const lower = k.toLowerCase();
+		for (const field of templateWikilinkFields) {
+			if (lower === field || lower.includes(field)) return field;
+		}
+		return null;
+	};
+
+	for (const [key, value] of Object.entries(extracted.args)) {
+		// Check if this is a wikilink field (even if it's a Templater prompt key)
+		const wikilinkField = getWikilinkFieldName(key);
+		if (wikilinkField && value !== null) {
+			wikilinkFieldsFound[wikilinkField] = value;
+		}
+
+		// Skip Templater prompt text for direct frontmatter updates
+		// Templater prompts contain: spaces, parentheses, or start with capital letter
+		if (
+			key.includes(" ") ||
+			key.includes("(") ||
+			key.includes(")") ||
+			/^[A-Z]/.test(key)
+		) {
+			continue;
+		}
+
+		// Add non-wikilink fields if they have a value
+		if (!wikilinkField && value !== null && value !== "null") {
+			frontmatterUpdates[key] = value;
+		}
+	}
+
+	// Always set wikilink fields (to value or null) to overwrite bad template defaults
+	for (const [field, value] of Object.entries(wikilinkFieldsFound)) {
+		frontmatterUpdates[field] = value;
+	}
+
+	// Always set template_version to the current expected version
+	const expectedVersion = config.templateVersions?.[template];
+	if (expectedVersion !== undefined) {
+		frontmatterUpdates.template_version = expectedVersion;
+	}
+
+	return frontmatterUpdates;
+}
+
+/**
+ * Inject content sections into the created note.
+ * @internal
+ */
+function injectContentSections(
+	config: ParaObsidianConfig,
+	filePath: string,
+	extracted: ExtractionResult,
+	options: ConvertNoteOptions,
+): {
+	sectionsInjected: string[];
+	sectionsSkipped: Array<{ heading: string; reason: string }>;
+} {
+	// Replace H1 title placeholder with actual title
+	const noteTitle =
+		typeof extracted.args.title === "string"
+			? extracted.args.title
+			: (options.titleOverride ?? extracted.title);
+	replaceH1Title(config, filePath, noteTitle);
+
+	// Replace content sections (not append)
+	let sectionsInjected: string[] = [];
+	let sectionsSkipped: Array<{ heading: string; reason: string }> = [];
+
+	if (extracted.content && Object.keys(extracted.content).length > 0) {
+		const injectionResult = replaceSections(
+			config,
+			filePath,
+			extracted.content,
+			{
+				preserveComments: true,
+			},
+		);
+		sectionsInjected = injectionResult.injected;
+		sectionsSkipped = injectionResult.skipped;
+	}
+
+	return { sectionsInjected, sectionsSkipped };
+}
+
+/**
+ * Validate the note and optionally auto-commit changes.
+ * @internal
+ */
+async function validateAndCommit(
+	config: ParaObsidianConfig,
+	filePath: string,
+	sourceFile: string,
+	template: string,
+): Promise<{ valid: boolean; issues: ReadonlyArray<ValidationIssue> }> {
+	const validation = validateFrontmatterFile(config, filePath);
+
+	if (config.autoCommit) {
+		await autoCommitChanges(
+			config,
+			[filePath],
+			`convert ${sourceFile} to ${template}`,
+		);
+	}
+
+	return {
+		valid: validation.valid,
+		issues: validation.issues,
+	};
+}
+
+// =============================================================================
+// Public Conversion Functions
+// =============================================================================
+
 /**
  * Convert a freeform note to a structured template using LLM extraction.
  *
@@ -270,65 +545,26 @@ export async function convertNoteToTemplate(
 	options: ConvertNoteOptions,
 ): Promise<ConversionResult> {
 	// 1. Read source note
-	let existingContent: string;
-	try {
-		const { body, attributes } = readFrontmatterFile(
-			config,
-			options.sourceFile,
-		);
-		existingContent =
-			Object.keys(attributes).length > 0
-				? `Existing frontmatter:\n${JSON.stringify(attributes, null, 2)}\n\nBody:\n${body}`
-				: body;
-	} catch {
-		// File might not have frontmatter, read as plain text
-		existingContent = readFile(config.vault, options.sourceFile);
-	}
+	const existingContent = readSourceContent(config, options.sourceFile);
 
-	// 2. Build vault context
-	const vaultContext: VaultContext = {
-		areas: listAreas(config),
-		projects: listProjects(config),
-		suggestedTags: listTags(config),
-	};
-
-	// 3. Get template info
-	const templateInfo = getTemplate(config, options.template);
-	if (!templateInfo) {
-		throw new Error(`Template "${options.template}" not found`);
-	}
-
-	const fields = getTemplateFields(templateInfo);
-	const sections = getEditableSections(templateInfo);
-	const rules = config.frontmatterRules?.[options.template];
-
-	// 4. Extract source document structure for intelligent mapping
-	const sourceHeadings = extractSourceHeadings(existingContent);
-	const sectionMapping = suggestSectionMapping(
-		sourceHeadings.map((h) => h.text),
-		sections,
+	// 2. Build vault and template context
+	const { vaultContext, templateContext } = buildConversionContext(
+		config,
+		options.template,
+		existingContent,
 	);
 
-	// 5. Build constraints and prompt
-	const constraints = buildConstraintSet(fields, sections, rules, vaultContext);
-	const prompt = buildStructuredPrompt({
-		systemRole: `You are extracting structured data from an existing note to convert it to a "${options.template}" template.`,
-		sourceContent: existingContent,
-		constraints,
-		criticalRules: DEFAULT_CRITICAL_RULES,
-		sourceHeadings: sourceHeadings.map((h) => h.text),
-		sectionMapping,
-	});
-
-	// 6. Call LLM
+	// 3. Extract structured data via LLM
 	const model = options.model ?? DEFAULT_LLM_MODEL;
-	const rawResponse = await callModel({ model: model as LLMModel, prompt });
-	const extracted = parseOllamaResponse(rawResponse);
+	const extracted = await extractWithLLM(
+		existingContent,
+		options.template,
+		model,
+		vaultContext,
+		templateContext,
+	);
 
-	// 6b. Normalize extracted args (strip wikilinks, handle nulls)
-	extracted.args = normalizeExtractedArgs(extracted.args);
-
-	// 7. Dry run check
+	// 4. Dry run check
 	if (options.dryRun) {
 		return {
 			filePath: "[dry-run]",
@@ -338,22 +574,10 @@ export async function convertNoteToTemplate(
 		};
 	}
 
-	// 8. Create note from template
-	// Resolve title with fallbacks, rejecting "null" and "Untitled" as invalid
-	const isValidTitle = (t: unknown): t is string =>
-		typeof t === "string" && t !== "" && t !== "null" && t !== "Untitled";
-
-	const baseTitle =
-		options.titleOverride ??
-		(isValidTitle(extracted.title) ? extracted.title : null) ??
-		(isValidTitle(extracted.args.title) ? extracted.args.title : null) ??
-		extracted.title;
-
-	// Apply template-specific prefix (e.g., "Research -", "Booking -")
-	const resolvedTitle = applyTitlePrefix(baseTitle, options.template, config);
+	// 5. Resolve title and create note from template
+	const resolvedTitle = resolveTitle(extracted, options, config);
 
 	// Filter out null values before passing to template substitution
-	// (null values would otherwise be coerced to "null" strings)
 	const nonNullArgs: Record<string, string> = {};
 	for (const [key, value] of Object.entries(extracted.args)) {
 		if (value !== null) {
@@ -368,66 +592,13 @@ export async function convertNoteToTemplate(
 		args: nonNullArgs,
 	});
 
-	// 9. Update frontmatter with extracted values
-	// - Wikilink fields defined in template schema get explicit null to overwrite bad template defaults
-	// - Other null values are skipped
-	// - Templater prompt keys are used to extract wikilink values, then skipped for direct frontmatter updates
-	const frontmatterUpdates: Record<string, unknown> = {};
-
-	// Track which wikilink fields we've seen values for
-	// Only include fields that are defined in this template's schema (not all possible wikilink fields)
-	const templateWikilinkFields = getWikilinkFieldsFromRules(rules);
-	const wikilinkFieldsFound: Record<string, string | null> = {};
-	for (const field of templateWikilinkFields) {
-		wikilinkFieldsFound[field] = null;
-	}
-
-	// Helper to check if a key refers to a wikilink field defined in this template
-	// Returns the canonical field name if match found, null otherwise
-	const getWikilinkFieldName = (k: string): string | null => {
-		const lower = k.toLowerCase();
-		for (const field of templateWikilinkFields) {
-			if (lower === field || lower.includes(field)) return field;
-		}
-		return null;
-	};
-
-	for (const [key, value] of Object.entries(extracted.args)) {
-		// Check if this is a wikilink field (even if it's a Templater prompt key)
-		const wikilinkField = getWikilinkFieldName(key);
-		if (wikilinkField && value !== null) {
-			wikilinkFieldsFound[wikilinkField] = value;
-		}
-
-		// Skip Templater prompt text for direct frontmatter updates
-		// Templater prompts contain: spaces, parentheses, or start with capital letter
-		// Valid field names: title, trip_date, day_number, location, accommodation
-		// Invalid (prompt text): "Day title", "Date (YYYY-MM-DD)", "Location", "Project"
-		if (
-			key.includes(" ") ||
-			key.includes("(") ||
-			key.includes(")") ||
-			/^[A-Z]/.test(key)
-		) {
-			continue; // Skip Templater prompt keys
-		}
-
-		// Add non-wikilink fields if they have a value
-		if (!wikilinkField && value !== null && value !== "null") {
-			frontmatterUpdates[key] = value;
-		}
-	}
-
-	// Always set wikilink fields (to value or null) to overwrite bad template defaults
-	for (const [field, value] of Object.entries(wikilinkFieldsFound)) {
-		frontmatterUpdates[field] = value;
-	}
-
-	// Always set template_version to the current expected version
-	const expectedVersion = config.templateVersions?.[options.template];
-	if (expectedVersion !== undefined) {
-		frontmatterUpdates.template_version = expectedVersion;
-	}
+	// 6. Update frontmatter with extracted values
+	const frontmatterUpdates = buildFrontmatterUpdates(
+		extracted,
+		templateContext.rules,
+		config,
+		options.template,
+	);
 
 	if (Object.keys(frontmatterUpdates).length > 0) {
 		updateFrontmatterFile(config, result.filePath, {
@@ -436,46 +607,25 @@ export async function convertNoteToTemplate(
 		});
 	}
 
-	// 10. Replace H1 title placeholder with actual title
-	const noteTitle =
-		typeof extracted.args.title === "string"
-			? extracted.args.title
-			: (options.titleOverride ?? extracted.title);
-	replaceH1Title(config, result.filePath, noteTitle);
+	// 7. Inject content sections and replace H1 title
+	const { sectionsInjected, sectionsSkipped } = injectContentSections(
+		config,
+		result.filePath,
+		extracted,
+		options,
+	);
 
-	// 11. Replace content sections (not append)
-	let sectionsInjected: string[] = [];
-	let sectionsSkipped: Array<{ heading: string; reason: string }> = [];
-
-	if (extracted.content && Object.keys(extracted.content).length > 0) {
-		const injectionResult = replaceSections(
-			config,
-			result.filePath,
-			extracted.content,
-			{ preserveComments: true },
-		);
-		sectionsInjected = injectionResult.injected;
-		sectionsSkipped = injectionResult.skipped;
-	}
-
-	// 12. Validate the result
-	const validation = validateFrontmatterFile(config, result.filePath);
-
-	// 13. Auto-commit if enabled
-	if (config.autoCommit) {
-		await autoCommitChanges(
-			config,
-			[result.filePath],
-			`convert ${options.sourceFile} to ${options.template}`,
-		);
-	}
+	// 8. Validate and optionally auto-commit
+	const validation = await validateAndCommit(
+		config,
+		result.filePath,
+		options.sourceFile,
+		options.template,
+	);
 
 	return {
 		filePath: result.filePath,
-		validation: {
-			valid: validation.valid,
-			issues: validation.issues,
-		},
+		validation,
 		sectionsInjected,
 		sectionsSkipped,
 	};

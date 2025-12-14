@@ -187,17 +187,22 @@ export const imageExtractor: ContentExtractor = {
 	},
 
 	async checkAvailability(): Promise<{ available: boolean; error?: string }> {
-		// TODO: Check for vision API availability
-		// Options to implement:
-		// 1. GOOGLE_AI_API_KEY env var for Gemini Vision
-		// 2. ANTHROPIC_API_KEY env var for Claude Vision
-		// 3. Local Tesseract for basic OCR
+		/**
+		 * Vision API integration status:
+		 *
+		 * Current: Not implemented - returns placeholder extraction
+		 * Roadmap: See GitHub issue for vision API integration tracking
+		 *
+		 * Supported providers (when implemented):
+		 * 1. GOOGLE_AI_API_KEY env var for Gemini Vision
+		 * 2. ANTHROPIC_API_KEY env var for Claude Vision
+		 * 3. Local Tesseract for basic OCR (fallback)
+		 */
 
 		const hasGeminiKey = !!process.env.GOOGLE_AI_API_KEY;
 		const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
 
 		if (hasGeminiKey || hasAnthropicKey) {
-			// For now, still return unavailable until we implement the actual API call
 			return {
 				available: false,
 				error:
@@ -239,14 +244,17 @@ export const imageExtractor: ContentExtractor = {
 
 		const mimeType = getMimeType(file.extension);
 
-		// TODO: Implement actual vision API call using VISION_EXTRACTION_PROMPT
-		// The extraction should:
-		// 1. Read image as base64: await readImageAsBase64(file.path)
-		// 2. Call vision API with the prompt
-		// 3. Parse structured response
-
-		// Placeholder: Return a stub response indicating vision is not available
-		// This allows the pipeline to handle images gracefully until vision is implemented
+		/**
+		 * Vision API integration - not yet implemented.
+		 *
+		 * When implemented, the extraction should:
+		 * 1. Read image as base64: await readImageAsBase64(file.path)
+		 * 2. Call vision API with VISION_EXTRACTION_PROMPT
+		 * 3. Parse structured response
+		 *
+		 * For now, return a placeholder that allows the pipeline to handle
+		 * images gracefully without blocking inbox processing.
+		 */
 		const stubText = `[Image: ${file.filename}]
 Unable to extract content - vision API not yet configured.
 File type: ${mimeType}
