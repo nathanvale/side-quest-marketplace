@@ -2,7 +2,7 @@
 import { MetricsCollector } from "@sidequest/core/logging";
 import { createSpinner } from "nanospinner";
 import { getLogFile, initLoggerWithNotice } from "../shared/logger";
-import { createInboxEngine } from "./engine";
+import { createInboxEngine } from "./core/engine";
 import type { InboxSuggestion } from "./types";
 import {
 	displayResults,
