@@ -7,7 +7,7 @@
  * @module inbox/engine
  */
 
-import { basename, dirname, extname, join } from "node:path";
+import path, { basename, dirname, extname, join } from "node:path";
 import {
 	ensureDirSync,
 	moveFile,
@@ -20,6 +20,7 @@ import { globFilesSync } from "@sidequest/core/glob";
 import pLimit from "p-limit";
 import { DEFAULT_PARA_FOLDERS } from "../../config/defaults";
 import { loadConfig } from "../../config/index";
+import { parseFrontmatter } from "../../frontmatter/parse";
 import { ensureGitGuard } from "../../git/index";
 import { createFromTemplate, injectSections } from "../../notes/create";
 import { resolveVaultPath } from "../../shared/fs";
@@ -62,6 +63,7 @@ import {
 	type InboxSuggestion,
 	isCreateNoteSuggestion,
 	isMoveSuggestion,
+	type ProcessedItem,
 	type ScanOptions,
 	type SuggestionId,
 } from "../types";
@@ -157,6 +159,9 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		// Load the registry to check for already-processed items
 		const registry = createRegistry(resolvedConfig.vaultPath);
 		await registry.load();
+
+		// Layer 4: Detect and clean up orphaned staging files from interrupted operations
+		await cleanupOrphanedStaging(resolvedConfig.vaultPath, registry, cid);
 
 		// Get inbox folder path
 		const inboxPath = join(
@@ -770,6 +775,108 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 // =============================================================================
 
 /**
+ * Layer 4: Cleanup orphaned staging files from interrupted operations.
+ * Detects notes left in .inbox-staging and moves them to final destination
+ * or deletes them if they're truly orphaned (no registry entry).
+ */
+async function cleanupOrphanedStaging(
+	vaultPath: string,
+	registry: ReturnType<typeof createRegistry>,
+	cid: string,
+): Promise<void> {
+	const stagingDir = join(vaultPath, ".inbox-staging");
+	if (!pathExistsSync(stagingDir)) return;
+
+	try {
+		const files = readDir(stagingDir).filter((f) => f.endsWith(".md"));
+		if (files.length === 0) return;
+
+		if (inboxLogger) {
+			inboxLogger.info`Found ${files.length} orphaned files in staging, attempting cleanup ${cid}`;
+		}
+
+		for (const file of files) {
+			const stagingPath = join(stagingDir, file);
+
+			// Check if this file has a registry entry with orphanedInStaging flag
+			const allItems = registry.getAllItems();
+			const matchingEntry = allItems.find(
+				(item: ProcessedItem) =>
+					item.createdNote?.includes(file) && item.orphanedInStaging === true,
+			);
+
+			if (matchingEntry) {
+				// Found registry entry - try to move to final destination
+				if (inboxLogger) {
+					inboxLogger.info`Recovering orphaned staging file: ${file} ${cid}`;
+				}
+
+				// Determine final destination from note type
+				try {
+					const config = loadConfig();
+					const content = readTextFileSync(stagingPath);
+					const { attributes } = parseFrontmatter(content);
+					const noteType = attributes.note_type as string | undefined;
+
+					let finalDest = "";
+					if (noteType && config.defaultDestinations?.[noteType]) {
+						finalDest = config.defaultDestinations[noteType];
+					}
+
+					const finalPath = join(vaultPath, finalDest, file);
+					ensureDirSync(dirname(finalPath));
+					await moveFile(stagingPath, finalPath);
+
+					// Update registry with final path (orphanedInStaging will be overridden)
+					const updatedItem: ProcessedItem = {
+						sourceHash: matchingEntry.sourceHash,
+						sourcePath: matchingEntry.sourcePath,
+						processedAt: matchingEntry.processedAt,
+						createdNote: join(finalDest, file),
+						movedAttachment: matchingEntry.movedAttachment,
+						orphanedInStaging: false,
+					};
+					registry.markProcessed(updatedItem);
+
+					if (inboxLogger) {
+						inboxLogger.info`Recovered orphaned file to final destination: ${finalPath} ${cid}`;
+					}
+				} catch (error) {
+					if (inboxLogger) {
+						inboxLogger.warn`Failed to recover orphaned file ${file}: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
+					}
+				}
+			} else {
+				// No registry entry - truly orphaned, delete after 24 hours
+				try {
+					const stats = await Bun.file(stagingPath).stat();
+					const ageMs = Date.now() - stats.mtime.getTime();
+					const oneDayMs = 24 * 60 * 60 * 1000;
+
+					if (ageMs > oneDayMs) {
+						const fs = await import("node:fs");
+						fs.unlinkSync(stagingPath);
+						if (inboxLogger) {
+							inboxLogger.info`Deleted stale orphaned file (>24h): ${file} ${cid}`;
+						}
+					}
+				} catch (error) {
+					if (inboxLogger) {
+						inboxLogger.warn`Failed to check/delete orphaned file ${file}: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
+					}
+				}
+			}
+		}
+
+		await registry.save();
+	} catch (error) {
+		if (inboxLogger) {
+			inboxLogger.warn`Failed to cleanup orphaned staging files: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
+		}
+	}
+}
+
+/**
  * Get list of areas from vault (recursive scan for all .md files).
  *
  * Uses config.paraFolders to determine the areas folder path.
@@ -948,9 +1055,21 @@ async function executeSuggestion(
 	}
 
 	let createdNotePath: string | undefined;
+	let stagingNotePath: string | undefined;
+
+	// Layer 2: Mark operation as in-progress in registry before any writes
+	// This allows cleanup job to detect interrupted operations
+	const inProgressMarker = {
+		sourceHash: hash,
+		sourcePath: suggestion.source,
+		processedAt: new Date().toISOString(),
+		inProgress: true,
+	};
+	registry.markInProgress(inProgressMarker);
+	await registry.save();
 
 	// Create note FIRST if action is create-note (before moving attachment)
-	// This ensures the inbox item stays in place if note creation fails
+	// Layer 1: Use staging directory pattern for atomic operations
 	if (
 		suggestion.action === "create-note" &&
 		suggestion.suggestedNoteType &&
@@ -993,21 +1112,27 @@ async function executeSuggestion(
 					`[[${suggestion.suggestedProject}]]`;
 			}
 
-			// Create the note
+			// Create note in staging directory first (.inbox-staging)
+			const stagingDir = join(config.vaultPath, ".inbox-staging");
+			ensureDirSync(stagingDir);
+
 			const result = createFromTemplate(paraConfig, {
 				template: suggestion.suggestedNoteType,
 				title: suggestion.suggestedTitle,
-				dest: suggestion.suggestedDestination,
+				dest: ".inbox-staging", // Stage in temp location
 				args,
 			});
 
-			createdNotePath = result.filePath;
+			stagingNotePath = result.filePath;
 
 			if (executeLogger) {
-				executeLogger.info`Created note from template=${suggestion.suggestedNoteType} path=${createdNotePath} ${cid}`;
+				executeLogger.info`Created note in staging path=${stagingNotePath} ${cid}`;
 			}
 		} catch (error) {
-			// Note creation failed - attachment stays in inbox for retry
+			// Note creation failed - clean up in-progress marker
+			registry.clearInProgress(hash);
+			await registry.save();
+
 			if (executeLogger) {
 				executeLogger.error`Failed to create note: ${error instanceof Error ? error.message : "unknown"} - attachment remains in inbox for retry ${cid}`;
 			}
@@ -1026,20 +1151,8 @@ async function executeSuggestion(
 	// TOCTOU protection: Check file still exists before moving
 	// File was hashed earlier, but could have been deleted by another process
 	if (!pathExistsSync(sourcePath)) {
-		// ROLLBACK: If we created a note but source disappeared, delete the orphaned note
-		if (createdNotePath) {
-			try {
-				const { unlink } = await import("node:fs/promises");
-				await unlink(createdNotePath);
-				if (executeLogger) {
-					executeLogger.warn`Rolled back orphaned note after source file disappeared: ${createdNotePath} ${cid}`;
-				}
-			} catch (rollbackError) {
-				if (executeLogger) {
-					executeLogger.error`Failed to rollback note: ${rollbackError instanceof Error ? rollbackError.message : "unknown"} ${cid}`;
-				}
-			}
-		}
+		// ROLLBACK: Clean up staging note and in-progress marker
+		await rollbackOperation(stagingNotePath, hash, registry, cid);
 
 		return {
 			suggestionId: suggestion.id,
@@ -1052,32 +1165,73 @@ async function executeSuggestion(
 	try {
 		await moveFile(sourcePath, attachmentDest);
 	} catch (error) {
-		// ROLLBACK: If we created a note but failed to move attachment, delete the orphaned note
-		if (createdNotePath) {
-			try {
-				const { unlink } = await import("node:fs/promises");
-				await unlink(createdNotePath);
-				if (executeLogger) {
-					executeLogger.warn`Rolled back orphaned note after move failure: ${createdNotePath} ${cid}`;
-				}
-			} catch (rollbackError) {
-				if (executeLogger) {
-					executeLogger.error`Failed to rollback note: ${rollbackError instanceof Error ? rollbackError.message : "unknown"} ${cid}`;
-				}
-			}
-		}
+		// ROLLBACK: Clean up staging note and in-progress marker
+		await rollbackOperation(stagingNotePath, hash, registry, cid);
 
 		// Log the failure and return error
 		if (executeLogger) {
-			executeLogger.error`Failed to move attachment: ${error instanceof Error ? error.message : "unknown"} - ${createdNotePath ? "rolled back note, " : ""}attachment remains in inbox ${cid}`;
+			executeLogger.error`Failed to move attachment: ${error instanceof Error ? error.message : "unknown"} - attachment remains in inbox ${cid}`;
 		}
 
 		return {
 			suggestionId: suggestion.id,
 			success: false,
 			action: suggestion.action,
-			error: `Operation failed and ${createdNotePath ? "was rolled back" : "aborted"}: ${error instanceof Error ? error.message : "unknown"}. Attachment remains in inbox - fix the issue and retry.`,
+			error: `Operation failed and was rolled back: ${error instanceof Error ? error.message : "unknown"}. Attachment remains in inbox - fix the issue and retry.`,
 		};
+	}
+
+	// SUCCESS: Move staged note to final destination atomically
+	if (stagingNotePath) {
+		try {
+			const paraConfig = loadConfig();
+			// Type narrowing: only CreateNoteSuggestion and MoveSuggestion have suggestedDestination
+			const finalDest =
+				("suggestedDestination" in suggestion
+					? suggestion.suggestedDestination
+					: "") ?? "";
+			const stagingAbsolute = resolveVaultPath(
+				paraConfig.vault,
+				stagingNotePath,
+			);
+			const finalRelative = join(finalDest, basename(stagingNotePath));
+			const finalAbsolute = resolveVaultPath(paraConfig.vault, finalRelative);
+
+			// Atomic rename from staging to final location
+			await moveFile(stagingAbsolute.absolute, finalAbsolute.absolute);
+			createdNotePath = finalRelative;
+
+			if (executeLogger) {
+				executeLogger.info`Moved note from staging to final destination=${createdNotePath} ${cid}`;
+			}
+		} catch (error) {
+			// Critical: attachment moved but note stuck in staging
+			// Log error but don't fail - cleanup job will handle orphans
+			if (executeLogger) {
+				executeLogger.error`Failed to move note from staging: ${error instanceof Error ? error.message : "unknown"} - note left in staging for cleanup ${cid}`;
+			}
+
+			// Mark staging path in registry for cleanup detection
+			registry.markProcessed({
+				sourceHash: hash,
+				sourcePath: suggestion.source,
+				processedAt: new Date().toISOString(),
+				createdNote: stagingNotePath,
+				movedAttachment: movedAttachmentPath,
+				orphanedInStaging: true,
+			});
+			await registry.save();
+
+			return {
+				suggestionId: suggestion.id,
+				success: true,
+				action: suggestion.action,
+				createdNote: undefined,
+				movedAttachment: movedAttachmentPath,
+				warning:
+					"Note created in staging but move failed - will be cleaned up automatically",
+			};
+		}
 	}
 
 	// Inject attachment link into the note (if note was created)
@@ -1114,7 +1268,8 @@ async function executeSuggestion(
 		}
 	}
 
-	// Update registry - only reached if note creation succeeded (or wasn't needed)
+	// Update registry - clear in-progress flag and mark as completed
+	registry.clearInProgress(hash);
 	registry.markProcessed({
 		sourceHash: hash,
 		sourcePath: suggestion.source,
@@ -1134,4 +1289,43 @@ async function executeSuggestion(
 		createdNote: createdNotePath,
 		movedAttachment: movedAttachmentPath,
 	};
+}
+
+/**
+ * Layer 3: Atomic rollback helper - cleans up staging note and registry marker
+ * Uses sync operations to ensure cleanup completes before returning control
+ */
+async function rollbackOperation(
+	stagingNotePath: string | undefined,
+	sourceHash: string,
+	registry: ReturnType<typeof createRegistry>,
+	cid: string,
+): Promise<void> {
+	if (stagingNotePath) {
+		try {
+			const fs = await import("node:fs");
+			const stagingAbsolute = path.resolve(stagingNotePath);
+
+			if (fs.existsSync(stagingAbsolute)) {
+				fs.unlinkSync(stagingAbsolute);
+				// Ensure deletion is durable
+				const dir = path.dirname(stagingAbsolute);
+				const fd = fs.openSync(dir, "r");
+				fs.fsyncSync(fd);
+				fs.closeSync(fd);
+
+				if (executeLogger) {
+					executeLogger.info`Rolled back staging note=${stagingNotePath} ${cid}`;
+				}
+			}
+		} catch (rollbackError) {
+			if (executeLogger) {
+				executeLogger.error`Failed to rollback staging note: ${rollbackError instanceof Error ? rollbackError.message : "unknown"} ${cid}`;
+			}
+		}
+	}
+
+	// Clean up in-progress marker
+	registry.clearInProgress(sourceHash);
+	await registry.save();
 }
