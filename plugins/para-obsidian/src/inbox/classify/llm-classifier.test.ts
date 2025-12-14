@@ -131,6 +131,51 @@ describe("inbox/llm-detection", () => {
 			expect(result.documentType).toBe("generic");
 			expect(result.suggestedArea).toBeNull();
 		});
+
+		test("should parse extractionWarnings array", () => {
+			const response = JSON.stringify({
+				documentType: "invoice",
+				confidence: 0.6,
+				extractionWarnings: [
+					"Could not find invoice date",
+					"Provider name unclear",
+				],
+			});
+
+			const result = parseDetectionResponse(response);
+
+			expect(result.extractionWarnings).toEqual([
+				"Could not find invoice date",
+				"Provider name unclear",
+			]);
+		});
+
+		test("should handle empty extractionWarnings array", () => {
+			const response = JSON.stringify({
+				documentType: "invoice",
+				confidence: 0.9,
+				extractionWarnings: [],
+			});
+
+			const result = parseDetectionResponse(response);
+
+			expect(result.extractionWarnings).toEqual([]);
+		});
+
+		test("should filter non-string values from extractionWarnings", () => {
+			const response = JSON.stringify({
+				documentType: "invoice",
+				confidence: 0.7,
+				extractionWarnings: ["Valid warning", 123, null, "Another warning"],
+			});
+
+			const result = parseDetectionResponse(response);
+
+			expect(result.extractionWarnings).toEqual([
+				"Valid warning",
+				"Another warning",
+			]);
+		});
 	});
 
 	describe("DocumentTypeResult type", () => {

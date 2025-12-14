@@ -204,6 +204,32 @@ describe("inbox/cli-adapter", () => {
 			expect(result).toContain("random-file.md");
 			expect(result).toContain("skip");
 		});
+
+		test("should display extraction warnings when present", () => {
+			const suggestionWithWarnings: InboxSuggestion = {
+				id: createSuggestionId("abc12345-0000-4000-8000-000000000003"),
+				source: "/vault/Inbox/mystery-invoice.pdf",
+				processor: "attachments",
+				confidence: "low",
+				action: "create-note",
+				suggestedNoteType: "invoice",
+				suggestedTitle: "Unknown Invoice",
+				reason: "Detected invoice pattern but missing key fields",
+				extractionWarnings: [
+					"Could not find invoice date",
+					"Provider name unclear",
+				],
+			};
+			const result = formatSuggestion(suggestionWithWarnings, 1);
+			expect(result).toContain("Warnings");
+			expect(result).toContain("Could not find invoice date");
+			expect(result).toContain("Provider name unclear");
+		});
+
+		test("should not display warnings section when no warnings", () => {
+			const result = formatSuggestion(baseSuggestion, 1);
+			expect(result).not.toContain("Warnings");
+		});
 	});
 
 	describe("formatSuggestionsTable", () => {

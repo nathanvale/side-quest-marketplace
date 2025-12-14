@@ -70,8 +70,9 @@ export async function executeSuggestion(
 		executeLogger.debug`Executing suggestion id=${suggestion.id} action=${suggestion.action} source=${filename} ${cid}`;
 	}
 
-	// Generate dated attachment name: YYYYMMDD-HHMM-description.ext
-	// Use LLM-suggested description if available, otherwise extract from filename
+	// Generate attachment filename
+	// LLM-suggested names already include the document date (e.g., "2025-10-27-pv-foulkes-invoice")
+	// Fallback uses processing timestamp (YYYYMMDD-HHMM-description)
 	let datedFilename: string;
 
 	// Extract suggestedAttachmentName if present on the suggestion type
@@ -82,18 +83,11 @@ export async function executeSuggestion(
 			: undefined;
 
 	if (suggestedName) {
-		// LLM provided a clean description - use it directly
+		// LLM provided a filename with document date - use it directly (no timestamp prefix)
 		const ext = extname(suggestion.source);
-		const timestamp = new Date();
-		const year = timestamp.getFullYear();
-		const month = String(timestamp.getMonth() + 1).padStart(2, "0");
-		const day = String(timestamp.getDate()).padStart(2, "0");
-		const hour = String(timestamp.getHours()).padStart(2, "0");
-		const minute = String(timestamp.getMinutes()).padStart(2, "0");
-		const timestampPrefix = `${year}${month}${day}-${hour}${minute}`;
-		datedFilename = `${timestampPrefix}-${suggestedName}${ext}`;
+		datedFilename = `${suggestedName}${ext}`;
 	} else {
-		// Fallback: extract description from messy filename
+		// Fallback: use processing timestamp + extracted description from filename
 		datedFilename = generateFilename(suggestion.source);
 	}
 

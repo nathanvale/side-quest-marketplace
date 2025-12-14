@@ -142,6 +142,12 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 		? llmResult.suggestedFilenameDescription
 		: undefined;
 
+	// Pass through extraction warnings from LLM
+	const extractionWarnings =
+		llmResult?.extractionWarnings && llmResult.extractionWarnings.length > 0
+			? llmResult.extractionWarnings
+			: undefined;
+
 	// Return properly typed discriminated union based on action
 	if (action === "create-note") {
 		return {
@@ -156,6 +162,7 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 			suggestedProject,
 			extractedFields,
 			suggestedAttachmentName,
+			extractionWarnings,
 			reason,
 		};
 	}
@@ -167,6 +174,7 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 		processor,
 		confidence,
 		action: "skip" as const,
+		extractionWarnings,
 		reason,
 	};
 }

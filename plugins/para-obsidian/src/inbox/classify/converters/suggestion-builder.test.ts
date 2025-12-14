@@ -197,6 +197,38 @@ describe("converters/suggestion-builder", () => {
 					);
 				}
 			});
+
+			test("should pass through extractionWarnings from LLM result", () => {
+				const input = createInput({
+					llmResult: createLLMResult({
+						confidence: 0.7,
+						extractionWarnings: [
+							"Could not find invoice date",
+							"Provider name unclear",
+						],
+					}),
+				});
+
+				const result = buildSuggestion(input);
+
+				expect(result.extractionWarnings).toEqual([
+					"Could not find invoice date",
+					"Provider name unclear",
+				]);
+			});
+
+			test("should not include extractionWarnings when empty", () => {
+				const input = createInput({
+					llmResult: createLLMResult({
+						confidence: 0.85,
+						extractionWarnings: [],
+					}),
+				});
+
+				const result = buildSuggestion(input);
+
+				expect(result.extractionWarnings).toBeUndefined();
+			});
 		});
 
 		describe("LLM + heuristic agreement boost", () => {

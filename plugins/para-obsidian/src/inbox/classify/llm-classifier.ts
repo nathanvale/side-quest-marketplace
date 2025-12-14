@@ -113,6 +113,9 @@ export interface DocumentTypeResult {
 
 	/** LLM's reasoning for the classification */
 	readonly reasoning?: string;
+
+	/** Warnings about fields that could not be extracted */
+	readonly extractionWarnings?: readonly string[];
 }
 
 // =============================================================================
@@ -138,7 +141,7 @@ const EXAMPLE_RESPONSE = {
 	confidence: 0.92,
 	suggestedArea: "Health",
 	suggestedProject: "Medical Expenses 2024",
-	suggestedFilenameDescription: "invoice-20241201-dr-smith-medical-practice",
+	suggestedFilenameDescription: "2024-12-01-dr-smith-medical-practice-invoice",
 	extractedFields: {
 		amount: "220.00",
 		currency: "AUD",
@@ -148,6 +151,7 @@ const EXAMPLE_RESPONSE = {
 	},
 	reasoning:
 		"Document contains TAX INVOICE header, ABN, amount due, and medical provider details",
+	extractionWarnings: [],
 };
 
 // =============================================================================
@@ -257,15 +261,23 @@ ${userHintSection}
 4. Suggest an appropriate project from the vault (if any matches) - return JUST the name without brackets
 5. Extract relevant fields based on document type
 6. Generate a descriptive filename slug for the attachment (lowercase, hyphen-separated)
-   - For invoices: "invoice-" + date (YYYYMMDD) + "-" + provider name (e.g., "invoice-20250930-pv-foulkes")
-   - For bookings: Use provider + booking type + reference (e.g., "qantas-flight-qf123")
-   - For receipts: Use provider + "receipt" + date (e.g., "woolworths-receipt-20241201")
+   - For invoices: date (YYYY-MM-DD) + "-" + provider slug + "-invoice" (e.g., "2025-09-30-pv-foulkes-invoice")
+   - For bookings: date (YYYY-MM-DD) + "-" + provider slug + "-booking" (e.g., "2025-01-15-qantas-booking")
+   - For receipts: date (YYYY-MM-DD) + "-" + provider slug + "-receipt" (e.g., "2024-12-01-woolworths-receipt")
    - Keep it concise (max 50 chars), use only a-z, 0-9, and hyphens
+   - If you CANNOT extract the date or provider, set suggestedFilenameDescription to null
+7. Report any fields you were asked to extract but could not find in extractionWarnings array
 
 **CRITICAL for area/project fields:**
 - suggestedArea: Return ONLY the area name (e.g., "Health" not "[[Health]]")
 - suggestedProject: Return ONLY the project name (e.g., "2025 Tassie Holiday" not "[[2025 Tassie Holiday]]")
 - Wikilink brackets will be added automatically - do NOT include them
+
+**CRITICAL for extractionWarnings:**
+- If a required field cannot be extracted, add a clear warning message
+- Example warnings: "Could not find invoice date", "Provider name unclear", "Amount not found in document"
+- Return an empty array [] if all fields were successfully extracted
+- This helps users understand what manual input may be needed
 
 ## Response Format
 Respond with a JSON object ONLY (no markdown, no explanation outside JSON):
@@ -342,6 +354,14 @@ export function parseDetectionResponse(response: string): DocumentTypeResult {
 		obj.documentType = "generic";
 	}
 
+	// Parse extraction warnings (ensure it's an array of strings)
+	let extractionWarnings: readonly string[] | undefined;
+	if (Array.isArray(obj.extractionWarnings)) {
+		extractionWarnings = obj.extractionWarnings.filter(
+			(w): w is string => typeof w === "string",
+		);
+	}
+
 	return {
 		documentType: obj.documentType as DocumentTypeResult["documentType"],
 		confidence: Math.max(0, Math.min(1, obj.confidence)),
@@ -356,6 +376,7 @@ export function parseDetectionResponse(response: string): DocumentTypeResult {
 			| null
 			| undefined,
 		reasoning: obj.reasoning as string | undefined,
+		extractionWarnings,
 	};
 }
 

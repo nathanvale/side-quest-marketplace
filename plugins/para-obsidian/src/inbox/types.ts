@@ -96,6 +96,9 @@ interface BaseSuggestion {
 	/** Human-readable explanation of why this suggestion was made */
 	readonly reason: string;
 
+	/** Warnings about fields that could not be extracted (requires user attention) */
+	readonly extractionWarnings?: readonly string[];
+
 	/** Previous classification that was challenged (for audit trail) */
 	readonly previousClassification?: {
 		readonly documentType?: string;

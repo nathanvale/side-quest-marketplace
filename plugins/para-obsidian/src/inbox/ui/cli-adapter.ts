@@ -218,6 +218,17 @@ export function formatSuggestion(
 
 	lines.push(`    ${emphasize.dim(suggestion.reason)}`);
 
+	// Display extraction warnings if present
+	if (
+		suggestion.extractionWarnings &&
+		suggestion.extractionWarnings.length > 0
+	) {
+		lines.push(`    ${emphasize.warn("⚠ Warnings:")}`);
+		for (const warning of suggestion.extractionWarnings) {
+			lines.push(`      ${emphasize.warn(`• ${warning}`)}`);
+		}
+	}
+
 	return lines.join("\n");
 }
 
