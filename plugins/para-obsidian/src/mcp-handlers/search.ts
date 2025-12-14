@@ -4,6 +4,7 @@
  * Text and semantic search tools for vault content.
  */
 
+import { parseKeyValuePairs } from "@sidequest/core/cli";
 import { tool, z } from "@sidequest/core/mcp";
 import {
 	createCorrelationId,
@@ -17,21 +18,6 @@ import {
 import { loadConfig } from "../config/index";
 import { filterByFrontmatter, searchText } from "../search/index";
 import { semanticSearch } from "../search/semantic";
-
-// ============================================================================
-// Helper: Parse key=value pairs
-// ============================================================================
-
-function parseKeyValuePairs(pairs: string[]): Record<string, string> {
-	const result: Record<string, string> = {};
-	for (const pair of pairs) {
-		const [key, ...rest] = pair.split("=");
-		if (key && rest.length > 0) {
-			result[key.trim()] = rest.join("=").trim();
-		}
-	}
-	return result;
-}
 
 // ============================================================================
 // Text Search Tool

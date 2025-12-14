@@ -11,24 +11,11 @@ import { autoCommitChanges, ensureGitGuard } from "../git/index";
 import { deleteFile } from "../notes/delete";
 import { listDir, readFile } from "../shared/fs";
 import type { CommandHandler } from "./types";
-import { normalizeFlags, parseAttachments } from "./utils";
-
-/**
- * Helper to auto-discover attachments for a file.
- * This replicates logic from the main cli.ts
- */
-function withAutoDiscoveredAttachments(
-	_config: { vault: string },
-	_file: string,
-	explicitAttachments: string[],
-): string[] {
-	// If explicit attachments provided, use those
-	if (explicitAttachments.length > 0) {
-		return explicitAttachments;
-	}
-	// Otherwise, auto-discover is handled at commit time by git
-	return [];
-}
+import {
+	normalizeFlags,
+	parseAttachments,
+	withAutoDiscoveredAttachments,
+} from "./utils";
 
 /**
  * Handle the `list` command.

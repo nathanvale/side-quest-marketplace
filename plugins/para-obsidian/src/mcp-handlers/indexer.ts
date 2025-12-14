@@ -4,6 +4,7 @@
  * Index management and PARA list tools.
  */
 
+import { parseKeyValuePairs } from "@sidequest/core/cli";
 import { tool, z } from "@sidequest/core/mcp";
 import {
 	createCorrelationId,
@@ -24,21 +25,6 @@ import {
 	saveIndex,
 	scanTags,
 } from "../search/indexer";
-
-// ============================================================================
-// Helper: Parse key=value pairs
-// ============================================================================
-
-function parseKeyValuePairs(pairs: string[]): Record<string, string> {
-	const result: Record<string, string> = {};
-	for (const pair of pairs) {
-		const [key, ...rest] = pair.split("=");
-		if (key && rest.length > 0) {
-			result[key.trim()] = rest.join("=").trim();
-		}
-	}
-	return result;
-}
 
 // ============================================================================
 // Index Prime Tool

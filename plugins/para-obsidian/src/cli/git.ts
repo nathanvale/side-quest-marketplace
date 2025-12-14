@@ -17,21 +17,11 @@ import {
 } from "../git/index";
 import { type InsertMode, insertIntoNote } from "../notes/insert";
 import type { CommandHandler } from "./types";
-import { normalizeFlags, parseAttachments } from "./utils";
-
-/**
- * Helper to auto-discover attachments for a file.
- */
-function withAutoDiscoveredAttachments(
-	_config: { vault: string },
-	_file: string,
-	explicitAttachments: string[],
-): string[] {
-	if (explicitAttachments.length > 0) {
-		return explicitAttachments;
-	}
-	return [];
-}
+import {
+	normalizeFlags,
+	parseAttachments,
+	withAutoDiscoveredAttachments,
+} from "./utils";
 
 /**
  * Handle the `insert` command.

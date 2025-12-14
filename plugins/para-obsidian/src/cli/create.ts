@@ -19,21 +19,12 @@ import {
 } from "../llm/client";
 import { createFromTemplate, replaceSections } from "../notes/create";
 import type { CommandHandler } from "./types";
-import { normalizeFlags, parseArgOverrides, parseAttachments } from "./utils";
-
-/**
- * Helper to auto-discover attachments for a file.
- */
-function withAutoDiscoveredAttachments(
-	_config: { vault: string },
-	_file: string,
-	explicitAttachments: string[],
-): string[] {
-	if (explicitAttachments.length > 0) {
-		return explicitAttachments;
-	}
-	return [];
-}
+import {
+	normalizeFlags,
+	parseArgOverrides,
+	parseAttachments,
+	withAutoDiscoveredAttachments,
+} from "./utils";
 
 /**
  * Internal handler for AI-powered create from source.
