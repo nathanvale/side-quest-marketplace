@@ -303,6 +303,7 @@ export function loadConfig(
 		...merged,
 		vault,
 		templatesDir,
+		autoCommit: merged.autoCommit ?? true,
 		suggestedTags: merged.suggestedTags ?? [...DEFAULT_SUGGESTED_TAGS],
 		frontmatterRules: merged.frontmatterRules ?? DEFAULT_FRONTMATTER_RULES,
 		templateVersions: merged.templateVersions ?? DEFAULT_TEMPLATE_VERSIONS,

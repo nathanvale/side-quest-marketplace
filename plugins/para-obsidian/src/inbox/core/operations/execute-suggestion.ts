@@ -18,6 +18,7 @@ import {
 	writeTextFileSync,
 } from "@sidequest/core/fs";
 import { loadConfig } from "../../../config/index";
+import { autoCommitChanges } from "../../../git/index";
 import { createFromTemplate, injectSections } from "../../../notes/create";
 import { resolveVaultPath } from "../../../shared/fs";
 import { executeLogger } from "../../../shared/logger";
@@ -342,6 +343,30 @@ export async function executeSuggestion(
 		createdNote: createdNotePath,
 		movedAttachment: movedAttachmentPath,
 	});
+
+	// Auto-commit changes if enabled (defense-in-depth: commit after each successful execution)
+	const paraConfig = loadConfig();
+	if (paraConfig.autoCommit) {
+		const filesToCommit = [movedAttachmentPath];
+		if (createdNotePath) {
+			filesToCommit.push(createdNotePath);
+		}
+		try {
+			await autoCommitChanges(
+				paraConfig,
+				filesToCommit,
+				`inbox: ${createdNotePath ? basename(createdNotePath, ".md") : basename(movedAttachmentPath)}`,
+			);
+			if (executeLogger) {
+				executeLogger.debug`Auto-committed ${filesToCommit.length} file(s) ${cid}`;
+			}
+		} catch (error) {
+			// Log but don't fail - registry already updated, files moved successfully
+			if (executeLogger) {
+				executeLogger.warn`Auto-commit failed: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
+			}
+		}
+	}
 
 	if (executeLogger) {
 		executeLogger.info`Executed suggestion id=${suggestion.id} movedTo=${datedFilename} createdNote=${createdNotePath ?? "none"} ${cid}`;
