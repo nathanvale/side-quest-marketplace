@@ -17,6 +17,7 @@ import {
 	handleCleanBrokenLinks,
 	handleConfig,
 	handleCreate,
+	handleCreateNoteTemplate,
 	handleDelete,
 	handleFindOrphans,
 	handleFrontmatter,
@@ -49,6 +50,7 @@ function printUsage(): void {
 		"  bun run src/cli.ts config [--format md|json]",
 		"  bun run src/cli.ts templates [--format md|json]",
 		"  bun run src/cli.ts template-fields <template> [--format md|json]",
+		"  bun run src/cli.ts create-note-template",
 		"  bun run src/cli.ts list [path] [--format md|json]",
 		"  bun run src/cli.ts read <file> [--format md|json]",
 		"  bun run src/cli.ts search <query> [--tag TAG] [--frontmatter key=val|--frontmatter.key val] [--regex] [--dir path[,path2]] [--glob pattern] [--context N] [--format md|json]",
@@ -231,6 +233,12 @@ async function main(): Promise<void> {
 
 			case "create": {
 				const result = await handleCreate(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
+				break;
+			}
+
+			case "create-note-template": {
+				const result = await handleCreateNoteTemplate(ctx);
 				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}

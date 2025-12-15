@@ -27,6 +27,7 @@ export {
 } from "./config";
 // Create commands
 export { handleCreate } from "./create";
+export { handleCreateNoteTemplate } from "./create-note-template";
 // Frontmatter commands
 export {
 	computeFrontmatterHints,

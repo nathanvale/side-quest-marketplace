@@ -223,3 +223,64 @@ export function validateFieldValue(
 		normalizedValue: trimmedValue,
 	};
 }
+
+/**
+ * Configuration for generating a new classifier
+ */
+export interface ClassifierConfig {
+	readonly id: string;
+	readonly displayName: string;
+	readonly description: string;
+	readonly priority: number;
+	readonly defaultArea?: string;
+	readonly filenamePatterns: readonly string[];
+	readonly contentMarkers: readonly string[];
+	readonly fields: readonly FieldDefinition[];
+	readonly promptHint: string;
+	readonly keyFields: readonly string[];
+	readonly templateName: string;
+	readonly fieldMappings: Readonly<Record<string, string>>;
+	readonly scoring: ScoringConfig;
+}
+
+/**
+ * Result of detecting existing template (discriminated union)
+ */
+export type TemplateDetectionResult =
+	| {
+			readonly exists: true;
+			readonly path: string;
+			readonly content: string;
+	  }
+	| { readonly exists: false; readonly suggestedPath: string };
+
+/**
+ * User choice for template handling (discriminated union)
+ */
+export type TemplateChoice =
+	| { readonly action: "use-existing" }
+	| {
+			readonly action: "create-new";
+			readonly suffix?: string;
+			readonly mode: "basic" | "rich";
+	  }
+	| { readonly action: "skip" };
+
+/**
+ * Registry modification patch
+ */
+export interface RegistryPatch {
+	readonly importStatement: string;
+	readonly exportStatement: string;
+	readonly insertionIndex: number;
+	readonly camelCaseName: string;
+}
+
+/**
+ * Atomic rollback operation
+ */
+export interface RollbackOperation {
+	readonly name: string;
+	readonly execute: () => Promise<unknown>;
+	readonly rollback: (result?: unknown) => Promise<void>;
+}
