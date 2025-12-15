@@ -3,8 +3,11 @@ import { createSuggestionId, type InboxSuggestion } from "../types";
 import {
 	formatConfidence,
 	formatSuggestion,
+	formatSuggestionDetails,
 	formatSuggestionsTable,
 	getHelpText,
+	PAGE_SIZE,
+	paginateSuggestions,
 	parseCommand,
 } from "./cli-adapter";
 
@@ -104,8 +107,17 @@ describe("inbox/cli-adapter", () => {
 			expect(parseCommand("xyz")).toEqual({ type: "invalid", input: "xyz" });
 		});
 
-		test("should parse empty string as invalid", () => {
+		test("should parse empty string as invalid (no approved items)", () => {
 			expect(parseCommand("")).toEqual({ type: "invalid", input: "" });
+			expect(parseCommand("", false)).toEqual({ type: "invalid", input: "" });
+		});
+
+		test("should parse empty string as execute when items approved", () => {
+			expect(parseCommand("", true)).toEqual({ type: "execute" });
+		});
+
+		test("should parse whitespace-only as execute when items approved", () => {
+			expect(parseCommand("   ", true)).toEqual({ type: "execute" });
 		});
 
 		test("should parse 'e' without id as invalid", () => {
@@ -114,6 +126,42 @@ describe("inbox/cli-adapter", () => {
 
 		test("should parse 's' without id as invalid", () => {
 			expect(parseCommand("s")).toEqual({ type: "invalid", input: "s" });
+		});
+
+		test("should parse 'v3' as view", () => {
+			expect(parseCommand("v3")).toEqual({ type: "view", id: 3 });
+		});
+
+		test("should parse 'V12' as view (case insensitive)", () => {
+			expect(parseCommand("V12")).toEqual({ type: "view", id: 12 });
+		});
+
+		test("should parse 'v' without id as invalid", () => {
+			expect(parseCommand("v")).toEqual({ type: "invalid", input: "v" });
+		});
+
+		test("should parse 'u' as undo", () => {
+			expect(parseCommand("u")).toEqual({ type: "undo" });
+		});
+
+		test("should parse 'U' as undo (case insensitive)", () => {
+			expect(parseCommand("U")).toEqual({ type: "undo" });
+		});
+
+		test("should parse 'n' as next-page", () => {
+			expect(parseCommand("n")).toEqual({ type: "next-page" });
+		});
+
+		test("should parse 'N' as next-page (case insensitive)", () => {
+			expect(parseCommand("N")).toEqual({ type: "next-page" });
+		});
+
+		test("should parse 'p' as prev-page", () => {
+			expect(parseCommand("p")).toEqual({ type: "prev-page" });
+		});
+
+		test("should parse 'P' as prev-page (case insensitive)", () => {
+			expect(parseCommand("P")).toEqual({ type: "prev-page" });
 		});
 
 		test("should parse 'e3' without prompt as invalid", () => {
@@ -224,9 +272,9 @@ describe("inbox/cli-adapter", () => {
 				],
 			};
 			const result = formatSuggestion(suggestionWithWarnings, 1);
-			expect(result).toContain("Warnings");
-			expect(result).toContain("Could not find invoice date");
-			expect(result).toContain("Provider name unclear");
+			// Warnings are now collapsed - shows indicator and count
+			expect(result).toContain("⚠ 2 warning(s)");
+			expect(result).toContain("use v1 for details");
 		});
 
 		test("should not display warnings section when no warnings", () => {
@@ -312,6 +360,140 @@ describe("inbox/cli-adapter", () => {
 			const help = getHelpText();
 			expect(help).toContain("h");
 			expect(help.toLowerCase()).toContain("help");
+		});
+
+		test("should contain view command", () => {
+			const help = getHelpText();
+			expect(help).toContain("v");
+		});
+
+		test("should contain undo command", () => {
+			const help = getHelpText();
+			expect(help).toContain("u");
+			expect(help.toLowerCase()).toContain("undo");
+		});
+
+		test("should contain navigation commands", () => {
+			const help = getHelpText();
+			expect(help).toContain("n");
+			expect(help).toContain("p");
+		});
+	});
+
+	describe("formatSuggestionDetails", () => {
+		const baseSuggestion: InboxSuggestion = {
+			id: createSuggestionId("abc12345-0000-4000-8000-000000000001"),
+			source: "/vault/Inbox/invoice-test.pdf",
+			processor: "attachments",
+			confidence: "high",
+			action: "create-note",
+			suggestedNoteType: "invoice",
+			suggestedTitle: "Test Invoice 2024",
+			suggestedDestination: "02 Areas/Finance",
+			suggestedAttachmentName: "2024-01-invoice-test.pdf",
+			detectionSource: "llm+heuristic",
+			reason: "Detected invoice with all required fields",
+			extractedFields: {
+				invoiceDate: "2024-01-15",
+				provider: "Test Provider Inc",
+				amount: "$150.00",
+			},
+		};
+
+		test("should display item number in header", () => {
+			const result = formatSuggestionDetails(baseSuggestion, 3);
+			expect(result).toContain("Item 3");
+		});
+
+		test("should display filename", () => {
+			const result = formatSuggestionDetails(baseSuggestion, 1);
+			expect(result).toContain("invoice-test.pdf");
+		});
+
+		test("should display suggested title", () => {
+			const result = formatSuggestionDetails(baseSuggestion, 1);
+			expect(result).toContain("Test Invoice 2024");
+		});
+
+		test("should display extracted fields", () => {
+			const result = formatSuggestionDetails(baseSuggestion, 1);
+			expect(result).toContain("invoiceDate");
+			expect(result).toContain("2024-01-15");
+			expect(result).toContain("provider");
+			expect(result).toContain("Test Provider Inc");
+			expect(result).toContain("amount");
+			expect(result).toContain("$150.00");
+		});
+
+		test("should display warnings when present", () => {
+			const suggestionWithWarnings: InboxSuggestion = {
+				...baseSuggestion,
+				extractionWarnings: ["Missing invoice number", "Date format unclear"],
+			};
+			const result = formatSuggestionDetails(suggestionWithWarnings, 1);
+			expect(result).toContain("Missing invoice number");
+			expect(result).toContain("Date format unclear");
+		});
+
+		test("should display destination", () => {
+			const result = formatSuggestionDetails(baseSuggestion, 1);
+			expect(result).toContain("02 Areas/Finance");
+		});
+
+		test("should display confidence and detection source", () => {
+			const result = formatSuggestionDetails(baseSuggestion, 1);
+			expect(result).toContain("high");
+			expect(result).toContain("llm+heuristic");
+		});
+	});
+
+	describe("paginateSuggestions", () => {
+		// Generate valid UUIDs for test data
+		const suggestions: InboxSuggestion[] = Array.from(
+			{ length: 12 },
+			(_, i) => ({
+				id: createSuggestionId(
+					`a${i.toString().padStart(7, "0")}-0000-4000-8000-000000000001`,
+				),
+				source: `/vault/Inbox/file-${i + 1}.pdf`,
+				processor: "attachments",
+				confidence: "high" as const,
+				action: "create-note" as const,
+				suggestedNoteType: "invoice",
+				suggestedTitle: `File ${i + 1}`,
+				detectionSource: "heuristic",
+				reason: "Test",
+			}),
+		);
+
+		test("should return first page items", () => {
+			const result = paginateSuggestions(suggestions, 0, 5);
+			expect(result).toHaveLength(5);
+			expect(result[0]?.source).toContain("file-1.pdf");
+			expect(result[4]?.source).toContain("file-5.pdf");
+		});
+
+		test("should return second page items", () => {
+			const result = paginateSuggestions(suggestions, 1, 5);
+			expect(result).toHaveLength(5);
+			expect(result[0]?.source).toContain("file-6.pdf");
+			expect(result[4]?.source).toContain("file-10.pdf");
+		});
+
+		test("should return partial last page", () => {
+			const result = paginateSuggestions(suggestions, 2, 5);
+			expect(result).toHaveLength(2); // Only 2 items left
+			expect(result[0]?.source).toContain("file-11.pdf");
+			expect(result[1]?.source).toContain("file-12.pdf");
+		});
+
+		test("should handle empty array", () => {
+			const result = paginateSuggestions([], 0, 5);
+			expect(result).toHaveLength(0);
+		});
+
+		test("should use PAGE_SIZE constant", () => {
+			expect(PAGE_SIZE).toBe(5);
 		});
 	});
 });

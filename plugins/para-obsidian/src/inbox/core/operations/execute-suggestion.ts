@@ -250,11 +250,27 @@ export async function executeSuggestion(
 	// SUCCESS: Move staged note to final destination atomically
 	if (stagingNotePath) {
 		try {
-			// Type narrowing: only CreateNoteSuggestion and MoveSuggestion have suggestedDestination
-			const finalDest =
-				("suggestedDestination" in suggestion
-					? suggestion.suggestedDestination
-					: "") ?? "";
+			// Determine final destination:
+			// 1. Use explicit suggestedDestination if set
+			// 2. Fall back to defaultDestinations for the note type
+			// 3. Default to "00 Inbox" (PARA method)
+			let finalDest: string;
+			if (
+				"suggestedDestination" in suggestion &&
+				suggestion.suggestedDestination
+			) {
+				finalDest = suggestion.suggestedDestination;
+			} else if (
+				suggestion.action === "create-note" &&
+				suggestion.suggestedNoteType
+			) {
+				finalDest =
+					paraConfig.defaultDestinations?.[suggestion.suggestedNoteType] ??
+					"00 Inbox";
+			} else {
+				// PARA method: all notes go to inbox by default
+				finalDest = "00 Inbox";
+			}
 			const stagingAbsolute = resolveVaultPath(
 				paraConfig.vault,
 				stagingNotePath,

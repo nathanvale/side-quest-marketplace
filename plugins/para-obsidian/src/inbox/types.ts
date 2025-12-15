@@ -829,12 +829,20 @@ export interface ProcessInboxOptions {
 
 /**
  * Parsed command from interactive CLI.
+ *
+ * All user interactions are represented as typed commands.
+ * This ensures consistent validation and handling across the CLI.
  */
 export type CLICommand =
+	| { type: "execute" } // Execute approved items (Enter key when items approved)
 	| { type: "approve-all" }
 	| { type: "approve"; ids: number[] }
 	| { type: "edit"; id: number; prompt: string }
 	| { type: "skip"; id: number }
+	| { type: "view"; id: number }
+	| { type: "undo" }
+	| { type: "next-page" }
+	| { type: "prev-page" }
 	| { type: "quit" }
 	| { type: "help" }
 	| { type: "invalid"; input: string };

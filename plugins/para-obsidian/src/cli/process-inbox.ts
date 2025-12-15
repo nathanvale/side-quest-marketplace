@@ -139,6 +139,40 @@ export async function handleProcessInbox(
 	return handleInteractiveMode(engine, filteredSuggestions, dryRun, isJson);
 }
 
+/** Average seconds per file for LLM classification (used for ETA calculation) */
+const AVG_SECONDS_PER_FILE = 20;
+
+/**
+ * Format duration in human-readable form
+ */
+function formatDuration(seconds: number): string {
+	if (seconds < 60) return `${Math.round(seconds)}s`;
+	const mins = Math.floor(seconds / 60);
+	const secs = Math.round(seconds % 60);
+	return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+}
+
+/**
+ * Calculate ETA based on progress
+ */
+function calculateEta(
+	processed: number,
+	total: number,
+	elapsedMs: number,
+): string {
+	if (processed === 0 || total === 0) {
+		// Initial estimate based on average
+		const remaining = total || 1;
+		return `~${formatDuration(remaining * AVG_SECONDS_PER_FILE)}`;
+	}
+
+	// Use actual timing for more accurate estimate
+	const avgMsPerFile = elapsedMs / processed;
+	const remaining = total - processed;
+	const etaMs = remaining * avgMsPerFile;
+	return formatDuration(etaMs / 1000);
+}
+
 /**
  * Scan inbox with progress spinner
  */
@@ -160,11 +194,13 @@ async function scanWithSpinner(
 	};
 
 	const updateScanText = () => {
+		const elapsedMs = Date.now() - scanStarted;
 		const elapsedStage = (
 			(Date.now() - scanState.stageStartedAt) /
 			1000
 		).toFixed(1);
-		const totals = `Scanning ${scanState.processed}/${scanState.total || "?"} (skipped ${scanState.skipped}, errors ${scanState.errors})`;
+		const eta = calculateEta(scanState.processed, scanState.total, elapsedMs);
+		const totals = `Scanning ${scanState.processed}/${scanState.total || "?"} (skipped ${scanState.skipped}, errors ${scanState.errors}) ETA ${eta}`;
 		const detail =
 			scanState.currentFile === ""
 				? ""
