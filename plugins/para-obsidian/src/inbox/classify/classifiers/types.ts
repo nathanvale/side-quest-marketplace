@@ -42,6 +42,10 @@ export interface FieldDefinition {
 	readonly conditionalOn?: string;
 	/** Human-readable description of the condition */
 	readonly conditionalDescription?: string;
+	/** Valid values for string fields (enables enum-like validation) */
+	readonly allowedValues?: readonly string[];
+	/** Validation pattern for additional constraints */
+	readonly validationPattern?: string;
 }
 
 /**
@@ -132,4 +136,90 @@ export interface ConverterMatch {
 	readonly converter: InboxConverter;
 	/** Combined heuristic score (0.0 to 1.0) */
 	readonly score: number;
+}
+
+/**
+ * Field validation result
+ */
+export interface FieldValidationResult {
+	/** Whether the field value is valid */
+	readonly isValid: boolean;
+	/** Error message if validation failed */
+	readonly error?: string;
+	/** Normalized value after validation */
+	readonly normalizedValue?: string;
+}
+
+/**
+ * Validates a field value against its definition constraints
+ * 
+ * @param value - The value to validate
+ * @param field - The field definition with constraints
+ * @returns Validation result with error details if invalid
+ */
+export function validateFieldValue(
+	value: string | undefined,
+	field: FieldDefinition
+): FieldValidationResult {
+	// Handle undefined/empty values
+	if (!value || value.trim() === "") {
+		if (field.requirement === "required") {
+			return {
+				isValid: false,
+				error: `Field '${field.name}' is required but was empty`,
+			};
+		}
+		return { isValid: true };
+	}
+
+	const trimmedValue = value.trim();
+
+	// Validate against allowed values
+	if (field.allowedValues && field.allowedValues.length > 0) {
+		if (!field.allowedValues.includes(trimmedValue)) {
+			return {
+				isValid: false,
+				error: `Field '${field.name}' must be one of: ${field.allowedValues.join(", ")}. Got: '${trimmedValue}'`,
+			};
+		}
+	}
+
+	// Validate against pattern
+	if (field.validationPattern) {
+		const pattern = new RegExp(field.validationPattern);
+		if (!pattern.test(trimmedValue)) {
+			return {
+				isValid: false,
+				error: `Field '${field.name}' does not match required pattern: ${field.validationPattern}`,
+			};
+		}
+	}
+
+	// Type-specific validation
+	switch (field.type) {
+		case "date":
+			if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmedValue)) {
+				return {
+					isValid: false,
+					error: `Field '${field.name}' must be a valid date in YYYY-MM-DD format. Got: '${trimmedValue}'`,
+				};
+			}
+			break;
+		case "currency":
+		case "number": {
+			const numValue = Number(trimmedValue);
+			if (Number.isNaN(numValue)) {
+				return {
+					isValid: false,
+					error: `Field '${field.name}' must be a valid number. Got: '${trimmedValue}'`,
+				};
+			}
+			break;
+		}
+	}
+
+	return {
+		isValid: true,
+		normalizedValue: trimmedValue,
+	};
 }

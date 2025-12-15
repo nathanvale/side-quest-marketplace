@@ -10,10 +10,14 @@
 import type { InboxConverter } from "../types";
 import { bookingClassifier } from "./booking";
 import { invoiceClassifier } from "./invoice";
+import { medicalStatementClassifier } from "./medical-statement";
+import { researchClassifier } from "./research";
 
 // Re-export individual classifiers for direct access
 export { bookingClassifier } from "./booking";
 export { invoiceClassifier } from "./invoice";
+export { medicalStatementClassifier } from "./medical-statement";
+export { researchClassifier } from "./research";
 
 /**
  * Default classifiers shipped with para-obsidian.
@@ -26,6 +30,8 @@ export { invoiceClassifier } from "./invoice";
  * @see _template.ts for classifier template
  */
 export const DEFAULT_CLASSIFIERS: readonly InboxConverter[] = [
-	invoiceClassifier,
-	bookingClassifier,
+	medicalStatementClassifier, // Priority 110 - medical statements before generic invoices
+	invoiceClassifier, // Priority 100
+	bookingClassifier, // Priority 90
+	researchClassifier, // Priority 85
 ] as const;

@@ -18,7 +18,7 @@ import {
 	inboxLogger,
 	initLoggerWithNotice,
 } from "../../shared/logger";
-import { buildSuggestion } from "../classify/classifiers";
+import { buildSuggestion, DEFAULT_CLASSIFIERS } from "../classify/classifiers";
 import {
 	checkPdfToText,
 	combineHeuristics,
@@ -388,12 +388,14 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					inboxLogger.debug`LLM starting file=${filename} model=${llmModel} cid=${cid}`;
 				}
 				llmResult = await llmLimit(async () => {
-					const prompt = buildInboxPrompt({
-						content: text,
-						filename,
-						vaultContext,
-					});
-
+					const prompt = buildInboxPrompt(
+						{
+							content: text,
+							filename,
+							vaultContext,
+						},
+						DEFAULT_CLASSIFIERS,
+					);
 					// Use callLLMWithMetadata when no custom client is injected
 					// This gives us fallback visibility in production
 					if (!resolvedConfig.llmClient) {
@@ -847,12 +849,15 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		};
 
 		// Build prompt with user hint
-		const llmPrompt = buildInboxPrompt({
-			content: text,
-			filename,
-			vaultContext,
-			userHint: prompt,
-		});
+		const llmPrompt = buildInboxPrompt(
+			{
+				content: text,
+				filename,
+				vaultContext,
+				userHint: prompt,
+			},
+			DEFAULT_CLASSIFIERS,
+		);
 
 		// Call LLM with user hint
 		let llmResult: DocumentTypeResult | null = null;

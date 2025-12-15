@@ -729,6 +729,10 @@ export async function runInteractiveLoop(
 				}
 
 				console.log(formatSuggestionDetails(targetSuggestion, command.id));
+
+				// Wait for user to acknowledge before returning to list
+				// This prevents the details from being scrolled away immediately
+				await input({ message: emphasize.dim("Press Enter to continue...") });
 				break;
 			}
 
@@ -780,11 +784,20 @@ export async function runInteractiveLoop(
 					console.log(formatConfirmationPreview(toExecute, originalIndices));
 
 					const confirmInput = await input({
-						message: "Execute? [Y/n/u to undo this batch]: ",
+						message: "Execute? [Enter=yes, no=cancel]: ",
 					});
 					const confirmLower = confirmInput.trim().toLowerCase();
 
-					if (confirmLower === "n" || confirmLower === "no") {
+					// Explicit yes or Enter to execute (defense-in-depth: require explicit confirmation)
+					if (
+						confirmLower === "" ||
+						confirmLower === "y" ||
+						confirmLower === "yes"
+					) {
+						return Array.from(approved);
+					}
+
+					if (confirmLower === "no" || confirmLower === "cancel") {
 						// Only remove the newly added approvals, preserve previous ones
 						for (const id of newlyApproved) {
 							approved.delete(id);
@@ -798,22 +811,15 @@ export async function runInteractiveLoop(
 						);
 						break;
 					}
-					if (confirmLower === "u") {
-						// Only undo the newly added approvals
-						for (const id of newlyApproved) {
-							approved.delete(id);
-							const histIdx = approvalHistory.lastIndexOf(id);
-							if (histIdx !== -1) approvalHistory.splice(histIdx, 1);
-						}
-						console.log(
-							emphasize.warn(
-								`Undid ${newlyApproved.length} approval(s). ${approved.size} still approved.`,
-							),
-						);
-						break;
-					}
 
-					return Array.from(approved);
+					// Unrecognized input (e.g., 'n', 'p') - don't execute, return to main menu
+					// This prevents accidental execution when user types navigation keys
+					console.log(
+						emphasize.dim(
+							`Unrecognized: '${confirmInput.trim()}'. Returning to menu. (${approved.size} item(s) still approved)`,
+						),
+					);
+					break;
 				} finally {
 					isProcessing = false;
 				}
@@ -873,11 +879,20 @@ export async function runInteractiveLoop(
 					console.log(formatConfirmationPreview(toExecute, originalIndices));
 
 					const confirmInput = await input({
-						message: "Execute? [Y/n/u to undo this batch]: ",
+						message: "Execute? [Enter=yes, no=cancel]: ",
 					});
 					const confirmLower = confirmInput.trim().toLowerCase();
 
-					if (confirmLower === "n" || confirmLower === "no") {
+					// Explicit yes or Enter to execute (defense-in-depth: require explicit confirmation)
+					if (
+						confirmLower === "" ||
+						confirmLower === "y" ||
+						confirmLower === "yes"
+					) {
+						return Array.from(approved);
+					}
+
+					if (confirmLower === "no" || confirmLower === "cancel") {
 						// Only remove the newly added approvals, preserve previous ones
 						for (const id of newlyApproved) {
 							approved.delete(id);
@@ -891,22 +906,15 @@ export async function runInteractiveLoop(
 						);
 						break;
 					}
-					if (confirmLower === "u") {
-						// Only undo the newly added approvals
-						for (const id of newlyApproved) {
-							approved.delete(id);
-							const histIdx = approvalHistory.lastIndexOf(id);
-							if (histIdx !== -1) approvalHistory.splice(histIdx, 1);
-						}
-						console.log(
-							emphasize.warn(
-								`Undid ${newlyApproved.length} approval(s). ${approved.size} still approved.`,
-							),
-						);
-						break;
-					}
 
-					return Array.from(approved);
+					// Unrecognized input (e.g., 'n', 'p') - don't execute, return to main menu
+					// This prevents accidental execution when user types navigation keys
+					console.log(
+						emphasize.dim(
+							`Unrecognized: '${confirmInput.trim()}'. Returning to menu. (${approved.size} item(s) still approved)`,
+						),
+					);
+					break;
 				} finally {
 					isProcessing = false;
 				}
