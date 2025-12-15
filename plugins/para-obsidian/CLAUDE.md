@@ -27,6 +27,7 @@ bun run format           # Biome format only
 **CLI Usage:**
 ```bash
 bun run src/cli.ts <command> [options]
+bun run src/debug-llm.ts           # Debug LLM classification chain
 ```
 
 ---
@@ -37,6 +38,7 @@ bun run src/cli.ts <command> [options]
 para-obsidian/
 ├── src/
 │   ├── cli.ts                 # CLI entry point (19 commands)
+│   ├── debug-llm.ts           # LLM classification debug script
 │   ├── cli/                   # CLI command handlers
 │   │   ├── index.ts           # Barrel exports
 │   │   ├── config.ts          # Config/info commands
@@ -45,7 +47,7 @@ para-obsidian/
 │   │   ├── git.ts             # Git integration
 │   │   ├── links.ts           # Link management
 │   │   ├── notes.ts           # CRUD operations
-│   │   ├── process-inbox.ts   # Inbox processing
+│   │   ├── process-inbox.ts   # Inbox processing (with execute command)
 │   │   └── search.ts          # Search commands
 │   ├── mcp-handlers/          # MCP tool implementations (6 modules)
 │   │   ├── config.ts          # para_config, para_templates
@@ -56,11 +58,18 @@ para-obsidian/
 │   │   └── search.ts          # para_search, para_semantic
 │   ├── inbox/                 # Inbox processing framework
 │   │   ├── core/              # Engine, operations, staging
-│   │   ├── classify/          # LLM classification, converters
+│   │   ├── classify/          # LLM classification, converters, classifiers
+│   │   │   ├── classifiers/   # NEW: Classifier registry system
+│   │   │   │   ├── definitions/  # Built-in classifiers (invoice, booking, etc.)
+│   │   │   │   ├── registry.ts   # Schema versioning
+│   │   │   │   ├── loader.ts     # Classifier matching
+│   │   │   │   └── migrations/   # Schema migrations
+│   │   │   ├── converters/    # Legacy converter system (being phased out)
+│   │   │   └── detection/     # Content processors (PDF, etc.)
 │   │   ├── scan/              # Content extractors (md, pdf, image)
-│   │   ├── execute/           # Suggestion execution
+│   │   ├── execute/           # Suggestion execution (with filename collision handling)
 │   │   ├── registry/          # Processed item tracking
-│   │   └── ui/                # Interactive CLI adapter
+│   │   └── ui/                # Interactive CLI adapter (with inline warnings)
 │   ├── frontmatter/           # Frontmatter utilities
 │   │   ├── parse.ts           # YAML parsing
 │   │   ├── validate.ts        # Type-specific validation
@@ -86,6 +95,7 @@ para-obsidian/
 │   └── utils.ts               # MCP utilities
 ├── commands/                  # Slash commands
 │   ├── create.md
+│   ├── create-classifier.md   # NEW: Classifier creation guide
 │   ├── search.md
 │   ├── validate.md
 │   └── commit.md
@@ -122,7 +132,8 @@ para-obsidian/
 
 1. **CLI** (`src/cli.ts`)
    - Command pattern with domain-organized handlers
-   - 19 commands: config, list, read, search, create, insert, rename, delete, frontmatter (6 subcommands), git, process-inbox, etc.
+   - 19 commands: config, list, read, search, create, insert, rename, delete, frontmatter (6 subcommands), git, process-inbox (scan/execute), etc.
+   - Debug tooling: `src/debug-llm.ts` for testing LLM classification chain
 
 2. **MCP Server** (`mcp/index.ts`)
    - 20+ tools via `@sidequest/core/mcp`
@@ -142,9 +153,17 @@ para-obsidian/
 ```
 scan → classify → suggest → review → execute
   ↓        ↓         ↓         ↓         ↓
-Extract  LLM      Build    User      Create
-content  detect   suggestions approve  notes
+Extract  Classifier Build    User      Create
+content  Registry  suggestions approve  notes
+(Git guard) (Schema versioning) (LLM fallback) (Inline warnings) (Collision safe)
 ```
+
+**New Features:**
+- **Classifier Registry**: Modular classifier definitions with schema versioning and migrations
+- **Git Guard**: Checks for uncommitted changes before LLM processing
+- **LLM Fallback Transparency**: Shows which fields used LLM vs heuristics
+- **Filename Collision Handling**: Automatic deduplication when creating notes
+- **Enhanced CLI**: Execute command, inline warnings, improved UX
 
 ---
 
@@ -155,10 +174,15 @@ content  detect   suggestions approve  notes
 - `PARA_OBSIDIAN_CONFIG` (optional) - Custom config path
 
 **Config Files (merged in order):**
-1. Built-in defaults
+1. Built-in defaults (autoCommit: true by default)
 2. `~/.config/para-obsidian/config.json`
 3. `.para-obsidianrc` (project root)
 4. Environment overrides
+
+**Git Integration:**
+- Auto-commit enabled by default for vault operations
+- Git guard checks for uncommitted changes before LLM processing
+- Attachments folder excluded from git guard checks
 
 ---
 

@@ -20,9 +20,17 @@
 │  Scan   │───▶│ Classify │───▶│ Suggest │───▶│ Review │───▶│ Execute │
 └─────────┘    └──────────┘    └─────────┘    └────────┘    └─────────┘
      │              │               │              │              │
- Extract        LLM detect      Build          User          Create
- content        doc type       suggestions     approve        notes
+ Extract        Classifier      Build          User          Create
+ content        Registry       suggestions     approve        notes
+(Git guard)  (Schema version) (LLM fallback) (Warnings)  (Collision safe)
 ```
+
+**Recent Enhancements:**
+- Classifier registry with schema versioning (v1.0)
+- Git guard prevents LLM calls on uncommitted changes
+- LLM fallback transparency shows which fields used heuristics
+- Filename collision handling with automatic deduplication
+- Enhanced CLI with inline warnings and explicit execute command
 
 ---
 
@@ -33,23 +41,40 @@ src/inbox/
 ├── types.ts                   # Core types (39 symbols)
 ├── index.ts                   # Public API barrel
 ├── core/                      # Main engine
-│   ├── engine.ts              # InboxEngine factory (12 functions)
-│   ├── engine-utils.ts        # Title/filename generation
+│   ├── engine.ts              # InboxEngine factory (with git guard, LLM fallback)
+│   ├── engine-utils.ts        # Title/filename generation (collision handling)
 │   ├── operations/            # Execution operations
-│   │   ├── execute-suggestion.ts  # Suggestion executor
+│   │   ├── execute-suggestion.ts  # Suggestion executor (atomic, auto-commit)
 │   │   └── report.ts          # Markdown report generation
 │   ├── staging/               # Temporary file management
 │   │   ├── cleanup.ts         # Orphaned staging cleanup
-│   │   └── rollback.ts        # Transaction rollback
+│   │   └── rollback.ts        # Transaction rollback (vault-relative paths)
 │   ├── llm/                   # LLM client wrapper
-│   │   └── client.ts          # callLLM abstraction
+│   │   └── client.ts          # callLLM with fallback transparency
 │   └── vault/                 # Vault context
 │       └── context.ts         # Projects/areas loader
 ├── classify/                  # Document classification
-│   ├── llm-classifier.ts      # LLM-based detection
+│   ├── llm-classifier.ts      # LLM-based detection (with fallback transparency)
+│   ├── classifiers/           # NEW: Classifier registry system
+│   │   ├── definitions/       # Built-in classifier modules
+│   │   │   ├── _template.ts   # Classifier template
+│   │   │   ├── booking.ts     # Travel/booking classifier
+│   │   │   ├── invoice.ts     # Invoice/receipt classifier
+│   │   │   ├── medical-statement.ts  # Medical statement classifier
+│   │   │   ├── research.ts    # Research paper classifier
+│   │   │   ├── index.ts       # Barrel exports
+│   │   │   └── README.md      # Classifier creation guide
+│   │   ├── registry.ts        # Classifier registry with schema versioning
+│   │   ├── loader.ts          # Classifier matching logic
+│   │   ├── suggestion-builder.ts  # Build suggestions from classifiers
+│   │   ├── types.ts           # Classifier schemas (InboxConverter)
+│   │   └── migrations/        # Schema migrations
+│   │       ├── index.ts       # Migration registry
+│   │       ├── migrate.ts     # Migration executor
+│   │       └── README.md      # Migration guide
 │   ├── detection/             # Content processors
 │   │   └── pdf-processor.ts  # PDF extraction + heuristics
-│   └── converters/            # Type-specific logic
+│   └── converters/            # Legacy converter system (being phased out)
 │       ├── defaults.ts        # Built-in converters
 │       ├── loader.ts          # Converter matching
 │       ├── suggestion-builder.ts  # Suggestion creation
@@ -62,14 +87,14 @@ src/inbox/
 │       ├── registry.ts        # Extractor registry
 │       └── types.ts           # Extractor schemas
 ├── execute/                   # Suggestion execution
-│   ├── executor.ts            # Main execution logic
-│   ├── note-creator.ts        # Note creation
+│   ├── executor.ts            # Main execution logic (atomic operations)
+│   ├── note-creator.ts        # Note creation (filename collision handling)
 │   ├── attachment-mover.ts    # Attachment handling
 │   └── attachment-linker.ts   # Link insertion
 ├── registry/                  # Processed items tracking
 │   └── processed-registry.ts  # SHA256-based dedup
 ├── ui/                        # Terminal interaction
-│   ├── cli-adapter.ts         # Interactive approval loop
+│   ├── cli-adapter.ts         # Interactive approval loop (with inline warnings, execute cmd)
 │   └── index.ts               # Public UI exports
 └── shared/                    # Cross-cutting concerns
     └── errors.ts              # InboxError types
@@ -150,19 +175,22 @@ const engine = createInboxEngine({
 ### Main Operations
 
 **scan()** - Find files, extract content, classify, build suggestions
+- **Git Guard**: Checks for uncommitted changes first (aborts if found)
 - Loads processed registry (SHA256 dedup)
 - Finds supported files (.md, .pdf, images)
 - Validates dependencies (pdf-to-text for PDFs)
 - Builds vault context (projects, areas)
 - Processes files in parallel (p-limit concurrency)
 - Skips already-processed items
-- Returns suggestion array
+- **LLM Fallback Transparency**: Tracks which fields used LLM vs heuristics
+- Returns suggestion array with fallback metadata
 
 **execute()** - Apply approved suggestions
 - Validates suggestion IDs
 - Executes sequentially (atomic registry saves)
-- Creates notes with frontmatter
-- Moves attachments
+- Creates notes with frontmatter (with filename collision handling)
+- Moves attachments (vault-relative paths for rollback safety)
+- **Auto-commit**: Commits changes to vault (enabled by default)
 - Updates registry
 - Returns execution results
 
@@ -178,6 +206,127 @@ const engine = createInboxEngine({
 **generateReport()** - Create markdown summary
 - Formats execution results
 - Includes success/failure counts
+
+---
+
+## Classifier System (src/inbox/classify/classifiers/)
+
+### Overview
+
+The classifier system provides modular, versioned document type detection with schema migrations.
+
+**Key Features:**
+- **Schema Versioning**: Each classifier has a `schemaVersion` field
+- **Migrations**: Automatic upgrades when schemas change
+- **Heuristics First**: Pattern matching before expensive LLM calls
+- **Extensible**: Add new classifiers without modifying core code
+
+### Classifier Structure
+
+```typescript
+interface InboxConverter {
+  schemaVersion: number
+  id: string
+  displayName: string
+  enabled: boolean
+  priority: number
+
+  heuristics: {
+    filenamePatterns: Array<{ pattern: string; weight: number }>
+    contentMarkers: Array<{ pattern: string; weight: number }>
+    threshold: number
+  }
+
+  fields: Array<{
+    name: string
+    type: "string" | "date" | "number" | "boolean"
+    description: string
+    requirement: "required" | "optional"
+  }>
+
+  migrations?: Array<(data: unknown) => unknown>
+}
+```
+
+### Built-in Classifiers
+
+| Classifier | ID | Priority | Detects |
+|------------|----|---------:|---------|
+| **invoice** | `invoice` | 100 | Invoices, receipts, bills, tax invoices |
+| **booking** | `booking` | 90 | Travel bookings, reservations, confirmations |
+| **medical-statement** | `medical-statement` | 85 | Medical statements, health records |
+| **research** | `research` | 80 | Research papers, academic articles |
+
+**Location:** `src/inbox/classify/classifiers/definitions/`
+
+### Creating a Classifier
+
+See `commands/create-classifier.md` for the complete guide.
+
+**Quick Template:**
+
+```typescript
+// src/inbox/classify/classifiers/definitions/my-type.ts
+import type { InboxConverter } from "../types";
+
+export const myTypeClassifier: InboxConverter = {
+  schemaVersion: 1,
+  id: "my-type",
+  displayName: "My Type",
+  enabled: true,
+  priority: 100,
+
+  heuristics: {
+    filenamePatterns: [
+      { pattern: "keyword", weight: 1.0 }
+    ],
+    contentMarkers: [
+      { pattern: "content pattern", weight: 0.9 }
+    ],
+    threshold: 0.5
+  },
+
+  fields: [
+    { name: "title", type: "string", description: "Title", requirement: "required" }
+  ]
+};
+```
+
+### Schema Migrations
+
+When a classifier schema changes, migrations handle data transformation:
+
+```typescript
+export const myTypeClassifier: InboxConverter = {
+  schemaVersion: 2,  // Bumped from 1
+  // ... other fields ...
+
+  migrations: [
+    // v1 → v2: Add new field
+    (data: any) => ({
+      ...data,
+      newField: data.oldField?.toUpperCase() || ""
+    })
+  ]
+};
+```
+
+**Migration files:** `src/inbox/classify/classifiers/migrations/`
+
+### Classifier Registry
+
+The registry (`registry.ts`) manages classifier loading, matching, and versioning:
+
+```typescript
+// Get all enabled classifiers
+const classifiers = getClassifierRegistry()
+
+// Find best match for a file
+const best = await findBestClassifier(content, filename)
+
+// Run migrations if needed
+const migrated = await migrateClassifierData(classifier, data)
+```
 
 ---
 
@@ -299,11 +448,17 @@ await registry.save()
 
 **Command Parsing:**
 - `a` - Approve all
+- `x` or `execute` - Execute approved suggestions (explicit command)
 - `1,2,5` - Approve specific IDs
 - `e3 prompt` - Edit suggestion #3 with prompt
 - `s3` - Skip suggestion #3
 - `q` - Quit
 - `h` or `?` - Help
+
+**Inline Warnings:**
+- Shows warning icon (⚠️) when LLM fallback was used
+- Displays which fields were extracted via LLM vs heuristics
+- Helps users understand suggestion confidence
 
 **Security:**
 - Prompt sanitization (removes code blocks, injection patterns)
@@ -392,12 +547,18 @@ interface InboxEngineConfig {
   templatesFolder?: string             // Default: "Templates"
   llmProvider?: "haiku" | "sonnet"    // Default: "haiku"
   llmModel?: string                    // Optional model override
+  autoCommit?: boolean                 // Default: true (NEW)
   concurrency?: {
     pdfExtraction?: number             // Default: 5
     fileIO?: number                    // Default: 3
   }
 }
 ```
+
+**Git Integration:**
+- **Auto-commit enabled by default** - Vault changes are committed automatically
+- **Git guard** - Scan aborts if uncommitted changes exist in vault (excluding attachments folder)
+- **Attachments folder excluded** - Large files don't trigger git guard
 
 ---
 
@@ -491,12 +652,13 @@ Registry uses content hashing (not path-based) because:
 2. **Duplicate detection** - Same content in different locations
 3. **Idempotency** - Re-running scan won't duplicate suggestions
 
-### Why LLM-First Classification?
+### Why Heuristics-First Classification?
 
-Heuristics are fallback-only. LLM classification is preferred because:
-1. **Semantic understanding** - Understands context, not just patterns
-2. **Flexibility** - Handles new document types without code changes
-3. **Accuracy** - Higher confidence than regex matching
+Changed from LLM-first to heuristics-first for performance and cost:
+1. **Performance** - Pattern matching is instant, LLM calls take 2-5s
+2. **Cost** - Avoid LLM calls for 80%+ of common documents
+3. **Transparency** - Users know when LLM was needed (fallback warnings)
+4. **Classifier System** - Modular classifiers with versioned schemas replace hardcoded converters
 
 ---
 
