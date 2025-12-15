@@ -304,29 +304,40 @@ export async function getUncommittedFiles(
  *
  * // Strict mode: check all file types (PDFs, JSON, etc.)
  * await ensureGitGuard(config, { checkAllFileTypes: true });
+ *
+ * // Exclude inbox folder (for scan() - we expect files in inbox)
+ * await ensureGitGuard(config, { checkAllFileTypes: true, excludeInbox: true });
  * ```
  */
 export async function ensureGitGuard(
 	config: ParaObsidianConfig,
-	options?: { checkAllFileTypes?: boolean },
+	options?: { checkAllFileTypes?: boolean; excludeInbox?: boolean },
 ): Promise<void> {
 	await assertGitRepo(config.vault);
 
 	// Get all uncommitted files and filter to PARA-managed folders only
 	const checkAllTypes = options?.checkAllFileTypes ?? false;
+	const excludeInbox = options?.excludeInbox ?? false;
 	const allUncommitted = await getUncommittedFiles(config.vault, {
 		allFileTypes: checkAllTypes,
 	});
 
 	const managedFolders = getManagedFolders(config);
+
+	// Optionally exclude inbox folder (for scan operations where we expect inbox to have files)
+	const inboxFolder = config.paraFolders?.inbox ?? "00 Inbox";
+	const foldersToCheck = excludeInbox
+		? new Set([...managedFolders].filter((f) => f !== inboxFolder))
+		: managedFolders;
+
 	const uncommitted = allUncommitted.filter((file) =>
-		isInManagedFolder(file, managedFolders),
+		isInManagedFolder(file, foldersToCheck),
 	);
 
 	if (uncommitted.length > 0) {
 		const fileList = `\nUncommitted files:\n${uncommitted.map((f: string) => `  - ${f}`).join("\n")}`;
 		throw new Error(
-			`Vault has uncommitted changes in PARA folders. Commit or stash before writing.${fileList}\n\nSuggestion: Run 'para-obsidian git commit'`,
+			`Vault has uncommitted changes in PARA folders. Commit or stash before processing inbox.${fileList}\n\nTo fix, run one of these commands:\n  /para-obsidian:commit          # Commit all uncommitted notes\n  git add . && git commit -m "chore: stage changes"  # Manual commit`,
 		);
 	}
 }

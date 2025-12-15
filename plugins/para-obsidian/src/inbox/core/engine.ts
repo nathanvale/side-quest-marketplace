@@ -503,6 +503,23 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			inboxLogger.info`Scan started vault=${resolvedConfig.vaultPath} cid=${cid}`;
 		}
 
+		// Git safety check FIRST: ensure vault is clean before expensive LLM processing
+		// This prevents wasted time/tokens if user has uncommitted changes
+		// excludeInbox: true because we expect files in inbox - we're checking output folders
+		try {
+			const config = { vault: resolvedConfig.vaultPath };
+			await ensureGitGuard(config, {
+				checkAllFileTypes: true,
+				excludeInbox: true,
+			});
+		} catch (error) {
+			throw createInboxError(
+				"SYS_UNEXPECTED",
+				{ cid, operation: "scan" },
+				error instanceof Error ? error.message : "Git safety check failed",
+			);
+		}
+
 		// Load registry and clean up staging
 		const registry = await loadAndCleanRegistry(cid);
 
@@ -583,15 +600,15 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			}
 		}
 
-		// Git safety check: ensure vault is a git repo with clean working tree
-		// Use checkAllFileTypes=true to prevent bypassing git guard with PDFs/JSON
+		// Git safety check (belt-and-suspenders): re-verify in case files changed since scan
+		// Primary check is in scan() to fail fast before expensive LLM processing
+		// excludeInbox: true because we expect files in inbox - we're checking output folders
 		try {
-			// Build minimal config for git guard without loading from disk
-			// This prevents test failures when PARA_VAULT points to a different location
-			const config = {
-				vault: resolvedConfig.vaultPath,
-			};
-			await ensureGitGuard(config, { checkAllFileTypes: true });
+			const config = { vault: resolvedConfig.vaultPath };
+			await ensureGitGuard(config, {
+				checkAllFileTypes: true,
+				excludeInbox: true,
+			});
 		} catch (error) {
 			throw createInboxError(
 				"SYS_UNEXPECTED",

@@ -112,7 +112,7 @@ describe("inbox/engine", () => {
 		let testVaultPath: string;
 		let inboxPath: string;
 
-		beforeEach(() => {
+		beforeEach(async () => {
 			testVaultPath = createTempDir("scan-test-vault-");
 			inboxPath = join(testVaultPath, "00 Inbox");
 			mkdirSync(inboxPath, { recursive: true });
@@ -120,6 +120,8 @@ describe("inbox/engine", () => {
 			mkdirSync(join(testVaultPath, "01 Projects"), { recursive: true });
 			mkdirSync(join(testVaultPath, "02 Areas"), { recursive: true });
 			mkdirSync(join(testVaultPath, "Attachments"), { recursive: true });
+			// Initialize git repo - scan() now requires clean git state
+			await initGitRepo(testVaultPath);
 		});
 
 		afterEach(() => {
