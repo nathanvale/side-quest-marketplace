@@ -11,8 +11,8 @@
 import { join } from "node:path";
 import { generateTitle } from "../../core/engine-utils";
 import {
-	type Confidence,
 	CONFIDENCE_THRESHOLDS,
+	type Confidence,
 	createSuggestionId,
 	type InboxAction,
 	type InboxSuggestion,
@@ -92,7 +92,8 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 
 	// If LLM detected with high confidence (using CONFIDENCE_THRESHOLDS for consistency)
 	if (llmResult && llmResult.confidence >= CONFIDENCE_THRESHOLDS.MEDIUM) {
-		confidence = llmResult.confidence >= CONFIDENCE_THRESHOLDS.HIGH ? "high" : "medium";
+		confidence =
+			llmResult.confidence >= CONFIDENCE_THRESHOLDS.HIGH ? "high" : "medium";
 		action = "create-note";
 		suggestedNoteType = llmResult.documentType;
 		suggestedArea = llmResult.suggestedArea ?? undefined;
@@ -114,8 +115,14 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 		}
 	}
 	// If only heuristics detected (using CONFIDENCE_THRESHOLDS for consistency)
-	else if (heuristicResult.detected && heuristicResult.confidence > CONFIDENCE_THRESHOLDS.HEURISTIC_MIN) {
-		confidence = heuristicResult.confidence >= CONFIDENCE_THRESHOLDS.HEURISTIC_MEDIUM ? "medium" : "low";
+	else if (
+		heuristicResult.detected &&
+		heuristicResult.confidence > CONFIDENCE_THRESHOLDS.HEURISTIC_MIN
+	) {
+		confidence =
+			heuristicResult.confidence >= CONFIDENCE_THRESHOLDS.HEURISTIC_MEDIUM
+				? "medium"
+				: "low";
 		action = "create-note";
 		suggestedNoteType = heuristicResult.suggestedType;
 		reason = `Heuristic detection: ${heuristicResult.suggestedType} (${(heuristicResult.confidence * 100).toFixed(0)}% confidence)`;

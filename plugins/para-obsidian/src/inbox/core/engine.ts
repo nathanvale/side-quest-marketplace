@@ -671,7 +671,8 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			if (onProgress) {
 				const lastResult = results[results.length - 1];
 				// Extract error from failed result using discriminated union pattern
-				const progressError = lastResult && !lastResult.success ? lastResult.error : undefined;
+				const progressError =
+					lastResult && !lastResult.success ? lastResult.error : undefined;
 				await onProgress({
 					processed,
 					total,

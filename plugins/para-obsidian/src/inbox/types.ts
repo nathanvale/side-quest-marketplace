@@ -57,18 +57,18 @@ export type SuggestionId = string & { readonly __brand: "SuggestionId" };
 
 /**
  * Create a branded suggestion ID.
- * 
+ *
  * When called without arguments, generates a new UUID v4 using crypto.randomUUID().
  * When called with a string, validates it's a proper UUID v4 format.
- * 
+ *
  * @param uuid - Optional UUID v4 string. If omitted, generates a new UUID.
  * @throws Error if uuid is provided but not a valid UUID v4 format
- * 
+ *
  * @example
  * ```typescript
  * // Generate new ID
  * const newId = createSuggestionId();
- * 
+ *
  * // Convert existing UUID
  * const existingId = createSuggestionId("abc12300-0000-4000-8000-000000000001");
  * ```
@@ -76,7 +76,7 @@ export type SuggestionId = string & { readonly __brand: "SuggestionId" };
 export function createSuggestionId(uuid?: string): SuggestionId {
 	// Generate new UUID if not provided (uses Bun/Node built-in crypto)
 	const id = uuid ?? crypto.randomUUID();
-	
+
 	if (!isValidSuggestionId(id)) {
 		throw new Error(
 			`Invalid suggestion ID format: "${id}". Must be a valid UUID v4.`,
@@ -847,25 +847,36 @@ export type CLICommand =
  * Validates InboxEngineConfig for runtime safety.
  * Ensures required directories exist and concurrency limits are valid.
  */
-export function validateInboxEngineConfig(config: InboxEngineConfig): InboxEngineConfig {
+export function validateInboxEngineConfig(
+	config: InboxEngineConfig,
+): InboxEngineConfig {
 	// Validate that required directories exist
-	if (!config.vaultPath || typeof config.vaultPath !== 'string') {
-		throw new Error('InboxEngineConfig: vaultPath is required and must be a string');
+	if (!config.vaultPath || typeof config.vaultPath !== "string") {
+		throw new Error(
+			"InboxEngineConfig: vaultPath is required and must be a string",
+		);
 	}
-	
+
 	// Validate concurrency limits
 	if (config.concurrency) {
 		const { concurrency } = config;
-		if (concurrency.pdfExtraction !== undefined && concurrency.pdfExtraction <= 0) {
-			throw new Error('InboxEngineConfig: concurrency.pdfExtraction must be positive');
+		if (
+			concurrency.pdfExtraction !== undefined &&
+			concurrency.pdfExtraction <= 0
+		) {
+			throw new Error(
+				"InboxEngineConfig: concurrency.pdfExtraction must be positive",
+			);
 		}
 		if (concurrency.llmCalls !== undefined && concurrency.llmCalls <= 0) {
-			throw new Error('InboxEngineConfig: concurrency.llmCalls must be positive');
+			throw new Error(
+				"InboxEngineConfig: concurrency.llmCalls must be positive",
+			);
 		}
 		if (concurrency.fileIO !== undefined && concurrency.fileIO <= 0) {
-			throw new Error('InboxEngineConfig: concurrency.fileIO must be positive');
+			throw new Error("InboxEngineConfig: concurrency.fileIO must be positive");
 		}
 	}
-	
+
 	return config;
 }
