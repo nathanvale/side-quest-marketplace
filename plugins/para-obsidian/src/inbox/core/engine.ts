@@ -506,11 +506,13 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		// Git safety check FIRST: ensure vault is clean before expensive LLM processing
 		// This prevents wasted time/tokens if user has uncommitted changes
 		// excludeInbox: true because we expect files in inbox - we're checking output folders
+		// excludeAttachments: true because orphaned attachments shouldn't block inbox processing
 		try {
 			const config = { vault: resolvedConfig.vaultPath };
 			await ensureGitGuard(config, {
 				checkAllFileTypes: true,
 				excludeInbox: true,
+				excludeAttachments: true,
 			});
 		} catch (error) {
 			throw createInboxError(
@@ -603,11 +605,13 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		// Git safety check (belt-and-suspenders): re-verify in case files changed since scan
 		// Primary check is in scan() to fail fast before expensive LLM processing
 		// excludeInbox: true because we expect files in inbox - we're checking output folders
+		// excludeAttachments: true because orphaned attachments shouldn't block inbox processing
 		try {
 			const config = { vault: resolvedConfig.vaultPath };
 			await ensureGitGuard(config, {
 				checkAllFileTypes: true,
 				excludeInbox: true,
+				excludeAttachments: true,
 			});
 		} catch (error) {
 			throw createInboxError(

@@ -311,13 +311,18 @@ export async function getUncommittedFiles(
  */
 export async function ensureGitGuard(
 	config: ParaObsidianConfig,
-	options?: { checkAllFileTypes?: boolean; excludeInbox?: boolean },
+	options?: {
+		checkAllFileTypes?: boolean;
+		excludeInbox?: boolean;
+		excludeAttachments?: boolean;
+	},
 ): Promise<void> {
 	await assertGitRepo(config.vault);
 
 	// Get all uncommitted files and filter to PARA-managed folders only
 	const checkAllTypes = options?.checkAllFileTypes ?? false;
 	const excludeInbox = options?.excludeInbox ?? false;
+	const excludeAttachments = options?.excludeAttachments ?? false;
 	const allUncommitted = await getUncommittedFiles(config.vault, {
 		allFileTypes: checkAllTypes,
 	});
@@ -325,10 +330,16 @@ export async function ensureGitGuard(
 	const managedFolders = getManagedFolders(config);
 
 	// Optionally exclude inbox folder (for scan operations where we expect inbox to have files)
+	// Optionally exclude attachments folder (orphaned attachments shouldn't block processing)
 	const inboxFolder = config.paraFolders?.inbox ?? "00 Inbox";
-	const foldersToCheck = excludeInbox
-		? new Set([...managedFolders].filter((f) => f !== inboxFolder))
-		: managedFolders;
+	const attachmentsFolder = "Attachments";
+	const foldersToCheck = new Set([...managedFolders]);
+	if (excludeInbox) {
+		foldersToCheck.delete(inboxFolder);
+	}
+	if (excludeAttachments) {
+		foldersToCheck.delete(attachmentsFolder);
+	}
 
 	const uncommitted = allUncommitted.filter((file) =>
 		isInManagedFolder(file, foldersToCheck),
