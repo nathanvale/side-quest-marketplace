@@ -155,15 +155,22 @@ const EXAMPLE_RESPONSE = {
 // =============================================================================
 
 /**
- * Build document type list from converters for LLM prompt
+ * Build document type list from converters for LLM prompt.
+ *
+ * Includes displayName and promptHint to help LLM distinguish between similar types.
  */
 function buildDocumentTypesFromConverters(
 	converters: readonly InboxConverter[],
 ): string {
 	return converters
 		.filter((c) => c.enabled)
-		.map((c) => c.id)
-		.join(", ");
+		.map((c) => {
+			const hint = c.extraction?.promptHint
+				? `: ${c.extraction.promptHint}`
+				: "";
+			return `- **${c.id}** (${c.displayName})${hint}`;
+		})
+		.join("\n");
 }
 
 /**

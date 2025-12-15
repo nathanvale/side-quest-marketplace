@@ -5,10 +5,13 @@
  * - Map extracted fields to template arguments
  * - Create note using para-obsidian createFromTemplate
  * - Handle area/project linking
+ * - Move pre-classified notes (frontmatter detection)
  *
  * @module inbox/execute/note-creator
  */
 
+import { mkdir, rename } from "node:fs/promises";
+import { basename, join } from "node:path";
 import { loadConfig } from "../../config/index";
 import { createFromTemplate } from "../../notes/create";
 import type { executeLogger } from "../../shared/logger";
@@ -16,8 +19,76 @@ import {
 	DEFAULT_CLASSIFIERS,
 	mapFieldsToTemplate,
 } from "../classify/classifiers";
-import type { InboxSuggestion } from "../types";
+import { generateUniqueNotePath } from "../core/engine-utils";
+import type { CreateNoteSuggestion, InboxSuggestion } from "../types";
 import type { NoteCreationResult } from "./types";
+
+/**
+ * Move a pre-classified note from inbox to its destination.
+ *
+ * Used when a note already has valid frontmatter with type/area/project.
+ * Instead of creating from template, we just move the existing file.
+ *
+ * @param suggestion - Pre-classified suggestion with source and destination
+ * @param vaultPath - Absolute vault root path
+ * @param logger - Optional logger instance
+ * @param cid - Correlation ID for logging
+ * @returns Result with notePath or error
+ */
+export async function movePreClassifiedNote(
+	suggestion: CreateNoteSuggestion,
+	vaultPath: string,
+	logger: typeof executeLogger,
+	cid: string,
+): Promise<NoteCreationResult> {
+	if (!suggestion.suggestedDestination) {
+		return {
+			success: false,
+			error: "Pre-classified note missing destination",
+		};
+	}
+
+	try {
+		const sourceFilename = basename(suggestion.source);
+		const sourcePath = join(vaultPath, suggestion.source);
+		const destDir = join(vaultPath, suggestion.suggestedDestination);
+
+		// Generate collision-safe destination path
+		const initialDestPath = join(destDir, sourceFilename);
+		const destPath = generateUniqueNotePath(initialDestPath);
+
+		// Log collision if path was modified
+		if (destPath !== initialDestPath) {
+			logger.warn`Pre-classified note collision: renamed to ${basename(destPath)} ${cid}`;
+		}
+
+		// Ensure destination directory exists
+		await mkdir(destDir, { recursive: true });
+
+		// Move the file
+		await rename(sourcePath, destPath);
+
+		// Return vault-relative path
+		const notePath = join(suggestion.suggestedDestination, basename(destPath));
+
+		if (logger) {
+			logger.info`Moved pre-classified note from=${suggestion.source} to=${notePath} ${cid}`;
+		}
+
+		return {
+			success: true,
+			notePath,
+		};
+	} catch (error) {
+		if (logger) {
+			logger.error`Failed to move pre-classified note: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
+		}
+		return {
+			success: false,
+			error: `Failed to move note: ${error instanceof Error ? error.message : "unknown"}`,
+		};
+	}
+}
 
 /**
  * Create a note from a suggestion using para-obsidian templates.

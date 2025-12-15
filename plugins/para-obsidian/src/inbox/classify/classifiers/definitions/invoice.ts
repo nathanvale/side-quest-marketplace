@@ -22,7 +22,7 @@ export const invoiceClassifier: InboxConverter = {
 		filenamePatterns: [
 			{ pattern: "invoice", weight: 1.0 },
 			{ pattern: "receipt", weight: 0.9 },
-			{ pattern: "statement", weight: 0.8 },
+			{ pattern: "statement", weight: 0.5 }, // Lower weight - "statement" is generic, let specific classifiers win
 			{ pattern: "bill", weight: 0.8 },
 			{ pattern: "tax", weight: 0.7 },
 			{ pattern: "payment", weight: 0.6 },

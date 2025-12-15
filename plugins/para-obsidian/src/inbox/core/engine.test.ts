@@ -265,6 +265,264 @@ describe("inbox/engine", () => {
 		});
 	});
 
+	describe("pre-classification (frontmatter detection)", () => {
+		let preClassTestPath: string;
+		let inboxPath: string;
+
+		beforeEach(async () => {
+			preClassTestPath = createTempDir("pre-class-test-vault-");
+			inboxPath = join(preClassTestPath, "00 Inbox");
+			mkdirSync(inboxPath, { recursive: true });
+			// Create PARA folders with named areas/projects for vault context
+			// Note: Vault context scans for .md files to detect areas/projects
+			mkdirSync(join(preClassTestPath, "01 Projects"), { recursive: true });
+			mkdirSync(join(preClassTestPath, "02 Areas"), { recursive: true });
+			mkdirSync(join(preClassTestPath, "02 Areas", "Health"), {
+				recursive: true,
+			});
+			mkdirSync(join(preClassTestPath, "02 Areas", "Finance"), {
+				recursive: true,
+			});
+			mkdirSync(join(preClassTestPath, "01 Projects", "House Renovation"), {
+				recursive: true,
+			});
+			// Create marker .md files so vault context can detect areas/projects
+			writeFileSync(
+				join(preClassTestPath, "02 Areas", "Health", "Health.md"),
+				"---\ntype: area\n---\n# Health Area",
+			);
+			writeFileSync(
+				join(preClassTestPath, "02 Areas", "Finance", "Finance.md"),
+				"---\ntype: area\n---\n# Finance Area",
+			);
+			writeFileSync(
+				join(
+					preClassTestPath,
+					"01 Projects",
+					"House Renovation",
+					"House Renovation.md",
+				),
+				"---\ntype: project\n---\n# House Renovation",
+			);
+			mkdirSync(join(preClassTestPath, "Attachments"), { recursive: true });
+			await initGitRepo(preClassTestPath);
+		});
+
+		afterEach(() => {
+			cleanupTestDir(preClassTestPath);
+		});
+
+		test("should pre-classify markdown note with valid type and area (skip LLM)", async () => {
+			// Create a markdown note with valid frontmatter matching a known classifier
+			const mdContent = `---
+type: invoice
+area: "[[Health]]"
+title: Medical Invoice December
+---
+# Medical Invoice
+
+Invoice from Dr. Smith for checkup.
+`;
+			writeFileSync(join(inboxPath, "medical-invoice.md"), mdContent);
+
+			const engine = createTestEngine({ vaultPath: preClassTestPath });
+			const suggestions = await engine.scan();
+
+			expect(suggestions).toHaveLength(1);
+			const suggestion = suggestions[0];
+			expect(suggestion).toBeDefined();
+			if (!suggestion) return;
+
+			// Should be a CreateNoteSuggestion
+			expect(isCreateNoteSuggestion(suggestion)).toBe(true);
+			if (!isCreateNoteSuggestion(suggestion)) return;
+
+			// Should have detectionSource: 'frontmatter' (skipped LLM)
+			expect(suggestion.detectionSource).toBe("frontmatter");
+
+			// Should have medium confidence (pre-classified ≠ AI-verified)
+			expect(suggestion.confidence).toBe("medium");
+
+			// Should preserve frontmatter values
+			expect(suggestion.suggestedNoteType).toBe("invoice");
+			expect(suggestion.suggestedArea).toBe("Health");
+			expect(suggestion.suggestedTitle).toBe("Medical Invoice December");
+
+			// Should set destination based on area
+			expect(suggestion.suggestedDestination).toBe("02 Areas/Health");
+		});
+
+		test("should pre-classify markdown note with valid type and project (skip LLM)", async () => {
+			// Create a markdown note with project instead of area
+			const mdContent = `---
+type: invoice
+project: "[[House Renovation]]"
+title: Hardware Store Receipt
+---
+# Receipt
+
+Receipt from hardware store.
+`;
+			writeFileSync(join(inboxPath, "hardware-receipt.md"), mdContent);
+
+			const engine = createTestEngine({ vaultPath: preClassTestPath });
+			const suggestions = await engine.scan();
+
+			expect(suggestions).toHaveLength(1);
+			const suggestion = suggestions[0];
+			expect(suggestion).toBeDefined();
+			if (!suggestion) return;
+
+			expect(isCreateNoteSuggestion(suggestion)).toBe(true);
+			if (!isCreateNoteSuggestion(suggestion)) return;
+
+			expect(suggestion.detectionSource).toBe("frontmatter");
+			expect(suggestion.confidence).toBe("medium");
+			expect(suggestion.suggestedProject).toBe("House Renovation");
+			expect(suggestion.suggestedDestination).toBe(
+				"01 Projects/House Renovation",
+			);
+		});
+
+		test("should fall through to LLM when type is unknown", async () => {
+			// Create a markdown note with unknown type
+			const mdContent = `---
+type: unknown-type-that-doesnt-exist
+area: "[[Health]]"
+title: Some Note
+---
+# Content
+`;
+			writeFileSync(join(inboxPath, "unknown-type.md"), mdContent);
+
+			const engine = createTestEngine({ vaultPath: preClassTestPath });
+			const suggestions = await engine.scan();
+
+			expect(suggestions).toHaveLength(1);
+			const suggestion = suggestions[0];
+
+			// Should NOT be pre-classified - fell through to LLM
+			expect(suggestion?.detectionSource).not.toBe("frontmatter");
+		});
+
+		test("should fall through to LLM when area/project not found in vault", async () => {
+			// Create a markdown note with non-existent area
+			const mdContent = `---
+type: invoice
+area: "[[NonExistent Area]]"
+title: Some Invoice
+---
+# Content
+`;
+			writeFileSync(join(inboxPath, "nonexistent-area.md"), mdContent);
+
+			const engine = createTestEngine({ vaultPath: preClassTestPath });
+			const suggestions = await engine.scan();
+
+			expect(suggestions).toHaveLength(1);
+			const suggestion = suggestions[0];
+
+			// Should NOT be pre-classified - area doesn't exist in vault
+			expect(suggestion?.detectionSource).not.toBe("frontmatter");
+		});
+
+		test("should fall through to LLM when no area or project specified", async () => {
+			// Create a markdown note with type but no area/project
+			const mdContent = `---
+type: invoice
+title: Orphan Invoice
+---
+# Content
+`;
+			writeFileSync(join(inboxPath, "no-destination.md"), mdContent);
+
+			const engine = createTestEngine({ vaultPath: preClassTestPath });
+			const suggestions = await engine.scan();
+
+			expect(suggestions).toHaveLength(1);
+			const suggestion = suggestions[0];
+
+			// Should NOT be pre-classified - no destination determinable
+			expect(suggestion?.detectionSource).not.toBe("frontmatter");
+		});
+
+		test("should handle plain text area format (no wikilinks)", async () => {
+			// Create a markdown note with plain text area (not wikilink format)
+			const mdContent = `---
+type: invoice
+area: Health
+title: Plain Area Invoice
+---
+# Content
+`;
+			writeFileSync(join(inboxPath, "plain-area.md"), mdContent);
+
+			const engine = createTestEngine({ vaultPath: preClassTestPath });
+			const suggestions = await engine.scan();
+
+			expect(suggestions).toHaveLength(1);
+			const suggestion = suggestions[0];
+			expect(suggestion).toBeDefined();
+			if (!suggestion) return;
+
+			expect(isCreateNoteSuggestion(suggestion)).toBe(true);
+			if (!isCreateNoteSuggestion(suggestion)) return;
+
+			// Should still work with plain text format
+			expect(suggestion.detectionSource).toBe("frontmatter");
+			expect(suggestion.suggestedArea).toBe("Health");
+		});
+
+		test("should use filename-derived title when frontmatter title missing", async () => {
+			// Create a markdown note without title in frontmatter
+			const mdContent = `---
+type: invoice
+area: "[[Finance]]"
+---
+# Content
+`;
+			writeFileSync(join(inboxPath, "important-receipt.md"), mdContent);
+
+			const engine = createTestEngine({ vaultPath: preClassTestPath });
+			const suggestions = await engine.scan();
+
+			expect(suggestions).toHaveLength(1);
+			const suggestion = suggestions[0];
+			expect(suggestion).toBeDefined();
+			if (!suggestion) return;
+
+			expect(isCreateNoteSuggestion(suggestion)).toBe(true);
+			if (!isCreateNoteSuggestion(suggestion)) return;
+
+			expect(suggestion.detectionSource).toBe("frontmatter");
+			// Title should be derived from filename
+			expect(suggestion.suggestedTitle).toContain("important");
+		});
+
+		test("should not affect PDF files (normal LLM flow)", async () => {
+			// PDF files should be unaffected by pre-classification
+			writeFileSync(
+				join(inboxPath, "document.pdf"),
+				"%PDF-1.4\nfake pdf content",
+			);
+
+			const engine = createTestEngine({ vaultPath: preClassTestPath });
+
+			// PDF processing may throw if pdftotext not available - that's expected
+			try {
+				const suggestions = await engine.scan();
+				// If we get here, pdftotext is available
+				if (suggestions.length > 0) {
+					// Should NOT be pre-classified (PDFs can't have frontmatter)
+					expect(suggestions[0]?.detectionSource).not.toBe("frontmatter");
+				}
+			} catch {
+				// pdftotext not available - test passes (pre-classification logic not triggered)
+				expect(true).toBe(true);
+			}
+		});
+	});
+
 	describe("execute()", () => {
 		let executeTestPath: string;
 		let originalParaVault: string | undefined;

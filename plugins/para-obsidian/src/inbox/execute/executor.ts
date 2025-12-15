@@ -13,10 +13,15 @@
 import { unlink } from "node:fs/promises";
 import { basename, join } from "node:path";
 import type { executeLogger } from "../../shared/logger";
+import { hashFile } from "../registry/processed-registry";
 import type { ExecutionResult, InboxSuggestion } from "../types";
+import { isCreateNoteSuggestion } from "../types";
 import { injectAttachmentLink } from "./attachment-linker";
 import { moveAttachment } from "./attachment-mover";
-import { createNoteFromSuggestion } from "./note-creator";
+import {
+	createNoteFromSuggestion,
+	movePreClassifiedNote,
+} from "./note-creator";
 import type { ExecutionContext } from "./types";
 
 // Re-export helper functions for backward compatibility
@@ -54,11 +59,16 @@ export async function rollbackNote(
 /**
  * Execute a single inbox suggestion.
  *
- * Execution flow:
+ * Execution flow (standard):
  * 1. Create note (if action is create-note) - FAIL EARLY
  * 2. Move attachment - ROLLBACK note if this fails
  * 3. Inject attachment link (non-fatal)
  * 4. Update registry
+ *
+ * Execution flow (pre-classified from frontmatter):
+ * 1. Move existing .md file to destination
+ * 2. Update registry
+ * (No attachment moving or link injection - the .md IS the note)
  *
  * This order ensures:
  * - Inbox item stays in place if note creation fails
@@ -80,6 +90,15 @@ export async function executeSuggestion(
 
 	if (logger) {
 		logger.debug`Executing suggestion id=${suggestion.id} action=${suggestion.action} source=${filename} ${cid}`;
+	}
+
+	// Handle pre-classified notes (detectionSource: 'frontmatter')
+	// These are markdown notes that already have valid frontmatter and just need to be moved
+	if (
+		isCreateNoteSuggestion(suggestion) &&
+		suggestion.detectionSource === "frontmatter"
+	) {
+		return executePreClassifiedNote(suggestion, context, logger, cid);
 	}
 
 	let createdNotePath: string | undefined;
@@ -156,5 +175,81 @@ export async function executeSuggestion(
 		action: suggestion.action,
 		createdNote: createdNotePath,
 		movedAttachment: moveResult.movedTo,
+	};
+}
+
+/**
+ * Execute a pre-classified note suggestion.
+ *
+ * Pre-classified notes are markdown files that already have valid frontmatter
+ * with a known type field. They just need to be moved to their destination.
+ *
+ * Simplified flow:
+ * 1. Move the existing .md file to destination
+ * 2. Update registry with source file hash
+ *
+ * No attachment moving or link injection needed - the .md IS the note.
+ *
+ * @param suggestion - Pre-classified CreateNoteSuggestion
+ * @param context - Execution context
+ * @param logger - Logger instance
+ * @param cid - Correlation ID
+ * @returns Execution result
+ */
+async function executePreClassifiedNote(
+	suggestion: import("../types").CreateNoteSuggestion,
+	context: ExecutionContext,
+	logger: typeof executeLogger,
+	cid: string,
+): Promise<ExecutionResult> {
+	const filename = basename(suggestion.source);
+
+	if (logger) {
+		logger.debug`Executing pre-classified note id=${suggestion.id} source=${filename} ${cid}`;
+	}
+
+	// Hash the source file before moving (for registry)
+	const sourceAbsPath = join(context.vaultPath, suggestion.source);
+	const sourceHash = await hashFile(sourceAbsPath);
+
+	// Move the existing .md file to destination
+	const moveResult = await movePreClassifiedNote(
+		suggestion,
+		context.vaultPath,
+		logger,
+		cid,
+	);
+
+	if (!moveResult.success) {
+		if (logger) {
+			logger.error`Failed to move pre-classified note: ${moveResult.error} ${cid}`;
+		}
+		return {
+			suggestionId: suggestion.id,
+			success: false,
+			action: suggestion.action,
+			error: `${moveResult.error}. Note remains in inbox - fix the issue and retry.`,
+		};
+	}
+
+	// Update registry
+	context.registry.markProcessed({
+		sourceHash,
+		sourcePath: suggestion.source,
+		processedAt: new Date().toISOString(),
+		createdNote: moveResult.notePath,
+		// No movedAttachment - the .md file WAS the source and is now the note
+	});
+
+	if (logger) {
+		logger.info`Executed pre-classified note id=${suggestion.id} movedTo=${moveResult.notePath} ${cid}`;
+	}
+
+	return {
+		suggestionId: suggestion.id,
+		success: true,
+		action: suggestion.action,
+		createdNote: moveResult.notePath,
+		// No movedAttachment for pre-classified notes
 	};
 }

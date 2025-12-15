@@ -35,9 +35,14 @@ import {
 	getDefaultRegistry,
 	type InboxFile,
 } from "../scan/extractors";
+import {
+	extractFrontmatterOnly,
+	type MarkdownExtractionMetadata,
+} from "../scan/extractors/markdown";
 import { createInboxError } from "../shared/errors";
 import {
 	type ChallengeSuggestion,
+	type CreateNoteSuggestion,
 	createSuggestionId,
 	type ExecuteOptions,
 	type ExecutionResult,
@@ -49,6 +54,7 @@ import {
 	type SuggestionId,
 	validateInboxEngineConfig,
 } from "../types";
+import { generateTitle, parseWikilink } from "./engine-utils";
 import { callLLM, callLLMWithMetadata } from "./llm";
 import { executeSuggestion } from "./operations";
 import { generateReport } from "./operations/report";
@@ -333,12 +339,14 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 
 			// Extract text using the appropriate extractor
 			let text: string;
+			let extractedMetadata: unknown;
 			try {
 				if (onProgress) {
 					await onProgress({ ...progressBase, stage: "extract" });
 				}
 				const extracted = await extractorMatch.extractor.extract(file, cid);
 				text = extracted.text;
+				extractedMetadata = extracted.metadata;
 			} catch (error) {
 				if (inboxLogger) {
 					inboxLogger.warn`Failed to extract content: ${filename} cid=${cid}`;
@@ -362,6 +370,80 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				};
 				suggestionCache.set(errorSuggestion.id, errorSuggestion);
 				return errorSuggestion;
+			}
+
+			// Pre-classification check for markdown notes with valid frontmatter
+			if (file.extension === ".md" && extractedMetadata) {
+				const mdMetadata = extractedMetadata as MarkdownExtractionMetadata;
+				if (mdMetadata.noteType && mdMetadata.hasFrontmatter) {
+					// Check if noteType matches a known classifier
+					const matchingClassifier = DEFAULT_CLASSIFIERS.find(
+						(c) => c.id === mdMetadata.noteType && c.enabled,
+					);
+
+					if (matchingClassifier) {
+						// Extract area/project from frontmatter for destination
+						const frontmatter = await extractFrontmatterOnly(file.path);
+						const area = parseWikilink(frontmatter.area);
+						const project = parseWikilink(frontmatter.project);
+
+						// Validate destination exists in vault
+						let destination: string | undefined;
+
+						if (project) {
+							const projectExists = vaultContext.projects.includes(project);
+							if (projectExists) {
+								destination = `01 Projects/${project}`;
+							}
+						} else if (area) {
+							const areaExists = vaultContext.areas.includes(area);
+							if (areaExists) {
+								destination = `02 Areas/${area}`;
+							}
+						}
+
+						// If destination valid, build CreateNoteSuggestion (skip LLM)
+						if (destination) {
+							const suggestion: CreateNoteSuggestion = {
+								id: createSuggestionId(),
+								source: join(resolvedConfig.inboxFolder, filename),
+								processor: "notes",
+								confidence: "medium", // Pre-classified = medium (not AI-verified)
+								detectionSource: "frontmatter",
+								action: "create-note",
+								suggestedNoteType: mdMetadata.noteType,
+								suggestedTitle:
+									(frontmatter.title as string) ||
+									generateTitle(filename, mdMetadata.noteType),
+								suggestedArea: area,
+								suggestedProject: project,
+								suggestedDestination: destination,
+								reason: `Pre-classified ${mdMetadata.noteType} note (frontmatter)`,
+							};
+
+							suggestionCache.set(suggestion.id, suggestion);
+							if (onProgress) {
+								await onProgress({
+									...progressBase,
+									stage: "done",
+								});
+							}
+							if (inboxLogger) {
+								inboxLogger.info`Pre-classified file=${filename} type=${mdMetadata.noteType} destination=${destination} cid=${cid}`;
+							}
+							return suggestion;
+						}
+
+						// If validation failed, fall through to LLM classification
+						if (inboxLogger) {
+							const reason =
+								!area && !project
+									? "no area/project in frontmatter"
+									: `${project ? "project" : "area"} not found in vault`;
+							inboxLogger.debug`Pre-classification skipped: ${reason} cid=${cid}`;
+						}
+					}
+				}
 			}
 
 			// Run heuristic detection

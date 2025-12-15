@@ -106,6 +106,7 @@ export type DetectionSource =
 	| "llm+heuristic" // Both LLM and heuristics detected same type (highest confidence)
 	| "llm" // LLM detected (heuristics didn't match or didn't detect)
 	| "heuristic" // Only heuristics detected (LLM failed or disagreed)
+	| "frontmatter" // Pre-classified from existing frontmatter (skipped LLM)
 	| "none"; // Neither detected (skip suggestion)
 
 /**
@@ -125,7 +126,7 @@ interface BaseSuggestion {
 	/** Confidence level in this suggestion */
 	readonly confidence: Confidence;
 
-	/** Source of detection: llm+heuristic, llm, heuristic, or none */
+	/** Source of detection: llm+heuristic, llm, heuristic, frontmatter, or none */
 	readonly detectionSource: DetectionSource;
 
 	/** Human-readable explanation of why this suggestion was made */
