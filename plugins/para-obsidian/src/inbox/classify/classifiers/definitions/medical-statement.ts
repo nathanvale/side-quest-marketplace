@@ -81,8 +81,9 @@ export const medicalStatementClassifier: InboxConverter = {
 		},
 		{
 			name: "statementType",
-			type: "string", 
-			description: "Type of medical statement (summary/detailed/single-appointment)",
+			type: "string",
+			description:
+				"Type of medical statement (summary/detailed/single-appointment)",
 			requirement: "optional",
 			allowedValues: ["summary", "detailed", "single-appointment"],
 			validationPattern: "^(summary|detailed|single-appointment)$",
@@ -99,7 +100,8 @@ export const medicalStatementClassifier: InboxConverter = {
 			description: "Doctor/practitioner name",
 			requirement: "conditional",
 			conditionalOn: "totalInvoiced",
-			conditionalDescription: "Required when there are consultation charges (totalInvoiced > 0)",
+			conditionalDescription:
+				"Required when there are consultation charges (totalInvoiced > 0)",
 		},
 		{
 			name: "patient",

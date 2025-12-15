@@ -152,14 +152,14 @@ export interface FieldValidationResult {
 
 /**
  * Validates a field value against its definition constraints
- * 
+ *
  * @param value - The value to validate
  * @param field - The field definition with constraints
  * @returns Validation result with error details if invalid
  */
 export function validateFieldValue(
 	value: string | undefined,
-	field: FieldDefinition
+	field: FieldDefinition,
 ): FieldValidationResult {
 	// Handle undefined/empty values
 	if (!value || value.trim() === "") {
