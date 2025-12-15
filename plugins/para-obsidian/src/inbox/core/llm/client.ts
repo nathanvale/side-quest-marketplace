@@ -43,6 +43,20 @@ function isClaudeModel(model: LLMModel): boolean {
 }
 
 /**
+ * Result from callLLMWithMetadata including fallback information.
+ */
+export interface LLMCallResult {
+	/** The LLM response text */
+	readonly response: string;
+	/** The actual model that was used */
+	readonly modelUsed: string;
+	/** True if a fallback model was used instead of the primary */
+	readonly isFallback: boolean;
+	/** Reason for fallback (only set if isFallback is true) */
+	readonly fallbackReason?: string;
+}
+
+/**
  * Test LLM client that returns fast, valid classification responses.
  * Use this in tests by injecting via InboxEngineConfig.llmClient.
  *
@@ -81,7 +95,7 @@ export function createTestLLMClient(
 }
 
 /**
- * Call LLM using the @sidequest/core/llm abstraction.
+ * Call LLM with metadata about which model was used and fallback status.
  *
  * When a Claude model fails (auth issues, rate limits, etc.),
  * automatically falls back to local Ollama model.
@@ -89,13 +103,13 @@ export function createTestLLMClient(
  * @param prompt - The prompt to send to the LLM
  * @param provider - The LLM provider (e.g., "haiku", "sonnet")
  * @param model - Optional specific model override
- * @returns The LLM response text
+ * @returns LLMCallResult with response text and fallback metadata
  */
-export async function callLLM(
+export async function callLLMWithMetadata(
 	prompt: string,
 	provider: string,
 	model?: string,
-): Promise<string> {
+): Promise<LLMCallResult> {
 	// Lazy load once, then reuse cached module
 	if (!llmModule) {
 		llmModule = await import("@sidequest/core/llm");
@@ -111,11 +125,16 @@ export async function callLLM(
 	// Use shorter timeout to fail fast and trigger fallback
 	if (isClaudeModel(resolvedModel)) {
 		try {
-			return await callModel({
+			const response = await callModel({
 				model: resolvedModel,
 				prompt,
 				timeoutMs: CLAUDE_FALLBACK_TIMEOUT_MS,
 			});
+			return {
+				response,
+				modelUsed: resolvedModel,
+				isFallback: false,
+			};
 		} catch (claudeError) {
 			// Claude failed - try fallback to local Ollama
 			const fallbackModel =
@@ -131,7 +150,7 @@ export async function callLLM(
 			}
 
 			try {
-				const result = await callModel({
+				const response = await callModel({
 					model: fallbackModel,
 					prompt,
 				});
@@ -141,7 +160,12 @@ export async function callLLM(
 					llmLogger.info`Fallback to ${fallbackModel} succeeded`;
 				}
 
-				return result;
+				return {
+					response,
+					modelUsed: fallbackModel,
+					isFallback: true,
+					fallbackReason: errorMsg,
+				};
 			} catch (fallbackError) {
 				const fallbackMsg =
 					fallbackError instanceof Error ? fallbackError.message : "unknown";
@@ -160,8 +184,34 @@ export async function callLLM(
 	}
 
 	// Non-Claude model - call directly
-	return callModel({
+	const response = await callModel({
 		model: resolvedModel,
 		prompt,
 	});
+	return {
+		response,
+		modelUsed: resolvedModel,
+		isFallback: false,
+	};
+}
+
+/**
+ * Call LLM using the @sidequest/core/llm abstraction.
+ *
+ * When a Claude model fails (auth issues, rate limits, etc.),
+ * automatically falls back to local Ollama model.
+ *
+ * @param prompt - The prompt to send to the LLM
+ * @param provider - The LLM provider (e.g., "haiku", "sonnet")
+ * @param model - Optional specific model override
+ * @returns The LLM response text
+ * @deprecated Use callLLMWithMetadata for fallback visibility
+ */
+export async function callLLM(
+	prompt: string,
+	provider: string,
+	model?: string,
+): Promise<string> {
+	const result = await callLLMWithMetadata(prompt, provider, model);
+	return result.response;
 }

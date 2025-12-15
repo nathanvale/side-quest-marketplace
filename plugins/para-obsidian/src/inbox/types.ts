@@ -393,6 +393,10 @@ export interface LLMProgress extends ScanProgressBase {
 	readonly stage: "llm";
 	/** LLM model being used (required during llm stage) */
 	readonly model: string;
+	/** True if this is a fallback model (Claude failed, using Ollama) */
+	readonly isFallback?: boolean;
+	/** Reason for fallback (e.g., "Limit reached", "Timeout") */
+	readonly fallbackReason?: string;
 }
 
 /**
@@ -409,6 +413,12 @@ export interface DoneProgress extends ScanProgressBase {
 	readonly stage: "done";
 	/** Running count of LLM failures (for detecting service unavailability) */
 	readonly llmFailures?: number;
+	/** LLM error message if classification failed */
+	readonly llmError?: string;
+	/** Actual LLM model used (may differ from requested if fallback) */
+	readonly llmModelUsed?: string;
+	/** True if fallback model was used instead of primary */
+	readonly llmFallbackUsed?: boolean;
 }
 
 /**
@@ -615,6 +625,20 @@ export interface ProcessedRegistry {
 // =============================================================================
 
 /**
+ * Result metadata from an LLM call with fallback information.
+ */
+export interface LLMCallResultMetadata {
+	/** The LLM response text */
+	readonly response: string;
+	/** The actual model that was used */
+	readonly modelUsed: string;
+	/** True if a fallback model was used instead of the primary */
+	readonly isFallback: boolean;
+	/** Reason for fallback (only set if isFallback is true) */
+	readonly fallbackReason?: string;
+}
+
+/**
  * LLM client function signature for classification.
  * Takes a prompt, provider, and optional model override.
  * Returns the LLM response as a string.
@@ -624,6 +648,17 @@ export type LLMClientFunction = (
 	provider: string,
 	model?: string,
 ) => Promise<string>;
+
+/**
+ * LLM client function signature with metadata about fallback.
+ * Takes a prompt, provider, and optional model override.
+ * Returns the LLM response with metadata about which model was used.
+ */
+export type LLMClientWithMetadataFunction = (
+	prompt: string,
+	provider: string,
+	model?: string,
+) => Promise<LLMCallResultMetadata>;
 
 /**
  * Configuration for the inbox engine.

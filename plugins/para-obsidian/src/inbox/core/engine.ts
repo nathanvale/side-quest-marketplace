@@ -49,7 +49,7 @@ import {
 	type SuggestionId,
 	validateInboxEngineConfig,
 } from "../types";
-import { callLLM } from "./llm";
+import { callLLM, callLLMWithMetadata } from "./llm";
 import { executeSuggestion } from "./operations";
 import { generateReport } from "./operations/report";
 import { cleanupOrphanedStaging } from "./staging";
@@ -247,7 +247,14 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		/** Correlation ID for logging */
 		cid: string;
 		/** Running statistics for LLM calls */
-		llmStats: { successes: number; failures: number };
+		llmStats: {
+			successes: number;
+			failures: number;
+			fallbacks: number;
+			lastError: string | undefined;
+			lastFallbackReason: string | undefined;
+			lastModelUsed: string | undefined;
+		};
 	}
 
 	/**
@@ -366,6 +373,9 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			// Run LLM detection (with its own rate limit)
 			const llmModel = resolvedConfig.llmModel ?? resolvedConfig.llmProvider;
 			let llmResult: DocumentTypeResult | null = null;
+			let llmFallbackUsed = false;
+			let llmFallbackReason: string | undefined;
+			let llmModelUsed: string | undefined;
 			try {
 				if (onProgress) {
 					await onProgress({
@@ -383,6 +393,41 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 						filename,
 						vaultContext,
 					});
+
+					// Use callLLMWithMetadata when no custom client is injected
+					// This gives us fallback visibility in production
+					if (!resolvedConfig.llmClient) {
+						const llmCallResult = await callLLMWithMetadata(
+							prompt,
+							resolvedConfig.llmProvider,
+							resolvedConfig.llmModel,
+						);
+						llmFallbackUsed = llmCallResult.isFallback;
+						llmFallbackReason = llmCallResult.fallbackReason;
+						llmModelUsed = llmCallResult.modelUsed;
+
+						// Emit fallback progress update if fallback occurred
+						if (llmFallbackUsed && onProgress) {
+							await onProgress({
+								...progressBase,
+								stage: "llm",
+								model: llmCallResult.modelUsed,
+								isFallback: true,
+								fallbackReason: llmCallResult.fallbackReason,
+							});
+						}
+
+						if (inboxLogger) {
+							inboxLogger.debug`LLM raw response file=${filename} length=${llmCallResult.response.length} preview=${llmCallResult.response.slice(0, 200).replace(/\n/g, " ")} cid=${cid}`;
+						}
+						const result = parseDetectionResponse(llmCallResult.response);
+						if (inboxLogger) {
+							inboxLogger.info`LLM success file=${filename} type=${result.documentType} confidence=${result.confidence.toFixed(2)} area=${result.suggestedArea ?? "none"} fallback=${llmFallbackUsed} cid=${cid}`;
+						}
+						return result;
+					}
+
+					// Custom llmClient provided (e.g., tests) - use as-is
 					const response = await llmClient(
 						prompt,
 						resolvedConfig.llmProvider,
@@ -398,11 +443,19 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					return result;
 				});
 				llmStats.successes += 1;
+				if (llmFallbackUsed) {
+					llmStats.fallbacks += 1;
+					llmStats.lastFallbackReason = llmFallbackReason;
+				}
+				llmStats.lastModelUsed = llmModelUsed ?? llmModel;
 			} catch (error) {
+				const errorMsg =
+					error instanceof Error ? error.message : "unknown error";
 				if (inboxLogger) {
-					inboxLogger.warn`LLM detection failed: ${filename} - ${error instanceof Error ? error.message : "unknown"} cid=${cid}`;
+					inboxLogger.warn`LLM detection failed: ${filename} - ${errorMsg} cid=${cid}`;
 				}
 				llmStats.failures += 1;
+				llmStats.lastError = errorMsg;
 				llmResult = null;
 			}
 
@@ -439,6 +492,9 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					...progressBase,
 					stage: "done",
 					llmFailures: llmStats.failures,
+					llmError: llmStats.lastError,
+					llmModelUsed: llmModelUsed ?? llmStats.lastModelUsed,
+					llmFallbackUsed: llmFallbackUsed,
 				});
 			}
 			return suggestion;
@@ -494,7 +550,14 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		const onProgress = options?.onProgress;
 
 		// Track LLM failures to detect service unavailability
-		const llmStats = { successes: 0, failures: 0 };
+		const llmStats = {
+			successes: 0,
+			failures: 0,
+			fallbacks: 0,
+			lastError: undefined as string | undefined,
+			lastFallbackReason: undefined as string | undefined,
+			lastModelUsed: undefined as string | undefined,
+		};
 
 		// Clear stale suggestions from previous scans to prevent memory leaks
 		suggestionCache.clear();

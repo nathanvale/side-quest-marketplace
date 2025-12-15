@@ -4,4 +4,9 @@
  * @module inbox/core/llm
  */
 
-export { callLLM, type LLMModel } from "./client";
+export {
+	callLLM,
+	callLLMWithMetadata,
+	type LLMCallResult,
+	type LLMModel,
+} from "./client";

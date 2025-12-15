@@ -188,6 +188,9 @@ async function scanWithSpinner(
 		skipped: 0,
 		errors: 0,
 		llmFailures: 0,
+		llmFallbacks: 0,
+		lastFallbackReason: undefined as string | undefined,
+		lastLlmError: undefined as string | undefined,
 		currentFile: "",
 		stage: "hash" as "hash" | "extract" | "llm" | "skip" | "done" | "error",
 		stageStartedAt: Date.now(),
@@ -231,6 +234,19 @@ async function scanWithSpinner(
 					if (progress.llmFailures !== undefined) {
 						scanState.llmFailures = progress.llmFailures;
 					}
+					// Track fallback usage
+					if (progress.llmFallbackUsed) {
+						scanState.llmFallbacks += 1;
+					}
+					// Track last error for summary
+					if (progress.llmError) {
+						scanState.lastLlmError = progress.llmError;
+					}
+				} else if (stage === "llm") {
+					// Track fallback reason when fallback is triggered
+					if (progress.isFallback && progress.fallbackReason) {
+						scanState.lastFallbackReason = progress.fallbackReason;
+					}
 				} else if (stage === "error") {
 					scanState.errors += 1;
 					scanState.processed += 1;
@@ -239,7 +255,9 @@ async function scanWithSpinner(
 						text: `Scanning ${scanState.processed}/${scanState.total || "?"} (skipped ${scanState.skipped}, errors ${scanState.errors}) | ${filename} error - ${progress.error}`,
 					});
 					return;
-				} else {
+				}
+				// Update current file and stage for in-progress stages
+				if (stage === "hash" || stage === "extract" || stage === "llm") {
 					scanState.currentFile = filename;
 					scanState.stage = stage;
 					scanState.stageStartedAt = Date.now();
@@ -254,20 +272,43 @@ async function scanWithSpinner(
 			text: `Scan complete (${scanState.processed}/${scanState.total || suggestions.length} scanned, skipped ${scanState.skipped}, errors ${scanState.errors}) in ${elapsed}s`,
 		});
 
-		// Warn if LLM service appears unavailable
+		// Show LLM status messages
 		const filesAttempted = scanState.processed - scanState.skipped;
+
+		// Scenario 1: All LLM calls failed - show error and recovery hints
 		if (scanState.llmFailures > 0 && scanState.llmFailures >= filesAttempted) {
 			console.log(
 				color(
-					"yellow",
-					`⚠ LLM service unavailable (${scanState.llmFailures} failures). Using heuristic-only classification.`,
+					"red",
+					`✗ LLM classification failed for all ${scanState.llmFailures} file(s). Using heuristic-only.`,
 				),
 			);
+			if (scanState.lastLlmError) {
+				console.log(emphasize.info(`   Error: ${scanState.lastLlmError}`));
+			}
 			console.log(
 				emphasize.info(
-					`Check LLM provider (${llmModel}) - may need authentication or the service may be down.`,
+					"   Check: 1) Claude API quota/auth, 2) Ollama running (ollama serve), 3) Model installed (ollama pull qwen2.5:14b)",
 				),
 			);
+		}
+		// Scenario 2: Some files used fallback - show warning
+		else if (scanState.llmFallbacks > 0) {
+			console.log(
+				color(
+					"yellow",
+					`⚠ Claude unavailable for ${scanState.llmFallbacks} file(s), used local Ollama fallback.`,
+				),
+			);
+			if (scanState.lastFallbackReason) {
+				// Extract short reason (e.g., "Limit reached" from the full message)
+				const shortReason = scanState.lastFallbackReason.includes("Limit")
+					? "Limit reached"
+					: scanState.lastFallbackReason.includes("timeout")
+						? "Timeout"
+						: scanState.lastFallbackReason.slice(0, 50);
+				console.log(emphasize.info(`   Reason: ${shortReason}`));
+			}
 		}
 
 		return suggestions;
