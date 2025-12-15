@@ -174,19 +174,19 @@ describe("inbox/cli-adapter", () => {
 	});
 
 	describe("formatConfidence", () => {
-		test("should format 'high' with checkmark", () => {
+		test("should format 'high' with green checkmark", () => {
 			const result = formatConfidence("high");
-			expect(result).toContain("✓");
+			expect(result).toContain("✅");
 		});
 
-		test("should format 'medium' with question mark", () => {
+		test("should format 'medium' with orange diamond", () => {
 			const result = formatConfidence("medium");
-			expect(result).toContain("?");
+			expect(result).toContain("🔶");
 		});
 
-		test("should format 'low' with warning icon", () => {
+		test("should format 'low' with warning emoji", () => {
 			const result = formatConfidence("low");
-			expect(result).toContain("⚠");
+			expect(result).toContain("⚠️");
 		});
 	});
 
@@ -216,7 +216,7 @@ describe("inbox/cli-adapter", () => {
 
 		test("should include confidence indicator", () => {
 			const result = formatSuggestion(baseSuggestion, 1);
-			expect(result).toContain("✓");
+			expect(result).toContain("✅"); // high confidence = green checkmark
 		});
 
 		test("should include action", () => {
@@ -234,9 +234,11 @@ describe("inbox/cli-adapter", () => {
 			expect(result).toContain("Finance");
 		});
 
-		test("should include reason", () => {
+		test("should include confidence explanation in output", () => {
 			const result = formatSuggestion(baseSuggestion, 1);
-			expect(result).toContain("PDF filename contains 'invoice' pattern");
+			// Confidence line shows detection method
+			expect(result).toContain("Confidence: HIGH");
+			expect(result).toContain("LLM + heuristics agree");
 		});
 
 		test("should handle suggestion without optional fields", () => {
@@ -255,7 +257,7 @@ describe("inbox/cli-adapter", () => {
 			expect(result).toContain("skip");
 		});
 
-		test("should display extraction warnings when present", () => {
+		test("should display extraction warnings inline with preview", () => {
 			const suggestionWithWarnings: InboxSuggestion = {
 				id: createSuggestionId("abc12345-0000-4000-8000-000000000003"),
 				source: "/vault/Inbox/mystery-invoice.pdf",
@@ -272,9 +274,10 @@ describe("inbox/cli-adapter", () => {
 				],
 			};
 			const result = formatSuggestion(suggestionWithWarnings, 1);
-			// Warnings are now collapsed - shows indicator and count
-			expect(result).toContain("⚠ 2 warning(s)");
-			expect(result).toContain("use v1 for details");
+			// Warnings now show inline - first warning visible, plus count of more
+			expect(result).toContain("Could not find invoice date");
+			expect(result).toContain("+1 more");
+			expect(result).toContain("v1 for full details");
 		});
 
 		test("should not display warnings section when no warnings", () => {
@@ -425,7 +428,7 @@ describe("inbox/cli-adapter", () => {
 			expect(result).toContain("$150.00");
 		});
 
-		test("should display warnings when present", () => {
+		test("should display warnings with recovery options", () => {
 			const suggestionWithWarnings: InboxSuggestion = {
 				...baseSuggestion,
 				extractionWarnings: ["Missing invoice number", "Date format unclear"],
@@ -433,6 +436,10 @@ describe("inbox/cli-adapter", () => {
 			const result = formatSuggestionDetails(suggestionWithWarnings, 1);
 			expect(result).toContain("Missing invoice number");
 			expect(result).toContain("Date format unclear");
+			// Should include recovery options
+			expect(result).toContain("Recovery options");
+			expect(result).toContain("e1"); // Edit hint
+			expect(result).toContain("s1"); // Skip hint
 		});
 
 		test("should display destination", () => {
@@ -442,8 +449,8 @@ describe("inbox/cli-adapter", () => {
 
 		test("should display confidence and detection source", () => {
 			const result = formatSuggestionDetails(baseSuggestion, 1);
-			expect(result).toContain("high");
-			expect(result).toContain("llm+heuristic");
+			expect(result).toContain("HIGH"); // Now uppercase
+			expect(result).toContain("LLM + heuristics agree"); // Descriptive text instead of raw value
 		});
 	});
 

@@ -204,33 +204,43 @@ export function parseCommand(
 export function formatConfidence(confidence: Confidence): string {
 	switch (confidence) {
 		case "high":
-			return emphasize.success("✓");
+			return emphasize.success("✅");
 		case "medium":
-			return emphasize.warn("?");
+			return emphasize.warn("🔶");
 		case "low":
-			return emphasize.error("⚠");
+			return emphasize.error("⚠️");
 	}
 }
 
 /**
- * Format detection source with icon.
- * Shows whether LLM contributed to the classification.
+ * Format detection source with descriptive text.
+ * Shows how the classification was determined.
  *
  * @param source - Detection source type
- * @returns Formatted string with icon
+ * @param confidence - Confidence level for additional context
+ * @returns Formatted string explaining detection method
  */
-export function formatDetectionSource(source: DetectionSource): string {
+export function formatDetectionSource(
+	source: DetectionSource,
+	confidence?: Confidence,
+): string {
 	switch (source) {
 		case "llm+heuristic":
-			return emphasize.success("🤖✓"); // LLM and heuristics agree
+			return emphasize.success("LLM + heuristics agree");
 		case "llm":
-			return emphasize.info("🤖"); // LLM only
-		case "heuristic":
-			return emphasize.warn("📋"); // Heuristic only (LLM failed/disagreed)
+			return emphasize.info("LLM detection only");
+		case "heuristic": {
+			// Show percentage for heuristic-only detection
+			const pct =
+				confidence === "medium" ? "70%" : confidence === "low" ? "50%" : "";
+			return pct
+				? emphasize.warn(`Heuristic only (${pct})`)
+				: emphasize.warn("Heuristic only");
+		}
 		case "none":
-			return emphasize.dim("—"); // Neither detected
+			return emphasize.dim("No detection");
 		default:
-			return emphasize.dim("?");
+			return emphasize.dim("Unknown");
 	}
 }
 
@@ -244,6 +254,7 @@ function getFilename(path: string): string {
 
 /**
  * Format a single suggestion for display.
+ * Now shows inline warning preview and cleaner confidence display.
  *
  * @param suggestion - The inbox suggestion to format
  * @param index - 1-based index for display
@@ -255,33 +266,44 @@ export function formatSuggestion(
 ): string {
 	const filename = getFilename(suggestion.source);
 	const confidence = formatConfidence(suggestion.confidence);
-	const sourceIcon = formatDetectionSource(suggestion.detectionSource);
-	const hasWarnings =
-		suggestion.extractionWarnings && suggestion.extractionWarnings.length > 0;
+	const warnings = suggestion.extractionWarnings ?? [];
+	const hasWarnings = warnings.length > 0;
 	const lines: string[] = [];
 
-	// Main line: index, confidence, source icon, filename, action, warning indicator
-	const warningIndicator = hasWarnings ? emphasize.warn(" ⚠") : "";
-	const mainLine = `${emphasize.info(`[${index}]`)} ${confidence} ${sourceIcon} ${emphasize.info(filename)} → ${suggestion.action}${warningIndicator}`;
+	// Main line: [index] confidence filename → action
+	const mainLine = `${emphasize.info(`[${index}]`)} ${confidence} ${emphasize.info(filename)} → ${suggestion.action}`;
 	lines.push(mainLine);
 
 	// Details on subsequent lines (only for create-note suggestions)
 	if (isCreateNoteSuggestion(suggestion)) {
 		lines.push(`    Title: ${suggestion.suggestedTitle}`);
+		// Compact area/type/confidence line
+		const metaParts: string[] = [];
 		if (suggestion.suggestedArea) {
-			lines.push(`    Area: ${suggestion.suggestedArea}`);
+			metaParts.push(`Area: ${suggestion.suggestedArea}`);
 		}
-		lines.push(`    Type: ${suggestion.suggestedNoteType}`);
+		metaParts.push(`Type: ${suggestion.suggestedNoteType}`);
+		lines.push(`    ${metaParts.join(" • ")}`);
 	}
 
-	lines.push(`    ${emphasize.dim(suggestion.reason)}`);
+	// Detection source explanation
+	const detectionText = formatDetectionSource(
+		suggestion.detectionSource,
+		suggestion.confidence,
+	);
+	lines.push(
+		`    ${emphasize.dim(`Confidence: ${suggestion.confidence.toUpperCase()} (${detectionText})`)}`,
+	);
 
-	// Display extraction warnings if present (collapsed - use v<n> for details)
+	// Inline warning preview - show first warning directly, hint at more
 	if (hasWarnings) {
-		const warningCount = suggestion.extractionWarnings?.length ?? 0;
-		lines.push(
-			`    ${emphasize.warn(`⚠ ${warningCount} warning(s) - use v${index} for details`)}`,
-		);
+		const firstWarning = warnings[0];
+		const moreText =
+			warnings.length > 1 ? ` (+${warnings.length - 1} more)` : "";
+		lines.push(`    ${emphasize.warn(`⚠️  ${firstWarning}${moreText}`)}`);
+		if (warnings.length > 1) {
+			lines.push(`    ${emphasize.dim(`    Use v${index} for full details`)}`);
+		}
 	}
 
 	return lines.join("\n");
@@ -289,6 +311,7 @@ export function formatSuggestion(
 
 /**
  * Format detailed view of a suggestion for the v<n> command.
+ * Includes actionable recovery hints for warnings.
  *
  * @param suggestion - The inbox suggestion to display
  * @param index - 1-based index for display
@@ -301,18 +324,26 @@ export function formatSuggestionDetails(
 	const filename = getFilename(suggestion.source);
 	const lines: string[] = [];
 
-	lines.push(emphasize.info(`── Item ${index}: ${filename} ──`));
+	lines.push(emphasize.info(`══ Item ${index}: ${filename} ══`));
 	lines.push("");
-	lines.push(`  Source:      ${suggestion.source}`);
-	lines.push(`  Action:      ${suggestion.action}`);
-	lines.push(
-		`  Confidence:  ${suggestion.confidence} (${suggestion.detectionSource})`,
+
+	// Confidence with explanation
+	const detectionText = formatDetectionSource(
+		suggestion.detectionSource,
+		suggestion.confidence,
 	);
-	lines.push(`  Reason:      ${suggestion.reason}`);
+	lines.push(
+		`  ${emphasize.dim("Confidence:")}  ${suggestion.confidence.toUpperCase()}`,
+	);
+	lines.push(`  ${emphasize.dim("Detection:")}   ${detectionText}`);
+	lines.push(`  ${emphasize.dim("Action:")}      ${suggestion.action}`);
+	lines.push("");
+	lines.push(`  ${emphasize.dim("Source:")}      ${suggestion.source}`);
+	lines.push(`  ${emphasize.dim("Reason:")}      ${suggestion.reason}`);
 
 	if (isCreateNoteSuggestion(suggestion)) {
 		lines.push("");
-		lines.push(emphasize.dim("  Classification:"));
+		lines.push(emphasize.info("  Classification"));
 		lines.push(`    Type:      ${suggestion.suggestedNoteType}`);
 		lines.push(`    Title:     ${suggestion.suggestedTitle}`);
 		if (suggestion.suggestedDestination) {
@@ -331,7 +362,7 @@ export function formatSuggestionDetails(
 			Object.keys(suggestion.extractedFields).length > 0
 		) {
 			lines.push("");
-			lines.push(emphasize.dim("  Extracted Fields:"));
+			lines.push(emphasize.info("  Extracted Fields"));
 			for (const [key, value] of Object.entries(suggestion.extractedFields)) {
 				if (value !== null && value !== undefined && value !== "") {
 					lines.push(`    ${key}: ${String(value)}`);
@@ -342,21 +373,33 @@ export function formatSuggestionDetails(
 		// Show attachment naming if available
 		if (suggestion.suggestedAttachmentName) {
 			lines.push("");
-			lines.push(emphasize.dim("  Attachment:"));
+			lines.push(emphasize.info("  Attachment"));
 			lines.push(`    New name:  ${suggestion.suggestedAttachmentName}`);
 		}
 	}
 
-	// Show warnings in detail
-	if (
-		suggestion.extractionWarnings &&
-		suggestion.extractionWarnings.length > 0
-	) {
+	// Show warnings in detail with recovery hints
+	const warnings = suggestion.extractionWarnings ?? [];
+	if (warnings.length > 0) {
 		lines.push("");
-		lines.push(emphasize.warn("  Warnings:"));
-		for (const warning of suggestion.extractionWarnings) {
+		lines.push(emphasize.warn(`  ⚠️  Warnings (${warnings.length})`));
+		for (const warning of warnings) {
 			lines.push(`    ${emphasize.warn(`• ${warning}`)}`);
 		}
+		// Recovery hint
+		lines.push("");
+		lines.push(emphasize.dim("  Recovery options:"));
+		lines.push(
+			emphasize.dim(
+				`    • e${index} "add missing info" - reclassify with hint`,
+			),
+		);
+		lines.push(
+			emphasize.dim(
+				`    • ${index} - approve as-is (will use fallback values)`,
+			),
+		);
+		lines.push(emphasize.dim(`    • s${index} - skip this item`));
 	}
 
 	lines.push("");
@@ -437,30 +480,55 @@ export function formatSuggestionsTable(
 		}
 	}
 
-	// Footer with warning summary
-	const warningCount = suggestions.filter(
+	// Footer with warning summary and legend
+	const warningItems = suggestions.filter(
 		(s) => s.extractionWarnings && s.extractionWarnings.length > 0,
-	).length;
+	);
+	const lowConfidenceItems = suggestions.filter(
+		(s) => s.confidence === "low" || s.confidence === "medium",
+	);
+
 	lines.push("");
-	if (warningCount > 0) {
-		const warningIndices = suggestions
-			.filter((s) => s.extractionWarnings && s.extractionWarnings.length > 0)
-			.map((s) => (originalIndices ? (originalIndices.get(s.id) ?? "?") : "?"))
-			.join(", ");
-		lines.push(
-			emphasize.warn(
-				`⚠ ${warningCount} item(s) have warnings: ${warningIndices}`,
-			),
-		);
+
+	// Confidence legend (once)
+	lines.push(emphasize.dim("Legend: ✅ HIGH  🔶 MEDIUM  ⚠️ LOW"));
+
+	// Summary of items needing attention
+	if (warningItems.length > 0 || lowConfidenceItems.length > 0) {
+		const attentionParts: string[] = [];
+		if (warningItems.length > 0) {
+			const warningIndices = warningItems
+				.map((s) =>
+					originalIndices ? (originalIndices.get(s.id) ?? "?") : "?",
+				)
+				.join(", ");
+			attentionParts.push(
+				`⚠️ ${warningItems.length} with warnings (${warningIndices})`,
+			);
+		}
+		if (lowConfidenceItems.length > 0) {
+			const lowIndices = lowConfidenceItems
+				.map((s) =>
+					originalIndices ? (originalIndices.get(s.id) ?? "?") : "?",
+				)
+				.join(", ");
+			attentionParts.push(
+				`🔶 ${lowConfidenceItems.length} need review (${lowIndices})`,
+			);
+		}
+		lines.push(emphasize.warn(attentionParts.join("  |  ")));
 	}
+
 	if (pagination) {
 		lines.push(
-			emphasize.dim(`${pagination.totalItems} item(s) total | Type ? for help`),
+			emphasize.dim(
+				`${pagination.totalItems} item(s) total | ? for help | v<n> for details`,
+			),
 		);
 	} else {
 		lines.push(
 			emphasize.dim(
-				`${suggestions.length} item(s) to process | Type ? for help`,
+				`${suggestions.length} item(s) to process | ? for help | v<n> for details`,
 			),
 		);
 	}
