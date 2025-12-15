@@ -193,7 +193,7 @@ describe("inbox/cli-adapter", () => {
 
 		test("should handle suggestion without optional fields", () => {
 			const minimalSuggestion: InboxSuggestion = {
-				id: createSuggestionId("xyz78900-0000-4000-8000-000000000002"),
+				id: createSuggestionId("a1b78900-0000-4000-8000-000000000002"),
 				source: "/vault/Inbox/random-file.md",
 				processor: "notes",
 				confidence: "low",

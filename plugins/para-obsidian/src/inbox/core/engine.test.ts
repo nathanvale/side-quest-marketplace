@@ -87,22 +87,34 @@ describe("inbox/engine", () => {
 	});
 
 	describe("scan()", () => {
-		test("should return a promise", () => {
-			const engine = createInboxEngine(testConfig);
+		let testVaultPath: string;
+
+		beforeEach(async () => {
+			testVaultPath = createTempDir("scan-basic-test-");
+			mkdirSync(join(testVaultPath, "00 Inbox"), { recursive: true });
+			await initGitRepo(testVaultPath);
+		});
+
+		afterEach(() => {
+			cleanupTestDir(testVaultPath);
+		});
+
+		test("should return a promise", async () => {
+			const engine = createTestEngine({ vaultPath: testVaultPath });
 			const result = engine.scan();
 			expect(result).toBeInstanceOf(Promise);
+			// Await to prevent unhandled promise rejection from auto-commit
+			await result;
 		});
 
 		test("should resolve to an array of suggestions", async () => {
-			const engine = createInboxEngine(testConfig);
+			const engine = createTestEngine({ vaultPath: testVaultPath });
 			const suggestions = await engine.scan();
 			expect(Array.isArray(suggestions)).toBe(true);
 		});
 
-		test("should return empty array for non-existent inbox folder", async () => {
-			const engine = createInboxEngine({
-				vaultPath: "/non-existent-path-12345",
-			});
+		test("should return empty array for empty inbox folder", async () => {
+			const engine = createTestEngine({ vaultPath: testVaultPath });
 			const suggestions = await engine.scan();
 			expect(suggestions).toHaveLength(0);
 		});
