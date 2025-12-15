@@ -218,7 +218,13 @@ export async function executeSuggestion(
 	// File was hashed earlier, but could have been deleted by another process
 	if (!pathExistsSync(sourcePath)) {
 		// ROLLBACK: Clean up staging note and in-progress marker
-		await rollbackOperation(stagingNotePath, hash, registry, cid);
+		await rollbackOperation(
+			config.vaultPath,
+			stagingNotePath,
+			hash,
+			registry,
+			cid,
+		);
 
 		return {
 			suggestionId: suggestion.id,
@@ -232,7 +238,13 @@ export async function executeSuggestion(
 		await moveFile(sourcePath, attachmentDest);
 	} catch (error) {
 		// ROLLBACK: Clean up staging note and in-progress marker
-		await rollbackOperation(stagingNotePath, hash, registry, cid);
+		await rollbackOperation(
+			config.vaultPath,
+			stagingNotePath,
+			hash,
+			registry,
+			cid,
+		);
 
 		// Log the failure and return error
 		if (executeLogger) {

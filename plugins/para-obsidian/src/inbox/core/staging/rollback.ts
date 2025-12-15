@@ -7,7 +7,7 @@
  * @module inbox/core/staging/rollback
  */
 
-import path from "node:path";
+import { dirname, join } from "node:path";
 import { executeLogger } from "../../../shared/logger";
 import type { createRegistry } from "../../registry/processed-registry";
 
@@ -15,12 +15,14 @@ import type { createRegistry } from "../../registry/processed-registry";
  * Atomic rollback helper - cleans up staging note and registry marker.
  * Uses sync operations to ensure cleanup completes before returning control.
  *
- * @param stagingNotePath - Path to the staging note to delete (if any)
+ * @param vaultPath - Absolute path to the vault root (required for resolving staging paths)
+ * @param stagingNotePath - Vault-relative path to the staging note to delete (if any)
  * @param sourceHash - Hash of the source file for registry cleanup
  * @param registry - Registry instance for clearing in-progress marker
  * @param cid - Correlation ID for logging
  */
 export async function rollbackOperation(
+	vaultPath: string,
 	stagingNotePath: string | undefined,
 	sourceHash: string,
 	registry: ReturnType<typeof createRegistry>,
@@ -29,12 +31,13 @@ export async function rollbackOperation(
 	if (stagingNotePath) {
 		try {
 			const fs = await import("node:fs");
-			const stagingAbsolute = path.resolve(stagingNotePath);
+			// Resolve staging path relative to vault, not CWD
+			const stagingAbsolute = join(vaultPath, stagingNotePath);
 
 			if (fs.existsSync(stagingAbsolute)) {
 				fs.unlinkSync(stagingAbsolute);
 				// Ensure deletion is durable
-				const dir = path.dirname(stagingAbsolute);
+				const dir = dirname(stagingAbsolute);
 				const fd = fs.openSync(dir, "r");
 				fs.fsyncSync(fd);
 				fs.closeSync(fd);
@@ -42,6 +45,9 @@ export async function rollbackOperation(
 				if (executeLogger) {
 					executeLogger.info`Rolled back staging note=${stagingNotePath} ${cid}`;
 				}
+			} else if (executeLogger) {
+				// Layer 2: Log warning if staging file not found (helps debug path issues)
+				executeLogger.warn`Staging note not found during rollback path=${stagingAbsolute} ${cid}`;
 			}
 		} catch (rollbackError) {
 			if (executeLogger) {
