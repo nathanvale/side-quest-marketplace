@@ -108,27 +108,19 @@ export function generateTitle(
 }
 
 /**
- * Generate a random suffix for unique path generation.
- * Uses crypto.randomUUID() and takes first 6 characters for brevity.
- */
-function generateRandomSuffix(): string {
-	return crypto.randomUUID().slice(0, 6);
-}
-
-/**
  * Generate a unique file path by appending a counter if the path already exists.
  *
- * Uses a combination of counter and random suffix to prevent race conditions
- * when multiple processes try to generate unique paths concurrently.
+ * Uses a simple counter pattern for sequential inbox processing.
+ * Pattern: filename-2.ext, filename-3.ext, etc.
  *
  * @param basePath - The desired file path
- * @returns Unique path (original or with -N-RANDOM suffix before extension)
+ * @returns Unique path (original or with -N suffix before extension)
  *
  * @example
  * ```typescript
  * // If "2025-12-10-invoice.pdf" exists:
  * generateUniquePath("/vault/Attachments/2025-12-10-invoice.pdf");
- * // → "/vault/Attachments/2025-12-10-invoice-1-a3b2c1.pdf"
+ * // → "/vault/Attachments/2025-12-10-invoice-2.pdf"
  * ```
  */
 export function generateUniquePath(basePath: string): string {
@@ -138,15 +130,73 @@ export function generateUniquePath(basePath: string): string {
 
 	const ext = extname(basePath);
 	const base = ext ? basePath.slice(0, -ext.length) : basePath;
-	let counter = 1;
+	let counter = 2;
 
-	// Add random suffix to prevent race conditions between concurrent processes
-	// Each process gets a unique path even if they check at the same time
-	const randomSuffix = generateRandomSuffix();
-
-	while (pathExistsSync(`${base}-${counter}-${randomSuffix}${ext}`)) {
+	while (pathExistsSync(`${base}-${counter}${ext}`)) {
 		counter++;
 	}
 
-	return `${base}-${counter}-${randomSuffix}${ext}`;
+	return `${base}-${counter}${ext}`;
+}
+
+/**
+ * Generate a unique path for notes using Obsidian's naming convention.
+ *
+ * Pattern: "Title.md", "Title 1.md", "Title 2.md", etc.
+ * This matches Obsidian's native behavior when creating duplicate notes.
+ *
+ * @param basePath - The desired file path (should end with .md)
+ * @returns Unique path (original or with " N" suffix before extension)
+ *
+ * @example
+ * ```typescript
+ * // If "Invoice - Amazon - 2024-12-10.md" exists:
+ * generateUniqueNotePath("/vault/Notes/Invoice - Amazon - 2024-12-10.md");
+ * // → "/vault/Notes/Invoice - Amazon - 2024-12-10 1.md"
+ * ```
+ */
+export function generateUniqueNotePath(basePath: string): string {
+	if (!pathExistsSync(basePath)) {
+		return basePath;
+	}
+
+	const ext = extname(basePath);
+	const base = ext ? basePath.slice(0, -ext.length) : basePath;
+	let counter = 1;
+
+	// Obsidian uses space before number: "Title 1.md", "Title 2.md"
+	while (pathExistsSync(`${base} ${counter}${ext}`)) {
+		counter++;
+	}
+
+	return `${base} ${counter}${ext}`;
+}
+
+/**
+ * Parse wikilink format [[Name]] to plain string.
+ *
+ * Handles both wikilink format and plain strings.
+ * Returns undefined for non-string or empty values.
+ *
+ * @param value - Value to parse (typically from frontmatter)
+ * @returns Extracted name or undefined
+ *
+ * @example
+ * ```typescript
+ * parseWikilink("[[Health]]"); // "Health"
+ * parseWikilink("Finance"); // "Finance"
+ * parseWikilink(""); // undefined
+ * parseWikilink(null); // undefined
+ * ```
+ */
+export function parseWikilink(value: unknown): string | undefined {
+	if (typeof value !== "string") return undefined;
+	if (!value.trim()) return undefined;
+
+	// Match wikilink format [[Name]] or [[Name|Alias]]
+	const match = value.match(/^\[\[([^\]|]+)(?:\|[^\]]+)?\]\]$/);
+	if (match?.[1]) {
+		return match[1].trim() || undefined;
+	}
+	return value.trim() || undefined;
 }

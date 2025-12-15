@@ -5,6 +5,7 @@ import {
 	capitalizeFirst,
 	generateFilename,
 	generateTitle,
+	generateUniqueNotePath,
 	generateUniquePath,
 } from "./engine-utils";
 
@@ -207,28 +208,20 @@ describe("inbox/engine-utils", () => {
 
 			const result = generateUniquePath(path);
 
-			// Should be: existing-1-<random>.pdf
-			expect(result).toMatch(
-				new RegExp(`^${tempDir}/existing-1-[a-f0-9]{6}\\.pdf$`),
-			);
+			// Should be: existing-2.pdf (starts at 2)
+			expect(result).toBe(`${tempDir}/existing-2.pdf`);
 		});
 
-		test("should generate unique paths even with same counter", () => {
+		test("should increment counter when multiple files exist", () => {
 			const basePath = `${tempDir}/existing.pdf`;
 			writeFileSync(basePath, "content");
+			writeFileSync(`${tempDir}/existing-2.pdf`, "content");
+			writeFileSync(`${tempDir}/existing-3.pdf`, "content");
 
-			// Generate two unique paths (both will be -1- with different random suffixes)
-			const path1 = generateUniquePath(basePath);
-			const path2 = generateUniquePath(basePath);
+			const result = generateUniquePath(basePath);
 
-			// Both should have counter 1 but different random suffixes
-			expect(path1).toMatch(
-				new RegExp(`^${tempDir}/existing-1-[a-f0-9]{6}\\.pdf$`),
-			);
-			expect(path2).toMatch(
-				new RegExp(`^${tempDir}/existing-1-[a-f0-9]{6}\\.pdf$`),
-			);
-			expect(path1).not.toBe(path2); // Different random suffixes
+			// Should find -4 as first available
+			expect(result).toBe(`${tempDir}/existing-4.pdf`);
 		});
 
 		test("should handle files without extension", () => {
@@ -237,7 +230,7 @@ describe("inbox/engine-utils", () => {
 
 			const result = generateUniquePath(path);
 
-			expect(result).toMatch(new RegExp(`^${tempDir}/README-1-[a-f0-9]{6}$`));
+			expect(result).toBe(`${tempDir}/README-2`);
 		});
 
 		test("should preserve extension correctly", () => {
@@ -247,9 +240,7 @@ describe("inbox/engine-utils", () => {
 			const result = generateUniquePath(path);
 
 			// Extension is only .gz (last segment)
-			expect(result).toMatch(
-				new RegExp(`^${tempDir}/file\\.tar-1-[a-f0-9]{6}\\.gz$`),
-			);
+			expect(result).toBe(`${tempDir}/file.tar-2.gz`);
 		});
 
 		test("should handle directory paths", () => {
@@ -258,32 +249,54 @@ describe("inbox/engine-utils", () => {
 
 			const result = generateUniquePath(dirPath);
 
-			expect(result).toMatch(new RegExp(`^${tempDir}/subdir-1-[a-f0-9]{6}$`));
+			expect(result).toBe(`${tempDir}/subdir-2`);
+		});
+	});
+
+	describe("generateUniqueNotePath", () => {
+		let tempDir: string;
+
+		beforeEach(() => {
+			tempDir = createTempDir("engine-utils-note-test-");
 		});
 
-		test("should generate unique IDs for concurrent calls", () => {
-			const path = `${tempDir}/concurrent.pdf`;
-			writeFileSync(path, "content");
+		test("should return original path if file does not exist", () => {
+			const path = `${tempDir}/My Note.md`;
 
-			const result1 = generateUniquePath(path);
-			const result2 = generateUniquePath(path);
+			const result = generateUniqueNotePath(path);
 
-			// Different random suffixes
-			expect(result1).not.toBe(result2);
-			expect(result1).toMatch(/-1-[a-f0-9]{6}\.pdf$/);
-			expect(result2).toMatch(/-1-[a-f0-9]{6}\.pdf$/);
+			expect(result).toBe(path);
 		});
 
-		test("should use 6-character random suffix", () => {
-			const path = `${tempDir}/file.pdf`;
+		test("should add space and counter when file exists", () => {
+			const path = `${tempDir}/My Note.md`;
 			writeFileSync(path, "content");
 
-			const result = generateUniquePath(path);
+			const result = generateUniqueNotePath(path);
 
-			// Extract random suffix
-			const match = result.match(/-([a-f0-9]{6})\.pdf$/);
-			expect(match).not.toBeNull();
-			expect(match?.[1]).toHaveLength(6);
+			// Obsidian pattern: "My Note 1.md"
+			expect(result).toBe(`${tempDir}/My Note 1.md`);
+		});
+
+		test("should increment counter when multiple notes exist", () => {
+			const basePath = `${tempDir}/Invoice - Amazon - 2024-12-10.md`;
+			writeFileSync(basePath, "content");
+			writeFileSync(`${tempDir}/Invoice - Amazon - 2024-12-10 1.md`, "content");
+			writeFileSync(`${tempDir}/Invoice - Amazon - 2024-12-10 2.md`, "content");
+
+			const result = generateUniqueNotePath(basePath);
+
+			// Should find 3 as first available
+			expect(result).toBe(`${tempDir}/Invoice - Amazon - 2024-12-10 3.md`);
+		});
+
+		test("should handle files without extension", () => {
+			const path = `${tempDir}/README`;
+			writeFileSync(path, "content");
+
+			const result = generateUniqueNotePath(path);
+
+			expect(result).toBe(`${tempDir}/README 1`);
 		});
 	});
 });

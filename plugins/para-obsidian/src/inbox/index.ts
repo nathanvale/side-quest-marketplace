@@ -52,6 +52,7 @@ export {
 	capitalizeFirst,
 	generateFilename,
 	generateTitle,
+	generateUniqueNotePath,
 	generateUniquePath,
 } from "./core/engine-utils";
 // =============================================================================

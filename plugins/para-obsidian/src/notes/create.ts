@@ -8,19 +8,17 @@
  * - Automatic template_version injection
  * - Title field injection
  * - Content injection into template sections
+ * - Unique filename generation on collision (Obsidian-style: "Title 1.md")
  *
  * @module create
  */
 import path from "node:path";
-import {
-	ensureDirSync,
-	pathExistsSync,
-	writeTextFileSync,
-} from "@sidequest/core/fs";
+import { ensureDirSync, writeTextFileSync } from "@sidequest/core/fs";
 import { getErrorMessage } from "@sidequest/core/utils";
 
 import type { ParaObsidianConfig } from "../config/index";
 import { parseFrontmatter, serializeFrontmatter } from "../frontmatter/index";
+import { generateUniqueNotePath } from "../inbox/core/engine-utils";
 import { resolveVaultPath } from "../shared/fs";
 import {
 	applyDateSubstitutions,
@@ -330,11 +328,17 @@ export function createFromTemplate(
 	const destDir =
 		options.dest ?? config.defaultDestinations?.[options.template] ?? "";
 	const filename = titleToFilename(displayTitle);
-	const target = resolveVaultPath(config.vault, path.join(destDir, filename));
+	const initialTarget = resolveVaultPath(
+		config.vault,
+		path.join(destDir, filename),
+	);
 
-	if (pathExistsSync(target.absolute)) {
-		throw new Error(`File already exists: ${target.relative}`);
-	}
+	// Generate unique path if file already exists (Obsidian-style: "Title 1.md")
+	const uniqueAbsolutePath = generateUniqueNotePath(initialTarget.absolute);
+	const target = {
+		absolute: uniqueAbsolutePath,
+		relative: path.relative(config.vault, uniqueAbsolutePath),
+	};
 
 	// Apply template substitutions:
 	// 1. First, replace all date patterns (tp.date.now) with actual dates
