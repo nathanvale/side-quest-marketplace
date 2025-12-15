@@ -67,6 +67,9 @@ export async function executeSuggestion(
 	const sourcePath = join(config.vaultPath, suggestion.source);
 	const filename = basename(suggestion.source);
 
+	// Load para-obsidian config once for all operations (template creation, staging, injection, auto-commit)
+	const paraConfig = loadConfig();
+
 	if (executeLogger) {
 		executeLogger.debug`Executing suggestion id=${suggestion.id} action=${suggestion.action} source=${filename} ${cid}`;
 	}
@@ -142,9 +145,6 @@ export async function executeSuggestion(
 		suggestion.suggestedTitle
 	) {
 		try {
-			// Load para-obsidian config to get template info
-			const paraConfig = loadConfig();
-
 			// Build args from suggestion using converter field mappings
 			let args: Record<string, string> = {};
 
@@ -250,7 +250,6 @@ export async function executeSuggestion(
 	// SUCCESS: Move staged note to final destination atomically
 	if (stagingNotePath) {
 		try {
-			const paraConfig = loadConfig();
 			// Type narrowing: only CreateNoteSuggestion and MoveSuggestion have suggestedDestination
 			const finalDest =
 				("suggestedDestination" in suggestion
@@ -303,7 +302,6 @@ export async function executeSuggestion(
 	// Inject attachment link into the note (if note was created)
 	if (createdNotePath) {
 		try {
-			const paraConfig = loadConfig();
 			const attachmentWikilink = `![[${movedAttachmentPath}]]`;
 			const injectionResult = injectSections(paraConfig, createdNotePath, {
 				Attachments: attachmentWikilink,
@@ -345,7 +343,6 @@ export async function executeSuggestion(
 	});
 
 	// Auto-commit changes if enabled (defense-in-depth: commit after each successful execution)
-	const paraConfig = loadConfig();
 	if (paraConfig.autoCommit) {
 		const filesToCommit = [movedAttachmentPath];
 		if (createdNotePath) {
