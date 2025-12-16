@@ -38,12 +38,21 @@ import path from "node:path";
 
 /**
  * Check if a path exists asynchronously.
+ * Works for both files and directories.
+ *
+ * Note: Bun.file().exists() only works for files, not directories.
+ * We use fsStat which handles both.
  *
  * @param filePath - Path to check
- * @returns true if path exists
+ * @returns true if path exists (file or directory)
  */
 export async function pathExists(filePath: string): Promise<boolean> {
-	return Bun.file(filePath).exists();
+	try {
+		await fsStat(filePath);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 /**
