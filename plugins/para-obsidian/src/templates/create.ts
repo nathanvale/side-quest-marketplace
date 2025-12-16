@@ -33,6 +33,8 @@ export interface CreateTemplateConfig {
 	readonly fieldMappings: Readonly<Record<string, string>>;
 	/** User's template choice */
 	readonly choice: TemplateChoice;
+	/** Templates directory name (defaults to "Templates") */
+	readonly templatesDir?: string;
 }
 
 /**
@@ -94,7 +96,8 @@ export async function createTemplate(
 		? `${templateName}-${choice.suffix}`
 		: templateName;
 
-	const templatePath = join(vaultPath, "Templates", `${finalName}.md`);
+	const templatesDir = config.templatesDir ?? "Templates";
+	const templatePath = join(vaultPath, templatesDir, `${finalName}.md`);
 
 	// Shared scaffold config for both basic and rich modes
 	const scaffoldConfig = {

@@ -155,7 +155,7 @@ async function createClassifier(config: ParaObsidianConfig): Promise<void> {
 		.filter((p) => p.length > 0)
 		.map((pattern, idx) => ({
 			pattern,
-			weight: validateWeight(Math.max(0.5, 1.0 - idx * 0.1)),
+			weight: validateWeight(Math.max(0.1, 1.0 - idx * 0.1)),
 		}));
 
 	const contentInput = await input({
@@ -168,7 +168,7 @@ async function createClassifier(config: ParaObsidianConfig): Promise<void> {
 		.filter((p) => p.length > 0)
 		.map((pattern, idx) => ({
 			pattern,
-			weight: validateWeight(Math.max(0.5, 1.0 - idx * 0.1)),
+			weight: validateWeight(Math.max(0.1, 1.0 - idx * 0.1)),
 		}));
 
 	// Step 3: Field Extraction
@@ -427,6 +427,7 @@ async function createClassifier(config: ParaObsidianConfig): Promise<void> {
 				fields,
 				fieldMappings,
 				choice: templateChoice,
+				templatesDir: config.templatesDir,
 			});
 
 			return templateResult;
