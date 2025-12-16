@@ -87,27 +87,6 @@
 			"keywords": ["validation", "plugin", "hooks", "linting", "quality"]
 		},
 		{
-			"name": "para-brain",
-			"source": "./plugins/para-brain",
-			"description": "Ultimate PARA method and Building a Second Brain plugin for Obsidian. Includes CODE methodology (Capture, Organize, Distill, Express), Progressive Summarization, and complete note management workflows with MCP Obsidian integration.",
-			"version": "1.0.0",
-			"author": {
-				"name": "Nathan Vale"
-			},
-			"category": "productivity",
-			"keywords": [
-				"obsidian",
-				"para",
-				"second-brain",
-				"basb",
-				"pkm",
-				"knowledge-management",
-				"tiago-forte",
-				"code",
-				"progressive-summarization"
-			]
-		},
-		{
 			"name": "para-obsidian",
 			"source": "./plugins/para-obsidian",
 			"description": "PARA-compliant Obsidian vault management CLI. Creates notes with proper frontmatter, templates, and file organization following the PARA method.",

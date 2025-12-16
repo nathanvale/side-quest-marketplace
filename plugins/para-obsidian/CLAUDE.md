@@ -12,6 +12,14 @@
 **Test Framework:** Bun test (`*.test.ts` alongside source)
 **Linter:** Biome (inherits from monorepo root)
 
+**Slash Commands:**
+- `/create` - Create new notes with template selection
+- `/create-classifier` - Create inbox classifiers with template integration
+- `/create-note-template` - Create standalone Templater templates
+- `/search` - Search notes by content or metadata
+- `/validate` - Validate frontmatter and templates
+- `/commit` - Git commit with auto-staging
+
 ---
 
 ## Commands
@@ -28,6 +36,8 @@ bun run format           # Biome format only
 ```bash
 bun run src/cli.ts <command> [options]
 bun run src/debug-llm.ts           # Debug LLM classification chain
+bun run src/cli.ts create-classifier    # Classifier creation wizard
+bun run src/cli.ts create-note-template # Template creation wizard
 ```
 
 ---
@@ -95,7 +105,8 @@ para-obsidian/
 │   └── utils.ts               # MCP utilities
 ├── commands/                  # Slash commands
 │   ├── create.md
-│   ├── create-classifier.md   # NEW: Classifier creation guide
+│   ├── create-classifier.md   # Classifier creation guide
+│   ├── create-note-template.md # Template creation guide
 │   ├── search.md
 │   ├── validate.md
 │   └── commit.md
@@ -107,7 +118,8 @@ para-obsidian/
 ├── docs/                      # Documentation
 │   ├── SPEC.md                # Working specification
 │   ├── STATUS.md              # Feature status
-│   └── ROADMAP.md             # Planned features
+│   ├── ROADMAP.md             # Planned features
+│   └── USAGE_EXAMPLES.md      # Command usage examples
 └── .claude-plugin/
     └── plugin.json            # Plugin manifest
 ```
@@ -123,6 +135,15 @@ para-obsidian/
 | `src/config/defaults.ts` | Default frontmatter rules, templates |
 | `src/inbox/core/engine.ts` | Inbox processing engine |
 | `src/frontmatter/validate.ts` | Frontmatter validation rules |
+| `src/cli/create-classifier.ts` | Classifier creation wizard |
+| `src/cli/create-note-template.ts` | Template creation wizard |
+| `src/inbox/classify/classifiers/generator.ts` | Classifier code generation |
+| `src/inbox/classify/classifiers/registry-updater.ts` | AST-based registry updates |
+| `src/templates/wizard.ts` | Template configuration wizard |
+| `src/templates/generator.ts` | Template file generation |
+| `src/shared/atomic-fs.ts` | Atomic file operations |
+| `src/shared/transaction.ts` | Transaction with rollback |
+| `src/shared/file-lock.ts` | File locking for concurrency |
 
 ---
 
@@ -164,6 +185,30 @@ content  Registry  suggestions approve  notes
 - **LLM Fallback Transparency**: Shows which fields used LLM vs heuristics
 - **Filename Collision Handling**: Automatic deduplication when creating notes
 - **Enhanced CLI**: Execute command, inline warnings, improved UX
+- **Classifier Creation Wizard**: Interactive classifier generation with template integration
+- **Template Creation Wizard**: Standalone Templater template generation
+
+### Reliability Features
+
+**Atomic Operations:**
+- All file writes use temp+rename pattern for crash safety
+- Ensures no partial writes or corrupted files
+- Template and classifier generation are atomic
+
+**Transaction System:**
+- Multi-step operations wrapped in transactions with rollback
+- Automatic cleanup on failure (removes partial files)
+- Used for classifier creation (code + registry + template)
+
+**Concurrency Protection:**
+- File locking prevents concurrent modifications to critical files
+- Registry updates are serialized to prevent corruption
+- Lock cleanup on process exit or crash
+
+**Input Validation:**
+- Path traversal prevention (blocks `../` patterns)
+- ReDoS protection (validates regex patterns before use)
+- Sanitizes user input for file names and code generation
 
 ---
 
@@ -237,6 +282,18 @@ bun test --watch             # Watch mode
 
 ---
 
+## Resources
+
+| Resource | Location |
+|----------|----------|
+| Usage Examples | `@./docs/USAGE_EXAMPLES.md` |
+| Security Guide | `@./docs/SECURITY.md` |
+| Troubleshooting | `@./docs/TROUBLESHOOTING.md` |
+| Roadmap | `@./docs/ROADMAP.md` |
+| Spec | `@./docs/SPEC.md` |
+
+---
+
 ## Notes
 
 - Inherits TypeScript config from monorepo root (`extends: "../../tsconfig.json"`)
@@ -244,3 +301,11 @@ bun test --watch             # Watch mode
 - Uses `workspace:*` protocol for `@sidequest/core`
 - MCP server requires `PARA_VAULT` environment variable
 - LLM features require local Ollama instance
+
+**Security Mitigations:**
+- Path traversal prevention in all file operations
+- ReDoS protection for user-provided regex patterns
+- Concurrent modification protection via file locking
+- Registry corruption prevention through atomic updates
+- Input sanitization for code generation (prevents injection)
+- Transaction rollback prevents partial state on failures
