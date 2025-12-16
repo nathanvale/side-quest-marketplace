@@ -7,7 +7,7 @@
 		"email": "hi@nathanvale.com"
 	},
 	"commands": ["./commands/sample.md"],
-	"agents": ["./agents/code-monkey.md"],
+	"agents": ["./agents/code-monkey.md", "./agents/bun-test-reviewer.md"],
 	"skills": [
 		"./skills/dev-toolkit",
 		"./skills/bun-cli",
