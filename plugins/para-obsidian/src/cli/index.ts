@@ -28,6 +28,8 @@ export {
 // Create commands
 export { handleCreate } from "./create";
 export { handleCreateNoteTemplate } from "./create-note-template";
+// Export commands
+export { handleExportBookmarks } from "./export-bookmarks";
 // Frontmatter commands
 export {
 	computeFrontmatterHints,

@@ -9,12 +9,14 @@
 
 import type { InboxConverter } from "../types";
 import { bookingClassifier } from "./booking";
+import { bookmarkClassifier } from "./bookmark";
 import { invoiceClassifier } from "./invoice";
 import { medicalStatementClassifier } from "./medical-statement";
 import { researchClassifier } from "./research";
 
 // Re-export individual classifiers for direct access
 export { bookingClassifier } from "./booking";
+export { bookmarkClassifier } from "./bookmark";
 export { invoiceClassifier } from "./invoice";
 export { medicalStatementClassifier } from "./medical-statement";
 export { researchClassifier } from "./research";
@@ -34,4 +36,5 @@ export const DEFAULT_CLASSIFIERS: readonly InboxConverter[] = [
 	invoiceClassifier, // Priority 100
 	bookingClassifier, // Priority 90
 	researchClassifier, // Priority 85
+	bookmarkClassifier, // Priority 70
 ] as const;

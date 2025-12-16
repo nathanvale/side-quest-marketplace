@@ -14,6 +14,7 @@ import {
 	CONFIDENCE_THRESHOLDS,
 	type Confidence,
 	createSuggestionId,
+	type DetectionSource,
 	type InboxAction,
 	type InboxSuggestion,
 	type ProcessorType,
@@ -50,6 +51,8 @@ export interface SuggestionInput {
 	readonly llmResult: DocumentTypeResult | null;
 	/** Processor type that generated this suggestion */
 	readonly processor?: ProcessorType;
+	/** Optional override for detection source (e.g., "frontmatter" for pre-tagged notes) */
+	readonly detectionSource?: DetectionSource;
 }
 
 // =============================================================================
@@ -60,11 +63,12 @@ export interface SuggestionInput {
  * Build a suggestion from heuristic and LLM results.
  *
  * Decision logic:
- * 1. If LLM detected with high confidence (≥0.7): Use LLM result
+ * 1. If detectionSource provided: Use it (frontmatter fast-path)
+ * 2. If LLM detected with high confidence (≥0.7): Use LLM result
  *    - Boost to HIGH if heuristics agree
- * 2. If only heuristics detected (>0.5): Use heuristic result
- * 3. If LLM detected with low confidence: Mark for review
- * 4. No detection: Skip
+ * 3. If only heuristics detected (>0.5): Use heuristic result
+ * 4. If LLM detected with low confidence: Mark for review
+ * 5. No detection: Skip
  *
  * @param input - Suggestion input with detection results
  * @returns Inbox suggestion ready for user review
@@ -76,11 +80,12 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 		heuristicResult,
 		llmResult,
 		processor = "attachments",
+		detectionSource: providedDetectionSource,
 	} = input;
 
 	const source = join(inboxFolder, filename);
 
-	// Determine confidence level
+	// Determine confidence level and detection source
 	let confidence: Confidence;
 	let action: InboxAction;
 	let suggestedNoteType: string | undefined;
@@ -88,10 +93,22 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 	let suggestedProject: string | undefined;
 	let extractedFields: Record<string, unknown> | undefined;
 	let reason: string;
-	let detectionSource: "llm+heuristic" | "llm" | "heuristic" | "none";
+	let detectionSource: DetectionSource;
 
+	// Check if LLM result indicates a fallback scenario (error with warnings)
+	const isLLMFallback =
+		llmResult &&
+		llmResult.confidence === 0 &&
+		llmResult.extractionWarnings &&
+		llmResult.extractionWarnings.length > 0;
+
+	// Calculate detectionSource (can be overridden by providedDetectionSource later)
 	// If LLM detected with high confidence (using CONFIDENCE_THRESHOLDS for consistency)
-	if (llmResult && llmResult.confidence >= CONFIDENCE_THRESHOLDS.MEDIUM) {
+	if (
+		llmResult &&
+		!isLLMFallback &&
+		llmResult.confidence >= CONFIDENCE_THRESHOLDS.MEDIUM
+	) {
 		confidence =
 			llmResult.confidence >= CONFIDENCE_THRESHOLDS.HIGH ? "high" : "medium";
 		action = "create-note";
@@ -114,10 +131,11 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 			detectionSource = "llm+heuristic";
 		}
 	}
-	// If only heuristics detected (using CONFIDENCE_THRESHOLDS for consistency)
+	// If heuristics detected OR LLM fallback scenario (use heuristics + frontmatter extraction)
 	else if (
-		heuristicResult.detected &&
-		heuristicResult.confidence > CONFIDENCE_THRESHOLDS.HEURISTIC_MIN
+		(heuristicResult.detected &&
+			heuristicResult.confidence > CONFIDENCE_THRESHOLDS.HEURISTIC_MIN) ||
+		isLLMFallback
 	) {
 		confidence =
 			heuristicResult.confidence >= CONFIDENCE_THRESHOLDS.HEURISTIC_MEDIUM
@@ -125,8 +143,13 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 				: "low";
 		action = "create-note";
 		suggestedNoteType = heuristicResult.suggestedType;
-		reason = `Heuristic detection: ${heuristicResult.suggestedType} (${(heuristicResult.confidence * 100).toFixed(0)}% confidence)`;
+		reason = `Heuristic detection: ${heuristicResult.suggestedType ?? "generic"} (${(heuristicResult.confidence * 100).toFixed(0)}% confidence)`;
 		detectionSource = "heuristic";
+
+		// If LLM fallback, merge extracted fields from frontmatter
+		if (isLLMFallback && llmResult.extractedFields) {
+			extractedFields = llmResult.extractedFields;
+		}
 	}
 	// Low confidence - needs review
 	else if (llmResult) {
@@ -142,6 +165,11 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 		action = "skip";
 		reason = "Unable to determine document type";
 		detectionSource = "none";
+	}
+
+	// Override detection source if provided (frontmatter fast-path)
+	if (providedDetectionSource) {
+		detectionSource = providedDetectionSource;
 	}
 
 	// Generate suggested title from filename
@@ -162,6 +190,14 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 			? llmResult.extractionWarnings
 			: undefined;
 
+	// Set destination to PARA area for bookmarks
+	// The execute-suggestion handler will add /Bookmarks/ subfolder for bookmark types
+	let suggestedDestination: string | undefined;
+	if (suggestedNoteType === "bookmark" && suggestedArea) {
+		// LLM returns: "Projects", "Areas", "Resources", "Archives"
+		suggestedDestination = suggestedArea;
+	}
+
 	// Return properly typed discriminated union based on action
 	if (action === "create-note") {
 		return {
@@ -175,6 +211,7 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 			suggestedTitle: suggestedTitle ?? filename,
 			suggestedArea,
 			suggestedProject,
+			suggestedDestination,
 			extractedFields,
 			suggestedAttachmentName,
 			extractionWarnings,

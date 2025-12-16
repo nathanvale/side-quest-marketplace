@@ -3,13 +3,7 @@ name: Code Quality Reviewer
 description: SOLID principles, clean code analysis, and code improvement suggestions for maintainability and clarity
 model: Claude Sonnet 4
 tools:
-  - search
-  - codebase
-  - editFiles
-  - runCommand
-  - usages
-  - problems
-  - fetch
+  ['vscode/runCommand', 'read/problems', 'read/readFile', 'edit/editFiles', 'search', 'web/fetch']
 handoffs:
   - label: Refactor Code
     agent: agent

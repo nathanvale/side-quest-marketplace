@@ -1,7 +1,7 @@
 {
 	"name": "para-obsidian",
 	"description": "PARA-style Obsidian vault management with frontmatter validation, template versioning, and git auto-commit. Provides 20 MCP tools for complete vault operations including AI-assisted content injection.",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"author": {
 		"name": "Nathan Vale",
 		"email": "hi@nathanvale.com"
@@ -16,6 +16,14 @@
 		"ai-content"
 	],
 	"license": "MIT",
+	"commands": [
+		"./commands/commit.md",
+		"./commands/create.md",
+		"./commands/create-classifier.md",
+		"./commands/create-note-template.md",
+		"./commands/search.md",
+		"./commands/validate.md"
+	],
 	"mcpServers": ["./.mcp.json"],
 	"skills": ["./skills/template-assistant"]
 }

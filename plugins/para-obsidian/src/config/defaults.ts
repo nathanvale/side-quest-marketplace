@@ -42,6 +42,7 @@ export const DEFAULT_SUGGESTED_TAGS = [
 	"career",
 	"session",
 	"invoice",
+	"bookmark",
 ] as const;
 
 export const DEFAULT_FRONTMATTER_RULES: NonNullable<
@@ -310,6 +311,25 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 		},
 		oneOfRequired: ["area", "project"],
 	},
+	bookmark: {
+		required: {
+			type: { type: "enum", enum: ["bookmark"] },
+			para: {
+				type: "enum",
+				enum: ["Projects", "Areas", "Resources", "Archives"],
+				optional: true, // Optional for raw Web Clipper captures, added during classification
+			},
+			url: { type: "string", pattern: "^https?://" },
+			title: { type: "string" },
+			clipped: { type: "date" },
+			template_version: { type: "number" },
+			category: { type: "wikilink", optional: true },
+			author: { type: "wikilink", optional: true },
+			published: { type: "date", optional: true },
+			tags: { type: "array", optional: true },
+			notes: { type: "string", optional: true },
+		},
+	},
 };
 
 export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
@@ -328,6 +348,7 @@ export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
 	research: 3,
 	session: 1,
 	invoice: 1,
+	bookmark: 1,
 };
 
 /**
@@ -352,6 +373,7 @@ export const DEFAULT_DESTINATIONS: Record<string, string> = {
 	research: "00 Inbox",
 	session: "00 Inbox",
 	invoice: "00 Inbox",
+	bookmark: "00 Inbox",
 	// Attachments folder (for git operations, not template destination)
 	attachments: "Attachments",
 };
@@ -427,4 +449,5 @@ export const DEFAULT_TITLE_PREFIXES: Partial<Record<string, string>> = {
 	checklist: "✅ ",
 	session: "🧠 ",
 	invoice: "🧾 ",
+	bookmark: "🔖 ",
 };

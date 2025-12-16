@@ -89,6 +89,24 @@ function validateField(
 					message: `expected string, got ${formatValueForError(value)}${optionalHint}`,
 				};
 			}
+			// Check pattern if provided
+			if (rule.pattern) {
+				try {
+					const regex = new RegExp(rule.pattern);
+					if (!regex.test(value)) {
+						return {
+							field,
+							message: `must match pattern ${rule.pattern}, got ${formatValueForError(value)}${optionalHint}`,
+						};
+					}
+				} catch (_error) {
+					// Invalid regex pattern - this is a configuration error
+					return {
+						field,
+						message: `invalid pattern in validation rule: ${rule.pattern}`,
+					};
+				}
+			}
 			return undefined;
 		}
 		case "number": {

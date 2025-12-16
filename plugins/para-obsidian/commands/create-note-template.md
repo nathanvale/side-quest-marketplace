@@ -1,3 +1,9 @@
+---
+description: Create custom Templater-compatible note templates via interactive wizard
+argument-hint: [template-name]
+allowed-tools: AskUserQuestion, Write, Read
+---
+
 # Create Note Template
 
 **Create custom Templater-compatible note templates via interactive wizard.**

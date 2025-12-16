@@ -65,6 +65,8 @@ export interface FieldRule {
 	readonly description?: string;
 	/** If true, the field is not required (validation won't fail if missing). */
 	readonly optional?: boolean;
+	/** For string types, a regex pattern the value must match. */
+	readonly pattern?: string;
 }
 
 /**

@@ -20,6 +20,13 @@
 - `/validate` - Validate frontmatter and templates
 - `/commit` - Git commit with auto-staging
 
+**Key Features:**
+- Intelligent inbox processing with LLM-assisted classification
+- Web bookmark management via Obsidian Web Clipper integration
+- PARA-based organization (Projects/Areas/Resources/Archives)
+- Template versioning and migration system
+- Atomic operations with transaction rollback
+
 ---
 
 ## Commands
@@ -70,7 +77,7 @@ para-obsidian/
 │   │   ├── core/              # Engine, operations, staging
 │   │   ├── classify/          # LLM classification, converters, classifiers
 │   │   │   ├── classifiers/   # NEW: Classifier registry system
-│   │   │   │   ├── definitions/  # Built-in classifiers (invoice, booking, etc.)
+│   │   │   │   ├── definitions/  # Built-in classifiers (invoice, booking, bookmark, etc.)
 │   │   │   │   ├── registry.ts   # Schema versioning
 │   │   │   │   ├── loader.ts     # Classifier matching
 │   │   │   │   └── migrations/   # Schema migrations
@@ -287,6 +294,7 @@ bun test --watch             # Watch mode
 | Resource | Location |
 |----------|----------|
 | Usage Examples | `@./docs/USAGE_EXAMPLES.md` |
+| Bookmark Workflow | `@./docs/BOOKMARK_WORKFLOW.md` |
 | Security Guide | `@./docs/SECURITY.md` |
 | Troubleshooting | `@./docs/TROUBLESHOOTING.md` |
 | Roadmap | `@./docs/ROADMAP.md` |

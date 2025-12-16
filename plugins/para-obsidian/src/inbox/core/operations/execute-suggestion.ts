@@ -18,6 +18,10 @@ import {
 	writeTextFileSync,
 } from "@sidequest/core/fs";
 import { loadConfig } from "../../../config/index";
+import {
+	parseFrontmatter,
+	serializeFrontmatter,
+} from "../../../frontmatter/parse";
 import { autoCommitChanges } from "../../../git/index";
 import { createFromTemplate, injectSections } from "../../../notes/create";
 import { resolveVaultPath } from "../../../shared/fs";
@@ -137,12 +141,19 @@ export async function executeSuggestion(
 	registry.markInProgress(inProgressMarker);
 	await registry.save();
 
+	// Bookmarks are special: the source .md file IS the note (already has frontmatter+content)
+	// Skip template creation and move the file directly to destination instead of Attachments
+	const isBookmark =
+		suggestion.action === "create-note" &&
+		suggestion.suggestedNoteType === "bookmark";
+
 	// Create note FIRST if action is create-note (before moving attachment)
 	// Layer 1: Use staging directory pattern for atomic operations
 	if (
 		suggestion.action === "create-note" &&
 		suggestion.suggestedNoteType &&
-		suggestion.suggestedTitle
+		suggestion.suggestedTitle &&
+		!isBookmark // Skip template creation for bookmarks
 	) {
 		try {
 			// Build args from suggestion using converter field mappings
@@ -211,8 +222,47 @@ export async function executeSuggestion(
 		}
 	}
 
-	// Now move the attachment (note creation succeeded or wasn't needed)
-	ensureDirSync(dirname(attachmentDest));
+	// For bookmarks: move source .md directly to final destination (it IS the note)
+	// For other types: move source to Attachments folder (it's an attachment like PDF)
+	let actualDestination: string;
+	let movedFilePath: string;
+
+	if (isBookmark) {
+		// Determine final destination for bookmark
+		let finalDest: string;
+		if (
+			"suggestedDestination" in suggestion &&
+			suggestion.suggestedDestination
+		) {
+			finalDest = suggestion.suggestedDestination;
+		} else {
+			finalDest =
+				paraConfig.defaultDestinations?.[suggestion.suggestedNoteType] ??
+				"00 Inbox";
+		}
+
+		// Add /Bookmarks/ subfolder for bookmark note types
+		finalDest = join(finalDest, "Bookmarks");
+
+		// Use original filename (with emoji prefix) for bookmarks
+		const bookmarkFilename = basename(sourcePath);
+		const bookmarkDest = join(config.vaultPath, finalDest, bookmarkFilename);
+
+		// Ensure unique path
+		actualDestination = generateUniquePath(bookmarkDest);
+		movedFilePath = join(finalDest, basename(actualDestination));
+
+		if (executeLogger) {
+			executeLogger.info`Moving bookmark to ${movedFilePath} ${cid}`;
+		}
+	} else {
+		// Standard attachment workflow
+		actualDestination = attachmentDest;
+		movedFilePath = movedAttachmentPath;
+	}
+
+	// Now move the file (bookmark or attachment)
+	ensureDirSync(dirname(actualDestination));
 
 	// TOCTOU protection: Check file still exists before moving
 	// File was hashed earlier, but could have been deleted by another process
@@ -235,7 +285,7 @@ export async function executeSuggestion(
 	}
 
 	try {
-		await moveFile(sourcePath, attachmentDest);
+		await moveFile(sourcePath, actualDestination);
 	} catch (error) {
 		// ROLLBACK: Clean up staging note and in-progress marker
 		await rollbackOperation(
@@ -248,14 +298,14 @@ export async function executeSuggestion(
 
 		// Log the failure and return error
 		if (executeLogger) {
-			executeLogger.error`Failed to move attachment: ${error instanceof Error ? error.message : "unknown"} - attachment remains in inbox ${cid}`;
+			executeLogger.error`Failed to move file: ${error instanceof Error ? error.message : "unknown"} - file remains in inbox ${cid}`;
 		}
 
 		return {
 			suggestionId: suggestion.id,
 			success: false,
 			action: suggestion.action,
-			error: `Operation failed and was rolled back: ${error instanceof Error ? error.message : "unknown"}. Attachment remains in inbox - fix the issue and retry.`,
+			error: `Operation failed and was rolled back: ${error instanceof Error ? error.message : "unknown"}. File remains in inbox - fix the issue and retry.`,
 		};
 	}
 
@@ -283,6 +333,17 @@ export async function executeSuggestion(
 				// PARA method: all notes go to inbox by default
 				finalDest = "00 Inbox";
 			}
+
+			// Add /Bookmarks/ subfolder for bookmark note types
+			// Format: {PARA Area}/Bookmarks/{filename}
+			// Examples: Resources/Bookmarks/, Projects/Bookmarks/, Areas/Finance/Bookmarks/
+			if (
+				suggestion.action === "create-note" &&
+				suggestion.suggestedNoteType === "bookmark"
+			) {
+				finalDest = join(finalDest, "Bookmarks");
+			}
+
 			const stagingAbsolute = resolveVaultPath(
 				paraConfig.vault,
 				stagingNotePath,
@@ -327,10 +388,80 @@ export async function executeSuggestion(
 		}
 	}
 
-	// Inject attachment link into the note (if note was created)
-	if (createdNotePath) {
+	// For bookmarks: the moved file IS the note
+	// Update frontmatter with LLM-extracted fields
+	if (isBookmark) {
+		// Set createdNote to the bookmark file path
+		createdNotePath = movedFilePath;
+
+		// Update frontmatter with extracted fields
+		if (
+			suggestion.action === "create-note" &&
+			(suggestion.extractedFields || suggestion.suggestedArea)
+		) {
+			try {
+				const target = resolveVaultPath(paraConfig.vault, createdNotePath);
+				const content = readTextFileSync(target.absolute);
+				const { attributes, body } = parseFrontmatter(content);
+
+				// Add para field from suggestedArea
+				if (suggestion.suggestedArea) {
+					attributes.para = suggestion.suggestedArea;
+				}
+
+				// Update fields from LLM extraction
+				if (suggestion.extractedFields) {
+					for (const [key, value] of Object.entries(
+						suggestion.extractedFields,
+					)) {
+						if (key === "category" || key === "author") {
+							// Strip wikilinks from category/author fields
+							// "[[Documentation]]" → "Documentation"
+							if (typeof value === "string") {
+								attributes[key] = value.replace(/\[\[([^\]]+)\]\]/g, "$1");
+							}
+						} else if (key === "tags") {
+							// Merge tags: existing + extracted + "bookmarks"
+							const existingTags = Array.isArray(attributes.tags)
+								? attributes.tags
+								: [];
+							const extractedTags = Array.isArray(value) ? value : [];
+							const merged = [
+								...new Set([...existingTags, ...extractedTags, "bookmarks"]),
+							];
+							attributes.tags = merged;
+						} else if (value !== null && value !== undefined) {
+							attributes[key] = value;
+						}
+					}
+				}
+
+				// Always ensure "bookmarks" tag is present
+				const currentTags = Array.isArray(attributes.tags)
+					? attributes.tags
+					: [];
+				if (!currentTags.includes("bookmarks")) {
+					attributes.tags = [...currentTags, "bookmarks"];
+				}
+
+				// Write updated frontmatter
+				const updated = serializeFrontmatter(attributes, body);
+				writeTextFileSync(target.absolute, updated);
+
+				if (executeLogger) {
+					executeLogger.info`Updated bookmark frontmatter with LLM fields ${cid}`;
+				}
+			} catch (error) {
+				if (executeLogger) {
+					executeLogger.warn`Failed to update bookmark frontmatter: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
+				}
+				// Don't fail - file moved successfully, just missing frontmatter updates
+			}
+		}
+	} else if (createdNotePath) {
+		// Inject attachment link into the note (if note was created)
 		try {
-			const attachmentWikilink = `![[${movedAttachmentPath}]]`;
+			const attachmentWikilink = `![[${movedFilePath}]]`;
 			const injectionResult = injectSections(paraConfig, createdNotePath, {
 				Attachments: attachmentWikilink,
 			});
@@ -367,20 +498,23 @@ export async function executeSuggestion(
 		sourcePath: suggestion.source,
 		processedAt: new Date().toISOString(),
 		createdNote: createdNotePath,
-		movedAttachment: movedAttachmentPath,
+		movedAttachment: isBookmark ? undefined : movedFilePath,
 	});
 
 	// Auto-commit changes if enabled (defense-in-depth: commit after each successful execution)
 	if (paraConfig.autoCommit) {
-		const filesToCommit = [movedAttachmentPath];
+		const filesToCommit: string[] = [];
 		if (createdNotePath) {
 			filesToCommit.push(createdNotePath);
+		}
+		if (!isBookmark && movedFilePath) {
+			filesToCommit.push(movedFilePath);
 		}
 		try {
 			await autoCommitChanges(
 				paraConfig,
 				filesToCommit,
-				`inbox: ${createdNotePath ? basename(createdNotePath, ".md") : basename(movedAttachmentPath)}`,
+				`inbox: ${createdNotePath ? basename(createdNotePath, ".md") : basename(movedFilePath)}`,
 			);
 			if (executeLogger) {
 				executeLogger.debug`Auto-committed ${filesToCommit.length} file(s) ${cid}`;
@@ -394,7 +528,7 @@ export async function executeSuggestion(
 	}
 
 	if (executeLogger) {
-		executeLogger.info`Executed suggestion id=${suggestion.id} movedTo=${datedFilename} createdNote=${createdNotePath ?? "none"} ${cid}`;
+		executeLogger.info`Executed suggestion id=${suggestion.id} movedTo=${isBookmark ? movedFilePath : datedFilename} createdNote=${createdNotePath ?? "none"} ${cid}`;
 	}
 
 	return {
@@ -402,6 +536,6 @@ export async function executeSuggestion(
 		success: true,
 		action: suggestion.action,
 		createdNote: createdNotePath,
-		movedAttachment: movedAttachmentPath,
+		movedAttachment: isBookmark ? undefined : movedFilePath,
 	};
 }

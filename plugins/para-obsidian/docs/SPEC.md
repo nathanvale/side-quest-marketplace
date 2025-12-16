@@ -5,6 +5,8 @@ Source context: chat session with user; based on PARA/Templater templates at `pl
 ## Goals
 - CLI + MCP server for PARA-style Obsidian vault management (local vault; ENV-first config).
 - Feature parity with Obsidian MCP idea: list/read/search, create from template, insert, rename/move with link updates, delete with confirm, frontmatter validation/edit, index/semantic search, git guard/auto-commit, template versioning/migration.
+- Intelligent inbox processing with classifier system for document types (invoices, bookings, bookmarks, etc.)
+- Web bookmark management via Obsidian Web Clipper integration with PARA classification
 - Vault path via `PARA_VAULT`; optional rc (`~/.config/para-obsidian/config.json`, `.para-obsidianrc`).
 
 ## Command Surface (planned)

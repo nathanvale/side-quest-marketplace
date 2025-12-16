@@ -19,6 +19,7 @@ import {
 	handleCreate,
 	handleCreateNoteTemplate,
 	handleDelete,
+	handleExportBookmarks,
 	handleFindOrphans,
 	handleFrontmatter,
 	handleGit,
@@ -77,6 +78,7 @@ function printUsage(): void {
 		"  bun run src/cli.ts rewrite-links --from <link> --to <link> [--dir path[,path2]] [--dry-run] [--format md|json]",
 		"  bun run src/cli.ts rewrite-links --mapping <file.json> [--dir path[,path2]] [--dry-run] [--format md|json]",
 		"  bun run src/cli.ts process-inbox [--auto] [--preview] [--dry-run] [--verbose] [--filter pattern] [--force] [--format md|json]",
+		'  bun run src/cli.ts export-bookmarks [--filter "type:bookmark"] [--out path] [--format md|json]',
 		"",
 		"Options:",
 		"  --format md|json  Output format (default: md)",
@@ -263,6 +265,12 @@ async function main(): Promise<void> {
 
 			case "process-inbox": {
 				const result = await handleProcessInbox(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
+				break;
+			}
+
+			case "export-bookmarks": {
+				const result = await handleExportBookmarks(ctx);
 				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}

@@ -1,6 +1,6 @@
 # Usage Examples
 
-**Comprehensive examples for create-classifier and create-note-template commands**
+**Comprehensive examples for create-classifier, create-note-template, and bookmark workflow**
 
 ---
 
@@ -16,6 +16,11 @@
   - [Rich Project Template](#rich-project-template)
   - [Journal Template (Weekly Review)](#journal-template-weekly-review)
   - [Custom Workflow Template (Meeting Notes)](#custom-workflow-template-meeting-notes)
+- [Bookmark Workflow Examples](#bookmark-workflow-examples)
+  - [Capturing Bookmarks](#capturing-bookmarks)
+  - [Classifying Bookmarks](#classifying-bookmarks)
+  - [Organizing by PARA](#organizing-by-para)
+  - [Exporting to Browser](#exporting-to-browser)
 - [Common Workflows](#common-workflows)
   - [Creating a Classifier for a New Document Type](#creating-a-classifier-for-a-new-document-type)
   - [Setting Up a Custom Project Template](#setting-up-a-custom-project-template)
@@ -839,6 +844,425 @@ bun run src/cli.ts create --template client-meeting "Q4 Planning - Acme Corp"
 - Review action items
 - Link to related project notes
 - Set reminders for follow-ups
+
+---
+
+## Bookmark Workflow Examples
+
+### Capturing Bookmarks
+
+**Scenario:** You want to save web pages to your Obsidian vault for later reference and PARA classification.
+
+#### iOS Safari Capture
+
+**Step 1: Browse to interesting webpage**
+
+Example: You're reading the Kit CLI documentation at https://kit.cased.com
+
+**Step 2: Use Web Clipper**
+
+1. Tap Share icon in Safari
+2. Select "Obsidian Web Clipper"
+3. Configure capture:
+   - Title: "Kit CLI Documentation" (auto-filled)
+   - Vault: Your vault name
+   - Folder: `Inbox`
+   - Template: `bookmark` (if configured)
+4. Tap "Add to Obsidian"
+
+**Result: `Inbox/Kit CLI Documentation.md`**
+
+```markdown
+---
+type: bookmark
+url: https://kit.cased.com
+title: Kit CLI Documentation
+clipped: 2024-12-16
+category: "[[Documentation]]"
+tags: [cli, code-search]
+---
+
+## Notes
+
+Fast semantic search for codebases using ML embeddings.
+
+## Highlights
+
+- "30-50x faster than grep for symbol lookup"
+```
+
+#### Desktop Browser Capture
+
+**Chrome/Firefox/Edge:**
+
+1. Navigate to webpage
+2. Click Obsidian Web Clipper extension icon
+3. Template auto-selects
+4. Click "Clip to Obsidian"
+5. Bookmark saved to `Inbox/`
+
+**Safari:**
+
+1. Click Share button
+2. Select "Obsidian Web Clipper"
+3. Configure vault/folder
+4. Click "Save"
+5. Bookmark saved to `Inbox/`
+
+---
+
+### Classifying Bookmarks
+
+**Scenario:** You have 5 bookmarks in your Inbox and want to organize them by PARA category.
+
+#### Setup Bookmark Classifier
+
+**Create the classifier (one-time setup):**
+
+```bash
+/para-obsidian:create-classifier bookmark
+```
+
+**Wizard answers:**
+
+```
+Q1: What type of documents should this classifier detect?
+A: Web bookmarks captured via Obsidian Web Clipper
+
+Q2: Priority? (0-100)
+A: 70
+
+Q3: PARA area?
+A: varies
+
+Q4: Filename patterns?
+A: [skip]
+
+Q5: Content patterns?
+A: type: bookmark, url: http, clipped:
+
+Q6: Fields to extract?
+A:
+title:string:required
+url:string:required
+clipped:date:required
+para:string:required
+category:wikilink:optional
+tags:array:optional
+
+Q7: Field descriptions?
+A:
+- title: Bookmark title or page title
+- url: Original webpage URL
+- clipped: Date captured
+- para: PARA classification (Projects/Areas/Resources/Archives)
+
+Q8: Template name?
+A: bookmark
+
+Q9: Create template?
+A: basic
+```
+
+#### Run Classification
+
+**Scan inbox for bookmarks:**
+
+```bash
+bun run src/cli.ts process-inbox scan
+```
+
+**Output:**
+
+```
+Scanning inbox...
+Found 5 new files
+
+┌─────┬──────────────────────┬──────────┬────────────┬─────────────────┐
+│ ID  │ Source               │ Type     │ Confidence │ Suggested Title │
+├─────┼──────────────────────┼──────────┼────────────┼─────────────────┤
+│ 1   │ Kit CLI Docs.md      │ bookmark │ high (0.95)│ Kit CLI Docs    │
+│ 2   │ GitHub PR.md         │ bookmark │ high (0.92)│ Fix auth bug    │
+│ 3   │ NetBank.md           │ bookmark │ med (0.78) │ Banking Portal  │
+│ 4   │ TypeScript Docs.md   │ bookmark │ high (0.90)│ TS Handbook     │
+│ 5   │ Old API.md           │ bookmark │ low (0.65) │ Deprecated API  │
+└─────┴──────────────────────┴──────────┴────────────┴─────────────────┘
+
+Classifier: bookmark
+Extracted fields (LLM + heuristics):
+
+1. Kit CLI Documentation
+   - para: Resources (documentation)
+   - reasoning: URL contains /docs/, technical reference
+
+2. GitHub PR #1234
+   - para: Projects (active work)
+   - reasoning: Recent PR, active development
+
+3. NetBank Login
+   - para: Areas (ongoing)
+   - reasoning: Banking portal, account management
+
+4. TypeScript Handbook
+   - para: Resources (reference)
+   - reasoning: Official documentation
+
+5. Old API Docs
+   - para: Archives (stale)
+   - reasoning: Clipped 200 days ago, deprecated tag
+```
+
+#### Review and Execute
+
+**Interactive review:**
+
+```bash
+# Review suggestions
+> a  # Approve #1
+> a  # Approve #2
+> e  # Edit #3
+
+Enter new PARA category: Areas
+Reason: Banking is ongoing responsibility
+Updated: para: Areas
+
+> a  # Approve (with edit)
+> a  # Approve #4
+> s  # Skip #5 (will delete manually)
+
+# Execute approved suggestions
+bun run src/cli.ts process-inbox execute
+```
+
+**Result:**
+
+```
+Executing 4 suggestions...
+
+✓ Created: Resources/Web/Kit CLI Documentation.md
+✓ Created: Projects/Web/GitHub PR #1234.md
+✓ Created: Areas/Web/NetBank Login.md
+✓ Created: Resources/Web/TypeScript Handbook.md
+
+Summary:
+- 4 notes created
+- 0 failed
+- 1 skipped
+```
+
+---
+
+### Organizing by PARA
+
+**Scenario:** Understanding PARA categories and how bookmarks are classified.
+
+#### PARA Categories Explained
+
+**ASCII diagram:**
+
+```
+Projects              Areas              Resources           Archives
+(Time-bound)          (Ongoing)          (Reference)         (Stale)
+┌──────────┐         ┌──────────┐       ┌──────────┐        ┌──────────┐
+│ Active   │         │ Banking  │       │ Docs     │        │ Old API  │
+│ GitHub   │         │ Health   │       │ Tutorials│        │ Deprecated│
+│ PRs      │         │ Home     │       │ Guides   │        │ >6 months│
+│          │         │ portals  │       │ Learning │        │          │
+└──────────┘         └──────────┘       └──────────┘        └──────────┘
+  < 3 months           Permanent          Someday             Inactive
+```
+
+#### Classification Examples
+
+**Projects:**
+- `https://github.com/user/repo/pull/123` → Active PR for current project
+- `https://jira.company.com/sprint/42` → Sprint board for active sprint
+- `https://docs.google.com/document/project-plan` → Project planning doc
+
+**Why:** Time-bound, will be completed within 3 months.
+
+**Areas:**
+- `https://mybank.com/netbank` → Banking portal (ongoing account management)
+- `https://strava.com/dashboard` → Fitness tracking (ongoing health area)
+- `https://homeassistant.io/dashboard` → Home automation (ongoing home area)
+
+**Why:** Ongoing responsibilities with no end date.
+
+**Resources:**
+- `https://kit.cased.com/docs` → CLI documentation (reference material)
+- `https://developer.mozilla.org/javascript` → MDN guides (learning resource)
+- `https://stackoverflow.com/questions/12345` → Solution to common problem
+
+**Why:** Reference material you might need someday, not tied to current work.
+
+**Archives:**
+- Old API documentation for deprecated service (clipped 8 months ago)
+- Completed project resources no longer needed
+- Outdated tutorials or guides
+
+**Why:** No longer active or relevant, but kept for historical reference.
+
+#### Folder Structure After Classification
+
+```
+vault/
+├── Inbox/                      # Empty after processing
+├── Projects/
+│   └── Web/
+│       ├── GitHub PR #1234.md
+│       └── Sprint Board.md
+├── Areas/
+│   └── Web/
+│       ├── NetBank Login.md
+│       ├── Strava Dashboard.md
+│       └── HomeAssistant.md
+├── Resources/
+│   └── Web/                    # Most bookmarks end up here
+│       ├── Kit CLI Documentation.md
+│       ├── MDN JavaScript Guide.md
+│       ├── TypeScript Handbook.md
+│       └── Stack Overflow Solutions/
+│           └── React Hook Debug.md
+└── Archives/
+    └── Web/
+        └── Old API Docs.md
+```
+
+#### Reclassification
+
+**Scenario:** You moved a bookmark to Resources, but it should be Projects.
+
+**Manual move:**
+
+```bash
+# Edit frontmatter
+# Change: para: Resources
+# To: para: Projects
+
+# Move file
+mv "Resources/Web/Kit CLI Docs.md" "Projects/Web/Kit CLI Docs.md"
+```
+
+**Reprocess through inbox:**
+
+```bash
+# Move back to inbox
+mv "Resources/Web/Kit CLI Docs.md" "Inbox/"
+
+# Remove from registry
+# Edit .para/processed-registry.json, delete entry for this file
+
+# Reprocess
+bun run src/cli.ts process-inbox scan
+# Review new suggestion
+# Execute
+```
+
+---
+
+### Exporting to Browser
+
+**Scenario:** You want to sync your PARA-organized bookmarks to Safari/Chrome for mobile access.
+
+#### Generate Browser HTML
+
+```bash
+cd /Users/nathanvale/code/side-quest-marketplace/plugins/para-obsidian
+bun run src/cli.ts export-bookmarks \
+  --filter "type:bookmark" \
+  --out ~/Downloads/bookmarks-para.html
+```
+
+**Output:**
+
+```
+Exporting bookmarks...
+Found 42 bookmarks:
+- Projects: 5
+- Areas: 8
+- Resources: 25
+- Archives: 4
+
+Generated: ~/Downloads/bookmarks-para.html
+Format: Netscape HTML (Safari/Chrome compatible)
+```
+
+#### HTML Structure
+
+**Example: `bookmarks-para.html`**
+
+```html
+<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+<TITLE>Bookmarks</TITLE>
+<H1>Bookmarks</H1>
+<DL><p>
+    <DT><H3 FOLDED>Projects</H3>
+    <DL><p>
+        <DT><A HREF="https://github.com/user/repo/pull/1234">GitHub PR #1234</A>
+        <DT><A HREF="https://jira.company.com/sprint/42">Sprint Board</A>
+    </DL><p>
+    <DT><H3 FOLDED>Areas</H3>
+    <DL><p>
+        <DT><A HREF="https://mybank.com/netbank">NetBank Login</A>
+        <DT><A HREF="https://strava.com/dashboard">Strava Dashboard</A>
+    </DL><p>
+    <DT><H3 FOLDED>Resources</H3>
+    <DL><p>
+        <DT><A HREF="https://kit.cased.com">Kit CLI Documentation</A>
+        <DT><A HREF="https://developer.mozilla.org">MDN Web Docs</A>
+        <DT><A HREF="https://www.typescriptlang.org/docs">TypeScript Handbook</A>
+    </DL><p>
+</DL>
+```
+
+#### Import to Browser
+
+**Safari:**
+
+1. Safari → File → Import From → Bookmarks HTML File
+2. Select `~/Downloads/bookmarks-para.html`
+3. Bookmarks appear in Favorites Bar with PARA folders
+4. iCloud syncs to iPhone/iPad
+
+**Chrome:**
+
+1. Bookmarks Manager (Cmd+Shift+O)
+2. Three dots menu → Import bookmarks
+3. Select `~/Downloads/bookmarks-para.html`
+4. PARA folders appear in Bookmarks Bar
+5. Chrome Sync syncs to other devices
+
+**Firefox/Edge:**
+
+Similar import process through Bookmarks Manager.
+
+#### Sync Workflow
+
+**Monthly sync routine:**
+
+```bash
+# 1. Export vault bookmarks
+bun run src/cli.ts export-bookmarks \
+  --filter "type:bookmark" \
+  --out ~/Downloads/bookmarks-para.html
+
+# 2. Import to Safari
+# Safari → File → Import From → Bookmarks HTML
+
+# 3. Sync propagates to mobile devices via iCloud
+```
+
+**Note:** This is one-way sync (vault → browser). Browser bookmarks don't automatically sync back to vault.
+
+**Alternative: Two-way sync**
+
+If you bookmark in browser frequently:
+
+1. **Weekly:** Export browser bookmarks to HTML
+2. **Import to vault:** Use `import-bookmarks` command (TODO: implement)
+3. **Process inbox:** Classify new bookmarks via normal workflow
+4. **Export back to browser:** Keep browser in sync with PARA structure
 
 ---
 

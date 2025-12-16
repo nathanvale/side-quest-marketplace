@@ -373,6 +373,11 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			}
 
 			// Pre-classification check for markdown notes with valid frontmatter
+			// If frontmatter has a valid type that matches a known classifier AND
+			// all required fields are present, skip LLM entirely (frontmatter fast-path)
+			// Note: We extract frontmatter here and preserve it for later merging with LLM results
+			let preservedFrontmatter: Record<string, unknown> | undefined;
+
 			if (file.extension === ".md" && extractedMetadata) {
 				const mdMetadata = extractedMetadata as MarkdownExtractionMetadata;
 				if (mdMetadata.noteType && mdMetadata.hasFrontmatter) {
@@ -382,28 +387,57 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					);
 
 					if (matchingClassifier) {
-						// Extract area/project from frontmatter for destination
+						// Extract all fields from frontmatter for the suggestion
 						const frontmatter = await extractFrontmatterOnly(file.path);
-						const area = parseWikilink(frontmatter.area);
-						const project = parseWikilink(frontmatter.project);
 
-						// Validate destination exists in vault
-						let destination: string | undefined;
+						// Preserve frontmatter for potential merge with LLM results
+						preservedFrontmatter = frontmatter;
 
-						if (project) {
-							const projectExists = vaultContext.projects.includes(project);
-							if (projectExists) {
-								destination = `01 Projects/${project}`;
+						// Check if key extraction fields are present in frontmatter
+						// Key fields are defined in the classifier's extraction.keyFields
+						// If key fields are missing, fall through to LLM for extraction
+						const keyFields = matchingClassifier.extraction?.keyFields ?? [];
+						const missingKeyFields = keyFields.filter(
+							(fieldName) => !frontmatter[fieldName],
+						);
+
+						// For bookmarks, require para field (for PARA routing) in addition to url/title
+						// For invoices, require provider + amount as minimum key fields
+						const hasMinimumFields =
+							missingKeyFields.length === 0 ||
+							(matchingClassifier.id === "bookmark" &&
+								frontmatter.url &&
+								frontmatter.title &&
+								frontmatter.para) || // Must have para for PARA routing
+							(matchingClassifier.id === "invoice" &&
+								frontmatter.provider &&
+								frontmatter.amount);
+
+						if (hasMinimumFields) {
+							// All required fields present - use frontmatter fast-path
+							const area = parseWikilink(frontmatter.area);
+							const project = parseWikilink(frontmatter.project);
+							const para = parseWikilink(frontmatter.para);
+
+							// Build destination from frontmatter fields
+							let destination: string | undefined;
+
+							if (project) {
+								const projectExists = vaultContext.projects.includes(project);
+								if (projectExists) {
+									destination = `01 Projects/${project}`;
+								}
+							} else if (area) {
+								const areaExists = vaultContext.areas.includes(area);
+								if (areaExists) {
+									destination = `02 Areas/${area}`;
+								}
+							} else if (para) {
+								// Support 'para' field with PARA category name (e.g., "Resources")
+								destination = para;
 							}
-						} else if (area) {
-							const areaExists = vaultContext.areas.includes(area);
-							if (areaExists) {
-								destination = `02 Areas/${area}`;
-							}
-						}
 
-						// If destination valid, build CreateNoteSuggestion (skip LLM)
-						if (destination) {
+							// Build CreateNoteSuggestion from frontmatter (skip LLM)
 							const suggestion: CreateNoteSuggestion = {
 								id: createSuggestionId(),
 								source: join(resolvedConfig.inboxFolder, filename),
@@ -418,6 +452,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 								suggestedArea: area,
 								suggestedProject: project,
 								suggestedDestination: destination,
+								extractedFields: frontmatter,
 								reason: `Pre-classified ${mdMetadata.noteType} note (frontmatter)`,
 							};
 
@@ -429,18 +464,14 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 								});
 							}
 							if (inboxLogger) {
-								inboxLogger.info`Pre-classified file=${filename} type=${mdMetadata.noteType} destination=${destination} cid=${cid}`;
+								inboxLogger.info`Pre-classified file=${filename} type=${mdMetadata.noteType} destination=${destination ?? "none"} cid=${cid}`;
 							}
 							return suggestion;
 						}
 
-						// If validation failed, fall through to LLM classification
+						// Missing key fields - fall through to LLM
 						if (inboxLogger) {
-							const reason =
-								!area && !project
-									? "no area/project in frontmatter"
-									: `${project ? "project" : "area"} not found in vault`;
-							inboxLogger.debug`Pre-classification skipped: ${reason} cid=${cid}`;
+							inboxLogger.debug`Pre-classification skipped: missing key fields=${missingKeyFields.join(", ")} file=${filename} cid=${cid}`;
 						}
 					}
 				}
@@ -458,6 +489,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			let llmFallbackUsed = false;
 			let llmFallbackReason: string | undefined;
 			let llmModelUsed: string | undefined;
+			let llmErrorMessage: string | undefined;
 			try {
 				if (onProgress) {
 					await onProgress({
@@ -541,6 +573,75 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				llmStats.failures += 1;
 				llmStats.lastError = errorMsg;
 				llmResult = null;
+				llmErrorMessage = errorMsg;
+			}
+
+			// If LLM failed and we have a markdown file, extract frontmatter for fallback data
+			let fallbackExtractedFields: Record<string, unknown> | undefined;
+			if (llmErrorMessage && file.extension === ".md") {
+				try {
+					fallbackExtractedFields = await extractFrontmatterOnly(file.path);
+					if (inboxLogger) {
+						inboxLogger.debug`Extracted fallback frontmatter fields=${Object.keys(fallbackExtractedFields).join(", ")} file=${filename} cid=${cid}`;
+					}
+				} catch (err) {
+					if (inboxLogger) {
+						inboxLogger.warn`Failed to extract fallback frontmatter file=${filename} error=${err instanceof Error ? err.message : "unknown"} cid=${cid}`;
+					}
+				}
+			}
+
+			// Inject LLM error into llmResult for buildSuggestion to handle
+			if (llmErrorMessage) {
+				// Create a synthetic llmResult with error warnings
+				llmResult = {
+					documentType: heuristicResult.suggestedType || "generic",
+					confidence: 0, // Low confidence since LLM failed
+					extractionWarnings: [
+						// Map error messages to user-friendly warnings
+						llmErrorMessage.includes("timeout") ||
+						llmErrorMessage.includes("ETIMEDOUT")
+							? "LLM service timeout - using heuristic classification"
+							: llmErrorMessage.includes("429") ||
+									llmErrorMessage.toLowerCase().includes("rate limit")
+								? "LLM rate limit exceeded - using heuristic classification"
+								: llmErrorMessage.includes("ECONNREFUSED") ||
+										llmErrorMessage.toLowerCase().includes("unavailable")
+									? "LLM service unavailable - using heuristic classification"
+									: `LLM error: ${llmErrorMessage}`,
+					],
+					extractedFields: fallbackExtractedFields,
+				};
+			}
+
+			// Merge preserved frontmatter with LLM extracted fields
+			// Original frontmatter values take precedence (they're already validated)
+			// LLM fills in gaps for missing fields only
+			if (preservedFrontmatter && llmResult?.extractedFields) {
+				const mergedFields = {
+					...llmResult.extractedFields,
+					...preservedFrontmatter, // Frontmatter overrides LLM values
+				};
+				llmResult = {
+					...llmResult,
+					extractedFields: mergedFields,
+				};
+				if (inboxLogger) {
+					inboxLogger.debug`Merged frontmatter with LLM fields file=${filename} frontmatterKeys=${Object.keys(preservedFrontmatter).join(", ")} mergedKeys=${Object.keys(mergedFields).join(", ")} cid=${cid}`;
+				}
+			} else if (
+				preservedFrontmatter &&
+				!llmResult?.extractedFields &&
+				llmResult
+			) {
+				// LLM didn't extract any fields, use frontmatter as the extracted fields
+				llmResult = {
+					...llmResult,
+					extractedFields: preservedFrontmatter,
+				};
+				if (inboxLogger) {
+					inboxLogger.debug`Using frontmatter as extracted fields (LLM had none) file=${filename} cid=${cid}`;
+				}
 			}
 
 			// Build suggestion
