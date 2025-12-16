@@ -314,10 +314,13 @@ describe("inbox/engine", () => {
 
 		test("should pre-classify markdown note with valid type and area (skip LLM)", async () => {
 			// Create a markdown note with valid frontmatter matching a known classifier
+			// Invoice classifier requires provider + amount fields for pre-classification
 			const mdContent = `---
 type: invoice
 area: "[[Health]]"
 title: Medical Invoice December
+provider: Dr. Smith
+amount: 150.00
 ---
 # Medical Invoice
 
@@ -354,10 +357,13 @@ Invoice from Dr. Smith for checkup.
 
 		test("should pre-classify markdown note with valid type and project (skip LLM)", async () => {
 			// Create a markdown note with project instead of area
+			// Invoice classifier requires provider + amount fields for pre-classification
 			const mdContent = `---
 type: invoice
 project: "[[House Renovation]]"
 title: Hardware Store Receipt
+provider: Hardware Store
+amount: 89.99
 ---
 # Receipt
 
@@ -448,10 +454,13 @@ title: Orphan Invoice
 
 		test("should handle plain text area format (no wikilinks)", async () => {
 			// Create a markdown note with plain text area (not wikilink format)
+			// Invoice classifier requires provider + amount fields for pre-classification
 			const mdContent = `---
 type: invoice
 area: Health
 title: Plain Area Invoice
+provider: Some Provider
+amount: 50.00
 ---
 # Content
 `;
@@ -475,9 +484,12 @@ title: Plain Area Invoice
 
 		test("should use filename-derived title when frontmatter title missing", async () => {
 			// Create a markdown note without title in frontmatter
+			// Invoice classifier requires provider + amount fields for pre-classification
 			const mdContent = `---
 type: invoice
 area: "[[Finance]]"
+provider: Local Shop
+amount: 25.00
 ---
 # Content
 `;

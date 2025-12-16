@@ -13,7 +13,14 @@
  * @module test/integration/suites/git-guard
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {
+	afterAll,
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	test,
+} from "bun:test";
 import * as path from "node:path";
 import { gitStatus } from "../../../src/git";
 import { createDocumentTypeFixture } from "../fixtures";
@@ -111,6 +118,16 @@ describe("Git Guard Safety", () => {
 
 	afterEach(() => {
 		harness.cleanup();
+	});
+
+	afterAll(() => {
+		if (harness) {
+			try {
+				harness.cleanup();
+			} catch {
+				// Already cleaned up or other error - ignore
+			}
+		}
 	});
 
 	describe("Dirty Vault Rejection", () => {

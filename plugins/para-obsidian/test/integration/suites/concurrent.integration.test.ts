@@ -1,4 +1,11 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {
+	afterAll,
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	test,
+} from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createDocumentTypeFixture } from "../fixtures";
@@ -59,6 +66,18 @@ describe("Concurrent Processing Safety", () => {
 			// Cleanup both harnesses
 			harness2.cleanup();
 			harness1.cleanup();
+		});
+
+		afterAll(() => {
+			for (const h of [harness1, harness2]) {
+				if (h) {
+					try {
+						h.cleanup();
+					} catch {
+						// Already cleaned up or other error - ignore
+					}
+				}
+			}
 		});
 
 		test("prevents duplicate processing when two CLI instances run simultaneously", async () => {
@@ -203,6 +222,18 @@ clipped: 2024-12-16
 		afterEach(() => {
 			harness2.cleanup();
 			harness1.cleanup();
+		});
+
+		afterAll(() => {
+			for (const h of [harness1, harness2]) {
+				if (h) {
+					try {
+						h.cleanup();
+					} catch {
+						// Already cleaned up or other error - ignore
+					}
+				}
+			}
 		});
 
 		test("handles concurrent processing of different files without registry corruption", async () => {
@@ -390,6 +421,18 @@ clipped: 2024-12-16
 		afterEach(() => {
 			harness2.cleanup();
 			harness1.cleanup();
+		});
+
+		afterAll(() => {
+			for (const h of [harness1, harness2]) {
+				if (h) {
+					try {
+						h.cleanup();
+					} catch {
+						// Already cleaned up or other error - ignore
+					}
+				}
+			}
 		});
 
 		test("one instance failing does not block other instance", async () => {

@@ -7,7 +7,14 @@
  * @module test/integration/suites/pipeline
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {
+	afterAll,
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	test,
+} from "bun:test";
 import { createDocumentTypeFixture } from "../fixtures";
 import { BOOKMARK_FIXTURES } from "../fixtures/bookmark.fixtures";
 import { INVOICE_FIXTURES } from "../fixtures/invoice.fixtures";
@@ -28,6 +35,16 @@ describe("Pipeline Integration", () => {
 
 	afterEach(() => {
 		harness.cleanup();
+	});
+
+	afterAll(() => {
+		if (harness) {
+			try {
+				harness.cleanup();
+			} catch {
+				// Already cleaned up or other error - ignore
+			}
+		}
 	});
 
 	describe("Mixed Type Processing", () => {
@@ -177,7 +194,7 @@ Test content for bookmark ${i}.
 
 					// Re-add same content (same SHA256 hash)
 					await harness.addToInbox(
-						"copy-" + BOOKMARK_FIXTURES.complete.input.filename,
+						`copy-${BOOKMARK_FIXTURES.complete.input.filename}`,
 						BOOKMARK_FIXTURES.complete.input.content,
 					);
 
@@ -204,8 +221,7 @@ Test content for bookmark ${i}.
 					await harness.execute();
 
 					// Modify content slightly (different SHA256)
-					const modifiedContent =
-						BOOKMARK_FIXTURES.complete.input.content + "\nExtra content added";
+					const modifiedContent = `${BOOKMARK_FIXTURES.complete.input.content}\nExtra content added`;
 					await harness.addToInbox("modified-bookmark.md", modifiedContent);
 
 					harness.setLLMResponse(BOOKMARK_FIXTURES.complete._mockLLMResponse);

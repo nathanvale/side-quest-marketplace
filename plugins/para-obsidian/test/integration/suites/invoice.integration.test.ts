@@ -16,7 +16,14 @@
  * @module test/integration/suites/invoice
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {
+	afterAll,
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	test,
+} from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { parseFrontmatter } from "../../../src/frontmatter/parse";
@@ -45,6 +52,16 @@ describe("Invoice Integration", () => {
 
 	afterEach(() => {
 		harness.cleanup();
+	});
+
+	afterAll(() => {
+		if (harness) {
+			try {
+				harness.cleanup();
+			} catch {
+				// Already cleaned up or other error - ignore
+			}
+		}
 	});
 
 	describe("Complete Invoice Workflow", () => {

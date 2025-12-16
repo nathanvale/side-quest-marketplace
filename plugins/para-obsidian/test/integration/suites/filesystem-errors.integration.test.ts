@@ -15,7 +15,14 @@
  * @module test/integration/suites/filesystem-errors
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {
+	afterAll,
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	test,
+} from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { createDocumentTypeFixture } from "../fixtures";
@@ -33,6 +40,16 @@ describe("Filesystem Error Handling", () => {
 
 	afterEach(() => {
 		harness.cleanup();
+	});
+
+	afterAll(() => {
+		if (harness) {
+			try {
+				harness.cleanup();
+			} catch {
+				// Already cleaned up or other error - ignore
+			}
+		}
 	});
 
 	describe("Permission Errors", () => {

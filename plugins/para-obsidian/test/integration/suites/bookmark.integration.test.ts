@@ -13,7 +13,14 @@
  * @module test/integration/suites/bookmark.integration.test
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {
+	afterAll,
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	test,
+} from "bun:test";
 import * as path from "node:path";
 import { BOOKMARK_FIXTURES } from "../fixtures/bookmark.fixtures";
 import {
@@ -36,6 +43,16 @@ describe("Bookmark Integration", () => {
 
 	afterEach(() => {
 		harness.cleanup();
+	});
+
+	afterAll(() => {
+		if (harness) {
+			try {
+				harness.cleanup();
+			} catch {
+				// Already cleaned up or other error - ignore
+			}
+		}
 	});
 
 	describe("Complete Bookmark Workflow", () => {

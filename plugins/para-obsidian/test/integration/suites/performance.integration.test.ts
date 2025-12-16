@@ -13,7 +13,14 @@
  * @module test/integration/suites/performance
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {
+	afterAll,
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	test,
+} from "bun:test";
 import { createDocumentTypeFixture } from "../fixtures";
 import {
 	createTestHarness,
@@ -46,6 +53,16 @@ describe("Performance Benchmarks", () => {
 
 	afterEach(() => {
 		harness.cleanup();
+	});
+
+	afterAll(() => {
+		if (harness) {
+			try {
+				harness.cleanup();
+			} catch {
+				// Already cleaned up or other error - ignore
+			}
+		}
 	});
 
 	describe("Single Document Processing", () => {

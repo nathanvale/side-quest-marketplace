@@ -310,16 +310,40 @@ tags:
 	}
 
 	// Commit the initial structure to avoid git guard errors
-	Bun.spawnSync(["git", "add", "."], {
+	const addResult = Bun.spawnSync(["git", "add", "."], {
 		cwd: vaultPath,
-		stdout: "ignore",
-		stderr: "ignore",
+		stdout: "pipe",
+		stderr: "pipe",
 	});
-	Bun.spawnSync(["git", "commit", "-m", "chore: initialize vault structure"], {
+	if (addResult.exitCode !== 0) {
+		const stderr = new TextDecoder().decode(addResult.stderr);
+		throw new Error(
+			`Failed to stage vault files in ${vaultPath}: git add exited with ${addResult.exitCode}. stderr: ${stderr}`,
+		);
+	}
+
+	// Only commit if there are staged changes
+	const statusResult = Bun.spawnSync(["git", "diff", "--cached", "--quiet"], {
 		cwd: vaultPath,
-		stdout: "ignore",
-		stderr: "ignore",
 	});
+	const hasStagedChanges = statusResult.exitCode !== 0;
+
+	if (hasStagedChanges) {
+		const commitResult = Bun.spawnSync(
+			["git", "commit", "-m", "chore: initialize vault structure"],
+			{
+				cwd: vaultPath,
+				stdout: "pipe",
+				stderr: "pipe",
+			},
+		);
+		if (commitResult.exitCode !== 0) {
+			const stderr = new TextDecoder().decode(commitResult.stderr);
+			throw new Error(
+				`Failed to commit vault structure in ${vaultPath}: git commit exited with ${commitResult.exitCode}. stderr: ${stderr}`,
+			);
+		}
+	}
 
 	// Track suggestions from last scan
 	let lastSuggestions: InboxSuggestion[] = [];
@@ -408,6 +432,7 @@ tags:
 		},
 
 		cleanup(): void {
+			lastSuggestions = [];
 			// Restore environment variable
 			if (originalEnv === undefined) {
 				delete process.env.PARA_VAULT;
