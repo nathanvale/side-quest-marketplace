@@ -176,7 +176,7 @@ title: Test Article
 			// Attempt scan - should show file list in error
 			try {
 				await harness.scan();
-				expect(false).toBe(true); // Should not reach here
+				throw new Error("Expected scan to throw due to uncommitted changes");
 			} catch (error) {
 				const err = error as Error;
 				expect(err.message).toContain("uncommitted changes");
@@ -415,7 +415,9 @@ title: Test
 			// Should reject - both tracked and untracked changes
 			try {
 				await harness.scan();
-				expect(false).toBe(true); // Should not reach here
+				throw new Error(
+					"Expected scan to throw due to mixed tracked/untracked changes",
+				);
 			} catch (error) {
 				const err = error as Error;
 				expect(err.message).toContain("uncommitted changes");
@@ -435,7 +437,7 @@ title: Test
 			// Error should include helpful commands
 			try {
 				await harness.scan();
-				expect(false).toBe(true); // Should not reach here
+				throw new Error("Expected scan to throw with fix instructions");
 			} catch (error) {
 				const err = error as Error;
 				expect(err.message).toContain("/para-obsidian:commit");
@@ -451,7 +453,9 @@ title: Test
 
 			try {
 				await harness.scan();
-				expect(false).toBe(true); // Should not reach here
+				throw new Error(
+					"Expected scan to throw with user-friendly error message",
+				);
 			} catch (error) {
 				const err = error as Error;
 				// Should be clear and actionable
