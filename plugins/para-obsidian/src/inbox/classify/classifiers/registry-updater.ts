@@ -7,7 +7,8 @@
  * @module classifiers/registry-updater
  */
 
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { atomicWriteFile } from "../../../shared/atomic-fs";
 import { generateExportStatement, generateImportStatement } from "./generator";
 
 /**
@@ -165,8 +166,8 @@ export async function updateRegistry(
 	const adjustedExportIndex = exportInsertIndex + 1;
 	lines.splice(adjustedExportIndex, 0, patch.exportStatement);
 
-	// Write back
-	await writeFile(registryPath, lines.join("\n"), "utf-8");
+	// Write back (atomic write prevents corruption)
+	await atomicWriteFile(registryPath, lines.join("\n"));
 }
 
 /**
