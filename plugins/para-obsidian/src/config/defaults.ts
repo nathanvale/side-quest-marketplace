@@ -43,6 +43,7 @@ export const DEFAULT_SUGGESTED_TAGS = [
 	"session",
 	"invoice",
 	"bookmark",
+	"medical-statement",
 ] as const;
 
 export const DEFAULT_FRONTMATTER_RULES: NonNullable<
@@ -330,6 +331,39 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			notes: { type: "string", optional: true },
 		},
 	},
+	"medical-statement": {
+		required: {
+			title: { type: "string" },
+			created: { type: "date" },
+			type: { type: "enum", enum: ["medical-statement"] },
+			statement_type: {
+				type: "enum",
+				enum: ["summary", "detailed", "single-appointment"],
+				optional: true,
+			},
+			provider: { type: "string" },
+			practitioner: { type: "string", optional: true },
+			patient: { type: "string" },
+			statement_date: { type: "date" },
+			period_start: { type: "date", optional: true },
+			period_end: { type: "date", optional: true },
+			previous_balance: { type: "number", optional: true },
+			total_invoiced: { type: "number", optional: true },
+			total_payments: { type: "number", optional: true },
+			statement_balance: { type: "number" },
+			status: {
+				type: "enum",
+				enum: ["paid", "unpaid", "pending"],
+			},
+			area: { type: "wikilink" },
+			attachments: {
+				type: "array",
+				optional: true,
+				description: "Wikilinks to statement PDF in Attachments/ folder",
+			},
+			tags: { type: "array", includes: ["medical-statement"] },
+		},
+	},
 };
 
 export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
@@ -349,6 +383,7 @@ export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
 	session: 1,
 	invoice: 1,
 	bookmark: 1,
+	"medical-statement": 1,
 };
 
 /**
@@ -374,6 +409,7 @@ export const DEFAULT_DESTINATIONS: Record<string, string> = {
 	session: "00 Inbox",
 	invoice: "00 Inbox",
 	bookmark: "00 Inbox",
+	"medical-statement": "00 Inbox",
 	// Attachments folder (for git operations, not template destination)
 	attachments: "Attachments",
 };
@@ -450,4 +486,5 @@ export const DEFAULT_TITLE_PREFIXES: Partial<Record<string, string>> = {
 	session: "🧠 ",
 	invoice: "🧾 ",
 	bookmark: "🔖 ",
+	"medical-statement": "🏥 ",
 };
