@@ -294,6 +294,17 @@
 			},
 			"category": "development",
 			"keywords": ["bun", "cli", "developer-experience", "workflows", "skills"]
+		},
+		{
+			"name": "bookmarks",
+			"source": "./plugins/bookmarks",
+			"description": "Bookmark management for Claude Code",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "productivity",
+			"keywords": ["bookmarks"]
 		}
 	]
 }

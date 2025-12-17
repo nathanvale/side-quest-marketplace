@@ -257,7 +257,12 @@ function migrateFile(filePath: string): MigrationResult {
 		if (typeof repl === "function") {
 			const matches = content.match(pattern);
 			if (matches) {
-				content = content.replace(pattern, repl as any);
+				// Type assertion needed: replace() expects specific callback signatures,
+				// but our generic replacer function handles all captured groups
+				content = content.replace(
+					pattern,
+					repl as (substring: string, ...args: unknown[]) => string,
+				);
 				changes.push(description);
 			}
 		} else {
