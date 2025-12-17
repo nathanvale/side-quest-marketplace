@@ -44,21 +44,31 @@ import type { CommandContext, CommandResult } from "./types";
  * Handles the create-classifier command.
  *
  * Runs an interactive wizard to create a new inbox classifier.
+ * Use --quick flag for minimal prompts with sensible defaults.
  *
  * @param ctx - Command context with config and flags
  * @returns Command result
  *
  * @example
  * ```bash
+ * # Full interactive wizard
  * bun run src/cli.ts create-classifier medical-bill
- * # Interactive wizard guides user through classifier creation
+ *
+ * # Quick mode - only prompts for ID, uses defaults
+ * bun run src/cli.ts create-classifier --quick
  * ```
  */
 export async function handleCreateClassifier(
 	ctx: CommandContext,
 ): Promise<CommandResult> {
+	const isQuickMode = ctx.flags.quick === true;
+
 	try {
-		await createClassifier(ctx.config);
+		if (isQuickMode) {
+			await createClassifierQuick(ctx.config);
+		} else {
+			await createClassifier(ctx.config);
+		}
 		return { success: true, exitCode: 0 };
 	} catch (error) {
 		const message =
@@ -512,4 +522,243 @@ async function createClassifier(config: ParaObsidianConfig): Promise<void> {
 		console.log(`  1. Run: bun typecheck`);
 		console.log(`  2. Test with: bun run src/cli.ts process-inbox scan`);
 	}
+}
+
+/**
+ * Get sensible defaults for a classifier based on its ID.
+ *
+ * @param id - Classifier ID (kebab-case)
+ * @returns Default classifier configuration
+ */
+function getQuickDefaults(id: string): {
+	displayName: string;
+	priority: number;
+	filenamePatterns: Array<{ pattern: string; weight: number }>;
+	contentMarkers: Array<{ pattern: string; weight: number }>;
+	fields: FieldDefinition[];
+	promptHint: string;
+} {
+	// Convert kebab-case to Title Case for display name
+	const displayName = id
+		.split("-")
+		.map((w) => w[0]?.toUpperCase() + w.slice(1))
+		.join(" ");
+
+	// Use ID words as filename patterns
+	const idWords = id.split("-").filter((w) => w.length > 2);
+	const filenamePatterns = idWords.map((pattern, idx) => ({
+		pattern,
+		weight: Math.max(0.5, 1.0 - idx * 0.15),
+	}));
+
+	// Default fields: title only (minimal)
+	const fields: FieldDefinition[] = [
+		{
+			name: "title",
+			type: "string",
+			description: `${displayName} title/description`,
+			requirement: "required",
+		},
+	];
+
+	return {
+		displayName,
+		priority: 85, // Default priority
+		filenamePatterns,
+		contentMarkers: [], // Empty by default - user can customize later
+		fields,
+		promptHint: `Extract information from ${displayName} documents`,
+	};
+}
+
+/**
+ * Creates a new classifier with minimal prompts using sensible defaults.
+ *
+ * Quick mode only asks for:
+ * 1. Classifier ID
+ *
+ * All other values use sensible defaults that can be customized later.
+ *
+ * @param config - Para-obsidian configuration
+ */
+async function createClassifierQuick(
+	config: ParaObsidianConfig,
+): Promise<void> {
+	console.log("\n⚡ Quick Classifier Creation\n");
+
+	// Only prompt for classifier ID
+	const idInput = await input({
+		message: "Classifier ID (kebab-case):",
+		validate: (value) => {
+			try {
+				validateClassifierId(value);
+				return true;
+			} catch (error) {
+				return error instanceof Error ? error.message : "Invalid ID";
+			}
+		},
+	});
+	const id = validateClassifierId(idInput);
+
+	// Check uniqueness
+	const projectRoot = path.resolve(__dirname, "../../..");
+	const definitionsPath = path.join(
+		projectRoot,
+		"src/inbox/classify/classifiers/definitions",
+	);
+	const classifierPath = path.join(definitionsPath, `${id}.ts`);
+	if (await pathExists(classifierPath)) {
+		throw new Error(
+			`Classifier '${id}' already exists at ${classifierPath}. Choose a different ID.`,
+		);
+	}
+
+	// Get defaults based on ID
+	const defaults = getQuickDefaults(id);
+	const templateName = id;
+
+	// Build classifier config with defaults
+	const classifier: InboxConverter = {
+		schemaVersion: 1,
+		id,
+		displayName: defaults.displayName,
+		enabled: true,
+		priority: defaults.priority,
+		heuristics: {
+			filenamePatterns: defaults.filenamePatterns,
+			contentMarkers: defaults.contentMarkers,
+			threshold: 0.5,
+		},
+		fields: defaults.fields,
+		extraction: {
+			promptHint: defaults.promptHint,
+			keyFields: ["title"],
+		},
+		template: {
+			name: templateName,
+			fieldMappings: {
+				title: `${defaults.displayName} title/description`,
+			},
+		},
+		scoring: {
+			heuristicWeight: 0.3,
+			llmWeight: 0.7,
+			highThreshold: 0.85,
+			mediumThreshold: 0.6,
+		},
+	};
+
+	// Validate configuration
+	const validation = validateClassifier(classifier);
+	if (!validation.isValid) {
+		console.error("\n❌ Configuration validation failed:\n");
+		for (const error of validation.errors) {
+			console.error(`  - ${error}`);
+		}
+		throw new Error("Invalid classifier configuration");
+	}
+
+	// Execute transaction with rollback
+	const tx = new Transaction();
+	const registryPath = path.join(definitionsPath, "index.ts");
+
+	// Step 1: Create classifier file
+	tx.add({
+		name: "create-classifier-file",
+		execute: async () => {
+			const code = generateClassifierCode(classifier);
+			await atomicWriteFile(classifierPath, code);
+			return { path: classifierPath };
+		},
+		rollback: async () => {
+			const fs = await import("node:fs/promises");
+			await fs.unlink(classifierPath).catch(() => {});
+		},
+	});
+
+	// Step 2: Update registry
+	tx.add({
+		name: "update-registry",
+		execute: async () => {
+			const backup = await readTextFile(registryPath);
+			await withFileLock("classifier-registry", async () => {
+				const patch = await generateRegistryPatch(
+					registryPath,
+					id,
+					defaults.priority,
+				);
+				await updateRegistry(registryPath, patch);
+			});
+			return { backup };
+		},
+		rollback: async (result) => {
+			if (result && typeof result === "object" && "backup" in result) {
+				await atomicWriteFile(registryPath, result.backup as string);
+			}
+		},
+	});
+
+	// Step 3: Create basic template
+	let templateResult:
+		| { created: boolean; templatePath?: string; finalName: string }
+		| undefined;
+
+	tx.add({
+		name: "create-template",
+		execute: async () => {
+			templateResult = await createTemplate({
+				vaultPath: config.vault,
+				templateName,
+				noteType: id,
+				version: 1,
+				fields: defaults.fields,
+				fieldMappings: { title: `${defaults.displayName} title/description` },
+				choice: { action: "create-new", mode: "basic" },
+				templatesDir: config.templatesDir,
+			});
+			return templateResult;
+		},
+		rollback: async (result) => {
+			if (
+				result &&
+				typeof result === "object" &&
+				"created" in result &&
+				result.created &&
+				"templatePath" in result
+			) {
+				const fs = await import("node:fs/promises");
+				await fs.unlink(result.templatePath as string).catch(() => {});
+			}
+		},
+	});
+
+	const result = await tx.execute();
+	if (!result.success) {
+		throw new Error(
+			`Transaction failed at ${result.failedAt}: ${result.error.message}`,
+		);
+	}
+
+	// Success output
+	console.log(`\n✅ Classifier created successfully!\n`);
+	console.log(`   ID:       ${id}`);
+	console.log(`   Name:     ${defaults.displayName}`);
+	console.log(`   Priority: ${defaults.priority}`);
+	console.log(`   Template: ${templateName}.md`);
+	console.log(`   Fields:   title`);
+
+	console.log(`\n📁 Files created:`);
+	console.log(`   • ${classifierPath}`);
+	if (templateResult?.created && templateResult.templatePath) {
+		console.log(`   • ${templateResult.templatePath}`);
+	}
+
+	console.log(`\n📝 Customize later:`);
+	console.log(`   Edit classifier: ${classifierPath}`);
+	console.log(
+		`   Edit template:   ${config.templatesDir ?? "Templates"}/${templateName}.md`,
+	);
+
+	console.log(`\n🧪 Test with:`);
+	console.log(`   bun run src/cli.ts process-inbox scan`);
 }

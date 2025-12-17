@@ -27,6 +27,7 @@ export {
 } from "./config";
 // Create commands
 export { handleCreate } from "./create";
+export { handleCreateClassifier } from "./create-classifier";
 export { handleCreateNoteTemplate } from "./create-note-template";
 // Export commands
 export { handleExportBookmarks } from "./export-bookmarks";
@@ -58,6 +59,8 @@ export {
 export { handleDelete, handleList, handleRead } from "./notes";
 // Process inbox commands
 export { handleProcessInbox } from "./process-inbox";
+// Registry commands
+export { handleRegistry } from "./registry";
 // Search commands
 export { handleIndex, handleSearch, handleSemantic } from "./search";
 // Types

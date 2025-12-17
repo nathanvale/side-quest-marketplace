@@ -103,6 +103,11 @@ export function parseCommand(
 	const lower = trimmed.toLowerCase();
 
 	// Single character commands
+	// Case-sensitive: 'a' = approve visible, 'A' = approve ALL remaining
+	if (trimmed === "A") {
+		return { type: "approve-remaining" };
+	}
+
 	if (lower === "a") {
 		return { type: "approve-all" };
 	}
@@ -125,6 +130,10 @@ export function parseCommand(
 
 	if (lower === "p") {
 		return { type: "prev-page" };
+	}
+
+	if (lower === "l") {
+		return { type: "list-all" };
 	}
 
 	// View command: v<id>
@@ -264,14 +273,14 @@ export function formatSuggestion(
 	suggestion: InboxSuggestion,
 	index: number,
 ): string {
-	const filename = getFilename(suggestion.source);
+	const sourceFilename = getFilename(suggestion.source);
 	const confidence = formatConfidence(suggestion.confidence);
 	const warnings = suggestion.extractionWarnings ?? [];
 	const hasWarnings = warnings.length > 0;
 	const lines: string[] = [];
 
 	// Main line: [index] confidence filename → action
-	const mainLine = `${emphasize.info(`[${index}]`)} ${confidence} ${emphasize.info(filename)} → ${suggestion.action}`;
+	const mainLine = `${emphasize.info(`[${index}]`)} ${confidence} ${emphasize.info(sourceFilename)} → ${suggestion.action}`;
 	lines.push(mainLine);
 
 	// Details on subsequent lines (only for create-note suggestions)
@@ -284,6 +293,13 @@ export function formatSuggestion(
 		}
 		metaParts.push(`Type: ${suggestion.suggestedNoteType}`);
 		lines.push(`    ${metaParts.join(" • ")}`);
+
+		// Show renamed attachment if different from source
+		if (suggestion.suggestedAttachmentName) {
+			lines.push(
+				`    ${emphasize.dim("Attachment:")} ${suggestion.suggestedAttachmentName}`,
+			);
+		}
 	}
 
 	// Detection source explanation
@@ -407,7 +423,7 @@ export function formatSuggestionDetails(
 }
 
 /** Default page size for pagination */
-export const PAGE_SIZE = 5;
+export const PAGE_SIZE = 6;
 
 /**
  * Pagination state for the interactive loop.
@@ -549,12 +565,14 @@ export function getHelpText(): string {
 	const lines = [
 		emphasize.info("═══ Commands ═══"),
 		"",
-		`  ${emphasize.success("a")}           Approve all visible items`,
+		`  ${emphasize.success("a")}           Approve all visible items on current page`,
+		`  ${emphasize.success("A")}           Approve ALL remaining items (all pages)`,
 		`  ${emphasize.success("1,2,5")}       Approve specific items by number`,
 		`  ${emphasize.success("v<n>")}        View details of item #n`,
 		`  ${emphasize.success("e<n> <hint>")} Edit suggestion #n with hint`,
 		`  ${emphasize.success("s<n>")}        Skip item #n`,
 		`  ${emphasize.success("u")}           Undo last approval (before execute)`,
+		`  ${emphasize.success("l")}           List all items with status`,
 		`  ${emphasize.success("n")} / ${emphasize.success("p")}       Next / Previous page`,
 		`  ${emphasize.success("q")}           Quit without processing`,
 		`  ${emphasize.success("?")}           Show this help`,
@@ -562,6 +580,9 @@ export function getHelpText(): string {
 		emphasize.dim("Examples:"),
 		emphasize.dim("  3              - approve item 3"),
 		emphasize.dim("  1,3,5          - approve items 1, 3, and 5"),
+		emphasize.dim(
+			"  A              - approve all remaining (skip confirmation per page)",
+		),
 		emphasize.dim("  v2             - view details of item 2"),
 		emphasize.dim('  e2 "use Work"  - re-classify item 2'),
 	];
@@ -825,6 +846,86 @@ export async function runInteractiveLoop(
 				}
 			}
 
+			case "approve-remaining": {
+				// Approve ALL remaining items (across all pages, not just visible)
+				// This is triggered by uppercase 'A' and differs from 'a' which is page-scoped
+				if (isProcessing) {
+					console.log(
+						emphasize.warn(
+							"\n⏳ Please wait for previous operation to complete...",
+						),
+					);
+					break;
+				}
+				isProcessing = true;
+				try {
+					// Track which IDs were added in this operation for potential rollback
+					const newlyApproved: SuggestionId[] = [];
+					// Approve ALL items that aren't skipped (not just displayable/current page)
+					for (const s of currentSuggestions) {
+						if (!approved.has(s.id) && !skipped.has(s.id)) {
+							approved.add(s.id);
+							approvalHistory.push(s.id);
+							newlyApproved.push(s.id);
+						}
+					}
+
+					const skippedCount = skipped.size;
+					const skippedNote =
+						skippedCount > 0 ? ` (${skippedCount} skipped items excluded)` : "";
+					console.log(
+						emphasize.success(
+							`\nApproved ALL ${newlyApproved.length} remaining item(s)${skippedNote}. Total: ${approved.size}`,
+						),
+					);
+
+					// Show confirmation and wait for user
+					const toExecute = currentSuggestions.filter((s) =>
+						approved.has(s.id),
+					);
+					console.log(formatConfirmationPreview(toExecute, originalIndices));
+
+					const confirmInput = await input({
+						message: "Execute? [Enter=yes, no=cancel]: ",
+					});
+					const confirmLower = confirmInput.trim().toLowerCase();
+
+					// Explicit yes or Enter to execute
+					if (
+						confirmLower === "" ||
+						confirmLower === "y" ||
+						confirmLower === "yes"
+					) {
+						return Array.from(approved);
+					}
+
+					if (confirmLower === "no" || confirmLower === "cancel") {
+						// Only remove the newly added approvals, preserve previous ones
+						for (const id of newlyApproved) {
+							approved.delete(id);
+							const histIdx = approvalHistory.lastIndexOf(id);
+							if (histIdx !== -1) approvalHistory.splice(histIdx, 1);
+						}
+						console.log(
+							emphasize.warn(
+								`Cancelled. Removed ${newlyApproved.length} item(s). ${approved.size} still approved.`,
+							),
+						);
+						break;
+					}
+
+					// Unrecognized input - return to main menu
+					console.log(
+						emphasize.dim(
+							`Unrecognized: '${confirmInput.trim()}'. Returning to menu. (${approved.size} item(s) still approved)`,
+						),
+					);
+					break;
+				} finally {
+					isProcessing = false;
+				}
+			}
+
 			case "approve": {
 				if (isProcessing) {
 					console.log(
@@ -1010,6 +1111,38 @@ export async function runInteractiveLoop(
 				console.log("");
 				console.log(getHelpText());
 				break;
+
+			case "list-all": {
+				// Show all items with their current status
+				console.log("");
+				console.log(emphasize.info("═══ All Items ═══"));
+				console.log("");
+
+				for (const s of currentSuggestions) {
+					const idx = originalIndices.get(s.id) ?? "?";
+					const filename = getFilename(s.source);
+
+					let status: string;
+					if (approved.has(s.id)) {
+						status = emphasize.success("[APPROVED]");
+					} else if (skipped.has(s.id)) {
+						status = emphasize.warn("[SKIPPED]");
+					} else {
+						status = emphasize.dim("[pending]");
+					}
+
+					console.log(`  ${status} [${idx}] ${filename}`);
+				}
+
+				console.log("");
+				console.log(
+					emphasize.dim(
+						`Total: ${currentSuggestions.length} | Approved: ${approved.size} | Skipped: ${skipped.size} | Pending: ${currentSuggestions.length - approved.size - skipped.size}`,
+					),
+				);
+				console.log("");
+				break;
+			}
 
 			case "invalid":
 				console.log(

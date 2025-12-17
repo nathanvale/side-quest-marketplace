@@ -17,8 +17,8 @@ describe("inbox/cli-adapter", () => {
 			expect(parseCommand("a")).toEqual({ type: "approve-all" });
 		});
 
-		test("should parse 'A' as approve-all (case insensitive)", () => {
-			expect(parseCommand("A")).toEqual({ type: "approve-all" });
+		test("should parse 'A' as approve-remaining (uppercase = all remaining)", () => {
+			expect(parseCommand("A")).toEqual({ type: "approve-remaining" });
 		});
 
 		test("should parse '1,2,5' as approve with ids [1,2,5]", () => {
@@ -284,6 +284,22 @@ describe("inbox/cli-adapter", () => {
 			const result = formatSuggestion(baseSuggestion, 1);
 			expect(result).not.toContain("Warnings");
 		});
+
+		test("should display suggestedAttachmentName when present", () => {
+			const suggestionWithAttachment: InboxSuggestion = {
+				...baseSuggestion,
+				suggestedAttachmentName: "2024-01-15-acme-corp-invoice.pdf",
+			};
+			const result = formatSuggestion(suggestionWithAttachment, 1);
+			expect(result).toContain("Attachment:");
+			expect(result).toContain("2024-01-15-acme-corp-invoice.pdf");
+		});
+
+		test("should not display attachment line when suggestedAttachmentName is absent", () => {
+			// baseSuggestion has no suggestedAttachmentName
+			const result = formatSuggestion(baseSuggestion, 1);
+			expect(result).not.toContain("Attachment:");
+		});
 	});
 
 	describe("formatSuggestionsTable", () => {
@@ -500,7 +516,7 @@ describe("inbox/cli-adapter", () => {
 		});
 
 		test("should use PAGE_SIZE constant", () => {
-			expect(PAGE_SIZE).toBe(5);
+			expect(PAGE_SIZE).toBe(6);
 		});
 	});
 });

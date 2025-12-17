@@ -17,6 +17,7 @@ import {
 	handleCleanBrokenLinks,
 	handleConfig,
 	handleCreate,
+	handleCreateClassifier,
 	handleCreateNoteTemplate,
 	handleDelete,
 	handleExportBookmarks,
@@ -31,6 +32,7 @@ import {
 	handleListTags,
 	handleProcessInbox,
 	handleRead,
+	handleRegistry,
 	handleRename,
 	handleRewriteLinks,
 	handleScanTags,
@@ -48,37 +50,36 @@ function printUsage(): void {
 		color("cyan", "PARA Obsidian CLI"),
 		"",
 		"Usage:",
-		"  bun run src/cli.ts config [--format md|json]",
-		"  bun run src/cli.ts templates [--format md|json]",
-		"  bun run src/cli.ts template-fields <template> [--format md|json]",
-		"  bun run src/cli.ts create-note-template",
-		"  bun run src/cli.ts list [path] [--format md|json]",
-		"  bun run src/cli.ts read <file> [--format md|json]",
-		"  bun run src/cli.ts search <query> [--tag TAG] [--frontmatter key=val|--frontmatter.key val] [--regex] [--dir path[,path2]] [--glob pattern] [--context N] [--format md|json]",
-		"  bun run src/cli.ts index prime [--dir path[,path2]] [--format md|json]",
-		"  bun run src/cli.ts index query [--tag TAG] [--frontmatter key=val|--frontmatter.key val] [--dir path[,path2]] [--format md|json]",
-		'  bun run src/cli.ts create --template <name> --title "<Title>" [--dest path] [--arg key=value ...] [--content \'{"heading": "content"}\'] [--attachments paths] [--format md|json]',
-		"  bun run src/cli.ts create --template <name> --source <file> [--preview] [--model name] [--arg key=value ...] [--format md|json]",
-		'  bun run src/cli.ts create --template <name> --source-text "<text>" [--preview] [--model name] [--arg key=value ...] [--format md|json]',
-		'  bun run src/cli.ts insert <file> --heading "<Heading>" --content "<Content>" [--before|--after|--append|--prepend] [--attachments paths] [--format md|json]',
-		"  bun run src/cli.ts rename <from> <to> [--dry-run] [--attachments paths] [--format md|json]",
-		"  bun run src/cli.ts delete <file> --confirm [--dry-run] [--attachments paths] [--format md|json]",
-		"  bun run src/cli.ts semantic <query> [--para folder[,folder2]] [--dir path] [--limit N] [--format md|json]",
-		"  bun run src/cli.ts frontmatter get <file> [--format md|json]",
-		"  bun run src/cli.ts frontmatter validate <file> [--format md|json]",
-		"  bun run src/cli.ts frontmatter validate-all [--dir path[,path2]] [--type noteType] [--format md|json]",
-		"  bun run src/cli.ts frontmatter set <file> key=value [...] [--unset key1,key2] [--dry-run] [--attachments paths] [--format md|json]",
-		"  bun run src/cli.ts frontmatter migrate <file> [--force <version>] [--dry-run] [--attachments paths] [--format md|json]",
-		"  bun run src/cli.ts frontmatter migrate-all [--dir path[,path2]] [--force <version>] [--type <type>] [--dry-run] [--attachments paths] [--format md|json]",
-		"  bun run src/cli.ts frontmatter plan <type> --to <version> [--dir path[,path2]] [--save plan.json] [--format md|json]",
-		"  bun run src/cli.ts frontmatter apply-plan <plan.json> [--statuses s1,s2] [--dir path[,path2]] [--emit-plan filtered.json] [--dry-run] [--attachments paths] [--format md|json]",
-		"  bun run src/cli.ts frontmatter plan --interactive (prints summary/plan and exits non-interactively)",
-		"  bun run src/cli.ts git guard [--format md|json]",
-		"  bun run src/cli.ts find-orphans [--dir path[,path2]] [--format md|json]",
-		"  bun run src/cli.ts rewrite-links --from <link> --to <link> [--dir path[,path2]] [--dry-run] [--format md|json]",
-		"  bun run src/cli.ts rewrite-links --mapping <file.json> [--dir path[,path2]] [--dry-run] [--format md|json]",
-		"  bun run src/cli.ts process-inbox [--auto] [--preview] [--dry-run] [--verbose] [--filter pattern] [--force] [--format md|json]",
-		'  bun run src/cli.ts export-bookmarks [--filter "type:bookmark"] [--out path] [--format md|json]',
+		"  para config [--format md|json]",
+		"  para templates [--format md|json]",
+		"  para template-fields <template> [--format md|json]",
+		"  para list [path] [--format md|json]",
+		"  para read <file> [--format md|json]",
+		"  para search <query> [--tag TAG] [--frontmatter key=val] [--regex] [--dir path] [--format md|json]",
+		"  para index prime [--dir path] [--format md|json]",
+		'  para create --template <name> --title "<Title>" [--dest path] [--arg key=value ...] [--format md|json]',
+		"  para create --template <name> --source <file> [--preview] [--model name] [--format md|json]",
+		'  para insert <file> --heading "<Heading>" --content "<Content>" [--attachments paths] [--format md|json]',
+		"  para rename <from> <to> [--dry-run] [--format md|json]",
+		"  para delete <file> --confirm [--dry-run] [--format md|json]",
+		"  para semantic <query> [--para folder] [--dir path] [--limit N] [--format md|json]",
+		"  para frontmatter get|validate|set|migrate <file> [--format md|json]",
+		"  para git guard [--format md|json]",
+		"  para find-orphans [--dir path] [--format md|json]",
+		"  para rewrite-links --from <link> --to <link> [--dry-run] [--format md|json]",
+		"",
+		"Inbox Processing:",
+		"  para process-inbox [--auto] [--preview] [--dry-run] [--filter pattern] [--force]",
+		"  para export-bookmarks [--filter type:bookmark] [--out path] [--format md|json]",
+		"  para create-classifier [--quick]",
+		"  para create-note-template",
+		"  para registry list|remove|clear [--format md|json]",
+		"",
+		"Shorter aliases:",
+		"  para scan        (alias for process-inbox)",
+		"  para execute     (alias for process-inbox --auto)",
+		"  para export      (alias for export-bookmarks)",
+		"  para init        (alias for create-classifier)",
 		"",
 		"Options:",
 		"  --format md|json  Output format (default: md)",
@@ -271,6 +272,48 @@ async function main(): Promise<void> {
 
 			case "export-bookmarks": {
 				const result = await handleExportBookmarks(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
+				break;
+			}
+
+			// New shorter aliases for inbox processing
+			case "scan": {
+				// Alias for process-inbox scan mode (default)
+				const result = await handleProcessInbox(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
+				break;
+			}
+
+			case "execute": {
+				// Alias for process-inbox --auto (execute mode)
+				ctx.flags.auto = true;
+				const result = await handleProcessInbox(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
+				break;
+			}
+
+			case "export": {
+				// Alias for export-bookmarks
+				const result = await handleExportBookmarks(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
+				break;
+			}
+
+			case "init": {
+				// Alias for create-classifier
+				const result = await handleCreateClassifier(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
+				break;
+			}
+
+			case "create-classifier": {
+				const result = await handleCreateClassifier(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
+				break;
+			}
+
+			case "registry": {
+				const result = await handleRegistry(ctx);
 				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}

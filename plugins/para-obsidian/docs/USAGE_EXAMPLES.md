@@ -4,6 +4,47 @@
 
 ---
 
+## Shell Alias Setup (Recommended)
+
+For faster CLI access, add a shell alias to your `~/.zshrc`:
+
+```bash
+# Add to ~/.zshrc
+alias para="bun run /path/to/side-quest-marketplace/plugins/para-obsidian/src/cli.ts"
+
+# Then reload your shell
+source ~/.zshrc
+```
+
+**Now you can use shortened commands:**
+
+```bash
+# Before (verbose)
+bun run /path/to/para-obsidian/src/cli.ts process-inbox scan
+
+# After (with alias)
+para scan
+para execute
+para registry list
+para create --template project "My Project"
+```
+
+**Available commands:**
+
+| Command | Alias For | Description |
+|---------|-----------|-------------|
+| `para scan` | `process-inbox` | Scan inbox for new files (interactive review) |
+| `para execute` | `process-inbox --auto` | Execute approved suggestions |
+| `para export` | `export-bookmarks` | Export bookmarks to browser format |
+| `para init` | `create-classifier` | Create new classifier (full wizard) |
+| `para init --quick` | - | Create classifier with minimal prompts |
+| `para registry list` | - | Show processed items registry |
+| `para registry remove <hash>` | - | Remove item from registry |
+| `para registry clear` | - | Clear entire registry |
+| `para create --template <name>` | - | Create note from template |
+
+---
+
 ## Table of Contents
 
 - [Create-Classifier Examples](#create-classifier-examples)

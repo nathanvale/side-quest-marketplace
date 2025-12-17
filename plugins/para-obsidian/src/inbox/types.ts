@@ -871,7 +871,8 @@ export interface ProcessInboxOptions {
  */
 export type CLICommand =
 	| { type: "execute" } // Execute approved items (Enter key when items approved)
-	| { type: "approve-all" }
+	| { type: "approve-all" } // Approve all visible items (lowercase 'a')
+	| { type: "approve-remaining" } // Approve all non-skipped items across all pages (uppercase 'A')
 	| { type: "approve"; ids: number[] }
 	| { type: "edit"; id: number; prompt: string }
 	| { type: "skip"; id: number }
@@ -879,6 +880,7 @@ export type CLICommand =
 	| { type: "undo" }
 	| { type: "next-page" }
 	| { type: "prev-page" }
+	| { type: "list-all" } // Show all items with status (approved/skipped/pending)
 	| { type: "quit" }
 	| { type: "help" }
 	| { type: "invalid"; input: string };
