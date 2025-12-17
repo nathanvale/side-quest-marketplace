@@ -16,7 +16,7 @@ export { moveAttachment } from "./attachment-mover";
 // Re-export execution functions
 export {
 	executeSuggestion,
-	generateDatedFilename,
+	generateHashedFilename,
 	rollbackNote,
 } from "./executor";
 export { createNoteFromSuggestion } from "./note-creator";

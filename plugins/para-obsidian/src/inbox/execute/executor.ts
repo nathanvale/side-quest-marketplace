@@ -25,7 +25,7 @@ import {
 import type { ExecutionContext } from "./types";
 
 // Re-export helper functions for backward compatibility
-export { generateDatedFilename } from "./attachment-mover";
+export { generateHashedFilename } from "./attachment-mover";
 
 /**
  * Rollback a created note (delete the file).

@@ -1,63 +1,66 @@
 /**
  * Attachment Moving Logic
  *
- * Handles moving attachments with dated filenames:
- * - Generate dated filename (YYYYMMDD-HHMM-description.ext)
+ * Handles moving attachments with hash-based filenames:
+ * - Generate filename with hash prefix (YYYYMMDD-hash4-description.ext)
+ * - Hash guarantees uniqueness, no collision counters needed
  * - Move with TOCTOU protection
- * - Handle collisions with unique paths
  *
  * @module inbox/execute/attachment-mover
  */
 
-import { basename, dirname, extname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { ensureDirSync, moveFile, pathExistsSync } from "@sidequest/core/fs";
 import type { executeLogger } from "../../shared/logger";
-import { generateFilename, generateUniquePath } from "../core/engine-utils";
+import { generateFilename, getHashPrefix } from "../core/engine-utils";
 import { hashFile } from "../registry";
 import type { InboxSuggestion } from "../types";
 import type { AttachmentMoveResult } from "./types";
 
 /**
- * Generate a dated filename for an attachment.
+ * Generate a hash-based filename for an attachment.
  *
- * Format: YYYYMMDD-HHMM-description.ext
+ * Format: YYYYMMDD-hash4-description.ext
+ *
+ * The hash prefix guarantees uniqueness and links to the corresponding note.
  *
  * @param suggestion - Suggestion containing source path and optional attachment name
- * @returns Dated filename
+ * @param hash - SHA256 hash of the file contents
+ * @returns Hash-based filename
  */
-export function generateDatedFilename(suggestion: InboxSuggestion): string {
-	// Extract suggestedAttachmentName if present
+export function generateHashedFilename(
+	suggestion: InboxSuggestion,
+	hash: string,
+): string {
+	// Use pre-generated attachment name if available (from scan phase)
 	const suggestedName =
 		"suggestedAttachmentName" in suggestion
 			? suggestion.suggestedAttachmentName
 			: undefined;
 
 	if (suggestedName) {
-		// LLM provided a clean description - use it directly
-		const ext = extname(suggestion.source);
-		const timestamp = new Date();
-		const year = timestamp.getFullYear();
-		const month = String(timestamp.getMonth() + 1).padStart(2, "0");
-		const day = String(timestamp.getDate()).padStart(2, "0");
-		const hour = String(timestamp.getHours()).padStart(2, "0");
-		const minute = String(timestamp.getMinutes()).padStart(2, "0");
-		const timestampPrefix = `${year}${month}${day}-${hour}${minute}`;
-		return `${timestampPrefix}-${suggestedName}${ext}`;
+		return suggestedName;
 	}
 
-	// Fallback: extract description from messy filename
-	return generateFilename(suggestion.source);
+	// Fallback: generate filename using available suggestion data
+	const noteType =
+		"suggestedNoteType" in suggestion
+			? suggestion.suggestedNoteType
+			: undefined;
+	const fields =
+		"extractedFields" in suggestion ? suggestion.extractedFields : undefined;
+
+	return generateFilename(suggestion.source, hash, noteType, fields);
 }
 
 /**
- * Move an attachment to the attachments folder with a dated filename.
+ * Move an attachment to the attachments folder with a hash-based filename.
  *
  * Steps:
- * 1. Generate dated filename
- * 2. Hash source file
- * 3. Check for collisions and generate unique path if needed
- * 4. TOCTOU check: verify source still exists
- * 5. Move file
+ * 1. Hash source file (provides unique ID)
+ * 2. Generate filename with hash prefix (guarantees uniqueness)
+ * 3. TOCTOU check: verify source still exists
+ * 4. Move file
  *
  * @param suggestion - Suggestion containing source path
  * @param config - Vault configuration
@@ -78,24 +81,7 @@ export async function moveAttachment(
 		logger.debug`Moving attachment source=${filename} ${cid}`;
 	}
 
-	// Generate dated filename
-	const datedFilename = generateDatedFilename(suggestion);
-	const intendedDest = join(
-		config.vaultPath,
-		config.attachmentsFolder,
-		datedFilename,
-	);
-
-	// Generate unique path to prevent overwriting
-	const finalDest = generateUniquePath(intendedDest);
-	const actualFilename = basename(finalDest);
-	const vaultRelativePath = join(config.attachmentsFolder, actualFilename);
-
-	if (finalDest !== intendedDest && logger) {
-		logger.warn`File collision detected - using unique name: ${actualFilename} ${cid}`;
-	}
-
-	// Hash source file BEFORE moving
+	// Hash source file FIRST - this provides our unique ID
 	let hash: string;
 	try {
 		hash = await hashFile(sourcePath);
@@ -104,6 +90,19 @@ export async function moveAttachment(
 			success: false,
 			error: `Failed to hash source file: ${error instanceof Error ? error.message : "unknown"}`,
 		};
+	}
+
+	// Generate filename with hash prefix - guaranteed unique
+	const hashedFilename = generateHashedFilename(suggestion, hash);
+	const finalDest = join(
+		config.vaultPath,
+		config.attachmentsFolder,
+		hashedFilename,
+	);
+	const vaultRelativePath = join(config.attachmentsFolder, hashedFilename);
+
+	if (logger) {
+		logger.debug`Generated filename=${hashedFilename} hash=${getHashPrefix(hash)} ${cid}`;
 	}
 
 	// TOCTOU protection: Check file still exists before moving

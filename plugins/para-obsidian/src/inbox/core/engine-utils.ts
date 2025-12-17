@@ -11,43 +11,128 @@ import { basename, extname } from "node:path";
 import { pathExistsSync } from "@sidequest/core/fs";
 
 /**
- * Generates a timestamp-based filename for an attachment.
+ * Extract first 4 characters of a hash as a short ID.
  *
- * Format: YYYYMMDD-HHMM-description.ext
+ * @param hash - Full SHA256 hash (64 chars)
+ * @returns 4-character hash prefix
  *
- * @param originalPath - Original file path
- * @param timestamp - Optional timestamp (default: now)
+ * @example
+ * ```typescript
+ * getHashPrefix("a7b3c4d5e6f7..."); // "a7b3"
+ * ```
+ */
+export function getHashPrefix(hash: string): string {
+	return hash.slice(0, 4);
+}
+
+/**
+ * Generates a hash-based filename for an attachment.
+ *
+ * Transforms the note title to filename format:
+ *   Note title:  "2024 12 10 a7b3 Invoice Amazon"
+ *   Attachment:  "2024-12-10-a7b3-invoice-amazon.pdf"
+ *
+ * Simply takes generateTitle output, replaces spaces with hyphens,
+ * and lowercases. This keeps note and attachment names in sync.
+ *
+ * @param originalPath - Original file path (for extension)
+ * @param hash - SHA256 hash of file contents
+ * @param noteType - Document type (invoice, booking, etc.)
+ * @param fields - Extracted fields (provider, date, etc.)
  * @returns Generated filename
  *
  * @example
  * ```typescript
- * generateFilename("/path/to/Invoice ABC.pdf");
- * // "20241210-1430-invoice-abc.pdf"
+ * generateFilename("/path/to/doc.pdf", "a7b3c4d5...", "invoice", {
+ *   date: "2024-12-10",
+ *   provider: "Amazon"
+ * });
+ * // "2024-12-10-a7b3-invoice-amazon.pdf"
  * ```
  */
 export function generateFilename(
 	originalPath: string,
-	timestamp?: Date,
+	hash: string,
+	noteType?: string,
+	fields?: Record<string, unknown>,
 ): string {
-	const ts = timestamp ?? new Date();
-	const year = ts.getFullYear();
-	const month = String(ts.getMonth() + 1).padStart(2, "0");
-	const day = String(ts.getDate()).padStart(2, "0");
-	const hour = String(ts.getHours()).padStart(2, "0");
-	const minute = String(ts.getMinutes()).padStart(2, "0");
+	const ext = extname(originalPath);
 
-	const timestampPrefix = `${year}${month}${day}-${hour}${minute}`;
-
-	const file = basename(originalPath);
-	const ext = extname(file);
-	const nameWithoutExt = basename(file, ext);
-
-	const description = nameWithoutExt
+	// Get note title and transform to filename-safe format:
+	// - lowercase
+	// - replace spaces and special chars with hyphens
+	// - collapse multiple hyphens
+	// - trim leading/trailing hyphens
+	const title = generateTitle(basename(originalPath), noteType, fields, hash);
+	const filename = title
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/^-+|-+$/g, "");
 
-	return `${timestampPrefix}-${description}${ext}`;
+	return `${filename}${ext}`;
+}
+
+/**
+ * Generate a PARA-formatted attachment name from extracted fields.
+ *
+ * Format: YYYY-MM-DD-type-provider-slug.ext
+ *
+ * This is used as a fallback when the LLM doesn't provide suggestedFilenameDescription.
+ * Unlike generateFilename(), this doesn't require a hash - it uses extracted data.
+ *
+ * @param originalPath - Original file path (for extension)
+ * @param noteType - Document type (invoice, booking, etc.)
+ * @param fields - Extracted fields from document (date, provider, etc.)
+ * @returns Generated filename or undefined if insufficient data
+ *
+ * @example
+ * ```typescript
+ * generateAttachmentName(
+ *   "/inbox/statement.pdf",
+ *   "medical-statement",
+ *   { date: "2025-10-21", provider: "PV Foulkes Medical Services" }
+ * );
+ * // "2025-10-21-medical-statement-pv-foulkes-medical-services.pdf"
+ * ```
+ */
+export function generateAttachmentName(
+	originalPath: string,
+	noteType?: string,
+	fields?: Record<string, unknown>,
+): string | undefined {
+	// Get date from various field names
+	const date = (fields?.date ??
+		fields?.statementDate ??
+		fields?.invoice_date ??
+		fields?.invoiceDate) as string | undefined;
+
+	// Get provider
+	const provider = fields?.provider as string | undefined;
+
+	// Need at least date and type to generate a meaningful name
+	if (!date || !noteType) {
+		return undefined;
+	}
+
+	const ext = extname(originalPath);
+
+	// Build slug from provider (if available) or just use type
+	const providerSlug = provider
+		? provider
+				.toLowerCase()
+				.replace(/[^a-z0-9]+/g, "-")
+				.replace(/^-+|-+$/g, "")
+				.slice(0, 40) // Limit length
+		: undefined;
+
+	const typeSlug = noteType
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+
+	// Format: date-type-provider.ext
+	const parts = [date, typeSlug, providerSlug].filter(Boolean);
+	return `${parts.join("-")}${ext}`;
 }
 
 /**
@@ -67,38 +152,92 @@ export function capitalizeFirst(s: string): string {
 }
 
 /**
+ * Format a date string with spaces instead of hyphens.
+ *
+ * @param date - Date in YYYY-MM-DD format
+ * @returns Date in YYYY MM DD format
+ *
+ * @example
+ * ```typescript
+ * formatDateWithSpaces("2024-12-10"); // "2024 12 10"
+ * ```
+ */
+export function formatDateWithSpaces(date: string): string {
+	return date.replace(/-/g, " ");
+}
+
+/**
  * Generate a suggested title from filename and extracted data.
  *
- * Uses extracted provider and date fields if available,
- * otherwise falls back to cleaned filename.
+ * When a hash is provided (from source attachment), the format is:
+ *   YYYY MM DD hash4 Type Provider
+ *
+ * This links the note to its source attachment which uses the same hash prefix.
+ *
+ * When no hash is provided (manual note, markdown in inbox):
+ *   Date Type Provider (with hyphens)
  *
  * @param filename - Original filename
  * @param noteType - Suggested note type (optional)
  * @param fields - Extracted fields from document (optional)
+ * @param hash - SHA256 hash of source attachment (optional)
  * @returns Generated title
  *
  * @example
  * ```typescript
- * generateTitle("invoice.pdf", "invoice", { provider: "Amazon", date: "2024-12-10" });
- * // "Invoice - Amazon - 2024-12-10"
+ * // With hash (from PDF/image):
+ * generateTitle("invoice.pdf", "invoice", { provider: "Amazon", date: "2024-12-10" }, "a7b3...");
+ * // "2024 12 10 a7b3 Invoice Amazon"
+ *
+ * // Without hash (manual note):
+ * generateTitle("notes.md", "note", { provider: "Meeting" });
+ * // "Note - Meeting"
  * ```
  */
 export function generateTitle(
 	filename: string,
 	noteType?: string,
 	fields?: Record<string, unknown>,
+	hash?: string,
 ): string {
 	// Try to use extracted provider and date
+	// Check multiple date field variations (date, statementDate, invoice_date)
 	const provider = fields?.provider as string | undefined;
-	const date = fields?.date as string | undefined;
+	const date = (fields?.date ??
+		fields?.statementDate ??
+		fields?.invoice_date) as string | undefined;
 
+	// Title case: "medical-statement" → "Medical Statement"
+	const typeLabel = noteType
+		? noteType
+				.split("-")
+				.map((word) => capitalizeFirst(word))
+				.join(" ")
+		: "Document";
+
+	// When hash is provided, use space-separated format for linking to attachment
+	if (hash) {
+		const hashPrefix = getHashPrefix(hash);
+		const formattedDate = date ? formatDateWithSpaces(date) : "";
+
+		// Format: YYYY MM DD Type Provider hash4 (hash at end for visual cleanliness)
+		const parts = [formattedDate, typeLabel, provider, hashPrefix].filter(
+			Boolean,
+		);
+		return parts.join(" ");
+	}
+
+	// No hash - use traditional format with hyphens (manual notes, markdown files)
+	// Format: Date - Type - Provider (date first for chronological sorting)
 	if (provider && date) {
-		const typeLabel = noteType ? capitalizeFirst(noteType) : "Document";
-		return `${typeLabel} - ${provider} - ${date}`;
+		return `${date} - ${typeLabel} - ${provider}`;
+	}
+
+	if (date) {
+		return `${date} - ${typeLabel}`;
 	}
 
 	if (provider) {
-		const typeLabel = noteType ? capitalizeFirst(noteType) : "Document";
 		return `${typeLabel} - ${provider}`;
 	}
 
@@ -152,7 +291,7 @@ export function generateUniquePath(basePath: string): string {
  * ```typescript
  * // If "Invoice - Amazon - 2024-12-10.md" exists:
  * generateUniqueNotePath("/vault/Notes/Invoice - Amazon - 2024-12-10.md");
- * // → "/vault/Notes/Invoice - Amazon - 2024-12-10 1.md"
+ * // → "/vault/Notes/Invoice - Amazon - 2024-12-10 (2).md"
  * ```
  */
 export function generateUniqueNotePath(basePath: string): string {
@@ -162,14 +301,14 @@ export function generateUniqueNotePath(basePath: string): string {
 
 	const ext = extname(basePath);
 	const base = ext ? basePath.slice(0, -ext.length) : basePath;
-	let counter = 1;
+	let counter = 2;
 
-	// Obsidian uses space before number: "Title 1.md", "Title 2.md"
-	while (pathExistsSync(`${base} ${counter}${ext}`)) {
+	// Obsidian pattern: "Title.md", "Title (2).md", "Title (3).md"
+	while (pathExistsSync(`${base} (${counter})${ext}`)) {
 		counter++;
 	}
 
-	return `${base} ${counter}${ext}`;
+	return `${base} (${counter})${ext}`;
 }
 
 /**

@@ -9,7 +9,7 @@
  * @module inbox/core/operations/execute-suggestion
  */
 
-import { basename, dirname, extname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import {
 	ensureDirSync,
 	moveFile,
@@ -35,7 +35,11 @@ import {
 	hashFile,
 } from "../../registry/processed-registry";
 import type { ExecutionResult, InboxSuggestion } from "../../types";
-import { generateFilename, generateUniquePath } from "../engine-utils";
+import {
+	generateFilename,
+	generateUniquePath,
+	getHashPrefix,
+} from "../engine-utils";
 import { rollbackOperation } from "../staging/rollback";
 
 /**
@@ -78,43 +82,7 @@ export async function executeSuggestion(
 		executeLogger.debug`Executing suggestion id=${suggestion.id} action=${suggestion.action} source=${filename} ${cid}`;
 	}
 
-	// Generate attachment filename
-	// LLM-suggested names already include the document date (e.g., "2025-10-27-pv-foulkes-invoice")
-	// Fallback uses processing timestamp (YYYYMMDD-HHMM-description)
-	let datedFilename: string;
-
-	// Extract suggestedAttachmentName if present on the suggestion type
-	// (available on create-note, move, rename, and link suggestions)
-	const suggestedName =
-		"suggestedAttachmentName" in suggestion
-			? suggestion.suggestedAttachmentName
-			: undefined;
-
-	if (suggestedName) {
-		// LLM provided a filename with document date - use it directly (no timestamp prefix)
-		const ext = extname(suggestion.source);
-		datedFilename = `${suggestedName}${ext}`;
-	} else {
-		// Fallback: use processing timestamp + extracted description from filename
-		datedFilename = generateFilename(suggestion.source);
-	}
-
-	const intendedAttachmentDest = join(
-		config.vaultPath,
-		config.attachmentsFolder,
-		datedFilename,
-	);
-
-	// Generate unique path to prevent overwriting existing files
-	const attachmentDest = generateUniquePath(intendedAttachmentDest);
-	const actualFilename = basename(attachmentDest);
-	const movedAttachmentPath = join(config.attachmentsFolder, actualFilename);
-
-	if (attachmentDest !== intendedAttachmentDest && executeLogger) {
-		executeLogger.warn`File collision detected - using unique name: ${actualFilename} ${cid}`;
-	}
-
-	// Hash the SOURCE file BEFORE moving (needed for registry)
+	// Hash the SOURCE file FIRST - this provides our unique ID for filename generation
 	let hash: string;
 	try {
 		hash = await hashFile(sourcePath);
@@ -125,6 +93,49 @@ export async function executeSuggestion(
 			action: suggestion.action,
 			error: `Failed to hash source file: ${error instanceof Error ? error.message : "unknown"}`,
 		};
+	}
+
+	// Generate attachment filename with hash prefix
+	// Format: YYYYMMDD-hash4-description.ext (hash guarantees uniqueness)
+	let hashedFilename: string;
+
+	// Extract suggestedAttachmentName if present on the suggestion type
+	// (available on create-note, move, rename, and link suggestions)
+	const suggestedName =
+		"suggestedAttachmentName" in suggestion
+			? suggestion.suggestedAttachmentName
+			: undefined;
+
+	const hashPrefix = getHashPrefix(hash);
+
+	if (suggestedName) {
+		// Use the pre-generated attachment name from scan phase
+		hashedFilename = suggestedName;
+	} else {
+		// Fallback: generate filename using available suggestion data
+		const noteType =
+			"suggestedNoteType" in suggestion
+				? suggestion.suggestedNoteType
+				: undefined;
+		const fields =
+			"extractedFields" in suggestion ? suggestion.extractedFields : undefined;
+		hashedFilename = generateFilename(
+			suggestion.source,
+			hash,
+			noteType,
+			fields,
+		);
+	}
+
+	const attachmentDest = join(
+		config.vaultPath,
+		config.attachmentsFolder,
+		hashedFilename,
+	);
+	const movedAttachmentPath = join(config.attachmentsFolder, hashedFilename);
+
+	if (executeLogger) {
+		executeLogger.debug`Generated filename=${hashedFilename} hash=${hashPrefix} ${cid}`;
 	}
 
 	let createdNotePath: string | undefined;
@@ -528,7 +539,7 @@ export async function executeSuggestion(
 	}
 
 	if (executeLogger) {
-		executeLogger.info`Executed suggestion id=${suggestion.id} movedTo=${isBookmark ? movedFilePath : datedFilename} createdNote=${createdNotePath ?? "none"} ${cid}`;
+		executeLogger.info`Executed suggestion id=${suggestion.id} movedTo=${isBookmark ? movedFilePath : hashedFilename} createdNote=${createdNotePath ?? "none"} ${cid}`;
 	}
 
 	return {

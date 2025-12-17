@@ -292,13 +292,14 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				filename,
 			} as const;
 
-			// Check if already processed via hash
+			// Calculate hash for dedup check and linking note title to attachment
+			let fileHash: string;
 			try {
 				if (onProgress) {
 					await onProgress({ ...progressBase, stage: "hash" });
 				}
-				const hash = await hashFile(filePath);
-				if (registry.isProcessed(hash)) {
+				fileHash = await hashFile(filePath);
+				if (registry.isProcessed(fileHash)) {
 					if (inboxLogger) {
 						inboxLogger.debug`Skipping already processed: ${filename} cid=${cid}`;
 					}
@@ -650,6 +651,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				inboxFolder: resolvedConfig.inboxFolder,
 				heuristicResult,
 				llmResult,
+				hash: fileHash,
 			});
 
 			// Log the final suggestion source
