@@ -224,12 +224,20 @@ content  Registry  suggestions approve  notes
 **Environment Variables:**
 - `PARA_VAULT` (required) - Path to Obsidian vault
 - `PARA_OBSIDIAN_CONFIG` (optional) - Custom config path
+- `PARA_LLM_MODEL` (optional) - Override LLM model (e.g., "qwen2.5:14b", "haiku")
+- `PARA_LLM_FALLBACK_MODEL` (optional) - Fallback model when Claude fails
+- `PARA_LLM_TIMEOUT_MS` (optional) - Override LLM timeout in milliseconds
 
 **Config Files (merged in order):**
 1. Built-in defaults (autoCommit: true by default)
 2. `~/.config/para-obsidian/config.json`
 3. `.para-obsidianrc` (project root)
 4. Environment overrides
+
+**LLM Timeout Configuration (priority order, highest wins):**
+1. `PARA_LLM_TIMEOUT_MS` env var
+2. `llmTimeoutMs` in config files
+3. Model-aware defaults: 60s (Claude) / 10 min (Ollama)
 
 **Git Integration:**
 - Auto-commit enabled by default for vault operations

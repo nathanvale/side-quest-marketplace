@@ -6,9 +6,15 @@
  *
  * Includes automatic fallback from Claude to local Ollama when Claude fails.
  *
+ * Timeout configuration (priority order, highest wins):
+ * 1. PARA_LLM_TIMEOUT_MS env var
+ * 2. llmTimeoutMs in config files (.paraobsidianrc, ~/.config/para-obsidian/config.json)
+ * 3. Model-aware defaults (60s Claude, 10min Ollama)
+ *
  * @module inbox/core/llm/client
  */
 
+import { loadConfig } from "../../../config";
 import { llmLogger } from "../../../shared/logger";
 
 // Lazy-loaded LLM module to avoid circular dependencies at module load time
@@ -17,8 +23,56 @@ let llmModule: typeof import("@sidequest/core/llm") | null = null;
 /** Default fallback model when Claude fails */
 const DEFAULT_FALLBACK_MODEL = "qwen2.5:14b";
 
-/** Timeout for Claude calls before triggering fallback (15 seconds) */
-const CLAUDE_FALLBACK_TIMEOUT_MS = 15_000;
+/**
+ * Get timeout from PARA_LLM_TIMEOUT_MS env var.
+ * @returns Timeout in ms, or undefined if not set
+ */
+function getEnvTimeoutMs(): number | undefined {
+	const val = process.env.PARA_LLM_TIMEOUT_MS;
+	if (!val) return undefined;
+	const parsed = Number.parseInt(val, 10);
+	return !Number.isNaN(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+/**
+ * Get timeout from config files (via loadConfig cascade).
+ * @returns Timeout in ms, or undefined if not configured
+ */
+function getConfigTimeoutMs(): number | undefined {
+	try {
+		const config = loadConfig();
+		return config.llmTimeoutMs;
+	} catch {
+		// Config not available (e.g., PARA_VAULT not set in tests)
+		return undefined;
+	}
+}
+
+/**
+ * Resolve timeout for a model using priority cascade:
+ * 1. PARA_LLM_TIMEOUT_MS env var (highest)
+ * 2. llmTimeoutMs in config files
+ * 3. Model-aware defaults (60s Claude, 10min Ollama)
+ *
+ * @param model - The LLM model to get timeout for
+ * @returns Timeout in milliseconds
+ */
+async function resolveTimeout(model: LLMModel): Promise<number> {
+	// Lazy load to get getDefaultTimeoutMs
+	if (!llmModule) {
+		llmModule = await import("@sidequest/core/llm");
+	}
+	const { getDefaultTimeoutMs } = llmModule;
+
+	const timeout =
+		getEnvTimeoutMs() ?? getConfigTimeoutMs() ?? getDefaultTimeoutMs(model);
+
+	if (llmLogger) {
+		llmLogger.debug`Resolved timeout for ${model}: ${timeout}ms`;
+	}
+
+	return timeout;
+}
 
 /**
  * Supported LLM model types.
@@ -100,6 +154,10 @@ export function createTestLLMClient(
  * When a Claude model fails (auth issues, rate limits, etc.),
  * automatically falls back to local Ollama model.
  *
+ * Environment variables:
+ * - PARA_LLM_MODEL: Override the primary model (e.g., "qwen2.5:14b", "haiku", "sonnet")
+ * - PARA_LLM_FALLBACK_MODEL: Override the fallback model when Claude fails
+ *
  * @param prompt - The prompt to send to the LLM
  * @param provider - The LLM provider (e.g., "haiku", "sonnet")
  * @param model - Optional specific model override
@@ -116,19 +174,22 @@ export async function callLLMWithMetadata(
 	}
 	const { callModel } = llmModule;
 
-	// Determine the model to use based on provider
+	// Priority: env var > explicit model param > provider-based default
 	// Cast to satisfy the type - callModel will validate
-	const resolvedModel = (model ??
+	const resolvedModel = (process.env.PARA_LLM_MODEL ??
+		model ??
 		(provider === "haiku" ? "haiku" : "sonnet")) as LLMModel;
 
+	// Resolve timeout using config cascade
+	const timeoutMs = await resolveTimeout(resolvedModel);
+
 	// If using Claude, try it first with fallback to Ollama
-	// Use shorter timeout to fail fast and trigger fallback
 	if (isClaudeModel(resolvedModel)) {
 		try {
 			const response = await callModel({
 				model: resolvedModel,
 				prompt,
-				timeoutMs: CLAUDE_FALLBACK_TIMEOUT_MS,
+				timeoutMs,
 			});
 			return {
 				response,
@@ -149,10 +210,14 @@ export async function callLLMWithMetadata(
 				llmLogger.warn`Claude (${resolvedModel}) failed: ${errorMsg}. Falling back to ${fallbackModel}`;
 			}
 
+			// Resolve timeout for fallback model (critical fix: was using 60s default!)
+			const fallbackTimeoutMs = await resolveTimeout(fallbackModel);
+
 			try {
 				const response = await callModel({
 					model: fallbackModel,
 					prompt,
+					timeoutMs: fallbackTimeoutMs,
 				});
 
 				// Log successful fallback
@@ -183,10 +248,11 @@ export async function callLLMWithMetadata(
 		}
 	}
 
-	// Non-Claude model - call directly
+	// Non-Claude model (Ollama) - call directly with resolved timeout
 	const response = await callModel({
 		model: resolvedModel,
 		prompt,
+		timeoutMs,
 	});
 	return {
 		response,

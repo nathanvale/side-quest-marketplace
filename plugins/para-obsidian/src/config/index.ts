@@ -112,6 +112,12 @@ export interface ParaObsidianConfig {
 	>;
 	/** IDs of converters to disable. */
 	readonly disabledConverters?: ReadonlyArray<string>;
+	/**
+	 * LLM timeout in milliseconds.
+	 * Overrides model-aware defaults (60s Claude, 10min Ollama).
+	 * Can also be set via PARA_LLM_TIMEOUT_MS env var (takes precedence).
+	 */
+	readonly llmTimeoutMs?: number;
 }
 
 /**

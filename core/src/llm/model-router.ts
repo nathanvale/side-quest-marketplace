@@ -27,8 +27,11 @@ export type LLMModel = ClaudeModel | OllamaModel;
 /** Default Ollama API URL */
 export const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 
-/** Default timeout for LLM calls in milliseconds (60 seconds) */
-export const DEFAULT_LLM_TIMEOUT_MS = 60000;
+/** Default timeout for Claude models (60 seconds) - fast API, fail-fast for fallback */
+export const DEFAULT_CLAUDE_TIMEOUT_MS = 60_000;
+
+/** Default timeout for Ollama models (10 minutes) - local inference needs time for complex PDFs */
+export const DEFAULT_OLLAMA_TIMEOUT_MS = 600_000;
 
 /**
  * Options for calling an LLM model.
@@ -71,6 +74,21 @@ export function isOllamaModel(model: LLMModel): model is OllamaModel {
 }
 
 /**
+ * Get the default timeout for a given model based on its type.
+ *
+ * Claude models get 60s (fast API, fail-fast for fallback).
+ * Ollama models get 10 minutes (local inference needs time for complex PDFs).
+ *
+ * @param model - The LLM model identifier
+ * @returns Default timeout in milliseconds
+ */
+export function getDefaultTimeoutMs(model: LLMModel): number {
+	return isClaudeModel(model)
+		? DEFAULT_CLAUDE_TIMEOUT_MS
+		: DEFAULT_OLLAMA_TIMEOUT_MS;
+}
+
+/**
  * Validate a model against allowed models list.
  *
  * @param model - Model to validate
@@ -100,7 +118,7 @@ export function validateModel(
 export async function callClaudeHeadless(
 	prompt: string,
 	model: ClaudeModel,
-	timeoutMs: number = DEFAULT_LLM_TIMEOUT_MS,
+	timeoutMs: number = DEFAULT_CLAUDE_TIMEOUT_MS,
 ): Promise<string> {
 	try {
 		// Use spawnWithTimeout for proper process cleanup on timeout
@@ -171,7 +189,7 @@ export async function callClaudeHeadless(
  * @param prompt - The prompt to send
  * @param model - Ollama model identifier
  * @param ollamaUrl - Ollama API URL (default: http://localhost:11434)
- * @param timeoutMs - Timeout in milliseconds (default: 60000ms / 60 seconds)
+ * @param timeoutMs - Timeout in milliseconds (default: 10 minutes for local inference)
  * @returns The generated response text
  * @throws Error if Ollama is not running, model not found, or call times out
  */
@@ -179,7 +197,7 @@ export async function callOllamaModel(
 	prompt: string,
 	model: OllamaModel,
 	ollamaUrl: string = DEFAULT_OLLAMA_URL,
-	timeoutMs: number = DEFAULT_LLM_TIMEOUT_MS,
+	timeoutMs: number = DEFAULT_OLLAMA_TIMEOUT_MS,
 ): Promise<string> {
 	let response: Response;
 
@@ -206,8 +224,10 @@ export async function callOllamaModel(
 	} catch (error) {
 		if (error instanceof Error) {
 			if (error.name === "AbortError") {
+				const minutes = Math.round(timeoutMs / 60000);
 				throw new Error(
-					`Ollama call timed out after ${timeoutMs}ms. Try using a smaller model or increasing timeout.`,
+					`Ollama call timed out after ${minutes} min. ` +
+						`Set PARA_LLM_TIMEOUT_MS or llmTimeoutMs in config to increase.`,
 				);
 			}
 			if (error.message.includes("ECONNREFUSED")) {
