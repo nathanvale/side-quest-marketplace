@@ -14,7 +14,7 @@ import type { InboxConverter } from "../types";
  * Medical statement classifier for healthcare provider account statements
  */
 export const medicalStatementClassifier: InboxConverter = {
-	schemaVersion: 1,
+	schemaVersion: 3,
 	id: "medical-statement",
 	displayName: "Medical Statement",
 	enabled: true,
@@ -33,7 +33,6 @@ export const medicalStatementClassifier: InboxConverter = {
 			{ pattern: "specialist", weight: 0.9 },
 			{ pattern: "pathology", weight: 0.9 },
 			{ pattern: "radiology", weight: 0.9 },
-			{ pattern: "invoice", weight: 0.6 },
 		],
 		contentMarkers: [
 			// Strong medical indicators
@@ -89,10 +88,11 @@ export const medicalStatementClassifier: InboxConverter = {
 			validationPattern: "^(summary|detailed|single-appointment)$",
 		},
 		{
-			name: "provider",
+			name: "providerNumber",
 			type: "string",
-			description: "Medical practice/provider name",
-			requirement: "required",
+			description:
+				"Medicare provider number (format: 7 digits + letter, e.g., 0388478B)",
+			requirement: "optional",
 		},
 		{
 			name: "practitioner",
@@ -163,6 +163,33 @@ export const medicalStatementClassifier: InboxConverter = {
 			allowedValues: ["paid", "unpaid", "pending"],
 			validationPattern: "^(paid|unpaid|pending)$",
 		},
+		// Payment details for bank transfers
+		{
+			name: "bsb",
+			type: "string",
+			description: "Bank BSB number for payment (format: XXX-XXX)",
+			requirement: "optional",
+		},
+		{
+			name: "accountNumber",
+			type: "string",
+			description: "Bank account number for payment",
+			requirement: "optional",
+		},
+		// Consultation details
+		{
+			name: "consultationCount",
+			type: "number",
+			description: "Number of consultations/appointments in this statement",
+			requirement: "optional",
+		},
+		{
+			name: "consultations",
+			type: "string",
+			description:
+				"Consultation details as markdown table with columns: Date, Service, Item Code, Amount. Each row is one appointment.",
+			requirement: "optional",
+		},
 		{
 			name: "area",
 			type: "string",
@@ -174,15 +201,17 @@ export const medicalStatementClassifier: InboxConverter = {
 
 	extraction: {
 		promptHint:
-			"This is a medical account statement from a healthcare provider. Extract the provider name, patient details, statement period, and financial summary. The statement balance is the amount currently owing. Set status to 'paid' if balance is 0, 'unpaid' if there is an amount owing. Area should always be 'Health'. Determine the statement type: 'summary' for period summaries, 'detailed' for itemized services, 'single-appointment' for individual consultations.",
+			"This is a medical account statement from a healthcare provider. Extract: (1) Provider name, provider number (Medicare format: 7 digits + letter like 0388478B), patient details, statement period, and financial summary. (2) Payment details - look for BSB (format XXX-XXX) and account number (A/C). (3) Consultation table - extract each appointment as a markdown table row with Date, Service description, Item code (in parentheses like 306 or 91830), and Amount. Count the consultations. Set status to 'paid' if balance is 0, 'unpaid' if owing. Area should always be 'Health'. Statement type: 'summary' for period summaries, 'detailed' for itemized services, 'single-appointment' for single consultation.",
 		keyFields: [
 			"provider",
+			"providerNumber",
 			"patient",
 			"statementDate",
 			"statementBalance",
 			"status",
 			"area",
 			"statementType",
+			"consultations",
 		],
 	},
 
@@ -192,6 +221,7 @@ export const medicalStatementClassifier: InboxConverter = {
 			// Primary fields
 			title: "Statement title",
 			provider: "Medical practice name",
+			providerNumber: "Provider number",
 			practitioner: "Doctor/practitioner name",
 			patient: "Patient name",
 			statementDate: "Statement date (YYYY-MM-DD)",
@@ -202,6 +232,12 @@ export const medicalStatementClassifier: InboxConverter = {
 			totalPayments: "Total payments",
 			statementBalance: "Statement balance (amount owing)",
 			status: "Status (paid/unpaid/pending)",
+			// Payment details
+			bsb: "BSB (XXX-XXX)",
+			accountNumber: "Account number",
+			// Consultation details
+			consultationCount: "Number of consultations",
+			consultations: "Consultation details (markdown table)",
 			area: "Area (Health)",
 			// Aliases
 			date: "Statement date (YYYY-MM-DD)",

@@ -245,9 +245,9 @@ export function buildInboxPrompt(
 
 ## Document Information
 - Filename: ${filename}
-- Content preview (first 3000 chars):
+- Content preview (first 6000 chars):
 
-${content.slice(0, 3000)}
+${content.slice(0, 6000)}
 
 ## Available Document Types
 ${documentTypes}

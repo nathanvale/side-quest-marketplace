@@ -9,7 +9,7 @@
  */
 
 import { join } from "node:path";
-import { generateTitle } from "../../core/engine-utils";
+import { generateFilename, generateTitle } from "../../core/engine-utils";
 import {
 	CONFIDENCE_THRESHOLDS,
 	type Confidence,
@@ -53,6 +53,8 @@ export interface SuggestionInput {
 	readonly processor?: ProcessorType;
 	/** Optional override for detection source (e.g., "frontmatter" for pre-tagged notes) */
 	readonly detectionSource?: DetectionSource;
+	/** SHA256 hash of file content (links note title to attachment filename) */
+	readonly hash?: string;
 }
 
 // =============================================================================
@@ -81,6 +83,7 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 		llmResult,
 		processor = "attachments",
 		detectionSource: providedDetectionSource,
+		hash,
 	} = input;
 
 	const source = join(inboxFolder, filename);
@@ -172,16 +175,18 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 		detectionSource = providedDetectionSource;
 	}
 
-	// Generate suggested title from filename
+	// Generate suggested title (with hash for linking to attachment)
 	const suggestedTitle = generateTitle(
 		filename,
 		suggestedNoteType,
 		extractedFields,
+		hash,
 	);
 
-	// Use LLM-suggested filename description if available
-	const suggestedAttachmentName = llmResult?.suggestedFilenameDescription
-		? llmResult.suggestedFilenameDescription
+	// Generate attachment name using hash (guarantees uniqueness)
+	// Format mirrors note title: date-hash-type-provider.ext (lowercase, hyphens)
+	const suggestedAttachmentName = hash
+		? generateFilename(filename, hash, suggestedNoteType, extractedFields)
 		: undefined;
 
 	// Pass through extraction warnings from LLM
