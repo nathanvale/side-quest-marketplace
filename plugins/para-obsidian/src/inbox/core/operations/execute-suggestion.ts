@@ -17,6 +17,7 @@ import {
 	readTextFileSync,
 	writeTextFileSync,
 } from "@sidequest/core/fs";
+import { DEFAULT_PARA_FOLDERS } from "../../../config/defaults";
 import { loadConfig } from "../../../config/index";
 import {
 	parseFrontmatter,
@@ -50,6 +51,64 @@ export interface ExecuteSuggestionConfig {
 	readonly inboxFolder: string;
 	readonly attachmentsFolder: string;
 	readonly templatesFolder: string;
+}
+
+/**
+ * Resolve semantic PARA folder names to numbered folder paths.
+ *
+ * Maps short semantic names like "Resources" to actual vault folder paths like "03 Resources".
+ * Throws an error if the destination looks like a PARA name but isn't mapped.
+ * Passes through full paths (e.g., "02 Areas/Finance") unchanged.
+ *
+ * @param destination - The destination string from suggestion (e.g., "Resources", "02 Areas/Finance")
+ * @param paraFolders - PARA folder mappings from config (e.g., { resources: "03 Resources" })
+ * @returns Resolved folder path
+ * @throws Error if destination looks like unmapped PARA name
+ */
+export function resolveParaFolder(
+	destination: string,
+	paraFolders: Record<string, string> = DEFAULT_PARA_FOLDERS,
+): string {
+	// Check if it's already a full path (contains "/" or starts with number)
+	if (destination.includes("/") || /^\d{2}\s/.test(destination)) {
+		return destination;
+	}
+
+	// Map semantic PARA names to numbered folders
+	const semanticName = destination.toLowerCase();
+	const mapping: Record<string, string> = {
+		inbox: paraFolders.inbox ?? DEFAULT_PARA_FOLDERS.inbox ?? "00 Inbox",
+		projects:
+			paraFolders.projects ?? DEFAULT_PARA_FOLDERS.projects ?? "01 Projects",
+		areas: paraFolders.areas ?? DEFAULT_PARA_FOLDERS.areas ?? "02 Areas",
+		resources:
+			paraFolders.resources ?? DEFAULT_PARA_FOLDERS.resources ?? "03 Resources",
+		archives:
+			paraFolders.archives ?? DEFAULT_PARA_FOLDERS.archives ?? "04 Archives",
+	};
+
+	// If it's a known PARA name, return the mapped value
+	if (semanticName in mapping) {
+		const resolved = mapping[semanticName];
+		if (!resolved) {
+			throw new Error(
+				`PARA folder mapping returned undefined for: "${destination}"`,
+			);
+		}
+		return resolved;
+	}
+
+	// If it looks like a PARA name but isn't mapped, throw error
+	// (Prevents silent failures where "Resources" becomes a new folder in vault root)
+	const paraNamesPattern = /^(inbox|projects|areas|resources|archives)$/i;
+	if (paraNamesPattern.test(destination)) {
+		throw new Error(
+			`Unmapped PARA folder name: "${destination}". Expected mapping in paraFolders config.`,
+		);
+	}
+
+	// Not a PARA name - return unchanged (custom folder path)
+	return destination;
 }
 
 /**
@@ -245,7 +304,11 @@ export async function executeSuggestion(
 			"suggestedDestination" in suggestion &&
 			suggestion.suggestedDestination
 		) {
-			finalDest = suggestion.suggestedDestination;
+			// Resolve semantic PARA names (e.g., "Resources" → "03 Resources")
+			finalDest = resolveParaFolder(
+				suggestion.suggestedDestination,
+				paraConfig.paraFolders,
+			);
 		} else {
 			finalDest =
 				paraConfig.defaultDestinations?.[suggestion.suggestedNoteType] ??
@@ -332,7 +395,11 @@ export async function executeSuggestion(
 				"suggestedDestination" in suggestion &&
 				suggestion.suggestedDestination
 			) {
-				finalDest = suggestion.suggestedDestination;
+				// Resolve semantic PARA names (e.g., "Resources" → "03 Resources")
+				finalDest = resolveParaFolder(
+					suggestion.suggestedDestination,
+					paraConfig.paraFolders,
+				);
 			} else if (
 				suggestion.action === "create-note" &&
 				suggestion.suggestedNoteType

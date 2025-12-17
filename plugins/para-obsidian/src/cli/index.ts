@@ -31,6 +31,7 @@ export { handleCreateClassifier } from "./create-classifier";
 export { handleCreateNoteTemplate } from "./create-note-template";
 // Export commands
 export { handleExportBookmarks } from "./export-bookmarks";
+export { handleExportWebClipperTemplate } from "./export-webclipper-template";
 // Frontmatter commands
 export {
 	computeFrontmatterHints,

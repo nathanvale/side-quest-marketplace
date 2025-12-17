@@ -343,8 +343,11 @@ Invoice from Dr. Smith for checkup.
 			// Should have detectionSource: 'frontmatter' (skipped LLM)
 			expect(suggestion.detectionSource).toBe("frontmatter");
 
-			// Should have medium confidence (pre-classified ≠ AI-verified)
-			expect(suggestion.confidence).toBe("medium");
+			// Should have high confidence (fast-path with valid routing)
+			expect(suggestion.confidence).toBe("high");
+
+			// Should have autoRoute flag set
+			expect(suggestion.autoRoute).toBe(true);
 
 			// Should preserve frontmatter values
 			expect(suggestion.suggestedNoteType).toBe("invoice");
@@ -383,7 +386,8 @@ Receipt from hardware store.
 			if (!isCreateNoteSuggestion(suggestion)) return;
 
 			expect(suggestion.detectionSource).toBe("frontmatter");
-			expect(suggestion.confidence).toBe("medium");
+			expect(suggestion.confidence).toBe("high");
+			expect(suggestion.autoRoute).toBe(true);
 			expect(suggestion.suggestedProject).toBe("House Renovation");
 			expect(suggestion.suggestedDestination).toBe(
 				"01 Projects/House Renovation",
@@ -479,6 +483,42 @@ amount: 50.00
 
 			// Should still work with plain text format
 			expect(suggestion.detectionSource).toBe("frontmatter");
+			expect(suggestion.suggestedArea).toBe("Health");
+		});
+
+		test("should prioritize project over area when both are present", async () => {
+			// Create a markdown note with both area and project
+			const mdContent = `---
+type: invoice
+area: "[[Health]]"
+project: "[[House Renovation]]"
+title: Both Area and Project
+provider: Test Provider
+amount: 100.00
+---
+# Content
+`;
+			writeFileSync(join(inboxPath, "both-area-project.md"), mdContent);
+
+			const engine = createTestEngine({ vaultPath: preClassTestPath });
+			const suggestions = await engine.scan();
+
+			expect(suggestions).toHaveLength(1);
+			const suggestion = suggestions[0];
+			expect(suggestion).toBeDefined();
+			if (!suggestion) return;
+
+			expect(isCreateNoteSuggestion(suggestion)).toBe(true);
+			if (!isCreateNoteSuggestion(suggestion)) return;
+
+			// Project should take precedence
+			expect(suggestion.detectionSource).toBe("frontmatter");
+			expect(suggestion.confidence).toBe("high");
+			expect(suggestion.autoRoute).toBe(true);
+			expect(suggestion.suggestedDestination).toBe(
+				"01 Projects/House Renovation",
+			);
+			expect(suggestion.suggestedProject).toBe("House Renovation");
 			expect(suggestion.suggestedArea).toBe("Health");
 		});
 

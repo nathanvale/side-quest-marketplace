@@ -173,6 +173,15 @@ export interface CreateNoteSuggestion extends BaseSuggestion {
 
 	/** [[Attachments/...]] wikilink */
 	readonly attachmentLink?: string;
+
+	/** If true, auto-route without user review (for high-confidence suggestions) */
+	readonly autoRoute?: boolean;
+
+	/** LLM's suggested area (display only - shows what LLM detected before user override) */
+	readonly llmSuggestedArea?: string;
+
+	/** LLM's suggested project (display only - shows what LLM detected before user override) */
+	readonly llmSuggestedProject?: string;
 }
 
 /**
@@ -874,6 +883,8 @@ export type CLICommand =
 	| { type: "approve-all" } // Approve all visible items (lowercase 'a')
 	| { type: "approve-remaining" } // Approve all non-skipped items across all pages (uppercase 'A')
 	| { type: "approve"; ids: number[] }
+	| { type: "accept-suggestion"; id: number } // Accept LLM suggestion for item (y<n>)
+	| { type: "set-destination"; id: number; path: string } // Set custom destination (d<n> <path>)
 	| { type: "edit"; id: number; prompt: string }
 	| { type: "skip"; id: number }
 	| { type: "view"; id: number }

@@ -264,6 +264,34 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	}
 
 	/**
+	 * Resolve destination path from frontmatter fields.
+	 * Returns undefined if routing fields are missing or invalid.
+	 *
+	 * @param frontmatter - Extracted frontmatter fields
+	 * @param vaultContext - Vault context with areas and projects
+	 * @returns Resolved destination path or undefined
+	 * @internal
+	 */
+	function resolveDestinationFromFrontmatter(
+		frontmatter: Record<string, unknown>,
+		vaultContext: VaultContext,
+	): string | undefined {
+		const area = parseWikilink(frontmatter.area);
+		const project = parseWikilink(frontmatter.project);
+
+		// Project takes precedence over area if both are set
+		if (project && vaultContext.projects.includes(project)) {
+			return `01 Projects/${project}`;
+		}
+		if (area && vaultContext.areas.includes(area)) {
+			return `02 Areas/${area}`;
+		}
+
+		// No valid routing fields found
+		return undefined;
+	}
+
+	/**
 	 * Process a single inbox file: hash check, extraction, LLM detection, suggestion building.
 	 * @internal
 	 */
@@ -373,9 +401,9 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				return errorSuggestion;
 			}
 
-			// Pre-classification check for markdown notes with valid frontmatter
-			// If frontmatter has a valid type that matches a known classifier AND
-			// all required fields are present, skip LLM entirely (frontmatter fast-path)
+			// Two-path routing strategy for markdown notes with valid frontmatter:
+			// - FAST PATH: type in classifier registry + has area/project → auto-route (skip LLM)
+			// - LLM PATH: everything else → LLM suggests, user must confirm
 			// Note: We extract frontmatter here and preserve it for later merging with LLM results
 			let preservedFrontmatter: Record<string, unknown> | undefined;
 
@@ -394,56 +422,22 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 						// Preserve frontmatter for potential merge with LLM results
 						preservedFrontmatter = frontmatter;
 
-						// Check if key extraction fields are present in frontmatter
-						// Key fields are defined in the classifier's extraction.keyFields
-						// If key fields are missing, fall through to LLM for extraction
-						const keyFields = matchingClassifier.extraction?.keyFields ?? [];
-						const missingKeyFields = keyFields.filter(
-							(fieldName) => !frontmatter[fieldName],
+						// Try to resolve destination from frontmatter (fast-path check)
+						const destination = resolveDestinationFromFrontmatter(
+							frontmatter,
+							vaultContext,
 						);
 
-						// For bookmarks, require para field (for PARA routing) in addition to url/title
-						// For invoices, require provider + amount as minimum key fields
-						const hasMinimumFields =
-							missingKeyFields.length === 0 ||
-							(matchingClassifier.id === "bookmark" &&
-								frontmatter.url &&
-								frontmatter.title &&
-								frontmatter.para) || // Must have para for PARA routing
-							(matchingClassifier.id === "invoice" &&
-								frontmatter.provider &&
-								frontmatter.amount);
-
-						if (hasMinimumFields) {
-							// All required fields present - use frontmatter fast-path
+						// FAST PATH: Has valid routing fields (area/project) → auto-route without LLM
+						if (destination) {
 							const area = parseWikilink(frontmatter.area);
 							const project = parseWikilink(frontmatter.project);
-							const para = parseWikilink(frontmatter.para);
 
-							// Build destination from frontmatter fields
-							let destination: string | undefined;
-
-							if (project) {
-								const projectExists = vaultContext.projects.includes(project);
-								if (projectExists) {
-									destination = `01 Projects/${project}`;
-								}
-							} else if (area) {
-								const areaExists = vaultContext.areas.includes(area);
-								if (areaExists) {
-									destination = `02 Areas/${area}`;
-								}
-							} else if (para) {
-								// Support 'para' field with PARA category name (e.g., "Resources")
-								destination = para;
-							}
-
-							// Build CreateNoteSuggestion from frontmatter (skip LLM)
 							const suggestion: CreateNoteSuggestion = {
 								id: createSuggestionId(),
 								source: join(resolvedConfig.inboxFolder, filename),
 								processor: "notes",
-								confidence: "medium", // Pre-classified = medium (not AI-verified)
+								confidence: "high", // Fast-path with valid routing = high confidence
 								detectionSource: "frontmatter",
 								action: "create-note",
 								suggestedNoteType: mdMetadata.noteType,
@@ -454,7 +448,8 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 								suggestedProject: project,
 								suggestedDestination: destination,
 								extractedFields: frontmatter,
-								reason: `Pre-classified ${mdMetadata.noteType} note (frontmatter)`,
+								autoRoute: true, // Flag for auto-routing (skip user review)
+								reason: `Pre-routed via frontmatter (${project ? "project" : "area"})`,
 							};
 
 							suggestionCache.set(suggestion.id, suggestion);
@@ -465,14 +460,15 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 								});
 							}
 							if (inboxLogger) {
-								inboxLogger.info`Pre-classified file=${filename} type=${mdMetadata.noteType} destination=${destination ?? "none"} cid=${cid}`;
+								inboxLogger.info`Fast-path file=${filename} type=${mdMetadata.noteType} destination=${destination} autoRoute=true cid=${cid}`;
 							}
 							return suggestion;
 						}
 
-						// Missing key fields - fall through to LLM
+						// LLM PATH: No valid routing fields OR routing fields don't exist in vault
+						// Fall through to LLM classification to suggest destination
 						if (inboxLogger) {
-							inboxLogger.debug`Pre-classification skipped: missing key fields=${missingKeyFields.join(", ")} file=${filename} cid=${cid}`;
+							inboxLogger.debug`LLM-path triggered: no valid routing fields file=${filename} type=${mdMetadata.noteType} cid=${cid}`;
 						}
 					}
 				}

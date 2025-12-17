@@ -41,10 +41,18 @@ bun run format           # Biome format only
 
 **CLI Usage:**
 ```bash
-bun run src/cli.ts <command> [options]
-bun run src/debug-llm.ts           # Debug LLM classification chain
-bun run src/cli.ts create-classifier    # Classifier creation wizard
-bun run src/cli.ts create-note-template # Template creation wizard
+# Inbox processing (shorter aliases)
+para scan                          # Scan inbox for new files
+para execute                       # Execute approved suggestions
+para export                        # Export bookmarks to browser format
+para init [--quick]                # Create new classifier (wizard)
+para registry list|remove|clear    # Manage processed items registry
+
+# Full commands (also work)
+para process-inbox [--auto] [--preview] [--dry-run]
+para export-bookmarks [--filter type:bookmark]
+para create-classifier
+para create-note-template
 ```
 
 ---
@@ -60,11 +68,14 @@ para-obsidian/
 │   │   ├── index.ts           # Barrel exports
 │   │   ├── config.ts          # Config/info commands
 │   │   ├── create.ts          # Note creation
+│   │   ├── create-classifier.ts # Classifier creation wizard (--quick flag)
+│   │   ├── export-bookmarks.ts  # Export bookmarks to browser format
 │   │   ├── frontmatter/       # Frontmatter subcommands
 │   │   ├── git.ts             # Git integration
 │   │   ├── links.ts           # Link management
 │   │   ├── notes.ts           # CRUD operations
-│   │   ├── process-inbox.ts   # Inbox processing (with execute command)
+│   │   ├── process-inbox.ts   # Inbox processing (visual progress bars)
+│   │   ├── registry.ts        # Registry management (list, remove, clear)
 │   │   └── search.ts          # Search commands
 │   ├── mcp-handlers/          # MCP tool implementations (6 modules)
 │   │   ├── config.ts          # para_config, para_templates
@@ -77,7 +88,7 @@ para-obsidian/
 │   │   ├── core/              # Engine, operations, staging
 │   │   ├── classify/          # LLM classification, converters, classifiers
 │   │   │   ├── classifiers/   # NEW: Classifier registry system
-│   │   │   │   ├── definitions/  # Built-in classifiers (invoice, booking, bookmark, etc.)
+│   │   │   │   ├── definitions/  # Built-in classifiers (invoice, booking, bookmark, medical-statement, research)
 │   │   │   │   ├── registry.ts   # Schema versioning
 │   │   │   │   ├── loader.ts     # Classifier matching
 │   │   │   │   └── migrations/   # Schema migrations
@@ -137,15 +148,19 @@ para-obsidian/
 
 | File | Purpose |
 |------|---------|
-| `src/cli.ts` | CLI entry point with 19 commands |
+| `src/cli.ts` | CLI entry point with 23 commands (including aliases) |
 | `mcp/index.ts` | MCP server entry (20+ tools) |
 | `src/config/defaults.ts` | Default frontmatter rules, templates |
 | `src/inbox/core/engine.ts` | Inbox processing engine |
 | `src/frontmatter/validate.ts` | Frontmatter validation rules |
-| `src/cli/create-classifier.ts` | Classifier creation wizard |
+| `src/cli/create-classifier.ts` | Classifier creation wizard (--quick flag) |
 | `src/cli/create-note-template.ts` | Template creation wizard |
+| `src/cli/process-inbox.ts` | Scan/execute with visual progress bars |
+| `src/cli/export-bookmarks.ts` | Export bookmarks to browser format |
+| `src/cli/registry.ts` | Registry management (list, remove, clear) |
 | `src/inbox/classify/classifiers/generator.ts` | Classifier code generation |
 | `src/inbox/classify/classifiers/registry-updater.ts` | AST-based registry updates |
+| `src/inbox/classify/classifiers/definitions/bookmark.ts` | Web bookmark classifier |
 | `src/templates/wizard.ts` | Template configuration wizard |
 | `src/templates/generator.ts` | Template file generation |
 | `src/shared/atomic-fs.ts` | Atomic file operations |
@@ -160,7 +175,8 @@ para-obsidian/
 
 1. **CLI** (`src/cli.ts`)
    - Command pattern with domain-organized handlers
-   - 19 commands: config, list, read, search, create, insert, rename, delete, frontmatter (6 subcommands), git, process-inbox (scan/execute), etc.
+   - 23 commands with shorter aliases: scan, execute, export, init, registry
+   - Visual progress bars for scan/execute operations
    - Debug tooling: `src/debug-llm.ts` for testing LLM classification chain
 
 2. **MCP Server** (`mcp/index.ts`)
@@ -188,10 +204,16 @@ content  Registry  suggestions approve  notes
 
 **New Features:**
 - **Classifier Registry**: Modular classifier definitions with schema versioning and migrations
+- **Bookmark Classifier**: Web bookmark classification from Obsidian Web Clipper
+- **Export Bookmarks**: Export vault bookmarks to browser-compatible format
 - **Git Guard**: Checks for uncommitted changes before LLM processing
 - **LLM Fallback Transparency**: Shows which fields used LLM vs heuristics
 - **Filename Collision Handling**: Automatic deduplication when creating notes
-- **Enhanced CLI**: Execute command, inline warnings, improved UX
+- **Timestamped Attachments**: Unique attachment filenames prevent collisions
+- **Enhanced CLI UX**: Visual progress bars, shorter command aliases
+- **Enhanced Review Commands**: Approve-all (A), back (b), list (l) navigation
+- **Quick-Start Wizard**: `--quick` flag for fast classifier creation
+- **Registry Management**: List, remove, clear processed items
 - **Classifier Creation Wizard**: Interactive classifier generation with template integration
 - **Template Creation Wizard**: Standalone Templater template generation
 

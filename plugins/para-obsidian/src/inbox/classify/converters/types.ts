@@ -113,6 +113,17 @@ export interface InboxConverter {
 	readonly template: TemplateConfig;
 	/** Confidence scoring configuration */
 	readonly scoring: ScoringConfig;
+	/**
+	 * Optional conversion configuration for transforming to different note types.
+	 * Used for clipping→bookmark conversion workflow where source is web clipping
+	 * but target should be bookmark note with enrichment.
+	 */
+	readonly conversion?: {
+		/** Target note type after conversion */
+		readonly targetType: string;
+		/** If true, requires LLM enrichment before creation */
+		readonly requiresEnrichment?: boolean;
+	};
 }
 
 /**

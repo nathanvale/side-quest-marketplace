@@ -11,6 +11,7 @@ import { createSpinner } from "nanospinner";
 import type {
 	CLICommand,
 	Confidence,
+	CreateNoteSuggestion,
 	DetectionSource,
 	ExecutionResult,
 	InboxEngine,
@@ -141,6 +142,32 @@ export function parseCommand(
 	if (viewMatch?.[1]) {
 		const id = Number.parseInt(viewMatch[1], 10);
 		return { type: "view", id };
+	}
+
+	// Accept suggestion: y<id>
+	const acceptMatch = trimmed.match(/^[yY](\d+)$/);
+	if (acceptMatch?.[1]) {
+		const id = Number.parseInt(acceptMatch[1], 10);
+		return { type: "accept-suggestion", id };
+	}
+
+	// Set destination: d<id> <path>
+	const destMatch = trimmed.match(/^[dD](\d+)\s+(.+)$/);
+	if (destMatch?.[1] && destMatch[2]) {
+		const id = Number.parseInt(destMatch[1], 10);
+		const path = destMatch[2].trim();
+
+		// Security: Prevent path traversal attacks
+		if (path.includes("../")) {
+			return { type: "invalid", input: trimmed };
+		}
+
+		return { type: "set-destination", id, path };
+	}
+
+	// Set destination without path is invalid
+	if (/^[dD]\d*$/.test(trimmed)) {
+		return { type: "invalid", input: trimmed };
 	}
 
 	// Edit command: e<id> <prompt>
@@ -293,6 +320,22 @@ export function formatSuggestion(
 		}
 		metaParts.push(`Type: ${suggestion.suggestedNoteType}`);
 		lines.push(`    ${metaParts.join(" • ")}`);
+
+		// Show destination status
+		if (suggestion.suggestedDestination) {
+			lines.push(`    ├─ Destination: ${suggestion.suggestedDestination}`);
+		} else {
+			lines.push(`    ├─ ${emphasize.error("⚠️ NO DESTINATION SET")}`);
+		}
+
+		// Show LLM suggestion if available and different from current destination
+		const llmSuggestion =
+			suggestion.llmSuggestedArea ?? suggestion.llmSuggestedProject;
+		if (llmSuggestion && llmSuggestion !== suggestion.suggestedDestination) {
+			lines.push(
+				`    └─ ${emphasize.dim(`💡 LLM suggests: ${llmSuggestion} (y${index} to accept)`)}`,
+			);
+		}
 
 		// Show renamed attachment if different from source
 		if (suggestion.suggestedAttachmentName) {
@@ -565,6 +608,8 @@ export function getHelpText(): string {
 	const lines = [
 		emphasize.info("═══ Commands ═══"),
 		"",
+		`  ${emphasize.success("y<n>")}        Accept LLM suggestion for item n`,
+		`  ${emphasize.success("d<n> <path>")} Set destination for item n`,
 		`  ${emphasize.success("a")}           Approve all visible items on current page`,
 		`  ${emphasize.success("A")}           Approve ALL remaining items (all pages)`,
 		`  ${emphasize.success("1,2,5")}       Approve specific items by number`,
@@ -578,13 +623,19 @@ export function getHelpText(): string {
 		`  ${emphasize.success("?")}           Show this help`,
 		"",
 		emphasize.dim("Examples:"),
-		emphasize.dim("  3              - approve item 3"),
-		emphasize.dim("  1,3,5          - approve items 1, 3, and 5"),
+		emphasize.dim("  y1                    - accept LLM suggestion for item 1"),
+		emphasize.dim("  d2 Areas/Health       - set destination for item 2"),
+		emphasize.dim("  d3 Projects/Tax 2024  - multi-word paths supported"),
 		emphasize.dim(
-			"  A              - approve all remaining (skip confirmation per page)",
+			"  y1 y2 y3 a            - accept suggestions then approve all",
 		),
-		emphasize.dim("  v2             - view details of item 2"),
-		emphasize.dim('  e2 "use Work"  - re-classify item 2'),
+		emphasize.dim("  3                     - approve item 3"),
+		emphasize.dim("  1,3,5                 - approve items 1, 3, and 5"),
+		emphasize.dim(
+			"  A                     - approve all remaining (skip confirmation per page)",
+		),
+		emphasize.dim("  v2                    - view details of item 2"),
+		emphasize.dim('  e2 "use Work"         - re-classify item 2'),
 	];
 
 	return lines.join("\n");
@@ -606,6 +657,17 @@ export interface InteractiveOptions {
 
 	/** Page size for pagination (default: PAGE_SIZE) */
 	pageSize?: number;
+}
+
+/**
+ * Check if a suggestion has a destination set (required for execution).
+ * Only create-note suggestions require destinations.
+ */
+function hasDestination(suggestion: InboxSuggestion): boolean {
+	if (!isCreateNoteSuggestion(suggestion)) {
+		return true; // Non-create-note suggestions don't need destinations
+	}
+	return suggestion.suggestedDestination !== undefined;
 }
 
 /**
@@ -714,6 +776,104 @@ export async function runInteractiveLoop(
 		const command = parseCommand(userInput, approved.size > 0);
 
 		switch (command.type) {
+			case "accept-suggestion": {
+				// Copy LLM suggestion to suggestedDestination
+				const targetSuggestion = currentSuggestions.find(
+					(s) => originalIndices.get(s.id) === command.id,
+				);
+
+				if (!targetSuggestion) {
+					console.log(emphasize.error(`Invalid item number: ${command.id}`));
+					break;
+				}
+
+				if (!isCreateNoteSuggestion(targetSuggestion)) {
+					console.log(
+						emphasize.error(
+							`Item ${command.id} is not a create-note suggestion`,
+						),
+					);
+					break;
+				}
+
+				// Accept LLM's area or project suggestion
+				const llmSuggestion =
+					targetSuggestion.llmSuggestedArea ??
+					targetSuggestion.llmSuggestedProject;
+
+				if (!llmSuggestion) {
+					console.log(
+						emphasize.error(
+							`Item ${command.id} has no LLM suggestion to accept`,
+						),
+					);
+					break;
+				}
+
+				// Update suggestion with accepted destination
+				const updatedSuggestion: CreateNoteSuggestion = {
+					...targetSuggestion,
+					suggestedDestination: llmSuggestion,
+				};
+
+				// Replace in current suggestions array
+				const originalIndex = currentSuggestions.findIndex(
+					(s) => s.id === targetSuggestion.id,
+				);
+				if (originalIndex >= 0) {
+					currentSuggestions[originalIndex] = updatedSuggestion;
+				}
+
+				console.log(
+					emphasize.success(
+						`Accepted LLM suggestion for item ${command.id}: ${llmSuggestion}`,
+					),
+				);
+				break;
+			}
+
+			case "set-destination": {
+				// Set custom destination path
+				const targetSuggestion = currentSuggestions.find(
+					(s) => originalIndices.get(s.id) === command.id,
+				);
+
+				if (!targetSuggestion) {
+					console.log(emphasize.error(`Invalid item number: ${command.id}`));
+					break;
+				}
+
+				if (!isCreateNoteSuggestion(targetSuggestion)) {
+					console.log(
+						emphasize.error(
+							`Item ${command.id} is not a create-note suggestion`,
+						),
+					);
+					break;
+				}
+
+				// Update suggestion with custom destination
+				const updatedSuggestion: CreateNoteSuggestion = {
+					...targetSuggestion,
+					suggestedDestination: command.path,
+				};
+
+				// Replace in current suggestions array
+				const originalIndex = currentSuggestions.findIndex(
+					(s) => s.id === targetSuggestion.id,
+				);
+				if (originalIndex >= 0) {
+					currentSuggestions[originalIndex] = updatedSuggestion;
+				}
+
+				console.log(
+					emphasize.success(
+						`Set destination for item ${command.id}: ${command.path}`,
+					),
+				);
+				break;
+			}
+
 			case "execute":
 				// Explicit execution command (Enter key when items approved)
 				return Array.from(approved);
@@ -785,13 +945,45 @@ export async function runInteractiveLoop(
 				try {
 					// Track which IDs were added in this operation for potential rollback
 					const newlyApproved: SuggestionId[] = [];
+					const skippedNoDestination: number[] = [];
+
 					for (const s of displayable) {
 						if (!approved.has(s.id)) {
+							// Check if suggestion has required destination
+							if (!hasDestination(s)) {
+								const idx = originalIndices.get(s.id) ?? 0;
+								skippedNoDestination.push(idx);
+								console.log(
+									emphasize.error(
+										`⚠️  Skipped item ${idx}: No destination set. Use y${idx} to accept LLM suggestion, or d${idx} <path>`,
+									),
+								);
+								continue;
+							}
+
 							approved.add(s.id);
 							approvalHistory.push(s.id);
 							newlyApproved.push(s.id);
 						}
 					}
+
+					if (skippedNoDestination.length > 0) {
+						console.log(
+							emphasize.warn(
+								`\nSkipped ${skippedNoDestination.length} item(s) without destinations: ${skippedNoDestination.join(", ")}`,
+							),
+						);
+					}
+
+					if (newlyApproved.length === 0) {
+						console.log(
+							emphasize.dim(
+								"\nNo items approved (all either already approved or missing destinations).",
+							),
+						);
+						break;
+					}
+
 					console.log(
 						emphasize.success(
 							`\nApproved ${newlyApproved.length} new item(s). Total: ${approved.size}`,
@@ -861,13 +1053,44 @@ export async function runInteractiveLoop(
 				try {
 					// Track which IDs were added in this operation for potential rollback
 					const newlyApproved: SuggestionId[] = [];
+					const skippedNoDestination: number[] = [];
+
 					// Approve ALL items that aren't skipped (not just displayable/current page)
 					for (const s of currentSuggestions) {
 						if (!approved.has(s.id) && !skipped.has(s.id)) {
+							// Check if suggestion has required destination
+							if (!hasDestination(s)) {
+								const idx = originalIndices.get(s.id) ?? 0;
+								skippedNoDestination.push(idx);
+								console.log(
+									emphasize.error(
+										`⚠️  Skipped item ${idx}: No destination set. Use y${idx} to accept LLM suggestion, or d${idx} <path>`,
+									),
+								);
+								continue;
+							}
+
 							approved.add(s.id);
 							approvalHistory.push(s.id);
 							newlyApproved.push(s.id);
 						}
+					}
+
+					if (skippedNoDestination.length > 0) {
+						console.log(
+							emphasize.warn(
+								`\nSkipped ${skippedNoDestination.length} item(s) without destinations: ${skippedNoDestination.join(", ")}`,
+							),
+						);
+					}
+
+					if (newlyApproved.length === 0) {
+						console.log(
+							emphasize.dim(
+								"\nNo items approved (all either already approved, skipped, or missing destinations).",
+							),
+						);
+						break;
 					}
 
 					const skippedCount = skipped.size;
@@ -939,6 +1162,8 @@ export async function runInteractiveLoop(
 				try {
 					// Track which IDs were added in this operation for potential rollback
 					const newlyApproved: SuggestionId[] = [];
+					const skippedNoDestination: number[] = [];
+
 					for (const targetIndex of command.ids) {
 						// Find suggestion by original index, not filtered array position
 						const targetSuggestion = currentSuggestions.find(
@@ -961,12 +1186,41 @@ export async function runInteractiveLoop(
 							continue;
 						}
 
+						// Check if suggestion has required destination
+						if (!hasDestination(targetSuggestion)) {
+							skippedNoDestination.push(targetIndex);
+							console.log(
+								emphasize.error(
+									`⚠️  Skipped item ${targetIndex}: No destination set. Use y${targetIndex} to accept LLM suggestion, or d${targetIndex} <path>`,
+								),
+							);
+							continue;
+						}
+
 						if (!approved.has(targetSuggestion.id)) {
 							approved.add(targetSuggestion.id);
 							approvalHistory.push(targetSuggestion.id);
 							newlyApproved.push(targetSuggestion.id);
 						}
 					}
+
+					if (skippedNoDestination.length > 0) {
+						console.log(
+							emphasize.warn(
+								`\nSkipped ${skippedNoDestination.length} item(s) without destinations: ${skippedNoDestination.join(", ")}`,
+							),
+						);
+					}
+
+					if (newlyApproved.length === 0) {
+						console.log(
+							emphasize.dim(
+								"\nNo items approved (all either already approved, skipped, or missing destinations).",
+							),
+						);
+						break;
+					}
+
 					console.log(
 						emphasize.success(
 							`\nApproved ${newlyApproved.length} new item(s). Total: ${approved.size}`,

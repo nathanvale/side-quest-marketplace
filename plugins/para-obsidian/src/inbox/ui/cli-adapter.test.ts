@@ -171,6 +171,97 @@ describe("inbox/cli-adapter", () => {
 		test("should trim whitespace from input", () => {
 			expect(parseCommand("  a  ")).toEqual({ type: "approve-all" });
 		});
+
+		// Accept suggestion command tests
+		test("should parse 'y1' as accept-suggestion", () => {
+			expect(parseCommand("y1")).toEqual({ type: "accept-suggestion", id: 1 });
+		});
+
+		test("should parse 'Y1' as accept-suggestion (case insensitive)", () => {
+			expect(parseCommand("Y1")).toEqual({ type: "accept-suggestion", id: 1 });
+		});
+
+		test("should parse 'y12' as accept-suggestion with larger id", () => {
+			expect(parseCommand("y12")).toEqual({
+				type: "accept-suggestion",
+				id: 12,
+			});
+		});
+
+		test("should parse 'y' without id as invalid", () => {
+			expect(parseCommand("y")).toEqual({ type: "invalid", input: "y" });
+		});
+
+		// Set destination command tests
+		test("should parse 'd1 Areas/Health' as set-destination", () => {
+			expect(parseCommand("d1 Areas/Health")).toEqual({
+				type: "set-destination",
+				id: 1,
+				path: "Areas/Health",
+			});
+		});
+
+		test("should parse 'D2 Projects/Tax 2024' as set-destination (case insensitive)", () => {
+			expect(parseCommand("D2 Projects/Tax 2024")).toEqual({
+				type: "set-destination",
+				id: 2,
+				path: "Projects/Tax 2024",
+			});
+		});
+
+		test("should parse 'd3 Resources' as set-destination", () => {
+			expect(parseCommand("d3 Resources")).toEqual({
+				type: "set-destination",
+				id: 3,
+				path: "Resources",
+			});
+		});
+
+		test("should trim whitespace from destination path", () => {
+			expect(parseCommand("d1   Areas/Finance  ")).toEqual({
+				type: "set-destination",
+				id: 1,
+				path: "Areas/Finance",
+			});
+		});
+
+		test("should reject paths with ../ (path traversal)", () => {
+			expect(parseCommand("d1 ../etc/passwd")).toEqual({
+				type: "invalid",
+				input: "d1 ../etc/passwd",
+			});
+		});
+
+		test("should reject paths with ../ in middle", () => {
+			expect(parseCommand("d1 Areas/../Projects")).toEqual({
+				type: "invalid",
+				input: "d1 Areas/../Projects",
+			});
+		});
+
+		test("should parse 'd' without id as invalid", () => {
+			expect(parseCommand("d")).toEqual({ type: "invalid", input: "d" });
+		});
+
+		test("should parse 'd1' without path as invalid", () => {
+			expect(parseCommand("d1")).toEqual({ type: "invalid", input: "d1" });
+		});
+
+		test("should handle multi-word paths with spaces", () => {
+			expect(parseCommand("d1 Areas/Personal Finance")).toEqual({
+				type: "set-destination",
+				id: 1,
+				path: "Areas/Personal Finance",
+			});
+		});
+
+		test("should handle paths with special characters", () => {
+			expect(parseCommand("d1 Areas/Health & Wellness")).toEqual({
+				type: "set-destination",
+				id: 1,
+				path: "Areas/Health & Wellness",
+			});
+		});
 	});
 
 	describe("formatConfidence", () => {
@@ -517,6 +608,122 @@ describe("inbox/cli-adapter", () => {
 
 		test("should use PAGE_SIZE constant", () => {
 			expect(PAGE_SIZE).toBe(6);
+		});
+	});
+
+	describe("formatSuggestion - destination display", () => {
+		test("should show destination when set", () => {
+			const suggestion: InboxSuggestion = {
+				id: createSuggestionId(),
+				action: "create-note",
+				source: "/inbox/test.pdf",
+				processor: "attachments",
+				confidence: "high",
+				detectionSource: "llm+heuristic",
+				reason: "Test",
+				suggestedNoteType: "invoice",
+				suggestedTitle: "Test Invoice",
+				suggestedDestination: "Areas/Finance",
+			};
+
+			const result = formatSuggestion(suggestion, 1);
+			expect(result).toContain("├─ Destination: Areas/Finance");
+			expect(result).not.toContain("NO DESTINATION SET");
+		});
+
+		test("should show warning when no destination set", () => {
+			const suggestion: InboxSuggestion = {
+				id: createSuggestionId(),
+				action: "create-note",
+				source: "/inbox/test.pdf",
+				processor: "attachments",
+				confidence: "high",
+				detectionSource: "llm+heuristic",
+				reason: "Test",
+				suggestedNoteType: "invoice",
+				suggestedTitle: "Test Invoice",
+				// No suggestedDestination
+			};
+
+			const result = formatSuggestion(suggestion, 1);
+			expect(result).toContain("⚠️ NO DESTINATION SET");
+			expect(result).not.toContain("├─ Destination:");
+		});
+
+		test("should show LLM suggestion when available and different", () => {
+			const suggestion: InboxSuggestion = {
+				id: createSuggestionId(),
+				action: "create-note",
+				source: "/inbox/test.pdf",
+				processor: "attachments",
+				confidence: "high",
+				detectionSource: "llm+heuristic",
+				reason: "Test",
+				suggestedNoteType: "invoice",
+				suggestedTitle: "Test Invoice",
+				llmSuggestedArea: "Areas/Health",
+				// No suggestedDestination yet
+			};
+
+			const result = formatSuggestion(suggestion, 1);
+			expect(result).toContain("💡 LLM suggests: Areas/Health");
+			expect(result).toContain("y1 to accept");
+		});
+
+		test("should not show LLM suggestion when same as destination", () => {
+			const suggestion: InboxSuggestion = {
+				id: createSuggestionId(),
+				action: "create-note",
+				source: "/inbox/test.pdf",
+				processor: "attachments",
+				confidence: "high",
+				detectionSource: "llm+heuristic",
+				reason: "Test",
+				suggestedNoteType: "invoice",
+				suggestedTitle: "Test Invoice",
+				suggestedDestination: "Areas/Health",
+				llmSuggestedArea: "Areas/Health",
+			};
+
+			const result = formatSuggestion(suggestion, 1);
+			expect(result).toContain("├─ Destination: Areas/Health");
+			expect(result).not.toContain("💡 LLM suggests");
+		});
+
+		test("should show LLM project suggestion when area not available", () => {
+			const suggestion: InboxSuggestion = {
+				id: createSuggestionId(),
+				action: "create-note",
+				source: "/inbox/test.pdf",
+				processor: "attachments",
+				confidence: "high",
+				detectionSource: "llm+heuristic",
+				reason: "Test",
+				suggestedNoteType: "booking",
+				suggestedTitle: "Test Booking",
+				llmSuggestedProject: "Projects/Travel 2024",
+				// No suggestedDestination yet
+			};
+
+			const result = formatSuggestion(suggestion, 2);
+			expect(result).toContain("💡 LLM suggests: Projects/Travel 2024");
+			expect(result).toContain("y2 to accept");
+		});
+
+		test("should not show destination info for non-create-note suggestions", () => {
+			const suggestion: InboxSuggestion = {
+				id: createSuggestionId(),
+				action: "skip",
+				source: "/inbox/test.pdf",
+				processor: "attachments",
+				confidence: "low",
+				detectionSource: "none",
+				reason: "Cannot process",
+			};
+
+			const result = formatSuggestion(suggestion, 1);
+			expect(result).not.toContain("Destination");
+			expect(result).not.toContain("NO DESTINATION SET");
 		});
 	});
 });

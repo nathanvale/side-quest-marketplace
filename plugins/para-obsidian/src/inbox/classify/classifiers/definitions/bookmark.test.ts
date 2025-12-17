@@ -213,23 +213,6 @@ clipped: 2024-12-16
 					"Date bookmark was captured (YYYY-MM-DD format)",
 				);
 			});
-
-			test("should require para field with allowed values", () => {
-				const field = bookmarkClassifier.fields.find((f) => f.name === "para");
-
-				expect(field).toBeDefined();
-				expect(field?.type).toBe("string");
-				expect(field?.requirement).toBe("required");
-				expect(field?.description).toBe(
-					"PARA classification (Projects/Areas/Resources/Archives)",
-				);
-				expect(field?.allowedValues).toEqual([
-					"Projects",
-					"Areas",
-					"Resources",
-					"Archives",
-				]);
-			});
 		});
 
 		describe("optional fields", () => {
@@ -329,20 +312,6 @@ clipped: 2024-12-16
 				expect(invalidResult.error).toContain("YYYY-MM-DD");
 			});
 
-			test("should validate para field against allowed values", () => {
-				const field = bookmarkClassifier.fields.find((f) => f.name === "para")!;
-
-				const validValues = ["Projects", "Areas", "Resources", "Archives"];
-				for (const value of validValues) {
-					const result = validateFieldValue(value, field);
-					expect(result.isValid).toBe(true);
-				}
-
-				const invalidResult = validateFieldValue("InvalidCategory", field);
-				expect(invalidResult.isValid).toBe(false);
-				expect(invalidResult.error).toContain("must be one of");
-			});
-
 			test("should allow empty optional fields", () => {
 				const field = bookmarkClassifier.fields.find(
 					(f) => f.name === "notes",
@@ -354,52 +323,42 @@ clipped: 2024-12-16
 		});
 	});
 
-	describe("PARA classification", () => {
+	describe("extraction prompt", () => {
 		describe("prompt hint", () => {
-			test("should include Projects classification criteria", () => {
-				const hint = bookmarkClassifier.extraction.promptHint;
-
-				expect(hint).toContain("Projects: Time-bound work");
-				expect(hint).toContain("GitHub/GitLab repos with active issues/PRs");
-				expect(hint).toContain("Project management tools");
-				expect(hint).toContain("Recent (<30 days) work-related bookmarks");
-			});
-
-			test("should include Areas classification criteria", () => {
-				const hint = bookmarkClassifier.extraction.promptHint;
-
-				expect(hint).toContain("Areas: Ongoing responsibilities");
-				expect(hint).toContain("Banking/finance portals");
-				expect(hint).toContain("Health dashboards");
-				expect(hint).toContain("Home management");
-				expect(hint).toContain("Account settings pages");
-			});
-
-			test("should include Resources classification criteria with DEFAULT marker", () => {
-				const hint = bookmarkClassifier.extraction.promptHint;
-
-				expect(hint).toContain("Resources: Reference material (DEFAULT)");
-				expect(hint).toContain("Documentation (/docs/, /api/, /reference/)");
-				expect(hint).toContain("Tutorials, guides, articles");
-				expect(hint).toContain("Stack Overflow, MDN, dev.to");
-				expect(hint).toContain("Learning resources");
-			});
-
-			test("should include Archives classification criteria", () => {
-				const hint = bookmarkClassifier.extraction.promptHint;
-
-				expect(hint).toContain("Archives: Stale content");
-				expect(hint).toContain("Created >180 days ago");
-				expect(hint).toContain("Deprecated/archived URLs");
-				expect(hint).toContain("Legacy documentation");
-			});
-
 			test("should request extraction of key fields", () => {
 				const hint = bookmarkClassifier.extraction.promptHint;
 
-				expect(hint).toContain("Extract URL, title, clipped date");
-				expect(hint).toContain("determine PARA category");
-				expect(hint).toContain("reasoning");
+				expect(hint).toContain("title");
+				expect(hint).toContain("url");
+				expect(hint).toContain("clipped");
+			});
+
+			test("should list optional fields", () => {
+				const hint = bookmarkClassifier.extraction.promptHint;
+
+				expect(hint).toContain("category");
+				expect(hint).toContain("author");
+				expect(hint).toContain("published");
+				expect(hint).toContain("tags");
+				expect(hint).toContain("notes");
+			});
+
+			test("should suggest area/project organization", () => {
+				const hint = bookmarkClassifier.extraction.promptHint;
+
+				expect(hint).toContain("Suggest area or project");
+				expect(hint).toContain("Development area");
+				expect(hint).toContain("Finance area");
+				expect(hint).toContain("Health area");
+				expect(hint).toContain("Resources area");
+			});
+
+			test("should provide URL pattern guidance", () => {
+				const hint = bookmarkClassifier.extraction.promptHint;
+
+				expect(hint).toContain("Dev tools/docs");
+				expect(hint).toContain("Finance portals");
+				expect(hint).toContain("Health/fitness");
 			});
 		});
 
@@ -409,40 +368,7 @@ clipped: 2024-12-16
 					"title",
 					"url",
 					"clipped",
-					"para",
 				]);
-			});
-		});
-
-		describe("classification scenarios", () => {
-			test("should classify GitHub repo as Projects (active work)", () => {
-				const hint = bookmarkClassifier.extraction.promptHint;
-
-				// LLM should classify GitHub URLs with active PRs/issues as Projects
-				expect(hint).toContain("GitHub/GitLab repos with active issues/PRs");
-			});
-
-			test("should classify banking portal as Areas (ongoing responsibility)", () => {
-				const hint = bookmarkClassifier.extraction.promptHint;
-
-				// LLM should classify banking/finance portals as Areas
-				expect(hint).toContain("Banking/finance portals");
-				expect(hint).toContain("netbank, paypal, stripe");
-			});
-
-			test("should classify documentation as Resources (default category)", () => {
-				const hint = bookmarkClassifier.extraction.promptHint;
-
-				// Resources is marked as DEFAULT, most bookmarks should land here
-				expect(hint).toContain("Resources: Reference material (DEFAULT)");
-				expect(hint).toContain("Documentation");
-			});
-
-			test("should classify old bookmarks as Archives (>180 days)", () => {
-				const hint = bookmarkClassifier.extraction.promptHint;
-
-				// LLM should use clipped date to determine if bookmark is stale
-				expect(hint).toContain("Created >180 days ago");
 			});
 		});
 	});
@@ -550,12 +476,6 @@ clipped: 2024-12-16
 			test("should map clipped field", () => {
 				expect(bookmarkClassifier.template.fieldMappings.clipped).toBe(
 					"Date bookmark was captured (YYYY-MM-DD)",
-				);
-			});
-
-			test("should map para field", () => {
-				expect(bookmarkClassifier.template.fieldMappings.para).toBe(
-					"PARA classification (Projects/Areas/Resources/Archives)",
 				);
 			});
 

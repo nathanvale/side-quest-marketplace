@@ -21,6 +21,7 @@ import {
 	handleCreateNoteTemplate,
 	handleDelete,
 	handleExportBookmarks,
+	handleExportWebClipperTemplate,
 	handleFindOrphans,
 	handleFrontmatter,
 	handleGit,
@@ -71,6 +72,7 @@ function printUsage(): void {
 		"Inbox Processing:",
 		"  para process-inbox [--auto] [--preview] [--dry-run] [--filter pattern] [--force]",
 		"  para export-bookmarks [--filter type:bookmark] [--out path] [--format md|json]",
+		"  para export-webclipper-template [-o path] [--format md|json]",
 		"  para create-classifier [--quick]",
 		"  para create-note-template",
 		"  para registry list|remove|clear [--format md|json]",
@@ -272,6 +274,12 @@ async function main(): Promise<void> {
 
 			case "export-bookmarks": {
 				const result = await handleExportBookmarks(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
+				break;
+			}
+
+			case "export-webclipper-template": {
+				const result = await handleExportWebClipperTemplate(ctx);
 				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}

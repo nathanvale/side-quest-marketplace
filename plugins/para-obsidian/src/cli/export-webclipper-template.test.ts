@@ -1,0 +1,242 @@
+/**
+ * Tests for export-webclipper-template CLI handler.
+ */
+
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import path from "node:path";
+import { createTempDir, pathExists, readJsonFile } from "@sidequest/core/fs";
+import { OutputFormat } from "@sidequest/core/terminal";
+import { cleanupTestDir } from "@sidequest/core/testing";
+import { loadConfig } from "../config";
+import { handleExportWebClipperTemplate } from "./export-webclipper-template";
+import type { CommandContext } from "./types";
+
+interface WebClipperProperty {
+	readonly name: string;
+	readonly value: string;
+	readonly type: string;
+}
+
+interface WebClipperTemplateType {
+	readonly schemaVersion: string;
+	readonly name: string;
+	readonly behavior: string;
+	readonly noteNameFormat: string;
+	readonly path: string;
+	readonly noteContentFormat: string;
+	readonly properties: readonly WebClipperProperty[];
+	readonly triggers: readonly unknown[];
+}
+
+describe("export-webclipper-template", () => {
+	let tempDir: string;
+
+	beforeEach(() => {
+		tempDir = createTempDir("test-export-webclipper-");
+	});
+
+	afterEach(() => {
+		cleanupTestDir(tempDir);
+	});
+
+	test("exports template to default filename", async () => {
+		const config = loadConfig();
+		const ctx: CommandContext = {
+			config,
+			positional: [],
+			flags: {},
+			format: OutputFormat.MARKDOWN,
+			isJson: false,
+		};
+
+		const result = await handleExportWebClipperTemplate(ctx);
+
+		expect(result.success).toBe(true);
+
+		const defaultPath = path.join(process.cwd(), "para-bookmark-template.json");
+		expect(await pathExists(defaultPath)).toBe(true);
+
+		const template = (await readJsonFile(
+			defaultPath,
+		)) as WebClipperTemplateType;
+		expect(template.schemaVersion).toBe("0.1.0");
+		expect(template.name).toBe("PARA Bookmark");
+		expect(template.behavior).toBe("create");
+		expect(template.noteNameFormat).toBe("{{title|safe_name}}");
+		expect(template.path).toBe("00 Inbox");
+
+		// Cleanup
+		await Bun.file(defaultPath).writer().end();
+	});
+
+	test("exports template to custom output path", async () => {
+		const config = loadConfig();
+		const outputPath = path.join(tempDir, "custom-template.json");
+
+		const ctx: CommandContext = {
+			config,
+			positional: [],
+			flags: { output: outputPath },
+			format: OutputFormat.MARKDOWN,
+			isJson: false,
+		};
+
+		const result = await handleExportWebClipperTemplate(ctx);
+
+		expect(result.success).toBe(true);
+		expect(await pathExists(outputPath)).toBe(true);
+
+		const template = (await readJsonFile(outputPath)) as WebClipperTemplateType;
+		expect(template.name).toBe("PARA Bookmark");
+	});
+
+	test("exports template with correct properties", async () => {
+		const config = loadConfig();
+		const outputPath = path.join(tempDir, "template.json");
+
+		const ctx: CommandContext = {
+			config,
+			positional: [],
+			flags: { output: outputPath },
+			format: OutputFormat.MARKDOWN,
+			isJson: false,
+		};
+
+		await handleExportWebClipperTemplate(ctx);
+
+		const template = (await readJsonFile(outputPath)) as WebClipperTemplateType;
+		const properties = template.properties;
+
+		// Check required properties
+		const typeProperty = properties.find((p) => p.name === "type");
+		expect(typeProperty).toBeDefined();
+		expect(typeProperty?.value).toBe("bookmark");
+		expect(typeProperty?.type).toBe("text");
+
+		const urlProperty = properties.find((p) => p.name === "url");
+		expect(urlProperty).toBeDefined();
+		expect(urlProperty?.value).toBe("{{url}}");
+		expect(urlProperty?.type).toBe("text");
+
+		const titleProperty = properties.find((p) => p.name === "title");
+		expect(titleProperty).toBeDefined();
+		expect(titleProperty?.value).toBe("{{title}}");
+
+		const clippedProperty = properties.find((p) => p.name === "clipped");
+		expect(clippedProperty).toBeDefined();
+		expect(clippedProperty?.type).toBe("date");
+
+		const domainProperty = properties.find((p) => p.name === "domain");
+		expect(domainProperty).toBeDefined();
+		expect(domainProperty?.value).toBe("{{domain}}");
+	});
+
+	test("exports template with correct content format", async () => {
+		const config = loadConfig();
+		const outputPath = path.join(tempDir, "template.json");
+
+		const ctx: CommandContext = {
+			config,
+			positional: [],
+			flags: { output: outputPath },
+			format: OutputFormat.MARKDOWN,
+			isJson: false,
+		};
+
+		await handleExportWebClipperTemplate(ctx);
+
+		const template = (await readJsonFile(outputPath)) as WebClipperTemplateType;
+
+		expect(template.noteContentFormat).toContain("{{content|slice:0,2000}}");
+		expect(template.noteContentFormat).toContain("---");
+		expect(template.noteContentFormat).toContain("*Clipped from");
+		expect(template.noteContentFormat).toContain("{{domain}}");
+		expect(template.noteContentFormat).toContain("{{url}}");
+		expect(template.noteContentFormat).toContain("{{date}}");
+	});
+
+	test("fails when parent directory does not exist", async () => {
+		const config = loadConfig();
+		const invalidPath = path.join(tempDir, "nonexistent-dir", "template.json");
+
+		const ctx: CommandContext = {
+			config,
+			positional: [],
+			flags: { output: invalidPath },
+			format: OutputFormat.MARKDOWN,
+			isJson: false,
+		};
+
+		const result = await handleExportWebClipperTemplate(ctx);
+
+		expect(result.success).toBe(false);
+		expect(result.error).toContain("Parent directory does not exist");
+	});
+
+	test("returns JSON format when --format json", async () => {
+		const config = loadConfig();
+		const outputPath = path.join(tempDir, "template.json");
+
+		const ctx: CommandContext = {
+			config,
+			positional: [],
+			flags: { output: outputPath },
+			format: OutputFormat.JSON,
+			isJson: true,
+		};
+
+		const result = await handleExportWebClipperTemplate(ctx);
+
+		expect(result.success).toBe(true);
+		expect(await pathExists(outputPath)).toBe(true);
+	});
+
+	test("expands tilde in output path", async () => {
+		const config = loadConfig();
+		const homeDir = process.env.HOME ?? "/home/test";
+		const relativePath = "template.json";
+		const tildeOutput = `~/${relativePath}`;
+		const expectedPath = path.join(homeDir, relativePath);
+
+		// Create a temp file to simulate success
+		await Bun.write(expectedPath, "{}");
+
+		const ctx: CommandContext = {
+			config,
+			positional: [],
+			flags: { output: tildeOutput },
+			format: OutputFormat.MARKDOWN,
+			isJson: false,
+		};
+
+		const result = await handleExportWebClipperTemplate(ctx);
+
+		expect(result.success).toBe(true);
+		expect(await pathExists(expectedPath)).toBe(true);
+
+		// Cleanup
+		await Bun.file(expectedPath).writer().end();
+	});
+
+	test("handles relative paths correctly", async () => {
+		const config = loadConfig();
+		const relativePath = "template.json";
+		const expectedPath = path.join(process.cwd(), relativePath);
+
+		const ctx: CommandContext = {
+			config,
+			positional: [],
+			flags: { output: relativePath },
+			format: OutputFormat.MARKDOWN,
+			isJson: false,
+		};
+
+		const result = await handleExportWebClipperTemplate(ctx);
+
+		expect(result.success).toBe(true);
+		expect(await pathExists(expectedPath)).toBe(true);
+
+		// Cleanup
+		await Bun.file(expectedPath).writer().end();
+	});
+});

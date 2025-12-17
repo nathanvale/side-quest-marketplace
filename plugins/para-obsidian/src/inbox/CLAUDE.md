@@ -27,10 +27,16 @@
 
 **Recent Enhancements:**
 - Classifier registry with schema versioning (v1.0)
+- Bookmark classifier for Obsidian Web Clipper content
 - Git guard prevents LLM calls on uncommitted changes
 - LLM fallback transparency shows which fields used heuristics
 - Filename collision handling with automatic deduplication
-- Enhanced CLI with inline warnings and explicit execute command
+- Timestamped attachment filenames for unique naming
+- Enhanced CLI with visual progress bars and shorter aliases
+- Enhanced review commands: approve-all (A), back (b), list (l)
+- Quick-start wizard with `--quick` flag
+- Registry management commands (list, remove, clear)
+- Export bookmarks command for browser-compatible output
 
 ---
 
@@ -59,6 +65,7 @@ src/inbox/
 │   │   ├── definitions/       # Built-in classifier modules
 │   │   │   ├── _template.ts   # Classifier template
 │   │   │   ├── booking.ts     # Travel/booking classifier
+│   │   │   ├── bookmark.ts    # Web bookmark classifier (Obsidian Web Clipper)
 │   │   │   ├── invoice.ts     # Invoice/receipt classifier
 │   │   │   ├── medical-statement.ts  # Medical statement classifier
 │   │   │   ├── research.ts    # Research paper classifier
@@ -254,6 +261,7 @@ interface InboxConverter {
 |------------|----|---------:|---------|
 | **invoice** | `invoice` | 100 | Invoices, receipts, bills, tax invoices |
 | **booking** | `booking` | 90 | Travel bookings, reservations, confirmations |
+| **bookmark** | `bookmark` | 85 | Web bookmarks from Obsidian Web Clipper |
 | **medical-statement** | `medical-statement` | 85 | Medical statements, health records |
 | **research** | `research` | 80 | Research papers, academic articles |
 
@@ -447,7 +455,10 @@ await registry.save()
 ### Interactive CLI Adapter (cli-adapter.ts)
 
 **Command Parsing:**
-- `a` - Approve all
+- `a` - Approve current suggestion
+- `A` - Approve all remaining suggestions
+- `b` - Back to previous suggestion
+- `l` - List all pending suggestions with status
 - `x` or `execute` - Execute approved suggestions (explicit command)
 - `1,2,5` - Approve specific IDs
 - `e3 prompt` - Edit suggestion #3 with prompt

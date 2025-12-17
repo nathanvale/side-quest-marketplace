@@ -4,6 +4,10 @@
 	"private": true,
 	"description": "Firecrawl plugin for Claude Code",
 	"type": "module",
+	"exports": {
+		"./client": "./src/client.ts",
+		"./types": "./src/types.ts"
+	},
 	"scripts": {
 		"test": "bun test --recursive",
 		"typecheck": "tsc --noEmit",

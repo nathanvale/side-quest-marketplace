@@ -195,12 +195,26 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 			? llmResult.extractionWarnings
 			: undefined;
 
-	// Set destination to PARA area for bookmarks
-	// The execute-suggestion handler will add /Bookmarks/ subfolder for bookmark types
+	// Set destination based on routing source
+	// Fast-path items (have area/project frontmatter) get auto-routed with destination
+	// LLM-path items (no routing fields) do NOT get destination - user must choose
 	let suggestedDestination: string | undefined;
-	if (suggestedNoteType === "bookmark" && suggestedArea) {
-		// LLM returns: "Projects", "Areas", "Resources", "Archives"
-		suggestedDestination = suggestedArea;
+	let llmSuggestedArea: string | undefined;
+	let llmSuggestedProject: string | undefined;
+
+	// Check if this is a fast-path item with frontmatter routing
+	const hasFrontmatterRouting =
+		detectionSource === "frontmatter" && (suggestedArea || suggestedProject);
+
+	if (hasFrontmatterRouting) {
+		// Fast-path: Has area/project in frontmatter → set destination for auto-routing
+		suggestedDestination = suggestedArea || suggestedProject;
+	} else {
+		// LLM-path: No frontmatter routing → store LLM suggestions for DISPLAY only
+		// User must explicitly accept with y<n> or set with d<n>
+		llmSuggestedArea = suggestedArea;
+		llmSuggestedProject = suggestedProject;
+		// Leave suggestedDestination undefined - user MUST set it
 	}
 
 	// Return properly typed discriminated union based on action
@@ -221,6 +235,8 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 			suggestedAttachmentName,
 			extractionWarnings,
 			reason,
+			llmSuggestedArea,
+			llmSuggestedProject,
 		};
 	}
 

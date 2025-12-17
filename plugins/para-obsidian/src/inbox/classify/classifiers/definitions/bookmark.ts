@@ -62,13 +62,6 @@ export const bookmarkClassifier: InboxConverter = {
 			requirement: "required",
 		},
 		{
-			name: "para",
-			type: "string",
-			description: "PARA classification (Projects/Areas/Resources/Archives)",
-			requirement: "required",
-			allowedValues: ["Projects", "Areas", "Resources", "Archives"],
-		},
-		{
 			name: "category",
 			type: "string",
 			description: "Category or topic (wikilink format)",
@@ -107,32 +100,27 @@ export const bookmarkClassifier: InboxConverter = {
 	],
 
 	extraction: {
-		promptHint: `Classify this bookmark into PARA categories:
+		promptHint: `Extract bookmark metadata and suggest organization:
 
-- Projects: Time-bound work
-  - GitHub/GitLab repos with active issues/PRs
-  - Project management tools
-  - Recent (<30 days) work-related bookmarks
+Key fields to extract:
+- title: Page title or bookmark name
+- url: Full webpage URL
+- clipped: Date captured (YYYY-MM-DD)
 
-- Areas: Ongoing responsibilities
-  - Banking/finance portals (netbank, paypal, stripe)
-  - Health dashboards (strava, myfitnesspal)
-  - Home management (homeassistant, recipes)
-  - Account settings pages
+Optional fields:
+- category: Topic or domain (wikilink format)
+- author: Content creator (wikilink format)
+- published: Publication date (YYYY-MM-DD)
+- tags: Relevant topics (comma-separated)
+- notes: Highlights or annotations
 
-- Resources: Reference material (DEFAULT)
-  - Documentation (/docs/, /api/, /reference/)
-  - Tutorials, guides, articles
-  - Stack Overflow, MDN, dev.to
-  - Learning resources
-
-- Archives: Stale content
-  - Created >180 days ago
-  - Deprecated/archived URLs
-  - Legacy documentation
-
-Extract URL, title, clipped date, and determine PARA category with reasoning.`,
-		keyFields: ["title", "url", "clipped", "para"],
+Suggest area or project based on URL patterns:
+- Dev tools/docs → Development area
+- Finance portals → Finance area
+- Health/fitness → Health area
+- Active projects → Specific project name
+- General reference → Resources area`,
+		keyFields: ["title", "url", "clipped"],
 	},
 
 	template: {
@@ -141,7 +129,6 @@ Extract URL, title, clipped date, and determine PARA category with reasoning.`,
 			title: "Bookmark title or page title",
 			url: "Original webpage URL",
 			clipped: "Date bookmark was captured (YYYY-MM-DD)",
-			para: "PARA classification (Projects/Areas/Resources/Archives)",
 			category: "Category or topic (optional)",
 			author: "Author or creator (optional)",
 			published: "Original publication date (YYYY-MM-DD)",

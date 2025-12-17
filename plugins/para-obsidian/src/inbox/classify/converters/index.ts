@@ -7,6 +7,11 @@
  * @module converters
  */
 
+// Clipping converter
+export {
+	type ClippingConversionResult,
+	convertClippingToBookmark,
+} from "./clipping-converter";
 // Default converters
 export { DEFAULT_INBOX_CONVERTERS } from "./defaults";
 // Loader utilities
