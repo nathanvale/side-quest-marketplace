@@ -120,7 +120,7 @@ describe("Bookmark Integration", () => {
 	});
 
 	describe("PARA Classification", () => {
-		test("classifies GitHub PR to Projects", async () => {
+		test("LLM suggests Projects for GitHub PR (user must accept)", async () => {
 			const fixture = BOOKMARK_FIXTURES.edgeCases.find(
 				(f) => f.description === "GitHub PR bookmark classified to Projects",
 			);
@@ -138,14 +138,15 @@ describe("Bookmark Integration", () => {
 			const suggestion = suggestions[0];
 			expect(suggestion).toBeDefined();
 			if (suggestion?.action === "create-note") {
-				expect(suggestion.suggestedDestination).toBe("Projects");
+				expect(suggestion.suggestedArea).toBe("Projects");
+				expect(suggestion.suggestedDestination).toBeUndefined();
 			}
 
 			const results = await harness.execute();
 			expect(results[0]).toBeDefined();
 			assertExecutionSuccess(results[0]!, fixture.expectedOutcome.noteCreated!);
 
-			// Verify PARA location
+			// Verify stays in inbox until user accepts destination
 			await assertNoteExists(
 				harness.vault,
 				fixture.expectedOutcome.noteCreated!,
@@ -155,12 +156,11 @@ describe("Bookmark Integration", () => {
 				fixture.expectedOutcome.noteCreated!,
 			);
 			await assertFrontmatterMatches(notePath, {
-				para: "Projects",
 				type: "bookmark",
 			});
 		});
 
-		test("classifies banking portal to Areas", async () => {
+		test("LLM suggests Areas for banking portal (user must accept)", async () => {
 			const fixture = BOOKMARK_FIXTURES.edgeCases.find(
 				(f) =>
 					f.description ===
@@ -180,14 +180,15 @@ describe("Bookmark Integration", () => {
 			const suggestion = suggestions[0];
 			expect(suggestion).toBeDefined();
 			if (suggestion?.action === "create-note") {
-				expect(suggestion.suggestedDestination).toBe("Areas");
+				expect(suggestion.suggestedArea).toBe("Areas");
+				expect(suggestion.suggestedDestination).toBeUndefined();
 			}
 
 			const results = await harness.execute();
 			expect(results[0]).toBeDefined();
 			assertExecutionSuccess(results[0]!, fixture.expectedOutcome.noteCreated!);
 
-			// Verify PARA location and category
+			// Verify stays in inbox until user accepts destination
 			await assertNoteExists(
 				harness.vault,
 				fixture.expectedOutcome.noteCreated!,
@@ -197,13 +198,12 @@ describe("Bookmark Integration", () => {
 				fixture.expectedOutcome.noteCreated!,
 			);
 			await assertFrontmatterMatches(notePath, {
-				para: "Areas",
 				type: "bookmark",
 				category: "Banking",
 			});
 		});
 
-		test("classifies documentation to Resources", async () => {
+		test("LLM suggests Resources for documentation (user must accept)", async () => {
 			const fixture = BOOKMARK_FIXTURES.complete;
 			harness.setLLMResponse(fixture._mockLLMResponse);
 
@@ -214,14 +214,15 @@ describe("Bookmark Integration", () => {
 			const suggestion = suggestions[0];
 			expect(suggestion).toBeDefined();
 			if (suggestion?.action === "create-note") {
-				expect(suggestion.suggestedDestination).toBe("Resources");
+				expect(suggestion.suggestedArea).toBe("Resources");
+				expect(suggestion.suggestedDestination).toBeUndefined();
 			}
 
 			const results = await harness.execute();
 			expect(results[0]).toBeDefined();
 			assertExecutionSuccess(results[0]!, fixture.expectedOutcome.noteCreated!);
 
-			// Verify default Resources classification
+			// Verify stays in inbox until user accepts destination
 			await assertNoteExists(
 				harness.vault,
 				fixture.expectedOutcome.noteCreated!,
@@ -231,7 +232,6 @@ describe("Bookmark Integration", () => {
 				fixture.expectedOutcome.noteCreated!,
 			);
 			await assertFrontmatterMatches(notePath, {
-				para: "Resources",
 				type: "bookmark",
 			});
 		});

@@ -46,13 +46,13 @@ Fast semantic search for codebases using ML embeddings.
 		},
 	}),
 	expectedOutcome: {
-		noteCreated: "Resources/Bookmarks/🔖 Kit CLI Documentation.md",
-		noteLocation: "Resources",
+		// LLM path: notes go to inbox until user sets destination
+		noteCreated: "00 Inbox/Bookmarks/🔖 Kit CLI Documentation.md",
+		noteLocation: "00 Inbox",
 		frontmatter: {
 			type: "bookmark",
 			url: "https://kit.cased.com",
 			title: "Kit CLI Documentation",
-			para: "Resources",
 			category: "Documentation",
 			author: "Cased",
 		},
@@ -61,7 +61,8 @@ Fast semantic search for codebases using ML embeddings.
 			"semantic search",
 			"30-50x faster than grep",
 		],
-		shouldAutoClassify: true,
+		shouldAutoClassify: false, // Needs user to accept destination
+		shouldPromptUser: true,
 	},
 	expectedFields: {
 		url: "https://kit.cased.com",
@@ -104,16 +105,16 @@ Official TypeScript documentation and language reference.
 		},
 	}),
 	expectedOutcome: {
-		noteCreated: "Resources/Bookmarks/🔖 TypeScript Handbook.md",
-		noteLocation: "Resources",
+		noteCreated: "00 Inbox/Bookmarks/🔖 TypeScript Handbook.md",
+		noteLocation: "00 Inbox",
 		frontmatter: {
 			type: "bookmark",
 			url: "https://www.typescriptlang.org/docs/handbook/",
 			title: "TypeScript Handbook",
-			para: "Resources",
 		},
 		bodyContains: ["TypeScript Handbook", "Official TypeScript documentation"],
-		shouldAutoClassify: true,
+		shouldAutoClassify: false,
+		shouldPromptUser: true,
 	},
 	expectedFields: {
 		url: "https://www.typescriptlang.org/docs/handbook/",
@@ -165,17 +166,17 @@ Adds LLM-based bookmark classifier for Web Clipper integration.
 		},
 	}),
 	expectedOutcome: {
-		noteCreated: "Projects/Bookmarks/🔖 PR Add bookmark classifier.md",
-		noteLocation: "Projects",
+		noteCreated: "00 Inbox/Bookmarks/🔖 PR Add bookmark classifier.md",
+		noteLocation: "00 Inbox",
 		frontmatter: {
 			type: "bookmark",
 			url: "https://github.com/nathanvale/side-quest-marketplace/pull/1234",
 			title: "PR: Add bookmark classifier",
-			para: "Projects",
 			category: "Pull Requests",
 		},
 		bodyContains: ["Add bookmark classifier", "LLM-based bookmark classifier"],
-		shouldAutoClassify: true,
+		shouldAutoClassify: false,
+		shouldPromptUser: true,
 	},
 	expectedFields: {
 		url: "https://github.com/nathanvale/side-quest-marketplace/pull/1234",
@@ -226,19 +227,17 @@ Personal banking login portal.
 		},
 	}),
 	expectedOutcome: {
-		// Note: Currently routes to Areas/Bookmarks/ (no category subfolder)
-		// Future enhancement could map category to subfolder (e.g., Banking -> Finance)
-		noteCreated: "Areas/Bookmarks/🔖 NAB NetBank.md",
-		noteLocation: "Areas",
+		noteCreated: "00 Inbox/Bookmarks/🔖 NAB NetBank.md",
+		noteLocation: "00 Inbox",
 		frontmatter: {
 			type: "bookmark",
 			url: "https://www.nab.com.au/netbank/login",
 			title: "NAB NetBank",
-			para: "Areas",
 			category: "Banking",
 		},
 		bodyContains: ["NAB NetBank", "Personal banking login portal"],
-		shouldAutoClassify: true,
+		shouldAutoClassify: false,
+		shouldPromptUser: true,
 	},
 	expectedFields: {
 		url: "https://www.nab.com.au/netbank/login",
@@ -279,16 +278,16 @@ Complete guide to TypeScript's features & best practices.
 		},
 	}),
 	expectedOutcome: {
-		noteCreated: "Resources/Bookmarks/🔖 TypeScript The Guide & More.md",
-		noteLocation: "Resources",
+		noteCreated: "00 Inbox/Bookmarks/🔖 TypeScript The Guide & More.md",
+		noteLocation: "00 Inbox",
 		frontmatter: {
 			type: "bookmark",
 			url: "https://example.com/ts-guide",
 			title: "TypeScript: The Guide & More",
-			para: "Resources",
 		},
 		bodyContains: ["TypeScript: The Guide & More", "best practices"],
-		shouldAutoClassify: true,
+		shouldAutoClassify: false,
+		shouldPromptUser: true,
 	},
 	expectedFields: {
 		url: "https://example.com/ts-guide",
@@ -338,17 +337,17 @@ tags: [typescript, 中文]
 		},
 	}),
 	expectedOutcome: {
-		noteCreated: "Resources/Bookmarks/🔖 TypeScript 學習指南.md",
-		noteLocation: "Resources",
+		noteCreated: "00 Inbox/Bookmarks/🔖 TypeScript 學習指南.md",
+		noteLocation: "00 Inbox",
 		frontmatter: {
 			type: "bookmark",
 			url: "https://example.com/ts-zh",
 			title: "🚀 TypeScript 學習指南",
-			para: "Resources",
 			category: "教學文件",
 		},
 		bodyContains: ["TypeScript 學習指南", "類型系統基礎"],
-		shouldAutoClassify: true,
+		shouldAutoClassify: false,
+		shouldPromptUser: true,
 	},
 	expectedFields: {
 		url: "https://example.com/ts-zh",
@@ -389,20 +388,111 @@ Advanced TypeScript generics search results with multiple filters.
 		},
 	}),
 	expectedOutcome: {
-		noteCreated: "Resources/Bookmarks/🔖 Complex Search Results.md",
-		noteLocation: "Resources",
+		noteCreated: "00 Inbox/Bookmarks/🔖 Complex Search Results.md",
+		noteLocation: "00 Inbox",
 		frontmatter: {
 			type: "bookmark",
 			url: "https://www.example.com/search/results/advanced?query=typescript+generics+conditional+types&filters=language%3Aen&sort=relevance&page=1&limit=50&category=documentation&tags=advanced%2Ctutorial#section-examples",
 			title: "Complex Search Results",
-			para: "Resources",
 		},
 		bodyContains: ["Complex Search Results", "TypeScript generics"],
-		shouldAutoClassify: true,
+		shouldAutoClassify: false,
+		shouldPromptUser: true,
 	},
 	expectedFields: {
 		url: "https://www.example.com/search/results/advanced?query=typescript+generics+conditional+types&filters=language%3Aen&sort=relevance&page=1&limit=50&category=documentation&tags=advanced%2Ctutorial#section-examples",
 		title: "Complex Search Results",
+	},
+};
+
+/**
+ * Fast-path bookmark with area wikilink - auto-routes without LLM.
+ * Tests the two-path routing when area field is present.
+ */
+export const BOOKMARK_FASTPATH_AREA: DocumentFixture<"bookmark"> = {
+	description: "pre-routed bookmark with area wikilink (fast path)",
+	classifier: "bookmark",
+	input: {
+		filename: "🔖 Finance Article.md",
+		content: `---
+type: bookmark
+url: https://example.com/finance
+title: Finance Article
+clipped: 2024-12-16
+area: "[[Finance]]"
+---
+
+# Finance Article
+
+Article about personal finance management.
+`,
+	},
+	_mockLLMResponse: createDocumentTypeFixture({
+		documentType: "bookmark",
+		confidence: 0.0,
+		reasoning: "ERROR: LLM should NOT be called for fast-path items",
+	}),
+	expectedOutcome: {
+		noteCreated: "02 Areas/Finance/Bookmarks/🔖 Finance Article.md",
+		noteLocation: "Areas",
+		frontmatter: {
+			type: "bookmark",
+			url: "https://example.com/finance",
+			title: "Finance Article",
+			area: "[[Finance]]",
+		},
+		bodyContains: ["Finance Article", "personal finance"],
+		shouldAutoClassify: true,
+		shouldPromptUser: false,
+	},
+	expectedFields: {
+		url: "https://example.com/finance",
+		title: "Finance Article",
+	},
+};
+
+/**
+ * Fast-path bookmark with project wikilink - auto-routes without LLM.
+ */
+export const BOOKMARK_FASTPATH_PROJECT: DocumentFixture<"bookmark"> = {
+	description: "pre-routed bookmark with project wikilink (fast path)",
+	classifier: "bookmark",
+	input: {
+		filename: "🔖 Tax Guide 2024.md",
+		content: `---
+type: bookmark
+url: https://ato.gov.au/tax-guide
+title: Tax Guide 2024
+clipped: 2024-12-16
+project: "[[Tax 2024]]"
+---
+
+# Tax Guide 2024
+
+Official ATO tax guide for 2024 financial year.
+`,
+	},
+	_mockLLMResponse: createDocumentTypeFixture({
+		documentType: "bookmark",
+		confidence: 0.0,
+		reasoning: "ERROR: LLM should NOT be called for fast-path items",
+	}),
+	expectedOutcome: {
+		noteCreated: "01 Projects/Tax 2024/Bookmarks/🔖 Tax Guide 2024.md",
+		noteLocation: "Projects",
+		frontmatter: {
+			type: "bookmark",
+			url: "https://ato.gov.au/tax-guide",
+			title: "Tax Guide 2024",
+			project: "[[Tax 2024]]",
+		},
+		bodyContains: ["Tax Guide 2024", "ATO"],
+		shouldAutoClassify: true,
+		shouldPromptUser: false,
+	},
+	expectedFields: {
+		url: "https://ato.gov.au/tax-guide",
+		title: "Tax Guide 2024",
 	},
 };
 
@@ -415,6 +505,8 @@ export const BOOKMARK_EDGE_CASES: DocumentFixture<"bookmark">[] = [
 	BOOKMARK_SPECIAL_CHARS,
 	BOOKMARK_UNICODE,
 	BOOKMARK_LONG_URL,
+	BOOKMARK_FASTPATH_AREA,
+	BOOKMARK_FASTPATH_PROJECT,
 ];
 
 /**
