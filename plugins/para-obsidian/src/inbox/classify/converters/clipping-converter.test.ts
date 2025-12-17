@@ -46,7 +46,9 @@ describe("convertClippingToBookmark", () => {
 			expect(result.success).toBe(true);
 			expect(result.title).toBe("Example Page");
 			expect(result.firecrawlAttempted).toBe(false);
-			expect(result.errorType).toBe("api-key-missing");
+			if (result.success) {
+				expect(result.firecrawlError?.type).toBe("api-key-missing");
+			}
 		});
 
 		test("fails when URL is missing", async () => {
@@ -62,7 +64,9 @@ describe("convertClippingToBookmark", () => {
 			);
 
 			expect(result.success).toBe(false);
-			expect(result.error).toContain("URL required");
+			if (!result.success) {
+				expect(result.error).toContain("URL required");
+			}
 			expect(result.firecrawlAttempted).toBe(false);
 		});
 
@@ -118,8 +122,10 @@ describe("convertClippingToBookmark", () => {
 
 			expect(result.success).toBe(true);
 			expect(result.firecrawlAttempted).toBe(true);
-			expect(result.summary).toBeDefined();
-			expect(result.summary).toContain("Example");
+			if (result.success) {
+				expect(result.summary).toBeDefined();
+				expect(result.summary).toContain("Example");
+			}
 		});
 
 		test("handles Firecrawl API errors gracefully", async () => {
@@ -151,8 +157,10 @@ describe("convertClippingToBookmark", () => {
 
 			expect(result.success).toBe(true); // Conversion still succeeds
 			expect(result.firecrawlAttempted).toBe(true);
-			expect(result.summary).toBeUndefined();
-			expect(result.errorType).toBe("rate-limit");
+			if (result.success) {
+				expect(result.summary).toBeUndefined();
+				expect(result.firecrawlError?.type).toBe("rate-limit");
+			}
 		});
 
 		test("handles network errors gracefully", async () => {
@@ -183,8 +191,10 @@ describe("convertClippingToBookmark", () => {
 
 			expect(result.success).toBe(true);
 			expect(result.firecrawlAttempted).toBe(true);
-			expect(result.summary).toBeUndefined();
-			expect(result.errorType).toBe("network");
+			if (result.success) {
+				expect(result.summary).toBeUndefined();
+				expect(result.firecrawlError?.type).toBe("network");
+			}
 		});
 
 		test("handles timeout errors", async () => {
@@ -215,8 +225,10 @@ describe("convertClippingToBookmark", () => {
 
 			expect(result.success).toBe(true);
 			expect(result.firecrawlAttempted).toBe(true);
-			expect(result.summary).toBeUndefined();
-			expect(result.errorType).toBe("timeout");
+			if (result.success) {
+				expect(result.summary).toBeUndefined();
+				expect(result.firecrawlError?.type).toBe("timeout");
+			}
 		});
 	});
 
@@ -238,8 +250,10 @@ describe("convertClippingToBookmark", () => {
 				vaultContext,
 			);
 
-			expect(result.suggestedArea).toBe("Finance");
-			expect(result.suggestedProject).toBeUndefined();
+			if (result.success) {
+				expect(result.suggestedArea).toBe("Finance");
+				expect(result.suggestedProject).toBeUndefined();
+			}
 		});
 
 		test("suggests Health area for medical URLs", async () => {
@@ -255,7 +269,9 @@ describe("convertClippingToBookmark", () => {
 				vaultContext,
 			);
 
-			expect(result.suggestedArea).toBe("Health");
+			if (result.success) {
+				expect(result.suggestedArea).toBe("Health");
+			}
 		});
 
 		test("suggests Development area for GitHub URLs", async () => {
@@ -271,7 +287,9 @@ describe("convertClippingToBookmark", () => {
 				vaultContext,
 			);
 
-			expect(result.suggestedArea).toBe("Development");
+			if (result.success) {
+				expect(result.suggestedArea).toBe("Development");
+			}
 		});
 
 		test("suggests Learning area for course URLs", async () => {
@@ -287,7 +305,9 @@ describe("convertClippingToBookmark", () => {
 				vaultContext,
 			);
 
-			expect(result.suggestedArea).toBe("Learning");
+			if (result.success) {
+				expect(result.suggestedArea).toBe("Learning");
+			}
 		});
 
 		test("suggests based on content when URL pattern doesn't match", async () => {
@@ -306,7 +326,9 @@ describe("convertClippingToBookmark", () => {
 				vaultContext,
 			);
 
-			expect(result.suggestedArea).toBe("Finance");
+			if (result.success) {
+				expect(result.suggestedArea).toBe("Finance");
+			}
 		});
 
 		test("returns no suggestion when pattern doesn't match vault areas", async () => {
@@ -327,8 +349,10 @@ describe("convertClippingToBookmark", () => {
 				vaultContextWithoutFinance,
 			);
 
-			expect(result.suggestedArea).toBeUndefined();
-			expect(result.suggestedProject).toBeUndefined();
+			if (result.success) {
+				expect(result.suggestedArea).toBeUndefined();
+				expect(result.suggestedProject).toBeUndefined();
+			}
 		});
 	});
 
@@ -366,13 +390,15 @@ describe("convertClippingToBookmark", () => {
 				vaultContext,
 			);
 
-			expect(result.summary).toBeDefined();
-			if (result.summary) {
-				expect(result.summary.length).toBeLessThanOrEqual(2000);
-				// Should end with a sentence boundary (period, not ellipsis if sentence found)
-				const endsWithSentence = /[.!?]$/.test(result.summary.trim());
-				const endsWithEllipsis = result.summary.endsWith("...");
-				expect(endsWithSentence || endsWithEllipsis).toBe(true);
+			if (result.success) {
+				expect(result.summary).toBeDefined();
+				if (result.summary) {
+					expect(result.summary.length).toBeLessThanOrEqual(2000);
+					// Should end with a sentence boundary (period, not ellipsis if sentence found)
+					const endsWithSentence = /[.!?]$/.test(result.summary.trim());
+					const endsWithEllipsis = result.summary.endsWith("...");
+					expect(endsWithSentence || endsWithEllipsis).toBe(true);
+				}
 			}
 		});
 
@@ -404,7 +430,9 @@ describe("convertClippingToBookmark", () => {
 				vaultContext,
 			);
 
-			expect(result.summary).toBe(shortMarkdown);
+			if (result.success) {
+				expect(result.summary).toBe(shortMarkdown);
+			}
 		});
 	});
 });

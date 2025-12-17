@@ -62,16 +62,29 @@ export interface ExecuteSuggestionConfig {
  *
  * @param destination - The destination string from suggestion (e.g., "Resources", "02 Areas/Finance")
  * @param paraFolders - PARA folder mappings from config (e.g., { resources: "03 Resources" })
+ * @param vaultPath - Optional vault path to validate the resolved folder exists
  * @returns Resolved folder path
  * @throws Error if destination looks like unmapped PARA name
+ * @throws Error if vaultPath provided and resolved folder doesn't exist
  */
 export function resolveParaFolder(
 	destination: string,
 	paraFolders: Record<string, string> = DEFAULT_PARA_FOLDERS,
+	vaultPath?: string,
 ): string {
 	// Check if it's already a full path (contains "/" or starts with number)
 	if (destination.includes("/") || /^\d{2}\s/.test(destination)) {
-		return destination;
+		const resolved = destination;
+
+		// Validate folder exists if vaultPath provided
+		if (vaultPath) {
+			const fullPath = join(vaultPath, resolved);
+			if (!pathExistsSync(fullPath)) {
+				throw new Error(`Destination folder does not exist: ${resolved}`);
+			}
+		}
+
+		return resolved;
 	}
 
 	// Map semantic PARA names to numbered folders
@@ -95,6 +108,15 @@ export function resolveParaFolder(
 				`PARA folder mapping returned undefined for: "${destination}"`,
 			);
 		}
+
+		// Validate folder exists if vaultPath provided
+		if (vaultPath) {
+			const fullPath = join(vaultPath, resolved);
+			if (!pathExistsSync(fullPath)) {
+				throw new Error(`Destination folder does not exist: ${resolved}`);
+			}
+		}
+
 		return resolved;
 	}
 
@@ -108,7 +130,17 @@ export function resolveParaFolder(
 	}
 
 	// Not a PARA name - return unchanged (custom folder path)
-	return destination;
+	const resolved = destination;
+
+	// Validate folder exists if vaultPath provided
+	if (vaultPath) {
+		const fullPath = join(vaultPath, resolved);
+		if (!pathExistsSync(fullPath)) {
+			throw new Error(`Destination folder does not exist: ${resolved}`);
+		}
+	}
+
+	return resolved;
 }
 
 /**

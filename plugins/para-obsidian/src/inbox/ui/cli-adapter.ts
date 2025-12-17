@@ -21,6 +21,26 @@ import type {
 import { isCreateNoteSuggestion } from "../types";
 
 // =============================================================================
+// CLI Messages
+// =============================================================================
+
+/**
+ * Centralized CLI message templates.
+ * Using functions for messages that require interpolation.
+ */
+const CLI_MESSAGES = {
+	noDestination: (idx: number) =>
+		`⚠️  Skipped item ${idx}: No destination set. Use y${idx} to accept LLM suggestion, or d${idx} <path>`,
+	noItemsApprovedWithDestinations:
+		"\nNo items approved (all either already approved or missing destinations).",
+	noItemsApprovedWithSkipped:
+		"\nNo items approved (all either already approved, skipped, or missing destinations).",
+	invalidItem: (idx: number) => `Invalid item number: ${idx}`,
+	approvedCount: (count: number, total: number) =>
+		`\nApproved ${count} new item(s). Total: ${total}`,
+} as const;
+
+// =============================================================================
 // Command Parsing
 // =============================================================================
 
@@ -783,7 +803,7 @@ export async function runInteractiveLoop(
 				);
 
 				if (!targetSuggestion) {
-					console.log(emphasize.error(`Invalid item number: ${command.id}`));
+					console.log(emphasize.error(CLI_MESSAGES.invalidItem(command.id)));
 					break;
 				}
 
@@ -839,7 +859,7 @@ export async function runInteractiveLoop(
 				);
 
 				if (!targetSuggestion) {
-					console.log(emphasize.error(`Invalid item number: ${command.id}`));
+					console.log(emphasize.error(CLI_MESSAGES.invalidItem(command.id)));
 					break;
 				}
 
@@ -905,7 +925,7 @@ export async function runInteractiveLoop(
 				);
 
 				if (!targetSuggestion) {
-					console.log(emphasize.error(`Invalid item number: ${command.id}`));
+					console.log(emphasize.error(CLI_MESSAGES.invalidItem(command.id)));
 					break;
 				}
 
@@ -953,11 +973,7 @@ export async function runInteractiveLoop(
 							if (!hasDestination(s)) {
 								const idx = originalIndices.get(s.id) ?? 0;
 								skippedNoDestination.push(idx);
-								console.log(
-									emphasize.error(
-										`⚠️  Skipped item ${idx}: No destination set. Use y${idx} to accept LLM suggestion, or d${idx} <path>`,
-									),
-								);
+								console.log(emphasize.error(CLI_MESSAGES.noDestination(idx)));
 								continue;
 							}
 
@@ -977,16 +993,14 @@ export async function runInteractiveLoop(
 
 					if (newlyApproved.length === 0) {
 						console.log(
-							emphasize.dim(
-								"\nNo items approved (all either already approved or missing destinations).",
-							),
+							emphasize.dim(CLI_MESSAGES.noItemsApprovedWithDestinations),
 						);
 						break;
 					}
 
 					console.log(
 						emphasize.success(
-							`\nApproved ${newlyApproved.length} new item(s). Total: ${approved.size}`,
+							CLI_MESSAGES.approvedCount(newlyApproved.length, approved.size),
 						),
 					);
 
@@ -1062,11 +1076,7 @@ export async function runInteractiveLoop(
 							if (!hasDestination(s)) {
 								const idx = originalIndices.get(s.id) ?? 0;
 								skippedNoDestination.push(idx);
-								console.log(
-									emphasize.error(
-										`⚠️  Skipped item ${idx}: No destination set. Use y${idx} to accept LLM suggestion, or d${idx} <path>`,
-									),
-								);
+								console.log(emphasize.error(CLI_MESSAGES.noDestination(idx)));
 								continue;
 							}
 
@@ -1085,11 +1095,7 @@ export async function runInteractiveLoop(
 					}
 
 					if (newlyApproved.length === 0) {
-						console.log(
-							emphasize.dim(
-								"\nNo items approved (all either already approved, skipped, or missing destinations).",
-							),
-						);
+						console.log(emphasize.dim(CLI_MESSAGES.noItemsApprovedWithSkipped));
 						break;
 					}
 
@@ -1190,9 +1196,7 @@ export async function runInteractiveLoop(
 						if (!hasDestination(targetSuggestion)) {
 							skippedNoDestination.push(targetIndex);
 							console.log(
-								emphasize.error(
-									`⚠️  Skipped item ${targetIndex}: No destination set. Use y${targetIndex} to accept LLM suggestion, or d${targetIndex} <path>`,
-								),
+								emphasize.error(CLI_MESSAGES.noDestination(targetIndex)),
 							);
 							continue;
 						}
@@ -1213,17 +1217,13 @@ export async function runInteractiveLoop(
 					}
 
 					if (newlyApproved.length === 0) {
-						console.log(
-							emphasize.dim(
-								"\nNo items approved (all either already approved, skipped, or missing destinations).",
-							),
-						);
+						console.log(emphasize.dim(CLI_MESSAGES.noItemsApprovedWithSkipped));
 						break;
 					}
 
 					console.log(
 						emphasize.success(
-							`\nApproved ${newlyApproved.length} new item(s). Total: ${approved.size}`,
+							CLI_MESSAGES.approvedCount(newlyApproved.length, approved.size),
 						),
 					);
 
@@ -1282,7 +1282,7 @@ export async function runInteractiveLoop(
 				);
 
 				if (!targetSuggestion) {
-					console.log(emphasize.error(`Invalid item number: ${command.id}`));
+					console.log(emphasize.error(CLI_MESSAGES.invalidItem(command.id)));
 					break;
 				}
 
@@ -1316,7 +1316,7 @@ export async function runInteractiveLoop(
 				);
 
 				if (!targetSuggestion) {
-					console.log(emphasize.error(`Invalid item number: ${command.id}`));
+					console.log(emphasize.error(CLI_MESSAGES.invalidItem(command.id)));
 					break;
 				}
 

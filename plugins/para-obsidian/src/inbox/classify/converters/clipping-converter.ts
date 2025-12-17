@@ -21,32 +21,43 @@ const logger = {
 };
 
 /**
- * Result of clipping to bookmark conversion.
+ * Error type for Firecrawl enrichment failures
  */
-export interface ClippingConversionResult {
-	/** Conversion success status */
-	readonly success: boolean;
-	/** Page title */
-	readonly title: string;
-	/** Page summary from Firecrawl (if available) */
-	readonly summary?: string;
-	/** Suggested area based on URL/content analysis */
-	readonly suggestedArea?: string;
-	/** Suggested project based on URL/content analysis */
-	readonly suggestedProject?: string;
-	/** Error message if conversion failed */
-	readonly error?: string;
-	/** Whether Firecrawl enrichment was attempted */
-	readonly firecrawlAttempted: boolean;
-	/** Specific error type for logging/debugging */
-	readonly errorType?:
-		| "api-key-missing"
-		| "network"
-		| "auth"
-		| "rate-limit"
-		| "timeout"
-		| "other";
+export type FirecrawlErrorType =
+	| "api-key-missing"
+	| "network"
+	| "auth"
+	| "rate-limit"
+	| "timeout"
+	| "other";
+
+/**
+ * Firecrawl error details
+ */
+export interface FirecrawlError {
+	readonly type: FirecrawlErrorType;
+	readonly message: string;
 }
+
+/**
+ * Result of clipping to bookmark conversion (discriminated union).
+ */
+export type ClippingConversionResult =
+	| {
+			readonly success: true;
+			readonly title: string;
+			readonly summary?: string;
+			readonly suggestedArea?: string;
+			readonly suggestedProject?: string;
+			readonly firecrawlAttempted: boolean;
+			readonly firecrawlError?: FirecrawlError;
+	  }
+	| {
+			readonly success: false;
+			readonly title: string;
+			readonly error: string;
+			readonly firecrawlAttempted: boolean;
+	  };
 
 /**
  * Convert Web Clipper note (type: clipping) to bookmark format.
@@ -95,7 +106,7 @@ export async function convertClippingToBookmark(
 	const apiKey = process.env.FIRECRAWL_API_KEY;
 	let summary: string | undefined;
 	let firecrawlAttempted = false;
-	let errorType: ClippingConversionResult["errorType"];
+	let firecrawlError: FirecrawlError | undefined;
 
 	// Attempt Firecrawl enrichment if API key available
 	if (apiKey) {
@@ -133,7 +144,8 @@ export async function convertClippingToBookmark(
 			} else if ("error" in result) {
 				// Log specific error type for debugging
 				const errorMsg = result.error ?? "Unknown error";
-				errorType = categorizeError(errorMsg);
+				const errorType = categorizeError(errorMsg);
+				firecrawlError = { type: errorType, message: errorMsg };
 				logger.warn("Firecrawl enrichment failed", {
 					url,
 					error: errorMsg,
@@ -144,7 +156,8 @@ export async function convertClippingToBookmark(
 			// Handle timeout and network errors
 			const errorMessage =
 				error instanceof Error ? error.message : String(error);
-			errorType = categorizeError(errorMessage);
+			const errorType = categorizeError(errorMessage);
+			firecrawlError = { type: errorType, message: errorMessage };
 
 			logger.warn("Firecrawl enrichment error", {
 				url,
@@ -156,7 +169,10 @@ export async function convertClippingToBookmark(
 		logger.debug("Firecrawl API key not configured, skipping enrichment", {
 			url,
 		});
-		errorType = "api-key-missing";
+		firecrawlError = {
+			type: "api-key-missing",
+			message: "Firecrawl API key not configured",
+		};
 	}
 
 	// Suggest routing based on URL patterns and content
@@ -173,7 +189,7 @@ export async function convertClippingToBookmark(
 		suggestedArea,
 		suggestedProject,
 		firecrawlAttempted,
-		errorType,
+		firecrawlError,
 	};
 }
 
@@ -219,7 +235,7 @@ function smartTruncate(text: string, maxLength: number): string {
  * @param error - Error message or string
  * @returns Error category
  */
-function categorizeError(error: string): ClippingConversionResult["errorType"] {
+function categorizeError(error: string): FirecrawlErrorType {
 	const lowerError = error.toLowerCase();
 
 	if (lowerError.includes("timeout") || lowerError.includes("timed out")) {

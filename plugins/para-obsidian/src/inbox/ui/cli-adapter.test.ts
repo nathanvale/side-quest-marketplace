@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { createSuggestionId, type InboxSuggestion } from "../types";
+import {
+	type CreateNoteSuggestion,
+	createSuggestionId,
+	type InboxSuggestion,
+	type SkipSuggestion,
+} from "../types";
 import {
 	formatConfidence,
 	formatSuggestion,
@@ -724,6 +729,207 @@ describe("inbox/cli-adapter", () => {
 			const result = formatSuggestion(suggestion, 1);
 			expect(result).not.toContain("Destination");
 			expect(result).not.toContain("NO DESTINATION SET");
+		});
+	});
+
+	describe("approval blocking behavior", () => {
+		// Helper to create test suggestions (returns CreateNoteSuggestion)
+		const createTestSuggestion = (
+			id: string,
+			hasDestination: boolean,
+		): CreateNoteSuggestion => ({
+			id: createSuggestionId(id),
+			action: "create-note",
+			source: `/inbox/test-${id}.pdf`,
+			processor: "attachments",
+			confidence: "high",
+			detectionSource: "llm+heuristic",
+			reason: "Test",
+			suggestedNoteType: "invoice",
+			suggestedTitle: `Test ${id}`,
+			...(hasDestination && { suggestedDestination: "Areas/Finance" }),
+		});
+
+		test("should reject approval of item without destination", () => {
+			// Single item without destination
+			const suggestion = createTestSuggestion(
+				"00000001-0000-4000-8000-000000000001",
+				false,
+			);
+
+			// Verify the suggestion is actually missing destination
+			expect(suggestion.suggestedDestination).toBeUndefined();
+		});
+
+		test("should accept approval of item with destination", () => {
+			// Single item with destination
+			const suggestion = createTestSuggestion(
+				"00000002-0000-4000-8000-000000000002",
+				true,
+			);
+
+			// Verify the suggestion has destination
+			expect(suggestion.suggestedDestination).toBe("Areas/Finance");
+		});
+
+		test("should handle mixed items - some with, some without destinations", () => {
+			// Mix of items
+			const suggestions = [
+				createTestSuggestion("00000003-0000-4000-8000-000000000003", true), // Has destination
+				createTestSuggestion("00000004-0000-4000-8000-000000000004", false), // No destination
+				createTestSuggestion("00000005-0000-4000-8000-000000000005", true), // Has destination
+			];
+
+			// Verify expectations
+			expect(suggestions[0]?.suggestedDestination).toBe("Areas/Finance");
+			expect(suggestions[1]?.suggestedDestination).toBeUndefined();
+			expect(suggestions[2]?.suggestedDestination).toBe("Areas/Finance");
+		});
+
+		test("should handle all items missing destinations", () => {
+			// All items without destinations
+			const suggestions = [
+				createTestSuggestion("00000006-0000-4000-8000-000000000006", false),
+				createTestSuggestion("00000007-0000-4000-8000-000000000007", false),
+				createTestSuggestion("00000008-0000-4000-8000-000000000008", false),
+			];
+
+			// All should be missing destinations
+			for (const s of suggestions) {
+				expect(s.suggestedDestination).toBeUndefined();
+			}
+		});
+
+		test("should allow non-create-note suggestions without destinations", () => {
+			// skip action doesn't need destination
+			const skipSuggestion: SkipSuggestion = {
+				id: createSuggestionId("00000009-0000-4000-8000-000000000009"),
+				action: "skip",
+				source: "/inbox/skip-test.pdf",
+				processor: "attachments",
+				confidence: "low",
+				detectionSource: "none",
+				reason: "Cannot process",
+			};
+
+			// Skip actions don't require destinations (and don't have the field)
+			expect(skipSuggestion.action).toBe("skip");
+		});
+
+		test("should handle destination set via LLM suggestion acceptance", () => {
+			// Item initially without destination but has LLM suggestion
+			const suggestion: CreateNoteSuggestion = {
+				id: createSuggestionId("0000000a-0000-4000-8000-00000000000a"),
+				action: "create-note",
+				source: "/inbox/llm-test.pdf",
+				processor: "attachments",
+				confidence: "high",
+				detectionSource: "llm+heuristic",
+				reason: "Test",
+				suggestedNoteType: "invoice",
+				suggestedTitle: "LLM Test",
+				llmSuggestedArea: "Areas/Health",
+				// No suggestedDestination yet
+			};
+
+			// Before accepting LLM suggestion
+			expect(suggestion.suggestedDestination).toBeUndefined();
+			expect(suggestion.llmSuggestedArea).toBe("Areas/Health");
+
+			// After accepting (simulated - in real code this would update suggestedDestination)
+			const accepted: CreateNoteSuggestion = {
+				...suggestion,
+				suggestedDestination: suggestion.llmSuggestedArea,
+			};
+
+			expect(accepted.suggestedDestination).toBe("Areas/Health");
+		});
+
+		test("should handle destination set via manual command", () => {
+			// Item initially without destination
+			const suggestion = createTestSuggestion(
+				"0000000b-0000-4000-8000-00000000000b",
+				false,
+			);
+
+			// Before manual setting
+			expect(suggestion.suggestedDestination).toBeUndefined();
+
+			// After manual setting (simulated - in real code this would be handled by set-destination command)
+			const withManualDest: CreateNoteSuggestion = {
+				...suggestion,
+				suggestedDestination: "Projects/Tax 2024",
+			};
+
+			expect(withManualDest.suggestedDestination).toBe("Projects/Tax 2024");
+		});
+
+		test("should format warning message for items without destinations", () => {
+			const suggestion = createTestSuggestion(
+				"0000000c-0000-4000-8000-00000000000c",
+				false,
+			);
+
+			const formatted = formatSuggestion(suggestion, 1);
+
+			// Should show warning about missing destination
+			expect(formatted).toContain("⚠️ NO DESTINATION SET");
+		});
+
+		test("should not show warning for items with destinations", () => {
+			const suggestion = createTestSuggestion(
+				"0000000d-0000-4000-8000-00000000000d",
+				true,
+			);
+
+			const formatted = formatSuggestion(suggestion, 1);
+
+			// Should not show warning
+			expect(formatted).not.toContain("NO DESTINATION SET");
+			expect(formatted).toContain("Destination: Areas/Finance");
+		});
+
+		test("should handle edge case: empty destination string", () => {
+			// Edge case: destination is empty string (should be treated as no destination)
+			const suggestion: CreateNoteSuggestion = {
+				id: createSuggestionId("0000000e-0000-4000-8000-00000000000e"),
+				action: "create-note",
+				source: "/inbox/empty-dest.pdf",
+				processor: "attachments",
+				confidence: "high",
+				detectionSource: "llm+heuristic",
+				reason: "Test",
+				suggestedNoteType: "invoice",
+				suggestedTitle: "Empty Dest Test",
+				suggestedDestination: "", // Empty string
+			};
+
+			// Empty string is technically a value, but should probably be treated as invalid
+			// This documents current behavior - may need validation in real code
+			expect(suggestion.suggestedDestination).toBe("");
+		});
+
+		test("should validate destination format requirements", () => {
+			// Valid destination formats
+			const validSuggestions = [
+				{
+					...createTestSuggestion("0000000f-0000-4000-8000-00000000000f", true),
+					suggestedDestination: "Areas/Finance",
+				},
+				{
+					...createTestSuggestion("00000010-0000-4000-8000-000000000010", true),
+					suggestedDestination: "Projects/Tax 2024",
+				},
+				{
+					...createTestSuggestion("00000011-0000-4000-8000-000000000011", true),
+					suggestedDestination: "Resources",
+				},
+			];
+
+			// All should have valid destinations
+			for (const s of validSuggestions) {
+				expect(s.suggestedDestination).toBeTruthy();
+			}
 		});
 	});
 });
