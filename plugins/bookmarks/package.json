@@ -1,0 +1,14 @@
+{
+	"name": "@sidequest/bookmarks",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Bookmark management for Claude Code",
+	"author": {
+		"name": "Nathan Vale",
+		"email": "hi@nathanvale.com"
+	},
+	"scripts": {
+		"test": "echo 'No tests'",
+		"typecheck": "echo 'No typecheck'"
+	}
+}

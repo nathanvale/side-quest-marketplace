@@ -1,0 +1,13 @@
+{
+	"name": "bookmarks",
+	"description": "Bookmark management for Claude Code",
+	"version": "1.0.0",
+	"author": {
+		"name": "Nathan Vale",
+		"email": "hi@nathanvale.com"
+	},
+	"repository": "https://github.com/nathanvale/side-quest-marketplace",
+	"license": "MIT",
+	"keywords": ["bookmarks", "browser", "search"],
+	"commands": ["./commands/search.md"]
+}
