@@ -18,6 +18,9 @@
 	},
 	"scripts": {
 		"test": "bun test --recursive",
+		"test:unit": "bun test src --recursive",
+		"test:integration": "bun test test/integration",
+		"test:integration:watch": "bun test --watch test/integration",
 		"typecheck": "tsc --noEmit",
 		"format": "biome format --write .",
 		"format:check": "biome format .",

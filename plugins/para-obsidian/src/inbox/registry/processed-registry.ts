@@ -154,6 +154,21 @@ export interface RegistryManager {
 	 * @param hash - SHA256 hash to clear
 	 */
 	clearInProgress(hash: string): void;
+
+	/**
+	 * Remove an item from the registry by hash.
+	 * Call save() after to persist the change.
+	 *
+	 * @param hash - SHA256 hash of file to remove
+	 * @returns true if item was found and removed, false if not found
+	 */
+	removeItem(hash: string): boolean;
+
+	/**
+	 * Clear all items from the registry.
+	 * Call save() after to persist the change.
+	 */
+	clear(): void;
 }
 
 // =============================================================================
@@ -575,6 +590,31 @@ export function createRegistry(vaultPath: string): RegistryManager {
 		}
 	}
 
+	/**
+	 * Remove an item from the registry.
+	 * Call save() after to persist the change.
+	 */
+	function removeItem(hash: string): boolean {
+		const existed = items.has(hash);
+		if (existed) {
+			items.delete(hash);
+			log.debug("Item removed from registry", {
+				hash: `${hash.slice(0, 8)}...`,
+			});
+		}
+		return existed;
+	}
+
+	/**
+	 * Clear all items from the registry.
+	 * Call save() after to persist the change.
+	 */
+	function clear(): void {
+		const count = items.size;
+		items.clear();
+		log.debug("Registry cleared", { itemsRemoved: count });
+	}
+
 	return {
 		load,
 		save,
@@ -584,5 +624,7 @@ export function createRegistry(vaultPath: string): RegistryManager {
 		getAllItems,
 		markInProgress,
 		clearInProgress,
+		removeItem,
+		clear,
 	};
 }
