@@ -185,7 +185,8 @@ Supports:
 			log({
 				cid,
 				tool: "para_rewrite_links",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);

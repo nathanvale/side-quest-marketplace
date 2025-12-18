@@ -102,7 +102,8 @@ Configuration sources (precedence order):
 			log({
 				cid,
 				tool: "para_config",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(
@@ -173,7 +174,8 @@ catalog display.`,
 			log({
 				cid,
 				tool: "para_templates",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(
@@ -405,7 +407,8 @@ Example: For project template, shows you need:
 			log({
 				cid,
 				tool: "para_template_fields",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(

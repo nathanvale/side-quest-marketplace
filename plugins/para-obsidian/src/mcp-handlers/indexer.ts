@@ -106,7 +106,8 @@ Index saved to .para-obsidian-index.json in vault root.`,
 			log({
 				cid,
 				tool: "para_index_prime",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
@@ -233,7 +234,8 @@ Requires index to exist (run para_index_prime first).`,
 			log({
 				cid,
 				tool: "para_index_query",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
@@ -301,7 +303,8 @@ tool(
 			log({
 				cid,
 				tool: "para_list_areas",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(
@@ -371,7 +374,8 @@ tool(
 			log({
 				cid,
 				tool: "para_list_projects",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(
@@ -441,7 +445,8 @@ tool(
 			log({
 				cid,
 				tool: "para_list_tags",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(
@@ -511,7 +516,8 @@ tool(
 			log({
 				cid,
 				tool: "para_scan_tags",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(

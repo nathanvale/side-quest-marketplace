@@ -152,7 +152,8 @@ Requires ripgrep (rg) to be installed.`,
 			log({
 				cid,
 				tool: "para_search",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
@@ -250,7 +251,8 @@ Falls back to text search if ML dependencies unavailable.`,
 			log({
 				cid,
 				tool: "para_semantic_search",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);

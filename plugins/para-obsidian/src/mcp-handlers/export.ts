@@ -136,7 +136,8 @@ Returns the output file path and bookmark count.`,
 			log({
 				cid,
 				tool: "para_export_bookmarks",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);

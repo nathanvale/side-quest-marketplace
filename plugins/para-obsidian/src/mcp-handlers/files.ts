@@ -90,7 +90,8 @@ Note: Returns vault-relative paths.`,
 			log({
 				cid,
 				tool: "para_list",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
@@ -156,7 +157,8 @@ Note: Paths are vault-relative (e.g., "Projects/My Note.md").`,
 			log({
 				cid,
 				tool: "para_read",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
@@ -321,7 +323,8 @@ Requires git repository with clean working tree.`,
 			log({
 				cid,
 				tool: "para_create",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
@@ -404,7 +407,8 @@ Requires git repository with clean working tree.`,
 			log({
 				cid,
 				tool: "para_insert",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
@@ -492,7 +496,8 @@ Requires git repository with clean working tree (unless dry-run).`,
 			log({
 				cid,
 				tool: "para_rename",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
@@ -576,7 +581,8 @@ Requires git repository with clean working tree (unless dry-run).`,
 			log({
 				cid,
 				tool: "para_delete",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);

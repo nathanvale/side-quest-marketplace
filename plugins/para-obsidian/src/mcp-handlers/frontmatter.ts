@@ -99,7 +99,8 @@ Example output:
 			log({
 				cid,
 				tool: "para_frontmatter_get",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
@@ -194,7 +195,8 @@ Validation rules configured per note type (project, area, resource, etc.).`,
 			log({
 				cid,
 				tool: "para_frontmatter_validate",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
@@ -330,7 +332,8 @@ Requires git repository with clean working tree (unless dry-run).`,
 			log({
 				cid,
 				tool: "para_frontmatter_set",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
@@ -441,7 +444,8 @@ Requires git repository with clean working tree (unless dry-run).`,
 			log({
 				cid,
 				tool: "para_frontmatter_migrate",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
@@ -570,7 +574,8 @@ Requires git repository with clean working tree (unless dry-run).`,
 			log({
 				cid,
 				tool: "para_frontmatter_migrate_all",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
@@ -676,7 +681,8 @@ Used for:
 			log({
 				cid,
 				tool: "para_frontmatter_plan",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
@@ -824,7 +830,8 @@ Requires git repository with clean working tree (unless dry-run).`,
 			log({
 				cid,
 				tool: "para_frontmatter_apply_plan",
-				event: "error",
+				durationMs: Date.now() - startTime,
+				success: false,
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const format = parseResponseFormat(response_format);
