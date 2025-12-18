@@ -14,16 +14,44 @@ import {
 	formatSuggestionsTable,
 	runInteractiveLoop,
 } from "../inbox";
+import { checkThreshold } from "../inbox/shared/thresholds";
 import { isCreateNoteSuggestion } from "../inbox/types";
-import { getLogFile, initLoggerWithNotice } from "../shared/logger";
+import {
+	createCorrelationId,
+	getLogFile,
+	inboxLogger,
+	initLoggerWithNotice,
+} from "../shared/logger";
 import type { CommandContext, CommandResult } from "./types";
 
 type MetricsSummary = ReturnType<MetricsCollector["getSummary"]>;
 
+/**
+ * Singleton metrics collector instance scoped to this plugin only.
+ * Prevents expensive repeated log scans and cross-plugin contamination.
+ */
+let metricsCollector: MetricsCollector | null = null;
+
+/**
+ * Get or create metrics collector with plugin-scoped filtering.
+ * Collects metrics only once per CLI invocation for performance.
+ */
+async function getOrCreateMetricsCollector(): Promise<MetricsCollector> {
+	if (!metricsCollector) {
+		metricsCollector = new MetricsCollector({
+			includePlugins: ["para-obsidian"], // CRITICAL: scope to this plugin only
+		});
+		await metricsCollector.collect();
+	}
+	return metricsCollector;
+}
+
+/**
+ * Collect metrics summary (cached after first collection).
+ */
 async function collectMetricsSummary(): Promise<MetricsSummary | null> {
 	try {
-		const collector = new MetricsCollector();
-		await collector.collect();
+		const collector = await getOrCreateMetricsCollector();
 		return collector.getSummary();
 	} catch {
 		return null;
@@ -83,6 +111,9 @@ export async function handleProcessInbox(
 		console.log(emphasize.info(`Logs: ${getLogFile()}`));
 	}
 
+	// Generate a single session correlation ID for end-to-end tracing
+	const sessionCid = createCorrelationId();
+
 	// Parse process-inbox specific flags
 	const autoMode = flags.auto === true;
 	const previewMode = flags.preview === true;
@@ -111,9 +142,9 @@ export async function handleProcessInbox(
 	// Scan inbox for suggestions
 	let suggestions: InboxSuggestion[];
 	if (isJson) {
-		suggestions = await engine.scan();
+		suggestions = await engine.scan({ sessionCid });
 	} else {
-		suggestions = await scanWithSpinner(engine, llmModel);
+		suggestions = await scanWithSpinner(engine, llmModel, sessionCid);
 	}
 
 	// Apply filter if provided
@@ -144,6 +175,7 @@ export async function handleProcessInbox(
 			dryRun,
 			skipConfirm,
 			isJson,
+			sessionCid,
 		);
 	}
 
@@ -154,6 +186,7 @@ export async function handleProcessInbox(
 		dryRun,
 		isJson,
 		config.vault,
+		sessionCid,
 		config.paraFolders,
 	);
 }
@@ -230,7 +263,9 @@ function renderProgressBarFromCounts(
 async function scanWithSpinner(
 	engine: ReturnType<typeof createInboxEngine>,
 	llmModel: string,
+	sessionCid: string,
 ): Promise<InboxSuggestion[]> {
+	const cid = createCorrelationId();
 	const scanSpinner = createSpinner("Scanning inbox...").start();
 	const scanStarted = Date.now();
 	const scanState = {
@@ -305,6 +340,7 @@ async function scanWithSpinner(
 
 	try {
 		const suggestions = await engine.scan({
+			sessionCid,
 			onProgress: (progress) => {
 				const { total, filename, stage } = progress;
 				scanState.total = total;
@@ -367,7 +403,8 @@ async function scanWithSpinner(
 		});
 		clearInterval(scanTicker);
 		process.removeListener("SIGINT", cleanup);
-		const elapsed = ((Date.now() - scanStarted) / 1000).toFixed(1);
+		const durationMs = Date.now() - scanStarted;
+		const elapsed = (durationMs / 1000).toFixed(1);
 		const total = scanState.total || suggestions.length;
 		const finalBar = renderProgressBarFromCounts(
 			scanState.processed,
@@ -379,12 +416,101 @@ async function scanWithSpinner(
 		if (scanState.skipped > 0) finalStats.push(`${scanState.skipped} skipped`);
 		if (scanState.errors > 0) finalStats.push(`${scanState.errors} errors`);
 		const statsStr = finalStats.length > 0 ? ` (${finalStats.join(", ")})` : "";
+
+		// KEEP user-facing output
 		scanSpinner.success({
 			text: `${finalBar} ${finalCount}${statsStr} in ${elapsed}s`,
 		});
 
+		// ADD observability alongside
+		if (inboxLogger) {
+			inboxLogger.info`Scan completed tool=cli:scanInbox cid=${cid} durationMs=${durationMs} success=true total=${total} processed=${scanState.processed} skipped=${scanState.skipped} errors=${scanState.errors} timestamp=${new Date().toISOString()}`;
+		}
+
+		// Check scan duration threshold
+		const scanThresholdCheck = checkThreshold("scanTotalMs", durationMs);
+		if (scanThresholdCheck.exceeded && inboxLogger) {
+			inboxLogger.warn("MCP tool response", {
+				tool: "cli:thresholdExceeded",
+				sessionCid,
+				durationMs,
+				success: true,
+				thresholdExceeded: true,
+				thresholdName: "scanTotalMs",
+				thresholdValue: scanThresholdCheck.threshold,
+				thresholdPercentage: scanThresholdCheck.percentage,
+				alertLevel:
+					scanThresholdCheck.percentage > 150 ? "critical" : "warning",
+			});
+			// Surface in console for visibility
+			console.log(
+				color(
+					scanThresholdCheck.percentage > 150 ? "red" : "yellow",
+					`⚠ Scan duration exceeded threshold: ${(durationMs / 1000).toFixed(1)}s (${scanThresholdCheck.percentage}% of ${(scanThresholdCheck.threshold / 1000).toFixed(0)}s limit)`,
+				),
+			);
+		}
+
 		// Show LLM status messages
 		const filesAttempted = scanState.processed - scanState.skipped;
+
+		// Check LLM failure rate threshold
+		if (filesAttempted > 0 && scanState.llmFailures > 0) {
+			const llmFailureRate = scanState.llmFailures / filesAttempted;
+			const llmFailureCheck = checkThreshold("llmFailureRate", llmFailureRate);
+			if (llmFailureCheck.exceeded && inboxLogger) {
+				inboxLogger.warn("MCP tool response", {
+					tool: "cli:thresholdExceeded",
+					sessionCid,
+					durationMs,
+					success: true,
+					thresholdExceeded: true,
+					thresholdName: "llmFailureRate",
+					thresholdValue: llmFailureCheck.threshold,
+					thresholdPercentage: llmFailureCheck.percentage,
+					llmFailures: scanState.llmFailures,
+					filesAttempted,
+					actualRate: llmFailureRate,
+					alertLevel: llmFailureCheck.percentage > 150 ? "critical" : "warning",
+				});
+				// Surface in console for visibility
+				console.log(
+					color(
+						llmFailureCheck.percentage > 150 ? "red" : "yellow",
+						`⚠ LLM failure rate exceeded threshold: ${(llmFailureRate * 100).toFixed(1)}% (${llmFailureCheck.percentage}% of ${(llmFailureCheck.threshold * 100).toFixed(0)}% limit)`,
+					),
+				);
+			}
+		}
+
+		// Check error rate threshold
+		if (scanState.processed > 0 && scanState.errors > 0) {
+			const errorRate = scanState.errors / scanState.processed;
+			const errorRateCheck = checkThreshold("errorRate", errorRate);
+			if (errorRateCheck.exceeded && inboxLogger) {
+				inboxLogger.warn("MCP tool response", {
+					tool: "cli:thresholdExceeded",
+					sessionCid,
+					durationMs,
+					success: true,
+					thresholdExceeded: true,
+					thresholdName: "errorRate",
+					thresholdValue: errorRateCheck.threshold,
+					thresholdPercentage: errorRateCheck.percentage,
+					errors: scanState.errors,
+					processed: scanState.processed,
+					actualRate: errorRate,
+					alertLevel: errorRateCheck.percentage > 150 ? "critical" : "warning",
+				});
+				// Surface in console for visibility
+				console.log(
+					color(
+						errorRateCheck.percentage > 150 ? "red" : "yellow",
+						`⚠ Error rate exceeded threshold: ${(errorRate * 100).toFixed(1)}% (${errorRateCheck.percentage}% of ${(errorRateCheck.threshold * 100).toFixed(0)}% limit)`,
+					),
+				);
+			}
+		}
 
 		// Scenario 1: All LLM calls failed - show error and recovery hints
 		if (scanState.llmFailures > 0 && scanState.llmFailures >= filesAttempted) {
@@ -426,9 +552,20 @@ async function scanWithSpinner(
 	} catch (error) {
 		clearInterval(scanTicker);
 		process.removeListener("SIGINT", cleanup);
+		const durationMs = Date.now() - scanStarted;
+		const errorMessage =
+			error instanceof Error ? error.message : "unknown error";
+
+		// KEEP user-facing output
 		scanSpinner.error({
-			text: `Scan failed: ${error instanceof Error ? error.message : "unknown error"}`,
+			text: `Scan failed: ${errorMessage}`,
 		});
+
+		// ADD observability alongside
+		if (inboxLogger) {
+			inboxLogger.error`Scan failed tool=cli:scanInbox cid=${cid} durationMs=${durationMs} success=false error=${errorMessage} timestamp=${new Date().toISOString()}`;
+		}
+
 		throw error;
 	}
 }
@@ -529,6 +666,7 @@ async function handleAutoMode(
 	dryRun: boolean,
 	skipConfirm: boolean,
 	isJson: boolean,
+	sessionCid: string,
 ): Promise<CommandResult> {
 	// Dry-run: show what would happen without executing
 	if (dryRun) {
@@ -589,9 +727,12 @@ async function handleAutoMode(
 	// Execute all suggestions
 	let batchResult: BatchResult;
 	if (isJson) {
-		batchResult = await engine.execute(suggestions.map((s) => s.id));
+		batchResult = await engine.execute(
+			suggestions.map((s) => s.id),
+			{ sessionCid },
+		);
 	} else {
-		batchResult = await executeWithSpinner(engine, suggestions);
+		batchResult = await executeWithSpinner(engine, suggestions, sessionCid);
 	}
 
 	// Aggregate results
@@ -649,7 +790,9 @@ async function handleAutoMode(
 async function executeWithSpinner(
 	engine: ReturnType<typeof createInboxEngine>,
 	suggestions: InboxSuggestion[],
+	sessionCid: string,
 ): Promise<BatchResult> {
+	const cid = createCorrelationId();
 	const total = suggestions.length;
 	const execSpinner = createSpinner(renderProgressBar(0, 16)).start();
 	const execStarted = Date.now();
@@ -658,6 +801,7 @@ async function executeWithSpinner(
 	const results = await engine.execute(
 		suggestions.map((s) => s.id),
 		{
+			sessionCid,
 			onProgress: ({ percentComplete, suggestionId, success, error }) => {
 				if (!success) errorCount++;
 
@@ -671,16 +815,40 @@ async function executeWithSpinner(
 		},
 	);
 
-	const elapsed = ((Date.now() - execStarted) / 1000).toFixed(1);
+	const durationMs = Date.now() - execStarted;
+	const elapsed = (durationMs / 1000).toFixed(1);
 	const finalBar = renderProgressBarFromCounts(
 		results.summary.total,
 		total,
 		16,
 	);
 	const statsStr = errorCount > 0 ? ` (${errorCount} failed)` : "";
+
+	// KEEP user-facing output
 	execSpinner.success({
 		text: `${finalBar}${statsStr} in ${elapsed}s`,
 	});
+
+	// ADD observability alongside
+	if (inboxLogger) {
+		inboxLogger.info`Execute completed tool=cli:executeInbox cid=${cid} durationMs=${durationMs} success=true total=${total} succeeded=${results.summary.succeeded} failed=${results.summary.failed} timestamp=${new Date().toISOString()}`;
+	}
+
+	// Check threshold
+	const executeThresholdCheck = checkThreshold("executeTotalMs", durationMs);
+	if (executeThresholdCheck.exceeded && inboxLogger) {
+		inboxLogger.warn("MCP tool response", {
+			tool: "cli:thresholdExceeded",
+			durationMs,
+			success: true,
+			thresholdExceeded: true,
+			thresholdName: "executeTotalMs",
+			thresholdValue: executeThresholdCheck.threshold,
+			thresholdPercentage: executeThresholdCheck.percentage,
+			alertLevel:
+				executeThresholdCheck.percentage > 150 ? "critical" : "warning",
+		});
+	}
 
 	return results;
 }
@@ -694,6 +862,7 @@ async function handleInteractiveMode(
 	dryRun: boolean,
 	isJson: boolean,
 	vaultPath: string,
+	sessionCid: string,
 	paraFolders?: Record<string, string>,
 ): Promise<CommandResult> {
 	if (isJson) {
@@ -740,6 +909,7 @@ async function handleInteractiveMode(
 			let errorCount = 0;
 
 			const batchResults = await engine.execute(approvedIds, {
+				sessionCid,
 				updatedSuggestions, // Pass CLI-modified suggestions to ensure destination changes are respected
 				onProgress: ({ percentComplete, suggestionId, success, error }) => {
 					if (!success) errorCount++;
