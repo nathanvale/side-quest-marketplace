@@ -1,4 +1,9 @@
 {
 	"description": "Obsidian PARA method integration with CLI operations and MCP server",
-	"hooks": {}
+	"hooks": [
+		{
+			"event": "Stop",
+			"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/session-summary.ts"
+		}
+	]
 }
