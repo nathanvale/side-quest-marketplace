@@ -10,8 +10,17 @@
 import { basename, join } from "node:path";
 import { pathExistsSync, readDir } from "@sidequest/core/fs";
 import pLimit from "p-limit";
+import {
+	DEFAULT_DESTINATIONS,
+	DEFAULT_PARA_FOLDERS,
+} from "../../config/defaults";
 import { loadConfig } from "../../config/index";
-import { ensureGitGuard } from "../../git/index";
+import {
+	ensureCleanState,
+	finalizeSession,
+	startSession,
+	trackChange,
+} from "../../git/session";
 import {
 	createCorrelationId,
 	executeLogger,
@@ -28,6 +37,7 @@ import {
 	type DocumentTypeResult,
 	parseDetectionResponse,
 } from "../classify/llm-classifier";
+import { createDefaultEnrichmentPipeline } from "../enrich";
 import { createRegistry, hashFile } from "../registry/processed-registry";
 import {
 	createInboxFile,
@@ -370,14 +380,71 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 						);
 
 						if (matchingClassifier) {
+							// =============================================================
+							// ENRICHMENT PIPELINE: Enrich content before classification
+							// Uses Strategy Pattern - currently supports bookmarks
+							// =============================================================
+							let enrichedFrontmatter = frontmatter;
+
+							// Create enrichment pipeline for this file
+							const enrichmentPipeline = createDefaultEnrichmentPipeline(
+								resolvedConfig.vaultPath,
+								{ maxRetries: 3, baseDelayMs: 1000 },
+							);
+
+							// Check if file needs enrichment
+							const needsEnrichment =
+								await enrichmentPipeline.needsEnrichment(file);
+
+							if (needsEnrichment) {
+								if (onProgress) {
+									await onProgress({
+										...progressBase,
+										stage: "enrich",
+									});
+								}
+
+								// Process through enrichment pipeline
+								const enrichmentResult =
+									await enrichmentPipeline.processFile(file);
+
+								if (enrichmentResult.error) {
+									// Enrichment failed - BLOCKING error
+									// Skip this file, let user know, they can retry later
+									const error = enrichmentResult.error;
+									const errorMessage = `${error.code}: ${error.message}`;
+
+									if (inboxLogger) {
+										inboxLogger.warn`Enrichment failed file=${filename} strategy=${enrichmentResult.strategyId} error=${errorMessage} cid=${cid}`;
+									}
+									if (onProgress) {
+										await onProgress({
+											...progressBase,
+											stage: "error",
+											error: `Enrichment failed: ${errorMessage}`,
+										});
+									}
+									// Return null to skip this file - blocking behavior
+									return null;
+								}
+
+								if (enrichmentResult.enriched) {
+									enrichedFrontmatter = enrichmentResult.frontmatter;
+
+									if (inboxLogger) {
+										inboxLogger.info`File enriched file=${filename} strategy=${enrichmentResult.strategyId} cid=${cid}`;
+									}
+								}
+							}
+
 							// Try to resolve destination from frontmatter
 							const destination = resolveDestinationFromFrontmatter(
-								frontmatter,
+								enrichedFrontmatter,
 								vaultContext,
 							);
 
-							const area = parseWikilink(frontmatter.area);
-							const project = parseWikilink(frontmatter.project);
+							const area = parseWikilink(enrichedFrontmatter.area);
+							const project = parseWikilink(enrichedFrontmatter.project);
 
 							// Build suggestion - no hashing needed for markdown notes
 							const suggestion: CreateNoteSuggestion = {
@@ -389,12 +456,12 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 								action: "create-note",
 								suggestedNoteType: noteType,
 								suggestedTitle:
-									(frontmatter.title as string) ||
+									(enrichedFrontmatter.title as string) ||
 									generateTitle(filename, noteType),
 								suggestedArea: area,
 								suggestedProject: project,
 								suggestedDestination: destination,
-								extractedFields: frontmatter,
+								extractedFields: enrichedFrontmatter,
 								autoRoute: !!destination, // Auto-route only if destination resolved
 								reason: destination
 									? `Pre-routed via frontmatter (${project ? "project" : "area"})`
@@ -791,23 +858,17 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			inboxLogger.info`Scan started vault=${resolvedConfig.vaultPath} cid=${cid}`;
 		}
 
-		// Git safety check FIRST: ensure vault is clean before expensive LLM processing
-		// This prevents wasted time/tokens if user has uncommitted changes
-		// excludeInbox: true because we expect files in inbox - we're checking output folders
-		// excludeAttachments: true because orphaned attachments shouldn't block inbox processing
-		try {
-			const config = { vault: resolvedConfig.vaultPath };
-			await ensureGitGuard(config, {
-				checkAllFileTypes: true,
-				excludeInbox: true,
-				excludeAttachments: true,
-			});
-		} catch (error) {
-			throw createInboxError(
-				"SYS_UNEXPECTED",
-				{ cid, operation: "scan" },
-				error instanceof Error ? error.message : "Git safety check failed",
-			);
+		// Silent pre-commit: auto-save any uncommitted PARA files before scan
+		// This never blocks - if git fails, we log and continue
+		// Note: We use default PARA folders here to avoid filesystem config reads
+		// which can conflict with test vault setups
+		const preCommitResult = await ensureCleanState({
+			vault: resolvedConfig.vaultPath,
+			paraFolders: DEFAULT_PARA_FOLDERS,
+			defaultDestinations: DEFAULT_DESTINATIONS,
+		});
+		if (preCommitResult.preCommitted && inboxLogger) {
+			inboxLogger.info`Auto-saved ${preCommitResult.files.length} existing files before scan`;
 		}
 
 		// Load registry and clean up staging
@@ -903,23 +964,17 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			paraConfig.paraFolders ?? {},
 		);
 
-		// Git safety check (belt-and-suspenders): re-verify in case files changed since scan
-		// Primary check is in scan() to fail fast before expensive LLM processing
-		// excludeInbox: true because we expect files in inbox - we're checking output folders
-		// excludeAttachments: true because orphaned attachments shouldn't block inbox processing
-		try {
-			const config = { vault: resolvedConfig.vaultPath };
-			await ensureGitGuard(config, {
-				checkAllFileTypes: true,
-				excludeInbox: true,
-				excludeAttachments: true,
-			});
-		} catch (error) {
-			throw createInboxError(
-				"SYS_UNEXPECTED",
-				{ cid, operation: "execute" },
-				error instanceof Error ? error.message : "Git safety check failed",
-			);
+		// Start a session - this silently pre-commits any existing uncommitted files
+		// and tracks changes for batch commit at the end
+		// Note: We use defaults with fallback from config to avoid test interference
+		const session = await startSession({
+			vault: resolvedConfig.vaultPath,
+			paraFolders: paraConfig.paraFolders ?? DEFAULT_PARA_FOLDERS,
+			defaultDestinations:
+				paraConfig.defaultDestinations ?? DEFAULT_DESTINATIONS,
+		});
+		if (inboxLogger) {
+			inboxLogger.debug`Execute session started id=${session.id} cid=${cid}`;
 		}
 
 		// Build path maps ONCE for entire batch
@@ -978,6 +1033,13 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					if (executeLogger) {
 						executeLogger.debug`Registry saved after item=${id} ${cid}`;
 					}
+					// Track file changes in session for batch commit
+					if (result.createdNote) {
+						trackChange(session, result.createdNote);
+					}
+					if (result.movedAttachment) {
+						trackChange(session, result.movedAttachment);
+					}
 				} else {
 					// Track as failed even though executeSuggestion returned a result
 					failed.set(id, new Error(result.error));
@@ -1016,6 +1078,19 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		// Final save to ensure any edge cases are captured
 		// (This is now redundant but harmless as a safety net)
 		await registry.save();
+
+		// Finalize session - batch commit all changes from this execute() call
+		const successCount = successful.filter((r) => r.success).length;
+		if (successCount > 0) {
+			const summary = `inbox: processed ${successCount} item${successCount === 1 ? "" : "s"}`;
+			const commitResult = await finalizeSession(session, summary, paraConfig);
+			if (commitResult.committed && inboxLogger) {
+				inboxLogger.info`Session committed: ${summary}`;
+			}
+		} else {
+			// No successful operations - just mark session as finalized without commit
+			session.finalized = true;
+		}
 
 		const durationMs = Date.now() - startedAt;
 		if (inboxLogger) {

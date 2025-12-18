@@ -418,6 +418,13 @@ export interface LLMProgress extends ScanProgressBase {
 }
 
 /**
+ * Progress update during bookmark enrichment stage.
+ */
+export interface EnrichProgress extends ScanProgressBase {
+	readonly stage: "enrich";
+}
+
+/**
  * Progress update when file is skipped (already processed).
  */
 export interface SkippedProgress extends ScanProgressBase {
@@ -465,6 +472,7 @@ export type ScanProgress =
 	| StartProgress
 	| HashingProgress
 	| ExtractingProgress
+	| EnrichProgress
 	| LLMProgress
 	| SkippedProgress
 	| DoneProgress

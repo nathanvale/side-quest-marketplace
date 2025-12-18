@@ -1,14 +1,13 @@
 /**
- * Integration tests for Git Guard safety features.
+ * Integration tests for Git Session and Silent Pre-commit features.
  *
- * Tests git-based safety mechanisms that prevent data loss:
- * - Dirty vault rejection (uncommitted changes block processing)
- * - Clean vault processing (committed vaults proceed normally)
- * - Auto-commit behavior (optional automatic commits after operations)
- * - Untracked file handling (warnings for untracked content)
+ * Tests git-based session management that abstracts git away from users:
+ * - Silent pre-commit (uncommitted changes are auto-committed before operations)
+ * - Session tracking (changes tracked during operations)
+ * - Batch commits at session end
+ * - Graceful degradation (logs warnings, continues on failure)
  *
- * These tests verify that the git guard protects users from accidentally
- * losing work by requiring clean working trees before destructive operations.
+ * The user never sees git errors - the CLI "just works".
  *
  * @module test/integration/suites/git-guard
  */
@@ -93,6 +92,25 @@ function commitAllChanges(
 }
 
 /**
+ * Helper: Get the latest commit message.
+ */
+function getLatestCommitMessage(vaultPath: string): string {
+	const result = Bun.spawnSync(["git", "log", "-1", "--format=%s"], {
+		cwd: vaultPath,
+		stdout: "pipe",
+		stderr: "pipe",
+	});
+
+	if (result.exitCode !== 0) {
+		throw new Error(
+			`git log failed: ${new TextDecoder().decode(result.stderr)}`,
+		);
+	}
+
+	return new TextDecoder().decode(result.stdout).trim();
+}
+
+/**
  * Helper: Modify a file to create uncommitted changes.
  */
 function modifyFile(vaultPath: string, relativePath: string, content: string) {
@@ -100,7 +118,7 @@ function modifyFile(vaultPath: string, relativePath: string, content: string) {
 	Bun.write(filePath, content);
 }
 
-describe("Git Guard Safety", () => {
+describe("Git Session - Silent Pre-commit", () => {
 	let harness: IntegrationTestHarness;
 
 	beforeEach(() => {
@@ -130,8 +148,8 @@ describe("Git Guard Safety", () => {
 		}
 	});
 
-	describe("Dirty Vault Rejection", () => {
-		test("rejects processing when vault has uncommitted changes", async () => {
+	describe("Silent Pre-commit Behavior", () => {
+		test("silently pre-commits uncommitted PARA files before scan", async () => {
 			// Add a file to inbox and commit it (clean state)
 			await harness.addToInbox(
 				"test.md",
@@ -139,6 +157,7 @@ describe("Git Guard Safety", () => {
 type: bookmark
 url: https://example.com
 title: Test Article
+enrichedAt: 2024-12-17T00:00:00Z
 ---
 # Test Article
 `,
@@ -160,11 +179,20 @@ title: Test Article
 			const statusAfter = getGitStatusSync(harness.vault);
 			expect(statusAfter.clean).toBe(false);
 
-			// Attempt to scan - should reject due to dirty state
-			await expect(harness.scan()).rejects.toThrow(/uncommitted changes/i);
+			// Scan should succeed (silently pre-commits the dirty files)
+			const suggestions = await harness.scan();
+			expect(suggestions).toHaveLength(1);
+
+			// Verify the dirty file was auto-committed
+			const statusFinal = getGitStatusSync(harness.vault);
+			expect(statusFinal.clean).toBe(true);
+
+			// Verify the pre-commit message
+			const commitMsg = getLatestCommitMessage(harness.vault);
+			expect(commitMsg).toContain("auto-save before session");
 		});
 
-		test("rejects with clear error message listing dirty files", async () => {
+		test("pre-commits multiple uncommitted files", async () => {
 			// Add file to inbox and commit
 			await harness.addToInbox("test.md", "# Test");
 			commitAllChanges(harness.vault);
@@ -173,19 +201,16 @@ title: Test Article
 			modifyFile(harness.vault, "02 Areas/note1.md", "# Note 1");
 			modifyFile(harness.vault, "03 Resources/note2.md", "# Note 2");
 
-			// Attempt scan - should show file list in error
-			try {
-				await harness.scan();
-				throw new Error("Expected scan to throw due to uncommitted changes");
-			} catch (error) {
-				const err = error as Error;
-				expect(err.message).toContain("uncommitted changes");
-				expect(err.message).toContain("note1.md");
-				expect(err.message).toContain("note2.md");
-			}
+			// Scan should succeed (pre-commits all dirty files)
+			const suggestions = await harness.scan();
+			expect(suggestions).toHaveLength(1);
+
+			// Verify all files were committed
+			const status = getGitStatusSync(harness.vault);
+			expect(status.clean).toBe(true);
 		});
 
-		test("rejects when staged but not committed", async () => {
+		test("pre-commits staged but not committed files", async () => {
 			// Add and commit initial file
 			await harness.addToInbox("test.md", "# Test");
 			commitAllChanges(harness.vault);
@@ -205,11 +230,16 @@ title: Test Article
 			const status = new TextDecoder().decode(statusResult.stdout);
 			expect(status).toContain("02 Areas/staged.md");
 
-			// Should reject - staged files count as uncommitted
-			await expect(harness.scan()).rejects.toThrow(/uncommitted changes/i);
+			// Scan should succeed (pre-commits staged files)
+			const suggestions = await harness.scan();
+			expect(suggestions).toHaveLength(1);
+
+			// Verify staged file was committed
+			const statusFinal = getGitStatusSync(harness.vault);
+			expect(statusFinal.clean).toBe(true);
 		});
 
-		test("does NOT reject when only inbox has uncommitted files", async () => {
+		test("does NOT pre-commit inbox files (they are excluded)", async () => {
 			// Commit initial vault structure
 			commitAllChanges(harness.vault);
 
@@ -220,17 +250,23 @@ title: Test Article
 type: bookmark
 url: https://example.com
 title: Test
+enrichedAt: 2024-12-17T00:00:00Z
 ---
 # Test
 `,
 			);
 
-			// Should succeed - inbox is excluded from git guard
+			// Inbox file should remain uncommitted after scan
+			// (inbox is excluded from pre-commit to allow processing)
 			const suggestions = await harness.scan();
 			expect(suggestions).toHaveLength(1);
+
+			// Vault will be dirty because inbox file is not pre-committed
+			// The inbox file will be dirty, but that's expected
+			// The key point is that scan() didn't throw an error
 		});
 
-		test("does NOT reject when only attachments folder has uncommitted files", async () => {
+		test("does NOT pre-commit attachments folder (excluded)", async () => {
 			// Commit initial vault structure
 			commitAllChanges(harness.vault);
 
@@ -241,6 +277,7 @@ title: Test
 type: bookmark
 url: https://example.com
 title: Test
+enrichedAt: 2024-12-17T00:00:00Z
 ---
 # Test
 `,
@@ -249,7 +286,7 @@ title: Test
 			// Add uncommitted attachment (simulating orphaned attachment)
 			modifyFile(harness.vault, "Attachments/orphaned.png", "fake image data");
 
-			// Should succeed - attachments folder is excluded from git guard
+			// Should succeed - attachments folder is excluded from pre-commit
 			const suggestions = await harness.scan();
 			expect(suggestions).toHaveLength(1);
 		});
@@ -268,6 +305,7 @@ type: bookmark
 url: https://example.com
 title: Test Article
 clipped: 2024-12-17
+enrichedAt: 2024-12-17T00:00:00Z
 ---
 # Test Article
 `,
@@ -290,9 +328,7 @@ clipped: 2024-12-17
 				console.log("Execution failed:", result);
 			}
 
-			// For this test, we just care that the git guard didn't block execution
-			// The execution itself might fail for other reasons (missing fields, etc.)
-			// So we just verify we got a result back (wasn't blocked by git guard)
+			// Verify we got a result back (git didn't block execution)
 			expect(result).toBeTruthy();
 		});
 
@@ -307,6 +343,7 @@ clipped: 2024-12-17
 type: bookmark
 url: https://first.com
 title: First
+enrichedAt: 2024-12-17T00:00:00Z
 ---
 # First
 `,
@@ -323,6 +360,7 @@ title: First
 type: bookmark
 url: https://second.com
 title: Second
+enrichedAt: 2024-12-17T00:00:00Z
 ---
 # Second
 `,
@@ -333,7 +371,7 @@ title: Second
 			expect(scan2).toHaveLength(2);
 		});
 
-		test("processes after committing previous dirty state", async () => {
+		test("processes after pre-committing dirty state", async () => {
 			// Start clean
 			commitAllChanges(harness.vault);
 
@@ -343,24 +381,18 @@ title: Second
 			// Create dirty state
 			modifyFile(harness.vault, "02 Areas/dirty.md", "# Dirty");
 
-			// Should reject due to dirty state
-			await expect(harness.scan()).rejects.toThrow(/uncommitted changes/i);
-
-			// Commit the dirty file
-			commitAllChanges(harness.vault, "chore: commit dirty file");
-
-			// Verify clean
-			const status = getGitStatusSync(harness.vault);
-			expect(status.clean).toBe(true);
-
-			// Should now succeed
+			// Should succeed (pre-commits dirty state automatically)
 			const suggestions = await harness.scan();
 			expect(suggestions).toHaveLength(1);
+
+			// Verify vault is now clean (dirty file was pre-committed)
+			const status = getGitStatusSync(harness.vault);
+			expect(status.clean).toBe(true);
 		});
 	});
 
 	describe("Untracked Files Handling", () => {
-		test("detects untracked files in PARA folders", async () => {
+		test("pre-commits untracked files in PARA folders", async () => {
 			// Commit initial structure
 			commitAllChanges(harness.vault);
 
@@ -370,8 +402,13 @@ title: Second
 			// Add file to inbox
 			await harness.addToInbox("test.md", "# Test");
 
-			// Should reject - untracked files count as uncommitted
-			await expect(harness.scan()).rejects.toThrow(/uncommitted changes/i);
+			// Should succeed (pre-commits untracked files)
+			const suggestions = await harness.scan();
+			expect(suggestions).toHaveLength(1);
+
+			// Verify untracked file was committed
+			const status = getGitStatusSync(harness.vault);
+			expect(status.clean).toBe(true);
 		});
 
 		test("ignores untracked files in non-PARA folders", async () => {
@@ -388,6 +425,7 @@ title: Second
 type: bookmark
 url: https://example.com
 title: Test
+enrichedAt: 2024-12-17T00:00:00Z
 ---
 # Test
 `,
@@ -412,62 +450,18 @@ title: Test
 			// Add file to inbox
 			await harness.addToInbox("test.md", "# Test");
 
-			// Should reject - both tracked and untracked changes
-			try {
-				await harness.scan();
-				throw new Error(
-					"Expected scan to throw due to mixed tracked/untracked changes",
-				);
-			} catch (error) {
-				const err = error as Error;
-				expect(err.message).toContain("uncommitted changes");
-				expect(err.message).toContain("tracked.md");
-				expect(err.message).toContain("untracked.md");
-			}
-		});
-	});
+			// Should succeed (pre-commits both tracked and untracked changes)
+			const suggestions = await harness.scan();
+			expect(suggestions).toHaveLength(1);
 
-	describe("Error Message Clarity", () => {
-		test("error includes fix instructions", async () => {
-			// Create dirty state
-			commitAllChanges(harness.vault);
-			await harness.addToInbox("test.md", "# Test");
-			modifyFile(harness.vault, "02 Areas/dirty.md", "# Dirty");
-
-			// Error should include helpful commands
-			try {
-				await harness.scan();
-				throw new Error("Expected scan to throw with fix instructions");
-			} catch (error) {
-				const err = error as Error;
-				expect(err.message).toContain("para git commit");
-				expect(err.message).toContain("git add");
-				expect(err.message).toContain("git commit");
-			}
-		});
-
-		test("error message is user-friendly", async () => {
-			commitAllChanges(harness.vault);
-			await harness.addToInbox("test.md", "# Test");
-			modifyFile(harness.vault, "02 Areas/note.md", "# Note");
-
-			try {
-				await harness.scan();
-				throw new Error(
-					"Expected scan to throw with user-friendly error message",
-				);
-			} catch (error) {
-				const err = error as Error;
-				// Should be clear and actionable
-				expect(err.message).toContain("uncommitted changes");
-				expect(err.message).toContain("PARA folders");
-				expect(err.message).toContain("Commit or stash");
-			}
+			// Verify all changes were committed
+			const status = getGitStatusSync(harness.vault);
+			expect(status.clean).toBe(true);
 		});
 	});
 
 	describe("Git Status Integration", () => {
-		test("git status helper matches git guard behavior", async () => {
+		test("git status helper matches session behavior", async () => {
 			// Test clean state
 			commitAllChanges(harness.vault);
 			const clean = await gitStatus(harness.vault);
@@ -485,6 +479,26 @@ title: Test
 			// Vault starts with committed structure from harness setup
 			const status = await gitStatus(harness.vault);
 			expect(status.clean).toBe(true);
+		});
+	});
+
+	describe("Session Commit Messages", () => {
+		test("pre-commit uses correct message format", async () => {
+			// Start clean
+			commitAllChanges(harness.vault);
+
+			// Create dirty state
+			modifyFile(harness.vault, "02 Areas/note.md", "# Note");
+
+			// Add file to inbox
+			await harness.addToInbox("test.md", "# Test");
+
+			// Scan triggers pre-commit
+			await harness.scan();
+
+			// Verify commit message format
+			const commitMsg = getLatestCommitMessage(harness.vault);
+			expect(commitMsg).toBe("chore(para-obsidian): auto-save before session");
 		});
 	});
 });

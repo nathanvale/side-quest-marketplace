@@ -21,7 +21,15 @@ import {
 /**
  * All subsystems used by para-obsidian plugin.
  */
-export const SUBSYSTEMS = ["mcp", "inbox", "pdf", "llm", "execute"] as const;
+export const SUBSYSTEMS = [
+	"mcp",
+	"inbox",
+	"pdf",
+	"llm",
+	"execute",
+	"git",
+	"enrich",
+] as const;
 
 export type PluginSubsystem = (typeof SUBSYSTEMS)[number];
 
@@ -112,6 +120,16 @@ export const llmLogger = subsystemLoggers.llm!;
  */
 export const executeLogger = subsystemLoggers.execute!;
 
+/**
+ * Logger for git operations (status, add, commit, sessions).
+ */
+export const gitLogger = subsystemLoggers.git!;
+
+/**
+ * Logger for enrichment pipeline operations (Firecrawl, LLM improvement).
+ */
+export const enrichLogger = subsystemLoggers.enrich!;
+
 // =============================================================================
 // Re-exports for convenience
 // =============================================================================
@@ -137,4 +155,6 @@ export const loggers = {
 	pdf: pdfLogger,
 	llm: llmLogger,
 	execute: executeLogger,
+	git: gitLogger,
+	enrich: enrichLogger,
 } as const;

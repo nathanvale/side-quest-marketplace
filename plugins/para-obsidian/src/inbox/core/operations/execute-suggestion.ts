@@ -23,7 +23,7 @@ import {
 	parseFrontmatter,
 	serializeFrontmatter,
 } from "../../../frontmatter/parse";
-import { autoCommitChanges } from "../../../git/index";
+// Note: autoCommitChanges removed - commits are now batched at session level in engine.ts
 import { createFromTemplate, injectSections } from "../../../notes/create";
 import { resolveVaultPath } from "../../../shared/fs";
 import { executeLogger } from "../../../shared/logger";
@@ -727,31 +727,8 @@ export async function executeSuggestion(
 		movedAttachment: isBookmark ? undefined : movedFilePath,
 	});
 
-	// Auto-commit changes if enabled (defense-in-depth: commit after each successful execution)
-	if (paraConfig.autoCommit) {
-		const filesToCommit: string[] = [];
-		if (createdNotePath) {
-			filesToCommit.push(createdNotePath);
-		}
-		if (!isBookmark && movedFilePath) {
-			filesToCommit.push(movedFilePath);
-		}
-		try {
-			await autoCommitChanges(
-				paraConfig,
-				filesToCommit,
-				`inbox: ${createdNotePath ? basename(createdNotePath, ".md") : basename(movedFilePath)}`,
-			);
-			if (executeLogger) {
-				executeLogger.debug`Auto-committed ${filesToCommit.length} file(s) ${cid}`;
-			}
-		} catch (error) {
-			// Log but don't fail - registry already updated, files moved successfully
-			if (executeLogger) {
-				executeLogger.warn`Auto-commit failed: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
-			}
-		}
-	}
+	// Note: Auto-commit removed from per-operation execution
+	// Commits are now batched at session level in engine.ts for cleaner history
 
 	if (executeLogger) {
 		executeLogger.info`Executed suggestion id=${suggestion.id} movedTo=${isBookmark ? movedFilePath : hashedFilename} createdNote=${createdNotePath ?? "none"} ${cid}`;

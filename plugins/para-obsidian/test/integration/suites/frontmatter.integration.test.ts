@@ -51,6 +51,7 @@ url: https://github.com/user/repo
 title: GitHub Repository
 clipped: 2024-12-16
 area: "[[Tech]]"
+enrichedAt: 2024-12-16T00:00:00Z
 ---
 # GitHub Repository
 
@@ -227,6 +228,7 @@ author: John Doe
 published: 2024-12-01
 clipped: 2024-12-16
 area: "[[Resources]]"
+enrichedAt: 2024-12-16T00:00:00Z
 ---
 # Complete Guide
 
@@ -274,6 +276,7 @@ Full guide to using the system.
 				`---
 type: bookmark
 clipped: 2024-12-16
+enrichedAt: 2024-12-16T00:00:00Z
 ---
 # Interesting Research Paper
 
@@ -607,6 +610,7 @@ type: bookmark
 url: https://example.com
 title: Example
 area: "[[Resources]]"
+enrichedAt: 2024-12-16T00:00:00Z
 ---
 # Example Bookmark
 `,
@@ -648,6 +652,7 @@ type: bookmark
 url: https://example.com
 title: Example
 clipped: 2024-12-16
+enrichedAt: 2024-12-16T00:00:00Z
 ---
 # Example
 `,
@@ -750,6 +755,7 @@ url: https://example.com/1
 title: Bookmark 1
 clipped: 2024-12-16
 area: "[[Resources]]"
+enrichedAt: 2024-12-16T00:00:00Z
 ---
 # Bookmark 1
 `,
@@ -763,6 +769,7 @@ url: https://example.com/2
 title: Bookmark 2
 clipped: 2024-12-16
 area: "[[Resources]]"
+enrichedAt: 2024-12-16T00:00:00Z
 ---
 # Bookmark 2
 `,
@@ -813,6 +820,7 @@ url: https://example.com
 title: Tagged
 clipped: 2024-12-16
 area: "[[Resources]]"
+enrichedAt: 2024-12-16T00:00:00Z
 ---
 # Tagged
 `,
