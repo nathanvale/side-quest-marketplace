@@ -26,19 +26,42 @@ export async function initMcpLogger(): Promise<void> {
 	await initLogger();
 }
 
-/** Log entry structure for MCP tool invocations. */
+/**
+ * Log entry structure for MCP tool invocations.
+ *
+ * Required fields:
+ * - cid: Correlation ID for request tracing
+ * - tool: Tool name (e.g., "para_config")
+ *
+ * For MetricsCollector compatibility (on response/error events):
+ * - durationMs: Execution time in milliseconds
+ * - success: Whether the tool succeeded
+ */
 export interface LogEntry {
 	cid: string;
 	tool: string;
+	durationMs?: number;
+	success?: boolean;
 	[key: string]: unknown;
 }
 
 /**
  * Log an MCP tool event.
+ *
+ * Uses standard LogTape signature: logger.info(message, properties)
+ * This format enables MetricsCollector to parse tool invocation metrics.
+ *
+ * Required properties for metrics collection:
+ * - tool: Tool name
+ * - durationMs: Execution time in milliseconds
+ * - success: Whether the tool succeeded
  */
 export function log(entry: LogEntry): void {
 	if (mcpLogger) {
-		mcpLogger.info({ ...entry, timestamp: new Date().toISOString() });
+		mcpLogger.info("MCP tool response", {
+			...entry,
+			timestamp: new Date().toISOString(),
+		});
 	}
 }
 
