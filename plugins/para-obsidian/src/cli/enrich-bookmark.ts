@@ -289,7 +289,7 @@ export async function handleEnrichBookmark(
 	if (!args.yes && !args.dryRun) {
 		console.log("\nFiles to enrich:");
 		for (const filePath of bookmarkFiles.slice(0, 10)) {
-			const relativePath = filePath.replace(vaultPath + "/", "");
+			const relativePath = filePath.replace(`${vaultPath}/`, "");
 			console.log(`  ${color("cyan", "→")} ${relativePath}`);
 		}
 		if (bookmarkFiles.length > 10) {
@@ -321,7 +321,7 @@ export async function handleEnrichBookmark(
 
 	for (let i = 0; i < bookmarkFiles.length; i++) {
 		const filePath = bookmarkFiles[i]!;
-		const relativePath = filePath.replace(vaultPath + "/", "");
+		const relativePath = filePath.replace(`${vaultPath}/`, "");
 
 		// Rate limit (except for first request)
 		if (i > 0) {

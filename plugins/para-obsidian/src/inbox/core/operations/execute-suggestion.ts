@@ -74,7 +74,7 @@ function validatePathSafety(destination: string, vaultPath: string): void {
 	const resolved = resolve(vaultPath, destination);
 	const vaultResolved = resolve(vaultPath);
 
-	if (!resolved.startsWith(vaultResolved + "/") && resolved !== vaultResolved) {
+	if (!resolved.startsWith(`${vaultResolved}/`) && resolved !== vaultResolved) {
 		throw new Error(
 			`Path traversal detected: "${destination}" escapes vault boundary`,
 		);
