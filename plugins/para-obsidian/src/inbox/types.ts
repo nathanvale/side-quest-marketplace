@@ -383,6 +383,14 @@ interface ScanProgressBase {
 }
 
 /**
+ * Progress update when file processing starts.
+ * Emitted before any work begins on a file.
+ */
+export interface StartProgress extends ScanProgressBase {
+	readonly stage: "start";
+}
+
+/**
  * Progress update during hash calculation stage.
  */
 export interface HashingProgress extends ScanProgressBase {
@@ -445,6 +453,7 @@ export interface ErrorProgress extends ScanProgressBase {
  * Discriminated union based on `stage` field for type-safe handling.
  *
  * Each stage has its specific required fields:
+ * - start: Just base fields (emitted when file processing begins)
  * - hash: Just base fields
  * - extract: Just base fields
  * - llm: Requires `model` field
@@ -453,6 +462,7 @@ export interface ErrorProgress extends ScanProgressBase {
  * - error: Requires `error` message
  */
 export type ScanProgress =
+	| StartProgress
 	| HashingProgress
 	| ExtractingProgress
 	| LLMProgress

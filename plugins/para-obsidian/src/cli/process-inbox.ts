@@ -49,6 +49,8 @@ function withLogContext<T extends object>(
  */
 function stageLabel(stage: string, model?: string): string {
 	switch (stage) {
+		case "start":
+			return "starting";
 		case "hash":
 			return "hashing";
 		case "extract":
@@ -229,7 +231,7 @@ async function scanWithSpinner(
 		lastFallbackReason: undefined as string | undefined,
 		lastLlmError: undefined as string | undefined,
 		currentFile: "",
-		stage: "hash" as "hash" | "extract" | "llm" | "skip" | "done" | "error",
+		stage: "start" as "start" | "hash" | "extract" | "llm" | "skip" | "done" | "error",
 		stageStartedAt: Date.now(),
 	};
 
@@ -278,7 +280,12 @@ async function scanWithSpinner(
 			onProgress: (progress) => {
 				const { total, filename, stage } = progress;
 				scanState.total = total;
-				if (stage === "skip") {
+				if (stage === "start") {
+					// File processing started - update current file for display
+					scanState.currentFile = filename;
+					scanState.stage = "start";
+					scanState.stageStartedAt = Date.now();
+				} else if (stage === "skip") {
 					scanState.skipped += 1;
 					scanState.processed += 1;
 				} else if (stage === "done") {

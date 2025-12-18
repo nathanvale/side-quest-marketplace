@@ -348,6 +348,11 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				filename,
 			} as const;
 
+			// Emit start event so CLI can track pending files
+			if (onProgress) {
+				await onProgress({ ...progressBase, stage: "start" });
+			}
+
 			// =================================================================
 			// MARKDOWN FAST-PATH: Check for typed markdown files BEFORE hashing
 			// Markdown files with valid type frontmatter are already notes -
