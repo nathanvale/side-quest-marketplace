@@ -290,16 +290,29 @@ async function scanWithSpinner(
 				const { total, filename, stage } = progress;
 				scanState.total = total;
 				if (stage === "start") {
-					// File processing started - increment started count and update display
-					scanState.started += 1;
+					// File queued for processing - just update current file display
 					scanState.currentFile = filename;
 					scanState.stage = "start";
 					scanState.stageStartedAt = Date.now();
+				} else if (stage === "hash") {
+					// First real work stage - increment progress bar
+					scanState.started += 1;
+					scanState.currentFile = filename;
+					scanState.stage = "hash";
+					scanState.stageStartedAt = Date.now();
 					updateScanText(); // Immediate update so bar increments visibly
 				} else if (stage === "skip") {
+					// Skipped files count as both started and processed
+					if (scanState.started < scanState.total) {
+						scanState.started += 1;
+					}
 					scanState.skipped += 1;
 					scanState.processed += 1;
 				} else if (stage === "done") {
+					// Markdown fast-path files skip hash stage, so count them here
+					if (scanState.started < scanState.total) {
+						scanState.started += 1;
+					}
 					scanState.processed += 1;
 					// Track running LLM failure count (only on DoneProgress)
 					if (progress.llmFailures !== undefined) {
