@@ -47,12 +47,9 @@ initMcpLogger().catch(console.error);
 // ============================================================================
 
 if (import.meta.main) {
+	// File logging handled by initMcpLogger() above, which initializes
+	// the plugin's logger writing to ~/.claude/logs/para-obsidian.jsonl
 	startServer("para-obsidian", {
 		version: "0.1.0",
-		fileLogging: {
-			enabled: true,
-			subsystems: ["mcp"],
-			level: "info",
-		},
 	});
 }
