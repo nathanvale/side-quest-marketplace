@@ -194,24 +194,34 @@ function calculateEta(
 
 /**
  * Render a visual progress bar (bar only, count displayed separately)
- * @param processed - Number of items processed
- * @param total - Total number of items
+ * @param percentComplete - Progress percentage (0-100)
  * @param width - Width of the bar in characters (default: 20)
  * @returns Formatted progress bar string like "[████████░░░░░░░░]"
  */
-function renderProgressBar(
-	processed: number,
-	total: number,
-	width = 20,
-): string {
-	if (total === 0) return `[${"░".repeat(width)}]`;
-
-	const ratio = Math.min(processed / total, 1);
+function renderProgressBar(percentComplete: number, width = 20): string {
+	const ratio = Math.min(Math.max(percentComplete / 100, 0), 1);
 	const filled = Math.round(ratio * width);
 	const empty = width - filled;
 
 	const bar = "█".repeat(filled) + "░".repeat(empty);
 	return `[${bar}]`;
+}
+
+/**
+ * Render a visual progress bar using processed/total counts (legacy version)
+ * @param processed - Number of items processed
+ * @param total - Total number of items
+ * @param width - Width of the bar in characters (default: 20)
+ * @returns Formatted progress bar string like "[████████░░░░░░░░]"
+ */
+function renderProgressBarFromCounts(
+	processed: number,
+	total: number,
+	width = 20,
+): string {
+	if (total === 0) return `[${"░".repeat(width)}]`;
+	const percentComplete = Math.round((processed / total) * 100);
+	return renderProgressBar(percentComplete, width);
 }
 
 /**
@@ -254,7 +264,7 @@ async function scanWithSpinner(
 		const eta = calculateEta(scanState.processed, scanState.total, elapsedMs);
 
 		// Progress bar fills based on COMPLETED files only
-		const progressBar = renderProgressBar(
+		const progressBar = renderProgressBarFromCounts(
 			scanState.processed,
 			scanState.total || 0,
 			16,
@@ -341,7 +351,7 @@ async function scanWithSpinner(
 					scanState.errors += 1;
 					scanState.processed += 1;
 					// Error message with progress bar
-					const progressBar = renderProgressBar(
+					const progressBar = renderProgressBarFromCounts(
 						scanState.processed,
 						scanState.total || 0,
 						16,
@@ -359,7 +369,11 @@ async function scanWithSpinner(
 		process.removeListener("SIGINT", cleanup);
 		const elapsed = ((Date.now() - scanStarted) / 1000).toFixed(1);
 		const total = scanState.total || suggestions.length;
-		const finalBar = renderProgressBar(scanState.processed, total, 16);
+		const finalBar = renderProgressBarFromCounts(
+			scanState.processed,
+			total,
+			16,
+		);
 		const finalCount = `${scanState.processed}/${total}`;
 		const finalStats = [];
 		if (scanState.skipped > 0) finalStats.push(`${scanState.skipped} skipped`);
@@ -637,17 +651,17 @@ async function executeWithSpinner(
 	suggestions: InboxSuggestion[],
 ): Promise<BatchResult> {
 	const total = suggestions.length;
-	const execSpinner = createSpinner(renderProgressBar(0, total, 16)).start();
+	const execSpinner = createSpinner(renderProgressBar(0, 16)).start();
 	const execStarted = Date.now();
 	let errorCount = 0;
 
 	const results = await engine.execute(
 		suggestions.map((s) => s.id),
 		{
-			onProgress: ({ processed, total, suggestionId, success, error }) => {
+			onProgress: ({ percentComplete, suggestionId, success, error }) => {
 				if (!success) errorCount++;
 
-				const progressBar = renderProgressBar(processed, total, 16);
+				const progressBar = renderProgressBar(percentComplete, 16);
 				const status = success ? color("green", "✓") : color("red", "✗");
 				const detail = error ? ` ${error}` : "";
 				execSpinner.update({
@@ -658,7 +672,11 @@ async function executeWithSpinner(
 	);
 
 	const elapsed = ((Date.now() - execStarted) / 1000).toFixed(1);
-	const finalBar = renderProgressBar(results.summary.total, total, 16);
+	const finalBar = renderProgressBarFromCounts(
+		results.summary.total,
+		total,
+		16,
+	);
 	const statsStr = errorCount > 0 ? ` (${errorCount} failed)` : "";
 	execSpinner.success({
 		text: `${finalBar}${statsStr} in ${elapsed}s`,
@@ -717,18 +735,16 @@ async function handleInteractiveMode(
 			);
 		} else {
 			const total = approvedIds.length;
-			const execSpinner = createSpinner(
-				renderProgressBar(0, total, 16),
-			).start();
+			const execSpinner = createSpinner(renderProgressBar(0, 16)).start();
 			const execStarted = Date.now();
 			let errorCount = 0;
 
 			const batchResults = await engine.execute(approvedIds, {
 				updatedSuggestions, // Pass CLI-modified suggestions to ensure destination changes are respected
-				onProgress: ({ processed, total, suggestionId, success, error }) => {
+				onProgress: ({ percentComplete, suggestionId, success, error }) => {
 					if (!success) errorCount++;
 
-					const progressBar = renderProgressBar(processed, total, 16);
+					const progressBar = renderProgressBar(percentComplete, 16);
 					const status = success ? color("green", "✓") : color("red", "✗");
 					const detail = error ? ` ${error}` : "";
 					execSpinner.update({
@@ -738,7 +754,11 @@ async function handleInteractiveMode(
 			});
 
 			const elapsed = ((Date.now() - execStarted) / 1000).toFixed(1);
-			const finalBar = renderProgressBar(batchResults.summary.total, total, 16);
+			const finalBar = renderProgressBarFromCounts(
+				batchResults.summary.total,
+				total,
+				16,
+			);
 			const statsStr = errorCount > 0 ? ` (${errorCount} failed)` : "";
 			execSpinner.success({
 				text: `${finalBar}${statsStr} in ${elapsed}s`,

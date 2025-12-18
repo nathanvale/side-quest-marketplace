@@ -590,6 +590,9 @@ export interface ExecuteProgress {
 
 	/** Error message when execution failed */
 	readonly error?: string;
+
+	/** Progress percentage (0-100) */
+	readonly percentComplete: number;
 }
 
 /**
@@ -906,6 +909,34 @@ export interface ErrorContext {
 
 	/** Additional context data */
 	readonly [key: string]: unknown;
+}
+
+// =============================================================================
+// Timing Metrics
+// =============================================================================
+
+/**
+ * Per-file timing breakdown for performance analysis.
+ * Tracks duration of each processing stage to identify bottlenecks.
+ */
+export interface FileTimingMetrics {
+	/** Filename without path */
+	readonly filename: string;
+
+	/** Per-stage timings in milliseconds */
+	readonly stages: {
+		/** Content hash calculation */
+		readonly hash?: { readonly durationMs: number };
+		/** Content extraction (PDF, markdown, image) */
+		readonly extract?: { readonly durationMs: number };
+		/** Bookmark enrichment (Firecrawl API) */
+		readonly enrich?: { readonly durationMs: number };
+		/** LLM classification call */
+		readonly llm?: { readonly durationMs: number };
+	};
+
+	/** Total processing time for this file (sum of all stages) */
+	readonly totalMs: number;
 }
 
 // =============================================================================

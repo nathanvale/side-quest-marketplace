@@ -9,3 +9,9 @@ export {
 	isInboxError,
 	isRecoverableError,
 } from "./errors";
+export {
+	checkThreshold,
+	PERFORMANCE_THRESHOLDS,
+	type ThresholdCheckResult,
+	type ThresholdKey,
+} from "./thresholds";

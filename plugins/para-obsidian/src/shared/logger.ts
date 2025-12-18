@@ -158,3 +158,30 @@ export const loggers = {
 	git: gitLogger,
 	enrich: enrichLogger,
 } as const;
+
+// =============================================================================
+// Structured Logging Helpers
+// =============================================================================
+
+/**
+ * Format structured log data as JSON string for consistent parsing.
+ *
+ * Use this for important events that need to be parsed by log aggregation tools.
+ * The structured format enables easy querying, filtering, and analysis of logs.
+ *
+ * @param data - Structured data to log (will be serialized as JSON)
+ * @returns JSON string representation
+ *
+ * @example
+ * ```typescript
+ * inboxLogger.info(logJson({
+ *   event: 'scan_complete',
+ *   suggestions: 5,
+ *   durationMs: 2340,
+ *   cid: 'abc123'
+ * }));
+ * ```
+ */
+export function logJson(data: Record<string, unknown>): string {
+	return JSON.stringify(data);
+}

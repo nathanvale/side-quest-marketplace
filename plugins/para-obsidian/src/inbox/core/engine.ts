@@ -1084,6 +1084,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					: lastResult && !lastResult.success
 						? lastResult.error
 						: undefined;
+				const percentComplete = Math.round((processed / total) * 100);
 				await onProgress({
 					processed,
 					total,
@@ -1091,6 +1092,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					action: suggestion?.action ?? "skip",
 					success: wasSuccessful,
 					error: progressError,
+					percentComplete,
 				});
 			}
 		}
