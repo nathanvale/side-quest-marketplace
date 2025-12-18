@@ -7,6 +7,9 @@
  * @module shared/transaction
  */
 
+import { observe } from "./instrumentation.js";
+import { txLogger } from "./logger.js";
+
 /**
  * Rollback operation definition
  */
@@ -79,25 +82,38 @@ export class Transaction {
 	 * @returns Transaction result with success flag and data/error
 	 */
 	async execute<T = void>(): Promise<TransactionResult<T>> {
-		try {
-			let lastResult: unknown;
+		return observe(
+			txLogger,
+			"tx:execute",
+			async () => {
+				try {
+					let lastResult: unknown;
 
-			for (const op of this.operations) {
-				const result = await op.execute();
-				this.completed.push({ op, result });
-				lastResult = result;
-			}
+					for (const op of this.operations) {
+						const result = await op.execute();
+						this.completed.push({ op, result });
+						lastResult = result;
+					}
 
-			return { success: true, data: lastResult as T };
-		} catch (error) {
-			const failedOp = this.operations[this.completed.length];
-			await this.rollback();
-			return {
-				success: false,
-				error: error as Error,
-				failedAt: failedOp?.name || "unknown",
-			};
-		}
+					return { success: true, data: lastResult as T };
+				} catch (error) {
+					const failedOp = this.operations[this.completed.length];
+					await this.rollback();
+					return {
+						success: false,
+						error: error as Error,
+						failedAt: failedOp?.name || "unknown",
+					};
+				}
+			},
+			{
+				context: {
+					operationCount: this.operations.length,
+					operationNames: this.operations.map((op) => op.name),
+				},
+				isSuccess: (result) => result.success,
+			},
+		);
 	}
 
 	/**
@@ -110,7 +126,22 @@ export class Transaction {
 			try {
 				await op.rollback(result);
 			} catch (rollbackError) {
-				console.error(`Rollback failed for ${op.name}:`, rollbackError);
+				const errorMessage =
+					rollbackError instanceof Error
+						? rollbackError.message
+						: String(rollbackError);
+				const errorStack =
+					rollbackError instanceof Error ? rollbackError.stack : undefined;
+
+				txLogger.error("MCP tool response", {
+					tool: "tx:rollbackOperation",
+					durationMs: 0,
+					success: false,
+					timestamp: new Date().toISOString(),
+					operationName: op.name,
+					error: errorMessage,
+					stack: errorStack,
+				});
 			}
 		}
 		this.completed = [];
@@ -156,9 +187,22 @@ export class Transaction {
 export async function executeTransaction<T = void>(
 	operations: readonly RollbackOperation[],
 ): Promise<TransactionResult<T>> {
-	const tx = new Transaction();
-	for (const op of operations) {
-		tx.add(op);
-	}
-	return tx.execute<T>();
+	return observe(
+		txLogger,
+		"tx:executeTransaction",
+		async () => {
+			const tx = new Transaction();
+			for (const op of operations) {
+				tx.add(op);
+			}
+			return tx.execute<T>();
+		},
+		{
+			context: {
+				operationCount: operations.length,
+				operationNames: operations.map((op) => op.name),
+			},
+			isSuccess: (result) => result.success,
+		},
+	);
 }

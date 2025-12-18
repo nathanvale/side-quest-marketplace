@@ -1,0 +1,6 @@
+# Para-obsidian Bun configuration
+# See: https://bun.sh/docs/runtime/bunfig
+
+[test]
+# Preload test setup to suppress logs automatically
+preload = ["./src/testing/setup.ts"]

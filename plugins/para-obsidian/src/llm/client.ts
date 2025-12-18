@@ -41,6 +41,9 @@ export {
 
 // Import default model from centralized defaults
 import { DEFAULT_MODEL } from "../config/defaults";
+import { observe } from "../shared/instrumentation.js";
+// Import observability utilities
+import { llmLogger } from "../shared/logger.js";
 
 /** Default LLM model for extraction tasks (re-exported from defaults.ts) */
 export const DEFAULT_LLM_MODEL = DEFAULT_MODEL;
@@ -124,38 +127,53 @@ export async function callOllama(
 	model: string = DEFAULT_LLM_MODEL,
 	ollamaUrl: string = DEFAULT_OLLAMA_URL,
 ): Promise<string> {
-	let response: Response;
+	return observe(
+		llmLogger,
+		"llm:generate",
+		async () => {
+			let response: Response;
 
-	try {
-		response = await fetch(`${ollamaUrl}/api/generate`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
+			try {
+				response = await fetch(`${ollamaUrl}/api/generate`, {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						model,
+						prompt,
+						stream: false,
+						format: "json",
+					}),
+				});
+			} catch (error) {
+				if (error instanceof Error && error.message.includes("ECONNREFUSED")) {
+					throw new Error(`Ollama is not running. Start it with: ollama serve`);
+				}
+				throw error;
+			}
+
+			if (!response.ok) {
+				const errorText = await response.text();
+				if (response.status === 404 && errorText.includes("model")) {
+					throw new Error(
+						`Model "${model}" not found. Install it with: ollama pull ${model}`,
+					);
+				}
+				throw new Error(
+					`Ollama error: ${response.status} ${response.statusText}`,
+				);
+			}
+
+			const data = (await response.json()) as { response: string };
+			return data.response;
+		},
+		{
+			context: {
 				model,
-				prompt,
-				stream: false,
-				format: "json",
-			}),
-		});
-	} catch (error) {
-		if (error instanceof Error && error.message.includes("ECONNREFUSED")) {
-			throw new Error(`Ollama is not running. Start it with: ollama serve`);
-		}
-		throw error;
-	}
-
-	if (!response.ok) {
-		const errorText = await response.text();
-		if (response.status === 404 && errorText.includes("model")) {
-			throw new Error(
-				`Model "${model}" not found. Install it with: ollama pull ${model}`,
-			);
-		}
-		throw new Error(`Ollama error: ${response.status} ${response.statusText}`);
-	}
-
-	const data = (await response.json()) as { response: string };
-	return data.response;
+				promptLength: prompt.length,
+				url: ollamaUrl,
+			},
+		},
+	);
 }
 
 /**

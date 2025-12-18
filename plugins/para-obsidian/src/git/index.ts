@@ -19,6 +19,8 @@ import { discoverAttachments } from "../attachments/index";
 import { DEFAULT_DESTINATIONS, DEFAULT_PARA_FOLDERS } from "../config/defaults";
 import type { ParaObsidianConfig } from "../config/index";
 import { resolveVaultPath } from "../shared/fs";
+import { observe } from "../shared/instrumentation.js";
+import { gitLogger } from "../shared/logger.js";
 
 /**
  * Unescapes git's C-style quoted paths.
@@ -203,13 +205,15 @@ export async function assertGitRepo(dir: string): Promise<void> {
  * ```
  */
 export async function gitStatus(dir: string): Promise<{ clean: boolean }> {
-	const { stdout, exitCode } = await spawnAndCollect(
-		["git", "status", "--porcelain"],
-		{ cwd: dir },
-	);
-	if (exitCode !== 0) throw new Error("git status failed");
-	const output = stdout.trim();
-	return { clean: output.length === 0 };
+	return observe(gitLogger, "git:getRepoStatus", async () => {
+		const { stdout, exitCode } = await spawnAndCollect(
+			["git", "status", "--porcelain"],
+			{ cwd: dir },
+		);
+		if (exitCode !== 0) throw new Error("git status failed");
+		const output = stdout.trim();
+		return { clean: output.length === 0 };
+	});
 }
 
 /**
@@ -245,44 +249,56 @@ export async function getUncommittedFiles(
 	dir: string,
 	options?: GetUncommittedFilesOptions,
 ): Promise<string[]> {
-	const { stdout, exitCode } = await spawnAndCollect(
-		["git", "status", "--porcelain", "-uall"],
-		{ cwd: dir },
+	return observe(
+		gitLogger,
+		"git:getUncommittedFiles",
+		async () => {
+			const { stdout, exitCode } = await spawnAndCollect(
+				["git", "status", "--porcelain", "-uall"],
+				{ cwd: dir },
+			);
+			if (exitCode !== 0) throw new Error("git status failed");
+
+			// Split first, then filter empty lines
+			// Important: Don't trim() the whole stdout as it strips leading spaces
+			// from git status format (e.g., " M file.md" becomes "M file.md")
+			const lines = stdout.split("\n").filter((line) => line.length > 0);
+			const files: string[] = [];
+			const allFileTypes = options?.allFileTypes ?? false;
+
+			for (const line of lines) {
+				// Porcelain format: XY PATH (2 status chars + 1 space + path)
+				// X = index status, Y = working tree status
+				// Status codes: M (modified), A (added), ?? (untracked), etc.
+				// Extract path after the "XY " prefix (3 chars)
+				// Use match to handle any leading whitespace/status combo
+				const match = line.match(/^.{2}\s(.+)$/);
+				let filePath = match?.[1];
+				// Git quotes filenames containing spaces or special chars, e.g. "Note 1.md"
+				// It also escapes non-ASCII UTF-8 bytes as octal sequences, e.g. \360\237\247\276 for 🧾
+				// Strip surrounding quotes and decode escape sequences
+				if (filePath?.startsWith('"') && filePath.endsWith('"')) {
+					filePath = filePath.slice(1, -1);
+					filePath = unescapeGitPath(filePath);
+				}
+
+				if (!filePath) continue;
+
+				// Filter by file type if not including all
+				if (allFileTypes || filePath.endsWith(".md")) {
+					files.push(filePath);
+				}
+			}
+
+			return files;
+		},
+		{
+			context: {
+				repoPath: dir,
+				allFileTypes: options?.allFileTypes ?? false,
+			},
+		},
 	);
-	if (exitCode !== 0) throw new Error("git status failed");
-
-	// Split first, then filter empty lines
-	// Important: Don't trim() the whole stdout as it strips leading spaces
-	// from git status format (e.g., " M file.md" becomes "M file.md")
-	const lines = stdout.split("\n").filter((line) => line.length > 0);
-	const files: string[] = [];
-	const allFileTypes = options?.allFileTypes ?? false;
-
-	for (const line of lines) {
-		// Porcelain format: XY PATH (2 status chars + 1 space + path)
-		// X = index status, Y = working tree status
-		// Status codes: M (modified), A (added), ?? (untracked), etc.
-		// Extract path after the "XY " prefix (3 chars)
-		// Use match to handle any leading whitespace/status combo
-		const match = line.match(/^.{2}\s(.+)$/);
-		let filePath = match?.[1];
-		// Git quotes filenames containing spaces or special chars, e.g. "Note 1.md"
-		// It also escapes non-ASCII UTF-8 bytes as octal sequences, e.g. \360\237\247\276 for 🧾
-		// Strip surrounding quotes and decode escape sequences
-		if (filePath?.startsWith('"') && filePath.endsWith('"')) {
-			filePath = filePath.slice(1, -1);
-			filePath = unescapeGitPath(filePath);
-		}
-
-		if (!filePath) continue;
-
-		// Filter by file type if not including all
-		if (allFileTypes || filePath.endsWith(".md")) {
-			files.push(filePath);
-		}
-	}
-
-	return files;
 }
 
 /**
@@ -317,40 +333,54 @@ export async function ensureGitGuard(
 		excludeAttachments?: boolean;
 	},
 ): Promise<void> {
-	await assertGitRepo(config.vault);
+	return observe(
+		gitLogger,
+		"git:ensureGitGuard",
+		async () => {
+			await assertGitRepo(config.vault);
 
-	// Get all uncommitted files and filter to PARA-managed folders only
-	const checkAllTypes = options?.checkAllFileTypes ?? false;
-	const excludeInbox = options?.excludeInbox ?? false;
-	const excludeAttachments = options?.excludeAttachments ?? false;
-	const allUncommitted = await getUncommittedFiles(config.vault, {
-		allFileTypes: checkAllTypes,
-	});
+			// Get all uncommitted files and filter to PARA-managed folders only
+			const checkAllTypes = options?.checkAllFileTypes ?? false;
+			const excludeInbox = options?.excludeInbox ?? false;
+			const excludeAttachments = options?.excludeAttachments ?? false;
+			const allUncommitted = await getUncommittedFiles(config.vault, {
+				allFileTypes: checkAllTypes,
+			});
 
-	const managedFolders = getManagedFolders(config);
+			const managedFolders = getManagedFolders(config);
 
-	// Optionally exclude inbox folder (for scan operations where we expect inbox to have files)
-	// Optionally exclude attachments folder (orphaned attachments shouldn't block processing)
-	const inboxFolder = config.paraFolders?.inbox ?? "00 Inbox";
-	const attachmentsFolder = "Attachments";
-	const foldersToCheck = new Set([...managedFolders]);
-	if (excludeInbox) {
-		foldersToCheck.delete(inboxFolder);
-	}
-	if (excludeAttachments) {
-		foldersToCheck.delete(attachmentsFolder);
-	}
+			// Optionally exclude inbox folder (for scan operations where we expect inbox to have files)
+			// Optionally exclude attachments folder (orphaned attachments shouldn't block processing)
+			const inboxFolder = config.paraFolders?.inbox ?? "00 Inbox";
+			const attachmentsFolder = "Attachments";
+			const foldersToCheck = new Set([...managedFolders]);
+			if (excludeInbox) {
+				foldersToCheck.delete(inboxFolder);
+			}
+			if (excludeAttachments) {
+				foldersToCheck.delete(attachmentsFolder);
+			}
 
-	const uncommitted = allUncommitted.filter((file) =>
-		isInManagedFolder(file, foldersToCheck),
+			const uncommitted = allUncommitted.filter((file) =>
+				isInManagedFolder(file, foldersToCheck),
+			);
+
+			if (uncommitted.length > 0) {
+				const fileList = `\nUncommitted files:\n${uncommitted.map((f: string) => `  - ${f}`).join("\n")}`;
+				throw new Error(
+					`Vault has uncommitted changes in PARA folders. Commit or stash before processing inbox.${fileList}\n\nTo fix, run one of these commands:\n  para git commit                # Commit all uncommitted notes\n  git add . && git commit -m "chore: stage changes"  # Manual commit`,
+				);
+			}
+		},
+		{
+			context: {
+				vaultPath: config.vault,
+				checkAllFileTypes: options?.checkAllFileTypes ?? false,
+				excludeInbox: options?.excludeInbox ?? false,
+				excludeAttachments: options?.excludeAttachments ?? false,
+			},
+		},
 	);
-
-	if (uncommitted.length > 0) {
-		const fileList = `\nUncommitted files:\n${uncommitted.map((f: string) => `  - ${f}`).join("\n")}`;
-		throw new Error(
-			`Vault has uncommitted changes in PARA folders. Commit or stash before processing inbox.${fileList}\n\nTo fix, run one of these commands:\n  para git commit                # Commit all uncommitted notes\n  git add . && git commit -m "chore: stage changes"  # Manual commit`,
-		);
-	}
 }
 
 /**
@@ -361,12 +391,17 @@ export async function ensureGitGuard(
  * @throws Error if git add fails
  */
 export async function gitAdd(dir: string, paths: string[]): Promise<void> {
-	const { exitCode, stderr } = await spawnAndCollect(["git", "add", ...paths], {
-		cwd: dir,
+	return observe(gitLogger, "git:stageFiles", async () => {
+		const { exitCode, stderr } = await spawnAndCollect(
+			["git", "add", ...paths],
+			{
+				cwd: dir,
+			},
+		);
+		if (exitCode !== 0) {
+			throw new Error(`git add failed: ${stderr}`);
+		}
 	});
-	if (exitCode !== 0) {
-		throw new Error(`git add failed: ${stderr}`);
-	}
 }
 
 /**
@@ -411,11 +446,16 @@ export async function gitCommit(
 	dir: string,
 	message: string,
 ): Promise<{ committed: boolean }> {
-	const { exitCode } = await spawnAndCollect(["git", "commit", "-m", message], {
-		cwd: dir,
+	return observe(gitLogger, "git:createCommit", async () => {
+		const { exitCode } = await spawnAndCollect(
+			["git", "commit", "-m", message],
+			{
+				cwd: dir,
+			},
+		);
+		// Non-zero exit code when nothing to commit is expected
+		return { committed: exitCode === 0 };
 	});
-	// Non-zero exit code when nothing to commit is expected
-	return { committed: exitCode === 0 };
 }
 
 /**
@@ -603,64 +643,81 @@ export async function commitNote(
 	config: ParaObsidianConfig,
 	notePath: string,
 ): Promise<CommitNoteResult> {
-	await assertGitRepo(config.vault);
-	const gitRoot = await getGitRootForDir(config.vault);
-	if (!gitRoot) {
-		throw new Error("Vault must be inside a git repository.");
-	}
+	return observe(
+		gitLogger,
+		"git:commitNote",
+		async () => {
+			await assertGitRepo(config.vault);
+			const gitRoot = await getGitRootForDir(config.vault);
+			if (!gitRoot) {
+				throw new Error("Vault must be inside a git repository.");
+			}
 
-	// Discover attachments using both methods
-	const linkedAttachments = extractLinkedAttachments(config.vault, notePath);
-	const folderAttachments = discoverAttachments(config.vault, notePath);
-	const allAttachments = Array.from(
-		new Set([...linkedAttachments, ...folderAttachments]),
+			// Discover attachments using both methods
+			const linkedAttachments = extractLinkedAttachments(
+				config.vault,
+				notePath,
+			);
+			const folderAttachments = discoverAttachments(config.vault, notePath);
+			const allAttachments = Array.from(
+				new Set([...linkedAttachments, ...folderAttachments]),
+			);
+
+			// Resolve paths relative to git root
+			const realGitRoot = fs.realpathSync(gitRoot);
+			const realVaultPath = fs.realpathSync(config.vault);
+			const filesToCommit: string[] = [];
+
+			// Add the note itself (handle deleted files that don't exist on disk)
+			const noteResolved = resolveVaultPath(config.vault, notePath);
+			const noteAbsolute = fs.existsSync(noteResolved.absolute)
+				? fs.realpathSync(noteResolved.absolute)
+				: path.resolve(realVaultPath, noteResolved.relative);
+			filesToCommit.push(path.relative(realGitRoot, noteAbsolute));
+
+			// Add all attachments
+			for (const attachment of allAttachments) {
+				const attachmentResolved = resolveVaultPath(config.vault, attachment);
+				if (fs.existsSync(attachmentResolved.absolute)) {
+					const attachmentAbsolute = fs.realpathSync(
+						attachmentResolved.absolute,
+					);
+					filesToCommit.push(path.relative(realGitRoot, attachmentAbsolute));
+				}
+			}
+
+			// Stage files
+			const stagedDeletions = await getStagedDeletions(gitRoot);
+			const filesToAdd = filesToCommit.filter((relativePath) => {
+				const absolute = path.join(realGitRoot, relativePath);
+				if (fs.existsSync(absolute)) return true;
+
+				if (stagedDeletions.has(relativePath)) return false;
+
+				throw new Error(
+					`Cannot stage ${relativePath}: file is missing and not staged for deletion.`,
+				);
+			});
+
+			if (filesToAdd.length > 0) {
+				await gitAdd(gitRoot, filesToAdd);
+			}
+
+			// Build commit message from note title (filename without .md)
+			const title = path.basename(notePath, ".md");
+			const message = `docs: ${title}`;
+
+			// Commit
+			const { committed } = await gitCommit(gitRoot, message);
+			return { committed, message, files: filesToCommit };
+		},
+		{
+			context: {
+				vaultPath: config.vault,
+				notePath,
+			},
+		},
 	);
-
-	// Resolve paths relative to git root
-	const realGitRoot = fs.realpathSync(gitRoot);
-	const realVaultPath = fs.realpathSync(config.vault);
-	const filesToCommit: string[] = [];
-
-	// Add the note itself (handle deleted files that don't exist on disk)
-	const noteResolved = resolveVaultPath(config.vault, notePath);
-	const noteAbsolute = fs.existsSync(noteResolved.absolute)
-		? fs.realpathSync(noteResolved.absolute)
-		: path.resolve(realVaultPath, noteResolved.relative);
-	filesToCommit.push(path.relative(realGitRoot, noteAbsolute));
-
-	// Add all attachments
-	for (const attachment of allAttachments) {
-		const attachmentResolved = resolveVaultPath(config.vault, attachment);
-		if (fs.existsSync(attachmentResolved.absolute)) {
-			const attachmentAbsolute = fs.realpathSync(attachmentResolved.absolute);
-			filesToCommit.push(path.relative(realGitRoot, attachmentAbsolute));
-		}
-	}
-
-	// Stage files
-	const stagedDeletions = await getStagedDeletions(gitRoot);
-	const filesToAdd = filesToCommit.filter((relativePath) => {
-		const absolute = path.join(realGitRoot, relativePath);
-		if (fs.existsSync(absolute)) return true;
-
-		if (stagedDeletions.has(relativePath)) return false;
-
-		throw new Error(
-			`Cannot stage ${relativePath}: file is missing and not staged for deletion.`,
-		);
-	});
-
-	if (filesToAdd.length > 0) {
-		await gitAdd(gitRoot, filesToAdd);
-	}
-
-	// Build commit message from note title (filename without .md)
-	const title = path.basename(notePath, ".md");
-	const message = `docs: ${title}`;
-
-	// Commit
-	const { committed } = await gitCommit(gitRoot, message);
-	return { committed, message, files: filesToCommit };
 }
 
 /**
@@ -694,28 +751,39 @@ export interface CommitAllResult {
 export async function commitAllNotes(
 	config: ParaObsidianConfig,
 ): Promise<CommitAllResult> {
-	const allUncommitted = await getUncommittedFiles(config.vault);
+	return observe(
+		gitLogger,
+		"git:commitAllNotes",
+		async () => {
+			const allUncommitted = await getUncommittedFiles(config.vault);
 
-	// Filter to only PARA-managed folders
-	const managedFolders = getManagedFolders(config);
-	const uncommitted = allUncommitted.filter((file) =>
-		isInManagedFolder(file, managedFolders),
+			// Filter to only PARA-managed folders
+			const managedFolders = getManagedFolders(config);
+			const uncommitted = allUncommitted.filter((file) =>
+				isInManagedFolder(file, managedFolders),
+			);
+
+			const results: CommitNoteResult[] = [];
+			let committedCount = 0;
+
+			for (const notePath of uncommitted) {
+				const result = await commitNote(config, notePath);
+				results.push(result);
+				if (result.committed) {
+					committedCount++;
+				}
+			}
+
+			return {
+				total: uncommitted.length,
+				committed: committedCount,
+				results,
+			};
+		},
+		{
+			context: {
+				vaultPath: config.vault,
+			},
+		},
 	);
-
-	const results: CommitNoteResult[] = [];
-	let committedCount = 0;
-
-	for (const notePath of uncommitted) {
-		const result = await commitNote(config, notePath);
-		results.push(result);
-		if (result.committed) {
-			committedCount++;
-		}
-	}
-
-	return {
-		total: uncommitted.length,
-		committed: committedCount,
-		results,
-	};
 }

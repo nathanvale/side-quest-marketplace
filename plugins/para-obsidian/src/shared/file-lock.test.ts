@@ -185,8 +185,9 @@ describe("file-lock", () => {
 		});
 
 		test("handles missing lock directory gracefully", async () => {
-			// Should not throw
-			await expect(cleanupStaleLocks()).resolves.toBeUndefined();
+			// Should not throw, returns zero counts
+			const result = await cleanupStaleLocks();
+			expect(result).toEqual({ cleanedCount: 0, totalFiles: 0 });
 		});
 	});
 

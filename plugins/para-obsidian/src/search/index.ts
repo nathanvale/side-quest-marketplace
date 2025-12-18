@@ -19,6 +19,8 @@ import { parse } from "yaml";
 
 import type { ParaObsidianConfig } from "../config/index";
 import { resolveVaultPath } from "../shared/fs";
+import { observe } from "../shared/instrumentation.js";
+import { searchLogger } from "../shared/logger.js";
 
 /**
  * Options for text search operations.
@@ -161,46 +163,60 @@ export async function searchText(
 	config: ParaObsidianConfig,
 	options: SearchOptions,
 ): Promise<SearchHit[]> {
-	const args = buildRgArgs(options, config.vault, config.defaultSearchDirs);
-	const [cmd, ...cmdArgs] = args;
-	const command = ensureCommandAvailable(cmd ?? "rg");
-	const result = await spawnAndCollect([command, ...cmdArgs], {
-		cwd: config.vault,
-	});
+	return observe(
+		searchLogger,
+		"search:searchText",
+		async () => {
+			const args = buildRgArgs(options, config.vault, config.defaultSearchDirs);
+			const [cmd, ...cmdArgs] = args;
+			const command = ensureCommandAvailable(cmd ?? "rg");
+			const result = await spawnAndCollect([command, ...cmdArgs], {
+				cwd: config.vault,
+			});
 
-	// No matches returns empty array
-	if (result.exitCode !== 0 && result.stdout.trim().length === 0) {
-		return [];
-	}
+			// No matches returns empty array
+			if (result.exitCode !== 0 && result.stdout.trim().length === 0) {
+				return [];
+			}
 
-	// Parse ripgrep output (file:line:snippet format)
-	const hits: SearchHit[] = [];
-	for (const line of result.stdout.trim().split("\n")) {
-		if (!line) continue;
-		const [file, lineNo, ...rest] = line.split(":");
-		if (!file || !lineNo) continue;
-		const snippet = rest.join(":");
-		const relative = path.relative(config.vault, file);
-		hits.push({
-			file: relative,
-			line: Number.parseInt(lineNo, 10),
-			snippet,
-		});
-	}
+			// Parse ripgrep output (file:line:snippet format)
+			const hits: SearchHit[] = [];
+			for (const line of result.stdout.trim().split("\n")) {
+				if (!line) continue;
+				const [file, lineNo, ...rest] = line.split(":");
+				if (!file || !lineNo) continue;
+				const snippet = rest.join(":");
+				const relative = path.relative(config.vault, file);
+				hits.push({
+					file: relative,
+					line: Number.parseInt(lineNo, 10),
+					snippet,
+				});
+			}
 
-	// If tag/frontmatter filters are present, intersect hits with matches
-	const allowed =
-		options.allowedFiles ??
-		(options.tag || options.frontmatter
-			? await filterByFrontmatter(config, {
-					dir: options.dir,
-					tag: options.tag,
-					frontmatter: options.frontmatter,
-				})
-			: undefined);
-	if (!allowed || allowed.length === 0) return hits;
-	const allowedSet = new Set(allowed);
-	return hits.filter((hit) => allowedSet.has(hit.file));
+			// If tag/frontmatter filters are present, intersect hits with matches
+			const allowed =
+				options.allowedFiles ??
+				(options.tag || options.frontmatter
+					? await filterByFrontmatter(config, {
+							dir: options.dir,
+							tag: options.tag,
+							frontmatter: options.frontmatter,
+						})
+					: undefined);
+			if (!allowed || allowed.length === 0) return hits;
+			const allowedSet = new Set(allowed);
+			return hits.filter((hit) => allowedSet.has(hit.file));
+		},
+		{
+			context: {
+				query: options.query,
+				regex: options.regex ?? false,
+				hasTagFilter: !!options.tag,
+				hasFrontmatterFilter: !!options.frontmatter,
+			},
+		},
+	);
 }
 
 /**
@@ -232,38 +248,59 @@ export async function filterByFrontmatter(
 	// Return early if no filters specified
 	if (Object.keys(filters).length === 0 && !tagFilter) return [];
 
-	const matches: string[] = [];
-	const dirs = resolveDirs(config.vault, options.dir, config.defaultSearchDirs);
+	return observe(
+		searchLogger,
+		"search:filterByFrontmatter",
+		async () => {
+			const matches: string[] = [];
+			const dirs = resolveDirs(
+				config.vault,
+				options.dir,
+				config.defaultSearchDirs,
+			);
 
-	/** Checks if a file's frontmatter matches all filters. */
-	async function hasFrontmatter(filePath: string): Promise<boolean> {
-		const content = await readTextFile(filePath);
-		if (!content.startsWith("---")) return false;
-		const end = content.indexOf("\n---", 3);
-		if (end === -1) return false;
-		const raw = content.slice(3, end + 1);
-		const yaml = parse(raw) as Record<string, unknown>;
+			/** Checks if a file's frontmatter matches all filters. */
+			async function hasFrontmatter(filePath: string): Promise<boolean> {
+				const content = await readTextFile(filePath);
+				if (!content.startsWith("---")) return false;
+				const end = content.indexOf("\n---", 3);
+				if (end === -1) return false;
+				const raw = content.slice(3, end + 1);
+				const yaml = parse(raw) as Record<string, unknown>;
 
-		// Check all frontmatter key=value filters
-		for (const [k, v] of Object.entries(filters)) {
-			if (yaml[k] !== v) return false;
-		}
+				// Check all frontmatter key=value filters
+				for (const [k, v] of Object.entries(filters)) {
+					if (yaml[k] !== v) return false;
+				}
 
-		// Check tag filter
-		if (tagFilter) {
-			const tags = yaml.tags;
-			if (!Array.isArray(tags) || !tags.includes(tagFilter)) return false;
-		}
-		return true;
-	}
-
-	// Scan all directories and collect matching files
-	for (const dir of dirs) {
-		for (const file of await globFiles("**/*.md", { cwd: dir })) {
-			if (await hasFrontmatter(file)) {
-				matches.push(path.relative(config.vault, file));
+				// Check tag filter
+				if (tagFilter) {
+					const tags = yaml.tags;
+					if (!Array.isArray(tags) || !tags.includes(tagFilter)) return false;
+				}
+				return true;
 			}
-		}
-	}
-	return matches;
+
+			// Scan all directories and collect matching files
+			for (const dir of dirs) {
+				for (const file of await globFiles("**/*.md", { cwd: dir })) {
+					if (await hasFrontmatter(file)) {
+						matches.push(path.relative(config.vault, file));
+					}
+				}
+			}
+			return matches;
+		},
+		{
+			context: {
+				filterCount: Object.keys(filters).length,
+				hasTagFilter: !!tagFilter,
+				dirCount: resolveDirs(
+					config.vault,
+					options.dir,
+					config.defaultSearchDirs,
+				).length,
+			},
+		},
+	);
 }

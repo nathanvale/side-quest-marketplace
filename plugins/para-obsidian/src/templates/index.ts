@@ -12,6 +12,8 @@ import { pathExistsSync, readDir, readTextFileSync } from "@sidequest/core/fs";
 import { addDays, format } from "date-fns";
 import { DEFAULT_TEMPLATE_VERSIONS } from "../config/defaults";
 import type { ParaObsidianConfig } from "../config/index";
+import { observeSync } from "../shared/instrumentation.js";
+import { templatesLogger } from "../shared/logger.js";
 
 /**
  * Information about a template file.
@@ -25,6 +27,27 @@ export interface TemplateInfo {
 	readonly version: number;
 	/** Raw template content. */
 	readonly content: string;
+}
+
+/**
+ * Internal implementation - no instrumentation to avoid double-logging.
+ */
+function _listTemplatesImpl(config: ParaObsidianConfig): TemplateInfo[] {
+	const dir = config.templatesDir;
+	if (!dir || !pathExistsSync(dir)) return [];
+
+	const entries = readDir(dir)
+		.filter((f) => f.endsWith(".md"))
+		.sort();
+
+	return entries.map((file) => {
+		const name = file.replace(/\.md$/, "");
+		const version =
+			config.templateVersions?.[name] ?? DEFAULT_TEMPLATE_VERSIONS[name] ?? 1;
+		const fullPath = path.join(dir, file);
+		const content = readTextFileSync(fullPath);
+		return { name, path: fullPath, version, content };
+	});
 }
 
 /**
@@ -45,21 +68,12 @@ export interface TemplateInfo {
  * ```
  */
 export function listTemplates(config: ParaObsidianConfig): TemplateInfo[] {
-	const dir = config.templatesDir;
-	if (!dir || !pathExistsSync(dir)) return [];
-
-	const entries = readDir(dir)
-		.filter((f) => f.endsWith(".md"))
-		.sort();
-
-	return entries.map((file) => {
-		const name = file.replace(/\.md$/, "");
-		const version =
-			config.templateVersions?.[name] ?? DEFAULT_TEMPLATE_VERSIONS[name] ?? 1;
-		const fullPath = path.join(dir, file);
-		const content = readTextFileSync(fullPath);
-		return { name, path: fullPath, version, content };
-	});
+	return observeSync(
+		templatesLogger,
+		"templates:listTemplates",
+		() => _listTemplatesImpl(config),
+		{ context: { templatesDir: config.templatesDir } },
+	);
 }
 
 /**
@@ -81,7 +95,18 @@ export function getTemplate(
 	config: ParaObsidianConfig,
 	name: string,
 ): TemplateInfo | undefined {
-	return listTemplates(config).find((t) => t.name === name);
+	return observeSync(
+		templatesLogger,
+		"templates:getTemplate",
+		() => {
+			// Use internal impl to avoid double instrumentation
+			return _listTemplatesImpl(config).find((t) => t.name === name);
+		},
+		{
+			context: { templateName: name },
+			isSuccess: (result) => result !== undefined,
+		},
+	);
 }
 
 /**
@@ -155,52 +180,68 @@ export interface TemplateField {
  * ```
  */
 export function getTemplateFields(template: TemplateInfo): TemplateField[] {
-	const fields: TemplateField[] = [];
-	const seen = new Set<string>();
+	return observeSync(
+		templatesLogger,
+		"templates:getTemplateFields",
+		() => {
+			const fields: TemplateField[] = [];
+			const seen = new Set<string>();
 
-	// Extract frontmatter section
-	const frontmatterMatch = template.content.match(/^---\n([\s\S]*?)\n---/);
-	const frontmatter = frontmatterMatch?.[1] ?? "";
-	const body = frontmatterMatch
-		? template.content.slice(frontmatterMatch[0].length)
-		: template.content;
+			// Extract frontmatter section
+			const frontmatterMatch = template.content.match(/^---\n([\s\S]*?)\n---/);
+			const frontmatter = frontmatterMatch?.[1] ?? "";
+			const body = frontmatterMatch
+				? template.content.slice(frontmatterMatch[0].length)
+				: template.content;
 
-	// Find all tp.system.prompt("...") fields (both single and two-arg forms)
-	// Single: <% tp.system.prompt("key") %>
-	// Double: <% tp.system.prompt("key", "default") %>
-	const promptRegex =
-		/<%\s*tp\.system\.prompt\("([^"]+)"(?:\s*,\s*"[^"]*")?\)\s*%>/g;
+			// Find all tp.system.prompt("...") fields (both single and two-arg forms)
+			// Single: <% tp.system.prompt("key") %>
+			// Double: <% tp.system.prompt("key", "default") %>
+			const promptRegex =
+				/<%\s*tp\.system\.prompt\("([^"]+)"(?:\s*,\s*"[^"]*")?\)\s*%>/g;
 
-	// Scan frontmatter
-	for (const match of frontmatter.matchAll(promptRegex)) {
-		const key = match[1];
-		if (key && !seen.has(key)) {
-			fields.push({ key, inFrontmatter: true, isAutoDate: false });
-			seen.add(key);
-		}
-	}
+			// Scan frontmatter
+			for (const match of frontmatter.matchAll(promptRegex)) {
+				const key = match[1];
+				if (key && !seen.has(key)) {
+					fields.push({ key, inFrontmatter: true, isAutoDate: false });
+					seen.add(key);
+				}
+			}
 
-	// Scan body for any additional prompts
-	for (const match of body.matchAll(promptRegex)) {
-		const key = match[1];
-		if (key && !seen.has(key)) {
-			fields.push({ key, inFrontmatter: false, isAutoDate: false });
-			seen.add(key);
-		}
-	}
+			// Scan body for any additional prompts
+			for (const match of body.matchAll(promptRegex)) {
+				const key = match[1];
+				if (key && !seen.has(key)) {
+					fields.push({ key, inFrontmatter: false, isAutoDate: false });
+					seen.add(key);
+				}
+			}
 
-	// Find auto-date fields (tp.date.now)
-	const dateRegex = /<%\s*tp\.date\.now\([^)]+\)\s*%>/g;
-	const dateMatches = frontmatter.match(dateRegex);
-	if (dateMatches && dateMatches.length > 0) {
-		// Add a note about auto-filled dates
-		if (!seen.has("created")) {
-			fields.push({ key: "created", inFrontmatter: true, isAutoDate: true });
-			seen.add("created");
-		}
-	}
+			// Find auto-date fields (tp.date.now)
+			const dateRegex = /<%\s*tp\.date\.now\([^)]+\)\s*%>/g;
+			const dateMatches = frontmatter.match(dateRegex);
+			if (dateMatches && dateMatches.length > 0) {
+				// Add a note about auto-filled dates
+				if (!seen.has("created")) {
+					fields.push({
+						key: "created",
+						inFrontmatter: true,
+						isAutoDate: true,
+					});
+					seen.add("created");
+				}
+			}
 
-	return fields;
+			return fields;
+		},
+		{
+			context: {
+				templateName: template.name,
+				templateVersion: template.version,
+			},
+		},
+	);
 }
 
 /**

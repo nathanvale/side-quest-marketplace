@@ -7,6 +7,8 @@
  * @module templates/wizard
  */
 import { confirm, input, select } from "@inquirer/prompts";
+import { observe } from "../shared/instrumentation.js";
+import { templatesLogger } from "../shared/logger.js";
 import type { TemplateConfig, TemplateField, TemplateSection } from "./types";
 
 /**
@@ -27,58 +29,69 @@ import type { TemplateConfig, TemplateField, TemplateSection } from "./types";
  * ```
  */
 export async function runWizard(): Promise<TemplateConfig> {
-	console.log("\n📝 Template Creation Wizard\n");
+	return observe(
+		templatesLogger,
+		"templates:runWizard",
+		async () => {
+			console.log("\n📝 Template Creation Wizard\n");
 
-	// Step 1: Gather metadata
-	const name = await input({
-		message: "Template name (kebab-case, e.g., custom-project):",
-		validate: (value) => {
-			if (!/^[a-z][a-z0-9-]*$/.test(value)) {
-				return "Must be kebab-case (lowercase letters, numbers, hyphens)";
-			}
-			return true;
+			// Step 1: Gather metadata
+			const name = await input({
+				message: "Template name (kebab-case, e.g., custom-project):",
+				validate: (value) => {
+					if (!/^[a-z][a-z0-9-]*$/.test(value)) {
+						return "Must be kebab-case (lowercase letters, numbers, hyphens)";
+					}
+					return true;
+				},
+			});
+
+			const displayName = await input({
+				message: "Display name (e.g., Custom Project):",
+				default: toTitleCase(name),
+			});
+
+			const noteType = await input({
+				message: "Note type (matches frontmatter type field):",
+				default: name,
+			});
+
+			const versionStr = await input({
+				message: "Template version:",
+				default: "1",
+				validate: (value) => {
+					const num = Number.parseInt(value, 10);
+					if (Number.isNaN(num) || num < 1) {
+						return "Must be a positive integer";
+					}
+					return true;
+				},
+			});
+			const version = Number.parseInt(versionStr, 10);
+
+			// Step 2: Gather frontmatter fields
+			console.log("\n📋 Frontmatter Fields\n");
+			const fields = await gatherFields();
+
+			// Step 3: Gather body sections
+			console.log("\n📄 Body Sections\n");
+			const sections = await gatherSections();
+
+			return {
+				name,
+				displayName,
+				noteType,
+				version,
+				fields,
+				sections,
+			};
 		},
-	});
-
-	const displayName = await input({
-		message: "Display name (e.g., Custom Project):",
-		default: toTitleCase(name),
-	});
-
-	const noteType = await input({
-		message: "Note type (matches frontmatter type field):",
-		default: name,
-	});
-
-	const versionStr = await input({
-		message: "Template version:",
-		default: "1",
-		validate: (value) => {
-			const num = Number.parseInt(value, 10);
-			if (Number.isNaN(num) || num < 1) {
-				return "Must be a positive integer";
-			}
-			return true;
+		{
+			context: {
+				interactive: true,
+			},
 		},
-	});
-	const version = Number.parseInt(versionStr, 10);
-
-	// Step 2: Gather frontmatter fields
-	console.log("\n📋 Frontmatter Fields\n");
-	const fields = await gatherFields();
-
-	// Step 3: Gather body sections
-	console.log("\n📄 Body Sections\n");
-	const sections = await gatherSections();
-
-	return {
-		name,
-		displayName,
-		noteType,
-		version,
-		fields,
-		sections,
-	};
+	);
 }
 
 /**

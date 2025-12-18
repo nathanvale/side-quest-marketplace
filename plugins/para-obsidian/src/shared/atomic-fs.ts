@@ -11,6 +11,8 @@
 import { randomUUID } from "node:crypto";
 import { readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { ensureParentDir } from "@sidequest/core/fs";
+import { observe } from "./instrumentation.js";
+import { fsLogger } from "./logger.js";
 
 /**
  * Atomically write file using temp + rename pattern.
@@ -30,24 +32,31 @@ export async function atomicWriteFile(
 	filePath: string,
 	content: string,
 ): Promise<void> {
-	const tempPath = `${filePath}.tmp.${randomUUID()}`;
+	return observe(
+		fsLogger,
+		"fs:atomicWriteFile",
+		async () => {
+			const tempPath = `${filePath}.tmp.${randomUUID()}`;
 
-	try {
-		// Ensure parent directory exists
-		await ensureParentDir(filePath);
+			try {
+				// Ensure parent directory exists
+				await ensureParentDir(filePath);
 
-		// Write to temp file
-		await writeFile(tempPath, content, "utf-8");
+				// Write to temp file
+				await writeFile(tempPath, content, "utf-8");
 
-		// Atomic rename (OS-level operation)
-		await rename(tempPath, filePath);
-	} catch (error) {
-		// Clean up temp file on failure
-		await unlink(tempPath).catch(() => {
-			// Ignore cleanup errors
-		});
-		throw error;
-	}
+				// Atomic rename (OS-level operation)
+				await rename(tempPath, filePath);
+			} catch (error) {
+				// Clean up temp file on failure
+				await unlink(tempPath).catch(() => {
+					// Ignore cleanup errors
+				});
+				throw error;
+			}
+		},
+		{ context: { filePath, contentLength: content.length } },
+	);
 }
 
 /**
@@ -64,22 +73,29 @@ export async function atomicWriteFile(
  * ```
  */
 export async function safeReadJSON<T>(filePath: string): Promise<T> {
-	try {
-		const content = await readFile(filePath, "utf-8");
-		return JSON.parse(content) as T;
-	} catch (error) {
-		// Try backup if main file corrupted
-		const backupPath = `${filePath}.backup`;
-		const backup = await readFile(backupPath, "utf-8").catch(() => null);
+	return observe(
+		fsLogger,
+		"fs:safeReadJSON",
+		async () => {
+			try {
+				const content = await readFile(filePath, "utf-8");
+				return JSON.parse(content) as T;
+			} catch (error) {
+				// Try backup if main file corrupted
+				const backupPath = `${filePath}.backup`;
+				const backup = await readFile(backupPath, "utf-8").catch(() => null);
 
-		if (backup) {
-			console.warn(`Restored ${filePath} from backup`);
-			await atomicWriteFile(filePath, backup);
-			return JSON.parse(backup) as T;
-		}
+				if (backup) {
+					console.warn(`Restored ${filePath} from backup`);
+					await atomicWriteFile(filePath, backup);
+					return JSON.parse(backup) as T;
+				}
 
-		throw error;
-	}
+				throw error;
+			}
+		},
+		{ context: { filePath } },
+	);
 }
 
 /**
@@ -97,10 +113,17 @@ export async function safeReadJSON<T>(filePath: string): Promise<T> {
  * ```
  */
 export async function createBackup(filePath: string): Promise<string> {
-	const backupPath = `${filePath}.backup`;
-	const content = await readFile(filePath, "utf-8");
-	await atomicWriteFile(backupPath, content);
-	return backupPath;
+	return observe(
+		fsLogger,
+		"fs:createBackup",
+		async () => {
+			const backupPath = `${filePath}.backup`;
+			const content = await readFile(filePath, "utf-8");
+			await atomicWriteFile(backupPath, content);
+			return backupPath;
+		},
+		{ context: { filePath } },
+	);
 }
 
 /**
@@ -115,7 +138,14 @@ export async function createBackup(filePath: string): Promise<string> {
  * ```
  */
 export async function restoreFromBackup(filePath: string): Promise<void> {
-	const backupPath = `${filePath}.backup`;
-	const content = await readFile(backupPath, "utf-8");
-	await atomicWriteFile(filePath, content);
+	return observe(
+		fsLogger,
+		"fs:restoreFromBackup",
+		async () => {
+			const backupPath = `${filePath}.backup`;
+			const content = await readFile(backupPath, "utf-8");
+			await atomicWriteFile(filePath, content);
+		},
+		{ context: { filePath } },
+	);
 }

@@ -29,6 +29,7 @@
 		"check": "biome check --write ."
 	},
 	"devDependencies": {
+		"@logtape/logtape": "^0.12.0",
 		"@types/bun": "latest"
 	}
 }

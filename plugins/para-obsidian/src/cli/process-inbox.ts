@@ -27,6 +27,30 @@ import type { CommandContext, CommandResult } from "./types";
 type MetricsSummary = ReturnType<MetricsCollector["getSummary"]>;
 
 /**
+ * Metrics captured during scan operation
+ */
+interface ScanMetrics {
+	durationMs: number;
+	filesProcessed: number;
+	skipped: number;
+	errors: number;
+	llmFailures: number;
+	llmFallbacks: number;
+	llmUnavailable: boolean;
+	thresholdsExceeded: string[];
+}
+
+/**
+ * Metrics captured during execute operation
+ */
+interface ExecuteMetrics {
+	durationMs: number;
+	succeeded: number;
+	failed: number;
+	thresholdsExceeded: string[];
+}
+
+/**
  * Singleton metrics collector instance scoped to this plugin only.
  * Prevents expensive repeated log scans and cross-plugin contamination.
  */
@@ -141,10 +165,13 @@ export async function handleProcessInbox(
 
 	// Scan inbox for suggestions
 	let suggestions: InboxSuggestion[];
+	let scanMetrics: ScanMetrics | null = null;
 	if (isJson) {
 		suggestions = await engine.scan({ sessionCid });
 	} else {
-		suggestions = await scanWithSpinner(engine, llmModel, sessionCid);
+		const result = await scanWithSpinner(engine, llmModel, sessionCid);
+		suggestions = result.suggestions;
+		scanMetrics = result.metrics;
 	}
 
 	// Apply filter if provided
@@ -159,12 +186,17 @@ export async function handleProcessInbox(
 		: suggestions;
 
 	if (filteredSuggestions.length === 0) {
-		return handleEmptyInbox(isJson);
+		return handleEmptyInbox(isJson, sessionCid, scanMetrics);
 	}
 
 	// Preview mode: just display suggestions
 	if (previewMode) {
-		return handlePreviewMode(filteredSuggestions, isJson);
+		return handlePreviewMode(
+			filteredSuggestions,
+			isJson,
+			sessionCid,
+			scanMetrics,
+		);
 	}
 
 	// Auto mode: process all without interaction
@@ -176,6 +208,7 @@ export async function handleProcessInbox(
 			skipConfirm,
 			isJson,
 			sessionCid,
+			scanMetrics,
 		);
 	}
 
@@ -264,7 +297,7 @@ async function scanWithSpinner(
 	engine: ReturnType<typeof createInboxEngine>,
 	llmModel: string,
 	sessionCid: string,
-): Promise<InboxSuggestion[]> {
+): Promise<{ suggestions: InboxSuggestion[]; metrics: ScanMetrics }> {
 	const cid = createCorrelationId();
 	const scanSpinner = createSpinner("Scanning inbox...").start();
 	const scanStarted = Date.now();
@@ -548,7 +581,44 @@ async function scanWithSpinner(
 			}
 		}
 
-		return suggestions;
+		// Build metrics for return
+		const llmUnavailable =
+			scanState.llmFailures > 0 && scanState.llmFailures >= filesAttempted;
+
+		// Check thresholds
+		const thresholdsExceeded: string[] = [];
+		if (scanThresholdCheck.exceeded) {
+			thresholdsExceeded.push(
+				`scanTotalMs (${scanThresholdCheck.percentage}% of ${scanThresholdCheck.threshold}ms)`,
+			);
+		}
+
+		// Show threshold warnings
+		if (thresholdsExceeded.length > 0) {
+			console.log(
+				color(
+					"yellow",
+					`⚠ Performance thresholds exceeded: ${thresholdsExceeded.join(", ")}`,
+				),
+			);
+		}
+
+		// Show session ID for tracing
+		console.log(emphasize.dim(`Session ID: ${sessionCid}`));
+
+		return {
+			suggestions,
+			metrics: {
+				durationMs,
+				filesProcessed: scanState.processed,
+				skipped: scanState.skipped,
+				errors: scanState.errors,
+				llmFailures: scanState.llmFailures,
+				llmFallbacks: scanState.llmFallbacks,
+				llmUnavailable,
+				thresholdsExceeded,
+			},
+		};
 	} catch (error) {
 		clearInterval(scanTicker);
 		process.removeListener("SIGINT", cleanup);
@@ -573,7 +643,11 @@ async function scanWithSpinner(
 /**
  * Handle empty inbox case with helpful debugging info
  */
-async function handleEmptyInbox(isJson: boolean): Promise<CommandResult> {
+async function handleEmptyInbox(
+	isJson: boolean,
+	sessionCid: string,
+	scanMetrics: ScanMetrics | null,
+): Promise<CommandResult> {
 	const metrics = await collectMetricsSummary();
 	if (isJson) {
 		console.log(
@@ -624,6 +698,8 @@ async function handleEmptyInbox(isJson: boolean): Promise<CommandResult> {
 async function handlePreviewMode(
 	suggestions: InboxSuggestion[],
 	isJson: boolean,
+	sessionCid: string,
+	scanMetrics: ScanMetrics | null,
 ): Promise<CommandResult> {
 	const metrics = await collectMetricsSummary();
 	if (isJson) {
@@ -667,6 +743,7 @@ async function handleAutoMode(
 	skipConfirm: boolean,
 	isJson: boolean,
 	sessionCid: string,
+	scanMetrics: ScanMetrics | null,
 ): Promise<CommandResult> {
 	// Dry-run: show what would happen without executing
 	if (dryRun) {
@@ -679,6 +756,18 @@ async function handleAutoMode(
 							mode: "dry-run",
 							wouldProcess: suggestions.map((s) => s.id),
 							count: suggestions.length,
+							success: true,
+							sessionCid,
+							scan: scanMetrics
+								? {
+										durationMs: scanMetrics.durationMs,
+										filesProcessed: scanMetrics.filesProcessed,
+										llmFailures: scanMetrics.llmFailures,
+										llmFallbacks: scanMetrics.llmFallbacks,
+										llmUnavailable: scanMetrics.llmUnavailable,
+										thresholdsExceeded: scanMetrics.thresholdsExceeded,
+									}
+								: null,
 						},
 						metrics,
 					),
@@ -726,13 +815,17 @@ async function handleAutoMode(
 
 	// Execute all suggestions
 	let batchResult: BatchResult;
+	let executeMetrics: ExecuteMetrics | null = null;
 	if (isJson) {
 		batchResult = await engine.execute(
 			suggestions.map((s) => s.id),
 			{ sessionCid },
 		);
+		// TODO: Capture execute metrics from JSON mode
 	} else {
-		batchResult = await executeWithSpinner(engine, suggestions, sessionCid);
+		const result = await executeWithSpinner(engine, suggestions, sessionCid);
+		batchResult = result.batchResult;
+		executeMetrics = result.metrics;
 	}
 
 	// Aggregate results
@@ -745,10 +838,30 @@ async function handleAutoMode(
 			JSON.stringify(
 				withLogContext(
 					{
+						success: true,
+						sessionCid,
 						mode: "auto",
 						results: batchResult.successful,
 						successes,
 						failures,
+						scan: scanMetrics
+							? {
+									durationMs: scanMetrics.durationMs,
+									filesProcessed: scanMetrics.filesProcessed,
+									llmFailures: scanMetrics.llmFailures,
+									llmFallbacks: scanMetrics.llmFallbacks,
+									llmUnavailable: scanMetrics.llmUnavailable,
+									thresholdsExceeded: scanMetrics.thresholdsExceeded,
+								}
+							: null,
+						execute: executeMetrics
+							? {
+									durationMs: executeMetrics.durationMs,
+									succeeded: executeMetrics.succeeded,
+									failed: executeMetrics.failed,
+									thresholdsExceeded: executeMetrics.thresholdsExceeded,
+								}
+							: null,
 					},
 					metrics,
 				),
@@ -779,6 +892,7 @@ async function handleAutoMode(
 				),
 			);
 		}
+		console.log(emphasize.dim(`Session ID: ${sessionCid}`));
 	}
 
 	return { success: true };
@@ -791,7 +905,7 @@ async function executeWithSpinner(
 	engine: ReturnType<typeof createInboxEngine>,
 	suggestions: InboxSuggestion[],
 	sessionCid: string,
-): Promise<BatchResult> {
+): Promise<{ batchResult: BatchResult; metrics: ExecuteMetrics }> {
 	const cid = createCorrelationId();
 	const total = suggestions.length;
 	const execSpinner = createSpinner(renderProgressBar(0, 16)).start();
@@ -834,11 +948,12 @@ async function executeWithSpinner(
 		inboxLogger.info`Execute completed tool=cli:executeInbox cid=${cid} durationMs=${durationMs} success=true total=${total} succeeded=${results.summary.succeeded} failed=${results.summary.failed} timestamp=${new Date().toISOString()}`;
 	}
 
-	// Check threshold
+	// Check execute duration threshold
 	const executeThresholdCheck = checkThreshold("executeTotalMs", durationMs);
 	if (executeThresholdCheck.exceeded && inboxLogger) {
 		inboxLogger.warn("MCP tool response", {
 			tool: "cli:thresholdExceeded",
+			sessionCid,
 			durationMs,
 			success: true,
 			thresholdExceeded: true,
@@ -848,9 +963,36 @@ async function executeWithSpinner(
 			alertLevel:
 				executeThresholdCheck.percentage > 150 ? "critical" : "warning",
 		});
+		// Surface in console for visibility
+		console.log(
+			color(
+				executeThresholdCheck.percentage > 150 ? "red" : "yellow",
+				`⚠ Execute duration exceeded threshold: ${(durationMs / 1000).toFixed(1)}s (${executeThresholdCheck.percentage}% of ${(executeThresholdCheck.threshold / 1000).toFixed(0)}s limit)`,
+			),
+		);
 	}
 
-	return results;
+	// Check thresholds for metrics
+	const thresholdsExceeded: string[] = [];
+	if (executeThresholdCheck.exceeded) {
+		thresholdsExceeded.push(
+			`executeTotalMs (${executeThresholdCheck.percentage}% of ${executeThresholdCheck.threshold}ms)`,
+		);
+	}
+
+	// Show threshold warnings (already shown above, so skip duplicate)
+	// Show session ID for tracing
+	console.log(emphasize.dim(`Session ID: ${sessionCid}`));
+
+	return {
+		batchResult: results,
+		metrics: {
+			durationMs,
+			succeeded: results.summary.succeeded,
+			failed: results.summary.failed,
+			thresholdsExceeded,
+		},
+	};
 }
 
 /**
@@ -946,6 +1088,7 @@ async function handleInteractiveMode(
 		}
 	} else {
 		console.log(emphasize.info("\nNo items were approved."));
+		console.log(emphasize.dim(`Session ID: ${sessionCid}`));
 	}
 
 	return { success: true };

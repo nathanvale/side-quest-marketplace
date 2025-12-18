@@ -26,6 +26,7 @@ import {
 	executeLogger,
 	inboxLogger,
 	initLoggerWithNotice,
+	logJson,
 } from "../../shared/logger";
 import { buildSuggestion, DEFAULT_CLASSIFIERS } from "../classify/classifiers";
 import {
@@ -631,14 +632,30 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 						llmModelUsed = llmCallResult.modelUsed;
 
 						// Emit fallback progress update if fallback occurred
-						if (llmFallbackUsed && onProgress) {
-							await onProgress({
-								...progressBase,
-								stage: "llm",
-								model: llmCallResult.modelUsed,
-								isFallback: true,
-								fallbackReason: llmCallResult.fallbackReason,
-							});
+						if (llmFallbackUsed) {
+							if (inboxLogger) {
+								inboxLogger.info(
+									logJson({
+										event: "llm_fallback",
+										cid,
+										filename,
+										primaryModel:
+											resolvedConfig.llmModel ?? resolvedConfig.llmProvider,
+										fallbackModel: llmCallResult.modelUsed,
+										reason: llmCallResult.fallbackReason,
+										timestamp: new Date().toISOString(),
+									}),
+								);
+							}
+							if (onProgress) {
+								await onProgress({
+									...progressBase,
+									stage: "llm",
+									model: llmCallResult.modelUsed,
+									isFallback: true,
+									fallbackReason: llmCallResult.fallbackReason,
+								});
+							}
 						}
 
 						if (inboxLogger) {
@@ -785,6 +802,24 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			}
 
 			suggestionCache.set(suggestion.id, suggestion);
+
+			// Log file processing completion with structured event
+			if (inboxLogger) {
+				inboxLogger.info(
+					logJson({
+						event: "file_processed",
+						cid,
+						filename,
+						action: suggestion.action,
+						confidence: suggestion.confidence,
+						llmUsed: llmResult !== null && !llmErrorMessage,
+						llmFallbackUsed,
+						success: true,
+						timestamp: new Date().toISOString(),
+					}),
+				);
+			}
+
 			if (onProgress) {
 				await onProgress({
 					...progressBase,
@@ -833,7 +868,18 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		);
 
 		if (inboxLogger) {
-			inboxLogger.info`Scan complete suggestions=${suggestions.length} durationMs=${durationMs} llmSuccesses=${llmStats.successes} llmFailures=${llmStats.failures} cid=${cid}`;
+			inboxLogger.info(
+				logJson({
+					event: "scan_completed",
+					cid,
+					suggestionCount: suggestions.length,
+					durationMs,
+					llmSuccesses: llmStats.successes,
+					llmFailures: llmStats.failures,
+					llmFallbacks: llmStats.fallbacks,
+					timestamp: new Date().toISOString(),
+				}),
+			);
 			inboxLogger.debug`Scan breakdown confidence=${JSON.stringify(confidenceCounts)} actions=${JSON.stringify(actionCounts)} durationMs=${durationMs} cid=${cid}`;
 
 			// Error if LLM appears unavailable
@@ -873,7 +919,15 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		suggestionCache.clear();
 
 		if (inboxLogger) {
-			inboxLogger.info`Scan started vault=${resolvedConfig.vaultPath} cid=${cid} sessionCid=${sessionCid}`;
+			inboxLogger.info(
+				logJson({
+					event: "scan_started",
+					cid,
+					sessionCid,
+					vaultPath: resolvedConfig.vaultPath,
+					timestamp: new Date().toISOString(),
+				}),
+			);
 		}
 
 		// Silent pre-commit: auto-save any uncommitted PARA files before scan
@@ -955,7 +1009,15 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		const onProgress = options?.onProgress;
 
 		if (inboxLogger) {
-			inboxLogger.info`Execute started count=${ids.length} cid=${cid} sessionCid=${sessionCid}`;
+			inboxLogger.info(
+				logJson({
+					event: "execute_started",
+					cid,
+					sessionCid,
+					count: ids.length,
+					timestamp: new Date().toISOString(),
+				}),
+			);
 		}
 
 		if (ids.length === 0) {
@@ -1116,7 +1178,17 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 
 		const durationMs = Date.now() - startedAt;
 		if (inboxLogger) {
-			inboxLogger.info`Execute complete success=${successful.length} failed=${failed.size} durationMs=${durationMs} cid=${cid}`;
+			inboxLogger.info(
+				logJson({
+					event: "execute_completed",
+					cid,
+					successCount: successful.length,
+					failureCount: failed.size,
+					total,
+					durationMs,
+					timestamp: new Date().toISOString(),
+				}),
+			);
 			inboxLogger.debug`Execute summary total=${total} success=${successful.length} failed=${failed.size} durationMs=${durationMs} cid=${cid}`;
 		}
 

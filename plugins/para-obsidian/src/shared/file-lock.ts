@@ -11,6 +11,8 @@
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { observe } from "./instrumentation.js";
+import { lockLogger } from "./logger.js";
 
 const LOCK_DIR = join(tmpdir(), "para-obsidian-locks");
 const LOCK_TIMEOUT_MS = 30000; // 30 seconds
@@ -39,20 +41,33 @@ export async function withFileLock<T>(
 	resourceId: string,
 	operation: () => Promise<T>,
 ): Promise<T> {
-	await mkdir(LOCK_DIR, { recursive: true });
-	const lockPath = join(LOCK_DIR, `${resourceId}.lock`);
+	return observe(
+		lockLogger,
+		"lock:withFileLock",
+		async () => {
+			await mkdir(LOCK_DIR, { recursive: true });
+			const lockPath = join(LOCK_DIR, `${resourceId}.lock`);
 
-	// Acquire lock with timeout
-	const acquired = await acquireLock(lockPath);
-	if (!acquired) {
-		throw new Error(`Failed to acquire lock for ${resourceId}`);
-	}
+			// Acquire lock with timeout
+			const lockAcquireStart = Date.now();
+			const acquired = await acquireLock(lockPath);
+			const lockWaitMs = Date.now() - lockAcquireStart;
 
-	try {
-		return await operation();
-	} finally {
-		await releaseLock(lockPath);
-	}
+			if (!acquired) {
+				throw new Error(`Failed to acquire lock for ${resourceId}`);
+			}
+
+			// Log lock acquisition metrics separately (intentional sub-span)
+			lockLogger.debug`Lock acquired resourceId=${resourceId} lockWaitMs=${lockWaitMs}`;
+
+			try {
+				return await operation();
+			} finally {
+				await releaseLock(lockPath);
+			}
+		},
+		{ context: { resourceId } },
+	);
 }
 
 /**
@@ -135,24 +150,45 @@ function sleep(ms: number): Promise<void> {
  * await cleanupStaleLocks();
  * ```
  */
-export async function cleanupStaleLocks(): Promise<void> {
-	try {
-		const { readdirSync } = await import("node:fs");
-		const files = readdirSync(LOCK_DIR);
+export async function cleanupStaleLocks(): Promise<{
+	cleanedCount: number;
+	totalFiles: number;
+}> {
+	return observe(
+		lockLogger,
+		"lock:cleanupStaleLocks",
+		async () => {
+			let cleanedCount = 0;
+			let totalFiles = 0;
 
-		for (const file of files) {
-			if (!file.endsWith(".lock")) continue;
+			try {
+				const { readdirSync } = await import("node:fs");
+				const files = readdirSync(LOCK_DIR);
+				totalFiles = files.length;
 
-			const lockPath = join(LOCK_DIR, file);
-			const pid = await readFile(lockPath, "utf-8").catch(() => null);
+				for (const file of files) {
+					if (!file.endsWith(".lock")) continue;
 
-			if (pid && !isProcessRunning(Number(pid))) {
-				await unlink(lockPath).catch(() => {
-					// Ignore - another process may have removed it
-				});
+					const lockPath = join(LOCK_DIR, file);
+					const pid = await readFile(lockPath, "utf-8").catch(() => null);
+
+					if (pid && !isProcessRunning(Number(pid))) {
+						await unlink(lockPath).catch(() => {
+							// Ignore - another process may have removed it
+						});
+						cleanedCount++;
+					}
+				}
+			} catch {
+				// Lock directory doesn't exist or not accessible
 			}
-		}
-	} catch {
-		// Lock directory doesn't exist or not accessible
-	}
+
+			// Return metrics so observe() includes them in context
+			return { cleanedCount, totalFiles };
+		},
+		{
+			context: {},
+			isSuccess: () => true, // Always succeeds (best-effort cleanup)
+		},
+	);
 }

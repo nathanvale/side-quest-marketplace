@@ -26,6 +26,8 @@ import type { ParaObsidianConfig } from "../config/index";
 import { parseFrontmatter } from "../frontmatter/index";
 import { getManagedFolders } from "../git/index";
 import { resolveVaultPath } from "../shared/fs";
+import { observeSync } from "../shared/instrumentation.js";
+import { searchLogger } from "../shared/logger.js";
 
 /**
  * Indexed metadata for a single Markdown file.
@@ -93,6 +95,7 @@ export function buildIndex(
 		: dir
 			? [dir]
 			: Array.from(getManagedFolders(config));
+
 	const files: string[] = [];
 
 	// Collect all Markdown files from specified directories
@@ -113,28 +116,41 @@ export function buildIndex(
 	// Deduplicate files (in case directories overlap)
 	const uniqueFiles = Array.from(new Set(files));
 
-	// Build index entries for each file
-	const entries: IndexEntry[] = [];
-	for (const rel of uniqueFiles) {
-		const full = path.join(config.vault, rel);
-		const content = readTextFileSync(full);
-		const { attributes } = parseFrontmatter(content);
-		const tags = Array.isArray(attributes.tags)
-			? (attributes.tags as string[])
-			: [];
-		const headings = collectHeadings(content);
-		entries.push({
-			file: path.relative(config.vault, full),
-			tags,
-			frontmatter: attributes,
-			headings,
-		});
-	}
+	return observeSync(
+		searchLogger,
+		"search:buildIndex",
+		() => {
+			// Build index entries for each file
+			const entries: IndexEntry[] = [];
+			for (const rel of uniqueFiles) {
+				const full = path.join(config.vault, rel);
+				const content = readTextFileSync(full);
+				const { attributes } = parseFrontmatter(content);
+				const tags = Array.isArray(attributes.tags)
+					? (attributes.tags as string[])
+					: [];
+				const headings = collectHeadings(content);
+				entries.push({
+					file: path.relative(config.vault, full),
+					tags,
+					frontmatter: attributes,
+					headings,
+				});
+			}
 
-	return {
-		generatedAt: new Date().toISOString(),
-		entries,
-	};
+			return {
+				generatedAt: new Date().toISOString(),
+				entries,
+			};
+		},
+		{
+			context: {
+				vaultPath: config.vault,
+				dirCount: dirs.length,
+				fileCount: uniqueFiles.length,
+			},
+		},
+	);
 }
 
 /**
@@ -204,24 +220,31 @@ export function loadIndex(config: ParaObsidianConfig): VaultIndex | undefined {
  * ```
  */
 export function listAreas(config: ParaObsidianConfig): string[] {
-	const areasFolder = config.paraFolders?.areas ?? "02 Areas";
-	const areasDir = resolveVaultPath(config.vault, areasFolder);
-	const areas: string[] = [];
+	return observeSync(
+		searchLogger,
+		"search:listAreas",
+		() => {
+			const areasFolder = config.paraFolders?.areas ?? "02 Areas";
+			const areasDir = resolveVaultPath(config.vault, areasFolder);
+			const areas: string[] = [];
 
-	if (!fs.existsSync(areasDir.absolute)) {
-		return areas;
-	}
+			if (!fs.existsSync(areasDir.absolute)) {
+				return areas;
+			}
 
-	// Scan areas directory for .md files
-	const files = fs.readdirSync(areasDir.absolute);
-	for (const file of files) {
-		if (file.endsWith(".md")) {
-			// Use filename without extension as area title
-			areas.push(file.replace(/\.md$/, ""));
-		}
-	}
+			// Scan areas directory for .md files
+			const files = fs.readdirSync(areasDir.absolute);
+			for (const file of files) {
+				if (file.endsWith(".md")) {
+					// Use filename without extension as area title
+					areas.push(file.replace(/\.md$/, ""));
+				}
+			}
 
-	return areas.sort();
+			return areas.sort();
+		},
+		{ context: { vaultPath: config.vault } },
+	);
 }
 
 /**
@@ -239,24 +262,31 @@ export function listAreas(config: ParaObsidianConfig): string[] {
  * ```
  */
 export function listProjects(config: ParaObsidianConfig): string[] {
-	const projectsFolder = config.paraFolders?.projects ?? "01 Projects";
-	const projectsDir = resolveVaultPath(config.vault, projectsFolder);
-	const projects: string[] = [];
+	return observeSync(
+		searchLogger,
+		"search:listProjects",
+		() => {
+			const projectsFolder = config.paraFolders?.projects ?? "01 Projects";
+			const projectsDir = resolveVaultPath(config.vault, projectsFolder);
+			const projects: string[] = [];
 
-	if (!fs.existsSync(projectsDir.absolute)) {
-		return projects;
-	}
+			if (!fs.existsSync(projectsDir.absolute)) {
+				return projects;
+			}
 
-	// Scan projects directory for .md files
-	const files = fs.readdirSync(projectsDir.absolute);
-	for (const file of files) {
-		if (file.endsWith(".md")) {
-			// Use filename without extension as project title
-			projects.push(file.replace(/\.md$/, ""));
-		}
-	}
+			// Scan projects directory for .md files
+			const files = fs.readdirSync(projectsDir.absolute);
+			for (const file of files) {
+				if (file.endsWith(".md")) {
+					// Use filename without extension as project title
+					projects.push(file.replace(/\.md$/, ""));
+				}
+			}
 
-	return projects.sort();
+			return projects.sort();
+		},
+		{ context: { vaultPath: config.vault } },
+	);
 }
 
 /**
@@ -275,7 +305,14 @@ export function listProjects(config: ParaObsidianConfig): string[] {
  * ```
  */
 export function listTags(config: ParaObsidianConfig): string[] {
-	return config.suggestedTags ? [...config.suggestedTags].sort() : [];
+	return observeSync(
+		searchLogger,
+		"search:listTags",
+		() => {
+			return config.suggestedTags ? [...config.suggestedTags].sort() : [];
+		},
+		{ context: { vaultPath: config.vault } },
+	);
 }
 
 /**
@@ -294,46 +331,57 @@ export function listTags(config: ParaObsidianConfig): string[] {
  * ```
  */
 export function scanTags(config: ParaObsidianConfig): string[] {
-	const tagSet = new Set<string>();
+	return observeSync(
+		searchLogger,
+		"search:scanTags",
+		() => {
+			const tagSet = new Set<string>();
 
-	// Try to use existing index first
-	const index = loadIndex(config);
-	if (index) {
-		for (const entry of index.entries) {
-			for (const tag of entry.tags) {
-				tagSet.add(tag);
-			}
-		}
-		return Array.from(tagSet).sort();
-	}
-
-	// Fallback: scan all markdown files
-	const vaultRoot = config.vault;
-	const markdownFiles = globFilesSync("**/*.md", {
-		cwd: vaultRoot,
-		absolute: false,
-	});
-
-	for (const file of markdownFiles) {
-		const fullPath = path.join(vaultRoot, file);
-		try {
-			const content = fs.readFileSync(fullPath, "utf8");
-			const { attributes } = parseFrontmatter(content);
-			const tags = attributes.tags;
-			if (Array.isArray(tags)) {
-				for (const tag of tags) {
-					if (typeof tag === "string") {
+			// Try to use existing index first
+			const index = loadIndex(config);
+			if (index) {
+				for (const entry of index.entries) {
+					for (const tag of entry.tags) {
 						tagSet.add(tag);
 					}
 				}
+				return Array.from(tagSet).sort();
 			}
-		} catch (error) {
-			// Skip files that can't be read (e.g., permission issues)
-			console.warn(
-				`scanTags: failed to read ${file}: ${getErrorMessage(error)}`,
-			);
-		}
-	}
 
-	return Array.from(tagSet).sort();
+			// Fallback: scan all markdown files
+			const vaultRoot = config.vault;
+			const markdownFiles = globFilesSync("**/*.md", {
+				cwd: vaultRoot,
+				absolute: false,
+			});
+
+			for (const file of markdownFiles) {
+				const fullPath = path.join(vaultRoot, file);
+				try {
+					const content = fs.readFileSync(fullPath, "utf8");
+					const { attributes } = parseFrontmatter(content);
+					const tags = attributes.tags;
+					if (Array.isArray(tags)) {
+						for (const tag of tags) {
+							if (typeof tag === "string") {
+								tagSet.add(tag);
+							}
+						}
+					}
+				} catch (error) {
+					// Skip files that can't be read (e.g., permission issues)
+					console.warn(
+						`scanTags: failed to read ${file}: ${getErrorMessage(error)}`,
+					);
+				}
+			}
+
+			return Array.from(tagSet).sort();
+		},
+		{
+			context: {
+				vaultPath: config.vault,
+			},
+		},
+	);
 }

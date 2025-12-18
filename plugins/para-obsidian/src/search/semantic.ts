@@ -15,6 +15,8 @@ import { spawnAndCollect } from "@sidequest/core/spawn";
 import { getErrorMessage } from "@sidequest/core/utils";
 import type { ParaObsidianConfig } from "../config/index";
 import { resolveVaultPath } from "../shared/fs";
+import { observe } from "../shared/instrumentation.js";
+import { searchLogger } from "../shared/logger.js";
 import { checkKit, getKitMLErrorMessage } from "./kit-check";
 
 /**
@@ -243,26 +245,39 @@ export async function semanticSearch(
 		dirs = resolvePARAFolders(config, defaultPara);
 	}
 
-	// Run search in each directory
-	const hits: SemanticHit[] = [];
-	for (const dir of dirs) {
-		const chunk = await runner(config, { ...options, dir });
-		for (const hit of chunk) {
-			hits.push({ ...hit, dir: dir ?? "." });
-		}
-	}
-
-	// Deduplicate by file, keeping highest score for each file
-	const deduped = Array.from(
-		hits.reduce((map, hit) => {
-			const existing = map.get(hit.file);
-			if (!existing || hit.score > existing.score) {
-				map.set(hit.file, hit);
+	return observe(
+		searchLogger,
+		"search:semanticSearch",
+		async () => {
+			// Run search in each directory
+			const hits: SemanticHit[] = [];
+			for (const dir of dirs) {
+				const chunk = await runner(config, { ...options, dir });
+				for (const hit of chunk) {
+					hits.push({ ...hit, dir: dir ?? "." });
+				}
 			}
-			return map;
-		}, new Map<string, SemanticHit>()),
-	).map(([, hit]) => hit);
 
-	const limit = options.limit ?? 10;
-	return deduped.sort((a, b) => b.score - a.score).slice(0, limit);
+			// Deduplicate by file, keeping highest score for each file
+			const deduped = Array.from(
+				hits.reduce((map, hit) => {
+					const existing = map.get(hit.file);
+					if (!existing || hit.score > existing.score) {
+						map.set(hit.file, hit);
+					}
+					return map;
+				}, new Map<string, SemanticHit>()),
+			).map(([, hit]) => hit);
+
+			const limit = options.limit ?? 10;
+			return deduped.sort((a, b) => b.score - a.score).slice(0, limit);
+		},
+		{
+			context: {
+				query: options.query,
+				dirCount: dirs.length,
+				limit: options.limit ?? 10,
+			},
+		},
+	);
 }

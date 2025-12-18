@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
+	consoleEnabled,
 	createCorrelationId,
 	executeLogger,
 	getSubsystemLogger,
 	inboxLogger,
 	llmLogger,
+	logLevel,
 	pdfLogger,
 } from "./logger";
 
@@ -69,6 +71,32 @@ describe("logger", () => {
 
 			// Should be a valid nanoid-style string (alphanumeric + _-)
 			expect(id).toMatch(/^[a-zA-Z0-9_-]+$/);
+		});
+	});
+
+	describe("environment configuration", () => {
+		test("logLevel should be a valid log level", () => {
+			expect(logLevel).toMatch(/^(debug|info|warning|error)$/);
+		});
+
+		test("consoleEnabled should be a boolean", () => {
+			expect(typeof consoleEnabled).toBe("boolean");
+		});
+
+		test("logLevel defaults to debug when PARA_LOG_LEVEL not set", () => {
+			// This test verifies current behavior based on env at import time
+			// If PARA_LOG_LEVEL is not set, logLevel should be "debug"
+			if (!process.env.PARA_LOG_LEVEL) {
+				expect(logLevel).toBe("debug");
+			}
+		});
+
+		test("consoleEnabled defaults to false when PARA_LOG_CONSOLE not set", () => {
+			// This test verifies current behavior based on env at import time
+			// If PARA_LOG_CONSOLE is not set, consoleEnabled should be false
+			if (!process.env.PARA_LOG_CONSOLE) {
+				expect(consoleEnabled).toBe(false);
+			}
 		});
 	});
 });

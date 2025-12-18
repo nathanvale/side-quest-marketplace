@@ -9,6 +9,9 @@
  *
  * @module templates/validator
  */
+
+import { observeSync } from "../shared/instrumentation.js";
+import { templatesLogger } from "../shared/logger.js";
 import type { TemplateValidationResult } from "./types";
 
 /**
@@ -33,38 +36,49 @@ import type { TemplateValidationResult } from "./types";
  * ```
  */
 export function validateTemplate(content: string): TemplateValidationResult {
-	const errors: string[] = [];
-	const warnings: string[] = [];
+	return observeSync(
+		templatesLogger,
+		"templates:validateTemplate",
+		() => {
+			const errors: string[] = [];
+			const warnings: string[] = [];
 
-	// Check for frontmatter
-	if (!hasFrontmatter(content)) {
-		errors.push("Template must have YAML frontmatter (--- ... ---)");
-	}
+			// Check for frontmatter
+			if (!hasFrontmatter(content)) {
+				errors.push("Template must have YAML frontmatter (--- ... ---)");
+			}
 
-	// Validate Templater syntax
-	const templaterErrors = validateTemplaterSyntax(content);
-	errors.push(...templaterErrors);
+			// Validate Templater syntax
+			const templaterErrors = validateTemplaterSyntax(content);
+			errors.push(...templaterErrors);
 
-	// Check for balanced quotes in frontmatter
-	const frontmatterQuoteErrors = validateFrontmatterQuotes(content);
-	errors.push(...frontmatterQuoteErrors);
+			// Check for balanced quotes in frontmatter
+			const frontmatterQuoteErrors = validateFrontmatterQuotes(content);
+			errors.push(...frontmatterQuoteErrors);
 
-	// Check for balanced brackets in wikilinks
-	const wikilinkErrors = validateWikilinks(content);
-	errors.push(...wikilinkErrors);
+			// Check for balanced brackets in wikilinks
+			const wikilinkErrors = validateWikilinks(content);
+			errors.push(...wikilinkErrors);
 
-	// Warnings for best practices
-	if (!hasTemplateVersion(content)) {
-		warnings.push(
-			"Consider adding template_version field for migration support",
-		);
-	}
+			// Warnings for best practices
+			if (!hasTemplateVersion(content)) {
+				warnings.push(
+					"Consider adding template_version field for migration support",
+				);
+			}
 
-	return {
-		isValid: errors.length === 0,
-		errors,
-		warnings,
-	};
+			return {
+				isValid: errors.length === 0,
+				errors,
+				warnings,
+			};
+		},
+		{
+			context: {
+				contentLength: content.length,
+			},
+		},
+	);
 }
 
 /**
