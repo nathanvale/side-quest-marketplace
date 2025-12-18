@@ -223,7 +223,8 @@ async function scanWithSpinner(
 	const scanStarted = Date.now();
 	const scanState = {
 		total: 0,
-		processed: 0,
+		started: 0, // Files that have begun processing
+		processed: 0, // Files that have completed (done/skip/error)
 		skipped: 0,
 		errors: 0,
 		llmFailures: 0,
@@ -231,7 +232,14 @@ async function scanWithSpinner(
 		lastFallbackReason: undefined as string | undefined,
 		lastLlmError: undefined as string | undefined,
 		currentFile: "",
-		stage: "start" as "start" | "hash" | "extract" | "llm" | "skip" | "done" | "error",
+		stage: "start" as
+			| "start"
+			| "hash"
+			| "extract"
+			| "llm"
+			| "skip"
+			| "done"
+			| "error",
 		stageStartedAt: Date.now(),
 	};
 
@@ -244,8 +252,9 @@ async function scanWithSpinner(
 		const eta = calculateEta(scanState.processed, scanState.total, elapsedMs);
 
 		// Build visual progress bar with stats
+		// Use 'started' count for progress (shows work beginning, not just completion)
 		const progressBar = renderProgressBar(
-			scanState.processed,
+			scanState.started,
 			scanState.total || 0,
 			16,
 		);
@@ -281,10 +290,12 @@ async function scanWithSpinner(
 				const { total, filename, stage } = progress;
 				scanState.total = total;
 				if (stage === "start") {
-					// File processing started - update current file for display
+					// File processing started - increment started count and update display
+					scanState.started += 1;
 					scanState.currentFile = filename;
 					scanState.stage = "start";
 					scanState.stageStartedAt = Date.now();
+					updateScanText(); // Immediate update so bar increments visibly
 				} else if (stage === "skip") {
 					scanState.skipped += 1;
 					scanState.processed += 1;
