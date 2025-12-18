@@ -528,6 +528,23 @@ export interface FailedExecutionResult extends ExecutionResultBase {
 export type ExecutionResult = SuccessfulExecutionResult | FailedExecutionResult;
 
 /**
+ * Result of batch execution with fault isolation.
+ * Allows partial success - some suggestions can fail while others succeed.
+ */
+export interface BatchResult {
+	/** Successfully executed suggestions */
+	readonly successful: ExecutionResult[];
+	/** Failed suggestions with their errors */
+	readonly failed: ReadonlyMap<SuggestionId, Error>;
+	/** Summary counts */
+	readonly summary: {
+		readonly total: number;
+		readonly succeeded: number;
+		readonly failed: number;
+	};
+}
+
+/**
  * Progress update emitted during execution for user feedback.
  */
 export interface ExecuteProgress {
@@ -559,6 +576,26 @@ export interface ExecuteOptions {
 	 * Useful for updating CLI spinners/status lines.
 	 */
 	readonly onProgress?: (progress: ExecuteProgress) => void | Promise<void>;
+
+	/**
+	 * Map of area names (lowercase) to their full vault paths.
+	 * Used to resolve area names from LLM suggestions to actual paths.
+	 */
+	readonly areaPathMap?: Map<string, string>;
+
+	/**
+	 * Map of project names (lowercase) to their full vault paths.
+	 * Used to resolve project names from LLM suggestions to actual paths.
+	 */
+	readonly projectPathMap?: Map<string, string>;
+
+	/**
+	 * Map of suggestion IDs to CLI-modified suggestions.
+	 * When present, these take precedence over the engine's internal cache.
+	 * This allows the CLI to modify suggestions (e.g., accept LLM destination)
+	 * and have those modifications respected during execution.
+	 */
+	readonly updatedSuggestions?: Map<string, InboxSuggestion>;
 }
 
 // =============================================================================
@@ -750,12 +787,9 @@ export interface InboxEngine {
 	 *
 	 * @param ids - IDs of suggestions to execute
 	 * @param options - Optional execution options (progress callbacks)
-	 * @returns Results for each execution
+	 * @returns Batch result with successful executions and failures
 	 */
-	execute(
-		ids: SuggestionId[],
-		options?: ExecuteOptions,
-	): Promise<ExecutionResult[]>;
+	execute(ids: SuggestionId[], options?: ExecuteOptions): Promise<BatchResult>;
 
 	/**
 	 * Generate a markdown report of suggestions.

@@ -8,7 +8,7 @@
  */
 
 import { basename, join } from "node:path";
-import { readDir } from "@sidequest/core/fs";
+import { pathExistsSync, readDir } from "@sidequest/core/fs";
 import pLimit from "p-limit";
 import { loadConfig } from "../../config/index";
 import { ensureGitGuard } from "../../git/index";
@@ -41,6 +41,7 @@ import {
 } from "../scan/extractors/markdown";
 import { createInboxError } from "../shared/errors";
 import {
+	type BatchResult,
 	type ChallengeSuggestion,
 	type CreateNoteSuggestion,
 	createSuggestionId,
@@ -59,7 +60,13 @@ import { callLLM, callLLMWithMetadata } from "./llm";
 import { executeSuggestion } from "./operations";
 import { generateReport } from "./operations/report";
 import { cleanupOrphanedStaging } from "./staging";
-import { getVaultAreas, getVaultProjects, type VaultContext } from "./vault";
+import {
+	getAreaPathMap,
+	getProjectPathMap,
+	getVaultAreas,
+	getVaultProjects,
+	type VaultContext,
+} from "./vault";
 
 // =============================================================================
 // Engine Factory
@@ -136,6 +143,27 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	// =========================================================================
 	// Method Implementations
 	// =========================================================================
+
+	/**
+	 * Validate execution preconditions before batch processing.
+	 * Fails fast if vault structure is invalid.
+	 * @internal
+	 */
+	function validateExecutionPreconditions(
+		vaultPath: string,
+		paraFolders: Record<string, string>,
+	): void {
+		if (!pathExistsSync(vaultPath)) {
+			throw new Error(`Vault path does not exist: ${vaultPath}`);
+		}
+
+		for (const [_name, folder] of Object.entries(paraFolders)) {
+			const fullPath = join(vaultPath, folder);
+			if (!pathExistsSync(fullPath)) {
+				throw new Error(`Required PARA folder missing: ${folder}`);
+			}
+		}
+	}
 
 	/**
 	 * Load registry and clean up orphaned staging files.
@@ -320,6 +348,79 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				filename,
 			} as const;
 
+			// =================================================================
+			// MARKDOWN FAST-PATH: Check for typed markdown files BEFORE hashing
+			// Markdown files with valid type frontmatter are already notes -
+			// they just need to be moved, not processed through the full pipeline.
+			// =================================================================
+			if (file.extension === ".md") {
+				try {
+					const frontmatter = await extractFrontmatterOnly(file.path);
+					const noteType = frontmatter.type as string | undefined;
+
+					if (noteType) {
+						// Check if noteType matches a known classifier
+						const matchingClassifier = DEFAULT_CLASSIFIERS.find(
+							(c) => c.id === noteType && c.enabled,
+						);
+
+						if (matchingClassifier) {
+							// Try to resolve destination from frontmatter
+							const destination = resolveDestinationFromFrontmatter(
+								frontmatter,
+								vaultContext,
+							);
+
+							const area = parseWikilink(frontmatter.area);
+							const project = parseWikilink(frontmatter.project);
+
+							// Build suggestion - no hashing needed for markdown notes
+							const suggestion: CreateNoteSuggestion = {
+								id: createSuggestionId(),
+								source: join(resolvedConfig.inboxFolder, filename),
+								processor: "notes",
+								confidence: destination ? "high" : "medium",
+								detectionSource: "frontmatter",
+								action: "create-note",
+								suggestedNoteType: noteType,
+								suggestedTitle:
+									(frontmatter.title as string) ||
+									generateTitle(filename, noteType),
+								suggestedArea: area,
+								suggestedProject: project,
+								suggestedDestination: destination,
+								extractedFields: frontmatter,
+								autoRoute: !!destination, // Auto-route only if destination resolved
+								reason: destination
+									? `Pre-routed via frontmatter (${project ? "project" : "area"})`
+									: `Typed markdown note (needs destination)`,
+							};
+
+							suggestionCache.set(suggestion.id, suggestion);
+							if (onProgress) {
+								await onProgress({
+									...progressBase,
+									stage: "done",
+								});
+							}
+							if (inboxLogger) {
+								inboxLogger.info`Markdown fast-path file=${filename} type=${noteType} destination=${destination ?? "unresolved"} autoRoute=${!!destination} cid=${cid}`;
+							}
+							return suggestion;
+						}
+					}
+				} catch (_error) {
+					// Frontmatter extraction failed - fall through to normal processing
+					if (inboxLogger) {
+						inboxLogger.debug`Markdown fast-path skipped (frontmatter error): ${filename} cid=${cid}`;
+					}
+				}
+			}
+
+			// =================================================================
+			// STANDARD PATH: Hash, extract, classify (for PDFs, images, untyped markdown)
+			// =================================================================
+
 			// Calculate hash for dedup check and linking note title to attachment
 			let fileHash: string;
 			try {
@@ -401,76 +502,12 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				return errorSuggestion;
 			}
 
-			// Two-path routing strategy for markdown notes with valid frontmatter:
-			// - FAST PATH: type in classifier registry + has area/project → auto-route (skip LLM)
-			// - LLM PATH: everything else → LLM suggests, user must confirm
-			// Note: We extract frontmatter here and preserve it for later merging with LLM results
+			// Preserve frontmatter for potential merge with LLM results (for untyped markdown)
 			let preservedFrontmatter: Record<string, unknown> | undefined;
-
 			if (file.extension === ".md" && extractedMetadata) {
 				const mdMetadata = extractedMetadata as MarkdownExtractionMetadata;
-				if (mdMetadata.noteType && mdMetadata.hasFrontmatter) {
-					// Check if noteType matches a known classifier
-					const matchingClassifier = DEFAULT_CLASSIFIERS.find(
-						(c) => c.id === mdMetadata.noteType && c.enabled,
-					);
-
-					if (matchingClassifier) {
-						// Extract all fields from frontmatter for the suggestion
-						const frontmatter = await extractFrontmatterOnly(file.path);
-
-						// Preserve frontmatter for potential merge with LLM results
-						preservedFrontmatter = frontmatter;
-
-						// Try to resolve destination from frontmatter (fast-path check)
-						const destination = resolveDestinationFromFrontmatter(
-							frontmatter,
-							vaultContext,
-						);
-
-						// FAST PATH: Has valid routing fields (area/project) → auto-route without LLM
-						if (destination) {
-							const area = parseWikilink(frontmatter.area);
-							const project = parseWikilink(frontmatter.project);
-
-							const suggestion: CreateNoteSuggestion = {
-								id: createSuggestionId(),
-								source: join(resolvedConfig.inboxFolder, filename),
-								processor: "notes",
-								confidence: "high", // Fast-path with valid routing = high confidence
-								detectionSource: "frontmatter",
-								action: "create-note",
-								suggestedNoteType: mdMetadata.noteType,
-								suggestedTitle:
-									(frontmatter.title as string) ||
-									generateTitle(filename, mdMetadata.noteType),
-								suggestedArea: area,
-								suggestedProject: project,
-								suggestedDestination: destination,
-								extractedFields: frontmatter,
-								autoRoute: true, // Flag for auto-routing (skip user review)
-								reason: `Pre-routed via frontmatter (${project ? "project" : "area"})`,
-							};
-
-							suggestionCache.set(suggestion.id, suggestion);
-							if (onProgress) {
-								await onProgress({
-									...progressBase,
-									stage: "done",
-								});
-							}
-							if (inboxLogger) {
-								inboxLogger.info`Fast-path file=${filename} type=${mdMetadata.noteType} destination=${destination} autoRoute=true cid=${cid}`;
-							}
-							return suggestion;
-						}
-
-						// LLM PATH: No valid routing fields OR routing fields don't exist in vault
-						// Fall through to LLM classification to suggest destination
-						if (inboxLogger) {
-							inboxLogger.debug`LLM-path triggered: no valid routing fields file=${filename} type=${mdMetadata.noteType} cid=${cid}`;
-						}
-					}
+				if (mdMetadata.hasFrontmatter) {
+					preservedFrontmatter = await extractFrontmatterOnly(file.path);
 				}
 			}
 
@@ -821,12 +858,12 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	 *
 	 * @param ids - IDs of suggestions to execute
 	 * @param options - Optional execution options for progress reporting
-	 * @returns Array of execution results
+	 * @returns Batch result with successful executions and failures
 	 */
 	async function execute(
 		ids: SuggestionId[],
 		options?: ExecuteOptions,
-	): Promise<ExecutionResult[]> {
+	): Promise<BatchResult> {
 		await initLoggerWithNotice();
 		const startedAt = Date.now();
 		const cid = createCorrelationId();
@@ -837,7 +874,11 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		}
 
 		if (ids.length === 0) {
-			return [];
+			return {
+				successful: [],
+				failed: new Map(),
+				summary: { total: 0, succeeded: 0, failed: 0 },
+			};
 		}
 
 		// Warn if cache is empty - suggests scan() wasn't called
@@ -847,6 +888,15 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				inboxLogger.warn`Execute called with empty cache - did you forget to call scan()? cid=${cid}`;
 			}
 		}
+
+		// Load para-obsidian config for path maps
+		const paraConfig = loadConfig();
+
+		// Pre-flight validation
+		validateExecutionPreconditions(
+			resolvedConfig.vaultPath,
+			paraConfig.paraFolders ?? {},
+		);
 
 		// Git safety check (belt-and-suspenders): re-verify in case files changed since scan
 		// Primary check is in scan() to fail fast before expensive LLM processing
@@ -867,38 +917,44 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			);
 		}
 
+		// Build path maps ONCE for entire batch
+		const areaPathMap = getAreaPathMap(
+			resolvedConfig.vaultPath,
+			paraConfig.paraFolders,
+		);
+		const projectPathMap = getProjectPathMap(
+			resolvedConfig.vaultPath,
+			paraConfig.paraFolders,
+		);
+
 		// Load the registry for updating after successful execution
 		const registry = createRegistry(resolvedConfig.vaultPath);
 		await registry.load();
 
-		const results: ExecutionResult[] = [];
-		let successes = 0;
-		let failures = 0;
+		const successful: ExecutionResult[] = [];
+		const failed = new Map<SuggestionId, Error>();
 		let processed = 0;
 		const total = ids.length;
 
 		for (const id of ids) {
 			// Look up suggestion by ID
-			const suggestion = suggestionCache.get(id);
+			// Check CLI-modified suggestions first, then fall back to engine cache
+			// This ensures user modifications (e.g., accepted LLM destinations) are respected
+			const suggestion =
+				options?.updatedSuggestions?.get(id) ?? suggestionCache.get(id);
 			if (!suggestion) {
-				results.push({
-					suggestionId: id,
-					success: false,
-					action: "skip",
-					error: `Suggestion not found: ${id}`,
-				});
-				failures++;
+				const error = new Error(`Suggestion not found: ${id}`);
+				failed.set(id, error);
 				continue;
 			}
 
 			// Skip if action is skip
 			if (suggestion.action === "skip") {
-				results.push({
+				successful.push({
 					suggestionId: id,
 					success: true,
 					action: "skip",
 				});
-				successes++;
 				continue;
 			}
 
@@ -908,44 +964,45 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					resolvedConfig,
 					registry,
 					cid,
+					{ areaPathMap, projectPathMap },
 				);
-				results.push(result);
+				successful.push(result);
 				if (result.success) {
-					successes++;
 					// Save registry immediately after each successful execution
 					await registry.save();
 					if (executeLogger) {
 						executeLogger.debug`Registry saved after item=${id} ${cid}`;
 					}
 				} else {
-					failures++;
+					// Track as failed even though executeSuggestion returned a result
+					failed.set(id, new Error(result.error));
 				}
 			} catch (error) {
+				failed.set(id, error as Error);
+				// Log but don't stop - continue processing other suggestions
 				if (executeLogger) {
 					executeLogger.error`Execute failed id=${id} error=${error instanceof Error ? error.message : "unknown"} ${cid}`;
 				}
-				results.push({
-					suggestionId: id,
-					success: false,
-					action: suggestion.action,
-					error: error instanceof Error ? error.message : "Unknown error",
-				});
-				failures++;
 			}
 
 			// Emit progress after each item for CLI feedback
 			processed++;
 			if (onProgress) {
-				const lastResult = results[results.length - 1];
+				const lastResult = successful[successful.length - 1];
+				const wasSuccessful = lastResult?.success ?? false;
+				const failedError = failed.get(id);
 				// Extract error from failed result using discriminated union pattern
-				const progressError =
-					lastResult && !lastResult.success ? lastResult.error : undefined;
+				const progressError = failedError
+					? failedError.message
+					: lastResult && !lastResult.success
+						? lastResult.error
+						: undefined;
 				await onProgress({
 					processed,
 					total,
 					suggestionId: id,
 					action: suggestion?.action ?? "skip",
-					success: lastResult?.success ?? false,
+					success: wasSuccessful,
 					error: progressError,
 				});
 			}
@@ -957,11 +1014,19 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 
 		const durationMs = Date.now() - startedAt;
 		if (inboxLogger) {
-			inboxLogger.info`Execute complete success=${successes} failed=${failures} durationMs=${durationMs} cid=${cid}`;
-			inboxLogger.debug`Execute summary total=${total} success=${successes} failed=${failures} durationMs=${durationMs} cid=${cid}`;
+			inboxLogger.info`Execute complete success=${successful.length} failed=${failed.size} durationMs=${durationMs} cid=${cid}`;
+			inboxLogger.debug`Execute summary total=${total} success=${successful.length} failed=${failed.size} durationMs=${durationMs} cid=${cid}`;
 		}
 
-		return results;
+		return {
+			successful,
+			failed,
+			summary: {
+				total: ids.length,
+				succeeded: successful.length,
+				failed: failed.size,
+			},
+		};
 	}
 
 	/**

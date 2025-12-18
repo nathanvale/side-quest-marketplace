@@ -16,7 +16,7 @@ export const invoiceClassifier: InboxConverter = {
 	id: "invoice",
 	displayName: "Invoice",
 	enabled: true,
-	priority: 100,
+	priority: 120, // Higher than medical-statement (110) - "invoice" in filename is strong signal
 
 	heuristics: {
 		filenamePatterns: [
@@ -30,12 +30,19 @@ export const invoiceClassifier: InboxConverter = {
 		],
 		contentMarkers: [
 			{ pattern: "tax invoice", weight: 1.0 },
-			{ pattern: "invoice", weight: 0.9 },
+			// "Invoice to:" at start of line (not "Invoices to" which appears in statements)
+			{ pattern: "\\binvoice to:\\s", weight: 1.0 },
+			{ pattern: "invoice #", weight: 1.0 }, // Invoice number reference
+			{ pattern: "invoice number", weight: 1.0 },
+			{ pattern: "invoice date", weight: 0.9 }, // Invoice-specific date field
 			{ pattern: "amount due", weight: 0.8 },
-			{ pattern: "total", weight: 0.6 },
-			{ pattern: "gst", weight: 0.7 },
-			{ pattern: "abn", weight: 0.7 },
-			{ pattern: "payment", weight: 0.5 },
+			{ pattern: "total amount", weight: 0.8 }, // More specific than just "total"
+			{ pattern: "unit price", weight: 0.8 }, // Line item pricing = invoice
+			{ pattern: "quantity", weight: 0.7 }, // Line items with quantity = invoice
+			{ pattern: "total", weight: 0.5 }, // Lower weight - too generic
+			{ pattern: "gst", weight: 0.6 },
+			{ pattern: "abn", weight: 0.5 }, // Lower - appears in statements too
+			{ pattern: "payment due", weight: 0.8 }, // More specific than just "payment"
 		],
 		threshold: 0.3,
 	},
@@ -98,8 +105,25 @@ export const invoiceClassifier: InboxConverter = {
 	],
 
 	extraction: {
-		promptHint:
-			"This is an invoice, receipt, or billing document. Extract financial details.",
+		promptHint: `This is an INVOICE requesting payment for specific services rendered.
+
+CRITICAL DISTINCTION - Invoice vs Statement:
+- INVOICE = A bill for specific services with "Amount Due", "Pay By" date, "Invoice #"
+- STATEMENT = An account summary showing transaction history, "Previous Balance", "Statement Balance"
+
+Choose "invoice" if the document:
+- Has an Invoice Number or Tax Invoice header
+- Lists specific services/items with individual prices
+- Shows "Amount Due" or "Total Payable" for THIS document
+- Has a "Due Date" or "Pay By" date
+- Is requesting payment for a specific transaction
+
+Do NOT choose "invoice" if the document:
+- Shows "Previous Balance" and "Statement Balance" (that's a statement)
+- Lists a period range like "Invoices from X to Y" (that's a statement)
+- Is summarizing multiple past transactions (that's a statement)
+
+Extract: provider name, invoice date (YYYY-MM-DD), amount (numeric only), currency code, invoice number if present. For medical providers, still use "invoice" type if it's a bill for specific services.`,
 		keyFields: ["provider", "amount", "invoiceDate"],
 	},
 

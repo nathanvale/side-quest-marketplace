@@ -36,7 +36,16 @@ export function scoreFilename(
 }
 
 /**
- * Score content against heuristic markers
+ * Score content against heuristic markers.
+ *
+ * Scoring algorithm:
+ * - Uses max weight as base score (rewards strong matches)
+ * - Adds bonus for multiple matches (rewards breadth of evidence)
+ * - Bonus is sqrt(matchCount - 1) * 0.1, capped at 0.2
+ *
+ * This rewards classifiers with both strong signals AND multiple confirming signals,
+ * rather than penalizing classifiers with diverse markers (old averaging approach).
+ *
  * @param content - The document content to score
  * @param markers - Markers to match against
  * @returns Score between 0.0 and 1.0
@@ -46,14 +55,14 @@ export function scoreContent(
 	markers: readonly HeuristicPattern[],
 ): number {
 	const lowerContent = content.toLowerCase();
-	let totalScore = 0;
+	let maxWeight = 0;
 	let matchCount = 0;
 
 	for (const { pattern, weight } of markers) {
 		try {
 			const regex = new RegExp(pattern, "i");
 			if (regex.test(lowerContent)) {
-				totalScore += weight;
+				maxWeight = Math.max(maxWeight, weight);
 				matchCount++;
 			}
 		} catch {
@@ -61,8 +70,18 @@ export function scoreContent(
 		}
 	}
 
-	// Average of matched weights, capped at 1.0
-	return matchCount > 0 ? Math.min(totalScore / matchCount, 1.0) : 0;
+	if (matchCount === 0) {
+		return 0;
+	}
+
+	// Base score is the max weight (strongest signal)
+	// Bonus for multiple matches: sqrt(extra matches) * 0.05
+	// This rewards breadth without overwhelming strong single signals
+	// Note: Score can exceed 1.0 to allow breadth to differentiate between
+	// classifiers that both have 1.0 weight markers
+	const breadthBonus = Math.sqrt(matchCount - 1) * 0.05;
+
+	return maxWeight + breadthBonus;
 }
 
 /**
@@ -90,6 +109,12 @@ export function findBestConverter(
 
 		const filenameScore = scoreFilename(filename, heuristics.filenamePatterns);
 		const contentScore = scoreContent(content, heuristics.contentMarkers);
+
+		// Strong filename match (1.0) is authoritative - user named the file intentionally
+		// This prevents content-heavy classifiers from overriding explicit filename signals
+		if (filenameScore === 1.0) {
+			return { converter, score: 1.0 };
+		}
 
 		// Combine scores (filename weighted slightly higher for initial detection)
 		const combinedScore = filenameScore * 0.6 + contentScore * 0.4;

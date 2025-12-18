@@ -147,7 +147,10 @@ describe("export-webclipper-template", () => {
 
 		const template = (await readJsonFile(outputPath)) as WebClipperTemplateType;
 
-		expect(template.noteContentFormat).toContain("{{content|slice:0,2000}}");
+		// Updated to match actual implementation using contentHtml with filters
+		expect(template.noteContentFormat).toContain(
+			'{{contentHtml|remove_html:("table,.js-repo-nav,nav")|markdown|slice:0,3000}}',
+		);
 		expect(template.noteContentFormat).toContain("---");
 		expect(template.noteContentFormat).toContain("*Clipped from");
 		expect(template.noteContentFormat).toContain("{{domain}}");

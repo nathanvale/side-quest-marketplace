@@ -7,7 +7,9 @@
  * @module inbox/core/vault/context
  */
 
+import { readdirSync } from "node:fs";
 import { basename, join } from "node:path";
+import { pathExistsSync } from "@sidequest/core/fs";
 import { globFilesSync } from "@sidequest/core/glob";
 import { DEFAULT_PARA_FOLDERS } from "../../../config/defaults";
 
@@ -98,4 +100,98 @@ export function buildVaultContext(
 		areas: getVaultAreas(vaultPath, paraFolders),
 		projects: getVaultProjects(vaultPath, paraFolders),
 	};
+}
+
+/**
+ * Build case-insensitive map of area names to full PARA paths.
+ * Keys are lowercased for case-insensitive lookup.
+ * Handles duplicates by removing them (require full path disambiguation).
+ *
+ * @param vaultPath - Path to the vault root
+ * @param paraFolders - PARA folder configuration
+ * @returns Map of lowercase area name → full path (e.g., "health" → "02 Areas/Health")
+ *
+ * @example
+ * const map = getAreaPathMap("/vault", { areas: "02 Areas" });
+ * map.get("health");  // "02 Areas/Health"
+ * map.get("HEALTH");  // undefined (must lowercase first)
+ */
+export function getAreaPathMap(
+	vaultPath: string,
+	paraFolders?: Record<string, string>,
+): Map<string, string> {
+	const areasFolder = paraFolders?.areas ?? "02 Areas";
+	const areasPath = join(vaultPath, areasFolder);
+
+	if (!pathExistsSync(areasPath)) {
+		return new Map();
+	}
+
+	const entries = readdirSync(areasPath, { withFileTypes: true });
+	const map = new Map<string, string>();
+	const duplicates = new Set<string>();
+
+	for (const entry of entries) {
+		if (entry.isDirectory()) {
+			const key = entry.name.toLowerCase();
+			if (map.has(key)) {
+				duplicates.add(key);
+			}
+			map.set(key, `${areasFolder}/${entry.name}`);
+		}
+	}
+
+	// Remove duplicates - require full path for ambiguous names
+	for (const dup of duplicates) {
+		map.delete(dup);
+	}
+
+	return map;
+}
+
+/**
+ * Build case-insensitive map of project names to full PARA paths.
+ * Keys are lowercased for case-insensitive lookup.
+ * Handles duplicates by removing them (require full path disambiguation).
+ *
+ * @param vaultPath - Path to the vault root
+ * @param paraFolders - PARA folder configuration
+ * @returns Map of lowercase project name → full path (e.g., "tax 2024" → "01 Projects/Tax 2024")
+ *
+ * @example
+ * const map = getProjectPathMap("/vault", { projects: "01 Projects" });
+ * map.get("tax 2024");  // "01 Projects/Tax 2024"
+ * map.get("TAX 2024");  // undefined (must lowercase first)
+ */
+export function getProjectPathMap(
+	vaultPath: string,
+	paraFolders?: Record<string, string>,
+): Map<string, string> {
+	const projectsFolder = paraFolders?.projects ?? "01 Projects";
+	const projectsPath = join(vaultPath, projectsFolder);
+
+	if (!pathExistsSync(projectsPath)) {
+		return new Map();
+	}
+
+	const entries = readdirSync(projectsPath, { withFileTypes: true });
+	const map = new Map<string, string>();
+	const duplicates = new Set<string>();
+
+	for (const entry of entries) {
+		if (entry.isDirectory()) {
+			const key = entry.name.toLowerCase();
+			if (map.has(key)) {
+				duplicates.add(key);
+			}
+			map.set(key, `${projectsFolder}/${entry.name}`);
+		}
+	}
+
+	// Remove duplicates - require full path for ambiguous names
+	for (const dup of duplicates) {
+		map.delete(dup);
+	}
+
+	return map;
 }

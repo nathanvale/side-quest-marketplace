@@ -8,6 +8,7 @@
 import { input } from "@inquirer/prompts";
 import { emphasize } from "@sidequest/core/terminal";
 import { createSpinner } from "nanospinner";
+import { getAreaPathMap, getProjectPathMap } from "../core/vault/context";
 import type {
 	CLICommand,
 	Confidence,
@@ -498,6 +499,22 @@ export interface PaginationState {
 }
 
 /**
+ * Result of the interactive approval loop.
+ * Includes approved IDs and any CLI-modified suggestions.
+ */
+export interface InteractiveLoopResult {
+	/** IDs of approved suggestions */
+	approvedIds: SuggestionId[];
+	/**
+	 * Map of suggestion IDs to CLI-modified suggestions.
+	 * When user accepts an LLM suggestion (y<n>) or sets a custom destination (d<n>),
+	 * the modified suggestion is stored here. These take precedence over
+	 * the engine's internal cache during execution.
+	 */
+	updatedSuggestions: Map<string, InboxSuggestion>;
+}
+
+/**
  * Get paginated slice of suggestions.
  */
 export function paginateSuggestions(
@@ -677,6 +694,12 @@ export interface InteractiveOptions {
 
 	/** Page size for pagination (default: PAGE_SIZE) */
 	pageSize?: number;
+
+	/** Absolute path to vault root (for resolving area/project paths) */
+	vaultPath?: string;
+
+	/** PARA folder configuration (for resolving area/project paths) */
+	paraFolders?: Record<string, string>;
 }
 
 /**
@@ -692,10 +715,17 @@ function hasDestination(suggestion: InboxSuggestion): boolean {
 
 /**
  * Format a confirmation preview for approved items.
+ *
+ * @param suggestions - Approved suggestions to preview
+ * @param originalIndices - Map of suggestion IDs to original 1-based indices
+ * @param areaPathMap - Map of area names (lowercase) to vault paths
+ * @param projectPathMap - Map of project names (lowercase) to vault paths
  */
 function formatConfirmationPreview(
 	suggestions: InboxSuggestion[],
 	originalIndices: Map<SuggestionId, number>,
+	areaPathMap?: Map<string, string>,
+	projectPathMap?: Map<string, string>,
 ): string {
 	const lines: string[] = [];
 	lines.push("");
@@ -708,11 +738,30 @@ function formatConfirmationPreview(
 		const idx = originalIndices.get(s.id) ?? "?";
 		const filename = s.source.split("/").pop() ?? s.source;
 		if (isCreateNoteSuggestion(s)) {
+			// Resolve the destination for display
+			let noteDestination = "00 Inbox"; // Default
+			if (s.suggestedDestination) {
+				noteDestination = s.suggestedDestination;
+			} else if (s.suggestedArea && areaPathMap) {
+				const areaPath = areaPathMap.get(s.suggestedArea.toLowerCase());
+				if (areaPath) {
+					noteDestination = areaPath;
+				}
+			} else if (s.suggestedProject && projectPathMap) {
+				const projectPath = projectPathMap.get(
+					s.suggestedProject.toLowerCase(),
+				);
+				if (projectPath) {
+					noteDestination = projectPath;
+				}
+			}
+
 			lines.push(`  [${idx}] ${filename}`);
-			lines.push(`       → Create: ${s.suggestedTitle}`);
+			lines.push(`       → Create note in: ${noteDestination}/`);
+			lines.push(`         Title: ${s.suggestedTitle}`);
 			if (s.suggestedAttachmentName) {
 				lines.push(
-					`       → Move to: Attachments/${s.suggestedAttachmentName}`,
+					`       → Move attachment: Attachments/${s.suggestedAttachmentName}`,
 				);
 			}
 		} else {
@@ -734,18 +783,36 @@ function formatConfirmationPreview(
  * - Confirmation before execute
  *
  * @param options - Configuration for the interactive loop
- * @returns Array of approved suggestion IDs
+ * @returns InteractiveLoopResult with approved IDs and modified suggestions
  */
 export async function runInteractiveLoop(
 	options: InteractiveOptions,
-): Promise<SuggestionId[]> {
-	const { engine, suggestions, pageSize = PAGE_SIZE } = options;
+): Promise<InteractiveLoopResult> {
+	const {
+		engine,
+		suggestions,
+		pageSize = PAGE_SIZE,
+		vaultPath,
+		paraFolders,
+	} = options;
 	const approved = new Set<SuggestionId>();
 	const approvalHistory: SuggestionId[] = []; // For undo
 	const skipped = new Set<SuggestionId>();
 	const currentSuggestions = [...suggestions];
+	// Track CLI-modified suggestions (e.g., when user accepts LLM destination)
+	// These take precedence over engine's cache during execution
+	const updatedSuggestions = new Map<string, InboxSuggestion>();
 	let isProcessing = false;
 	let currentPage = 0;
+
+	// Build path maps for resolving area/project names to full vault paths
+	// e.g., "Health" → "02 Areas/Health", "Tax 2024" → "01 Projects/Tax 2024"
+	const areaPathMap = vaultPath
+		? getAreaPathMap(vaultPath, paraFolders)
+		: new Map<string, string>();
+	const projectPathMap = vaultPath
+		? getProjectPathMap(vaultPath, paraFolders)
+		: new Map<string, string>();
 
 	// Create stable ID-to-suggestion map and original index mapping
 	const suggestionById = new Map<SuggestionId, InboxSuggestion>();
@@ -817,9 +884,9 @@ export async function runInteractiveLoop(
 				}
 
 				// Accept LLM's area or project suggestion
-				const llmSuggestion =
-					targetSuggestion.llmSuggestedArea ??
-					targetSuggestion.llmSuggestedProject;
+				const llmSuggestedArea = targetSuggestion.llmSuggestedArea;
+				const llmSuggestedProject = targetSuggestion.llmSuggestedProject;
+				const llmSuggestion = llmSuggestedArea ?? llmSuggestedProject;
 
 				if (!llmSuggestion) {
 					console.log(
@@ -830,10 +897,30 @@ export async function runInteractiveLoop(
 					break;
 				}
 
-				// Update suggestion with accepted destination
+				// Resolve area/project name to full vault path
+				// e.g., "Health" → "02 Areas/Health"
+				let resolvedPath: string | undefined;
+				if (llmSuggestedArea) {
+					resolvedPath = areaPathMap.get(llmSuggestedArea.toLowerCase());
+				} else if (llmSuggestedProject) {
+					resolvedPath = projectPathMap.get(llmSuggestedProject.toLowerCase());
+				}
+
+				// If resolution failed, warn user but don't set destination
+				// Note will stay in inbox for manual sorting
+				if (!resolvedPath) {
+					console.log(
+						emphasize.warn(
+							`Could not resolve "${llmSuggestion}" to a vault path. Note will stay in inbox.`,
+						),
+					);
+					break;
+				}
+
+				// Update suggestion with resolved destination path
 				const updatedSuggestion: CreateNoteSuggestion = {
 					...targetSuggestion,
-					suggestedDestination: llmSuggestion,
+					suggestedDestination: resolvedPath,
 				};
 
 				// Replace in current suggestions array
@@ -844,9 +931,12 @@ export async function runInteractiveLoop(
 					currentSuggestions[originalIndex] = updatedSuggestion;
 				}
 
+				// Track modified suggestion for engine.execute()
+				updatedSuggestions.set(updatedSuggestion.id, updatedSuggestion);
+
 				console.log(
 					emphasize.success(
-						`Accepted LLM suggestion for item ${command.id}: ${llmSuggestion}`,
+						`Accepted LLM suggestion for item ${command.id}: ${llmSuggestion} → ${resolvedPath}`,
 					),
 				);
 				break;
@@ -886,6 +976,9 @@ export async function runInteractiveLoop(
 					currentSuggestions[originalIndex] = updatedSuggestion;
 				}
 
+				// Track modified suggestion for engine.execute()
+				updatedSuggestions.set(updatedSuggestion.id, updatedSuggestion);
+
 				console.log(
 					emphasize.success(
 						`Set destination for item ${command.id}: ${command.path}`,
@@ -896,11 +989,17 @@ export async function runInteractiveLoop(
 
 			case "execute":
 				// Explicit execution command (Enter key when items approved)
-				return Array.from(approved);
+				return {
+					approvedIds: Array.from(approved),
+					updatedSuggestions,
+				};
 
 			case "quit":
 				console.log(emphasize.warn("\nQuitting without executing."));
-				return [];
+				return {
+					approvedIds: [],
+					updatedSuggestions: new Map(),
+				};
 
 			case "next-page":
 				if (currentPage < totalPages - 1) {
@@ -1008,7 +1107,14 @@ export async function runInteractiveLoop(
 					const toExecute = currentSuggestions.filter((s) =>
 						approved.has(s.id),
 					);
-					console.log(formatConfirmationPreview(toExecute, originalIndices));
+					console.log(
+						formatConfirmationPreview(
+							toExecute,
+							originalIndices,
+							areaPathMap,
+							projectPathMap,
+						),
+					);
 
 					const confirmInput = await input({
 						message: "Execute? [Enter=yes, no=cancel]: ",
@@ -1021,7 +1127,10 @@ export async function runInteractiveLoop(
 						confirmLower === "y" ||
 						confirmLower === "yes"
 					) {
-						return Array.from(approved);
+						return {
+							approvedIds: Array.from(approved),
+							updatedSuggestions,
+						};
 					}
 
 					if (confirmLower === "no" || confirmLower === "cancel") {
@@ -1112,7 +1221,14 @@ export async function runInteractiveLoop(
 					const toExecute = currentSuggestions.filter((s) =>
 						approved.has(s.id),
 					);
-					console.log(formatConfirmationPreview(toExecute, originalIndices));
+					console.log(
+						formatConfirmationPreview(
+							toExecute,
+							originalIndices,
+							areaPathMap,
+							projectPathMap,
+						),
+					);
 
 					const confirmInput = await input({
 						message: "Execute? [Enter=yes, no=cancel]: ",
@@ -1125,7 +1241,10 @@ export async function runInteractiveLoop(
 						confirmLower === "y" ||
 						confirmLower === "yes"
 					) {
-						return Array.from(approved);
+						return {
+							approvedIds: Array.from(approved),
+							updatedSuggestions,
+						};
 					}
 
 					if (confirmLower === "no" || confirmLower === "cancel") {
@@ -1231,7 +1350,14 @@ export async function runInteractiveLoop(
 					const toExecute = currentSuggestions.filter((s) =>
 						approved.has(s.id),
 					);
-					console.log(formatConfirmationPreview(toExecute, originalIndices));
+					console.log(
+						formatConfirmationPreview(
+							toExecute,
+							originalIndices,
+							areaPathMap,
+							projectPathMap,
+						),
+					);
 
 					const confirmInput = await input({
 						message: "Execute? [Enter=yes, no=cancel]: ",
@@ -1244,7 +1370,10 @@ export async function runInteractiveLoop(
 						confirmLower === "y" ||
 						confirmLower === "yes"
 					) {
-						return Array.from(approved);
+						return {
+							approvedIds: Array.from(approved),
+							updatedSuggestions,
+						};
 					}
 
 					if (confirmLower === "no" || confirmLower === "cancel") {
@@ -1347,6 +1476,10 @@ export async function runInteractiveLoop(
 					if (originalIndex >= 0) {
 						currentSuggestions[originalIndex] = updated;
 					}
+					// Track modified suggestion for engine.execute()
+					// Note: engine.editWithPrompt also updates its cache, but we track here
+					// to ensure consistency if future changes alter that behavior
+					updatedSuggestions.set(updated.id, updated);
 					const elapsedMs = Date.now() - editStarted;
 					editSpinner.success({
 						text: `Updated item ${command.id} (${updated.confidence}) in ${Math.max(1, Math.round(elapsedMs))}ms`,
@@ -1408,7 +1541,10 @@ export async function runInteractiveLoop(
 		}
 	}
 
-	return Array.from(approved);
+	return {
+		approvedIds: Array.from(approved),
+		updatedSuggestions,
+	};
 }
 
 // =============================================================================

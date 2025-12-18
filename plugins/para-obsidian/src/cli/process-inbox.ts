@@ -7,7 +7,7 @@ import { MetricsCollector } from "@sidequest/core/logging";
 import { color, emphasize } from "@sidequest/core/terminal";
 import { createSpinner } from "nanospinner";
 import { DEFAULT_MODEL } from "../config/defaults";
-import type { ExecutionResult, InboxSuggestion } from "../inbox";
+import type { BatchResult, InboxSuggestion } from "../inbox";
 import {
 	createInboxEngine,
 	displayResults,
@@ -144,7 +144,14 @@ export async function handleProcessInbox(
 	}
 
 	// Interactive mode: run the interactive approval loop
-	return handleInteractiveMode(engine, filteredSuggestions, dryRun, isJson);
+	return handleInteractiveMode(
+		engine,
+		filteredSuggestions,
+		dryRun,
+		isJson,
+		config.vault,
+		config.paraFolders,
+	);
 }
 
 /** Average seconds per file for LLM classification (used for ETA calculation) */
@@ -536,16 +543,16 @@ async function handleAutoMode(
 	}
 
 	// Execute all suggestions
-	let results: ExecutionResult[];
+	let batchResult: BatchResult;
 	if (isJson) {
-		results = await engine.execute(suggestions.map((s) => s.id));
+		batchResult = await engine.execute(suggestions.map((s) => s.id));
 	} else {
-		results = await executeWithSpinner(engine, suggestions);
+		batchResult = await executeWithSpinner(engine, suggestions);
 	}
 
 	// Aggregate results
-	const successes = results.filter((r) => r.success).length;
-	const failures = results.filter((r) => !r.success).length;
+	const successes = batchResult.summary.succeeded;
+	const failures = batchResult.summary.failed;
 	const metrics = await collectMetricsSummary();
 
 	if (isJson) {
@@ -554,7 +561,7 @@ async function handleAutoMode(
 				withLogContext(
 					{
 						mode: "auto",
-						results: results,
+						results: batchResult.successful,
 						successes,
 						failures,
 					},
@@ -571,7 +578,7 @@ async function handleAutoMode(
 				`✓ Processed ${successes} of ${successes + failures} items`,
 			),
 		);
-		for (const result of results) {
+		for (const result of batchResult.successful) {
 			if (result.success) {
 				console.log(`  ${color("green", "✓")} ${result.suggestionId}`);
 			} else {
@@ -598,7 +605,7 @@ async function handleAutoMode(
 async function executeWithSpinner(
 	engine: ReturnType<typeof createInboxEngine>,
 	suggestions: InboxSuggestion[],
-): Promise<ExecutionResult[]> {
+): Promise<BatchResult> {
 	const total = suggestions.length;
 	const execSpinner = createSpinner(renderProgressBar(0, total, 16)).start();
 	const execStarted = Date.now();
@@ -621,7 +628,7 @@ async function executeWithSpinner(
 	);
 
 	const elapsed = ((Date.now() - execStarted) / 1000).toFixed(1);
-	const finalBar = renderProgressBar(results.length, total, 16);
+	const finalBar = renderProgressBar(results.summary.total, total, 16);
 	const statsStr = errorCount > 0 ? ` (${errorCount} failed)` : "";
 	execSpinner.success({
 		text: `${finalBar}${statsStr} in ${elapsed}s`,
@@ -638,6 +645,8 @@ async function handleInteractiveMode(
 	suggestions: InboxSuggestion[],
 	dryRun: boolean,
 	isJson: boolean,
+	vaultPath: string,
+	paraFolders?: Record<string, string>,
 ): Promise<CommandResult> {
 	if (isJson) {
 		const metrics = await collectMetricsSummary();
@@ -659,10 +668,12 @@ async function handleInteractiveMode(
 		return { success: true };
 	}
 
-	// Run interactive loop - returns approved IDs
-	const approvedIds = await runInteractiveLoop({
+	// Run interactive loop - returns approved IDs and modified suggestions
+	const { approvedIds, updatedSuggestions } = await runInteractiveLoop({
 		engine,
 		suggestions: suggestions,
+		vaultPath,
+		paraFolders,
 	});
 
 	// If user approved items, execute them
@@ -682,7 +693,8 @@ async function handleInteractiveMode(
 			const execStarted = Date.now();
 			let errorCount = 0;
 
-			const results = await engine.execute(approvedIds, {
+			const batchResults = await engine.execute(approvedIds, {
+				updatedSuggestions, // Pass CLI-modified suggestions to ensure destination changes are respected
 				onProgress: ({ processed, total, suggestionId, success, error }) => {
 					if (!success) errorCount++;
 
@@ -696,12 +708,12 @@ async function handleInteractiveMode(
 			});
 
 			const elapsed = ((Date.now() - execStarted) / 1000).toFixed(1);
-			const finalBar = renderProgressBar(results.length, total, 16);
+			const finalBar = renderProgressBar(batchResults.summary.total, total, 16);
 			const statsStr = errorCount > 0 ? ` (${errorCount} failed)` : "";
 			execSpinner.success({
 				text: `${finalBar}${statsStr} in ${elapsed}s`,
 			});
-			displayResults(results);
+			displayResults(batchResults.successful);
 
 			const metrics = await collectMetricsSummary();
 			if (metrics) {

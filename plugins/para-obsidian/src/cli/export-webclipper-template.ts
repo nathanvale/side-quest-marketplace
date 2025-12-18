@@ -51,7 +51,7 @@ const WEBCLIPPER_BOOKMARK_TEMPLATE: WebClipperTemplate = {
 	behavior: "create",
 	noteNameFormat: "{{title|safe_name}}",
 	path: "00 Inbox", // Always to inbox for processing
-	noteContentFormat: `{{content|slice:0,2000}}
+	noteContentFormat: `{{contentHtml|remove_html:("table,.js-repo-nav,nav")|markdown|slice:0,3000}}
 
 ---
 *Clipped from [{{domain}}]({{url}}) on {{date}}*`,

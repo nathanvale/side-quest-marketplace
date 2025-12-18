@@ -348,7 +348,7 @@ export async function ensureGitGuard(
 	if (uncommitted.length > 0) {
 		const fileList = `\nUncommitted files:\n${uncommitted.map((f: string) => `  - ${f}`).join("\n")}`;
 		throw new Error(
-			`Vault has uncommitted changes in PARA folders. Commit or stash before processing inbox.${fileList}\n\nTo fix, run one of these commands:\n  /para-obsidian:commit          # Commit all uncommitted notes\n  git add . && git commit -m "chore: stage changes"  # Manual commit`,
+			`Vault has uncommitted changes in PARA folders. Commit or stash before processing inbox.${fileList}\n\nTo fix, run one of these commands:\n  para git commit                # Commit all uncommitted notes\n  git add . && git commit -m "chore: stage changes"  # Manual commit`,
 		);
 	}
 }
@@ -367,6 +367,37 @@ export async function gitAdd(dir: string, paths: string[]): Promise<void> {
 	if (exitCode !== 0) {
 		throw new Error(`git add failed: ${stderr}`);
 	}
+}
+
+/**
+ * Lists files that are already staged for deletion.
+ *
+ * Uses `git diff --cached --name-only -z --diff-filter=D` to capture paths
+ * relative to the repo root without quoting, preserving spaces and unicode.
+ *
+ * @param dir - Git repository root
+ * @returns Set of staged deletion paths (relative to git root)
+ */
+async function getStagedDeletions(dir: string): Promise<Set<string>> {
+	const { stdout, stderr, exitCode } = await spawnAndCollect(
+		["git", "diff", "--cached", "--name-only", "-z", "--diff-filter=D"],
+		{ cwd: dir },
+	);
+	if (exitCode !== 0) {
+		throw new Error(`git diff failed: ${stderr}`);
+	}
+
+	const entries = stdout
+		.split("\0")
+		.filter((entry) => entry.length > 0)
+		.map((entry) => {
+			if (entry.startsWith('"') && entry.endsWith('"')) {
+				return unescapeGitPath(entry.slice(1, -1));
+			}
+			return entry;
+		});
+
+	return new Set(entries);
 }
 
 /**
@@ -587,11 +618,14 @@ export async function commitNote(
 
 	// Resolve paths relative to git root
 	const realGitRoot = fs.realpathSync(gitRoot);
+	const realVaultPath = fs.realpathSync(config.vault);
 	const filesToCommit: string[] = [];
 
-	// Add the note itself
+	// Add the note itself (handle deleted files that don't exist on disk)
 	const noteResolved = resolveVaultPath(config.vault, notePath);
-	const noteAbsolute = fs.realpathSync(noteResolved.absolute);
+	const noteAbsolute = fs.existsSync(noteResolved.absolute)
+		? fs.realpathSync(noteResolved.absolute)
+		: path.resolve(realVaultPath, noteResolved.relative);
 	filesToCommit.push(path.relative(realGitRoot, noteAbsolute));
 
 	// Add all attachments
@@ -604,7 +638,21 @@ export async function commitNote(
 	}
 
 	// Stage files
-	await gitAdd(gitRoot, filesToCommit);
+	const stagedDeletions = await getStagedDeletions(gitRoot);
+	const filesToAdd = filesToCommit.filter((relativePath) => {
+		const absolute = path.join(realGitRoot, relativePath);
+		if (fs.existsSync(absolute)) return true;
+
+		if (stagedDeletions.has(relativePath)) return false;
+
+		throw new Error(
+			`Cannot stage ${relativePath}: file is missing and not staged for deletion.`,
+		);
+	});
+
+	if (filesToAdd.length > 0) {
+		await gitAdd(gitRoot, filesToAdd);
+	}
 
 	// Build commit message from note title (filename without .md)
 	const title = path.basename(notePath, ".md");

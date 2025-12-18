@@ -312,3 +312,451 @@ describe("resolveParaFolder - vault validation", () => {
 		);
 	});
 });
+
+describe("resolveParaFolder - Security", () => {
+	const vaultPath = "/test/vault";
+	const paraFolders = {
+		inbox: "00 Inbox",
+		areas: "02 Areas",
+		projects: "01 Projects",
+		resources: "03 Resources",
+		archives: "04 Archives",
+	};
+
+	test("rejects path traversal with ../", () => {
+		expect(() =>
+			resolveParaFolder("../../secrets", paraFolders, vaultPath),
+		).toThrow("Unsafe path pattern");
+	});
+
+	test("rejects absolute paths", () => {
+		expect(() =>
+			resolveParaFolder("/etc/passwd", paraFolders, vaultPath),
+		).toThrow("Unsafe path pattern");
+	});
+
+	test("rejects home directory expansion", () => {
+		expect(() =>
+			resolveParaFolder("~/secrets", paraFolders, vaultPath),
+		).toThrow("Unsafe path pattern");
+	});
+
+	test("rejects paths that escape vault via resolve", () => {
+		// This would resolve to /test/secrets, outside /test/vault
+		expect(() =>
+			resolveParaFolder("vault/../secrets", paraFolders, vaultPath),
+		).toThrow("Unsafe path pattern");
+	});
+
+	test("allows safe paths within vault", () => {
+		// Note: These won't validate folder existence (vaultPath doesn't exist in this test)
+		// but they should pass path safety validation
+		expect(() =>
+			resolveParaFolder("02 Areas/Finance", paraFolders, vaultPath),
+		).not.toThrow("Unsafe path pattern");
+
+		expect(() =>
+			resolveParaFolder("projects", paraFolders, vaultPath),
+		).not.toThrow("Unsafe path pattern");
+	});
+
+	test("allows semantic PARA names with vaultPath", () => {
+		// These should pass safety validation but fail on folder existence
+		expect(() => resolveParaFolder("projects", paraFolders, vaultPath)).toThrow(
+			"Destination folder does not exist",
+		);
+
+		expect(() => resolveParaFolder("areas", paraFolders, vaultPath)).toThrow(
+			"Destination folder does not exist",
+		);
+	});
+
+	test("skips validation when vaultPath not provided", () => {
+		// Without vaultPath, should not validate path safety
+		// (backward compatibility - only validates when explicitly enabled)
+		expect(resolveParaFolder("../../secrets", paraFolders)).toBe(
+			"../../secrets",
+		);
+		expect(resolveParaFolder("/etc/passwd", paraFolders)).toBe("/etc/passwd");
+		expect(resolveParaFolder("~/secrets", paraFolders)).toBe("~/secrets");
+	});
+});
+
+describe("resolveParaFolder - Area/Project Resolution", () => {
+	let tempDir: string;
+	const paraFolders = {
+		inbox: "00 Inbox",
+		areas: "02 Areas",
+		projects: "01 Projects",
+		resources: "03 Resources",
+		archives: "04 Archives",
+	};
+
+	beforeEach(() => {
+		tempDir = createTempDir("test-area-project-");
+	});
+
+	afterEach(() => {
+		cleanupTestDir(tempDir);
+	});
+
+	test("resolves area names to full paths (case-insensitive)", () => {
+		// Create vault structure
+		writeTestFile(tempDir, "02 Areas/Health/.gitkeep", "");
+		writeTestFile(tempDir, "02 Areas/Finance/.gitkeep", "");
+
+		const areaPathMap = new Map([
+			["health", "02 Areas/Health"],
+			["finance", "02 Areas/Finance"],
+		]);
+		const projectPathMap = new Map();
+
+		// Lowercase
+		expect(
+			resolveParaFolder("health", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			}),
+		).toBe("02 Areas/Health");
+
+		// Mixed case
+		expect(
+			resolveParaFolder("Health", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			}),
+		).toBe("02 Areas/Health");
+
+		// Uppercase
+		expect(
+			resolveParaFolder("FINANCE", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			}),
+		).toBe("02 Areas/Finance");
+	});
+
+	test("resolves project names to full paths (case-insensitive)", () => {
+		// Create vault structure
+		writeTestFile(tempDir, "01 Projects/Tax 2024/.gitkeep", "");
+		writeTestFile(tempDir, "01 Projects/Vacation Planning/.gitkeep", "");
+
+		const areaPathMap = new Map();
+		const projectPathMap = new Map([
+			["tax 2024", "01 Projects/Tax 2024"],
+			["vacation planning", "01 Projects/Vacation Planning"],
+		]);
+
+		// Lowercase
+		expect(
+			resolveParaFolder("tax 2024", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			}),
+		).toBe("01 Projects/Tax 2024");
+
+		// Mixed case
+		expect(
+			resolveParaFolder("Vacation Planning", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			}),
+		).toBe("01 Projects/Vacation Planning");
+
+		// Uppercase
+		expect(
+			resolveParaFolder("TAX 2024", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			}),
+		).toBe("01 Projects/Tax 2024");
+	});
+
+	test("PARA folder names take precedence over area names", () => {
+		// Create a folder structure where an area is named "areas"
+		writeTestFile(tempDir, "02 Areas/.gitkeep", "");
+		writeTestFile(tempDir, "02 Areas/Areas/.gitkeep", "");
+
+		const areaPathMap = new Map([["areas", "02 Areas/Areas"]]);
+		const projectPathMap = new Map();
+
+		// "areas" should resolve to PARA folder (02 Areas), not the area path
+		expect(
+			resolveParaFolder("areas", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			}),
+		).toBe("02 Areas");
+	});
+
+	test("PARA folder names take precedence over project names", () => {
+		// Create a folder structure where a project is named "projects"
+		writeTestFile(tempDir, "01 Projects/.gitkeep", "");
+		writeTestFile(tempDir, "01 Projects/Projects/.gitkeep", "");
+
+		const areaPathMap = new Map();
+		const projectPathMap = new Map([["projects", "01 Projects/Projects"]]);
+
+		// "projects" should resolve to PARA folder (01 Projects), not the project path
+		expect(
+			resolveParaFolder("projects", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			}),
+		).toBe("01 Projects");
+	});
+
+	test("throws error for unknown destination with maps provided", () => {
+		const areaPathMap = new Map([["health", "02 Areas/Health"]]);
+		const projectPathMap = new Map([["tax", "01 Projects/Tax"]]);
+
+		expect(() =>
+			resolveParaFolder("unknown", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			}),
+		).toThrow("Unknown destination");
+	});
+
+	test("helpful error message lists available areas and projects", () => {
+		const areaPathMap = new Map([
+			["health", "02 Areas/Health"],
+			["finance", "02 Areas/Finance"],
+		]);
+		const projectPathMap = new Map([
+			["tax", "01 Projects/Tax"],
+			["vacation", "01 Projects/Vacation"],
+		]);
+
+		try {
+			resolveParaFolder("unknown", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			});
+			expect.unreachable("Should have thrown error");
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			expect(message).toContain("Unknown destination");
+			expect(message).toContain("Available areas:");
+			expect(message).toContain("02 Areas/Health");
+			expect(message).toContain("02 Areas/Finance");
+			expect(message).toContain("Available projects:");
+			expect(message).toContain("01 Projects/Tax");
+			expect(message).toContain("01 Projects/Vacation");
+		}
+	});
+
+	test("error message shows 'none' for empty area list", () => {
+		const areaPathMap = new Map(); // Empty
+		const projectPathMap = new Map([["tax", "01 Projects/Tax"]]);
+
+		try {
+			resolveParaFolder("unknown", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			});
+			expect.unreachable("Should have thrown error");
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			expect(message).toContain("Available areas: none");
+		}
+	});
+
+	test("error message omits projects section when empty", () => {
+		const areaPathMap = new Map([["health", "02 Areas/Health"]]);
+		const projectPathMap = new Map(); // Empty
+
+		try {
+			resolveParaFolder("unknown", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			});
+			expect.unreachable("Should have thrown error");
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			expect(message).toContain("Available areas:");
+			expect(message).not.toContain("Available projects:");
+		}
+	});
+
+	test("validates area folder exists when vaultPath provided", () => {
+		// Create only one area
+		writeTestFile(tempDir, "02 Areas/Health/.gitkeep", "");
+
+		const areaPathMap = new Map([
+			["health", "02 Areas/Health"],
+			["finance", "02 Areas/Finance"], // Doesn't exist
+		]);
+		const projectPathMap = new Map();
+
+		// Should succeed - folder exists
+		expect(
+			resolveParaFolder("health", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			}),
+		).toBe("02 Areas/Health");
+
+		// Should fail - folder doesn't exist
+		expect(() =>
+			resolveParaFolder("finance", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			}),
+		).toThrow("Area folder does not exist: 02 Areas/Finance");
+	});
+
+	test("validates project folder exists when vaultPath provided", () => {
+		// Create only one project
+		writeTestFile(tempDir, "01 Projects/Tax/.gitkeep", "");
+
+		const areaPathMap = new Map();
+		const projectPathMap = new Map([
+			["tax", "01 Projects/Tax"],
+			["vacation", "01 Projects/Vacation"], // Doesn't exist
+		]);
+
+		// Should succeed - folder exists
+		expect(
+			resolveParaFolder("tax", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			}),
+		).toBe("01 Projects/Tax");
+
+		// Should fail - folder doesn't exist
+		expect(() =>
+			resolveParaFolder("vacation", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			}),
+		).toThrow("Project folder does not exist: 01 Projects/Vacation");
+	});
+
+	test("backward compatibility: falls through when no maps provided", () => {
+		// Create a custom folder
+		writeTestFile(tempDir, "Custom Folder/.gitkeep", "");
+
+		// Without maps, should fall through to custom folder validation
+		expect(resolveParaFolder("Custom Folder", paraFolders, tempDir)).toBe(
+			"Custom Folder",
+		);
+
+		// Without maps, unknown folder should fail on existence check
+		expect(() =>
+			resolveParaFolder("Unknown Folder", paraFolders, tempDir),
+		).toThrow("Destination folder does not exist: Unknown Folder");
+	});
+
+	test("backward compatibility: no error for unknown destination without maps", () => {
+		// Without maps, should just pass through and validate existence
+		// (existing behavior - doesn't throw "Unknown destination" error)
+		expect(() =>
+			resolveParaFolder("Some Random Name", paraFolders, tempDir),
+		).toThrow("Destination folder does not exist");
+
+		expect(() =>
+			resolveParaFolder("Some Random Name", paraFolders, tempDir),
+		).not.toThrow("Unknown destination");
+	});
+
+	test("area names with special characters", () => {
+		// Create area with special chars
+		writeTestFile(tempDir, "02 Areas/Health & Fitness/.gitkeep", "");
+
+		const areaPathMap = new Map([
+			["health & fitness", "02 Areas/Health & Fitness"],
+		]);
+		const projectPathMap = new Map();
+
+		expect(
+			resolveParaFolder("health & fitness", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			}),
+		).toBe("02 Areas/Health & Fitness");
+	});
+
+	test("project names with numbers", () => {
+		// Create project with numbers
+		writeTestFile(tempDir, "01 Projects/Q1 2024 Planning/.gitkeep", "");
+
+		const areaPathMap = new Map();
+		const projectPathMap = new Map([
+			["q1 2024 planning", "01 Projects/Q1 2024 Planning"],
+		]);
+
+		expect(
+			resolveParaFolder("q1 2024 planning", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			}),
+		).toBe("01 Projects/Q1 2024 Planning");
+	});
+
+	test("both areaPathMap and projectPathMap can contain entries", () => {
+		// Create both areas and projects
+		writeTestFile(tempDir, "02 Areas/Health/.gitkeep", "");
+		writeTestFile(tempDir, "01 Projects/Tax/.gitkeep", "");
+
+		const areaPathMap = new Map([["health", "02 Areas/Health"]]);
+		const projectPathMap = new Map([["tax", "01 Projects/Tax"]]);
+
+		// Should resolve both correctly
+		expect(
+			resolveParaFolder("health", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			}),
+		).toBe("02 Areas/Health");
+
+		expect(
+			resolveParaFolder("tax", paraFolders, tempDir, {
+				areaPathMap,
+				projectPathMap,
+			}),
+		).toBe("01 Projects/Tax");
+	});
+
+	test("only areaPathMap provided (no projectPathMap)", () => {
+		// Create area
+		writeTestFile(tempDir, "02 Areas/Health/.gitkeep", "");
+
+		const areaPathMap = new Map([["health", "02 Areas/Health"]]);
+
+		// Should resolve area correctly (no projectPathMap in options)
+		expect(
+			resolveParaFolder("health", paraFolders, tempDir, {
+				areaPathMap,
+			}),
+		).toBe("02 Areas/Health");
+
+		// Unknown should fall through to custom folder logic (no maps check requires BOTH maps)
+		expect(() =>
+			resolveParaFolder("unknown", paraFolders, tempDir, {
+				areaPathMap,
+			}),
+		).toThrow("Destination folder does not exist");
+	});
+
+	test("only projectPathMap provided (no areaPathMap)", () => {
+		// Create project
+		writeTestFile(tempDir, "01 Projects/Tax/.gitkeep", "");
+
+		const projectPathMap = new Map([["tax", "01 Projects/Tax"]]);
+
+		// Should resolve project correctly (no areaPathMap in options)
+		expect(
+			resolveParaFolder("tax", paraFolders, tempDir, {
+				projectPathMap,
+			}),
+		).toBe("01 Projects/Tax");
+
+		// Unknown should fall through to custom folder logic (no maps check requires BOTH maps)
+		expect(() =>
+			resolveParaFolder("unknown", paraFolders, tempDir, {
+				projectPathMap,
+			}),
+		).toThrow("Destination folder does not exist");
+	});
+});

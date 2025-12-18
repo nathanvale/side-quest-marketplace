@@ -201,11 +201,12 @@ export function generateTitle(
 	hash?: string,
 ): string {
 	// Try to use extracted provider and date
-	// Check multiple date field variations (date, statementDate, invoice_date)
+	// Check multiple date field variations (date, statementDate, invoice_date, invoiceDate)
 	const provider = fields?.provider as string | undefined;
 	const date = (fields?.date ??
 		fields?.statementDate ??
-		fields?.invoice_date) as string | undefined;
+		fields?.invoice_date ??
+		fields?.invoiceDate) as string | undefined;
 
 	// Title case: "medical-statement" → "Medical Statement"
 	const typeLabel = noteType

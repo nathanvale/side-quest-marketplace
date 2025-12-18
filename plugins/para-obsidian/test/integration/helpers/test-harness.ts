@@ -150,6 +150,22 @@ export interface IntegrationTestHarness {
 	addToInbox(filename: string, content: string): Promise<void>;
 
 	/**
+	 * Add an area folder to the vault.
+	 * Creates a folder in "02 Areas" with a .gitkeep file.
+	 *
+	 * @param areaName - Name of the area (e.g., "Finance", "Health")
+	 */
+	addArea(areaName: string): Promise<void>;
+
+	/**
+	 * Add a project folder to the vault.
+	 * Creates a folder in "01 Projects" with a .gitkeep file.
+	 *
+	 * @param projectName - Name of the project (e.g., "Tax 2024")
+	 */
+	addProject(projectName: string): Promise<void>;
+
+	/**
 	 * Set or update the mock LLM response.
 	 *
 	 * Useful for testing different classification scenarios
@@ -417,12 +433,50 @@ tags:
 			// If no IDs provided, execute all suggestions from last scan
 			const idsToExecute =
 				ids ?? lastSuggestions.map((suggestion) => suggestion.id);
-			return await engine.execute(idsToExecute);
+			const batchResult = await engine.execute(idsToExecute);
+			return batchResult.successful;
 		},
 
 		async addToInbox(filename: string, content: string): Promise<void> {
 			const inboxPath = join("00 Inbox", filename);
 			writeVaultFile(vaultPath, inboxPath, content);
+		},
+
+		async addArea(areaName: string): Promise<void> {
+			// Create area folder with both .gitkeep and a .md file
+			// The .md file is required for getVaultAreas() to detect the area
+			const gitkeepPath = join("02 Areas", areaName, ".gitkeep");
+			const mdPath = join("02 Areas", areaName, `${areaName}.md`);
+			writeVaultFile(vaultPath, gitkeepPath, "");
+			writeVaultFile(
+				vaultPath,
+				mdPath,
+				`---\ntype: area\ntitle: ${areaName}\n---\n# ${areaName}\n`,
+			);
+			// Commit to avoid git guard errors
+			Bun.spawnSync(["git", "add", "."], { cwd: vaultPath });
+			Bun.spawnSync(["git", "commit", "-m", `chore: add area ${areaName}`], {
+				cwd: vaultPath,
+			});
+		},
+
+		async addProject(projectName: string): Promise<void> {
+			// Create project folder with both .gitkeep and a .md file
+			// The .md file is required for getVaultProjects() to detect the project
+			const gitkeepPath = join("01 Projects", projectName, ".gitkeep");
+			const mdPath = join("01 Projects", projectName, `${projectName}.md`);
+			writeVaultFile(vaultPath, gitkeepPath, "");
+			writeVaultFile(
+				vaultPath,
+				mdPath,
+				`---\ntype: project\ntitle: ${projectName}\nstatus: active\n---\n# ${projectName}\n`,
+			);
+			// Commit to avoid git guard errors
+			Bun.spawnSync(["git", "add", "."], { cwd: vaultPath });
+			Bun.spawnSync(
+				["git", "commit", "-m", `chore: add project ${projectName}`],
+				{ cwd: vaultPath },
+			);
 		},
 
 		setLLMResponse(response: DocumentTypeResult | Error): void {

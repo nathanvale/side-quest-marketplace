@@ -117,6 +117,7 @@ export {
 // Types - All type definitions
 // =============================================================================
 export type {
+	BatchResult,
 	Confidence,
 	DetectionSource,
 	DoneProgress,

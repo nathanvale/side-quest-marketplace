@@ -606,6 +606,34 @@ describe("commitNote", () => {
 		expect(result.files).toContain("doc.pdf");
 		expect(result.files).toHaveLength(4);
 	});
+
+	it("commits staged deletions without re-adding missing files", async () => {
+		const { commitNote } = await import("./index");
+		const vault = createTestVault();
+		await initGitRepo(vault);
+
+		const filename = "🧾 Receipt.md";
+		const notePath = path.join(vault, filename);
+		fs.writeFileSync(notePath, "# Receipt");
+		await Bun.$`git add ${filename}`.cwd(vault);
+		await Bun.$`git commit -m "add note"`.cwd(vault);
+
+		fs.unlinkSync(notePath);
+		await Bun.$`git add -u`.cwd(vault);
+
+		const result = await commitNote(makeConfig(vault), filename);
+
+		expect(result.committed).toBe(true);
+
+		const show =
+			await Bun.$`git -c core.quotePath=false show --name-status --format=format:`
+				.cwd(vault)
+				.text();
+		expect(show).toContain(`D\t${filename}`);
+
+		const status = await Bun.$`git status --porcelain`.cwd(vault).text();
+		expect(status.trim()).toBe("");
+	});
 });
 
 describe("commitAllNotes", () => {

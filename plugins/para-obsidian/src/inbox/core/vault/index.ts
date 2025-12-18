@@ -6,6 +6,8 @@
 
 export {
 	buildVaultContext,
+	getAreaPathMap,
+	getProjectPathMap,
 	getVaultAreas,
 	getVaultProjects,
 	type VaultContext,

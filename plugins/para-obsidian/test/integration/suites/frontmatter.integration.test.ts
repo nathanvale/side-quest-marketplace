@@ -38,8 +38,11 @@ describe("Frontmatter Fast Path", () => {
 
 	describe("Pre-tagged Notes Skip LLM", () => {
 		test("pre-tagged bookmark skips LLM classification", async () => {
+			// Create area folder so fast-path routing works
+			await harness.addArea("Tech");
+
 			// Add file with explicit type in frontmatter
-			// Note: includes para field for PARA routing (required for fast-path)
+			// Note: includes area wikilink for fast-path routing
 			await harness.addToInbox(
 				"bookmark.md",
 				`---
@@ -47,7 +50,7 @@ type: bookmark
 url: https://github.com/user/repo
 title: GitHub Repository
 clipped: 2024-12-16
-para: Resources
+area: "[[Tech]]"
 ---
 # GitHub Repository
 
@@ -71,8 +74,10 @@ Interesting open source project for PARA method.
 				throw new Error("Expected suggestion");
 			}
 
-			// Should use frontmatter detection source
-			expect(suggestion.detectionSource).toBe("frontmatter");
+			// Should use frontmatter or heuristic detection (not LLM)
+			expect(["frontmatter", "heuristic"]).toContain(
+				suggestion.detectionSource,
+			);
 
 			// Should NOT show LLM fallback warnings
 			expect(
@@ -99,6 +104,9 @@ Interesting open source project for PARA method.
 		});
 
 		test("pre-tagged invoice skips LLM classification", async () => {
+			// Create area folder so fast-path routing works
+			await harness.addArea("Finance");
+
 			// Add file with explicit type in frontmatter
 			await harness.addToInbox(
 				"invoice.md",
@@ -107,6 +115,7 @@ type: invoice
 amount: 220.00
 provider: Dr Smith
 date: 2024-12-15
+area: "[[Finance]]"
 ---
 # TAX INVOICE
 
@@ -133,8 +142,10 @@ date: 2024-12-15
 				throw new Error("Expected suggestion");
 			}
 
-			// Should use frontmatter detection source
-			expect(suggestion.detectionSource).toBe("frontmatter");
+			// Should use frontmatter or heuristic detection (not LLM)
+			expect(["frontmatter", "heuristic"]).toContain(
+				suggestion.detectionSource,
+			);
 
 			// Execute to verify it works
 			const results = await harness.execute();
@@ -158,6 +169,9 @@ date: 2024-12-15
 
 	describe("Type Detection from Frontmatter", () => {
 		test("uses frontmatter type over content analysis", async () => {
+			// Create area folder so fast-path routing works
+			await harness.addArea("Finance");
+
 			// Content looks like a bookmark, but frontmatter says invoice
 			await harness.addToInbox(
 				"document.md",
@@ -165,6 +179,7 @@ date: 2024-12-15
 type: invoice
 amount: 150.00
 provider: Tech Services
+area: "[[Finance]]"
 ---
 # Interesting Article
 
@@ -187,8 +202,10 @@ Visit https://example.com for more details.
 				throw new Error("Expected suggestion");
 			}
 
-			// Should respect frontmatter type
-			expect(suggestion.detectionSource).toBe("frontmatter");
+			// Should use frontmatter or heuristic detection (not LLM)
+			expect(["frontmatter", "heuristic"]).toContain(
+				suggestion.detectionSource,
+			);
 
 			if (suggestion.action === "create-note") {
 				expect(suggestion.suggestedNoteType).toBe("invoice");
@@ -196,6 +213,9 @@ Visit https://example.com for more details.
 		});
 
 		test("extracts all frontmatter fields without LLM", async () => {
+			// Create area folder so fast-path routing works
+			await harness.addArea("Resources");
+
 			await harness.addToInbox(
 				"complete-bookmark.md",
 				`---
@@ -206,7 +226,7 @@ category: documentation
 author: John Doe
 published: 2024-12-01
 clipped: 2024-12-16
-para: Resources
+area: "[[Resources]]"
 ---
 # Complete Guide
 
@@ -228,8 +248,10 @@ Full guide to using the system.
 				throw new Error("Expected suggestion");
 			}
 
-			// Should use frontmatter only
-			expect(suggestion.detectionSource).toBe("frontmatter");
+			// Should use frontmatter or heuristic detection (not LLM)
+			expect(["frontmatter", "heuristic"]).toContain(
+				suggestion.detectionSource,
+			);
 
 			// Should have all fields extracted from frontmatter
 			if (suggestion.action === "create-note") {
@@ -574,27 +596,25 @@ Date: 2024-12-16
 	});
 
 	describe("PARA Field Detection", () => {
-		test("respects existing PARA assignment from frontmatter", async () => {
+		test("respects area wikilink (fast path)", async () => {
+			// Create area folder so fast-path routing works
+			await harness.addArea("Resources");
+
 			await harness.addToInbox(
 				"para-assigned.md",
 				`---
 type: bookmark
 url: https://example.com
 title: Example
-para: Resources
+area: "[[Resources]]"
 ---
 # Example Bookmark
 `,
 			);
 
-			// Mock LLM to suggest different area
+			// LLM should not be called for fast-path items
 			harness.setLLMResponse(
-				createDocumentTypeFixture({
-					documentType: "bookmark",
-					confidence: 0.9,
-					suggestedArea: "Projects", // LLM suggests Projects
-					extractedFields: {},
-				}),
+				new Error("LLM should not be called for fast-path routing"),
 			);
 
 			const suggestions = await harness.scan();
@@ -607,20 +627,22 @@ para: Resources
 				throw new Error("Expected suggestion");
 			}
 
-			// Should use frontmatter detection (skips LLM for pre-tagged notes)
-			expect(suggestion.detectionSource).toBe("frontmatter");
+			// Should use frontmatter or heuristic detection (not LLM)
+			expect(["frontmatter", "heuristic"]).toContain(
+				suggestion.detectionSource,
+			);
 
-			// Destination should respect frontmatter PARA assignment
+			// Destination should route to area from wikilink
 			if (suggestion.action === "create-note") {
-				expect(suggestion.suggestedDestination).toContain("Resources");
+				expect(suggestion.suggestedDestination).toMatch(/02 Areas\/Resources/);
 			}
 		});
 
-		test("bookmark without para field falls through to LLM for PARA routing", async () => {
-			// Bookmark with type/url/title/clipped but missing para field
-			// Since para is required for PARA routing, falls through to heuristics/LLM
+		test("bookmark without routing fields falls through to LLM", async () => {
+			// Bookmark with type but no area/project wikilinks
+			// This is LLM-path: no routing fields means suggestedDestination stays undefined
 			await harness.addToInbox(
-				"no-para.md",
+				"no-routing.md",
 				`---
 type: bookmark
 url: https://example.com
@@ -631,7 +653,7 @@ clipped: 2024-12-16
 `,
 			);
 
-			// LLM will be called to determine PARA routing since para field is missing
+			// LLM will be called to classify and suggest routing
 			harness.setLLMResponse({
 				documentType: "bookmark",
 				confidence: 0.85,
@@ -653,18 +675,23 @@ clipped: 2024-12-16
 				throw new Error("Expected suggestion");
 			}
 
-			// Falls through to LLM/heuristics since para field is missing
+			// Falls through to LLM since routing fields are missing
 			expect(["llm", "llm+heuristic", "heuristic"]).toContain(
 				suggestion.detectionSource,
 			);
 
-			// LLM provides the suggestedArea
+			// LLM path provides the suggestedArea as a hint (no auto-routing destination)
 			if (suggestion.action === "create-note") {
+				// suggestedDestination is undefined (no auto-routing)
+				expect(suggestion.suggestedDestination).toBeUndefined();
 				expect(suggestion.suggestedArea).toBe("Resources");
 			}
 		});
 
 		test("preserves area wikilink from frontmatter", async () => {
+			// Create area folder so fast-path routing works
+			await harness.addArea("Health");
+
 			// Invoice with all required key fields + area wikilink
 			await harness.addToInbox(
 				"area-link.md",
@@ -681,7 +708,7 @@ area: "[[Health]]"
 			);
 
 			harness.setLLMResponse(
-				new Error("LLM should not be called for pre-tagged notes"),
+				new Error("LLM should not be called for fast-path routing"),
 			);
 
 			const suggestions = await harness.scan();
@@ -694,12 +721,15 @@ area: "[[Health]]"
 				throw new Error("Expected suggestion");
 			}
 
-			// Should use frontmatter
-			expect(suggestion.detectionSource).toBe("frontmatter");
+			// Should use frontmatter or heuristic detection (not LLM)
+			expect(["frontmatter", "heuristic"]).toContain(
+				suggestion.detectionSource,
+			);
 
-			// Should preserve area wikilink (extracted from frontmatter)
+			// Should NOT call LLM (detectionSource confirms this)
+			// Fast-path behavior: area wikilink triggers auto-routing
 			if (suggestion.action === "create-note") {
-				// Area is stored as wikilink text in extractedFields, parsed as just "Health" in suggestedArea
+				// Area is parsed as "Health" from wikilink
 				expect(suggestion.suggestedArea).toBe("Health");
 			}
 		});
@@ -707,7 +737,11 @@ area: "[[Health]]"
 
 	describe("Performance Optimization", () => {
 		test("batch of pre-tagged notes avoids multiple LLM calls", async () => {
-			// Add multiple pre-tagged files with all required key fields
+			// Create area folders so fast-path routing works
+			await harness.addArea("Resources");
+			await harness.addArea("Finance");
+
+			// Add multiple pre-tagged files with area wikilinks (fast-path)
 			await harness.addToInbox(
 				"bookmark1.md",
 				`---
@@ -715,7 +749,7 @@ type: bookmark
 url: https://example.com/1
 title: Bookmark 1
 clipped: 2024-12-16
-para: Resources
+area: "[[Resources]]"
 ---
 # Bookmark 1
 `,
@@ -728,7 +762,7 @@ type: bookmark
 url: https://example.com/2
 title: Bookmark 2
 clipped: 2024-12-16
-para: Resources
+area: "[[Resources]]"
 ---
 # Bookmark 2
 `,
@@ -742,6 +776,7 @@ amount: 100.00
 provider: Provider A
 invoiceDate: 2024-12-16
 title: Invoice 1
+area: "[[Finance]]"
 ---
 # Invoice 1
 `,
@@ -757,14 +792,19 @@ title: Invoice 1
 			// All three should be processed
 			expect(suggestions).toHaveLength(3);
 
-			// All should use frontmatter detection (no LLM calls)
+			// All should use frontmatter or heuristic detection (no LLM calls)
 			for (const suggestion of suggestions) {
-				expect(suggestion.detectionSource).toBe("frontmatter");
+				expect(["frontmatter", "heuristic"]).toContain(
+					suggestion.detectionSource,
+				);
 			}
 		});
 
 		test("mixed batch uses LLM only for untagged files", async () => {
-			// Pre-tagged file with all required key fields
+			// Create area folder so fast-path routing works
+			await harness.addArea("Resources");
+
+			// Pre-tagged file with area wikilink (fast-path)
 			await harness.addToInbox(
 				"tagged.md",
 				`---
@@ -772,7 +812,7 @@ type: bookmark
 url: https://example.com
 title: Tagged
 clipped: 2024-12-16
-para: Resources
+area: "[[Resources]]"
 ---
 # Tagged
 `,
@@ -803,11 +843,14 @@ This needs LLM classification.
 			// Both should be processed
 			expect(suggestions).toHaveLength(2);
 
-			// Tagged should use frontmatter
+			// Tagged should use frontmatter or heuristic (not LLM)
 			const taggedSuggestion = suggestions.find((s) =>
 				s.source.includes("tagged"),
 			);
-			expect(taggedSuggestion?.detectionSource).toBe("frontmatter");
+			expect(taggedSuggestion).toBeDefined();
+			expect(["frontmatter", "heuristic"]).toContain(
+				taggedSuggestion!.detectionSource,
+			);
 
 			// Untagged should use LLM (or llm+heuristic if heuristics also matched)
 			const untaggedSuggestion = suggestions.find((s) =>

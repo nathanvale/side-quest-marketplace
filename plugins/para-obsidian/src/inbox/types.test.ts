@@ -184,7 +184,11 @@ describe("inbox/types", () => {
 					detectionSource: "llm",
 					reason: "Updated",
 				}),
-				execute: async (_ids: SuggestionId[]) => [],
+				execute: async (_ids: SuggestionId[]) => ({
+					successful: [],
+					failed: new Map(),
+					summary: { total: 0, succeeded: 0, failed: 0 },
+				}),
 				generateReport: (_suggestions: InboxSuggestion[]) => "# Report",
 				challenge: async (_id: SuggestionId, _hint: string) => ({
 					id: testId,

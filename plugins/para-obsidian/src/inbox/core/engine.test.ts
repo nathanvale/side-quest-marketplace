@@ -415,8 +415,9 @@ title: Some Note
 			expect(suggestion?.detectionSource).not.toBe("frontmatter");
 		});
 
-		test("should fall through to LLM when area/project not found in vault", async () => {
+		test("should use fast-path for typed markdown even when area not found in vault", async () => {
 			// Create a markdown note with non-existent area
+			// New behavior: typed markdown files skip hashing/LLM entirely
 			const mdContent = `---
 type: invoice
 area: "[[NonExistent Area]]"
@@ -431,13 +432,22 @@ title: Some Invoice
 
 			expect(suggestions).toHaveLength(1);
 			const suggestion = suggestions[0];
+			expect(suggestion).toBeDefined();
+			if (!suggestion) return;
 
-			// Should NOT be pre-classified - area doesn't exist in vault
-			expect(suggestion?.detectionSource).not.toBe("frontmatter");
+			// Should use frontmatter fast-path (skips hashing/LLM)
+			// Destination will be unresolved, user picks interactively
+			expect(suggestion.detectionSource).toBe("frontmatter");
+			expect(suggestion.action).toBe("create-note");
+			if (suggestion.action === "create-note") {
+				expect(suggestion.suggestedDestination).toBeUndefined();
+				expect(suggestion.autoRoute).toBe(false);
+			}
 		});
 
-		test("should fall through to LLM when no area or project specified", async () => {
+		test("should use fast-path for typed markdown even without area/project", async () => {
 			// Create a markdown note with type but no area/project
+			// New behavior: typed markdown files skip hashing/LLM entirely
 			const mdContent = `---
 type: invoice
 title: Orphan Invoice
@@ -451,9 +461,17 @@ title: Orphan Invoice
 
 			expect(suggestions).toHaveLength(1);
 			const suggestion = suggestions[0];
+			expect(suggestion).toBeDefined();
+			if (!suggestion) return;
 
-			// Should NOT be pre-classified - no destination determinable
-			expect(suggestion?.detectionSource).not.toBe("frontmatter");
+			// Should use frontmatter fast-path (skips hashing/LLM)
+			// No destination, user picks interactively
+			expect(suggestion.detectionSource).toBe("frontmatter");
+			expect(suggestion.action).toBe("create-note");
+			if (suggestion.action === "create-note") {
+				expect(suggestion.suggestedDestination).toBeUndefined();
+				expect(suggestion.autoRoute).toBe(false);
+			}
 		});
 
 		test("should handle plain text area format (no wikilinks)", async () => {
@@ -588,6 +606,13 @@ amount: 25.00
 			// We must set it to the test path, not the real vault
 			originalParaVault = process.env.PARA_VAULT;
 			process.env.PARA_VAULT = executeTestPath;
+
+			// Create required PARA folders for pre-flight validation
+			mkdirSync(join(executeTestPath, "00 Inbox"), { recursive: true });
+			mkdirSync(join(executeTestPath, "01 Projects"), { recursive: true });
+			mkdirSync(join(executeTestPath, "02 Areas"), { recursive: true });
+			mkdirSync(join(executeTestPath, "03 Resources"), { recursive: true });
+			mkdirSync(join(executeTestPath, "04 Archives"), { recursive: true });
 		});
 
 		afterEach(() => {
@@ -614,21 +639,23 @@ amount: 25.00
 				createSuggestionId("11111111-0000-4000-8000-000000000001"),
 				createSuggestionId("22222222-0000-4000-8000-000000000002"),
 			]);
-			expect(Array.isArray(results)).toBe(true);
-			// Should have 2 results with errors (suggestion not found)
-			expect(results).toHaveLength(2);
-			const firstResult = results[0];
-			expect(firstResult?.success).toBe(false);
-			// Use type narrowing for discriminated union
-			if (firstResult && !firstResult.success) {
-				expect(firstResult.error).toContain("not found");
-			}
+			// BatchResult has successful array and failed map
+			expect(results.summary.total).toBe(2);
+			expect(results.summary.failed).toBe(2);
+			expect(results.failed.size).toBe(2);
+			// Check that the errors indicate "not found"
+			const failedErrors = Array.from(results.failed.values());
+			expect(failedErrors[0]?.message).toContain("not found");
 		});
 
-		test("should return empty array for empty input", async () => {
+		test("should return empty batch result for empty input", async () => {
 			const engine = createTestEngine({ vaultPath: executeTestPath });
 			const results = await engine.execute([]);
-			expect(results).toHaveLength(0);
+			expect(results.summary.total).toBe(0);
+			expect(results.summary.succeeded).toBe(0);
+			expect(results.summary.failed).toBe(0);
+			expect(results.successful).toHaveLength(0);
+			expect(results.failed.size).toBe(0);
 		});
 
 		test("happy path: verifies execute logic with unknown ID (cache limitation)", async () => {
@@ -664,13 +691,14 @@ amount: 25.00
 				createSuggestionId("aaaaaaaa-0000-4000-8000-000000000000"),
 			]);
 
-			expect(results).toHaveLength(1);
-			const result = results[0];
-			expect(result?.success).toBe(false);
-			// Use type narrowing for discriminated union
-			if (result && !result.success) {
-				expect(result.error).toContain("Suggestion not found");
-			}
+			// BatchResult should have one failed execution
+			expect(results.summary.total).toBe(1);
+			expect(results.summary.failed).toBe(1);
+			const failedId = createSuggestionId(
+				"aaaaaaaa-0000-4000-8000-000000000000",
+			);
+			const error = results.failed.get(failedId);
+			expect(error?.message).toContain("Suggestion not found");
 
 			// The full happy path would be:
 			// 1. scan() populates cache with real suggestions

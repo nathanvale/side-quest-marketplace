@@ -9,7 +9,7 @@
  * @module inbox/core/operations/execute-suggestion
  */
 
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import {
 	ensureDirSync,
 	moveFile,
@@ -54,6 +54,34 @@ export interface ExecuteSuggestionConfig {
 }
 
 /**
+ * Validate that a destination path is safe and doesn't escape the vault boundary.
+ *
+ * @param destination - The destination path to validate
+ * @param vaultPath - The vault root path
+ * @throws Error if path contains unsafe patterns or escapes vault
+ */
+function validatePathSafety(destination: string, vaultPath: string): void {
+	// Reject suspicious patterns immediately
+	if (
+		destination.includes("..") ||
+		destination.includes("~") ||
+		destination.startsWith("/")
+	) {
+		throw new Error(`Unsafe path pattern in destination: "${destination}"`);
+	}
+
+	// Ensure resolved path stays inside vault
+	const resolved = resolve(vaultPath, destination);
+	const vaultResolved = resolve(vaultPath);
+
+	if (!resolved.startsWith(vaultResolved + "/") && resolved !== vaultResolved) {
+		throw new Error(
+			`Path traversal detected: "${destination}" escapes vault boundary`,
+		);
+	}
+}
+
+/**
  * Resolve semantic PARA folder names to numbered folder paths.
  *
  * Maps short semantic names like "Resources" to actual vault folder paths like "03 Resources".
@@ -63,15 +91,28 @@ export interface ExecuteSuggestionConfig {
  * @param destination - The destination string from suggestion (e.g., "Resources", "02 Areas/Finance")
  * @param paraFolders - PARA folder mappings from config (e.g., { resources: "03 Resources" })
  * @param vaultPath - Optional vault path to validate the resolved folder exists
+ * @param options - Optional resolution options
+ * @param options.areaPathMap - Map of area names (lowercase) to full paths (e.g., "health" → "02 Areas/Health")
+ * @param options.projectPathMap - Map of project names (lowercase) to full paths (e.g., "tax 2024" → "01 Projects/Tax 2024")
  * @returns Resolved folder path
  * @throws Error if destination looks like unmapped PARA name
  * @throws Error if vaultPath provided and resolved folder doesn't exist
+ * @throws Error if destination is unknown and maps are provided
  */
 export function resolveParaFolder(
 	destination: string,
 	paraFolders: Record<string, string> = DEFAULT_PARA_FOLDERS,
 	vaultPath?: string,
+	options?: {
+		areaPathMap?: Map<string, string>;
+		projectPathMap?: Map<string, string>;
+	},
 ): string {
+	// Validate path safety first
+	if (vaultPath) {
+		validatePathSafety(destination, vaultPath);
+	}
+
 	// Check if it's already a full path (contains "/" or starts with number)
 	if (destination.includes("/") || /^\d{2}\s/.test(destination)) {
 		const resolved = destination;
@@ -129,7 +170,43 @@ export function resolveParaFolder(
 		);
 	}
 
-	// Not a PARA name - return unchanged (custom folder path)
+	// 3. Try to resolve as area name (case-insensitive)
+	if (options?.areaPathMap) {
+		const areaPath = options.areaPathMap.get(semanticName);
+		if (areaPath) {
+			if (vaultPath && !pathExistsSync(join(vaultPath, areaPath))) {
+				throw new Error(`Area folder does not exist: ${areaPath}`);
+			}
+			return areaPath;
+		}
+	}
+
+	// 4. Try to resolve as project name (case-insensitive)
+	if (options?.projectPathMap) {
+		const projectPath = options.projectPathMap.get(semanticName);
+		if (projectPath) {
+			if (vaultPath && !pathExistsSync(join(vaultPath, projectPath))) {
+				throw new Error(`Project folder does not exist: ${projectPath}`);
+			}
+			return projectPath;
+		}
+	}
+
+	// 5. Unknown with maps provided → error with helpful message
+	if (options?.areaPathMap && options?.projectPathMap) {
+		const availableAreas = [...options.areaPathMap.values()];
+		const availableProjects = [...options.projectPathMap.values()];
+		throw new Error(
+			`Unknown destination: "${destination}". ` +
+				`Not a PARA folder name, area, or project. ` +
+				`Available areas: ${availableAreas.length > 0 ? availableAreas.join(", ") : "none"}.` +
+				(availableProjects.length > 0
+					? ` Available projects: ${availableProjects.join(", ")}.`
+					: ""),
+		);
+	}
+
+	// Fallback: Not a PARA name, no maps provided - return unchanged (backward compatibility)
 	const resolved = destination;
 
 	// Validate folder exists if vaultPath provided
@@ -155,6 +232,9 @@ export function resolveParaFolder(
  * @param config - Engine configuration
  * @param registry - Registry instance for tracking processed items
  * @param cid - Correlation ID for logging
+ * @param options - Optional execution options
+ * @param options.areaPathMap - Pre-built map of area names to paths (performance optimization)
+ * @param options.projectPathMap - Pre-built map of project names to paths (performance optimization)
  * @returns Execution result
  */
 export async function executeSuggestion(
@@ -162,6 +242,10 @@ export async function executeSuggestion(
 	config: ExecuteSuggestionConfig,
 	registry: ReturnType<typeof createRegistry>,
 	cid: string,
+	options?: {
+		areaPathMap?: Map<string, string>;
+		projectPathMap?: Map<string, string>;
+	},
 ): Promise<ExecutionResult> {
 	const sourcePath = join(config.vaultPath, suggestion.source);
 	const filename = basename(suggestion.source);
@@ -340,6 +424,8 @@ export async function executeSuggestion(
 			finalDest = resolveParaFolder(
 				suggestion.suggestedDestination,
 				paraConfig.paraFolders,
+				config.vaultPath,
+				options,
 			);
 		} else {
 			finalDest =
@@ -347,8 +433,7 @@ export async function executeSuggestion(
 				"00 Inbox";
 		}
 
-		// Add /Bookmarks/ subfolder for bookmark note types
-		finalDest = join(finalDest, "Bookmarks");
+		// Bookmarks go directly to the resolved destination without type-specific subfolders
 
 		// Use original filename (with emoji prefix) for bookmarks
 		const bookmarkFilename = basename(sourcePath);
@@ -420,8 +505,10 @@ export async function executeSuggestion(
 		try {
 			// Determine final destination:
 			// 1. Use explicit suggestedDestination if set
-			// 2. Fall back to defaultDestinations for the note type
-			// 3. Default to "00 Inbox" (PARA method)
+			// 2. Resolve suggestedArea to "02 Areas/{area}" if area exists in vault
+			// 3. Resolve suggestedProject to "01 Projects/{project}" if project exists in vault
+			// 4. Fall back to defaultDestinations for the note type
+			// 5. Default to "00 Inbox" (PARA method)
 			let finalDest: string;
 			if (
 				"suggestedDestination" in suggestion &&
@@ -431,7 +518,43 @@ export async function executeSuggestion(
 				finalDest = resolveParaFolder(
 					suggestion.suggestedDestination,
 					paraConfig.paraFolders,
+					config.vaultPath,
+					options,
 				);
+			} else if (
+				suggestion.action === "create-note" &&
+				suggestion.suggestedArea &&
+				options?.areaPathMap
+			) {
+				// Try to resolve suggestedArea to a vault path
+				const areaPath = options.areaPathMap.get(
+					suggestion.suggestedArea.toLowerCase(),
+				);
+				if (areaPath) {
+					finalDest = areaPath;
+				} else {
+					// Area doesn't exist in vault, fall back to inbox
+					finalDest =
+						paraConfig.defaultDestinations?.[suggestion.suggestedNoteType] ??
+						"00 Inbox";
+				}
+			} else if (
+				suggestion.action === "create-note" &&
+				suggestion.suggestedProject &&
+				options?.projectPathMap
+			) {
+				// Try to resolve suggestedProject to a vault path
+				const projectPath = options.projectPathMap.get(
+					suggestion.suggestedProject.toLowerCase(),
+				);
+				if (projectPath) {
+					finalDest = projectPath;
+				} else {
+					// Project doesn't exist in vault, fall back to inbox
+					finalDest =
+						paraConfig.defaultDestinations?.[suggestion.suggestedNoteType] ??
+						"00 Inbox";
+				}
 			} else if (
 				suggestion.action === "create-note" &&
 				suggestion.suggestedNoteType
@@ -444,15 +567,8 @@ export async function executeSuggestion(
 				finalDest = "00 Inbox";
 			}
 
-			// Add /Bookmarks/ subfolder for bookmark note types
-			// Format: {PARA Area}/Bookmarks/{filename}
-			// Examples: Resources/Bookmarks/, Projects/Bookmarks/, Areas/Finance/Bookmarks/
-			if (
-				suggestion.action === "create-note" &&
-				suggestion.suggestedNoteType === "bookmark"
-			) {
-				finalDest = join(finalDest, "Bookmarks");
-			}
+			// Note: Bookmarks are handled earlier in the bookmark-specific branch
+			// Non-bookmark notes go directly to the resolved destination without type-specific subfolders
 
 			const stagingAbsolute = resolveVaultPath(
 				paraConfig.vault,

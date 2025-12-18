@@ -62,15 +62,25 @@ export interface SuggestionInput {
 // =============================================================================
 
 /**
+ * Threshold for strong filename match - when the user explicitly names a file
+ * with a type keyword (e.g., "invoice"), this is authoritative and should not
+ * be overridden by LLM classification.
+ */
+const STRONG_FILENAME_THRESHOLD = 0.9;
+
+/**
  * Build a suggestion from heuristic and LLM results.
  *
- * Decision logic:
+ * Decision logic (priority order):
  * 1. If detectionSource provided: Use it (frontmatter fast-path)
- * 2. If LLM detected with high confidence (≥0.7): Use LLM result
- *    - Boost to HIGH if heuristics agree
- * 3. If only heuristics detected (>0.5): Use heuristic result
- * 4. If LLM detected with low confidence: Mark for review
- * 5. No detection: Skip
+ * 2. **NEW**: If heuristics have a strong filename match (≥0.9): Use heuristic type
+ *    - This is authoritative - user explicitly named the file with a type keyword
+ *    - Still use LLM for field extraction, area, and project suggestions
+ * 3. If LLM and heuristics agree: HIGH confidence
+ * 4. If LLM detected with high confidence (≥0.7): Use LLM result
+ * 5. If only heuristics detected (>0.5): Use heuristic result
+ * 6. If LLM detected with low confidence: Mark for review
+ * 7. No detection: Skip
  *
  * @param input - Suggestion input with detection results
  * @returns Inbox suggestion ready for user review
@@ -105,9 +115,60 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 		llmResult.extractionWarnings &&
 		llmResult.extractionWarnings.length > 0;
 
-	// Calculate detectionSource (can be overridden by providedDetectionSource later)
-	// If LLM detected with high confidence (using CONFIDENCE_THRESHOLDS for consistency)
-	if (
+	// Check for strong filename match - this is AUTHORITATIVE
+	// When a user explicitly names a file with a type keyword (e.g., "invoice.pdf"),
+	// that signal should NOT be overridden by LLM guessing at the content
+	const hasStrongFilenameMatch =
+		heuristicResult.detected &&
+		heuristicResult.confidence >= STRONG_FILENAME_THRESHOLD &&
+		heuristicResult.suggestedType;
+
+	// PRIORITY 1: Strong filename match is authoritative
+	// User explicitly named the file with a type keyword - trust them
+	if (hasStrongFilenameMatch && !isLLMFallback) {
+		confidence = "high";
+		action = "create-note";
+		suggestedNoteType = heuristicResult.suggestedType;
+		// Still use LLM for field extraction, area, and project (if available)
+		suggestedArea = llmResult?.suggestedArea ?? undefined;
+		suggestedProject = llmResult?.suggestedProject ?? undefined;
+		extractedFields = llmResult?.extractedFields ?? undefined;
+
+		// Check if LLM agreed or disagreed
+		if (llmResult && llmResult.documentType === heuristicResult.suggestedType) {
+			reason = `Filename and LLM agree: ${heuristicResult.suggestedType}`;
+			detectionSource = "llm+heuristic";
+		} else if (
+			llmResult &&
+			llmResult.confidence >= CONFIDENCE_THRESHOLDS.MEDIUM
+		) {
+			// LLM disagrees but filename is authoritative
+			reason = `Filename authoritative: ${heuristicResult.suggestedType} (LLM suggested ${llmResult.documentType}, overridden)`;
+			detectionSource = "heuristic";
+		} else {
+			reason = `Strong filename match: ${heuristicResult.suggestedType}`;
+			detectionSource = "heuristic";
+		}
+	}
+	// PRIORITY 2: LLM and heuristics agree (both detected same type)
+	else if (
+		llmResult &&
+		!isLLMFallback &&
+		llmResult.confidence >= CONFIDENCE_THRESHOLDS.MEDIUM &&
+		heuristicResult.detected &&
+		heuristicResult.suggestedType === llmResult.documentType
+	) {
+		confidence = "high";
+		action = "create-note";
+		suggestedNoteType = llmResult.documentType;
+		suggestedArea = llmResult.suggestedArea ?? undefined;
+		suggestedProject = llmResult.suggestedProject ?? undefined;
+		extractedFields = llmResult.extractedFields ?? undefined;
+		reason = `Heuristics and LLM agree: ${llmResult.documentType}`;
+		detectionSource = "llm+heuristic";
+	}
+	// PRIORITY 3: LLM detected with high confidence (no strong filename match)
+	else if (
 		llmResult &&
 		!isLLMFallback &&
 		llmResult.confidence >= CONFIDENCE_THRESHOLDS.MEDIUM
@@ -123,18 +184,8 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 			llmResult.reasoning ??
 			`LLM detected ${llmResult.documentType} with ${(llmResult.confidence * 100).toFixed(0)}% confidence`;
 		detectionSource = "llm";
-
-		// Boost confidence if heuristics agree
-		if (
-			heuristicResult.detected &&
-			heuristicResult.suggestedType === llmResult.documentType
-		) {
-			confidence = "high";
-			reason = `Heuristics and LLM agree: ${llmResult.documentType}`;
-			detectionSource = "llm+heuristic";
-		}
 	}
-	// If heuristics detected OR LLM fallback scenario (use heuristics + frontmatter extraction)
+	// PRIORITY 4: Heuristics detected OR LLM fallback scenario
 	else if (
 		(heuristicResult.detected &&
 			heuristicResult.confidence > CONFIDENCE_THRESHOLDS.HEURISTIC_MIN) ||

@@ -44,6 +44,8 @@ export function discoverAttachmentsFromFrontmatter(
 	notePath: string,
 ): ReadonlyArray<string> {
 	const { absolute } = resolveVaultPath(vault, notePath);
+	// Handle deleted files (staged for deletion in git but no longer on disk)
+	if (!pathExistsSync(absolute)) return [];
 	const content = readTextFileSync(absolute);
 	const { attributes } = parseFrontmatter(content);
 
@@ -75,6 +77,8 @@ export function discoverAttachmentsFromBody(
 	notePath: string,
 ): ReadonlyArray<string> {
 	const { absolute } = resolveVaultPath(vault, notePath);
+	// Handle deleted files (staged for deletion in git but no longer on disk)
+	if (!pathExistsSync(absolute)) return [];
 	const content = readTextFileSync(absolute);
 	const { body } = parseFrontmatter(content);
 

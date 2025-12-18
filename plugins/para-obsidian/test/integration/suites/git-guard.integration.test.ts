@@ -440,7 +440,7 @@ title: Test
 				throw new Error("Expected scan to throw with fix instructions");
 			} catch (error) {
 				const err = error as Error;
-				expect(err.message).toContain("/para-obsidian:commit");
+				expect(err.message).toContain("para git commit");
 				expect(err.message).toContain("git add");
 				expect(err.message).toContain("git commit");
 			}

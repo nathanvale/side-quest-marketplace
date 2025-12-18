@@ -196,6 +196,40 @@ function buildFieldGuidelinesFromConverter(converter: InboxConverter): string {
  * @param converters - Optional converters for dynamic document types and fields
  * @returns Formatted prompt string
  */
+/**
+ * Known type keywords to detect in filenames.
+ * When found, we inform the LLM that this is an explicit user signal.
+ */
+const FILENAME_TYPE_KEYWORDS = [
+	"invoice",
+	"receipt",
+	"statement",
+	"booking",
+	"reservation",
+	"confirmation",
+	"bill",
+	"quote",
+	"estimate",
+] as const;
+
+/**
+ * Detect type keywords in a filename and return a hint for the LLM.
+ */
+function detectFilenameTypeHint(filename: string): string | null {
+	const lowerFilename = filename.toLowerCase();
+	const foundKeywords = FILENAME_TYPE_KEYWORDS.filter((keyword) =>
+		lowerFilename.includes(keyword),
+	);
+
+	if (foundKeywords.length === 0) {
+		return null;
+	}
+
+	// Return the most specific match (invoice > statement, etc.)
+	const keyword = foundKeywords[0];
+	return `**IMPORTANT: The filename contains "${keyword}" - this is an explicit signal from the user about the document type. Give strong weight to this signal.** If the document content matches a "${keyword}", you should classify it as such unless there is overwhelming evidence otherwise.`;
+}
+
 export function buildInboxPrompt(
 	options: InboxPromptOptions,
 	converters?: readonly InboxConverter[],
@@ -213,6 +247,10 @@ export function buildInboxPrompt(
 			: "No projects defined in vault";
 
 	const userHintSection = userHint ? `\nUser hint: "${userHint}"` : "";
+
+	// Detect filename type hint
+	const filenameHint = detectFilenameTypeHint(filename);
+	const filenameHintSection = filenameHint ? `\n${filenameHint}\n` : "";
 
 	// Use converters if provided, otherwise fall back to DEFAULT_DOCUMENT_TYPES
 	const documentTypes = converters
@@ -248,7 +286,7 @@ export function buildInboxPrompt(
 - Content preview (first 6000 chars):
 
 ${content.slice(0, 6000)}
-
+${filenameHintSection}
 ## Available Document Types
 ${documentTypes}
 

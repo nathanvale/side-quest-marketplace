@@ -35,39 +35,42 @@ export const medicalStatementClassifier: InboxConverter = {
 			{ pattern: "radiology", weight: 0.9 },
 		],
 		contentMarkers: [
-			// Strong medical indicators
-			{ pattern: "account statement", weight: 0.8 },
-			{ pattern: "provider #", weight: 1.0 },
-			{ pattern: "patient", weight: 0.9 },
-			{ pattern: "practitioner", weight: 1.0 },
-			{ pattern: "consultation", weight: 0.9 },
-			{ pattern: "telehealth", weight: 0.9 },
-			{ pattern: "appointment time", weight: 1.0 },
-			{ pattern: "service:", weight: 0.8 },
-			{ pattern: "item number", weight: 0.9 },
+			// EXCLUSIVE statement markers - these DO NOT appear in single invoices
+			// These are the definitive signals that distinguish statements from invoices
+			{ pattern: "account statement", weight: 1.0 }, // Header unique to statements
+			{ pattern: "previous balance", weight: 1.0 }, // Only statements show running balance
+			{ pattern: "statement balance", weight: 1.0 }, // Only statements have this
+			{ pattern: "invoices from", weight: 1.0 }, // Date range = statement
+			{ pattern: "invoices to", weight: 1.0 }, // Date range = statement
+			{ pattern: "total invoiced", weight: 1.0 }, // Summary of multiple invoices
+
+			// Strong medical indicators (also appear in invoices but help confirm medical context)
+			{ pattern: "provider #", weight: 0.8 },
+			{ pattern: "patient", weight: 0.7 },
+			{ pattern: "practitioner", weight: 0.8 },
+			{ pattern: "consultation", weight: 0.7 },
+			{ pattern: "telehealth", weight: 0.7 },
+			{ pattern: "appointment time", weight: 0.8 },
+			{ pattern: "service:", weight: 0.6 },
+			{ pattern: "item number", weight: 0.7 },
 
 			// Australian medical billing
-			{ pattern: "medicare", weight: 0.9 },
-			{ pattern: "bulk bill", weight: 0.9 },
-			{ pattern: "dor:", weight: 0.8 }, // Date of Referral
-			{ pattern: "private health", weight: 0.8 },
-			{ pattern: "health fund", weight: 0.8 },
-			{ pattern: "gap payment", weight: 0.9 },
-			{ pattern: "out of pocket", weight: 0.8 },
+			{ pattern: "medicare", weight: 0.8 },
+			{ pattern: "bulk bill", weight: 0.8 },
+			{ pattern: "dor:", weight: 0.6 }, // Date of Referral
+			{ pattern: "private health", weight: 0.6 },
+			{ pattern: "health fund", weight: 0.6 },
+			{ pattern: "gap payment", weight: 0.7 },
+			{ pattern: "out of pocket", weight: 0.6 },
 
 			// Financial markers
-			{ pattern: "previous balance", weight: 0.7 },
-			{ pattern: "statement balance", weight: 0.8 },
-			{ pattern: "total invoiced", weight: 0.8 },
 			{ pattern: "total payments", weight: 0.7 },
-			{ pattern: "invoices from", weight: 0.9 },
-			{ pattern: "invoices to", weight: 0.9 },
 
-			// Australian business identifiers
-			{ pattern: "abn", weight: 0.5 },
-			{ pattern: "bsb:", weight: 0.6 },
+			// Australian business identifiers (lower weight - appear in both)
+			{ pattern: "abn", weight: 0.4 },
+			{ pattern: "bsb:", weight: 0.5 },
 		],
-		threshold: 0.5,
+		threshold: 0.3, // Same as invoice - let content scores decide
 	},
 
 	fields: [
@@ -200,8 +203,26 @@ export const medicalStatementClassifier: InboxConverter = {
 	],
 
 	extraction: {
-		promptHint:
-			"This is a medical account statement from a healthcare provider. Extract: (1) Provider name, provider number (Medicare format: 7 digits + letter like 0388478B), patient details, statement period, and financial summary. (2) Payment details - look for BSB (format XXX-XXX) and account number (A/C). (3) Consultation table - extract each appointment as a markdown table row with Date, Service description, Item code (in parentheses like 306 or 91830), and Amount. Count the consultations. Set status to 'paid' if balance is 0, 'unpaid' if owing. Area should always be 'Health'. Statement type: 'summary' for period summaries, 'detailed' for itemized services, 'single-appointment' for single consultation.",
+		promptHint: `This is a medical ACCOUNT STATEMENT summarizing transactions over a period.
+
+CRITICAL DISTINCTION - Statement vs Invoice:
+- STATEMENT = Account summary showing "Previous Balance", "Statement Balance", transaction history over a period
+- INVOICE = A bill for ONE specific service with "Amount Due", "Invoice #", "Pay By" date
+
+Choose "medical-statement" if the document:
+- Shows "Previous Balance" and "Statement Balance"
+- Has a statement period (e.g., "Invoices from 01/09/2025 to 30/09/2025")
+- Summarizes MULTIPLE past consultations/transactions
+- Is an "Account Statement" (not a "Tax Invoice")
+- Shows running totals: total invoiced, total payments, balance owing
+
+Do NOT choose "medical-statement" if the document:
+- Is a single Tax Invoice for one specific consultation
+- Has "Invoice #" prominently displayed (that's an invoice)
+- Shows "Amount Due" for THIS specific bill only (that's an invoice)
+- Has no period range or previous balance (that's an invoice)
+
+Extract: (1) Provider name, provider number (Medicare format: 7 digits + letter like 0388478B), patient details, statement period, and financial summary. (2) Payment details - look for BSB (format XXX-XXX) and account number (A/C). (3) Consultation table - extract each appointment as a markdown table row with Date, Service description, Item code (in parentheses like 306 or 91830), and Amount. Count the consultations. Set status to 'paid' if balance is 0, 'unpaid' if owing. Area should always be 'Health'. Statement type: 'summary' for period summaries, 'detailed' for itemized services, 'single-appointment' for single consultation.`,
 		keyFields: [
 			"provider",
 			"providerNumber",
