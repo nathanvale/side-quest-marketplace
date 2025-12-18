@@ -57,6 +57,9 @@ export interface EnrichmentOptions {
 
 	/** LLM model to use for title/summary improvement */
 	readonly llmModel?: string;
+
+	/** Correlation ID for logging (optional) */
+	readonly cid?: string;
 }
 
 /**

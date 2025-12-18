@@ -110,7 +110,7 @@ export function createEnrichmentPipeline(config: EnrichmentPipelineConfig) {
 	 * Process a single file through the enrichment pipeline.
 	 *
 	 * @param file - The inbox file to process
-	 * @param options - Optional enrichment options
+	 * @param options - Optional enrichment options (includes cid for logging)
 	 * @returns Pipeline result with enrichment status and data
 	 */
 	async function processFile(
@@ -118,8 +118,9 @@ export function createEnrichmentPipeline(config: EnrichmentPipelineConfig) {
 		options?: EnrichmentOptions,
 	): Promise<EnrichmentPipelineResult> {
 		const startTime = Date.now();
+		const cid = options?.cid ?? "no-cid";
 		if (log) {
-			log.info`Enrichment starting file=${file.filename}`;
+			log.info`Enrichment starting file=${file.filename} cid=${cid}`;
 		}
 
 		// Read and parse file content
@@ -140,7 +141,7 @@ export function createEnrichmentPipeline(config: EnrichmentPipelineConfig) {
 		if (!strategy) {
 			// No strategy matched - return unchanged
 			if (log) {
-				log.debug`Enrichment skipped file=${file.filename} reason="No matching strategy"`;
+				log.debug`Enrichment skipped file=${file.filename} reason="No matching strategy" cid=${cid}`;
 			}
 			return {
 				file,
@@ -167,7 +168,7 @@ export function createEnrichmentPipeline(config: EnrichmentPipelineConfig) {
 
 			const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 			if (log) {
-				log.info`Enrichment complete file=${file.filename} strategy=${strategy.id} duration=${duration}s`;
+				log.info`Enrichment complete file=${file.filename} strategy=${strategy.id} duration=${duration}s cid=${cid}`;
 			}
 
 			return {
@@ -191,7 +192,7 @@ export function createEnrichmentPipeline(config: EnrichmentPipelineConfig) {
 
 			const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 			if (log) {
-				log.error`Enrichment failed file=${file.filename} strategy=${strategy.id} error=${enrichmentError.message} duration=${duration}s`;
+				log.error`Enrichment failed file=${file.filename} strategy=${strategy.id} error=${enrichmentError.message} duration=${duration}s cid=${cid}`;
 			}
 
 			return {

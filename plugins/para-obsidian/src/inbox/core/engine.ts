@@ -295,7 +295,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			successes: number;
 			failures: number;
 			fallbacks: number;
-			lastError: string | undefined;
+			errors: Array<{ filename: string; error: string; timestamp: number }>;
 			lastFallbackReason: string | undefined;
 			lastModelUsed: string | undefined;
 		};
@@ -404,9 +404,11 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 									});
 								}
 
-								// Process through enrichment pipeline
-								const enrichmentResult =
-									await enrichmentPipeline.processFile(file);
+								// Process through enrichment pipeline with CID for correlation
+								const enrichmentResult = await enrichmentPipeline.processFile(
+									file,
+									{ cid },
+								);
 
 								if (enrichmentResult.error) {
 									// Enrichment failed - BLOCKING error
@@ -677,7 +679,11 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					inboxLogger.warn`LLM detection failed: ${filename} - ${errorMsg} cid=${cid}`;
 				}
 				llmStats.failures += 1;
-				llmStats.lastError = errorMsg;
+				llmStats.errors.push({
+					filename: basename(file.path),
+					error: errorMsg,
+					timestamp: Date.now(),
+				});
 				llmResult = null;
 				llmErrorMessage = errorMsg;
 			}
@@ -784,7 +790,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					...progressBase,
 					stage: "done",
 					llmFailures: llmStats.failures,
-					llmError: llmStats.lastError,
+					llmError: llmStats.errors[llmStats.errors.length - 1]?.error,
 					llmModelUsed: llmModelUsed ?? llmStats.lastModelUsed,
 					llmFallbackUsed: llmFallbackUsed,
 				});
@@ -801,7 +807,14 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		suggestions: InboxSuggestion[],
 		durationMs: number,
 		cid: string,
-		llmStats: { successes: number; failures: number },
+		llmStats: {
+			successes: number;
+			failures: number;
+			fallbacks: number;
+			errors: Array<{ filename: string; error: string; timestamp: number }>;
+			lastFallbackReason: string | undefined;
+			lastModelUsed: string | undefined;
+		},
 	): void {
 		const confidenceCounts = suggestions.reduce(
 			(counts, suggestion) => {
@@ -823,9 +836,9 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			inboxLogger.info`Scan complete suggestions=${suggestions.length} durationMs=${durationMs} llmSuccesses=${llmStats.successes} llmFailures=${llmStats.failures} cid=${cid}`;
 			inboxLogger.debug`Scan breakdown confidence=${JSON.stringify(confidenceCounts)} actions=${JSON.stringify(actionCounts)} durationMs=${durationMs} cid=${cid}`;
 
-			// Warn if LLM appears unavailable
+			// Error if LLM appears unavailable
 			if (llmStats.failures > 0 && llmStats.successes === 0) {
-				inboxLogger.warn`LLM service unavailable: all ${llmStats.failures} calls failed. Suggestions are heuristic-only. cid=${cid}`;
+				inboxLogger.error`LLM service unavailable: all ${llmStats.failures} calls failed. Suggestions are heuristic-only. cid=${cid}`;
 			}
 		}
 	}
@@ -838,6 +851,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	async function scan(options?: ScanOptions): Promise<InboxSuggestion[]> {
 		await initLoggerWithNotice();
 		const startedAt = Date.now();
+		const sessionCid = options?.sessionCid ?? createCorrelationId();
 		const cid = createCorrelationId();
 		const onProgress = options?.onProgress;
 
@@ -846,7 +860,11 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			successes: 0,
 			failures: 0,
 			fallbacks: 0,
-			lastError: undefined as string | undefined,
+			errors: [] as Array<{
+				filename: string;
+				error: string;
+				timestamp: number;
+			}>,
 			lastFallbackReason: undefined as string | undefined,
 			lastModelUsed: undefined as string | undefined,
 		};
@@ -855,7 +873,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		suggestionCache.clear();
 
 		if (inboxLogger) {
-			inboxLogger.info`Scan started vault=${resolvedConfig.vaultPath} cid=${cid}`;
+			inboxLogger.info`Scan started vault=${resolvedConfig.vaultPath} cid=${cid} sessionCid=${sessionCid}`;
 		}
 
 		// Silent pre-commit: auto-save any uncommitted PARA files before scan
@@ -932,11 +950,12 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	): Promise<BatchResult> {
 		await initLoggerWithNotice();
 		const startedAt = Date.now();
+		const sessionCid = options?.sessionCid ?? createCorrelationId();
 		const cid = createCorrelationId();
 		const onProgress = options?.onProgress;
 
 		if (inboxLogger) {
-			inboxLogger.info`Execute started count=${ids.length} cid=${cid}`;
+			inboxLogger.info`Execute started count=${ids.length} cid=${cid} sessionCid=${sessionCid}`;
 		}
 
 		if (ids.length === 0) {
@@ -1048,7 +1067,8 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				failed.set(id, error as Error);
 				// Log but don't stop - continue processing other suggestions
 				if (executeLogger) {
-					executeLogger.error`Execute failed id=${id} error=${error instanceof Error ? error.message : "unknown"} ${cid}`;
+					const filename = suggestion ? basename(suggestion.source) : "unknown";
+					executeLogger.error`Execute failed id=${id} filename=${filename} error=${error instanceof Error ? error.message : "unknown"} ${cid}`;
 				}
 			}
 

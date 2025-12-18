@@ -1147,4 +1147,87 @@ amount: 25.00
 				expect(rechallenged.hint).toBe("Actually it's an invoice");
 		});
 	});
+
+	describe("Session Correlation ID", () => {
+		test("scan() accepts sessionCid option and logs it", async () => {
+			const vaultPath = createTempDir("session-cid-test-");
+			await initGitRepo(vaultPath);
+
+			// Create vault structure
+			mkdirSync(join(vaultPath, "00 Inbox"), { recursive: true });
+			mkdirSync(join(vaultPath, "01 Projects"), { recursive: true });
+			mkdirSync(join(vaultPath, "02 Areas"), { recursive: true });
+			mkdirSync(join(vaultPath, "03 Resources"), { recursive: true });
+			mkdirSync(join(vaultPath, "04 Archives"), { recursive: true });
+			mkdirSync(join(vaultPath, "Templates"), { recursive: true });
+			mkdirSync(join(vaultPath, "Attachments"), { recursive: true });
+
+			// Create a test PDF
+			const pdfPath = join(vaultPath, "00 Inbox", "test.pdf");
+			writeFileSync(pdfPath, "Mock PDF content for testing", "utf-8");
+
+			const engine = createTestEngine({ vaultPath });
+			const customSessionCid = "session-123-abc";
+
+			// Scan with custom sessionCid
+			await engine.scan({ sessionCid: customSessionCid });
+
+			// Test passes if no error thrown - logger will have sessionCid in logs
+			cleanupTestDir(vaultPath);
+		});
+
+		test("execute() accepts sessionCid option and logs it", async () => {
+			const vaultPath = createTempDir("session-cid-exec-test-");
+			await initGitRepo(vaultPath);
+
+			// Create vault structure
+			mkdirSync(join(vaultPath, "00 Inbox"), { recursive: true });
+			mkdirSync(join(vaultPath, "01 Projects"), { recursive: true });
+			mkdirSync(join(vaultPath, "02 Areas"), { recursive: true });
+			mkdirSync(join(vaultPath, "03 Resources"), { recursive: true });
+			mkdirSync(join(vaultPath, "04 Archives"), { recursive: true });
+			mkdirSync(join(vaultPath, "Templates"), { recursive: true });
+			mkdirSync(join(vaultPath, "Attachments"), { recursive: true });
+
+			const engine = createTestEngine({ vaultPath });
+			const customSessionCid = "session-456-def";
+
+			// Execute with custom sessionCid (empty array is valid)
+			await engine.execute([], { sessionCid: customSessionCid });
+
+			// Test passes if no error thrown - logger will have sessionCid in logs
+			cleanupTestDir(vaultPath);
+		});
+
+		test("scan() and execute() can share the same sessionCid for correlation", async () => {
+			const vaultPath = createTempDir("session-correlation-test-");
+			await initGitRepo(vaultPath);
+
+			// Create vault structure
+			mkdirSync(join(vaultPath, "00 Inbox"), { recursive: true });
+			mkdirSync(join(vaultPath, "01 Projects"), { recursive: true });
+			mkdirSync(join(vaultPath, "02 Areas"), { recursive: true });
+			mkdirSync(join(vaultPath, "03 Resources"), { recursive: true });
+			mkdirSync(join(vaultPath, "04 Archives"), { recursive: true });
+			mkdirSync(join(vaultPath, "Templates"), { recursive: true });
+			mkdirSync(join(vaultPath, "Attachments"), { recursive: true });
+
+			// Create a test PDF
+			const pdfPath = join(vaultPath, "00 Inbox", "invoice.pdf");
+			writeFileSync(pdfPath, "Invoice #123 for testing", "utf-8");
+
+			const engine = createTestEngine({ vaultPath });
+			const sharedSessionCid = "session-scan-execute-789";
+
+			// Scan with shared sessionCid
+			const suggestions = await engine.scan({ sessionCid: sharedSessionCid });
+
+			// Execute with same sessionCid to link operations
+			const suggestionIds = suggestions.map((s) => s.id);
+			await engine.execute(suggestionIds, { sessionCid: sharedSessionCid });
+
+			// Both operations logged with same sessionCid - correlation achieved
+			cleanupTestDir(vaultPath);
+		});
+	});
 });

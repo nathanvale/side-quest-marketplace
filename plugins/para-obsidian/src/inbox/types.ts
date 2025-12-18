@@ -487,6 +487,13 @@ export interface ScanOptions {
 	 * Useful for updating CLI spinners/status lines.
 	 */
 	readonly onProgress?: (progress: ScanProgress) => void | Promise<void>;
+
+	/**
+	 * Optional session-level correlation ID to link scan → execute operations.
+	 * If provided, will be logged alongside the operation-level CID.
+	 * If omitted, a new session CID will be generated.
+	 */
+	readonly sessionCid?: string;
 }
 
 /**
@@ -614,6 +621,13 @@ export interface ExecuteOptions {
 	 * and have those modifications respected during execution.
 	 */
 	readonly updatedSuggestions?: Map<string, InboxSuggestion>;
+
+	/**
+	 * Optional session-level correlation ID to link scan → execute operations.
+	 * If provided, will be logged alongside the operation-level CID.
+	 * If omitted, a new session CID will be generated.
+	 */
+	readonly sessionCid?: string;
 }
 
 // =============================================================================

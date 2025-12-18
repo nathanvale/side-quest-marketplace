@@ -277,7 +277,7 @@ async function scanWithSpinner(
 		const stageInfo =
 			scanState.currentFile === ""
 				? ""
-				: ` ${stageLabel(scanState.stage, scanState.stage === "llm" ? llmModel : undefined)} ${elapsedStage}s`;
+				: ` ${stageLabel(scanState.stage, scanState.stage === "llm" ? llmModel : undefined)} ${scanState.currentFile} ${elapsedStage}s`;
 
 		scanSpinner.update({
 			text: `${progressBar}${countInfo}${stats}${etaDisplay}${stageInfo}`,
