@@ -251,13 +251,21 @@ async function scanWithSpinner(
 		).toFixed(1);
 		const eta = calculateEta(scanState.processed, scanState.total, elapsedMs);
 
-		// Build visual progress bar with stats
-		// Use 'started' count for progress (shows work beginning, not just completion)
+		// Progress bar fills based on COMPLETED files
 		const progressBar = renderProgressBar(
-			scanState.started,
+			scanState.processed,
 			scanState.total || 0,
 			16,
 		);
+
+		// Two-phase display: show started count when different from processed
+		const startedInfo =
+			scanState.started > scanState.processed && scanState.total > 0
+				? ` ${scanState.started}/${scanState.total} started |`
+				: "";
+		const completeInfo =
+			scanState.total > 0 ? ` ${scanState.processed}/${scanState.total}` : "";
+
 		const stats =
 			scanState.skipped > 0 || scanState.errors > 0
 				? ` (${scanState.skipped} skipped, ${scanState.errors} errors)`
@@ -271,7 +279,7 @@ async function scanWithSpinner(
 				: ` ${stageLabel(scanState.stage, scanState.stage === "llm" ? llmModel : undefined)} ${elapsedStage}s`;
 
 		scanSpinner.update({
-			text: `${progressBar}${stats}${etaDisplay}${stageInfo}`,
+			text: `${progressBar}${startedInfo}${completeInfo}${stats}${etaDisplay}${stageInfo}`,
 		});
 	};
 
@@ -290,29 +298,23 @@ async function scanWithSpinner(
 				const { total, filename, stage } = progress;
 				scanState.total = total;
 				if (stage === "start") {
-					// File queued for processing - just update current file display
+					// File processing started - increment started count
+					scanState.started += 1;
 					scanState.currentFile = filename;
 					scanState.stage = "start";
 					scanState.stageStartedAt = Date.now();
-				} else if (stage === "hash") {
-					// First real work stage - increment progress bar
-					scanState.started += 1;
+					updateScanText(); // Immediate update
+				} else if (stage === "hash" || stage === "extract") {
+					// Update stage display only (started already incremented on "start")
 					scanState.currentFile = filename;
-					scanState.stage = "hash";
+					scanState.stage = stage;
 					scanState.stageStartedAt = Date.now();
-					updateScanText(); // Immediate update so bar increments visibly
 				} else if (stage === "skip") {
-					// Skipped files count as both started and processed
-					if (scanState.started < scanState.total) {
-						scanState.started += 1;
-					}
+					// Skipped files are both started and processed
 					scanState.skipped += 1;
 					scanState.processed += 1;
 				} else if (stage === "done") {
-					// Markdown fast-path files skip hash stage, so count them here
-					if (scanState.started < scanState.total) {
-						scanState.started += 1;
-					}
+					// File completed
 					scanState.processed += 1;
 					// Track running LLM failure count (only on DoneProgress)
 					if (progress.llmFailures !== undefined) {
@@ -327,6 +329,10 @@ async function scanWithSpinner(
 						scanState.lastLlmError = progress.llmError;
 					}
 				} else if (stage === "llm") {
+					// Update stage display for LLM processing
+					scanState.currentFile = filename;
+					scanState.stage = "llm";
+					scanState.stageStartedAt = Date.now();
 					// Track fallback reason when fallback is triggered
 					if (progress.isFallback && progress.fallbackReason) {
 						scanState.lastFallbackReason = progress.fallbackReason;
@@ -344,12 +350,6 @@ async function scanWithSpinner(
 						text: `${progressBar} error: ${filename} - ${progress.error}`,
 					});
 					return;
-				}
-				// Update current file and stage for in-progress stages
-				if (stage === "hash" || stage === "extract" || stage === "llm") {
-					scanState.currentFile = filename;
-					scanState.stage = stage;
-					scanState.stageStartedAt = Date.now();
 				}
 				updateScanText();
 			},
