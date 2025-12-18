@@ -29,6 +29,8 @@ export {
 export { handleCreate } from "./create";
 export { handleCreateClassifier } from "./create-classifier";
 export { handleCreateNoteTemplate } from "./create-note-template";
+// Enrich commands
+export { handleEnrichBookmark } from "./enrich-bookmark";
 // Export commands
 export { handleExportBookmarks } from "./export-bookmarks";
 export { handleExportWebClipperTemplate } from "./export-webclipper-template";

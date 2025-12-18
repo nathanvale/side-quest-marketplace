@@ -136,7 +136,8 @@ describe("inbox/pdf-processor", () => {
 		});
 
 		test("should detect invoice from various content patterns", () => {
-			const simpleContent = "Invoice";
+			// Simple content with invoice marker (requires specific pattern match)
+			const simpleContent = "Invoice #12345";
 			const detailedContent = `
         TAX INVOICE
         Invoice Number: 12345

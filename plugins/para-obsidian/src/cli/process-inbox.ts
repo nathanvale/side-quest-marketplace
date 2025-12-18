@@ -55,6 +55,8 @@ function stageLabel(stage: string, model?: string): string {
 			return "hashing";
 		case "extract":
 			return "extracting";
+		case "enrich":
+			return "enriching";
 		case "llm":
 			return model ? `LLM (${model})` : "LLM";
 		case "skip":
@@ -223,7 +225,6 @@ async function scanWithSpinner(
 	const scanStarted = Date.now();
 	const scanState = {
 		total: 0,
-		started: 0, // Files that have begun processing
 		processed: 0, // Files that have completed (done/skip/error)
 		skipped: 0,
 		errors: 0,
@@ -236,6 +237,7 @@ async function scanWithSpinner(
 			| "start"
 			| "hash"
 			| "extract"
+			| "enrich"
 			| "llm"
 			| "skip"
 			| "done"
@@ -251,26 +253,25 @@ async function scanWithSpinner(
 		).toFixed(1);
 		const eta = calculateEta(scanState.processed, scanState.total, elapsedMs);
 
-		// Progress bar fills based on COMPLETED files
+		// Progress bar fills based on COMPLETED files only
 		const progressBar = renderProgressBar(
 			scanState.processed,
 			scanState.total || 0,
 			16,
 		);
 
-		// Two-phase display: show started count when different from processed
-		const startedInfo =
-			scanState.started > scanState.processed && scanState.total > 0
-				? ` ${scanState.started}/${scanState.total} started |`
-				: "";
-		const completeInfo =
+		// Simple count: completed / total
+		const countInfo =
 			scanState.total > 0 ? ` ${scanState.processed}/${scanState.total}` : "";
 
 		const stats =
 			scanState.skipped > 0 || scanState.errors > 0
 				? ` (${scanState.skipped} skipped, ${scanState.errors} errors)`
 				: "";
-		const etaDisplay = scanState.total > 0 ? ` ~${eta}` : "";
+		const etaDisplay =
+			scanState.total > 0 && scanState.processed < scanState.total
+				? ` ${eta}`
+				: "";
 
 		// Stage indicator (what we're doing now)
 		const stageInfo =
@@ -279,7 +280,7 @@ async function scanWithSpinner(
 				: ` ${stageLabel(scanState.stage, scanState.stage === "llm" ? llmModel : undefined)} ${elapsedStage}s`;
 
 		scanSpinner.update({
-			text: `${progressBar}${startedInfo}${completeInfo}${stats}${etaDisplay}${stageInfo}`,
+			text: `${progressBar}${countInfo}${stats}${etaDisplay}${stageInfo}`,
 		});
 	};
 
@@ -297,28 +298,32 @@ async function scanWithSpinner(
 			onProgress: (progress) => {
 				const { total, filename, stage } = progress;
 				scanState.total = total;
-				if (stage === "start") {
-					// File processing started - increment started count
-					scanState.started += 1;
-					scanState.currentFile = filename;
-					scanState.stage = "start";
-					scanState.stageStartedAt = Date.now();
-					updateScanText(); // Immediate update
-				} else if (stage === "hash" || stage === "extract") {
-					// Update stage display only (started already incremented on "start")
+
+				if (
+					stage === "start" ||
+					stage === "hash" ||
+					stage === "extract" ||
+					stage === "enrich"
+				) {
+					// Update stage display only - no progress increment
 					scanState.currentFile = filename;
 					scanState.stage = stage;
 					scanState.stageStartedAt = Date.now();
+				} else if (stage === "llm") {
+					// Update stage display for LLM processing
+					scanState.currentFile = filename;
+					scanState.stage = "llm";
+					scanState.stageStartedAt = Date.now();
+					// Track fallback reason when fallback is triggered
+					if (progress.isFallback && progress.fallbackReason) {
+						scanState.lastFallbackReason = progress.fallbackReason;
+					}
 				} else if (stage === "skip") {
-					// Skipped files count as started AND processed (they complete instantly)
-					scanState.started += 1;
+					// Skipped files count as processed
 					scanState.skipped += 1;
 					scanState.processed += 1;
 				} else if (stage === "done") {
-					// File completed - also count as started if it bypassed start event (fast-path)
-					if (scanState.started < scanState.total) {
-						scanState.started += 1;
-					}
+					// File completed
 					scanState.processed += 1;
 					// Track running LLM failure count (only on DoneProgress)
 					if (progress.llmFailures !== undefined) {
@@ -331,15 +336,6 @@ async function scanWithSpinner(
 					// Track last error for summary
 					if (progress.llmError) {
 						scanState.lastLlmError = progress.llmError;
-					}
-				} else if (stage === "llm") {
-					// Update stage display for LLM processing
-					scanState.currentFile = filename;
-					scanState.stage = "llm";
-					scanState.stageStartedAt = Date.now();
-					// Track fallback reason when fallback is triggered
-					if (progress.isFallback && progress.fallbackReason) {
-						scanState.lastFallbackReason = progress.fallbackReason;
 					}
 				} else if (stage === "error") {
 					scanState.errors += 1;

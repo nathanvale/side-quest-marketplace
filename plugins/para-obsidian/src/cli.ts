@@ -20,6 +20,7 @@ import {
 	handleCreateClassifier,
 	handleCreateNoteTemplate,
 	handleDelete,
+	handleEnrichBookmark,
 	handleExportBookmarks,
 	handleExportWebClipperTemplate,
 	handleFindOrphans,
@@ -76,12 +77,15 @@ function printUsage(): void {
 		"  para create-classifier [--quick]",
 		"  para create-note-template",
 		"  para registry list|remove|clear [--format md|json]",
+		'  para enrich-bookmark <file.md|"*.md"> [--dry-run] [--force] [--delay N] [--yes]',
+		"  para enrich-bookmark --url <url> [--format md|json]",
 		"",
 		"Shorter aliases:",
 		"  para scan        (alias for process-inbox)",
 		"  para execute     (alias for process-inbox --auto)",
 		"  para export      (alias for export-bookmarks)",
 		"  para init        (alias for create-classifier)",
+		"  para enrich      (alias for enrich-bookmark)",
 		"",
 		"Options:",
 		"  --format md|json  Output format (default: md)",
@@ -322,6 +326,19 @@ async function main(): Promise<void> {
 
 			case "registry": {
 				const result = await handleRegistry(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
+				break;
+			}
+
+			case "enrich-bookmark": {
+				const result = await handleEnrichBookmark(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
+				break;
+			}
+
+			case "enrich": {
+				// Alias for enrich-bookmark
+				const result = await handleEnrichBookmark(ctx);
 				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
