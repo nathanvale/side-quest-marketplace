@@ -191,25 +191,25 @@ function calculateEta(
 }
 
 /**
- * Render a visual progress bar
+ * Render a visual progress bar (bar only, count displayed separately)
  * @param processed - Number of items processed
  * @param total - Total number of items
  * @param width - Width of the bar in characters (default: 20)
- * @returns Formatted progress bar string like "[████████░░░░░░░░] 8/20"
+ * @returns Formatted progress bar string like "[████████░░░░░░░░]"
  */
 function renderProgressBar(
 	processed: number,
 	total: number,
 	width = 20,
 ): string {
-	if (total === 0) return `[${"░".repeat(width)}] 0/?`;
+	if (total === 0) return `[${"░".repeat(width)}]`;
 
 	const ratio = Math.min(processed / total, 1);
 	const filled = Math.round(ratio * width);
 	const empty = width - filled;
 
 	const bar = "█".repeat(filled) + "░".repeat(empty);
-	return `[${bar}] ${processed}/${total}`;
+	return `[${bar}]`;
 }
 
 /**
@@ -310,11 +310,15 @@ async function scanWithSpinner(
 					scanState.stage = stage;
 					scanState.stageStartedAt = Date.now();
 				} else if (stage === "skip") {
-					// Skipped files are both started and processed
+					// Skipped files count as started AND processed (they complete instantly)
+					scanState.started += 1;
 					scanState.skipped += 1;
 					scanState.processed += 1;
 				} else if (stage === "done") {
-					// File completed
+					// File completed - also count as started if it bypassed start event (fast-path)
+					if (scanState.started < scanState.total) {
+						scanState.started += 1;
+					}
 					scanState.processed += 1;
 					// Track running LLM failure count (only on DoneProgress)
 					if (progress.llmFailures !== undefined) {
@@ -346,8 +350,9 @@ async function scanWithSpinner(
 						scanState.total || 0,
 						16,
 					);
+					const count = `${scanState.processed}/${scanState.total}`;
 					scanSpinner.update({
-						text: `${progressBar} error: ${filename} - ${progress.error}`,
+						text: `${progressBar} ${count} error: ${filename} - ${progress.error}`,
 					});
 					return;
 				}
@@ -357,17 +362,15 @@ async function scanWithSpinner(
 		clearInterval(scanTicker);
 		process.removeListener("SIGINT", cleanup);
 		const elapsed = ((Date.now() - scanStarted) / 1000).toFixed(1);
-		const finalBar = renderProgressBar(
-			scanState.processed,
-			scanState.total || suggestions.length,
-			16,
-		);
+		const total = scanState.total || suggestions.length;
+		const finalBar = renderProgressBar(scanState.processed, total, 16);
+		const finalCount = `${scanState.processed}/${total}`;
 		const finalStats = [];
 		if (scanState.skipped > 0) finalStats.push(`${scanState.skipped} skipped`);
 		if (scanState.errors > 0) finalStats.push(`${scanState.errors} errors`);
 		const statsStr = finalStats.length > 0 ? ` (${finalStats.join(", ")})` : "";
 		scanSpinner.success({
-			text: `${finalBar}${statsStr} in ${elapsed}s`,
+			text: `${finalBar} ${finalCount}${statsStr} in ${elapsed}s`,
 		});
 
 		// Show LLM status messages
