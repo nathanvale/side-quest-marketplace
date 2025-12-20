@@ -39,9 +39,15 @@ interface WebClipperTemplate {
  * Configuration:
  * - Sends all clips to inbox for processing
  * - Sets type:bookmark automatically
- * - Extracts page content (first 2000 chars)
- * - Captures URL metadata (domain, title, date)
+ * - Extracts page content (first 3000 chars)
+ * - Captures URL metadata (domain, date)
+ * - Stores originalTitle for reference (Firecrawl will improve it)
  * - Adds attribution footer
+ *
+ * Note: We don't set a `title` property because:
+ * 1. Obsidian uses the filename as the note title
+ * 2. Firecrawl enrichment generates an improved title
+ * 3. The file is renamed to the improved title during execute
  *
  * Optional: Users can enable Interpreter for LLM summaries.
  */
@@ -57,7 +63,8 @@ const WEBCLIPPER_BOOKMARK_TEMPLATE: WebClipperTemplate = {
 *Clipped from [{{domain}}]({{url}}) on {{date}}*`,
 	properties: [
 		{ name: "type", value: "bookmark", type: "text" },
-		{ name: "title", value: "{{title}}", type: "text" },
+		// originalTitle preserves the raw page title - filename will become the improved title
+		{ name: "originalTitle", value: "{{title}}", type: "text" },
 		{ name: "url", value: "{{url}}", type: "text" },
 		{ name: "clipped", value: "{{date}}", type: "date" },
 		{ name: "domain", value: "{{domain}}", type: "text" },
@@ -111,12 +118,23 @@ export async function handleExportWebClipperTemplate(
 	ctx: CommandContext,
 ): Promise<CommandResult> {
 	try {
-		const { flags, isJson } = ctx;
+		const { flags, isJson, subcommand, positional } = ctx;
 
-		// Parse output path flag
+		// Parse output path flag (-o or --output)
+		// Note: parseArgs may put -o in subcommand and path in positional[0]
 		const filename = "para-bookmark-template.json";
-		const outputPath =
-			typeof flags.output === "string" ? flags.output : filename;
+		let outputPath: string = filename;
+
+		if (typeof flags.output === "string") {
+			outputPath = flags.output;
+		} else if (typeof flags.o === "string") {
+			outputPath = flags.o;
+		} else if (subcommand === "-o" && positional[0]) {
+			// parseArgs quirk: -o becomes subcommand, path becomes positional[0]
+			outputPath = positional[0];
+		} else if (subcommand === "--output" && positional[0]) {
+			outputPath = positional[0];
+		}
 
 		// Resolve and write template
 		const resolvedPath = resolveOutputPath(outputPath);

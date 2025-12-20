@@ -239,6 +239,26 @@ content  Registry  suggestions approve  notes
 - ReDoS protection (validates regex patterns before use)
 - Sanitizes user input for file names and code generation
 
+**Observability & Tracing:**
+- **OpenTelemetry-compatible correlation IDs** following W3C Trace Context specification
+- **Three-tier ID hierarchy** for distributed tracing:
+  - `sessionCid` (trace_id): Session-level identifier present in ALL logs
+  - `cid` (span_id): Unique operation identifier for each logical unit of work
+  - `parentCid` (parent_span_id): Links child operations to their parent
+- **Structured logging** with consistent fields across all subsystems
+- **End-to-end traceability** across async operations (scan → classify → enrich → execute)
+- **Maturity level: 4/5 (Adaptive)** - Full trace correlation with parent-child relationships
+- See `@./OBSERVABILITY_IMPROVEMENTS.md` for implementation details and trace examples
+
+**Example Trace Hierarchy:**
+```
+acdfe223 (Session: para scan, 3.2s)
+├─ e400fff2: inbox:scan (parent: acdfe223)
+│  ├─ df2b9fd7: inbox:processPdf (parent: e400fff2, session: acdfe223)
+│  ├─ eae519bd: enrich:bookmark (parent: e400fff2, session: acdfe223)
+│  └─ 45c84df0: inbox:skipFastPath (parent: e400fff2, session: acdfe223)
+```
+
 ---
 
 ## Configuration

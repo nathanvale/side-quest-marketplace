@@ -231,22 +231,51 @@ pdfLogger.warn`No selectors matched - using fallback`;
 
 **Why:** DEBUG logs can be voluminous; use INFO for successes.
 
-#### Pattern 3: Contextual Properties
+#### Pattern 3: Structured Logging (Recommended)
+
+**Use structured logs with properties object instead of template literals:**
 
 ```typescript
-// Include relevant context in log properties
-executeLogger.info`Note created`, {
+// ✅ GOOD: Structured format with properties object
+inboxLogger.info("Bookmark enrichment started", {
+  event: "enrichment_started",
+  sessionCid,
   cid,
-  path: notePath,
-  template: "invoice",
-  attachments: 1,
-  durationMs: Date.now() - startTime,
+  parentCid,
+  file: file.filename,
+  url,
+  timestamp: new Date().toISOString(),
 });
+
+// ❌ BAD: Template literal (harder to query)
+inboxLogger.info`Bookmark enrichment started file=${file.filename} url=${url}`;
 ```
+
+**Benefits:**
+- Easier jq queries: `jq 'select(.properties.event == "enrichment_started")'`
+- Consistent field structure across logs
+- Type safety with TypeScript
+- Better for automated analysis
 
 **Queryable later:**
 ```bash
+# Find all enrichment operations
+jq 'select(.properties.event == "enrichment_started")' ~/.claude/logs/para-obsidian.jsonl
+
+# Find operations by template type
 jq 'select(.properties.template == "invoice")' ~/.claude/logs/para-obsidian.jsonl
+
+# Find slow operations
+jq 'select(.properties.durationMs > 1000)' ~/.claude/logs/para-obsidian.jsonl
+```
+
+**Event naming convention:**
+```typescript
+// Use snake_case for event names
+"scan_started", "scan_complete"       // Operation lifecycle
+"file_processing_started"              // File operations
+"enrichment_started", "enrichment_ended"  // Sub-operations
+"pdf_extraction_complete"              // Specific tasks
 ```
 
 **PII safety:** When logs sync to cloud storage, mask or omit sensitive extracted fields (names, amounts, IDs) before logging. Prefer short summaries or hashed values over raw content.
@@ -264,24 +293,105 @@ jq 'select(.properties.template == "invoice")' ~/.claude/logs/para-obsidian.json
 
 ## Correlation ID Patterns
 
-### Single Operation Tracking
+### OpenTelemetry-Compatible Three-Tier Hierarchy
+
+**Based on W3C Trace Context specification, used in production at para-obsidian:**
 
 ```typescript
-async function processInbox(vaultPath: string) {
-  const cid = createCorrelationId(); // One cid per top-level operation
+// Three-tier ID hierarchy for distributed tracing:
+// 1. sessionCid (trace_id): Session-level identifier - present in ALL logs
+// 2. cid (span_id): Unique operation identifier for each logical unit of work
+// 3. parentCid (parent_span_id): Links child operations to their parent
+```
 
-  inboxLogger.info`Scan started vault=${vaultPath} cid=${cid}`;
+**Example hierarchy:**
+```
+acdfe223 (Session: para scan, 3.2s)
+├─ e400fff2: inbox:scan (parent: acdfe223)
+│  ├─ df2b9fd7: inbox:processPdf (parent: e400fff2, session: acdfe223)
+│  ├─ eae519bd: enrich:bookmark (parent: e400fff2, session: acdfe223)
+│  └─ 45c84df0: inbox:skipFastPath (parent: e400fff2, session: acdfe223)
+```
 
-  // Pass cid to all sub-operations
-  const pdfs = await scanInbox(vaultPath, cid);
-  const suggestions = await detectTypes(pdfs, cid);
-  const results = await execute(suggestions, cid);
+### Pattern 1: Session-Level Tracking (Recommended)
 
-  inboxLogger.info`Scan complete processed=${results.length} cid=${cid}`;
+**Use when:** You have a top-level operation (CLI command, MCP request) that spawns multiple sub-operations.
+
+```typescript
+// Interface for context passing
+interface ProcessFileContext {
+  /** Session-level correlation ID for linking scan → execute operations */
+  sessionCid: string;
+  /** Parent correlation ID (scan's CID) for trace hierarchy */
+  parentCid: string;
+  file: InboxFile;
+  // ... other fields
+}
+
+async function scan(options?: ScanOptions) {
+  // Create session-level CID once at top level
+  const sessionCid = createCorrelationId();
+  const cid = createCorrelationId(); // This operation's CID
+
+  inboxLogger.info("Scan started", {
+    event: "scan_started",
+    sessionCid,
+    cid,
+    vault: vaultPath,
+    timestamp: new Date().toISOString(),
+  });
+
+  // Pass BOTH sessionCid and parentCid to all sub-operations
+  for (const file of files) {
+    await processSingleFile({
+      sessionCid,      // ✅ Same for entire session
+      parentCid: cid,  // ✅ This scan's CID becomes parent
+      file,
+      // ... other context
+    });
+  }
+
+  inboxLogger.info("Scan complete", {
+    event: "scan_complete",
+    sessionCid,
+    cid,
+    processed: files.length,
+    durationMs: Date.now() - startTime,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+async function processSingleFile(ctx: ProcessFileContext) {
+  const { sessionCid, parentCid, file } = ctx;
+  const cid = createCorrelationId(); // New CID for this file
+
+  // Include ALL three IDs in structured logs
+  pdfLogger.info("File processing started", {
+    event: "file_processing_started",
+    sessionCid,    // ✅ Links back to session
+    cid,           // ✅ This operation's ID
+    parentCid,     // ✅ Links to parent scan
+    file: file.name,
+  });
+
+  // Pass to enrichment pipeline
+  await enrichmentPipeline.processFile(file, {
+    sessionCid,
+    cid,
+    parentCid,  // ✅ Current operation becomes parent for enrichment
+  });
 }
 ```
 
-### Per-Item Tracking
+**Benefits:**
+- ✅ End-to-end traceability across async operations
+- ✅ Can trace all operations for a session: `grep sessionCid=acdfe223`
+- ✅ Can see parent-child relationships: `grep parentCid=e400fff2`
+- ✅ Compatible with OpenTelemetry for future integration
+
+### Pattern 2: Per-Item Tracking (Legacy, Not Recommended)
+
+**Use when:** Simple scripts without session concept.
 
 ```typescript
 for (const file of files) {
@@ -300,10 +410,33 @@ for (const file of files) {
 }
 ```
 
-### Grep Debugging Workflow
+**Limitation:** Cannot trace operations back to originating session.
+
+### Grep Debugging Workflow (Three-Tier IDs)
 
 ```bash
-# Find all logs for a specific operation
+# Find all operations for a session
+grep 'sessionCid=acdfe223' ~/.claude/logs/para-obsidian.jsonl
+
+# Find all children of a specific operation
+grep 'parentCid=e400fff2' ~/.claude/logs/para-obsidian.jsonl
+
+# Find a specific operation and its children
+grep -E '(cid=e400fff2|parentCid=e400fff2)' ~/.claude/logs/para-obsidian.jsonl
+
+# Timeline view with full trace context
+grep 'sessionCid=acdfe223' ~/.claude/logs/para-obsidian.jsonl | \
+  jq -r '."@timestamp" + " | " + (.properties.cid // "N/A") + " | " + (.properties.parentCid // "N/A") + " | " + .message'
+
+# Build hierarchy tree (requires jq post-processing)
+grep 'sessionCid=acdfe223' ~/.claude/logs/para-obsidian.jsonl | \
+  jq -s 'group_by(.properties.parentCid) |
+         map({parent: .[0].properties.parentCid, children: map(.properties.cid)})'
+```
+
+**Legacy single-CID workflow:**
+```bash
+# Find all logs for a specific operation (old pattern)
 grep 'cid=a1b2c3d4' ~/.claude/logs/my-plugin.jsonl
 
 # Pretty-print as JSON
@@ -756,6 +889,62 @@ For local plugins, correlation IDs are sufficient.
 
 ---
 
-**Last Updated:** 2025-12-11
+## Production Reference Implementation
+
+### para-obsidian Plugin
+
+**Location:** `plugins/para-obsidian/`
+
+**Observability Maturity:** 4/5 (Adaptive)
+
+**Key Features:**
+- ✅ OpenTelemetry-compatible three-tier CID hierarchy (sessionCid, cid, parentCid)
+- ✅ Structured logging with properties objects across all subsystems
+- ✅ End-to-end traceability across async operations (scan → classify → enrich → execute)
+- ✅ Full trace correlation with parent-child relationships
+- ✅ Subsystem loggers: inbox, pdf, llm, execute, git, enrich, search, templates, frontmatter, fs, lock, tx, cli, classify
+
+**Files to Study:**
+- `src/shared/logger.ts` - Plugin logger setup with 14 subsystems
+- `src/inbox/core/engine.ts` - Session-level CID threading through file processing
+- `src/inbox/enrich/strategies/bookmark-strategy.ts` - Structured logging in enrichment
+- `OBSERVABILITY_IMPROVEMENTS.md` - Complete implementation details and rationale
+
+**Example Trace:**
+```json
+{
+  "@timestamp": "2025-12-20T21:37:26.567Z",
+  "level": "info",
+  "logger": "para-obsidian.enrich",
+  "message": "Bookmark enrichment started",
+  "properties": {
+    "event": "enrichment_started",
+    "sessionCid": "acdfe223",
+    "cid": "eae519bd",
+    "parentCid": "e400fff2",
+    "file": "bookmark-example.md",
+    "url": "https://example.com"
+  }
+}
+```
+
+**Grep Workflow:**
+```bash
+# Trace entire session
+grep 'sessionCid=acdfe223' ~/.claude/logs/para-obsidian.jsonl
+
+# Timeline view with hierarchy
+grep 'sessionCid=acdfe223' ~/.claude/logs/para-obsidian.jsonl | \
+  jq -r '."@timestamp" + " | " + .properties.cid + " | " + .message'
+```
+
+**References:**
+- W3C Trace Context: https://www.w3.org/TR/trace-context/
+- OpenTelemetry Traces: https://opentelemetry.io/docs/concepts/signals/traces/
+- Observability Review: Agent a1a07a7 (can be resumed for follow-up work)
+
+---
+
+**Last Updated:** 2025-12-20
 **Status:** Production Reference Implementation
-**Related:** [Bun CLI](../bun-cli/SKILL.md), [Bun Runtime](../bun-runtime/SKILL.md)
+**Related:** [Bun CLI](../bun-cli/SKILL.md), [Bun Runtime](../bun-runtime/SKILL.md), [Inbox Processing Expert](../inbox-processing-expert/SKILL.md)

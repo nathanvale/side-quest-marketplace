@@ -49,6 +49,6 @@ export function applyTitlePrefix(
 		return title; // Already has prefix, don't duplicate
 	}
 
-	// Apply prefix with space
-	return `${prefix} ${title}`;
+	// Apply prefix (prefix already includes trailing space if needed)
+	return `${prefix}${title}`;
 }

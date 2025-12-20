@@ -22,6 +22,7 @@
 		"./commands/create-classifier.md",
 		"./commands/create-note-template.md",
 		"./commands/search.md",
+		"./commands/trace.md",
 		"./commands/validate.md"
 	],
 	"mcpServers": ["./.mcp.json"],

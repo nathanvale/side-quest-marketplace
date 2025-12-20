@@ -485,6 +485,6 @@ export const DEFAULT_TITLE_PREFIXES: Partial<Record<string, string>> = {
 	checklist: "✅ ",
 	session: "🧠 ",
 	invoice: "🧾 ",
-	bookmark: "🔖 ",
+	bookmark: "✂️ ",
 	"medical-statement": "🏥 ",
 };
