@@ -11,6 +11,8 @@
  * @module extractors/types
  */
 
+import type { OperationContext } from "../../shared/context";
+
 // =============================================================================
 // Input Types
 // =============================================================================
@@ -64,7 +66,11 @@ export interface ExtractedMetadata {
 	readonly truncated?: boolean;
 	/** Original content length before truncation */
 	readonly originalLength?: number;
-	/** Extraction duration in milliseconds */
+	/**
+	 * Extraction duration in milliseconds.
+	 * Optional - automatically tracked by observe() wrapper.
+	 * @deprecated Use observe() wrapper instead of manual timing
+	 */
 	readonly durationMs?: number;
 	/** Any extraction warnings */
 	readonly warnings?: readonly string[];
@@ -123,10 +129,17 @@ export interface ContentExtractor {
 	 *
 	 * @param file - The inbox file to extract from
 	 * @param cid - Correlation ID for logging
+	 * @param parentCid - Optional parent correlation ID for trace hierarchy
+	 * @param options - Optional operation context (e.g., sessionCid)
 	 * @returns Extracted content with text and metadata
 	 * @throws Error if extraction fails
 	 */
-	extract(file: InboxFile, cid: string): Promise<ExtractedContent>;
+	extract(
+		file: InboxFile,
+		cid: string,
+		parentCid?: string,
+		options?: OperationContext,
+	): Promise<ExtractedContent>;
 }
 
 // =============================================================================

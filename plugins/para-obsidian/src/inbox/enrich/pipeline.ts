@@ -153,7 +153,11 @@ export function createEnrichmentPipeline(config: EnrichmentPipelineConfig) {
 
 		// Apply enrichment
 		try {
-			const mergedOptions = { ...config.defaultOptions, ...options };
+			const mergedOptions: EnrichmentOptions = {
+				...config.defaultOptions,
+				...options,
+				cid, // Ensure cid is always present
+			};
 			const result = await strategy.enrich(ctx, mergedOptions);
 
 			// Apply enrichment to frontmatter based on result type

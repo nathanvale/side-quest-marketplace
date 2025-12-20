@@ -86,6 +86,16 @@ const ERROR_METADATA: Record<ErrorCode, ErrorMetadata> = {
 	},
 
 	// Validation errors
+	VAL_VAULT_NOT_FOUND: {
+		category: "validation",
+		recoverable: false,
+		defaultMessage: "Vault path does not exist",
+	},
+	VAL_PARA_FOLDER_MISSING: {
+		category: "validation",
+		recoverable: false,
+		defaultMessage: "Required PARA folder missing",
+	},
 	VAL_AREA_NOT_FOUND: {
 		category: "validation",
 		recoverable: false,

@@ -16,6 +16,9 @@
 import { constants } from "node:fs";
 import { access, readFile, stat } from "node:fs/promises";
 import { basename, extname } from "node:path";
+import { observe } from "../../../shared/instrumentation";
+import { inboxLogger } from "../../../shared/logger";
+import type { OperationContext } from "../../shared/context";
 import type { ContentExtractor, ExtractedContent, InboxFile } from "./types";
 
 /** Supported image extensions */
@@ -217,45 +220,54 @@ export const imageExtractor: ContentExtractor = {
 		};
 	},
 
-	async extract(file: InboxFile, _cid: string): Promise<ExtractedContent> {
-		const startTime = Date.now();
+	async extract(
+		file: InboxFile,
+		_cid: string,
+		parentCid?: string,
+		options?: OperationContext,
+	): Promise<ExtractedContent> {
+		const { sessionCid } = options ?? {};
 
-		// Validate file exists before processing (TOCTOU mitigation)
-		if (!(await fileExists(file.path))) {
-			throw new Error(`Image file not found: ${file.path}`);
-		}
+		return await observe(
+			inboxLogger,
+			"inbox:extractImage",
+			async () => {
+				// Validate file exists before processing (TOCTOU mitigation)
+				if (!(await fileExists(file.path))) {
+					throw new Error(`Image file not found: ${file.path}`);
+				}
 
-		// Get file size with validation
-		let fileSize: number;
-		try {
-			fileSize = await getImageFileSize(file.path);
-		} catch (error) {
-			throw new Error(
-				`Failed to read image file: ${file.path} - ${error instanceof Error ? error.message : "unknown error"}`,
-			);
-		}
+				// Get file size with validation
+				let fileSize: number;
+				try {
+					fileSize = await getImageFileSize(file.path);
+				} catch (error) {
+					throw new Error(
+						`Failed to read image file: ${file.path} - ${error instanceof Error ? error.message : "unknown error"}`,
+					);
+				}
 
-		// Check file size limit
-		if (fileSize > MAX_IMAGE_SIZE_BYTES) {
-			throw new Error(
-				`Image file too large: ${file.filename} is ${Math.round(fileSize / 1024 / 1024)}MB, max is ${Math.round(MAX_IMAGE_SIZE_BYTES / 1024 / 1024)}MB`,
-			);
-		}
+				// Check file size limit
+				if (fileSize > MAX_IMAGE_SIZE_BYTES) {
+					throw new Error(
+						`Image file too large: ${file.filename} is ${Math.round(fileSize / 1024 / 1024)}MB, max is ${Math.round(MAX_IMAGE_SIZE_BYTES / 1024 / 1024)}MB`,
+					);
+				}
 
-		const mimeType = getMimeType(file.extension);
+				const mimeType = getMimeType(file.extension);
 
-		/**
-		 * Vision API integration - not yet implemented.
-		 *
-		 * When implemented, the extraction should:
-		 * 1. Read image as base64: await readImageAsBase64(file.path)
-		 * 2. Call vision API with VISION_EXTRACTION_PROMPT
-		 * 3. Parse structured response
-		 *
-		 * For now, return a placeholder that allows the pipeline to handle
-		 * images gracefully without blocking inbox processing.
-		 */
-		const stubText = `[Image: ${file.filename}]
+				/**
+				 * Vision API integration - not yet implemented.
+				 *
+				 * When implemented, the extraction should:
+				 * 1. Read image as base64: await readImageAsBase64(file.path)
+				 * 2. Call vision API with VISION_EXTRACTION_PROMPT
+				 * 3. Parse structured response
+				 *
+				 * For now, return a placeholder that allows the pipeline to handle
+				 * images gracefully without blocking inbox processing.
+				 */
+				const stubText = `[Image: ${file.filename}]
 Unable to extract content - vision API not yet configured.
 File type: ${mimeType}
 Size: ${Math.round(fileSize / 1024)} KB
@@ -264,15 +276,23 @@ To enable image extraction, configure one of:
 - GOOGLE_AI_API_KEY for Gemini Vision
 - ANTHROPIC_API_KEY for Claude Vision`;
 
-		return {
-			text: stubText,
-			source: "image",
-			filePath: file.path,
-			metadata: {
-				durationMs: Date.now() - startTime,
-				warnings: ["Vision API not configured - using placeholder extraction"],
+				return {
+					text: stubText,
+					source: "image",
+					filePath: file.path,
+					metadata: {
+						// durationMs removed - observe() tracks this automatically
+						warnings: [
+							"Vision API not configured - using placeholder extraction",
+						],
+					},
+				};
 			},
-		};
+			{
+				parentCid,
+				context: { filename: file.filename, sessionCid },
+			},
+		);
 	},
 };
 

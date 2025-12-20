@@ -16,6 +16,7 @@
 
 import { loadConfig } from "../../../config";
 import { llmLogger } from "../../../shared/logger";
+import type { OperationContext } from "../../shared/context";
 
 // Lazy-loaded LLM module to avoid circular dependencies at module load time
 let llmModule: typeof import("@sidequest/core/llm") | null = null;
@@ -55,9 +56,13 @@ function getConfigTimeoutMs(): number | undefined {
  * 3. Model-aware defaults (60s Claude, 10min Ollama)
  *
  * @param model - The LLM model to get timeout for
+ * @param sessionCid - Optional session correlation ID for logging
  * @returns Timeout in milliseconds
  */
-async function resolveTimeout(model: LLMModel): Promise<number> {
+async function resolveTimeout(
+	model: LLMModel,
+	sessionCid?: string,
+): Promise<number> {
 	// Lazy load to get getDefaultTimeoutMs
 	if (!llmModule) {
 		llmModule = await import("@sidequest/core/llm");
@@ -68,7 +73,15 @@ async function resolveTimeout(model: LLMModel): Promise<number> {
 		getEnvTimeoutMs() ?? getConfigTimeoutMs() ?? getDefaultTimeoutMs(model);
 
 	if (llmLogger) {
-		llmLogger.debug`Resolved timeout for ${model}: ${timeout}ms`;
+		llmLogger.debug(
+			`Resolved timeout for ${model}: ${timeout}ms${sessionCid ? ` ${sessionCid}` : ""}`,
+			{
+				event: "llm_timeout_resolved",
+				model,
+				timeout,
+				...(sessionCid && { sessionCid }),
+			},
+		);
 	}
 
 	return timeout;
@@ -161,18 +174,22 @@ export function createTestLLMClient(
  * @param prompt - The prompt to send to the LLM
  * @param provider - The LLM provider (e.g., "haiku", "sonnet")
  * @param model - Optional specific model override
+ * @param context - Optional operation context with sessionCid
  * @returns LLMCallResult with response text and fallback metadata
  */
 export async function callLLMWithMetadata(
 	prompt: string,
 	provider: string,
 	model?: string,
+	context?: OperationContext,
 ): Promise<LLMCallResult> {
 	// Lazy load once, then reuse cached module
 	if (!llmModule) {
 		llmModule = await import("@sidequest/core/llm");
 	}
 	const { callModel } = llmModule;
+
+	const { sessionCid } = context ?? {};
 
 	// Priority: env var > explicit model param > provider-based default
 	// Cast to satisfy the type - callModel will validate
@@ -181,16 +198,40 @@ export async function callLLMWithMetadata(
 		(provider === "haiku" ? "haiku" : "sonnet")) as LLMModel;
 
 	// Resolve timeout using config cascade
-	const timeoutMs = await resolveTimeout(resolvedModel);
+	const timeoutMs = await resolveTimeout(resolvedModel, sessionCid);
 
 	// If using Claude, try it first with fallback to Ollama
 	if (isClaudeModel(resolvedModel)) {
 		try {
+			if (llmLogger) {
+				llmLogger.debug(
+					`Calling Claude model=${resolvedModel}${sessionCid ? ` ${sessionCid}` : ""}`,
+					{
+						event: "llm_call_started",
+						model: resolvedModel,
+						provider,
+						...(sessionCid && { sessionCid }),
+					},
+				);
+			}
+
 			const response = await callModel({
 				model: resolvedModel,
 				prompt,
 				timeoutMs,
 			});
+
+			if (llmLogger) {
+				llmLogger.debug(
+					`Claude response received model=${resolvedModel}${sessionCid ? ` ${sessionCid}` : ""}`,
+					{
+						event: "llm_call_completed",
+						model: resolvedModel,
+						...(sessionCid && { sessionCid }),
+					},
+				);
+			}
+
 			return {
 				response,
 				modelUsed: resolvedModel,
@@ -207,11 +248,20 @@ export async function callLLMWithMetadata(
 
 			// Log the fallback attempt
 			if (llmLogger) {
-				llmLogger.warn`Claude (${resolvedModel}) failed: ${errorMsg}. Falling back to ${fallbackModel}`;
+				llmLogger.warn(
+					`Claude (${resolvedModel}) failed: ${errorMsg}. Falling back to ${fallbackModel}${sessionCid ? ` ${sessionCid}` : ""}`,
+					{
+						event: "llm_fallback_triggered",
+						primaryModel: resolvedModel,
+						fallbackModel,
+						error: errorMsg,
+						...(sessionCid && { sessionCid }),
+					},
+				);
 			}
 
 			// Resolve timeout for fallback model (critical fix: was using 60s default!)
-			const fallbackTimeoutMs = await resolveTimeout(fallbackModel);
+			const fallbackTimeoutMs = await resolveTimeout(fallbackModel, sessionCid);
 
 			try {
 				const response = await callModel({
@@ -222,7 +272,14 @@ export async function callLLMWithMetadata(
 
 				// Log successful fallback
 				if (llmLogger) {
-					llmLogger.info`Fallback to ${fallbackModel} succeeded`;
+					llmLogger.info(
+						`Fallback to ${fallbackModel} succeeded${sessionCid ? ` ${sessionCid}` : ""}`,
+						{
+							event: "llm_fallback_succeeded",
+							fallbackModel,
+							...(sessionCid && { sessionCid }),
+						},
+					);
 				}
 
 				return {
@@ -237,7 +294,17 @@ export async function callLLMWithMetadata(
 
 				// Log both failures
 				if (llmLogger) {
-					llmLogger.error`Both Claude and fallback failed: claude=${errorMsg} fallback=${fallbackMsg}`;
+					llmLogger.error(
+						`Both Claude and fallback failed: claude=${errorMsg} fallback=${fallbackMsg}${sessionCid ? ` ${sessionCid}` : ""}`,
+						{
+							event: "llm_fallback_failed",
+							primaryModel: resolvedModel,
+							fallbackModel,
+							primaryError: errorMsg,
+							fallbackError: fallbackMsg,
+							...(sessionCid && { sessionCid }),
+						},
+					);
 				}
 
 				// Both failed - throw combined error
@@ -249,11 +316,35 @@ export async function callLLMWithMetadata(
 	}
 
 	// Non-Claude model (Ollama) - call directly with resolved timeout
+	if (llmLogger) {
+		llmLogger.debug(
+			`Calling Ollama model=${resolvedModel}${sessionCid ? ` ${sessionCid}` : ""}`,
+			{
+				event: "llm_call_started",
+				model: resolvedModel,
+				provider,
+				...(sessionCid && { sessionCid }),
+			},
+		);
+	}
+
 	const response = await callModel({
 		model: resolvedModel,
 		prompt,
 		timeoutMs,
 	});
+
+	if (llmLogger) {
+		llmLogger.debug(
+			`Ollama response received model=${resolvedModel}${sessionCid ? ` ${sessionCid}` : ""}`,
+			{
+				event: "llm_call_completed",
+				model: resolvedModel,
+				...(sessionCid && { sessionCid }),
+			},
+		);
+	}
+
 	return {
 		response,
 		modelUsed: resolvedModel,
@@ -270,6 +361,7 @@ export async function callLLMWithMetadata(
  * @param prompt - The prompt to send to the LLM
  * @param provider - The LLM provider (e.g., "haiku", "sonnet")
  * @param model - Optional specific model override
+ * @param context - Optional operation context with sessionCid
  * @returns The LLM response text
  * @deprecated Use callLLMWithMetadata for fallback visibility
  */
@@ -277,7 +369,8 @@ export async function callLLM(
 	prompt: string,
 	provider: string,
 	model?: string,
+	context?: OperationContext,
 ): Promise<string> {
-	const result = await callLLMWithMetadata(prompt, provider, model);
+	const result = await callLLMWithMetadata(prompt, provider, model, context);
 	return result.response;
 }

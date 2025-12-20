@@ -4,8 +4,14 @@
  * Used for alerting and monitoring to detect performance regressions.
  * When operations exceed these thresholds, warnings are logged.
  *
+ * IMPORTANT: Values derived from SLO_DEFINITIONS in slos.ts where applicable.
+ * This ensures consistency between SLO targets and threshold-based alerting.
+ * For operations not covered by SLOs, thresholds are defined independently.
+ *
  * @module inbox/shared/thresholds
  */
+
+import { SLO_DEFINITIONS } from "./slos.js";
 
 /**
  * Performance threshold definitions for various operations.
@@ -13,10 +19,16 @@
  * These values represent maximum expected durations before warnings
  * should be emitted. They're based on typical production performance
  * under normal load.
+ *
+ * SLO-derived thresholds (single source of truth):
+ * - scanTotalMs: From scan_latency SLO (95th percentile target)
+ *
+ * Independent thresholds (not covered by SLOs):
+ * - executeTotalMs, llmCallMs, extractionMs, enrichmentMs, errorRate, llmFailureRate
  */
 export const PERFORMANCE_THRESHOLDS = {
-	/** Maximum expected scan duration in ms (60 seconds) */
-	scanTotalMs: 60_000,
+	/** Maximum expected scan duration in ms - derived from scan_latency SLO */
+	scanTotalMs: SLO_DEFINITIONS.scan_latency?.threshold ?? 60_000,
 
 	/** Maximum expected execute duration in ms (30 seconds) */
 	executeTotalMs: 30_000,

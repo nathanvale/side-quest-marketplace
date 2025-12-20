@@ -31,6 +31,8 @@ export interface ExecutionContext extends ExecutionConfig {
 	registry: ReturnType<typeof import("../registry").createRegistry>;
 	/** Correlation ID for logging */
 	cid: string;
+	/** Session correlation ID for distributed tracing */
+	sessionCid?: string;
 }
 
 /**

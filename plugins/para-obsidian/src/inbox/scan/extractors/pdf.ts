@@ -8,10 +8,13 @@
  */
 
 import { basename, extname } from "node:path";
+import { observe } from "../../../shared/instrumentation";
+import { pdfLogger } from "../../../shared/logger";
 import {
 	checkPdfToText,
 	extractPdfText,
 } from "../../classify/detection/pdf-processor";
+import type { OperationContext } from "../../shared/context";
 import type { ContentExtractor, ExtractedContent, InboxFile } from "./types";
 
 /**
@@ -51,20 +54,35 @@ export const pdfExtractor: ContentExtractor = {
 		};
 	},
 
-	async extract(file: InboxFile, cid: string): Promise<ExtractedContent> {
-		const startTime = Date.now();
+	async extract(
+		file: InboxFile,
+		cid: string,
+		parentCid?: string,
+		options?: OperationContext,
+	): Promise<ExtractedContent> {
+		const { sessionCid } = options ?? {};
 
-		// extractPdfText handles all validation and error cases
-		const text = await extractPdfText(file.path, cid);
+		return await observe(
+			pdfLogger,
+			"pdf:extract",
+			async () => {
+				// extractPdfText handles all validation and error cases
+				const text = await extractPdfText(file.path, cid, parentCid);
 
-		return {
-			text,
-			source: "pdf",
-			filePath: file.path,
-			metadata: {
-				durationMs: Date.now() - startTime,
+				return {
+					text,
+					source: "pdf",
+					filePath: file.path,
+					metadata: {
+						// durationMs removed - observe() tracks this automatically
+					},
+				};
 			},
-		};
+			{
+				parentCid,
+				context: { filename: file.filename, sessionCid },
+			},
+		);
 	},
 };
 

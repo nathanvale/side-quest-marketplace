@@ -201,7 +201,7 @@ describe("imageExtractor", () => {
 			expect(result.text).toContain("1 KB");
 		});
 
-		test("should track extraction duration", async () => {
+		test("should extract placeholder content successfully", async () => {
 			const imagePath = join(testDir, "quick.png");
 			writeFileSync(imagePath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
 
@@ -213,8 +213,12 @@ describe("imageExtractor", () => {
 
 			const result = await imageExtractor.extract(file, "test-cid");
 
-			expect(result.metadata?.durationMs).toBeDefined();
-			expect(result.metadata!.durationMs).toBeGreaterThanOrEqual(0);
+			// durationMs removed - now tracked by observe() wrapper
+			expect(result.source).toBe("image");
+			expect(result.text).toContain("[Image: quick.png]");
+			expect(result.metadata?.warnings).toContain(
+				"Vision API not configured - using placeholder extraction",
+			);
 		});
 	});
 });

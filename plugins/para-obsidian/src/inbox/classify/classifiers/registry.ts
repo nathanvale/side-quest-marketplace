@@ -112,10 +112,15 @@ export class ClassifierRegistry {
 	 *
 	 * @param filename - The document filename
 	 * @param content - The document content
+	 * @param cid - Optional correlation ID for logging
 	 * @returns Match result or null if no converter matches
 	 */
-	findMatch(filename: string, content: string): ConverterMatch | null {
-		return findBestConverter(this.getAll(), filename, content);
+	findMatch(
+		filename: string,
+		content: string,
+		cid?: string,
+	): ConverterMatch | null {
+		return findBestConverter(this.getAll(), filename, content, { cid });
 	}
 
 	/**

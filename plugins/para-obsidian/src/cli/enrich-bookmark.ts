@@ -168,7 +168,7 @@ async function enrichSingleFile(
 			enrichment: {
 				originalTitle,
 				improvedTitle: "[would be improved]",
-				formattedTitle: `Bookmark [would be improved]`,
+				formattedTitle: "[would be improved]", // No prefix - PARA uses folders for organization
 				summary: "[would be generated]",
 				domain: new URL(url).hostname,
 				enrichedAt: new Date().toISOString(),
@@ -178,9 +178,11 @@ async function enrichSingleFile(
 
 	// Perform enrichment
 	try {
+		const { createCorrelationId } = await import("../shared/logger");
 		const enrichment = await enrichBookmarkWithFirecrawl(url, originalTitle, {
 			maxRetries: 3,
 			baseDelayMs: 1000,
+			cid: createCorrelationId(),
 		});
 
 		// Apply to file
@@ -401,9 +403,11 @@ async function handleDirectUrl(
 	const spinner = createSpinner(`Enriching ${url}...`).start();
 
 	try {
+		const { createCorrelationId } = await import("../shared/logger");
 		const enrichment = await enrichBookmarkWithFirecrawl(url, "Untitled", {
 			maxRetries: 3,
 			baseDelayMs: 1000,
+			cid: createCorrelationId(),
 		});
 
 		spinner.success({ text: "Enriched successfully" });

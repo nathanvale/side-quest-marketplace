@@ -14,6 +14,7 @@ import { loadConfig } from "../../config/index";
 import { injectSections } from "../../notes/create";
 import { resolveVaultPath } from "../../shared/fs";
 import type { executeLogger } from "../../shared/logger";
+import type { OperationContext } from "../shared/context";
 import type { AttachmentLinkResult } from "./types";
 
 /**
@@ -28,6 +29,7 @@ import type { AttachmentLinkResult } from "./types";
  * @param attachmentPath - Vault-relative path to attachment
  * @param logger - Optional logger instance
  * @param cid - Correlation ID for logging
+ * @param options - Optional operation context
  * @returns Result with success flag and warnings
  */
 export async function injectAttachmentLink(
@@ -35,7 +37,9 @@ export async function injectAttachmentLink(
 	attachmentPath: string,
 	logger: typeof executeLogger,
 	cid: string,
+	options?: OperationContext,
 ): Promise<AttachmentLinkResult> {
+	const { sessionCid } = options ?? {};
 	try {
 		const paraConfig = loadConfig();
 		const attachmentWikilink = `![[${attachmentPath}]]`;
@@ -46,7 +50,7 @@ export async function injectAttachmentLink(
 
 		if (injectionResult.injected.length > 0) {
 			if (logger) {
-				logger.info`Injected attachment link into section=Attachments ${cid}`;
+				logger.info`Injected attachment link into section=Attachments ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
 			}
 			return { success: true };
 		}
@@ -54,7 +58,7 @@ export async function injectAttachmentLink(
 		// Section doesn't exist - append to end of file
 		if (injectionResult.skipped.length > 0) {
 			if (logger) {
-				logger.warn`No Attachments section found - appending to end of file ${cid}`;
+				logger.warn`No Attachments section found - appending to end of file ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
 			}
 
 			const target = resolveVaultPath(paraConfig.vault, notePath);
@@ -63,7 +67,7 @@ export async function injectAttachmentLink(
 			writeTextFileSync(target.absolute, updatedContent);
 
 			if (logger) {
-				logger.info`Created Attachments section and added link ${cid}`;
+				logger.info`Created Attachments section and added link ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
 			}
 
 			return {
@@ -76,7 +80,7 @@ export async function injectAttachmentLink(
 	} catch (error) {
 		const errorMsg = `Failed to inject attachment link: ${error instanceof Error ? error.message : "unknown"}`;
 		if (logger) {
-			logger.warn`${errorMsg} ${cid}`;
+			logger.warn`${errorMsg} ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
 		}
 		return {
 			success: false,

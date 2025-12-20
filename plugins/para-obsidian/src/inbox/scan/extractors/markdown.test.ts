@@ -399,7 +399,7 @@ Content
 			]);
 		});
 
-		test("should track extraction duration", async () => {
+		test("should extract content successfully", async () => {
 			const mdPath = join(testDir, "duration.md");
 			writeFileSync(mdPath, "Content");
 
@@ -411,8 +411,9 @@ Content
 
 			const result = await markdownExtractor.extract(file, "test-cid");
 
-			expect(result.metadata?.durationMs).toBeDefined();
-			expect(result.metadata!.durationMs).toBeGreaterThanOrEqual(0);
+			// durationMs removed - now tracked by observe() wrapper
+			expect(result.text).toBe("Content");
+			expect(result.source).toBe("markdown");
 		});
 
 		test("should handle empty file", async () => {

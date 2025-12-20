@@ -18,6 +18,7 @@ import { loadConfig } from "../../../config/index";
 import { parseFrontmatter } from "../../../frontmatter/parse";
 import { inboxLogger } from "../../../shared/logger";
 import type { createRegistry } from "../../registry/processed-registry";
+import type { OperationContext } from "../../shared/context";
 import type { ProcessedItem } from "../../types";
 
 /**
@@ -28,13 +29,14 @@ import type { ProcessedItem } from "../../types";
  *
  * @param vaultPath - Absolute path to vault root
  * @param registry - Registry instance for checking processed items
- * @param cid - Correlation ID for logging
+ * @param options - Operation context with sessionCid for tracing
  */
 export async function cleanupOrphanedStaging(
 	vaultPath: string,
 	registry: ReturnType<typeof createRegistry>,
-	cid: string,
+	options?: OperationContext,
 ): Promise<void> {
+	const { sessionCid } = options ?? {};
 	const stagingDir = join(vaultPath, ".inbox-staging");
 	if (!pathExistsSync(stagingDir)) return;
 
@@ -43,7 +45,7 @@ export async function cleanupOrphanedStaging(
 		if (files.length === 0) return;
 
 		if (inboxLogger) {
-			inboxLogger.info`Found ${files.length} orphaned files in staging, attempting cleanup ${cid}`;
+			inboxLogger.info`Found ${files.length} orphaned files in staging, attempting cleanup${sessionCid ? ` ${sessionCid}` : ""}`;
 		}
 
 		for (const file of files) {
@@ -59,7 +61,7 @@ export async function cleanupOrphanedStaging(
 			if (matchingEntry) {
 				// Found registry entry - try to move to final destination
 				if (inboxLogger) {
-					inboxLogger.info`Recovering orphaned staging file: ${file} ${cid}`;
+					inboxLogger.info`Recovering orphaned staging file: ${file}${sessionCid ? ` ${sessionCid}` : ""}`;
 				}
 
 				// Determine final destination from note type
@@ -90,11 +92,11 @@ export async function cleanupOrphanedStaging(
 					registry.markProcessed(updatedItem);
 
 					if (inboxLogger) {
-						inboxLogger.info`Recovered orphaned file to final destination: ${finalPath} ${cid}`;
+						inboxLogger.info`Recovered orphaned file to final destination: ${finalPath}${sessionCid ? ` ${sessionCid}` : ""}`;
 					}
 				} catch (error) {
 					if (inboxLogger) {
-						inboxLogger.warn`Failed to recover orphaned file ${file}: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
+						inboxLogger.warn`Failed to recover orphaned file ${file}: ${error instanceof Error ? error.message : "unknown"}${sessionCid ? ` ${sessionCid}` : ""}`;
 					}
 				}
 			} else {
@@ -108,12 +110,12 @@ export async function cleanupOrphanedStaging(
 						const fs = await import("node:fs");
 						fs.unlinkSync(stagingPath);
 						if (inboxLogger) {
-							inboxLogger.info`Deleted stale orphaned file (>24h): ${file} ${cid}`;
+							inboxLogger.info`Deleted stale orphaned file (>24h): ${file}${sessionCid ? ` ${sessionCid}` : ""}`;
 						}
 					}
 				} catch (error) {
 					if (inboxLogger) {
-						inboxLogger.warn`Failed to check/delete orphaned file ${file}: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
+						inboxLogger.warn`Failed to check/delete orphaned file ${file}: ${error instanceof Error ? error.message : "unknown"}${sessionCid ? ` ${sessionCid}` : ""}`;
 					}
 				}
 			}
@@ -122,7 +124,7 @@ export async function cleanupOrphanedStaging(
 		await registry.save();
 	} catch (error) {
 		if (inboxLogger) {
-			inboxLogger.warn`Failed to cleanup orphaned staging files: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
+			inboxLogger.warn`Failed to cleanup orphaned staging files: ${error instanceof Error ? error.message : "unknown"}${sessionCid ? ` ${sessionCid}` : ""}`;
 		}
 	}
 }

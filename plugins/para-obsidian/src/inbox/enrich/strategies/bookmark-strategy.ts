@@ -13,7 +13,7 @@
  * @module inbox/enrich/strategies/bookmark-strategy
  */
 
-import { enrichLogger } from "../../../shared/logger";
+import { createCorrelationId, enrichLogger } from "../../../shared/logger";
 import { enrichBookmarkWithFirecrawl } from "../bookmark-enricher";
 import {
 	type BookmarkEnrichment,
@@ -79,8 +79,13 @@ export const bookmarkEnrichmentStrategy: EnrichmentStrategy = {
 		const url = frontmatter.url as string;
 		const originalTitle = (frontmatter.title as string) || file.filename;
 
+		// Generate cid for this enrichment operation
+		const cid = options?.cid || createCorrelationId();
+		const sessionCid = options?.sessionCid;
+		const parentCid = options?.parentCid;
+
 		if (log) {
-			log.info`Bookmark enrichment starting file=${file.filename} url=${url}`;
+			log.info`Bookmark enrichment starting sessionCid=${sessionCid} cid=${cid} file=${file.filename} url=${url}`;
 		}
 
 		try {
@@ -89,10 +94,13 @@ export const bookmarkEnrichmentStrategy: EnrichmentStrategy = {
 				baseDelayMs: options?.baseDelayMs ?? 1000,
 				timeout: options?.timeout,
 				llmModel: options?.llmModel,
+				cid,
+				sessionCid,
+				parentCid,
 			});
 
 			if (log) {
-				log.info`Bookmark enrichment success file=${file.filename} title="${enrichment.formattedTitle.slice(0, 50)}..."`;
+				log.info`Bookmark enrichment success sessionCid=${sessionCid} cid=${cid} file=${file.filename} title="${enrichment.formattedTitle.slice(0, 50)}..."`;
 			}
 
 			return {
@@ -102,7 +110,7 @@ export const bookmarkEnrichmentStrategy: EnrichmentStrategy = {
 		} catch (error) {
 			if (log) {
 				const errMsg = error instanceof Error ? error.message : "Unknown error";
-				log.error`Bookmark enrichment failed file=${file.filename} url=${url} error=${errMsg}`;
+				log.error`Bookmark enrichment failed sessionCid=${sessionCid} cid=${cid} file=${file.filename} url=${url} error=${errMsg}`;
 			}
 
 			// Re-throw BookmarkEnrichmentError as-is
@@ -135,6 +143,7 @@ export function applyBookmarkEnrichment(
 	return {
 		...frontmatter,
 		title: enrichment.formattedTitle,
+		improvedTitle: enrichment.improvedTitle,
 		originalTitle: enrichment.originalTitle,
 		summary: enrichment.summary,
 		domain: enrichment.domain,

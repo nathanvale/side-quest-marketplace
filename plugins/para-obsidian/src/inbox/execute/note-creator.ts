@@ -20,6 +20,7 @@ import {
 	mapFieldsToTemplate,
 } from "../classify/classifiers";
 import { generateUniqueNotePath } from "../core/engine-utils";
+import type { OperationContext } from "../shared/context";
 import type { CreateNoteSuggestion, InboxSuggestion } from "../types";
 import type { NoteCreationResult } from "./types";
 
@@ -33,6 +34,7 @@ import type { NoteCreationResult } from "./types";
  * @param vaultPath - Absolute vault root path
  * @param logger - Optional logger instance
  * @param cid - Correlation ID for logging
+ * @param options - Optional operation context
  * @returns Result with notePath or error
  */
 export async function movePreClassifiedNote(
@@ -40,7 +42,9 @@ export async function movePreClassifiedNote(
 	vaultPath: string,
 	logger: typeof executeLogger,
 	cid: string,
+	options?: OperationContext,
 ): Promise<NoteCreationResult> {
+	const { sessionCid } = options ?? {};
 	if (!suggestion.suggestedDestination) {
 		return {
 			success: false,
@@ -59,7 +63,7 @@ export async function movePreClassifiedNote(
 
 		// Log collision if path was modified
 		if (destPath !== initialDestPath) {
-			logger.warn`Pre-classified note collision: renamed to ${basename(destPath)} ${cid}`;
+			logger.warn`Pre-classified note collision: renamed to ${basename(destPath)} ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
 		}
 
 		// Ensure destination directory exists
@@ -72,7 +76,7 @@ export async function movePreClassifiedNote(
 		const notePath = join(suggestion.suggestedDestination, basename(destPath));
 
 		if (logger) {
-			logger.info`Moved pre-classified note from=${suggestion.source} to=${notePath} ${cid}`;
+			logger.info`Moved pre-classified note from=${suggestion.source} to=${notePath} ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
 		}
 
 		return {
@@ -81,7 +85,7 @@ export async function movePreClassifiedNote(
 		};
 	} catch (error) {
 		if (logger) {
-			logger.error`Failed to move pre-classified note: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
+			logger.error`Failed to move pre-classified note: ${error instanceof Error ? error.message : "unknown"} ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
 		}
 		return {
 			success: false,
@@ -102,13 +106,16 @@ export async function movePreClassifiedNote(
  * @param suggestion - Suggestion containing note details
  * @param logger - Optional logger instance
  * @param cid - Correlation ID for logging
+ * @param options - Optional operation context
  * @returns Result with notePath or error
  */
 export async function createNoteFromSuggestion(
 	suggestion: InboxSuggestion,
 	logger: typeof executeLogger,
 	cid: string,
+	options?: OperationContext,
 ): Promise<NoteCreationResult> {
+	const { sessionCid } = options ?? {};
 	if (
 		suggestion.action !== "create-note" ||
 		!suggestion.suggestedNoteType ||
@@ -165,7 +172,7 @@ export async function createNoteFromSuggestion(
 		});
 
 		if (logger) {
-			logger.info`Created note from template=${suggestion.suggestedNoteType} path=${result.filePath} ${cid}`;
+			logger.info`Created note from template=${suggestion.suggestedNoteType} path=${result.filePath} ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
 		}
 
 		return {
@@ -174,7 +181,7 @@ export async function createNoteFromSuggestion(
 		};
 	} catch (error) {
 		if (logger) {
-			logger.error`Failed to create note: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
+			logger.error`Failed to create note: ${error instanceof Error ? error.message : "unknown"} ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
 		}
 		return {
 			success: false,

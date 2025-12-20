@@ -102,6 +102,7 @@ export async function executeSuggestion(
 	}
 
 	let createdNotePath: string | undefined;
+	const { sessionCid } = context;
 
 	// Step 1: Create note FIRST (if needed) - fail early before touching inbox
 	if (
@@ -109,7 +110,9 @@ export async function executeSuggestion(
 		suggestion.suggestedNoteType &&
 		suggestion.suggestedTitle
 	) {
-		const noteResult = await createNoteFromSuggestion(suggestion, logger, cid);
+		const noteResult = await createNoteFromSuggestion(suggestion, logger, cid, {
+			sessionCid,
+		});
 
 		if (!noteResult.success) {
 			// Note creation failed - inbox item stays in place for retry
@@ -125,7 +128,9 @@ export async function executeSuggestion(
 	}
 
 	// Step 2: Move attachment - ROLLBACK note if this fails
-	const moveResult = await moveAttachment(suggestion, context, logger, cid);
+	const moveResult = await moveAttachment(suggestion, context, logger, cid, {
+		sessionCid,
+	});
 
 	if (!moveResult.success) {
 		// Attachment move failed - rollback note if we created one
@@ -152,6 +157,7 @@ export async function executeSuggestion(
 			moveResult.movedTo,
 			logger,
 			cid,
+			{ sessionCid },
 		);
 		// Note: Don't check result - link injection is non-fatal
 	}
@@ -211,6 +217,7 @@ async function executePreClassifiedNote(
 	// Hash the source file before moving (for registry)
 	const sourceAbsPath = join(context.vaultPath, suggestion.source);
 	const sourceHash = await hashFile(sourceAbsPath);
+	const { sessionCid } = context;
 
 	// Move the existing .md file to destination
 	const moveResult = await movePreClassifiedNote(
@@ -218,6 +225,7 @@ async function executePreClassifiedNote(
 		context.vaultPath,
 		logger,
 		cid,
+		{ sessionCid },
 	);
 
 	if (!moveResult.success) {

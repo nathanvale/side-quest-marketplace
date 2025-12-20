@@ -92,7 +92,7 @@ describe("enrichBookmarkWithFirecrawl", () => {
 
 	test("throws INVALID_URL for missing URL", async () => {
 		try {
-			await enrichBookmarkWithFirecrawl("", "Test Title");
+			await enrichBookmarkWithFirecrawl("", "Test Title", { cid: "test-cid" });
 			expect.unreachable("Should have thrown");
 		} catch (error) {
 			expect(error).toBeInstanceOf(BookmarkEnrichmentError);
@@ -104,7 +104,9 @@ describe("enrichBookmarkWithFirecrawl", () => {
 
 	test("throws INVALID_URL for malformed URL", async () => {
 		try {
-			await enrichBookmarkWithFirecrawl("not-a-valid-url", "Test Title");
+			await enrichBookmarkWithFirecrawl("not-a-valid-url", "Test Title", {
+				cid: "test-cid",
+			});
 			expect.unreachable("Should have thrown");
 		} catch (error) {
 			expect(error).toBeInstanceOf(BookmarkEnrichmentError);
@@ -117,7 +119,9 @@ describe("enrichBookmarkWithFirecrawl", () => {
 		delete process.env.FIRECRAWL_API_KEY;
 
 		try {
-			await enrichBookmarkWithFirecrawl("https://example.com", "Test Title");
+			await enrichBookmarkWithFirecrawl("https://example.com", "Test Title", {
+				cid: "test-cid",
+			});
 			expect.unreachable("Should have thrown");
 		} catch (error) {
 			expect(error).toBeInstanceOf(BookmarkEnrichmentError);

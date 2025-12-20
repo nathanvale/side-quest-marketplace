@@ -14,6 +14,9 @@
 import { readFile } from "node:fs/promises";
 import { basename, extname } from "node:path";
 import { parseFrontmatter } from "../../../frontmatter/parse";
+import { observe } from "../../../shared/instrumentation";
+import { inboxLogger } from "../../../shared/logger";
+import type { OperationContext } from "../../shared/context";
 import type { ContentExtractor, ExtractedContent, InboxFile } from "./types";
 
 /** Supported markdown extensions */
@@ -174,76 +177,93 @@ export const markdownExtractor: ContentExtractor = {
 		return { available: true };
 	},
 
-	async extract(file: InboxFile, _cid: string): Promise<ExtractedContent> {
-		const startTime = Date.now();
+	async extract(
+		file: InboxFile,
+		_cid: string,
+		parentCid?: string,
+		options?: OperationContext,
+	): Promise<ExtractedContent> {
+		const { sessionCid } = options ?? {};
 
-		// Read file content with validation
-		let rawContent: string;
-		try {
-			rawContent = await readFile(file.path, "utf-8");
-		} catch (error) {
-			throw new Error(
-				`Failed to read markdown file: ${file.path} - ${error instanceof Error ? error.message : "unknown error"}`,
-			);
-		}
+		return await observe(
+			inboxLogger,
+			"inbox:extractMarkdown",
+			async () => {
+				// Read file content with validation
+				let rawContent: string;
+				try {
+					rawContent = await readFile(file.path, "utf-8");
+				} catch (error) {
+					throw new Error(
+						`Failed to read markdown file: ${file.path} - ${error instanceof Error ? error.message : "unknown error"}`,
+					);
+				}
 
-		// Normalize Windows line endings to Unix
-		const normalizedContent = rawContent.replace(/\r\n/g, "\n");
+				// Normalize Windows line endings to Unix
+				const normalizedContent = rawContent.replace(/\r\n/g, "\n");
 
-		// Parse frontmatter
-		const { attributes, body } = parseFrontmatter(normalizedContent);
-		const hasFrontmatter = Object.keys(attributes).length > 0;
+				// Parse frontmatter
+				const { attributes, body } = parseFrontmatter(normalizedContent);
+				const hasFrontmatter = Object.keys(attributes).length > 0;
 
-		// Extract metadata
-		const title = extractTitle(attributes, body);
-		const tags = extractTags(attributes);
-		const noteType =
-			typeof attributes.type === "string" ? attributes.type : undefined;
+				// Extract metadata
+				const title = extractTitle(attributes, body);
+				const tags = extractTags(attributes);
+				const noteType =
+					typeof attributes.type === "string" ? attributes.type : undefined;
 
-		// Build text for LLM
-		const textParts: string[] = [];
+				// Build text for LLM
+				const textParts: string[] = [];
 
-		// Add frontmatter context
-		const frontmatterText = formatFrontmatterForLLM(attributes);
-		if (frontmatterText) {
-			textParts.push(frontmatterText);
-		}
+				// Add frontmatter context
+				const frontmatterText = formatFrontmatterForLLM(attributes);
+				if (frontmatterText) {
+					textParts.push(frontmatterText);
+				}
 
-		// Add body content
-		const trimmedBody = body.trim();
-		if (trimmedBody) {
-			if (frontmatterText) {
-				textParts.push("\n[Content]");
-			}
-			textParts.push(trimmedBody);
-		}
+				// Add body content
+				const trimmedBody = body.trim();
+				if (trimmedBody) {
+					if (frontmatterText) {
+						textParts.push("\n[Content]");
+					}
+					textParts.push(trimmedBody);
+				}
 
-		const text = textParts.join("\n");
+				const text = textParts.join("\n");
 
-		// Build metadata
-		const metadata: MarkdownExtractionMetadata = {
-			hasFrontmatter,
-			frontmatterFields: hasFrontmatter ? Object.keys(attributes) : undefined,
-			wordCount: countWords(trimmedBody),
-			charCount: trimmedBody.length,
-			lineCount: trimmedBody ? trimmedBody.split("\n").length : 0,
-			hasBody: trimmedBody.length > 0,
-			title,
-			tags: tags.length > 0 ? tags : undefined,
-			noteType,
-		};
+				// Build metadata
+				const metadata: MarkdownExtractionMetadata = {
+					hasFrontmatter,
+					frontmatterFields: hasFrontmatter
+						? Object.keys(attributes)
+						: undefined,
+					wordCount: countWords(trimmedBody),
+					charCount: trimmedBody.length,
+					lineCount: trimmedBody ? trimmedBody.split("\n").length : 0,
+					hasBody: trimmedBody.length > 0,
+					title,
+					tags: tags.length > 0 ? tags : undefined,
+					noteType,
+				};
 
-		return {
-			text,
-			source: "markdown",
-			filePath: file.path,
-			metadata: {
-				durationMs: Date.now() - startTime,
-				// Include markdown-specific metadata in the standard metadata object
-				// by spreading it (cast to satisfy the interface)
-				...(metadata as unknown as Record<string, unknown>),
+				return {
+					text,
+					source: "markdown",
+					filePath: file.path,
+					metadata: {
+						// durationMs removed - observe() tracks this automatically
+						// Include markdown-specific metadata in the standard metadata object
+						// by spreading it (cast to satisfy the interface)
+						...(metadata as unknown as Record<string, unknown>),
+					},
+				};
 			},
-		};
+			{
+				parentCid,
+				context: { filename: file.filename, sessionCid },
+			},
+		);
 	},
 };
 

@@ -23,6 +23,7 @@
 import { basename } from "node:path";
 import { stat } from "@sidequest/core/fs";
 import { $ } from "bun";
+import { observe } from "../../../shared/instrumentation";
 import { pdfLogger } from "../../../shared/logger";
 import { createInboxError, InboxError } from "../../shared/errors";
 import type { InboxConverter } from "../classifiers";
@@ -149,218 +150,236 @@ export async function checkPdfToText(): Promise<PdfToTextCheck> {
  *
  * @param filePath - Path to the PDF file
  * @param cid - Correlation ID for logging
+ * @param parentCid - Optional parent correlation ID for trace hierarchy
  * @returns Extracted text content
  * @throws InboxError if extraction fails
  */
 export async function extractPdfText(
 	filePath: string,
 	cid: string,
+	parentCid?: string,
 ): Promise<string> {
-	log.debug`Extracting PDF text from=${filePath} ${cid}`;
+	return await observe(
+		log,
+		"pdf:extractText",
+		async () => {
+			log.debug`Extracting PDF text from=${filePath} ${cid}`;
 
-	// Check pdftotext availability
-	const check = await checkPdfToText();
-	if (!check.available) {
-		throw createInboxError("DEP_PDFTOTEXT_MISSING", {
-			cid,
-			source: filePath,
-		});
-	}
-
-	// Check file size (pre-extraction)
-	let preExtractionStats: { size: number } | undefined;
-	try {
-		preExtractionStats = await stat(filePath);
-		if (preExtractionStats.size > MAX_PDF_SIZE) {
-			throw createInboxError("EXT_PDF_TOO_LARGE", {
-				cid,
-				source: filePath,
-				fileSize: preExtractionStats.size,
-				maxSize: MAX_PDF_SIZE,
-			});
-		}
-
-		log.debug`PDF file size=${preExtractionStats.size} bytes ${cid}`;
-	} catch (error) {
-		if (error instanceof InboxError) throw error;
-
-		throw createInboxError("EXT_PDF_CORRUPT", {
-			cid,
-			source: filePath,
-			originalError: String(error),
-		});
-	}
-
-	// Extract text with timeout
-	const startTime = Date.now();
-	let proc: ReturnType<typeof Bun.spawn> | null = null;
-
-	try {
-		// Spawn pdftotext subprocess
-		proc = Bun.spawn(["pdftotext", "-layout", filePath, "-"], {
-			stdout: "pipe",
-			stderr: "pipe",
-		});
-
-		// Race the process exit against timeout
-		const result = await Promise.race([
-			proc.exited.then((code) => ({ type: "exit" as const, code })),
-			new Promise<{ type: "timeout" }>((resolve) =>
-				setTimeout(() => resolve({ type: "timeout" }), EXTRACTION_TIMEOUT),
-			),
-		]);
-
-		// Handle timeout
-		if (result.type === "timeout") {
-			log.warn`PDF extraction timeout, killing subprocess ${cid}`;
-			proc.kill();
-			// Give it a moment to die gracefully
-			await Promise.race([
-				proc.exited,
-				new Promise((resolve) => setTimeout(resolve, 1000)),
-			]);
-			throw createInboxError("EXT_PDF_TIMEOUT", {
-				cid,
-				source: filePath,
-				timeout: EXTRACTION_TIMEOUT,
-			});
-		}
-
-		const exitCode = result.code;
-
-		if (exitCode !== 0) {
-			const stderr =
-				proc.stderr && typeof proc.stderr !== "number"
-					? await new Response(proc.stderr).text()
-					: "unknown error";
-			throw new Error(`pdftotext failed with exit code ${exitCode}: ${stderr}`);
-		}
-
-		if (!proc.stdout || typeof proc.stdout === "number") {
-			throw new Error("pdftotext stdout is not available");
-		}
-
-		// Stream stdout and check accumulated size to prevent OOM
-		const reader = proc.stdout.getReader();
-		const chunks: Uint8Array[] = [];
-		let totalSize = 0;
-		let peakMemory = 0;
-		let memoryPressure = false;
-
-		try {
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) break;
-
-				totalSize += value.length;
-				peakMemory = Math.max(peakMemory, totalSize);
-
-				// Check for memory pressure
-				if (totalSize > MEMORY_WARNING_THRESHOLD) {
-					memoryPressure = true;
-					log.warn`PDF extraction memory pressure detected size=${totalSize} threshold=${MEMORY_WARNING_THRESHOLD} ${cid}`;
-				}
-
-				if (totalSize > MAX_TEXT_SIZE) {
-					throw createInboxError("EXT_PDF_TOO_LARGE", {
-						cid,
-						source: filePath,
-						fileSize: totalSize,
-						maxSize: MAX_TEXT_SIZE,
-						reason: "extracted text exceeds limit",
-					});
-				}
-				chunks.push(value);
-
-				// Periodic progress logging for large files
-				if (chunks.length % 100 === 0 && totalSize > STREAM_CHUNK_SIZE) {
-					log.debug`PDF extraction progress size=${totalSize} chunks=${chunks.length} ${cid}`;
-				}
-			}
-		} finally {
-			reader.releaseLock();
-		}
-
-		// Concatenate chunks and decode to string
-		const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-		const combined = new Uint8Array(totalLength);
-		let offset = 0;
-		for (const chunk of chunks) {
-			combined.set(chunk, offset);
-			offset += chunk.length;
-		}
-
-		const text = new TextDecoder().decode(combined).trim();
-		const durationMs = Date.now() - startTime;
-
-		// Create performance metrics
-		const metrics: ExtractionMetrics = {
-			durationMs,
-			fileSizeBytes: preExtractionStats.size,
-			textLength: text.length,
-			peakMemoryBytes: peakMemory,
-			memoryPressure,
-		};
-
-		log.info`PDF extraction complete source=${basename(filePath)} textLength=${text.length} durationMs=${durationMs} peakMemory=${peakMemory} pressure=${memoryPressure} ${cid}`;
-
-		if (text.length === 0) {
-			throw createInboxError("EXT_PDF_EMPTY", {
-				cid,
-				source: filePath,
-				metrics,
-			});
-		}
-
-		// Post-extraction verification: detect TOCTOU attacks
-		try {
-			const postExtractionStats = await stat(filePath);
-			if (postExtractionStats.size > MAX_PDF_SIZE) {
-				throw createInboxError("EXT_PDF_CORRUPT", {
+			// Check pdftotext availability
+			const check = await checkPdfToText();
+			if (!check.available) {
+				throw createInboxError("DEP_PDFTOTEXT_MISSING", {
 					cid,
 					source: filePath,
-					originalError: `File size changed during extraction (possible TOCTOU attack): ${preExtractionStats.size} → ${postExtractionStats.size} bytes`,
 				});
 			}
 
-			// Log if size changed significantly (even if still under limit)
-			const sizeDiff = Math.abs(
-				postExtractionStats.size - preExtractionStats.size,
-			);
-			if (sizeDiff > 0) {
-				log.debug`File size changed during extraction: ${preExtractionStats.size} → ${postExtractionStats.size} bytes ${cid}`;
+			// Check file size (pre-extraction)
+			let preExtractionStats: { size: number } | undefined;
+			try {
+				preExtractionStats = await stat(filePath);
+				if (preExtractionStats.size > MAX_PDF_SIZE) {
+					throw createInboxError("EXT_PDF_TOO_LARGE", {
+						cid,
+						source: filePath,
+						fileSize: preExtractionStats.size,
+						maxSize: MAX_PDF_SIZE,
+					});
+				}
+
+				log.debug`PDF file size=${preExtractionStats.size} bytes ${cid}`;
+			} catch (error) {
+				if (error instanceof InboxError) throw error;
+
+				throw createInboxError("EXT_PDF_CORRUPT", {
+					cid,
+					source: filePath,
+					originalError: String(error),
+				});
 			}
-		} catch (error) {
-			if (error instanceof InboxError) throw error;
 
-			// File was deleted or moved - that's fine, we already extracted
-			log.debug`File no longer accessible after extraction, proceeding ${cid}`;
-		}
+			// Extract text with timeout
+			let proc: ReturnType<typeof Bun.spawn> | null = null;
 
-		return text;
-	} catch (error) {
-		if (error instanceof InboxError) throw error;
+			try {
+				// Spawn pdftotext subprocess
+				proc = Bun.spawn(["pdftotext", "-layout", filePath, "-"], {
+					stdout: "pipe",
+					stderr: "pipe",
+				});
 
-		// Check if process was killed by timeout
-		if (proc?.killed) {
-			throw createInboxError("EXT_PDF_TIMEOUT", {
+				// Race the process exit against timeout
+				const result = await Promise.race([
+					proc.exited.then((code) => ({ type: "exit" as const, code })),
+					new Promise<{ type: "timeout" }>((resolve) =>
+						setTimeout(() => resolve({ type: "timeout" }), EXTRACTION_TIMEOUT),
+					),
+				]);
+
+				// Handle timeout
+				if (result.type === "timeout") {
+					log.warn`PDF extraction timeout, killing subprocess ${cid}`;
+					proc.kill();
+					// Give it a moment to die gracefully
+					await Promise.race([
+						proc.exited,
+						new Promise((resolve) => setTimeout(resolve, 1000)),
+					]);
+					throw createInboxError("EXT_PDF_TIMEOUT", {
+						cid,
+						source: filePath,
+						timeout: EXTRACTION_TIMEOUT,
+					});
+				}
+
+				const exitCode = result.code;
+
+				if (exitCode !== 0) {
+					const stderr =
+						proc.stderr && typeof proc.stderr !== "number"
+							? await new Response(proc.stderr).text()
+							: "unknown error";
+					throw new Error(
+						`pdftotext failed with exit code ${exitCode}: ${stderr}`,
+					);
+				}
+
+				if (!proc.stdout || typeof proc.stdout === "number") {
+					throw new Error("pdftotext stdout is not available");
+				}
+
+				// Stream stdout and check accumulated size to prevent OOM
+				const reader = proc.stdout.getReader();
+				const chunks: Uint8Array[] = [];
+				let totalSize = 0;
+				let peakMemory = 0;
+				let memoryPressure = false;
+
+				try {
+					while (true) {
+						const { done, value } = await reader.read();
+						if (done) break;
+
+						totalSize += value.length;
+						peakMemory = Math.max(peakMemory, totalSize);
+
+						// Check for memory pressure
+						if (totalSize > MEMORY_WARNING_THRESHOLD) {
+							memoryPressure = true;
+							log.warn`PDF extraction memory pressure detected size=${totalSize} threshold=${MEMORY_WARNING_THRESHOLD} ${cid}`;
+						}
+
+						if (totalSize > MAX_TEXT_SIZE) {
+							throw createInboxError("EXT_PDF_TOO_LARGE", {
+								cid,
+								source: filePath,
+								fileSize: totalSize,
+								maxSize: MAX_TEXT_SIZE,
+								reason: "extracted text exceeds limit",
+							});
+						}
+						chunks.push(value);
+
+						// Periodic progress logging for large files
+						if (chunks.length % 100 === 0 && totalSize > STREAM_CHUNK_SIZE) {
+							log.debug`PDF extraction progress size=${totalSize} chunks=${chunks.length} ${cid}`;
+						}
+					}
+				} finally {
+					reader.releaseLock();
+				}
+
+				// Concatenate chunks and decode to string
+				const totalLength = chunks.reduce(
+					(sum, chunk) => sum + chunk.length,
+					0,
+				);
+				const combined = new Uint8Array(totalLength);
+				let offset = 0;
+				for (const chunk of chunks) {
+					combined.set(chunk, offset);
+					offset += chunk.length;
+				}
+
+				const text = new TextDecoder().decode(combined).trim();
+
+				// Log completion with metrics (duration tracked by observe())
+				log.info("PDF extraction complete", {
+					event: "pdf_extraction_complete",
+					cid,
+					...(parentCid && { parentCid }),
+					source: basename(filePath),
+					textLength: text.length,
+					peakMemory,
+					memoryPressure,
+					timestamp: new Date().toISOString(),
+				});
+
+				if (text.length === 0) {
+					throw createInboxError("EXT_PDF_EMPTY", {
+						cid,
+						source: filePath,
+					});
+				}
+
+				// Post-extraction verification: detect TOCTOU attacks
+				try {
+					const postExtractionStats = await stat(filePath);
+					if (postExtractionStats.size > MAX_PDF_SIZE) {
+						throw createInboxError("EXT_PDF_CORRUPT", {
+							cid,
+							source: filePath,
+							originalError: `File size changed during extraction (possible TOCTOU attack): ${preExtractionStats.size} → ${postExtractionStats.size} bytes`,
+						});
+					}
+
+					// Log if size changed significantly (even if still under limit)
+					const sizeDiff = Math.abs(
+						postExtractionStats.size - preExtractionStats.size,
+					);
+					if (sizeDiff > 0) {
+						log.debug`File size changed during extraction: ${preExtractionStats.size} → ${postExtractionStats.size} bytes ${cid}`;
+					}
+				} catch (error) {
+					if (error instanceof InboxError) throw error;
+
+					// File was deleted or moved - that's fine, we already extracted
+					log.debug`File no longer accessible after extraction, proceeding ${cid}`;
+				}
+
+				return text;
+			} catch (error) {
+				if (error instanceof InboxError) throw error;
+
+				// Check if process was killed by timeout
+				if (proc?.killed) {
+					throw createInboxError("EXT_PDF_TIMEOUT", {
+						cid,
+						source: filePath,
+						timeout: EXTRACTION_TIMEOUT,
+					});
+				}
+
+				throw createInboxError("EXT_PDF_CORRUPT", {
+					cid,
+					source: filePath,
+					originalError: String(error),
+				});
+			} finally {
+				// Safety net: ensure subprocess is killed on any exit path
+				if (proc && !proc.killed) {
+					proc.kill();
+				}
+			}
+		},
+		{
+			context: {
+				source: basename(filePath),
 				cid,
-				source: filePath,
-				timeout: EXTRACTION_TIMEOUT,
-			});
-		}
-
-		throw createInboxError("EXT_PDF_CORRUPT", {
-			cid,
-			source: filePath,
-			originalError: String(error),
-		});
-	} finally {
-		// Safety net: ensure subprocess is killed on any exit path
-		if (proc && !proc.killed) {
-			proc.kill();
-		}
-	}
+				...(parentCid && { parentCid }),
+			},
+		},
+	);
 }
 
 // =============================================================================
@@ -373,14 +392,16 @@ export async function extractPdfText(
  * @param filename - Filename to analyze
  * @param content - Text content to analyze
  * @param converters - Array of converters to match against
+ * @param cid - Optional correlation ID for logging
  * @returns Detection result with type and confidence, or null if no match
  */
 export function detectWithConverters(
 	filename: string,
 	content: string,
 	converters: readonly InboxConverter[],
+	cid?: string,
 ): { type: string; confidence: number } | null {
-	const match = findBestConverter(converters, filename, content);
+	const match = findBestConverter(converters, filename, content, { cid });
 	if (!match) return null;
 	return { type: match.converter.id, confidence: match.score };
 }

@@ -14,6 +14,7 @@ import { ensureDirSync, moveFile, pathExistsSync } from "@sidequest/core/fs";
 import type { executeLogger } from "../../shared/logger";
 import { generateFilename, getHashPrefix } from "../core/engine-utils";
 import { hashFile } from "../registry";
+import type { OperationContext } from "../shared/context";
 import type { InboxSuggestion } from "../types";
 import type { AttachmentMoveResult } from "./types";
 
@@ -66,6 +67,7 @@ export function generateHashedFilename(
  * @param config - Vault configuration
  * @param logger - Optional logger instance
  * @param cid - Correlation ID for logging
+ * @param options - Optional operation context
  * @returns Result with movedTo path and hash, or error
  */
 export async function moveAttachment(
@@ -73,12 +75,14 @@ export async function moveAttachment(
 	config: { vaultPath: string; inboxFolder: string; attachmentsFolder: string },
 	logger: typeof executeLogger,
 	cid: string,
+	options?: OperationContext,
 ): Promise<AttachmentMoveResult> {
+	const { sessionCid } = options ?? {};
 	const sourcePath = join(config.vaultPath, suggestion.source);
 	const filename = basename(suggestion.source);
 
 	if (logger) {
-		logger.debug`Moving attachment source=${filename} ${cid}`;
+		logger.debug`Moving attachment source=${filename} ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
 	}
 
 	// Hash source file FIRST - this provides our unique ID
@@ -102,7 +106,7 @@ export async function moveAttachment(
 	const vaultRelativePath = join(config.attachmentsFolder, hashedFilename);
 
 	if (logger) {
-		logger.debug`Generated filename=${hashedFilename} hash=${getHashPrefix(hash)} ${cid}`;
+		logger.debug`Generated filename=${hashedFilename} hash=${getHashPrefix(hash)} ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
 	}
 
 	// TOCTOU protection: Check file still exists before moving
@@ -121,7 +125,7 @@ export async function moveAttachment(
 		await moveFile(sourcePath, finalDest);
 	} catch (error) {
 		if (logger) {
-			logger.error`Failed to move attachment: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
+			logger.error`Failed to move attachment: ${error instanceof Error ? error.message : "unknown"} ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
 		}
 		return {
 			success: false,
@@ -130,7 +134,7 @@ export async function moveAttachment(
 	}
 
 	if (logger) {
-		logger.info`Moved attachment to=${vaultRelativePath} ${cid}`;
+		logger.info`Moved attachment to=${vaultRelativePath} ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
 	}
 
 	return {

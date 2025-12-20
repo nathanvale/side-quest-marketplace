@@ -6,6 +6,7 @@
  * @module classifiers/loader
  */
 
+import { classifyLogger } from "../../../shared/logger";
 import type { ConverterMatch, HeuristicPattern, InboxConverter } from "./types";
 
 /**
@@ -85,23 +86,42 @@ export function scoreContent(
 }
 
 /**
+ * Options for finding the best converter.
+ */
+export interface FindConverterOptions {
+	/** Correlation ID for logging */
+	cid?: string;
+}
+
+/**
  * Find the best matching converter for a file
  * @param converters - Available converters sorted by priority
  * @param filename - The filename to match
  * @param content - The document content to match
+ * @param options - Optional configuration including correlation ID
  * @returns Matched converter with score, or null if no match
  */
 export function findBestConverter(
 	converters: readonly InboxConverter[],
 	filename: string,
 	content: string,
+	options?: FindConverterOptions,
 ): ConverterMatch | null {
+	const { cid } = options ?? {};
+
 	// Sort by priority (higher first)
 	const sorted = [...converters]
 		.filter((c) => c.enabled)
 		.sort((a, b) => b.priority - a.priority);
 
 	let bestMatch: ConverterMatch | null = null;
+	const candidateScores: Array<{
+		id: string;
+		filenameScore: number;
+		contentScore: number;
+		combined: number;
+		threshold: number;
+	}> = [];
 
 	for (const converter of sorted) {
 		const { heuristics } = converter;
@@ -110,19 +130,63 @@ export function findBestConverter(
 		const filenameScore = scoreFilename(filename, heuristics.filenamePatterns);
 		const contentScore = scoreContent(content, heuristics.contentMarkers);
 
+		// Track scores for logging
+		const combinedScore = filenameScore * 0.6 + contentScore * 0.4;
+		candidateScores.push({
+			id: converter.id,
+			filenameScore,
+			contentScore,
+			combined: combinedScore,
+			threshold,
+		});
+
 		// Strong filename match (1.0) is authoritative - user named the file intentionally
 		// This prevents content-heavy classifiers from overriding explicit filename signals
 		if (filenameScore === 1.0) {
+			if (classifyLogger) {
+				classifyLogger.info("Classifier matched by filename", {
+					filename,
+					classifierId: converter.id,
+					filenameScore,
+					contentScore,
+					reason: "authoritative_filename",
+					cid,
+				});
+			}
 			return { converter, score: 1.0 };
 		}
-
-		// Combine scores (filename weighted slightly higher for initial detection)
-		const combinedScore = filenameScore * 0.6 + contentScore * 0.4;
 
 		if (combinedScore >= threshold) {
 			if (!bestMatch || combinedScore > bestMatch.score) {
 				bestMatch = { converter, score: combinedScore };
 			}
+		}
+	}
+
+	// Log the decision
+	if (classifyLogger) {
+		if (bestMatch) {
+			classifyLogger.info("Classifier matched by heuristics", {
+				filename,
+				classifierId: bestMatch.converter.id,
+				score: bestMatch.score,
+				candidatesEvaluated: candidateScores.length,
+				cid,
+			});
+			// Log all candidate scores at debug level for detailed analysis
+			classifyLogger.debug("Classifier candidate scores", {
+				filename,
+				candidates: candidateScores,
+				selectedId: bestMatch.converter.id,
+				cid,
+			});
+		} else {
+			classifyLogger.debug("No classifier matched", {
+				filename,
+				candidatesEvaluated: candidateScores.length,
+				candidates: candidateScores,
+				cid,
+			});
 		}
 	}
 

@@ -58,8 +58,14 @@ export interface EnrichmentOptions {
 	/** LLM model to use for title/summary improvement */
 	readonly llmModel?: string;
 
-	/** Correlation ID for logging (optional) */
-	readonly cid?: string;
+	/** Operation correlation ID for trace hierarchy (required) */
+	readonly cid: string;
+
+	/** Session-level correlation ID for linking operations (optional) */
+	readonly sessionCid?: string;
+
+	/** Parent correlation ID for trace hierarchy (optional) */
+	readonly parentCid?: string;
 }
 
 /**
