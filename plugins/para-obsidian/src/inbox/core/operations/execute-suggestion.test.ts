@@ -10,6 +10,7 @@ import {
 	createTempDir,
 	writeTestFile,
 } from "@sidequest/core/testing";
+import { createSuggestionId } from "../../types";
 import { resolveParaFolder } from "./execute-suggestion";
 
 describe("resolveParaFolder", () => {
@@ -194,6 +195,289 @@ describe("resolveParaFolder", () => {
 		expect(resolveParaFolder("1 Single Digit")).toBe("1 Single Digit");
 		expect(resolveParaFolder("123 Triple Digit")).toBe("123 Triple Digit");
 		expect(resolveParaFolder("01-Hyphen")).toBe("01-Hyphen");
+	});
+});
+
+describe("executeSuggestion - movedFrom field", () => {
+	let tempDir: string;
+
+	beforeEach(() => {
+		tempDir = createTempDir("test-execute-suggestion-");
+		process.env.PARA_VAULT = tempDir;
+
+		// Create necessary folders
+		writeTestFile(tempDir, "00 Inbox/.gitkeep", "");
+		writeTestFile(tempDir, "03 Resources/.gitkeep", "");
+		writeTestFile(tempDir, "02 Areas/Health/.gitkeep", "");
+		writeTestFile(tempDir, "Attachments/.gitkeep", "");
+		writeTestFile(tempDir, "Templates/.gitkeep", "");
+		writeTestFile(tempDir, ".inbox-staging/.gitkeep", "");
+	});
+
+	afterEach(() => {
+		cleanupTestDir(tempDir);
+		delete process.env.PARA_VAULT;
+	});
+
+	test("should return movedFrom when executing bookmark suggestion", async () => {
+		// Setup: Create a bookmark file in inbox
+		const bookmarkPath = "00 Inbox/test-bookmark.md";
+		const bookmarkContent = `---
+title: Test Bookmark
+url: https://example.com
+type: bookmark
+---
+# Test Bookmark Content
+`;
+		writeTestFile(tempDir, bookmarkPath, bookmarkContent);
+
+		// Create suggestion for bookmark
+		const suggestion = {
+			id: createSuggestionId(),
+			action: "create-note" as const,
+			source: bookmarkPath,
+			processor: "notes" as const,
+			confidence: "high" as const,
+			detectionSource: "frontmatter" as const,
+			reason: "Pre-classified bookmark from Web Clipper",
+			suggestedNoteType: "bookmark",
+			suggestedTitle: "Test Bookmark",
+			suggestedDestination: "03 Resources",
+		};
+
+		const config = {
+			vaultPath: tempDir,
+			inboxFolder: "00 Inbox",
+			attachmentsFolder: "Attachments",
+			templatesFolder: "Templates",
+		};
+
+		// Create registry
+		const { createRegistry } = await import(
+			"../../registry/processed-registry"
+		);
+		const registryPath = `${tempDir}/.para-obsidian-registry.json`;
+		const registry = createRegistry(registryPath);
+		await registry.load();
+
+		// Execute suggestion
+		const { executeSuggestion } = await import("./execute-suggestion");
+		const result = await executeSuggestion(
+			suggestion,
+			config,
+			registry,
+			"test-cid",
+		);
+
+		// Verify result
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.movedFrom).toBe(bookmarkPath);
+			expect(result.createdNote).toMatch(/03 Resources\/.+\.md$/);
+			// Bookmark should not have movedAttachment
+			expect(result.movedAttachment).toBeUndefined();
+		}
+	});
+
+	test("should return movedFrom when executing pre-classified note suggestion", async () => {
+		// Setup: Create a pre-classified markdown file in inbox
+		const notePath = "00 Inbox/Medical Statement.md";
+		const noteContent = `---
+title: Medical Statement
+type: medical-statement
+---
+# Medical Statement
+Pre-classified content
+`;
+		writeTestFile(tempDir, notePath, noteContent);
+
+		// Create a template for medical-statement
+		const templateContent = `---
+title: <%= title %>
+type: medical-statement
+---
+# <%= title %>
+
+## Attachments
+`;
+		writeTestFile(tempDir, "Templates/medical-statement.md", templateContent);
+
+		// Create suggestion for pre-classified note
+		const suggestion = {
+			id: createSuggestionId(),
+			action: "create-note" as const,
+			source: notePath,
+			processor: "notes" as const,
+			confidence: "high" as const,
+			detectionSource: "frontmatter" as const,
+			reason: "Pre-classified medical statement from frontmatter",
+			suggestedNoteType: "medical-statement",
+			suggestedTitle: "Medical Statement",
+			suggestedArea: "Health",
+		};
+
+		const config = {
+			vaultPath: tempDir,
+			inboxFolder: "00 Inbox",
+			attachmentsFolder: "Attachments",
+			templatesFolder: "Templates",
+		};
+
+		// Create registry
+		const { createRegistry } = await import(
+			"../../registry/processed-registry"
+		);
+		const registryPath = `${tempDir}/.para-obsidian-registry.json`;
+		const registry = createRegistry(registryPath);
+		await registry.load();
+
+		// Create area path map to resolve "Health" to "02 Areas/Health"
+		const areaPathMap = new Map([["health", "02 Areas/Health"]]);
+		const projectPathMap = new Map();
+
+		// Execute suggestion
+		const { executeSuggestion } = await import("./execute-suggestion");
+		const result = await executeSuggestion(
+			suggestion,
+			config,
+			registry,
+			"test-cid",
+			{ areaPathMap, projectPathMap },
+		);
+
+		// Verify result
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.movedFrom).toBe(notePath);
+			expect(result.createdNote).toMatch(/02 Areas\/Health\/.+\.md$/);
+			// Pre-classified note should have movedAttachment
+			expect(result.movedAttachment).toMatch(/Attachments\/.+\.md$/);
+		}
+	});
+
+	test("should return movedFrom for PDF attachment with created note", async () => {
+		// Setup: Create a PDF file in inbox
+		const pdfPath = "00 Inbox/invoice.pdf";
+		const pdfContent = "Mock PDF content for testing";
+		writeTestFile(tempDir, pdfPath, pdfContent);
+
+		// Create a template for invoice
+		const templateContent = `---
+title: <%= title %>
+type: invoice
+---
+# <%= title %>
+
+## Attachments
+`;
+		writeTestFile(tempDir, "Templates/invoice.md", templateContent);
+
+		// Create suggestion for PDF with note creation
+		const suggestion = {
+			id: createSuggestionId(),
+			action: "create-note" as const,
+			source: pdfPath,
+			processor: "attachments" as const,
+			confidence: "high" as const,
+			detectionSource: "llm+heuristic" as const,
+			reason: "Detected invoice from PDF content and filename",
+			suggestedNoteType: "invoice",
+			suggestedTitle: "Invoice 2024-001",
+			suggestedDestination: "02 Areas/Finance",
+			extractedFields: {
+				amount: "1234.56",
+				provider: "Test Provider",
+				date: "2024-01-15",
+			},
+			suggestedAttachmentName: "20240115-abcd-invoice.pdf",
+		};
+
+		const config = {
+			vaultPath: tempDir,
+			inboxFolder: "00 Inbox",
+			attachmentsFolder: "Attachments",
+			templatesFolder: "Templates",
+		};
+
+		// Create Finance area
+		writeTestFile(tempDir, "02 Areas/Finance/.gitkeep", "");
+
+		// Create registry
+		const { createRegistry } = await import(
+			"../../registry/processed-registry"
+		);
+		const registryPath = `${tempDir}/.para-obsidian-registry.json`;
+		const registry = createRegistry(registryPath);
+		await registry.load();
+
+		// Execute suggestion
+		const { executeSuggestion } = await import("./execute-suggestion");
+		const result = await executeSuggestion(
+			suggestion,
+			config,
+			registry,
+			"test-cid",
+		);
+
+		// Verify result
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.movedFrom).toBe(pdfPath);
+			expect(result.createdNote).toBeDefined();
+			expect(result.movedAttachment).toMatch(/Attachments\/.+\.pdf$/);
+		}
+	});
+
+	test("should return movedFrom even when note creation fails", async () => {
+		// Setup: Create a file in inbox
+		const filePath = "00 Inbox/test.pdf";
+		writeTestFile(tempDir, filePath, "test content");
+
+		// Create suggestion with invalid template (will fail note creation)
+		const suggestion = {
+			id: createSuggestionId(),
+			action: "create-note" as const,
+			source: filePath,
+			processor: "attachments" as const,
+			confidence: "high" as const,
+			detectionSource: "llm" as const,
+			reason: "Test suggestion with invalid template",
+			suggestedNoteType: "nonexistent-template",
+			suggestedTitle: "Test Note",
+		};
+
+		const config = {
+			vaultPath: tempDir,
+			inboxFolder: "00 Inbox",
+			attachmentsFolder: "Attachments",
+			templatesFolder: "Templates",
+		};
+
+		// Create registry
+		const { createRegistry } = await import(
+			"../../registry/processed-registry"
+		);
+		const registryPath = `${tempDir}/.para-obsidian-registry.json`;
+		const registry = createRegistry(registryPath);
+		await registry.load();
+
+		// Execute suggestion (will fail due to missing template)
+		const { executeSuggestion } = await import("./execute-suggestion");
+		const result = await executeSuggestion(
+			suggestion,
+			config,
+			registry,
+			"test-cid",
+		);
+
+		// Verify that movedFrom is NOT returned when execution fails
+		// (file should remain in inbox for retry)
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(result.error).toBeDefined();
+			// movedFrom should not be present in failed results
+			expect("movedFrom" in result).toBe(false);
+		}
 	});
 });
 

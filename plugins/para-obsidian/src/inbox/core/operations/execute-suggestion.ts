@@ -26,6 +26,7 @@ import {
 // Note: autoCommitChanges removed - commits are now batched at session level in engine.ts
 import { createFromTemplate, injectSections } from "../../../notes/create";
 import { resolveVaultPath } from "../../../shared/fs";
+import { categorizeError, observe } from "../../../shared/instrumentation";
 import { executeLogger } from "../../../shared/logger";
 import {
 	DEFAULT_CLASSIFIERS,
@@ -235,6 +236,7 @@ export function resolveParaFolder(
  * @param options - Optional execution options
  * @param options.areaPathMap - Pre-built map of area names to paths (performance optimization)
  * @param options.projectPathMap - Pre-built map of project names to paths (performance optimization)
+ * @param options.sessionCid - Session-level correlation ID for trace hierarchy
  * @returns Execution result
  */
 export async function executeSuggestion(
@@ -245,500 +247,578 @@ export async function executeSuggestion(
 	options?: {
 		areaPathMap?: Map<string, string>;
 		projectPathMap?: Map<string, string>;
+		sessionCid?: string;
 	},
 ): Promise<ExecutionResult> {
-	const sourcePath = join(config.vaultPath, suggestion.source);
-	const filename = basename(suggestion.source);
+	const { sessionCid } = options ?? {};
 
-	// Load para-obsidian config once for all operations (template creation, staging, injection, auto-commit)
-	const paraConfig = loadConfig();
+	return await observe(
+		executeLogger,
+		"execute:suggestion",
+		async () => {
+			const sourcePath = join(config.vaultPath, suggestion.source);
+			const filename = basename(suggestion.source);
 
-	if (executeLogger) {
-		executeLogger.debug`Executing suggestion id=${suggestion.id} action=${suggestion.action} source=${filename} ${cid}`;
-	}
-
-	// Hash the SOURCE file FIRST - this provides our unique ID for filename generation
-	let hash: string;
-	try {
-		hash = await hashFile(sourcePath);
-	} catch (error) {
-		return {
-			suggestionId: suggestion.id,
-			success: false,
-			action: suggestion.action,
-			error: `Failed to hash source file: ${error instanceof Error ? error.message : "unknown"}`,
-		};
-	}
-
-	// Generate attachment filename with hash prefix
-	// Format: YYYYMMDD-hash4-description.ext (hash guarantees uniqueness)
-	let hashedFilename: string;
-
-	// Extract suggestedAttachmentName if present on the suggestion type
-	// (available on create-note, move, rename, and link suggestions)
-	const suggestedName =
-		"suggestedAttachmentName" in suggestion
-			? suggestion.suggestedAttachmentName
-			: undefined;
-
-	const hashPrefix = getHashPrefix(hash);
-
-	if (suggestedName) {
-		// Use the pre-generated attachment name from scan phase
-		hashedFilename = suggestedName;
-	} else {
-		// Fallback: generate filename using available suggestion data
-		const noteType =
-			"suggestedNoteType" in suggestion
-				? suggestion.suggestedNoteType
-				: undefined;
-		const fields =
-			"extractedFields" in suggestion ? suggestion.extractedFields : undefined;
-		hashedFilename = generateFilename(
-			suggestion.source,
-			hash,
-			noteType,
-			fields,
-		);
-	}
-
-	const attachmentDest = join(
-		config.vaultPath,
-		config.attachmentsFolder,
-		hashedFilename,
-	);
-	const movedAttachmentPath = join(config.attachmentsFolder, hashedFilename);
-
-	if (executeLogger) {
-		executeLogger.debug`Generated filename=${hashedFilename} hash=${hashPrefix} ${cid}`;
-	}
-
-	let createdNotePath: string | undefined;
-	let stagingNotePath: string | undefined;
-
-	// Layer 2: Mark operation as in-progress in registry before any writes
-	// This allows cleanup job to detect interrupted operations
-	const inProgressMarker = {
-		sourceHash: hash,
-		sourcePath: suggestion.source,
-		processedAt: new Date().toISOString(),
-		inProgress: true,
-	};
-	registry.markInProgress(inProgressMarker);
-	await registry.save();
-
-	// Bookmarks are special: the source .md file IS the note (already has frontmatter+content)
-	// Skip template creation and move the file directly to destination instead of Attachments
-	const isBookmark =
-		suggestion.action === "create-note" &&
-		suggestion.suggestedNoteType === "bookmark";
-
-	// Create note FIRST if action is create-note (before moving attachment)
-	// Layer 1: Use staging directory pattern for atomic operations
-	if (
-		suggestion.action === "create-note" &&
-		suggestion.suggestedNoteType &&
-		suggestion.suggestedTitle &&
-		!isBookmark // Skip template creation for bookmarks
-	) {
-		try {
-			// Build args from suggestion using converter field mappings
-			let args: Record<string, string> = {};
-
-			// Find converter for this note type to get field mappings
-			const converter = DEFAULT_CLASSIFIERS.find(
-				(c) => c.id === suggestion.suggestedNoteType,
-			);
-
-			// Map extracted fields using converter (LLM keys → Templater prompts)
-			if (suggestion.extractedFields && converter) {
-				args = mapFieldsToTemplate(suggestion.extractedFields, converter);
-			} else if (suggestion.extractedFields) {
-				// Fallback: use raw field names if no converter found
-				for (const [key, value] of Object.entries(suggestion.extractedFields)) {
-					if (typeof value === "string") {
-						args[key] = value;
-					} else if (value !== null && value !== undefined) {
-						args[key] = String(value);
-					}
-				}
-			}
-
-			// Add area/project if suggested (use exact Templater prompt text as keys)
-			// Wrap in wikilink format [[...]] as required by frontmatter validation
-			if (suggestion.suggestedArea) {
-				args["Area (leave empty if using project)"] =
-					`[[${suggestion.suggestedArea}]]`;
-			}
-			if (suggestion.suggestedProject) {
-				args["Project (leave empty if using area)"] =
-					`[[${suggestion.suggestedProject}]]`;
-			}
-
-			// Create note in staging directory first (.inbox-staging)
-			const stagingDir = join(config.vaultPath, ".inbox-staging");
-			ensureDirSync(stagingDir);
-
-			const result = createFromTemplate(paraConfig, {
-				template: suggestion.suggestedNoteType,
-				title: suggestion.suggestedTitle,
-				dest: ".inbox-staging", // Stage in temp location
-				args,
-			});
-
-			stagingNotePath = result.filePath;
+			// Load para-obsidian config once for all operations (template creation, staging, injection, auto-commit)
+			const paraConfig = loadConfig();
 
 			if (executeLogger) {
-				executeLogger.info`Created note in staging path=${stagingNotePath} ${cid}`;
+				executeLogger.debug`Executing suggestion id=${suggestion.id} action=${suggestion.action} source=${filename} ${cid}`;
 			}
-		} catch (error) {
-			// Note creation failed - clean up in-progress marker
-			registry.clearInProgress(hash);
+
+			// Hash the SOURCE file FIRST - this provides our unique ID for filename generation
+			let hash: string;
+			try {
+				hash = await hashFile(sourcePath);
+			} catch (error) {
+				const errorCode = categorizeError(error);
+				return {
+					suggestionId: suggestion.id,
+					success: false,
+					action: suggestion.action,
+					error: `Failed to hash source file [${errorCode}]: ${error instanceof Error ? error.message : "unknown"}`,
+				};
+			}
+
+			// Generate attachment filename with hash prefix
+			// Format: YYYYMMDD-hash4-description.ext (hash guarantees uniqueness)
+			let hashedFilename: string;
+
+			// Extract suggestedAttachmentName if present on the suggestion type
+			// (available on create-note, move, rename, and link suggestions)
+			const suggestedName =
+				"suggestedAttachmentName" in suggestion
+					? suggestion.suggestedAttachmentName
+					: undefined;
+
+			const hashPrefix = getHashPrefix(hash);
+
+			if (suggestedName) {
+				// Use the pre-generated attachment name from scan phase
+				hashedFilename = suggestedName;
+			} else {
+				// Fallback: generate filename using available suggestion data
+				const noteType =
+					"suggestedNoteType" in suggestion
+						? suggestion.suggestedNoteType
+						: undefined;
+				const fields =
+					"extractedFields" in suggestion
+						? suggestion.extractedFields
+						: undefined;
+				hashedFilename = generateFilename(
+					suggestion.source,
+					hash,
+					noteType,
+					fields,
+				);
+			}
+
+			const attachmentDest = join(
+				config.vaultPath,
+				config.attachmentsFolder,
+				hashedFilename,
+			);
+			const movedAttachmentPath = join(
+				config.attachmentsFolder,
+				hashedFilename,
+			);
+
+			if (executeLogger) {
+				executeLogger.debug`Generated filename=${hashedFilename} hash=${hashPrefix} ${cid}`;
+			}
+
+			let createdNotePath: string | undefined;
+			let stagingNotePath: string | undefined;
+
+			// Layer 2: Mark operation as in-progress in registry before any writes
+			// This allows cleanup job to detect interrupted operations
+			const inProgressMarker = {
+				sourceHash: hash,
+				sourcePath: suggestion.source,
+				processedAt: new Date().toISOString(),
+				inProgress: true,
+			};
+			registry.markInProgress(inProgressMarker);
 			await registry.save();
 
-			if (executeLogger) {
-				executeLogger.error`Failed to create note: ${error instanceof Error ? error.message : "unknown"} - attachment remains in inbox for retry ${cid}`;
-			}
-			return {
-				suggestionId: suggestion.id,
-				success: false,
-				action: suggestion.action,
-				error: `Note creation failed: ${error instanceof Error ? error.message : "unknown"}. Attachment remains in inbox - fix the issue and retry.`,
-			};
-		}
-	}
+			// Bookmarks are special: the source .md file IS the note (already has frontmatter+content)
+			// Skip template creation and move the file directly to destination instead of Attachments
+			const isBookmark =
+				suggestion.action === "create-note" &&
+				suggestion.suggestedNoteType === "bookmark";
 
-	// For bookmarks: move source .md directly to final destination (it IS the note)
-	// For other types: move source to Attachments folder (it's an attachment like PDF)
-	let actualDestination: string;
-	let movedFilePath: string;
-
-	if (isBookmark) {
-		// Determine final destination for bookmark
-		let finalDest: string;
-		if (
-			"suggestedDestination" in suggestion &&
-			suggestion.suggestedDestination
-		) {
-			// Resolve semantic PARA names (e.g., "Resources" → "03 Resources")
-			finalDest = resolveParaFolder(
-				suggestion.suggestedDestination,
-				paraConfig.paraFolders,
-				config.vaultPath,
-				options,
-			);
-		} else {
-			finalDest =
-				paraConfig.defaultDestinations?.[suggestion.suggestedNoteType] ??
-				"00 Inbox";
-		}
-
-		// Bookmarks go directly to the resolved destination without type-specific subfolders
-
-		// Use original filename (with emoji prefix) for bookmarks
-		const bookmarkFilename = basename(sourcePath);
-		const bookmarkDest = join(config.vaultPath, finalDest, bookmarkFilename);
-
-		// Ensure unique path
-		actualDestination = generateUniquePath(bookmarkDest);
-		movedFilePath = join(finalDest, basename(actualDestination));
-
-		if (executeLogger) {
-			executeLogger.info`Moving bookmark to ${movedFilePath} ${cid}`;
-		}
-	} else {
-		// Standard attachment workflow
-		actualDestination = attachmentDest;
-		movedFilePath = movedAttachmentPath;
-	}
-
-	// Now move the file (bookmark or attachment)
-	ensureDirSync(dirname(actualDestination));
-
-	// TOCTOU protection: Check file still exists before moving
-	// File was hashed earlier, but could have been deleted by another process
-	if (!pathExistsSync(sourcePath)) {
-		// ROLLBACK: Clean up staging note and in-progress marker
-		await rollbackOperation(
-			config.vaultPath,
-			stagingNotePath,
-			hash,
-			registry,
-			cid,
-		);
-
-		return {
-			suggestionId: suggestion.id,
-			success: false,
-			action: suggestion.action,
-			error: `Source file no longer exists: ${sourcePath}. It may have been moved or deleted by another process.`,
-		};
-	}
-
-	try {
-		await moveFile(sourcePath, actualDestination);
-	} catch (error) {
-		// ROLLBACK: Clean up staging note and in-progress marker
-		await rollbackOperation(
-			config.vaultPath,
-			stagingNotePath,
-			hash,
-			registry,
-			cid,
-		);
-
-		// Log the failure and return error
-		if (executeLogger) {
-			executeLogger.error`Failed to move file: ${error instanceof Error ? error.message : "unknown"} - file remains in inbox ${cid}`;
-		}
-
-		return {
-			suggestionId: suggestion.id,
-			success: false,
-			action: suggestion.action,
-			error: `Operation failed and was rolled back: ${error instanceof Error ? error.message : "unknown"}. File remains in inbox - fix the issue and retry.`,
-		};
-	}
-
-	// SUCCESS: Move staged note to final destination atomically
-	if (stagingNotePath) {
-		try {
-			// Determine final destination:
-			// 1. Use explicit suggestedDestination if set
-			// 2. Resolve suggestedArea to "02 Areas/{area}" if area exists in vault
-			// 3. Resolve suggestedProject to "01 Projects/{project}" if project exists in vault
-			// 4. Fall back to defaultDestinations for the note type
-			// 5. Default to "00 Inbox" (PARA method)
-			let finalDest: string;
+			// Create note FIRST if action is create-note (before moving attachment)
+			// Layer 1: Use staging directory pattern for atomic operations
 			if (
-				"suggestedDestination" in suggestion &&
-				suggestion.suggestedDestination
+				suggestion.action === "create-note" &&
+				suggestion.suggestedNoteType &&
+				suggestion.suggestedTitle &&
+				!isBookmark // Skip template creation for bookmarks
 			) {
-				// Resolve semantic PARA names (e.g., "Resources" → "03 Resources")
-				finalDest = resolveParaFolder(
-					suggestion.suggestedDestination,
-					paraConfig.paraFolders,
+				try {
+					// Build args from suggestion using converter field mappings
+					let args: Record<string, string> = {};
+
+					// Find converter for this note type to get field mappings
+					const converter = DEFAULT_CLASSIFIERS.find(
+						(c) => c.id === suggestion.suggestedNoteType,
+					);
+
+					// Map extracted fields using converter (LLM keys → Templater prompts)
+					if (suggestion.extractedFields && converter) {
+						args = mapFieldsToTemplate(suggestion.extractedFields, converter);
+					} else if (suggestion.extractedFields) {
+						// Fallback: use raw field names if no converter found
+						for (const [key, value] of Object.entries(
+							suggestion.extractedFields,
+						)) {
+							if (typeof value === "string") {
+								args[key] = value;
+							} else if (value !== null && value !== undefined) {
+								args[key] = String(value);
+							}
+						}
+					}
+
+					// Add area/project if suggested (use exact Templater prompt text as keys)
+					// Wrap in wikilink format [[...]] as required by frontmatter validation
+					if (suggestion.suggestedArea) {
+						args["Area (leave empty if using project)"] =
+							`[[${suggestion.suggestedArea}]]`;
+					}
+					if (suggestion.suggestedProject) {
+						args["Project (leave empty if using area)"] =
+							`[[${suggestion.suggestedProject}]]`;
+					}
+
+					// Create note in staging directory first (.inbox-staging)
+					const stagingDir = join(config.vaultPath, ".inbox-staging");
+					ensureDirSync(stagingDir);
+
+					const result = createFromTemplate(paraConfig, {
+						template: suggestion.suggestedNoteType,
+						title: suggestion.suggestedTitle,
+						dest: ".inbox-staging", // Stage in temp location
+						args,
+					});
+
+					stagingNotePath = result.filePath;
+
+					if (executeLogger) {
+						executeLogger.info`Created note in staging path=${stagingNotePath} ${cid}`;
+					}
+				} catch (error) {
+					// Note creation failed - clean up in-progress marker
+					registry.clearInProgress(hash);
+					await registry.save();
+
+					if (executeLogger) {
+						executeLogger.error`Failed to create note: ${error instanceof Error ? error.message : "unknown"} - attachment remains in inbox for retry ${cid}`;
+					}
+					return {
+						suggestionId: suggestion.id,
+						success: false,
+						action: suggestion.action,
+						error: `Note creation failed: ${error instanceof Error ? error.message : "unknown"}. Attachment remains in inbox - fix the issue and retry.`,
+					};
+				}
+			}
+
+			// For bookmarks: move source .md directly to final destination (it IS the note)
+			// For other types: move source to Attachments folder (it's an attachment like PDF)
+			let actualDestination: string;
+			let movedFilePath: string;
+
+			if (isBookmark) {
+				// Determine final destination for bookmark
+				let finalDest: string;
+				if (
+					"suggestedDestination" in suggestion &&
+					suggestion.suggestedDestination
+				) {
+					// Resolve semantic PARA names (e.g., "Resources" → "03 Resources")
+					finalDest = resolveParaFolder(
+						suggestion.suggestedDestination,
+						paraConfig.paraFolders,
+						config.vaultPath,
+						options,
+					);
+				} else {
+					finalDest =
+						paraConfig.defaultDestinations?.[suggestion.suggestedNoteType] ??
+						"00 Inbox";
+				}
+
+				// Bookmarks go directly to the resolved destination without type-specific subfolders
+
+				// Read frontmatter to get improved title for filename (if enriched)
+				// Otherwise fall back to original filename
+				let bookmarkFilename = basename(sourcePath);
+				try {
+					const sourceContent = readTextFileSync(sourcePath);
+					const { attributes } = parseFrontmatter(sourceContent);
+					// Use improvedTitle if available (set by Firecrawl enrichment)
+					// This is the clean, LLM-generated title without emoji prefix
+					if (
+						typeof attributes.improvedTitle === "string" &&
+						attributes.improvedTitle.trim()
+					) {
+						// Apply emoji prefix from config (e.g., "✂️ ")
+						const { applyTitlePrefix } = await import("../../../utils/title");
+						const prefixedTitle = applyTitlePrefix(
+							attributes.improvedTitle,
+							"bookmark",
+							paraConfig,
+						);
+
+						// Sanitize title for filename: remove unsafe characters
+						const sanitized = prefixedTitle
+							.trim()
+							.replace(/[<>:"/\\|?*]/g, "") // Remove Windows-unsafe chars
+							.replace(/\s+/g, " ") // Normalize whitespace
+							.slice(0, 100); // Limit length
+						bookmarkFilename = `${sanitized}.md`;
+						if (executeLogger) {
+							executeLogger.debug`Using improved title for bookmark filename: ${bookmarkFilename} ${cid}`;
+						}
+					}
+				} catch {
+					// If we can't read frontmatter, use original filename
+					if (executeLogger) {
+						executeLogger.debug`Could not read frontmatter for bookmark, using original filename ${cid}`;
+					}
+				}
+				const bookmarkDest = join(
 					config.vaultPath,
-					options,
+					finalDest,
+					bookmarkFilename,
 				);
-			} else if (
-				suggestion.action === "create-note" &&
-				suggestion.suggestedArea &&
-				options?.areaPathMap
-			) {
-				// Try to resolve suggestedArea to a vault path
-				const areaPath = options.areaPathMap.get(
-					suggestion.suggestedArea.toLowerCase(),
-				);
-				if (areaPath) {
-					finalDest = areaPath;
-				} else {
-					// Area doesn't exist in vault, fall back to inbox
-					finalDest =
-						paraConfig.defaultDestinations?.[suggestion.suggestedNoteType] ??
-						"00 Inbox";
+
+				// Ensure unique path
+				actualDestination = generateUniquePath(bookmarkDest);
+				movedFilePath = join(finalDest, basename(actualDestination));
+
+				if (executeLogger) {
+					executeLogger.info`Moving bookmark to ${movedFilePath} ${cid}`;
 				}
-			} else if (
-				suggestion.action === "create-note" &&
-				suggestion.suggestedProject &&
-				options?.projectPathMap
-			) {
-				// Try to resolve suggestedProject to a vault path
-				const projectPath = options.projectPathMap.get(
-					suggestion.suggestedProject.toLowerCase(),
-				);
-				if (projectPath) {
-					finalDest = projectPath;
-				} else {
-					// Project doesn't exist in vault, fall back to inbox
-					finalDest =
-						paraConfig.defaultDestinations?.[suggestion.suggestedNoteType] ??
-						"00 Inbox";
-				}
-			} else if (
-				suggestion.action === "create-note" &&
-				suggestion.suggestedNoteType
-			) {
-				finalDest =
-					paraConfig.defaultDestinations?.[suggestion.suggestedNoteType] ??
-					"00 Inbox";
 			} else {
-				// PARA method: all notes go to inbox by default
-				finalDest = "00 Inbox";
+				// Standard attachment workflow
+				actualDestination = attachmentDest;
+				movedFilePath = movedAttachmentPath;
 			}
 
-			// Note: Bookmarks are handled earlier in the bookmark-specific branch
-			// Non-bookmark notes go directly to the resolved destination without type-specific subfolders
+			// Now move the file (bookmark or attachment)
+			ensureDirSync(dirname(actualDestination));
 
-			const stagingAbsolute = resolveVaultPath(
-				paraConfig.vault,
-				stagingNotePath,
-			);
-			const finalRelative = join(finalDest, basename(stagingNotePath));
-			const finalAbsolute = resolveVaultPath(paraConfig.vault, finalRelative);
+			// TOCTOU protection: Check file still exists before moving
+			// File was hashed earlier, but could have been deleted by another process
+			if (!pathExistsSync(sourcePath)) {
+				// ROLLBACK: Clean up staging note and in-progress marker
+				await rollbackOperation(
+					config.vaultPath,
+					stagingNotePath,
+					hash,
+					registry,
+					cid,
+				);
 
-			// Atomic rename from staging to final location
-			await moveFile(stagingAbsolute.absolute, finalAbsolute.absolute);
-			createdNotePath = finalRelative;
-
-			if (executeLogger) {
-				executeLogger.info`Moved note from staging to final destination=${createdNotePath} ${cid}`;
+				return {
+					suggestionId: suggestion.id,
+					success: false,
+					action: suggestion.action,
+					error: `Source file no longer exists: ${sourcePath}. It may have been moved or deleted by another process.`,
+				};
 			}
-		} catch (error) {
-			// Critical: attachment moved but note stuck in staging
-			// Log error but don't fail - cleanup job will handle orphans
-			if (executeLogger) {
-				executeLogger.error`Failed to move note from staging: ${error instanceof Error ? error.message : "unknown"} - note left in staging for cleanup ${cid}`;
+
+			try {
+				await moveFile(sourcePath, actualDestination);
+			} catch (error) {
+				const _errorCode = categorizeError(error);
+				// ROLLBACK: Clean up staging note and in-progress marker
+				await rollbackOperation(
+					config.vaultPath,
+					stagingNotePath,
+					hash,
+					registry,
+					cid,
+				);
+
+				// Log the failure and return error
+				if (executeLogger) {
+					executeLogger.error`Failed to move file: ${error instanceof Error ? error.message : "unknown"} - file remains in inbox ${cid}`;
+				}
+
+				return {
+					suggestionId: suggestion.id,
+					success: false,
+					action: suggestion.action,
+					error: `Operation failed and was rolled back: ${error instanceof Error ? error.message : "unknown"}. File remains in inbox - fix the issue and retry.`,
+				};
 			}
 
-			// Mark staging path in registry for cleanup detection
+			// SUCCESS: Move staged note to final destination atomically
+			if (stagingNotePath) {
+				try {
+					// Determine final destination:
+					// 1. Use explicit suggestedDestination if set
+					// 2. Resolve suggestedArea to "02 Areas/{area}" if area exists in vault
+					// 3. Resolve suggestedProject to "01 Projects/{project}" if project exists in vault
+					// 4. Fall back to defaultDestinations for the note type
+					// 5. Default to "00 Inbox" (PARA method)
+					let finalDest: string;
+					if (
+						"suggestedDestination" in suggestion &&
+						suggestion.suggestedDestination
+					) {
+						// Resolve semantic PARA names (e.g., "Resources" → "03 Resources")
+						finalDest = resolveParaFolder(
+							suggestion.suggestedDestination,
+							paraConfig.paraFolders,
+							config.vaultPath,
+							options,
+						);
+					} else if (
+						suggestion.action === "create-note" &&
+						suggestion.suggestedArea &&
+						options?.areaPathMap
+					) {
+						// Try to resolve suggestedArea to a vault path
+						const areaPath = options.areaPathMap.get(
+							suggestion.suggestedArea.toLowerCase(),
+						);
+						if (areaPath) {
+							finalDest = areaPath;
+						} else {
+							// Area doesn't exist in vault, fall back to inbox
+							finalDest =
+								paraConfig.defaultDestinations?.[
+									suggestion.suggestedNoteType
+								] ?? "00 Inbox";
+						}
+					} else if (
+						suggestion.action === "create-note" &&
+						suggestion.suggestedProject &&
+						options?.projectPathMap
+					) {
+						// Try to resolve suggestedProject to a vault path
+						const projectPath = options.projectPathMap.get(
+							suggestion.suggestedProject.toLowerCase(),
+						);
+						if (projectPath) {
+							finalDest = projectPath;
+						} else {
+							// Project doesn't exist in vault, fall back to inbox
+							finalDest =
+								paraConfig.defaultDestinations?.[
+									suggestion.suggestedNoteType
+								] ?? "00 Inbox";
+						}
+					} else if (
+						suggestion.action === "create-note" &&
+						suggestion.suggestedNoteType
+					) {
+						finalDest =
+							paraConfig.defaultDestinations?.[suggestion.suggestedNoteType] ??
+							"00 Inbox";
+					} else {
+						// PARA method: all notes go to inbox by default
+						finalDest = "00 Inbox";
+					}
+
+					// Note: Bookmarks are handled earlier in the bookmark-specific branch
+					// Non-bookmark notes go directly to the resolved destination without type-specific subfolders
+
+					const stagingAbsolute = resolveVaultPath(
+						paraConfig.vault,
+						stagingNotePath,
+					);
+					const finalRelative = join(finalDest, basename(stagingNotePath));
+					const finalAbsolute = resolveVaultPath(
+						paraConfig.vault,
+						finalRelative,
+					);
+
+					// Atomic rename from staging to final location
+					await moveFile(stagingAbsolute.absolute, finalAbsolute.absolute);
+					createdNotePath = finalRelative;
+
+					if (executeLogger) {
+						executeLogger.info`Moved note from staging to final destination=${createdNotePath} ${cid}`;
+					}
+				} catch (error) {
+					const errorCode = categorizeError(error);
+					// Critical: attachment moved but note stuck in staging
+					// Log error but don't fail - cleanup job will handle orphans
+					if (executeLogger) {
+						executeLogger.error`Failed to move note from staging [${errorCode}]: ${error instanceof Error ? error.message : "unknown"} - note left in staging for cleanup ${cid}`;
+					}
+
+					// Mark staging path in registry for cleanup detection
+					registry.markProcessed({
+						sourceHash: hash,
+						sourcePath: suggestion.source,
+						processedAt: new Date().toISOString(),
+						createdNote: stagingNotePath,
+						movedAttachment: movedAttachmentPath,
+						orphanedInStaging: true,
+					});
+					await registry.save();
+
+					return {
+						suggestionId: suggestion.id,
+						success: true,
+						action: suggestion.action,
+						createdNote: undefined,
+						movedAttachment: movedAttachmentPath,
+						warning:
+							"Note created in staging but move failed - will be cleaned up automatically",
+					};
+				}
+			}
+
+			// For bookmarks: the moved file IS the note
+			// Update frontmatter with LLM-extracted fields
+			if (isBookmark) {
+				// Set createdNote to the bookmark file path
+				createdNotePath = movedFilePath;
+
+				// Update frontmatter with extracted fields
+				if (
+					suggestion.action === "create-note" &&
+					(suggestion.extractedFields || suggestion.suggestedArea)
+				) {
+					try {
+						const target = resolveVaultPath(paraConfig.vault, createdNotePath);
+						const content = readTextFileSync(target.absolute);
+						const { attributes, body } = parseFrontmatter(content);
+
+						// Add para field from suggestedArea
+						if (suggestion.suggestedArea) {
+							attributes.para = suggestion.suggestedArea;
+						}
+
+						// Update fields from LLM extraction
+						if (suggestion.extractedFields) {
+							for (const [key, value] of Object.entries(
+								suggestion.extractedFields,
+							)) {
+								if (key === "category" || key === "author") {
+									// Strip wikilinks from category/author fields
+									// "[[Documentation]]" → "Documentation"
+									if (typeof value === "string") {
+										attributes[key] = value.replace(/\[\[([^\]]+)\]\]/g, "$1");
+									}
+								} else if (key === "tags") {
+									// Merge tags: existing + extracted + "bookmarks"
+									const existingTags = Array.isArray(attributes.tags)
+										? attributes.tags
+										: [];
+									const extractedTags = Array.isArray(value) ? value : [];
+									const merged = [
+										...new Set([
+											...existingTags,
+											...extractedTags,
+											"bookmarks",
+										]),
+									];
+									attributes.tags = merged;
+								} else if (value !== null && value !== undefined) {
+									attributes[key] = value;
+								}
+							}
+						}
+
+						// Always ensure "bookmarks" tag is present
+						const currentTags = Array.isArray(attributes.tags)
+							? attributes.tags
+							: [];
+						if (!currentTags.includes("bookmarks")) {
+							attributes.tags = [...currentTags, "bookmarks"];
+						}
+
+						// Write updated frontmatter
+						const updated = serializeFrontmatter(attributes, body);
+						writeTextFileSync(target.absolute, updated);
+
+						if (executeLogger) {
+							executeLogger.info`Updated bookmark frontmatter with LLM fields ${cid}`;
+						}
+					} catch (error) {
+						const errorCode = categorizeError(error);
+						if (executeLogger) {
+							executeLogger.warn`Failed to update bookmark frontmatter [${errorCode}]: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
+						}
+						// Don't fail - file moved successfully, just missing frontmatter updates
+					}
+				}
+			} else if (createdNotePath) {
+				// Inject attachment link into the note (if note was created)
+				try {
+					const attachmentWikilink = `![[${movedFilePath}]]`;
+					const injectionResult = injectSections(paraConfig, createdNotePath, {
+						Attachments: attachmentWikilink,
+					});
+
+					if (injectionResult.injected.length > 0) {
+						if (executeLogger) {
+							executeLogger.info`Injected attachment link into section=Attachments ${cid}`;
+						}
+					} else if (injectionResult.skipped.length > 0) {
+						// Section doesn't exist - append to end of file
+						if (executeLogger) {
+							executeLogger.warn`No Attachments section found - appending to end of file ${cid}`;
+						}
+						const target = resolveVaultPath(paraConfig.vault, createdNotePath);
+						const content = readTextFileSync(target.absolute);
+						const updatedContent = `${content.trimEnd()}\n\n## Attachments\n\n${attachmentWikilink}\n`;
+						writeTextFileSync(target.absolute, updatedContent);
+						if (executeLogger) {
+							executeLogger.info`Created Attachments section and added link ${cid}`;
+						}
+					}
+				} catch (error) {
+					const errorCode = categorizeError(error);
+					if (executeLogger) {
+						executeLogger.warn`Failed to inject attachment link [${errorCode}]: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
+					}
+					// Don't fail - note and attachment move succeeded, just missing link
+				}
+			}
+
+			// Update registry - clear in-progress flag and mark as completed
+			registry.clearInProgress(hash);
 			registry.markProcessed({
 				sourceHash: hash,
 				sourcePath: suggestion.source,
 				processedAt: new Date().toISOString(),
-				createdNote: stagingNotePath,
-				movedAttachment: movedAttachmentPath,
-				orphanedInStaging: true,
+				createdNote: createdNotePath,
+				movedAttachment: isBookmark ? undefined : movedFilePath,
 			});
-			await registry.save();
+
+			// Note: Auto-commit removed from per-operation execution
+			// Commits are now batched at session level in engine.ts for cleaner history
+
+			if (executeLogger) {
+				executeLogger.info`Executed suggestion id=${suggestion.id} movedTo=${isBookmark ? movedFilePath : hashedFilename} createdNote=${createdNotePath ?? "none"} ${cid}`;
+			}
 
 			return {
 				suggestionId: suggestion.id,
 				success: true,
 				action: suggestion.action,
-				createdNote: undefined,
-				movedAttachment: movedAttachmentPath,
-				warning:
-					"Note created in staging but move failed - will be cleaned up automatically",
+				createdNote: createdNotePath,
+				movedAttachment: isBookmark ? undefined : movedFilePath,
+				movedFrom: suggestion.source,
 			};
-		}
-	}
-
-	// For bookmarks: the moved file IS the note
-	// Update frontmatter with LLM-extracted fields
-	if (isBookmark) {
-		// Set createdNote to the bookmark file path
-		createdNotePath = movedFilePath;
-
-		// Update frontmatter with extracted fields
-		if (
-			suggestion.action === "create-note" &&
-			(suggestion.extractedFields || suggestion.suggestedArea)
-		) {
-			try {
-				const target = resolveVaultPath(paraConfig.vault, createdNotePath);
-				const content = readTextFileSync(target.absolute);
-				const { attributes, body } = parseFrontmatter(content);
-
-				// Add para field from suggestedArea
-				if (suggestion.suggestedArea) {
-					attributes.para = suggestion.suggestedArea;
-				}
-
-				// Update fields from LLM extraction
-				if (suggestion.extractedFields) {
-					for (const [key, value] of Object.entries(
-						suggestion.extractedFields,
-					)) {
-						if (key === "category" || key === "author") {
-							// Strip wikilinks from category/author fields
-							// "[[Documentation]]" → "Documentation"
-							if (typeof value === "string") {
-								attributes[key] = value.replace(/\[\[([^\]]+)\]\]/g, "$1");
-							}
-						} else if (key === "tags") {
-							// Merge tags: existing + extracted + "bookmarks"
-							const existingTags = Array.isArray(attributes.tags)
-								? attributes.tags
-								: [];
-							const extractedTags = Array.isArray(value) ? value : [];
-							const merged = [
-								...new Set([...existingTags, ...extractedTags, "bookmarks"]),
-							];
-							attributes.tags = merged;
-						} else if (value !== null && value !== undefined) {
-							attributes[key] = value;
-						}
-					}
-				}
-
-				// Always ensure "bookmarks" tag is present
-				const currentTags = Array.isArray(attributes.tags)
-					? attributes.tags
-					: [];
-				if (!currentTags.includes("bookmarks")) {
-					attributes.tags = [...currentTags, "bookmarks"];
-				}
-
-				// Write updated frontmatter
-				const updated = serializeFrontmatter(attributes, body);
-				writeTextFileSync(target.absolute, updated);
-
-				if (executeLogger) {
-					executeLogger.info`Updated bookmark frontmatter with LLM fields ${cid}`;
-				}
-			} catch (error) {
-				if (executeLogger) {
-					executeLogger.warn`Failed to update bookmark frontmatter: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
-				}
-				// Don't fail - file moved successfully, just missing frontmatter updates
-			}
-		}
-	} else if (createdNotePath) {
-		// Inject attachment link into the note (if note was created)
-		try {
-			const attachmentWikilink = `![[${movedFilePath}]]`;
-			const injectionResult = injectSections(paraConfig, createdNotePath, {
-				Attachments: attachmentWikilink,
-			});
-
-			if (injectionResult.injected.length > 0) {
-				if (executeLogger) {
-					executeLogger.info`Injected attachment link into section=Attachments ${cid}`;
-				}
-			} else if (injectionResult.skipped.length > 0) {
-				// Section doesn't exist - append to end of file
-				if (executeLogger) {
-					executeLogger.warn`No Attachments section found - appending to end of file ${cid}`;
-				}
-				const target = resolveVaultPath(paraConfig.vault, createdNotePath);
-				const content = readTextFileSync(target.absolute);
-				const updatedContent = `${content.trimEnd()}\n\n## Attachments\n\n${attachmentWikilink}\n`;
-				writeTextFileSync(target.absolute, updatedContent);
-				if (executeLogger) {
-					executeLogger.info`Created Attachments section and added link ${cid}`;
-				}
-			}
-		} catch (error) {
-			if (executeLogger) {
-				executeLogger.warn`Failed to inject attachment link: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
-			}
-			// Don't fail - note and attachment move succeeded, just missing link
-		}
-	}
-
-	// Update registry - clear in-progress flag and mark as completed
-	registry.clearInProgress(hash);
-	registry.markProcessed({
-		sourceHash: hash,
-		sourcePath: suggestion.source,
-		processedAt: new Date().toISOString(),
-		createdNote: createdNotePath,
-		movedAttachment: isBookmark ? undefined : movedFilePath,
-	});
-
-	// Note: Auto-commit removed from per-operation execution
-	// Commits are now batched at session level in engine.ts for cleaner history
-
-	if (executeLogger) {
-		executeLogger.info`Executed suggestion id=${suggestion.id} movedTo=${isBookmark ? movedFilePath : hashedFilename} createdNote=${createdNotePath ?? "none"} ${cid}`;
-	}
-
-	return {
-		suggestionId: suggestion.id,
-		success: true,
-		action: suggestion.action,
-		createdNote: createdNotePath,
-		movedAttachment: isBookmark ? undefined : movedFilePath,
-	};
+		},
+		{
+			parentCid: sessionCid,
+			context: {
+				suggestionId: suggestion.id,
+				action: suggestion.action,
+				...(sessionCid && { sessionCid }),
+			},
+		},
+	);
 }

@@ -21,13 +21,15 @@ import {
 	startSession,
 	trackChange,
 } from "../../git/session";
+import { observe } from "../../shared/instrumentation";
 import {
 	createCorrelationId,
 	executeLogger,
 	inboxLogger,
 	initLoggerWithNotice,
-	logJson,
 } from "../../shared/logger";
+import { captureResourceMetrics } from "../../shared/resource-metrics";
+import { applyTitlePrefix } from "../../utils/title";
 import { buildSuggestion, DEFAULT_CLASSIFIERS } from "../classify/classifiers";
 import {
 	checkPdfToText,
@@ -51,6 +53,7 @@ import {
 	type MarkdownExtractionMetadata,
 } from "../scan/extractors/markdown";
 import { createInboxError } from "../shared/errors";
+import { checkSLOBreach, recordSLOEvent } from "../shared/slos";
 import {
 	type BatchResult,
 	type ChallengeSuggestion,
@@ -140,7 +143,13 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	const suggestionCache = new Map<string, InboxSuggestion>();
 
 	if (inboxLogger) {
-		inboxLogger.debug`Engine created vault=${resolvedConfig.vaultPath}`;
+		const cid = createCorrelationId();
+		inboxLogger.debug("Engine initialized", {
+			event: "engine_created",
+			cid,
+			vaultPath: resolvedConfig.vaultPath,
+			timestamp: new Date().toISOString(),
+		});
 	}
 
 	return {
@@ -181,11 +190,13 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	 * @internal
 	 */
 	async function loadAndCleanRegistry(
-		cid: string,
+		sessionCid: string,
 	): Promise<ReturnType<typeof createRegistry>> {
 		const registry = createRegistry(resolvedConfig.vaultPath);
 		await registry.load();
-		await cleanupOrphanedStaging(resolvedConfig.vaultPath, registry, cid);
+		await cleanupOrphanedStaging(resolvedConfig.vaultPath, registry, {
+			sessionCid,
+		});
 		return registry;
 	}
 
@@ -208,7 +219,12 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			files = readDir(inboxPath);
 		} catch (_error) {
 			if (inboxLogger) {
-				inboxLogger.warn`Inbox folder not found: ${inboxPath} cid=${cid}`;
+				inboxLogger.warn("Inbox folder not found", {
+					event: "inbox_folder_not_found",
+					cid,
+					path: inboxPath,
+					timestamp: new Date().toISOString(),
+				});
 			}
 			return null;
 		}
@@ -242,7 +258,13 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		const pdfCheck = await checkPdfToText();
 		if (!pdfCheck.available) {
 			if (inboxLogger) {
-				inboxLogger.error`pdftotext not available: ${pdfCheck.error} cid=${cid}`;
+				inboxLogger.error("Required dependency missing", {
+					event: "dependency_missing",
+					cid,
+					dependency: "pdftotext",
+					error: pdfCheck.error,
+					timestamp: new Date().toISOString(),
+				});
 			}
 			throw createInboxError("DEP_PDFTOTEXT_MISSING", {
 				cid,
@@ -271,6 +293,8 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	 * Groups related parameters for cleaner function signatures.
 	 */
 	interface ProcessFileContext {
+		/** Session-level correlation ID for linking scan → execute operations */
+		sessionCid: string;
 		/** The inbox file to process */
 		file: InboxFile;
 		/** 0-based index in the file list */
@@ -289,8 +313,8 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		llmLimit: ReturnType<typeof pLimit>;
 		/** Optional progress callback */
 		onProgress?: ScanOptions["onProgress"];
-		/** Correlation ID for logging */
-		cid: string;
+		/** Parent correlation ID (scan's CID) for trace hierarchy */
+		parentCid: string;
 		/** Running statistics for LLM calls */
 		llmStats: {
 			successes: number;
@@ -338,6 +362,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		ctx: ProcessFileContext,
 	): Promise<InboxSuggestion | null> {
 		const {
+			sessionCid,
 			file,
 			index,
 			total,
@@ -347,11 +372,13 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			extractionLimit,
 			llmLimit,
 			onProgress,
-			cid,
+			parentCid,
 			llmStats,
 		} = ctx;
 
 		return extractionLimit(async () => {
+			// Create unique CID for this file with parentCid for trace hierarchy
+			const cid = createCorrelationId();
 			const { path: filePath, filename } = file;
 			const progressBase = {
 				index: index + 1,
@@ -390,7 +417,13 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 							// Create enrichment pipeline for this file
 							const enrichmentPipeline = createDefaultEnrichmentPipeline(
 								resolvedConfig.vaultPath,
-								{ maxRetries: 3, baseDelayMs: 1000 },
+								{
+									maxRetries: 3,
+									baseDelayMs: 1000,
+									cid,
+									sessionCid,
+									parentCid: cid,
+								},
 							);
 
 							// Check if file needs enrichment
@@ -406,9 +439,16 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 								}
 
 								// Process through enrichment pipeline with CID for correlation
-								const enrichmentResult = await enrichmentPipeline.processFile(
-									file,
-									{ cid },
+								const enrichmentResult = await observe(
+									inboxLogger,
+									"inbox:enrichFile",
+									async () =>
+										enrichmentPipeline.processFile(file, {
+											cid,
+											sessionCid,
+											parentCid,
+										}),
+									{ parentCid, context: { filename } },
 								);
 
 								if (enrichmentResult.error) {
@@ -418,7 +458,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 									const errorMessage = `${error.code}: ${error.message}`;
 
 									if (inboxLogger) {
-										inboxLogger.warn`Enrichment failed file=${filename} strategy=${enrichmentResult.strategyId} error=${errorMessage} cid=${cid}`;
+										inboxLogger.warn`Enrichment failed file=${filename} strategy=${enrichmentResult.strategyId} error=${errorMessage} sessionCid=${sessionCid} cid=${cid}`;
 									}
 									if (onProgress) {
 										await onProgress({
@@ -435,7 +475,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 									enrichedFrontmatter = enrichmentResult.frontmatter;
 
 									if (inboxLogger) {
-										inboxLogger.info`File enriched file=${filename} strategy=${enrichmentResult.strategyId} cid=${cid}`;
+										inboxLogger.info`File enriched file=${filename} strategy=${enrichmentResult.strategyId} sessionCid=${sessionCid} cid=${cid}`;
 									}
 								}
 							}
@@ -450,6 +490,17 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 							const project = parseWikilink(enrichedFrontmatter.project);
 
 							// Build suggestion - no hashing needed for markdown notes
+							// Apply emoji prefix for note types that have them configured
+							const paraConfig = loadConfig();
+							const baseTitle =
+								(enrichedFrontmatter.title as string) ||
+								generateTitle(filename, noteType);
+							const titleWithPrefix = applyTitlePrefix(
+								baseTitle,
+								noteType,
+								paraConfig,
+							);
+
 							const suggestion: CreateNoteSuggestion = {
 								id: createSuggestionId(),
 								source: join(resolvedConfig.inboxFolder, filename),
@@ -458,9 +509,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 								detectionSource: "frontmatter",
 								action: "create-note",
 								suggestedNoteType: noteType,
-								suggestedTitle:
-									(enrichedFrontmatter.title as string) ||
-									generateTitle(filename, noteType),
+								suggestedTitle: titleWithPrefix,
 								suggestedArea: area,
 								suggestedProject: project,
 								suggestedDestination: destination,
@@ -479,7 +528,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 								});
 							}
 							if (inboxLogger) {
-								inboxLogger.info`Markdown fast-path file=${filename} type=${noteType} destination=${destination ?? "unresolved"} autoRoute=${!!destination} cid=${cid}`;
+								inboxLogger.info`Markdown fast-path file=${filename} type=${noteType} destination=${destination ?? "unresolved"} autoRoute=${!!destination} sessionCid=${sessionCid} cid=${cid}`;
 							}
 							return suggestion;
 						}
@@ -487,7 +536,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				} catch (_error) {
 					// Frontmatter extraction failed - fall through to normal processing
 					if (inboxLogger) {
-						inboxLogger.debug`Markdown fast-path skipped (frontmatter error): ${filename} cid=${cid}`;
+						inboxLogger.debug`Markdown fast-path skipped (frontmatter error): ${filename} sessionCid=${sessionCid} cid=${cid}`;
 					}
 				}
 			}
@@ -505,7 +554,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				fileHash = await hashFile(filePath);
 				if (registry.isProcessed(fileHash)) {
 					if (inboxLogger) {
-						inboxLogger.debug`Skipping already processed: ${filename} cid=${cid}`;
+						inboxLogger.debug`Skipping already processed: ${filename} sessionCid=${sessionCid} cid=${cid}`;
 					}
 					if (onProgress) {
 						await onProgress({ ...progressBase, stage: "skip" });
@@ -514,7 +563,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				}
 			} catch (_error) {
 				if (inboxLogger) {
-					inboxLogger.warn`Failed to hash file: ${filename} cid=${cid}`;
+					inboxLogger.warn`Failed to hash file: ${filename} sessionCid=${sessionCid} cid=${cid}`;
 				}
 				if (onProgress) {
 					await onProgress({
@@ -530,7 +579,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			const extractorMatch = extractorRegistry.findExtractor(file);
 			if (!extractorMatch) {
 				if (inboxLogger) {
-					inboxLogger.warn`No extractor found for: ${filename} cid=${cid}`;
+					inboxLogger.warn`No extractor found for: ${filename} sessionCid=${sessionCid} cid=${cid}`;
 				}
 				if (onProgress) {
 					await onProgress({
@@ -549,12 +598,20 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				if (onProgress) {
 					await onProgress({ ...progressBase, stage: "extract" });
 				}
-				const extracted = await extractorMatch.extractor.extract(file, cid);
+				const extracted = await observe(
+					inboxLogger,
+					"inbox:extractContent",
+					async () =>
+						extractorMatch.extractor.extract(file, cid, parentCid, {
+							sessionCid,
+						}),
+					{ parentCid, context: { filename } },
+				);
 				text = extracted.text;
 				extractedMetadata = extracted.metadata;
 			} catch (error) {
 				if (inboxLogger) {
-					inboxLogger.warn`Failed to extract content: ${filename} cid=${cid}`;
+					inboxLogger.warn`Failed to extract content: ${filename} sessionCid=${sessionCid} cid=${cid}`;
 				}
 				if (onProgress) {
 					await onProgress({
@@ -589,7 +646,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			// Run heuristic detection
 			const heuristicResult = combineHeuristics(filename, text);
 			if (inboxLogger) {
-				inboxLogger.debug`Heuristic result file=${filename} detected=${heuristicResult.detected} type=${heuristicResult.suggestedType ?? "none"} confidence=${heuristicResult.confidence.toFixed(2)} cid=${cid}`;
+				inboxLogger.debug`Heuristic result file=${filename} detected=${heuristicResult.detected} type=${heuristicResult.suggestedType ?? "none"} confidence=${heuristicResult.confidence.toFixed(2)} sessionCid=${sessionCid} cid=${cid}`;
 			}
 
 			// Run LLM detection (with its own rate limit)
@@ -608,81 +665,88 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					});
 				}
 				if (inboxLogger) {
-					inboxLogger.debug`LLM starting file=${filename} model=${llmModel} cid=${cid}`;
+					inboxLogger.debug`LLM starting file=${filename} model=${llmModel} sessionCid=${sessionCid} cid=${cid}`;
 				}
-				llmResult = await llmLimit(async () => {
-					const prompt = buildInboxPrompt(
-						{
-							content: text,
-							filename,
-							vaultContext,
-						},
-						DEFAULT_CLASSIFIERS,
-					);
-					// Use callLLMWithMetadata when no custom client is injected
-					// This gives us fallback visibility in production
-					if (!resolvedConfig.llmClient) {
-						const llmCallResult = await callLLMWithMetadata(
-							prompt,
-							resolvedConfig.llmProvider,
-							resolvedConfig.llmModel,
-						);
-						llmFallbackUsed = llmCallResult.isFallback;
-						llmFallbackReason = llmCallResult.fallbackReason;
-						llmModelUsed = llmCallResult.modelUsed;
-
-						// Emit fallback progress update if fallback occurred
-						if (llmFallbackUsed) {
-							if (inboxLogger) {
-								inboxLogger.info(
-									logJson({
-										event: "llm_fallback",
-										cid,
-										filename,
-										primaryModel:
-											resolvedConfig.llmModel ?? resolvedConfig.llmProvider,
-										fallbackModel: llmCallResult.modelUsed,
-										reason: llmCallResult.fallbackReason,
-										timestamp: new Date().toISOString(),
-									}),
+				llmResult = await observe(
+					inboxLogger,
+					"inbox:llmCall",
+					async () =>
+						llmLimit(async () => {
+							const prompt = buildInboxPrompt(
+								{
+									content: text,
+									filename,
+									vaultContext,
+								},
+								DEFAULT_CLASSIFIERS,
+							);
+							// Use callLLMWithMetadata when no custom client is injected
+							// This gives us fallback visibility in production
+							if (!resolvedConfig.llmClient) {
+								const llmCallResult = await callLLMWithMetadata(
+									prompt,
+									resolvedConfig.llmProvider,
+									resolvedConfig.llmModel,
+									{ sessionCid },
 								);
-							}
-							if (onProgress) {
-								await onProgress({
-									...progressBase,
-									stage: "llm",
-									model: llmCallResult.modelUsed,
-									isFallback: true,
-									fallbackReason: llmCallResult.fallbackReason,
-								});
-							}
-						}
+								llmFallbackUsed = llmCallResult.isFallback;
+								llmFallbackReason = llmCallResult.fallbackReason;
+								llmModelUsed = llmCallResult.modelUsed;
 
-						if (inboxLogger) {
-							inboxLogger.debug`LLM raw response file=${filename} length=${llmCallResult.response.length} preview=${llmCallResult.response.slice(0, 200).replace(/\n/g, " ")} cid=${cid}`;
-						}
-						const result = parseDetectionResponse(llmCallResult.response);
-						if (inboxLogger) {
-							inboxLogger.info`LLM success file=${filename} type=${result.documentType} confidence=${result.confidence.toFixed(2)} area=${result.suggestedArea ?? "none"} fallback=${llmFallbackUsed} cid=${cid}`;
-						}
-						return result;
-					}
+								// Emit fallback progress update if fallback occurred
+								if (llmFallbackUsed) {
+									if (inboxLogger) {
+										inboxLogger.info("LLM fallback triggered", {
+											event: "llm_fallback",
+											cid,
+											sessionCid,
+											parentCid,
+											filename,
+											primaryModel:
+												resolvedConfig.llmModel ?? resolvedConfig.llmProvider,
+											fallbackModel: llmCallResult.modelUsed,
+											reason: llmCallResult.fallbackReason,
+											timestamp: new Date().toISOString(),
+										});
+									}
+									if (onProgress) {
+										await onProgress({
+											...progressBase,
+											stage: "llm",
+											model: llmCallResult.modelUsed,
+											isFallback: true,
+											fallbackReason: llmCallResult.fallbackReason,
+										});
+									}
+								}
 
-					// Custom llmClient provided (e.g., tests) - use as-is
-					const response = await llmClient(
-						prompt,
-						resolvedConfig.llmProvider,
-						resolvedConfig.llmModel,
-					);
-					if (inboxLogger) {
-						inboxLogger.debug`LLM raw response file=${filename} length=${response.length} preview=${response.slice(0, 200).replace(/\n/g, " ")} cid=${cid}`;
-					}
-					const result = parseDetectionResponse(response);
-					if (inboxLogger) {
-						inboxLogger.info`LLM success file=${filename} type=${result.documentType} confidence=${result.confidence.toFixed(2)} area=${result.suggestedArea ?? "none"} cid=${cid}`;
-					}
-					return result;
-				});
+								if (inboxLogger) {
+									inboxLogger.debug`LLM raw response file=${filename} length=${llmCallResult.response.length} preview=${llmCallResult.response.slice(0, 200).replace(/\n/g, " ")} sessionCid=${sessionCid} cid=${cid}`;
+								}
+								const result = parseDetectionResponse(llmCallResult.response);
+								if (inboxLogger) {
+									inboxLogger.info`LLM success file=${filename} type=${result.documentType} confidence=${result.confidence.toFixed(2)} area=${result.suggestedArea ?? "none"} fallback=${llmFallbackUsed} sessionCid=${sessionCid} cid=${cid}`;
+								}
+								return result;
+							}
+
+							// Custom llmClient provided (e.g., tests) - use as-is
+							const response = await llmClient(
+								prompt,
+								resolvedConfig.llmProvider,
+								resolvedConfig.llmModel,
+							);
+							if (inboxLogger) {
+								inboxLogger.debug`LLM raw response file=${filename} length=${response.length} preview=${response.slice(0, 200).replace(/\n/g, " ")} sessionCid=${sessionCid} cid=${cid}`;
+							}
+							const result = parseDetectionResponse(response);
+							if (inboxLogger) {
+								inboxLogger.info`LLM success file=${filename} type=${result.documentType} confidence=${result.confidence.toFixed(2)} area=${result.suggestedArea ?? "none"} sessionCid=${sessionCid} cid=${cid}`;
+							}
+							return result;
+						}),
+					{ parentCid, context: { filename, model: llmModel } },
+				);
 				llmStats.successes += 1;
 				if (llmFallbackUsed) {
 					llmStats.fallbacks += 1;
@@ -693,7 +757,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				const errorMsg =
 					error instanceof Error ? error.message : "unknown error";
 				if (inboxLogger) {
-					inboxLogger.warn`LLM detection failed: ${filename} - ${errorMsg} cid=${cid}`;
+					inboxLogger.warn`LLM detection failed: ${filename} - ${errorMsg} sessionCid=${sessionCid} cid=${cid}`;
 				}
 				llmStats.failures += 1;
 				llmStats.errors.push({
@@ -711,11 +775,11 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				try {
 					fallbackExtractedFields = await extractFrontmatterOnly(file.path);
 					if (inboxLogger) {
-						inboxLogger.debug`Extracted fallback frontmatter fields=${Object.keys(fallbackExtractedFields).join(", ")} file=${filename} cid=${cid}`;
+						inboxLogger.debug`Extracted fallback frontmatter fields=${Object.keys(fallbackExtractedFields).join(", ")} file=${filename} sessionCid=${sessionCid} cid=${cid}`;
 					}
 				} catch (err) {
 					if (inboxLogger) {
-						inboxLogger.warn`Failed to extract fallback frontmatter file=${filename} error=${err instanceof Error ? err.message : "unknown"} cid=${cid}`;
+						inboxLogger.warn`Failed to extract fallback frontmatter file=${filename} error=${err instanceof Error ? err.message : "unknown"} sessionCid=${sessionCid} cid=${cid}`;
 					}
 				}
 			}
@@ -756,7 +820,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					extractedFields: mergedFields,
 				};
 				if (inboxLogger) {
-					inboxLogger.debug`Merged frontmatter with LLM fields file=${filename} frontmatterKeys=${Object.keys(preservedFrontmatter).join(", ")} mergedKeys=${Object.keys(mergedFields).join(", ")} cid=${cid}`;
+					inboxLogger.debug`Merged frontmatter with LLM fields file=${filename} frontmatterKeys=${Object.keys(preservedFrontmatter).join(", ")} mergedKeys=${Object.keys(mergedFields).join(", ")} sessionCid=${sessionCid} cid=${cid}`;
 				}
 			} else if (
 				preservedFrontmatter &&
@@ -769,7 +833,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					extractedFields: preservedFrontmatter,
 				};
 				if (inboxLogger) {
-					inboxLogger.debug`Using frontmatter as extracted fields (LLM had none) file=${filename} cid=${cid}`;
+					inboxLogger.debug`Using frontmatter as extracted fields (LLM had none) file=${filename} sessionCid=${sessionCid} cid=${cid}`;
 				}
 			}
 
@@ -798,26 +862,26 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				const noteType = isCreateNoteSuggestion(suggestion)
 					? suggestion.suggestedNoteType
 					: "n/a";
-				inboxLogger.info`Suggestion built file=${filename} action=${suggestion.action} confidence=${suggestion.confidence} type=${noteType} source=${source} reason=${suggestion.reason} cid=${cid}`;
+				inboxLogger.info`Suggestion built file=${filename} action=${suggestion.action} confidence=${suggestion.confidence} type=${noteType} source=${source} reason=${suggestion.reason} sessionCid=${sessionCid} cid=${cid}`;
 			}
 
 			suggestionCache.set(suggestion.id, suggestion);
 
 			// Log file processing completion with structured event
 			if (inboxLogger) {
-				inboxLogger.info(
-					logJson({
-						event: "file_processed",
-						cid,
-						filename,
-						action: suggestion.action,
-						confidence: suggestion.confidence,
-						llmUsed: llmResult !== null && !llmErrorMessage,
-						llmFallbackUsed,
-						success: true,
-						timestamp: new Date().toISOString(),
-					}),
-				);
+				inboxLogger.info("File processed", {
+					event: "file_processed",
+					cid,
+					sessionCid,
+					parentCid,
+					filename,
+					action: suggestion.action,
+					confidence: suggestion.confidence,
+					llmUsed: llmResult !== null && !llmErrorMessage,
+					llmFallbackUsed,
+					success: true,
+					timestamp: new Date().toISOString(),
+				});
 			}
 
 			if (onProgress) {
@@ -842,6 +906,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		suggestions: InboxSuggestion[],
 		durationMs: number,
 		cid: string,
+		sessionCid: string,
 		llmStats: {
 			successes: number;
 			failures: number;
@@ -868,23 +933,22 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		);
 
 		if (inboxLogger) {
-			inboxLogger.info(
-				logJson({
-					event: "scan_completed",
-					cid,
-					suggestionCount: suggestions.length,
-					durationMs,
-					llmSuccesses: llmStats.successes,
-					llmFailures: llmStats.failures,
-					llmFallbacks: llmStats.fallbacks,
-					timestamp: new Date().toISOString(),
-				}),
-			);
-			inboxLogger.debug`Scan breakdown confidence=${JSON.stringify(confidenceCounts)} actions=${JSON.stringify(actionCounts)} durationMs=${durationMs} cid=${cid}`;
+			inboxLogger.info("Scan completed", {
+				event: "scan_completed",
+				cid,
+				sessionCid,
+				suggestionCount: suggestions.length,
+				durationMs,
+				llmSuccesses: llmStats.successes,
+				llmFailures: llmStats.failures,
+				llmFallbacks: llmStats.fallbacks,
+				timestamp: new Date().toISOString(),
+			});
+			inboxLogger.debug`Scan breakdown confidence=${JSON.stringify(confidenceCounts)} actions=${JSON.stringify(actionCounts)} durationMs=${durationMs} sessionCid=${sessionCid} cid=${cid}`;
 
 			// Error if LLM appears unavailable
 			if (llmStats.failures > 0 && llmStats.successes === 0) {
-				inboxLogger.error`LLM service unavailable: all ${llmStats.failures} calls failed. Suggestions are heuristic-only. cid=${cid}`;
+				inboxLogger.error`LLM service unavailable: all ${llmStats.failures} calls failed. Suggestions are heuristic-only. sessionCid=${sessionCid} cid=${cid}`;
 			}
 		}
 	}
@@ -896,99 +960,145 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	 */
 	async function scan(options?: ScanOptions): Promise<InboxSuggestion[]> {
 		await initLoggerWithNotice();
-		const startedAt = Date.now();
 		const sessionCid = options?.sessionCid ?? createCorrelationId();
-		const cid = createCorrelationId();
-		const onProgress = options?.onProgress;
 
-		// Track LLM failures to detect service unavailability
-		const llmStats = {
-			successes: 0,
-			failures: 0,
-			fallbacks: 0,
-			errors: [] as Array<{
-				filename: string;
-				error: string;
-				timestamp: number;
-			}>,
-			lastFallbackReason: undefined as string | undefined,
-			lastModelUsed: undefined as string | undefined,
-		};
+		return observe(
+			inboxLogger,
+			"inbox:scan",
+			async () => {
+				const startedAt = Date.now();
+				const cid = createCorrelationId();
+				const onProgress = options?.onProgress;
 
-		// Clear stale suggestions from previous scans to prevent memory leaks
-		suggestionCache.clear();
+				// Track LLM failures to detect service unavailability
+				const llmStats = {
+					successes: 0,
+					failures: 0,
+					fallbacks: 0,
+					errors: [] as Array<{
+						filename: string;
+						error: string;
+						timestamp: number;
+					}>,
+					lastFallbackReason: undefined as string | undefined,
+					lastModelUsed: undefined as string | undefined,
+				};
 
-		if (inboxLogger) {
-			inboxLogger.info(
-				logJson({
-					event: "scan_started",
-					cid,
-					sessionCid,
-					vaultPath: resolvedConfig.vaultPath,
-					timestamp: new Date().toISOString(),
-				}),
-			);
-		}
+				// Clear stale suggestions from previous scans to prevent memory leaks
+				suggestionCache.clear();
 
-		// Silent pre-commit: auto-save any uncommitted PARA files before scan
-		// This never blocks - if git fails, we log and continue
-		// Note: We use default PARA folders here to avoid filesystem config reads
-		// which can conflict with test vault setups
-		const preCommitResult = await ensureCleanState({
-			vault: resolvedConfig.vaultPath,
-			paraFolders: DEFAULT_PARA_FOLDERS,
-			defaultDestinations: DEFAULT_DESTINATIONS,
-		});
-		if (preCommitResult.preCommitted && inboxLogger) {
-			inboxLogger.info`Auto-saved ${preCommitResult.files.length} existing files before scan`;
-		}
+				if (inboxLogger) {
+					inboxLogger.info("Scan started", {
+						event: "scan_started",
+						cid,
+						sessionCid,
+						vaultPath: resolvedConfig.vaultPath,
+						timestamp: new Date().toISOString(),
+					});
 
-		// Load registry and clean up staging
-		const registry = await loadAndCleanRegistry(cid);
+					// Log resource usage at scan start
+					const startMetrics = captureResourceMetrics();
+					inboxLogger.debug("Scan resources start", {
+						event: "scan_resources_start",
+						cid,
+						sessionCid,
+						parentCid: sessionCid,
+						...startMetrics,
+					});
+				}
 
-		// Find supported files and get extractor registry
-		const findResult = await findSupportedFiles(cid);
-		if (!findResult) {
-			return [];
-		}
-		const { files: supportedFiles, extractorRegistry } = findResult;
+				// Silent pre-commit: auto-save any uncommitted PARA files before scan
+				// This never blocks - if git fails, we log and continue
+				// Note: We use default PARA folders here to avoid filesystem config reads
+				// which can conflict with test vault setups
+				const preCommitResult = await ensureCleanState({
+					vault: resolvedConfig.vaultPath,
+					paraFolders: DEFAULT_PARA_FOLDERS,
+					defaultDestinations: DEFAULT_DESTINATIONS,
+				});
+				if (preCommitResult.preCommitted && inboxLogger) {
+					inboxLogger.info`Auto-saved ${preCommitResult.files.length} existing files before scan`;
+				}
 
-		// Validate dependencies
-		await validateDependencies(cid);
+				// Load registry and clean up staging
+				const registry = await loadAndCleanRegistry(sessionCid);
 
-		// Build vault context
-		const vaultContext = buildVaultContext();
+				// Find supported files and get extractor registry
+				const findResult = await findSupportedFiles(cid);
+				if (!findResult) {
+					return [];
+				}
+				const { files: supportedFiles, extractorRegistry } = findResult;
 
-		// Create concurrency limiters
-		const extractionLimit = pLimit(
-			resolvedConfig.concurrency?.pdfExtraction ?? 5,
+				// Validate dependencies
+				await validateDependencies(cid);
+
+				// Build vault context
+				const vaultContext = buildVaultContext();
+
+				// Create concurrency limiters
+				const extractionLimit = pLimit(
+					resolvedConfig.concurrency?.pdfExtraction ?? 5,
+				);
+				const llmLimit = pLimit(resolvedConfig.concurrency?.llmCalls ?? 3);
+
+				// Process files concurrently
+				const suggestionPromises = supportedFiles.map((file, index) =>
+					processSingleFile({
+						sessionCid,
+						file,
+						index,
+						total: supportedFiles.length,
+						registry,
+						extractorRegistry,
+						vaultContext,
+						extractionLimit,
+						llmLimit,
+						onProgress,
+						parentCid: cid,
+						llmStats,
+					}),
+				);
+
+				const results = await Promise.all(suggestionPromises);
+				const suggestions = results.filter(
+					(s): s is InboxSuggestion => s !== null,
+				);
+				const durationMs = Date.now() - startedAt;
+
+				// Log resource usage at scan end
+				if (inboxLogger) {
+					const endMetrics = captureResourceMetrics();
+					inboxLogger.debug("Scan resources end", {
+						event: "scan_resources_end",
+						cid,
+						sessionCid,
+						parentCid: sessionCid,
+						...endMetrics,
+					});
+				}
+
+				// Record LLM availability SLO if any LLM calls were attempted
+				const totalLLMCalls = llmStats.successes + llmStats.failures;
+				if (totalLLMCalls > 0) {
+					const availabilityRate = (llmStats.successes / totalLLMCalls) * 100;
+					const llmSLOCheck = checkSLOBreach(
+						"llm_availability",
+						availabilityRate,
+					);
+					recordSLOEvent(
+						"llm_availability",
+						llmSLOCheck.breached,
+						availabilityRate,
+					);
+				}
+
+				logScanStatistics(suggestions, durationMs, cid, sessionCid, llmStats);
+
+				return suggestions;
+			},
+			{ parentCid: sessionCid },
 		);
-		const llmLimit = pLimit(resolvedConfig.concurrency?.llmCalls ?? 3);
-
-		// Process files concurrently
-		const suggestionPromises = supportedFiles.map((file, index) =>
-			processSingleFile({
-				file,
-				index,
-				total: supportedFiles.length,
-				registry,
-				extractorRegistry,
-				vaultContext,
-				extractionLimit,
-				llmLimit,
-				onProgress,
-				cid,
-				llmStats,
-			}),
-		);
-
-		const results = await Promise.all(suggestionPromises);
-		const suggestions = results.filter((s): s is InboxSuggestion => s !== null);
-		const durationMs = Date.now() - startedAt;
-
-		logScanStatistics(suggestions, durationMs, cid, llmStats);
-
-		return suggestions;
 	}
 
 	/**
@@ -1003,204 +1113,242 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		options?: ExecuteOptions,
 	): Promise<BatchResult> {
 		await initLoggerWithNotice();
-		const startedAt = Date.now();
 		const sessionCid = options?.sessionCid ?? createCorrelationId();
-		const cid = createCorrelationId();
-		const onProgress = options?.onProgress;
 
-		if (inboxLogger) {
-			inboxLogger.info(
-				logJson({
-					event: "execute_started",
-					cid,
-					sessionCid,
-					count: ids.length,
-					timestamp: new Date().toISOString(),
-				}),
-			);
-		}
+		return observe(
+			executeLogger,
+			"inbox:execute",
+			async () => {
+				const startedAt = Date.now();
+				const cid = createCorrelationId();
+				const onProgress = options?.onProgress;
 
-		if (ids.length === 0) {
-			return {
-				successful: [],
-				failed: new Map(),
-				summary: { total: 0, succeeded: 0, failed: 0 },
-			};
-		}
+				if (inboxLogger) {
+					inboxLogger.info("Execute started", {
+						event: "execute_started",
+						cid,
+						sessionCid,
+						count: ids.length,
+						timestamp: new Date().toISOString(),
+					});
 
-		// Warn if cache is empty - suggests scan() wasn't called
-		// Don't throw - let per-ID error handling return appropriate results
-		if (suggestionCache.size === 0) {
-			if (inboxLogger) {
-				inboxLogger.warn`Execute called with empty cache - did you forget to call scan()? cid=${cid}`;
-			}
-		}
+					// Log resource usage at execute start
+					const startMetrics = captureResourceMetrics();
+					inboxLogger.debug("Execute resources start", {
+						event: "execute_resources_start",
+						cid,
+						sessionCid,
+						parentCid: sessionCid,
+						...startMetrics,
+					});
+				}
 
-		// Load para-obsidian config for path maps
-		const paraConfig = loadConfig();
+				if (ids.length === 0) {
+					return {
+						successful: [],
+						failed: new Map(),
+						summary: { total: 0, succeeded: 0, failed: 0 },
+					};
+				}
 
-		// Pre-flight validation
-		validateExecutionPreconditions(
-			resolvedConfig.vaultPath,
-			paraConfig.paraFolders ?? {},
-		);
+				// Warn if cache is empty - suggests scan() wasn't called
+				// Don't throw - let per-ID error handling return appropriate results
+				if (suggestionCache.size === 0) {
+					if (inboxLogger) {
+						inboxLogger.warn`Execute called with empty cache - did you forget to call scan()? sessionCid=${sessionCid} cid=${cid}`;
+					}
+				}
 
-		// Start a session - this silently pre-commits any existing uncommitted files
-		// and tracks changes for batch commit at the end
-		// Note: We use defaults with fallback from config to avoid test interference
-		const session = await startSession({
-			vault: resolvedConfig.vaultPath,
-			paraFolders: paraConfig.paraFolders ?? DEFAULT_PARA_FOLDERS,
-			defaultDestinations:
-				paraConfig.defaultDestinations ?? DEFAULT_DESTINATIONS,
-		});
-		if (inboxLogger) {
-			inboxLogger.debug`Execute session started id=${session.id} cid=${cid}`;
-		}
+				// Load para-obsidian config for path maps
+				const paraConfig = loadConfig();
 
-		// Build path maps ONCE for entire batch
-		const areaPathMap = getAreaPathMap(
-			resolvedConfig.vaultPath,
-			paraConfig.paraFolders,
-		);
-		const projectPathMap = getProjectPathMap(
-			resolvedConfig.vaultPath,
-			paraConfig.paraFolders,
-		);
-
-		// Load the registry for updating after successful execution
-		const registry = createRegistry(resolvedConfig.vaultPath);
-		await registry.load();
-
-		const successful: ExecutionResult[] = [];
-		const failed = new Map<SuggestionId, Error>();
-		let processed = 0;
-		const total = ids.length;
-
-		for (const id of ids) {
-			// Look up suggestion by ID
-			// Check CLI-modified suggestions first, then fall back to engine cache
-			// This ensures user modifications (e.g., accepted LLM destinations) are respected
-			const suggestion =
-				options?.updatedSuggestions?.get(id) ?? suggestionCache.get(id);
-			if (!suggestion) {
-				const error = new Error(`Suggestion not found: ${id}`);
-				failed.set(id, error);
-				continue;
-			}
-
-			// Skip if action is skip
-			if (suggestion.action === "skip") {
-				successful.push({
-					suggestionId: id,
-					success: true,
-					action: "skip",
-				});
-				continue;
-			}
-
-			try {
-				const result = await executeSuggestion(
-					suggestion,
-					resolvedConfig,
-					registry,
-					cid,
-					{ areaPathMap, projectPathMap },
+				// Pre-flight validation
+				validateExecutionPreconditions(
+					resolvedConfig.vaultPath,
+					paraConfig.paraFolders ?? {},
 				);
-				successful.push(result);
-				if (result.success) {
-					// Save registry immediately after each successful execution
-					await registry.save();
-					if (executeLogger) {
-						executeLogger.debug`Registry saved after item=${id} ${cid}`;
+
+				// Start a session - this silently pre-commits any existing uncommitted files
+				// and tracks changes for batch commit at the end
+				// Note: We use defaults with fallback from config to avoid test interference
+				const session = await startSession({
+					vault: resolvedConfig.vaultPath,
+					paraFolders: paraConfig.paraFolders ?? DEFAULT_PARA_FOLDERS,
+					defaultDestinations:
+						paraConfig.defaultDestinations ?? DEFAULT_DESTINATIONS,
+				});
+				if (inboxLogger) {
+					inboxLogger.debug`Execute session started id=${session.id} sessionCid=${sessionCid} cid=${cid}`;
+				}
+
+				// Build path maps ONCE for entire batch
+				const areaPathMap = getAreaPathMap(
+					resolvedConfig.vaultPath,
+					paraConfig.paraFolders,
+				);
+				const projectPathMap = getProjectPathMap(
+					resolvedConfig.vaultPath,
+					paraConfig.paraFolders,
+				);
+
+				// Load the registry for updating after successful execution
+				const registry = createRegistry(resolvedConfig.vaultPath);
+				await registry.load();
+
+				const successful: ExecutionResult[] = [];
+				const failed = new Map<SuggestionId, Error>();
+				let processed = 0;
+				const total = ids.length;
+
+				for (const id of ids) {
+					// Look up suggestion by ID
+					// Check CLI-modified suggestions first, then fall back to engine cache
+					// This ensures user modifications (e.g., accepted LLM destinations) are respected
+					const suggestion =
+						options?.updatedSuggestions?.get(id) ?? suggestionCache.get(id);
+					if (!suggestion) {
+						const error = new Error(`Suggestion not found: ${id}`);
+						failed.set(id, error);
+						continue;
 					}
-					// Track file changes in session for batch commit
-					if (result.createdNote) {
-						trackChange(session, result.createdNote);
+
+					// Skip if action is skip
+					if (suggestion.action === "skip") {
+						successful.push({
+							suggestionId: id,
+							success: true,
+							action: "skip",
+						});
+						continue;
 					}
-					if (result.movedAttachment) {
-						trackChange(session, result.movedAttachment);
+
+					try {
+						const result = await executeSuggestion(
+							suggestion,
+							resolvedConfig,
+							registry,
+							cid,
+							{ areaPathMap, projectPathMap, sessionCid },
+						);
+						successful.push(result);
+						if (result.success) {
+							// Save registry immediately after each successful execution
+							await registry.save();
+							if (executeLogger) {
+								executeLogger.debug`Registry saved after item=${id} ${cid}`;
+							}
+							// Track file changes in session for batch commit
+							// Track source file deletion for git staging
+							if (result.movedFrom) {
+								trackChange(session, result.movedFrom);
+							}
+							// Track destination files for git staging
+							if (result.createdNote) {
+								trackChange(session, result.createdNote);
+							}
+							if (result.movedAttachment) {
+								trackChange(session, result.movedAttachment);
+							}
+						} else {
+							// Track as failed even though executeSuggestion returned a result
+							failed.set(id, new Error(result.error));
+						}
+					} catch (error) {
+						failed.set(id, error as Error);
+						// Log but don't stop - continue processing other suggestions
+						if (executeLogger) {
+							const filename = suggestion
+								? basename(suggestion.source)
+								: "unknown";
+							executeLogger.error`Execute failed id=${id} filename=${filename} error=${error instanceof Error ? error.message : "unknown"} ${cid}`;
+						}
+					}
+
+					// Emit progress after each item for CLI feedback
+					processed++;
+					if (onProgress) {
+						const lastResult = successful[successful.length - 1];
+						const wasSuccessful = lastResult?.success ?? false;
+						const failedError = failed.get(id);
+						// Extract error from failed result using discriminated union pattern
+						const progressError = failedError
+							? failedError.message
+							: lastResult && !lastResult.success
+								? lastResult.error
+								: undefined;
+						const percentComplete = Math.round((processed / total) * 100);
+						await onProgress({
+							processed,
+							total,
+							suggestionId: id,
+							action: suggestion?.action ?? "skip",
+							success: wasSuccessful,
+							error: progressError,
+							percentComplete,
+						});
+					}
+				}
+
+				// Final save to ensure any edge cases are captured
+				// (This is now redundant but harmless as a safety net)
+				await registry.save();
+
+				// Finalize session - batch commit all changes from this execute() call
+				const successCount = successful.filter((r) => r.success).length;
+				if (successCount > 0) {
+					const summary = `inbox: processed ${successCount} item${successCount === 1 ? "" : "s"}`;
+					const commitResult = await finalizeSession(
+						session,
+						summary,
+						paraConfig,
+					);
+					if (commitResult.committed && inboxLogger) {
+						inboxLogger.info`Session committed: ${summary}`;
 					}
 				} else {
-					// Track as failed even though executeSuggestion returned a result
-					failed.set(id, new Error(result.error));
+					// No successful operations - just mark session as finalized without commit
+					session.finalized = true;
 				}
-			} catch (error) {
-				failed.set(id, error as Error);
-				// Log but don't stop - continue processing other suggestions
-				if (executeLogger) {
-					const filename = suggestion ? basename(suggestion.source) : "unknown";
-					executeLogger.error`Execute failed id=${id} filename=${filename} error=${error instanceof Error ? error.message : "unknown"} ${cid}`;
+
+				const durationMs = Date.now() - startedAt;
+
+				// Log resource usage at execute end
+				if (inboxLogger) {
+					const endMetrics = captureResourceMetrics();
+					inboxLogger.debug("Execute resources end", {
+						event: "execute_resources_end",
+						cid,
+						sessionCid,
+						parentCid: sessionCid,
+						...endMetrics,
+					});
 				}
-			}
 
-			// Emit progress after each item for CLI feedback
-			processed++;
-			if (onProgress) {
-				const lastResult = successful[successful.length - 1];
-				const wasSuccessful = lastResult?.success ?? false;
-				const failedError = failed.get(id);
-				// Extract error from failed result using discriminated union pattern
-				const progressError = failedError
-					? failedError.message
-					: lastResult && !lastResult.success
-						? lastResult.error
-						: undefined;
-				const percentComplete = Math.round((processed / total) * 100);
-				await onProgress({
-					processed,
-					total,
-					suggestionId: id,
-					action: suggestion?.action ?? "skip",
-					success: wasSuccessful,
-					error: progressError,
-					percentComplete,
-				});
-			}
-		}
+				if (inboxLogger) {
+					inboxLogger.info("Execute completed", {
+						event: "execute_completed",
+						cid,
+						successCount: successful.length,
+						failureCount: failed.size,
+						total,
+						durationMs,
+						timestamp: new Date().toISOString(),
+					});
+					inboxLogger.debug`Execute summary total=${total} success=${successful.length} failed=${failed.size} durationMs=${durationMs} sessionCid=${sessionCid} cid=${cid}`;
+				}
 
-		// Final save to ensure any edge cases are captured
-		// (This is now redundant but harmless as a safety net)
-		await registry.save();
-
-		// Finalize session - batch commit all changes from this execute() call
-		const successCount = successful.filter((r) => r.success).length;
-		if (successCount > 0) {
-			const summary = `inbox: processed ${successCount} item${successCount === 1 ? "" : "s"}`;
-			const commitResult = await finalizeSession(session, summary, paraConfig);
-			if (commitResult.committed && inboxLogger) {
-				inboxLogger.info`Session committed: ${summary}`;
-			}
-		} else {
-			// No successful operations - just mark session as finalized without commit
-			session.finalized = true;
-		}
-
-		const durationMs = Date.now() - startedAt;
-		if (inboxLogger) {
-			inboxLogger.info(
-				logJson({
-					event: "execute_completed",
-					cid,
-					successCount: successful.length,
-					failureCount: failed.size,
-					total,
-					durationMs,
-					timestamp: new Date().toISOString(),
-				}),
-			);
-			inboxLogger.debug`Execute summary total=${total} success=${successful.length} failed=${failed.size} durationMs=${durationMs} cid=${cid}`;
-		}
-
-		return {
-			successful,
-			failed,
-			summary: {
-				total: ids.length,
-				succeeded: successful.length,
-				failed: failed.size,
+				return {
+					successful,
+					failed,
+					summary: {
+						total: ids.length,
+						succeeded: successful.length,
+						failed: failed.size,
+					},
+				};
 			},
-		};
+			{ parentCid: sessionCid },
+		);
 	}
 
 	/**
@@ -1218,7 +1366,8 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		const cid = createCorrelationId();
 
 		if (inboxLogger) {
-			inboxLogger.info`Edit started id=${id} prompt=${prompt} cid=${cid}`;
+			// SECURITY: Never log raw user prompts - only log metadata
+			inboxLogger.info`Edit started id=${id} promptLength=${prompt.length} hasPrompt=${prompt.length > 0} cid=${cid}`;
 		}
 
 		// Look up original suggestion
@@ -1352,7 +1501,11 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		}
 
 		if (inboxLogger) {
-			inboxLogger.info`Challenge started id=${id} cid=${cid}`;
+			inboxLogger.info("Challenge started", {
+				id,
+				hint: trimmedHint,
+				cid,
+			});
 		}
 
 		// Look up original suggestion
@@ -1382,7 +1535,11 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		} catch (error) {
 			// Log failure without exposing full error details
 			if (inboxLogger) {
-				inboxLogger.warn`Challenge re-classification failed id=${id} cid=${cid}`;
+				inboxLogger.warn("Challenge re-classification failed", {
+					id,
+					error: error instanceof Error ? error.message : "unknown",
+					cid,
+				});
 			}
 			throw error;
 		}
@@ -1407,7 +1564,14 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			const newType = isCreateNoteSuggestion(updated)
 				? updated.suggestedNoteType
 				: undefined;
-			inboxLogger.info`Challenge complete id=${id} oldType=${previousClassification.documentType} newType=${newType} cid=${cid}`;
+			inboxLogger.info("Challenge complete", {
+				id,
+				oldType: previousClassification.documentType,
+				newType,
+				oldConfidence: previousClassification.confidence,
+				newConfidence: updated.confidence,
+				cid,
+			});
 		}
 
 		return challengedSuggestion;

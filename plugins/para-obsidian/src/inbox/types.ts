@@ -520,6 +520,9 @@ export interface SuccessfulExecutionResult extends ExecutionResultBase {
 	/** Path to moved attachment (if applicable) */
 	readonly movedAttachment?: string;
 
+	/** Source path for git staging when files are moved */
+	readonly movedFrom?: string;
+
 	/** Warning message if operation partially succeeded */
 	readonly warning?: string;
 }
@@ -593,6 +596,12 @@ export interface ExecuteProgress {
 
 	/** Progress percentage (0-100) */
 	readonly percentComplete: number;
+
+	/** Running success rate (0-1) calculated from successful executions so far */
+	readonly runningSuccessRate?: number;
+
+	/** Estimated time remaining in milliseconds */
+	readonly etaMs?: number;
 }
 
 /**
@@ -872,6 +881,8 @@ export type ErrorCode =
 	| "DET_FIELDS_INCOMPLETE"
 	| "DET_LLM_PARSE_FAILED"
 	// Validation errors
+	| "VAL_VAULT_NOT_FOUND"
+	| "VAL_PARA_FOLDER_MISSING"
 	| "VAL_AREA_NOT_FOUND"
 	| "VAL_PROJECT_NOT_FOUND"
 	| "VAL_TEMPLATE_MISSING"
