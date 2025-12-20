@@ -171,6 +171,22 @@ export async function executeSuggestion(
 		movedAttachment: moveResult.movedTo as string,
 	});
 
+	// Step 5: Cleanup registry for moved attachments (Phase 1: prevent zombie entries)
+	if (moveResult.movedTo && moveResult.hash) {
+		// Use the hash computed during the move (source file is already moved)
+		const sourceHash = moveResult.hash;
+
+		// Remove from registry to allow reprocessing if user re-adds the file
+		const removed = registry.removeItem(sourceHash);
+		if (removed) {
+			await registry.save();
+
+			if (logger) {
+				logger.debug`Registry cleaned: hash=${sourceHash.slice(0, 8)} file=${basename(suggestion.source)} ${cid}`;
+			}
+		}
+	}
+
 	if (logger) {
 		logger.info`Executed suggestion id=${suggestion.id} movedTo=${basename(moveResult.movedTo as string)} createdNote=${createdNotePath ?? "none"} ${cid}`;
 	}
