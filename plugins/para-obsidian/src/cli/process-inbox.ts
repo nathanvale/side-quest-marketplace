@@ -14,6 +14,7 @@ import {
 	formatSuggestionsTable,
 	runInteractiveLoop,
 } from "../inbox";
+import { checkSLOBreach, recordSLOEvent } from "../inbox/shared/slos";
 import { checkThreshold } from "../inbox/shared/thresholds";
 import { isCreateNoteSuggestion } from "../inbox/types";
 import {
@@ -22,6 +23,7 @@ import {
 	inboxLogger,
 	initLoggerWithNotice,
 } from "../shared/logger";
+import { startSession } from "./shared/session";
 import type { CommandContext, CommandResult } from "./types";
 
 type MetricsSummary = ReturnType<MetricsCollector["getSummary"]>;
@@ -130,98 +132,106 @@ export async function handleProcessInbox(
 ): Promise<CommandResult> {
 	const { config, flags, isJson } = ctx;
 
+	// Start session with correlation ID tracking (shows at start and end)
+	const session = startSession("para process-inbox", { silent: isJson });
+	const sessionCid = session.sessionCid;
+
 	await initLoggerWithNotice();
 	if (!isJson) {
 		console.log(emphasize.info(`Logs: ${getLogFile()}`));
 	}
 
-	// Generate a single session correlation ID for end-to-end tracing
-	const sessionCid = createCorrelationId();
+	let result: CommandResult;
+	try {
+		// Parse process-inbox specific flags
+		const autoMode = flags.auto === true;
+		const previewMode = flags.preview === true;
+		const dryRun = flags["dry-run"] === true;
+		const skipConfirm = flags.confirm === true; // --confirm skips the interactive prompt
+		// Verbose and force flags reserved for future use
+		const _verbose = flags.verbose === true;
+		const _force = flags.force === true;
+		const filterPattern =
+			typeof flags.filter === "string" ? flags.filter : undefined;
 
-	// Parse process-inbox specific flags
-	const autoMode = flags.auto === true;
-	const previewMode = flags.preview === true;
-	const dryRun = flags["dry-run"] === true;
-	const skipConfirm = flags.confirm === true; // --confirm skips the interactive prompt
-	// Verbose and force flags reserved for future use
-	const _verbose = flags.verbose === true;
-	const _force = flags.force === true;
-	const filterPattern =
-		typeof flags.filter === "string" ? flags.filter : undefined;
+		// Get LLM model from env or default (uses DEFAULT_MODEL from config/defaults.ts)
+		// TODO: Get llmModel from config when inbox config is added to ParaObsidianConfig
+		const llmModel = process.env.PARA_LLM_MODEL || DEFAULT_MODEL;
 
-	// Get LLM model from env or default (uses DEFAULT_MODEL from config/defaults.ts)
-	// TODO: Get llmModel from config when inbox config is added to ParaObsidianConfig
-	const llmModel = process.env.PARA_LLM_MODEL || DEFAULT_MODEL;
+		// Create engine with config
+		const engine = createInboxEngine({
+			vaultPath: config.vault,
+			inboxFolder: "00 Inbox",
+			attachmentsFolder: "Attachments",
+			templatesFolder: config.templatesDir,
+			llmProvider: llmModel, // Pass the model as provider
+			llmModel: llmModel, // Also pass as explicit model
+		});
 
-	// Create engine with config
-	const engine = createInboxEngine({
-		vaultPath: config.vault,
-		inboxFolder: "00 Inbox",
-		attachmentsFolder: "Attachments",
-		templatesFolder: config.templatesDir,
-		llmProvider: llmModel, // Pass the model as provider
-		llmModel: llmModel, // Also pass as explicit model
-	});
+		// Scan inbox for suggestions
+		let suggestions: InboxSuggestion[];
+		let scanMetrics: ScanMetrics | null = null;
+		if (isJson) {
+			suggestions = await engine.scan({ sessionCid });
+		} else {
+			const scanResult = await scanWithSpinner(engine, llmModel, sessionCid);
+			suggestions = scanResult.suggestions;
+			scanMetrics = scanResult.metrics;
+		}
 
-	// Scan inbox for suggestions
-	let suggestions: InboxSuggestion[];
-	let scanMetrics: ScanMetrics | null = null;
-	if (isJson) {
-		suggestions = await engine.scan({ sessionCid });
-	} else {
-		const result = await scanWithSpinner(engine, llmModel, sessionCid);
-		suggestions = result.suggestions;
-		scanMetrics = result.metrics;
+		// Apply filter if provided
+		const filteredSuggestions = filterPattern
+			? suggestions.filter(
+					(s) =>
+						s.source.includes(filterPattern) ||
+						(isCreateNoteSuggestion(s) &&
+							s.suggestedTitle?.includes(filterPattern)) ||
+						false,
+				)
+			: suggestions;
+
+		if (filteredSuggestions.length === 0) {
+			result = await handleEmptyInbox(isJson, sessionCid, scanMetrics);
+		} else if (previewMode) {
+			// Preview mode: just display suggestions
+			result = await handlePreviewMode(
+				filteredSuggestions,
+				isJson,
+				sessionCid,
+				scanMetrics,
+			);
+		} else if (autoMode) {
+			// Auto mode: process all without interaction
+			result = await handleAutoMode(
+				engine,
+				filteredSuggestions,
+				dryRun,
+				skipConfirm,
+				isJson,
+				sessionCid,
+				scanMetrics,
+			);
+		} else {
+			// Interactive mode: run the interactive approval loop
+			result = await handleInteractiveMode(
+				engine,
+				filteredSuggestions,
+				dryRun,
+				isJson,
+				config.vault,
+				sessionCid,
+				config.paraFolders,
+			);
+		}
+	} catch (error) {
+		const errorMsg = error instanceof Error ? error.message : String(error);
+		session.end({ error: errorMsg });
+		throw error;
 	}
 
-	// Apply filter if provided
-	const filteredSuggestions = filterPattern
-		? suggestions.filter(
-				(s) =>
-					s.source.includes(filterPattern) ||
-					(isCreateNoteSuggestion(s) &&
-						s.suggestedTitle?.includes(filterPattern)) ||
-					false,
-			)
-		: suggestions;
-
-	if (filteredSuggestions.length === 0) {
-		return handleEmptyInbox(isJson, sessionCid, scanMetrics);
-	}
-
-	// Preview mode: just display suggestions
-	if (previewMode) {
-		return handlePreviewMode(
-			filteredSuggestions,
-			isJson,
-			sessionCid,
-			scanMetrics,
-		);
-	}
-
-	// Auto mode: process all without interaction
-	if (autoMode) {
-		return handleAutoMode(
-			engine,
-			filteredSuggestions,
-			dryRun,
-			skipConfirm,
-			isJson,
-			sessionCid,
-			scanMetrics,
-		);
-	}
-
-	// Interactive mode: run the interactive approval loop
-	return handleInteractiveMode(
-		engine,
-		filteredSuggestions,
-		dryRun,
-		isJson,
-		config.vault,
-		sessionCid,
-		config.paraFolders,
-	);
+	// End session with success status
+	session.end({ success: result.success });
+	return result;
 }
 
 /** Average seconds per file for LLM classification (used for ETA calculation) */
@@ -484,6 +494,23 @@ async function scanWithSpinner(
 			);
 		}
 
+		// Check SLO breach for scan latency
+		const scanSLOCheck = checkSLOBreach("scan_latency", durationMs);
+		recordSLOEvent("scan_latency", scanSLOCheck.breached, durationMs);
+		if (scanSLOCheck.breached && inboxLogger) {
+			inboxLogger.error("SLO breach detected", {
+				tool: "cli:sloBreached",
+				sessionCid,
+				sloName: "scan_latency",
+				breached: true,
+				burnRate: scanSLOCheck.burnRate,
+				currentValue: scanSLOCheck.currentValue,
+				threshold: scanSLOCheck.slo.threshold,
+				target: scanSLOCheck.slo.target,
+				errorBudget: scanSLOCheck.slo.errorBudget,
+			});
+		}
+
 		// Show LLM status messages
 		const filesAttempted = scanState.processed - scanState.skipped;
 
@@ -603,9 +630,6 @@ async function scanWithSpinner(
 			);
 		}
 
-		// Show session ID for tracing
-		console.log(emphasize.dim(`Session ID: ${sessionCid}`));
-
 		return {
 			suggestions,
 			metrics: {
@@ -645,8 +669,8 @@ async function scanWithSpinner(
  */
 async function handleEmptyInbox(
 	isJson: boolean,
-	sessionCid: string,
-	scanMetrics: ScanMetrics | null,
+	_sessionCid: string,
+	_scanMetrics: ScanMetrics | null,
 ): Promise<CommandResult> {
 	const metrics = await collectMetricsSummary();
 	if (isJson) {
@@ -698,8 +722,8 @@ async function handleEmptyInbox(
 async function handlePreviewMode(
 	suggestions: InboxSuggestion[],
 	isJson: boolean,
-	sessionCid: string,
-	scanMetrics: ScanMetrics | null,
+	_sessionCid: string,
+	_scanMetrics: ScanMetrics | null,
 ): Promise<CommandResult> {
 	const metrics = await collectMetricsSummary();
 	if (isJson) {
@@ -916,14 +940,24 @@ async function executeWithSpinner(
 		suggestions.map((s) => s.id),
 		{
 			sessionCid,
-			onProgress: ({ percentComplete, suggestionId, success, error }) => {
+			onProgress: ({
+				percentComplete,
+				suggestionId,
+				success,
+				error,
+				runningSuccessRate,
+			}) => {
 				if (!success) errorCount++;
 
 				const progressBar = renderProgressBar(percentComplete, 16);
 				const status = success ? color("green", "✓") : color("red", "✗");
+				const successRateDisplay =
+					runningSuccessRate !== undefined
+						? ` | Success: ${Math.round(runningSuccessRate * 100)}%`
+						: "";
 				const detail = error ? ` ${error}` : "";
 				execSpinner.update({
-					text: `${progressBar} ${status} ${suggestionId}${detail}`,
+					text: `${progressBar} ${status} ${suggestionId}${successRateDisplay}${detail}`,
 				});
 			},
 		},
@@ -970,6 +1004,25 @@ async function executeWithSpinner(
 				`⚠ Execute duration exceeded threshold: ${(durationMs / 1000).toFixed(1)}s (${executeThresholdCheck.percentage}% of ${(executeThresholdCheck.threshold / 1000).toFixed(0)}s limit)`,
 			),
 		);
+	}
+
+	// Check SLO breach for execute success rate
+	const successRate =
+		total > 0 ? (results.summary.succeeded / total) * 100 : 100;
+	const executeSLOCheck = checkSLOBreach("execute_success", successRate);
+	recordSLOEvent("execute_success", executeSLOCheck.breached, successRate);
+	if (executeSLOCheck.breached && inboxLogger) {
+		inboxLogger.error("SLO breach detected", {
+			tool: "cli:sloBreached",
+			sessionCid,
+			sloName: "execute_success",
+			breached: true,
+			burnRate: executeSLOCheck.burnRate,
+			currentValue: executeSLOCheck.currentValue,
+			threshold: executeSLOCheck.slo.threshold,
+			target: executeSLOCheck.slo.target,
+			errorBudget: executeSLOCheck.slo.errorBudget,
+		});
 	}
 
 	// Check thresholds for metrics
@@ -1053,14 +1106,24 @@ async function handleInteractiveMode(
 			const batchResults = await engine.execute(approvedIds, {
 				sessionCid,
 				updatedSuggestions, // Pass CLI-modified suggestions to ensure destination changes are respected
-				onProgress: ({ percentComplete, suggestionId, success, error }) => {
+				onProgress: ({
+					percentComplete,
+					suggestionId,
+					success,
+					error,
+					runningSuccessRate,
+				}) => {
 					if (!success) errorCount++;
 
 					const progressBar = renderProgressBar(percentComplete, 16);
 					const status = success ? color("green", "✓") : color("red", "✗");
+					const successRateDisplay =
+						runningSuccessRate !== undefined
+							? ` | Success: ${Math.round(runningSuccessRate * 100)}%`
+							: "";
 					const detail = error ? ` ${error}` : "";
 					execSpinner.update({
-						text: `${progressBar} ${status} ${suggestionId}${detail}`,
+						text: `${progressBar} ${status} ${suggestionId}${successRateDisplay}${detail}`,
 					});
 				},
 			});

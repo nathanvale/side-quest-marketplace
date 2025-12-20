@@ -8,6 +8,7 @@
 import { input } from "@inquirer/prompts";
 import { emphasize } from "@sidequest/core/terminal";
 import { createSpinner } from "nanospinner";
+import { cliLogger } from "../../shared/logger";
 import { getAreaPathMap, getProjectPathMap } from "../core/vault/context";
 import type {
 	CLICommand,
@@ -700,6 +701,9 @@ export interface InteractiveOptions {
 
 	/** PARA folder configuration (for resolving area/project paths) */
 	paraFolders?: Record<string, string>;
+
+	/** Session correlation ID for logging (optional) */
+	sessionCid?: string;
 }
 
 /**
@@ -794,6 +798,7 @@ export async function runInteractiveLoop(
 		pageSize = PAGE_SIZE,
 		vaultPath,
 		paraFolders,
+		sessionCid,
 	} = options;
 	const approved = new Set<SuggestionId>();
 	const approvalHistory: SuggestionId[] = []; // For undo
@@ -804,6 +809,14 @@ export async function runInteractiveLoop(
 	const updatedSuggestions = new Map<string, InboxSuggestion>();
 	let isProcessing = false;
 	let currentPage = 0;
+
+	// Log session start
+	if (cliLogger && sessionCid) {
+		cliLogger.info("Review session started", {
+			suggestions: suggestions.length,
+			cid: sessionCid,
+		});
+	}
 
 	// Build path maps for resolving area/project names to full vault paths
 	// e.g., "Health" → "02 Areas/Health", "Tax 2024" → "01 Projects/Tax 2024"
@@ -861,6 +874,24 @@ export async function runInteractiveLoop(
 		// Parse command with context about approved state
 		// This ensures all user input goes through the discriminated union
 		const command = parseCommand(userInput, approved.size > 0);
+
+		// Log user command (excluding help/navigation for brevity)
+		if (
+			cliLogger &&
+			sessionCid &&
+			command.type !== "help" &&
+			command.type !== "next-page" &&
+			command.type !== "prev-page" &&
+			command.type !== "list-all" &&
+			command.type !== "view"
+		) {
+			cliLogger.debug("User command", {
+				type: command.type,
+				approved: approved.size,
+				skipped: skipped.size,
+				cid: sessionCid,
+			});
+		}
 
 		switch (command.type) {
 			case "accept-suggestion": {
@@ -934,6 +965,15 @@ export async function runInteractiveLoop(
 				// Track modified suggestion for engine.execute()
 				updatedSuggestions.set(updatedSuggestion.id, updatedSuggestion);
 
+				// Log destination acceptance
+				if (cliLogger && sessionCid) {
+					cliLogger.info("Accepted LLM destination", {
+						suggestionId: targetSuggestion.id,
+						destination: resolvedPath,
+						cid: sessionCid,
+					});
+				}
+
 				console.log(
 					emphasize.success(
 						`Accepted LLM suggestion for item ${command.id}: ${llmSuggestion} → ${resolvedPath}`,
@@ -979,6 +1019,15 @@ export async function runInteractiveLoop(
 				// Track modified suggestion for engine.execute()
 				updatedSuggestions.set(updatedSuggestion.id, updatedSuggestion);
 
+				// Log custom destination
+				if (cliLogger && sessionCid) {
+					cliLogger.info("Set custom destination", {
+						suggestionId: targetSuggestion.id,
+						destination: command.path,
+						cid: sessionCid,
+					});
+				}
+
 				console.log(
 					emphasize.success(
 						`Set destination for item ${command.id}: ${command.path}`,
@@ -989,12 +1038,26 @@ export async function runInteractiveLoop(
 
 			case "execute":
 				// Explicit execution command (Enter key when items approved)
+				if (cliLogger && sessionCid) {
+					cliLogger.info("Review complete - executing", {
+						approved: approved.size,
+						skipped: skipped.size,
+						cid: sessionCid,
+					});
+				}
 				return {
 					approvedIds: Array.from(approved),
 					updatedSuggestions,
 				};
 
 			case "quit":
+				if (cliLogger && sessionCid) {
+					cliLogger.info("Review quit without executing", {
+						approved: approved.size,
+						skipped: skipped.size,
+						cid: sessionCid,
+					});
+				}
 				console.log(emphasize.warn("\nQuitting without executing."));
 				return {
 					approvedIds: [],
