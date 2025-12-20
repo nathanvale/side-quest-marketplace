@@ -99,4 +99,23 @@ describe("logger", () => {
 			}
 		});
 	});
+
+	describe("log directory configuration", () => {
+		test("should never use PARA_VAULT for log directory", async () => {
+			// IMPORTANT: Logs should ALWAYS go to ~/.claude/logs (user directory)
+			// NOT to the vault directory, to keep logs centralized
+			const { logDir } = await import("./logger");
+
+			// If PARA_OBSIDIAN_LOG_DIR is not set, logDir should be undefined
+			// (which causes core to use the default ~/.claude/logs)
+			if (!process.env.PARA_OBSIDIAN_LOG_DIR) {
+				expect(logDir).toBeUndefined();
+			}
+
+			// logDir should never contain the vault path
+			if (logDir && process.env.PARA_VAULT) {
+				expect(logDir).not.toContain(process.env.PARA_VAULT);
+			}
+		});
+	});
 });

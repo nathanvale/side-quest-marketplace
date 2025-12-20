@@ -9,8 +9,8 @@
  *
  * - `PARA_LOG_LEVEL` - Set minimum log level: "debug" | "info" | "warning" | "error" (default: "debug")
  * - `PARA_LOG_CONSOLE` - Enable console output for local development: "1" | "true" (default: off)
- * - `PARA_OBSIDIAN_LOG_DIR` - Custom log directory path
- * - `PARA_VAULT` - Vault path (fallback log dir: $PARA_VAULT/.claude/logs)
+ * - `PARA_OBSIDIAN_LOG_DIR` - Custom log directory path (default: ~/.claude/logs)
+ * - `PARA_VAULT` - Vault path (NOT used for logging - logs always go to user directory)
  *
  * @example
  * ```bash
@@ -24,7 +24,6 @@
  * @module logger
  */
 
-import { join } from "node:path";
 import { configure, getConsoleSink } from "@logtape/logtape";
 import {
 	createCorrelationId as coreCreateCorrelationId,
@@ -55,19 +54,20 @@ export const SUBSYSTEMS = [
 	"lock",
 	"tx",
 	"cli",
+	"classify",
 ] as const;
 
 export type PluginSubsystem = (typeof SUBSYSTEMS)[number];
 
 /**
  * Determine log directory from environment.
- * Priority: PARA_OBSIDIAN_LOG_DIR > PARA_VAULT/.claude/logs > undefined
+ * ALWAYS logs to ~/.claude/logs/ unless explicitly overridden.
+ * Priority: PARA_OBSIDIAN_LOG_DIR > undefined (core default: ~/.claude/logs)
+ *
+ * NOTE: We intentionally do NOT use PARA_VAULT for logging to keep logs
+ * centralized in the user directory, not scattered across vault directories.
  */
-export const logDir =
-	process.env.PARA_OBSIDIAN_LOG_DIR ??
-	(process.env.PARA_VAULT
-		? join(process.env.PARA_VAULT, ".claude", "logs")
-		: undefined);
+export const logDir = process.env.PARA_OBSIDIAN_LOG_DIR ?? undefined;
 
 /**
  * Parse log level from environment variable.
@@ -248,6 +248,11 @@ export const txLogger = subsystemLoggers.tx!;
  */
 export const cliLogger = subsystemLoggers.cli!;
 
+/**
+ * Logger for classifier matching operations.
+ */
+export const classifyLogger = subsystemLoggers.classify!;
+
 // =============================================================================
 // Re-exports for convenience
 // =============================================================================
@@ -283,30 +288,3 @@ export const loggers = {
 	tx: txLogger,
 	cli: cliLogger,
 } as const;
-
-// =============================================================================
-// Structured Logging Helpers
-// =============================================================================
-
-/**
- * Format structured log data as JSON string for consistent parsing.
- *
- * Use this for important events that need to be parsed by log aggregation tools.
- * The structured format enables easy querying, filtering, and analysis of logs.
- *
- * @param data - Structured data to log (will be serialized as JSON)
- * @returns JSON string representation
- *
- * @example
- * ```typescript
- * inboxLogger.info(logJson({
- *   event: 'scan_complete',
- *   suggestions: 5,
- *   durationMs: 2340,
- *   cid: 'abc123'
- * }));
- * ```
- */
-export function logJson(data: Record<string, unknown>): string {
-	return JSON.stringify(data);
-}
