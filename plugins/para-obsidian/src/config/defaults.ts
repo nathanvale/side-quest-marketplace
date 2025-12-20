@@ -329,6 +329,12 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			published: { type: "date", optional: true },
 			tags: { type: "array", optional: true },
 			notes: { type: "string", optional: true },
+			enrichedAt: {
+				type: "date",
+				optional: true,
+				description:
+					"Timestamp when bookmark was enriched with metadata (ISO 8601). Presence indicates enrichment is complete.",
+			},
 		},
 	},
 	"medical-statement": {

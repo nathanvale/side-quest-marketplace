@@ -289,6 +289,21 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	}
 
 	/**
+	 * Determine if a file should be tracked in the processed registry.
+	 *
+	 * Registry Scope (Phase 2):
+	 * - Attachments (PDFs, images): YES - tracked via content hash
+	 * - Markdown files (bookmarks): NO - tracked via frontmatter enrichedAt field
+	 *
+	 * @param file - Inbox file to check
+	 * @returns true if file should be tracked in registry
+	 */
+	function shouldTrackInRegistry(file: InboxFile): boolean {
+		// Only track attachments (non-markdown files)
+		return file.extension !== ".md";
+	}
+
+	/**
 	 * Context for processing a single inbox file.
 	 * Groups related parameters for cleaner function signatures.
 	 */
@@ -552,14 +567,24 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					await onProgress({ ...progressBase, stage: "hash" });
 				}
 				fileHash = await hashFile(filePath);
-				if (registry.isProcessed(fileHash)) {
+
+				// Registry check - only for attachments (Phase 2: scope restriction)
+				if (shouldTrackInRegistry(file)) {
+					if (registry.isProcessed(fileHash)) {
+						if (inboxLogger) {
+							inboxLogger.debug`Skipping already processed: ${filename} sessionCid=${sessionCid} cid=${cid}`;
+						}
+						if (onProgress) {
+							await onProgress({ ...progressBase, stage: "skip" });
+						}
+						return null;
+					}
+				} else {
+					// Markdown files use frontmatter-based enrichment tracking
+					// For bookmarks: check enrichedAt field in subsequent phases
 					if (inboxLogger) {
-						inboxLogger.debug`Skipping already processed: ${filename} sessionCid=${sessionCid} cid=${cid}`;
+						inboxLogger.debug`Skipped registry check for markdown: ${filename} cid=${cid}`;
 					}
-					if (onProgress) {
-						await onProgress({ ...progressBase, stage: "skip" });
-					}
-					return null;
 				}
 			} catch (_error) {
 				if (inboxLogger) {
