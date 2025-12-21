@@ -31,7 +31,7 @@ tool(
 Performs fast text search with support for:
 - Literal strings or regex patterns
 - Directory scoping
-- Frontmatter and tag filtering
+- Frontmatter filtering
 - Result limiting
 - Context lines
 
@@ -48,7 +48,6 @@ Requires ripgrep (rg) to be installed.`,
 				.boolean()
 				.optional()
 				.describe("Treat query as regex (default: false, literal search)"),
-			tag: z.string().optional().describe("Filter by tag in frontmatter"),
 			frontmatter: z
 				.string()
 				.optional()
@@ -78,7 +77,6 @@ Requires ripgrep (rg) to be installed.`,
 			query,
 			dir,
 			regex,
-			tag,
 			frontmatter,
 			max_results,
 			context,
@@ -87,7 +85,6 @@ Requires ripgrep (rg) to be installed.`,
 			query: string;
 			dir?: string;
 			regex?: boolean;
-			tag?: string;
 			frontmatter?: string;
 			max_results?: number;
 			context?: number;
@@ -104,15 +101,13 @@ Requires ripgrep (rg) to be installed.`,
 				? parseKeyValuePairs(frontmatter.split(","))
 				: undefined;
 
-			// Apply frontmatter/tag filters first if present
-			const allowedFiles =
-				fmFilters || tag
-					? await filterByFrontmatter(config, {
-							dir: dirs,
-							tag,
-							frontmatter: fmFilters,
-						})
-					: undefined;
+			// Apply frontmatter filters first if present
+			const allowedFiles = fmFilters
+				? await filterByFrontmatter(config, {
+						dir: dirs,
+						frontmatter: fmFilters,
+					})
+				: undefined;
 
 			const hits = await searchText(config, {
 				query,

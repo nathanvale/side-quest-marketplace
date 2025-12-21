@@ -17,33 +17,6 @@ import type {
 } from "../frontmatter/index";
 
 /**
- * Ensures required tags are present in the tags array.
- * Adds missing tags without duplicating existing ones.
- *
- * @param attributes - Current frontmatter attributes
- * @param required - Tags that must be present
- * @returns Updated attributes and list of changes made
- */
-function ensureTags(
-	attributes: Record<string, unknown>,
-	required: ReadonlyArray<string>,
-): { attributes: Record<string, unknown>; changes: string[] } {
-	const next = { ...attributes };
-	const changes: string[] = [];
-	const tags = Array.isArray(next.tags) ? [...(next.tags as unknown[])] : [];
-	let modified = false;
-	for (const tag of required) {
-		if (!tags.includes(tag)) {
-			tags.push(tag);
-			modified = true;
-			changes.push(`tags: added ${tag}`);
-		}
-	}
-	if (modified) next.tags = tags;
-	return { attributes: next, changes };
-}
-
-/**
  * Ensures a field exists, setting a default value if missing.
  *
  * @param attributes - Current frontmatter attributes
@@ -93,7 +66,6 @@ function renameField(
  * - Adds review_period field (default: "7d")
  * - Renames "target" to "target_completion"
  * - Renames "start" to "start_date"
- * - Ensures "project" tag is present
  */
 const projectV1To2: MigrationFn = (ctx): MigrationResult => {
 	const next = { ...ctx.attributes };
@@ -119,14 +91,12 @@ const projectV1To2: MigrationFn = (ctx): MigrationResult => {
 		"start_date",
 		"start → start_date",
 	);
-	const tagged = ensureTags(review.attributes, ["project"]);
 
 	return {
-		attributes: tagged.attributes,
+		attributes: renamedStart.attributes,
 		body: ctx.body,
 		changes: [
 			...changes,
-			...tagged.changes,
 			...review.changes,
 			...renamedTarget.changes,
 			...renamedStart.changes,
@@ -134,7 +104,7 @@ const projectV1To2: MigrationFn = (ctx): MigrationResult => {
 	};
 };
 
-/** Migrates area notes v1→v2: adds review_period, ensures "area" tag. */
+/** Migrates area notes v1→v2: adds review_period. */
 const areaV1To2: MigrationFn = (ctx): MigrationResult => {
 	const review = ensureField(
 		ctx.attributes,
@@ -142,15 +112,14 @@ const areaV1To2: MigrationFn = (ctx): MigrationResult => {
 		"7d",
 		"review_period: 7d",
 	);
-	const tagged = ensureTags(review.attributes, ["area"]);
 	return {
-		attributes: tagged.attributes,
+		attributes: review.attributes,
 		body: ctx.body,
-		changes: [...tagged.changes, ...review.changes],
+		changes: [...review.changes],
 	};
 };
 
-/** Migrates resource notes v1→v2: renames origin→source, ensures "resource" tag. */
+/** Migrates resource notes v1→v2: renames origin→source. */
 const resourceV1To2: MigrationFn = (ctx): MigrationResult => {
 	const source = renameField(
 		ctx.attributes,
@@ -158,15 +127,14 @@ const resourceV1To2: MigrationFn = (ctx): MigrationResult => {
 		"source",
 		"origin → source",
 	);
-	const tagged = ensureTags(source.attributes, ["resource"]);
 	return {
-		attributes: tagged.attributes,
+		attributes: source.attributes,
 		body: ctx.body,
-		changes: [...source.changes, ...tagged.changes],
+		changes: [...source.changes],
 	};
 };
 
-/** Migrates task notes v1→v2: adds status, effort, task_type defaults; ensures "task" tag. */
+/** Migrates task notes v1→v2: adds status, effort, task_type defaults. */
 const taskV1To2: MigrationFn = (ctx): MigrationResult => {
 	const status = ensureField(
 		ctx.attributes,
@@ -186,30 +154,23 @@ const taskV1To2: MigrationFn = (ctx): MigrationResult => {
 		"task",
 		"task_type: task",
 	);
-	const tagged = ensureTags(taskType.attributes, ["task"]);
 	return {
-		attributes: tagged.attributes,
+		attributes: taskType.attributes,
 		body: ctx.body,
-		changes: [
-			...status.changes,
-			...effort.changes,
-			...taskType.changes,
-			...tagged.changes,
-		],
+		changes: [...status.changes, ...effort.changes, ...taskType.changes],
 	};
 };
 
-/** Migrates daily notes v1→v2: ensures "daily" and "journal" tags. */
+/** Migrates daily notes v1→v2: no changes needed. */
 const dailyV1To2: MigrationFn = (ctx): MigrationResult => {
-	const tagged = ensureTags(ctx.attributes, ["daily", "journal"]);
 	return {
-		attributes: tagged.attributes,
+		attributes: ctx.attributes,
 		body: ctx.body,
-		changes: tagged.changes,
+		changes: [],
 	};
 };
 
-/** Migrates weekly-review notes v1→v2: adds week placeholder; ensures "weekly" and "review" tags. */
+/** Migrates weekly-review notes v1→v2: adds week placeholder. */
 const weeklyReviewV1To2: MigrationFn = (ctx): MigrationResult => {
 	const week = ensureField(
 		ctx.attributes,
@@ -217,15 +178,14 @@ const weeklyReviewV1To2: MigrationFn = (ctx): MigrationResult => {
 		"TODO-week",
 		"week: placeholder",
 	);
-	const tagged = ensureTags(week.attributes, ["weekly", "review"]);
 	return {
-		attributes: tagged.attributes,
+		attributes: week.attributes,
 		body: ctx.body,
-		changes: [...week.changes, ...tagged.changes],
+		changes: [...week.changes],
 	};
 };
 
-/** Migrates capture notes v1→v2: adds status/resonance defaults; ensures "capture" and "inbox" tags. */
+/** Migrates capture notes v1→v2: adds status/resonance defaults. */
 const captureV1To2: MigrationFn = (ctx): MigrationResult => {
 	const status = ensureField(
 		ctx.attributes,
@@ -239,15 +199,14 @@ const captureV1To2: MigrationFn = (ctx): MigrationResult => {
 		"useful",
 		"resonance: useful",
 	);
-	const tagged = ensureTags(resonance.attributes, ["capture", "inbox"]);
 	return {
-		attributes: tagged.attributes,
+		attributes: resonance.attributes,
 		body: ctx.body,
-		changes: [...status.changes, ...resonance.changes, ...tagged.changes],
+		changes: [...status.changes, ...resonance.changes],
 	};
 };
 
-/** Migrates checklist notes v1→v2: adds status default; ensures "checklist" tag. */
+/** Migrates checklist notes v1→v2: adds status default. */
 const checklistV1To2: MigrationFn = (ctx): MigrationResult => {
 	const status = ensureField(
 		ctx.attributes,
@@ -255,15 +214,14 @@ const checklistV1To2: MigrationFn = (ctx): MigrationResult => {
 		"draft",
 		"status: draft",
 	);
-	const tagged = ensureTags(status.attributes, ["checklist"]);
 	return {
-		attributes: tagged.attributes,
+		attributes: status.attributes,
 		body: ctx.body,
-		changes: [...status.changes, ...tagged.changes],
+		changes: [...status.changes],
 	};
 };
 
-/** Migrates booking notes v1→v2: adds payment_status default; ensures "booking" tag. */
+/** Migrates booking notes v1→v2: adds payment_status default. */
 const bookingV1To2: MigrationFn = (ctx): MigrationResult => {
 	const payment = ensureField(
 		ctx.attributes,
@@ -271,11 +229,10 @@ const bookingV1To2: MigrationFn = (ctx): MigrationResult => {
 		"unpaid",
 		"payment_status: unpaid",
 	);
-	const tagged = ensureTags(payment.attributes, ["booking"]);
 	return {
-		attributes: tagged.attributes,
+		attributes: payment.attributes,
 		body: ctx.body,
-		changes: [...payment.changes, ...tagged.changes],
+		changes: [...payment.changes],
 	};
 };
 
@@ -318,7 +275,7 @@ const bookingV2To3: MigrationFn = (ctx): MigrationResult => {
 	};
 };
 
-/** Migrates itinerary notes v1→v2: adds energy_level default; ensures "itinerary" tag. */
+/** Migrates itinerary notes v1→v2: adds energy_level default. */
 const itineraryV1To2: MigrationFn = (ctx): MigrationResult => {
 	const energy = ensureField(
 		ctx.attributes,
@@ -326,22 +283,20 @@ const itineraryV1To2: MigrationFn = (ctx): MigrationResult => {
 		"medium",
 		"energy_level: medium",
 	);
-	const tagged = ensureTags(energy.attributes, ["itinerary"]);
 	return {
-		attributes: tagged.attributes,
+		attributes: energy.attributes,
 		body: ctx.body,
-		changes: [...energy.changes, ...tagged.changes],
+		changes: [...energy.changes],
 	};
 };
 
-/** Migrates research notes v1→v2: adds status default; ensures "research" tag. */
+/** Migrates research notes v1→v2: adds status default. */
 const researchV1To2: MigrationFn = (ctx): MigrationResult => {
 	const status = ensureField(ctx.attributes, "status", "open", "status: open");
-	const tagged = ensureTags(status.attributes, ["research"]);
 	return {
-		attributes: tagged.attributes,
+		attributes: status.attributes,
 		body: ctx.body,
-		changes: [...status.changes, ...tagged.changes],
+		changes: [...status.changes],
 	};
 };
 

@@ -197,13 +197,6 @@ template_version: 1
 					autoFill: 'tp.date.now("YYYY-MM-DD")',
 				},
 				{
-					name: "tags",
-					displayName: "Tags",
-					type: "array",
-					required: false,
-					default: "",
-				},
-				{
 					name: "project",
 					displayName: "Project",
 					type: "wikilink",
@@ -232,7 +225,6 @@ template_version: 1
 		expect(result).toContain('title: "<% tp.system.prompt("Title") %>"');
 		expect(result).toContain('count: "<% tp.system.prompt("Count", "0") %>"');
 		expect(result).toContain("created: <% tp.date.now(");
-		expect(result).toContain('tags: "<% tp.system.prompt("Tags", "") %>"');
 		expect(result).toContain(
 			'project: "[[<% tp.system.prompt("Project", "") %>]]"',
 		);

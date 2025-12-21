@@ -29,7 +29,7 @@ import {
 	replaceH1Title,
 	replaceSections,
 } from "../notes/create";
-import { listAreas, listProjects, listTags } from "../search/indexer";
+import { listAreas, listProjects } from "../search/indexer";
 import { readFile } from "../shared/fs";
 import {
 	extractSourceHeadings,
@@ -284,7 +284,7 @@ function buildConversionContext(
 	const vaultContext: VaultContext = {
 		areas: listAreas(config),
 		projects: listProjects(config),
-		suggestedTags: listTags(config),
+		suggestedTags: [],
 	};
 
 	const templateInfo = getTemplate(config, template);
@@ -715,7 +715,7 @@ export async function extractMetadata(
 	const vaultContext: VaultContext = {
 		areas: listAreas(config),
 		projects: listProjects(config),
-		suggestedTags: listTags(config),
+		suggestedTags: [],
 	};
 
 	// 3. Get template info
@@ -829,7 +829,7 @@ export async function suggestFieldValues(
 	const vaultContext: VaultContext = {
 		areas: listAreas(config),
 		projects: listProjects(config),
-		suggestedTags: listTags(config),
+		suggestedTags: [],
 	};
 
 	const fields = getTemplateFields(templateInfo);

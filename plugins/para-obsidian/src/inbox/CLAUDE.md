@@ -23,9 +23,16 @@
  Extract        Classifier      Build          User          Create
  content        Registry       suggestions     approve        notes
 (Git guard)  (Schema version) (LLM fallback) (Warnings)  (Collision safe)
+   │                                                             │
+   └──────────────── SLO Tracking & Performance Thresholds ─────┘
 ```
 
 **Recent Enhancements:**
+- **SLO tracking with 7 production SLOs** - Automated performance monitoring and alerting
+- **Session-based correlation tracking** - W3C trace context with parent-child relationships
+- **Performance threshold alerting** - Real-time warnings when operations exceed thresholds
+- **Registry restricted to attachments only** - Breaking change: deduplication now tracks only attachment processing
+- **Automatic registry cleanup** - Entries removed after successful attachment moves
 - Classifier registry with schema versioning (v1.0)
 - Bookmark classifier for Obsidian Web Clipper content
 - Git guard prevents LLM calls on uncommitted changes
@@ -104,7 +111,13 @@ src/inbox/
 │   ├── cli-adapter.ts         # Interactive approval loop (with inline warnings, execute cmd)
 │   └── index.ts               # Public UI exports
 └── shared/                    # Cross-cutting concerns
-    └── errors.ts              # InboxError types
+    ├── errors.ts              # InboxError types
+    ├── context.ts             # Inbox context types
+    ├── slos.ts                # 7 SLO definitions and tracking logic
+    ├── slos-persistence.ts    # JSONL-based SLO event storage
+    ├── thresholds.ts          # Performance threshold constants
+    ├── index.ts               # Public exports
+    └── README.md              # Shared utilities guide
 ```
 
 ---
@@ -167,12 +180,15 @@ interface InboxEngine {
 ```typescript
 const engine = createInboxEngine({
   vaultPath: "/path/to/vault",
-  inboxFolder: "00 Inbox",              // Default
-  attachmentsFolder: "Attachments",     // Default
-  templatesFolder: "Templates",         // Default
-  llmProvider: "haiku",                 // Default: Claude Haiku
-  llmModel?: "specific-model",          // Optional override
-  concurrency?: {                        // Concurrency limits
+  inboxFolder: "00 Inbox",                      // Default
+  attachmentsFolder: "Attachments",             // Default
+  templatesFolder: "Templates",                 // Default
+  llmProvider: "haiku",                         // Default: Claude Haiku
+  llmModel?: "specific-model",                  // Optional override
+  autoCommit?: true,                            // Auto-commit vault changes
+  restrictRegistryToAttachments?: true,         // NEW: Only track attachments (default)
+  sessionCid?: string,                          // NEW: Optional session correlation ID
+  concurrency?: {                               // Concurrency limits
     pdfExtraction: 5,
     fileIO: 3
   }
@@ -183,7 +199,10 @@ const engine = createInboxEngine({
 
 **scan()** - Find files, extract content, classify, build suggestions
 - **Git Guard**: Checks for uncommitted changes first (aborts if found)
-- Loads processed registry (SHA256 dedup)
+- **SLO Tracking**: Records scan_latency SLO events
+- **Session Correlation**: All operations tagged with sessionCid
+- **Threshold Checks**: Warns when operations exceed thresholds
+- Loads processed registry (SHA256 dedup, attachments-only by default)
 - Finds supported files (.md, .pdf, images)
 - Validates dependencies (pdf-to-text for PDFs)
 - Builds vault context (projects, areas)
@@ -194,11 +213,13 @@ const engine = createInboxEngine({
 
 **execute()** - Apply approved suggestions
 - Validates suggestion IDs
+- **SLO Tracking**: Records execute_success and execute_latency SLOs
+- **Registry Cleanup**: Removes registry entries after successful attachment moves (when restrictRegistryToAttachments enabled)
 - Executes sequentially (atomic registry saves)
 - Creates notes with frontmatter (with filename collision handling)
 - Moves attachments (vault-relative paths for rollback safety)
 - **Auto-commit**: Commits changes to vault (enabled by default)
-- Updates registry
+- Updates registry (attachments-only by default)
 - Returns execution results
 
 **editWithPrompt()** - Re-process with user guidance
@@ -428,10 +449,38 @@ for (const suggestion of suggestions) {
 
 ## Registry (src/inbox/registry/)
 
-### Deduplication Strategy
+### Deduplication Strategy (Updated Phase 2)
+
+**Attachment-Only Tracking (Default):**
 
 ```typescript
-// SHA256-based processed items tracking
+// When restrictRegistryToAttachments: true (default)
+interface ProcessedItem {
+  hash: string              // SHA256 of attachment content
+  path: string              // Original attachment path
+  processedAt: string       // ISO timestamp
+  suggestionId: SuggestionId
+  movedAttachment: string   // Resulting attachment path (required)
+}
+
+// Registry lifecycle:
+// 1. Attachment processed → Entry added
+// 2. Attachment move succeeds → Entry kept (prevents re-processing)
+// 3. Cleanup: Entry removed after successful move (automatic)
+
+// Registry persisted to JSON
+const registry = createRegistry(registryPath)
+await registry.load()
+const isProcessed = registry.has(hash)
+await registry.save()
+```
+
+**Legacy Behavior (Optional):**
+
+Set `restrictRegistryToAttachments: false` in config to track all inbox items (previous behavior).
+
+```typescript
+// When restrictRegistryToAttachments: false
 interface ProcessedItem {
   hash: string              // SHA256 of file content
   path: string              // Original path
@@ -440,12 +489,6 @@ interface ProcessedItem {
   createdNote?: string      // Resulting note path
   movedAttachment?: string  // Resulting attachment path
 }
-
-// Registry persisted to JSON
-const registry = createRegistry(registryPath)
-await registry.load()
-const isProcessed = registry.has(hash)
-await registry.save()
 ```
 
 ---
@@ -552,24 +595,95 @@ PARA_VAULT=/path/to/vault  # Required
 
 ```typescript
 interface InboxEngineConfig {
-  vaultPath: string                    // Required
-  inboxFolder?: string                 // Default: "00 Inbox"
-  attachmentsFolder?: string           // Default: "Attachments"
-  templatesFolder?: string             // Default: "Templates"
-  llmProvider?: "haiku" | "sonnet"    // Default: "haiku"
-  llmModel?: string                    // Optional model override
-  autoCommit?: boolean                 // Default: true (NEW)
+  vaultPath: string                        // Required
+  inboxFolder?: string                     // Default: "00 Inbox"
+  attachmentsFolder?: string               // Default: "Attachments"
+  templatesFolder?: string                 // Default: "Templates"
+  llmProvider?: "haiku" | "sonnet"        // Default: "haiku"
+  llmModel?: string                        // Optional model override
+  autoCommit?: boolean                     // Default: true
+  restrictRegistryToAttachments?: boolean  // NEW: Default: true
+  sessionCid?: string                      // NEW: Optional session correlation ID
   concurrency?: {
-    pdfExtraction?: number             // Default: 5
-    fileIO?: number                    // Default: 3
+    pdfExtraction?: number                 // Default: 5
+    fileIO?: number                        // Default: 3
   }
 }
 ```
+
+**Breaking Change: Registry Behavior (Phase 2)**
+- `restrictRegistryToAttachments: true` (default since Phase 2)
+- Registry now only tracks attachment processing (not all inbox items)
+- Previous behavior: Tracked all files processed through inbox
+- New behavior: Only tracks attachment moves to prevent duplicates
+- Rationale: Reduces registry size, aligns with primary use case
+- Cleanup: Registry entries automatically removed after successful attachment moves
 
 **Git Integration:**
 - **Auto-commit enabled by default** - Vault changes are committed automatically
 - **Git guard** - Scan aborts if uncommitted changes exist in vault (excluding attachments folder)
 - **Attachments folder excluded** - Large files don't trigger git guard
+
+---
+
+## SLO Tracking (src/inbox/shared/)
+
+### Overview
+
+The inbox subsystem tracks 7 Service Level Objectives to ensure performance and reliability.
+
+### SLO Definitions (slos.ts)
+
+| SLO | Target | Threshold | Window | Description |
+|-----|--------|-----------|--------|-------------|
+| `scan_latency` | 95% | 60s | 30d | Scan operations complete quickly |
+| `execute_success` | 99% | N/A | 7d | Executions succeed reliably |
+| `llm_availability` | 80% | N/A | 24h | LLM service is available |
+| `execute_latency` | 95% | 30s | 30d | Execute operations complete quickly |
+| `extraction_latency` | 95% | 5s | 7d | Content extraction is fast |
+| `enrichment_latency` | 95% | 5s | 7d | Enrichment operations are fast |
+| `llm_latency` | 90% | 10s | 24h | LLM calls complete quickly |
+
+### Event Storage (slos-persistence.ts)
+
+SLO violations are persisted to `~/.claude/logs/slo-events.jsonl`:
+
+```typescript
+interface SLOEvent {
+  timestamp: number          // Unix ms
+  sloName: string           // e.g., "scan_latency"
+  violated: boolean         // Threshold exceeded?
+  actualValue: number       // Actual duration/count
+  threshold: number         // SLO threshold
+  cid: string              // Correlation ID
+  sessionCid?: string      // Session correlation ID
+}
+```
+
+### Threshold Constants (thresholds.ts)
+
+```typescript
+export const THRESHOLDS = {
+  scanTotalMs: 60_000,      // 60s
+  executeTotalMs: 30_000,   // 30s
+  extractionMs: 5_000,      // 5s
+  enrichmentMs: 5_000,      // 5s
+  llmCallMs: 10_000,        // 10s
+}
+```
+
+### Usage in Code
+
+```typescript
+import { trackSLO } from "./shared/slos"
+import { THRESHOLDS } from "./shared/thresholds"
+
+// Track scan latency
+const start = Date.now()
+await scanInbox()
+const duration = Date.now() - start
+trackSLO("scan_latency", duration, THRESHOLDS.scanTotalMs, sessionCid)
+```
 
 ---
 

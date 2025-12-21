@@ -49,6 +49,7 @@ export function applyTitlePrefix(
 		return title; // Already has prefix, don't duplicate
 	}
 
-	// Apply prefix (prefix already includes trailing space if needed)
-	return `${prefix}${title}`;
+	// Apply prefix (add space if prefix doesn't end with one)
+	const separator = prefix.endsWith(" ") ? "" : " ";
+	return `${prefix}${separator}${title}`;
 }

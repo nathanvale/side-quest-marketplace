@@ -3,7 +3,7 @@
  *
  * This module provides ripgrep-based text search with support for:
  * - Literal and regex patterns
- * - Frontmatter and tag filtering
+ * - Frontmatter filtering
  * - Multi-directory scoping
  * - Result limiting
  *
@@ -34,8 +34,6 @@ export interface SearchOptions {
 	readonly regex?: boolean;
 	/** Optional glob(s) to constrain files (passed to ripgrep). */
 	readonly glob?: string | ReadonlyArray<string>;
-	/** Filter results to notes containing this tag. */
-	readonly tag?: string;
 	/** Filter results by frontmatter field values. */
 	readonly frontmatter?: Record<string, string>;
 	/** Maximum number of results to return. */
@@ -64,8 +62,6 @@ export interface SearchHit {
 export interface FrontmatterFilterOptions {
 	/** Directory or directories to scan. */
 	readonly dir?: string | ReadonlyArray<string>;
-	/** Filter to notes containing this tag. */
-	readonly tag?: string;
 	/** Filter by frontmatter field values (key=value). */
 	readonly frontmatter?: Record<string, string>;
 }
@@ -194,13 +190,12 @@ export async function searchText(
 				});
 			}
 
-			// If tag/frontmatter filters are present, intersect hits with matches
+			// If frontmatter filters are present, intersect hits with matches
 			const allowed =
 				options.allowedFiles ??
-				(options.tag || options.frontmatter
+				(options.frontmatter
 					? await filterByFrontmatter(config, {
 							dir: options.dir,
-							tag: options.tag,
 							frontmatter: options.frontmatter,
 						})
 					: undefined);
@@ -212,7 +207,6 @@ export async function searchText(
 			context: {
 				query: options.query,
 				regex: options.regex ?? false,
-				hasTagFilter: !!options.tag,
 				hasFrontmatterFilter: !!options.frontmatter,
 			},
 		},
@@ -220,20 +214,19 @@ export async function searchText(
 }
 
 /**
- * Filters files by frontmatter field values and/or tags.
+ * Filters files by frontmatter field values.
  *
  * Scans Markdown files in the specified directories and returns
  * those whose frontmatter matches all provided criteria.
  *
  * @param config - Para-obsidian configuration
- * @param options - Filter options (dir, tag, frontmatter key=value)
+ * @param options - Filter options (dir, frontmatter key=value)
  * @returns Vault-relative paths to matching files
  *
  * @example
  * ```typescript
  * const files = filterByFrontmatter(config, {
  *   dir: 'Projects',
- *   tag: 'active',
  *   frontmatter: { status: 'in-progress' }
  * });
  * // ['Projects/Feature A.md', 'Projects/Feature B.md']
@@ -244,9 +237,8 @@ export async function filterByFrontmatter(
 	options: FrontmatterFilterOptions,
 ): Promise<string[]> {
 	const filters = options.frontmatter ?? {};
-	const tagFilter = options.tag;
 	// Return early if no filters specified
-	if (Object.keys(filters).length === 0 && !tagFilter) return [];
+	if (Object.keys(filters).length === 0) return [];
 
 	return observe(
 		searchLogger,
@@ -273,11 +265,6 @@ export async function filterByFrontmatter(
 					if (yaml[k] !== v) return false;
 				}
 
-				// Check tag filter
-				if (tagFilter) {
-					const tags = yaml.tags;
-					if (!Array.isArray(tags) || !tags.includes(tagFilter)) return false;
-				}
 				return true;
 			}
 
@@ -294,7 +281,6 @@ export async function filterByFrontmatter(
 		{
 			context: {
 				filterCount: Object.keys(filters).length,
-				hasTagFilter: !!tagFilter,
 				dirCount: resolveDirs(
 					config.vault,
 					options.dir,

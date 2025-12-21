@@ -17,7 +17,7 @@ describe("search", () => {
 		expect(hits[0]?.file).toBe("00 Inbox/note.md");
 	});
 
-	it("filters by frontmatter and tag", async () => {
+	it("filters by frontmatter", async () => {
 		const vault = createTestVault();
 		// Put files in PARA folders so defaultSearchDirs will find them
 		writeVaultFile(
@@ -25,7 +25,6 @@ describe("search", () => {
 			"01 Projects/match.md",
 			`---
 type: project
-tags: [project, x]
 ---
 `,
 		);
@@ -34,7 +33,6 @@ tags: [project, x]
 			"02 Areas/skip.md",
 			`---
 type: area
-tags: [area]
 ---
 `,
 		);
@@ -42,7 +40,6 @@ tags: [area]
 		const cfg = loadConfig({ cwd: vault });
 		const matches = await filterByFrontmatter(cfg, {
 			frontmatter: { type: "project" },
-			tag: "project",
 		});
 		expect(matches).toEqual(["01 Projects/match.md"]);
 	});

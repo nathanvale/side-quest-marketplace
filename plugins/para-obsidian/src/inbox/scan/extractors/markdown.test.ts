@@ -221,55 +221,6 @@ Content here.
 			expect(md?.title).toBe("Heading Title");
 		});
 
-		test("should extract tags from frontmatter array", async () => {
-			const mdPath = join(testDir, "tags-array.md");
-			writeFileSync(
-				mdPath,
-				`---
-tags:
-  - tag1
-  - tag2
-  - tag3
----
-Content
-`,
-			);
-
-			const file: InboxFile = {
-				path: mdPath,
-				extension: ".md",
-				filename: "tags-array.md",
-			};
-
-			const result = await markdownExtractor.extract(file, "test-cid");
-			const md = getMdMetadata(result.metadata);
-
-			expect(md?.tags).toEqual(["tag1", "tag2", "tag3"]);
-		});
-
-		test("should extract tags from comma-separated string", async () => {
-			const mdPath = join(testDir, "tags-string.md");
-			writeFileSync(
-				mdPath,
-				`---
-tags: tag1, tag2, tag3
----
-Content
-`,
-			);
-
-			const file: InboxFile = {
-				path: mdPath,
-				extension: ".md",
-				filename: "tags-string.md",
-			};
-
-			const result = await markdownExtractor.extract(file, "test-cid");
-			const md = getMdMetadata(result.metadata);
-
-			expect(md?.tags).toEqual(["tag1", "tag2", "tag3"]);
-		});
-
 		test("should include word count in metadata", async () => {
 			const mdPath = join(testDir, "word-count.md");
 			writeFileSync(mdPath, "one two three four five");
@@ -538,9 +489,7 @@ describe("extractFrontmatterOnly", () => {
 			mdPath,
 			`---
 title: Test Title
-tags:
-  - a
-  - b
+type: project
 ---
 Body content
 `,
@@ -549,7 +498,7 @@ Body content
 		const attributes = await extractFrontmatterOnly(mdPath);
 
 		expect(attributes.title).toBe("Test Title");
-		expect(attributes.tags).toEqual(["a", "b"]);
+		expect(attributes.type).toBe("project");
 	});
 
 	test("should return empty object for file without frontmatter", async () => {
@@ -579,7 +528,7 @@ describe("bug fixes", () => {
 			// Write file with explicit \r\n line endings
 			writeFileSync(
 				mdPath,
-				"---\r\ntitle: Windows Note\r\ntags:\r\n  - test\r\n---\r\n# Content\r\n\r\nBody text.\r\n",
+				"---\r\ntitle: Windows Note\r\n---\r\n# Content\r\n\r\nBody text.\r\n",
 			);
 
 			const file: InboxFile = {
@@ -592,7 +541,6 @@ describe("bug fixes", () => {
 			const md = getMdMetadata(result.metadata);
 
 			expect(md?.title).toBe("Windows Note");
-			expect(md?.tags).toEqual(["test"]);
 			expect(result.text).toContain("Body text.");
 		});
 
@@ -699,56 +647,6 @@ More content.
 			const md = getMdMetadata(result.metadata);
 
 			expect(md?.title).toBe("Actual Title");
-		});
-	});
-
-	describe("tag extraction", () => {
-		test("should NOT split tags on spaces (only commas)", async () => {
-			const mdPath = join(testDir, "spaced-tags.md");
-			writeFileSync(
-				mdPath,
-				`---
-tags: multi word tag, another tag
----
-Content
-`,
-			);
-
-			const file: InboxFile = {
-				path: mdPath,
-				extension: ".md",
-				filename: "spaced-tags.md",
-			};
-
-			const result = await markdownExtractor.extract(file, "test-cid");
-			const md = getMdMetadata(result.metadata);
-
-			// Should preserve "multi word tag" as a single tag
-			expect(md?.tags).toEqual(["multi word tag", "another tag"]);
-		});
-
-		test("should handle tags with leading/trailing whitespace", async () => {
-			const mdPath = join(testDir, "whitespace-tags.md");
-			writeFileSync(
-				mdPath,
-				`---
-tags: "  tag1  ,  tag2  ,  tag3  "
----
-Content
-`,
-			);
-
-			const file: InboxFile = {
-				path: mdPath,
-				extension: ".md",
-				filename: "whitespace-tags.md",
-			};
-
-			const result = await markdownExtractor.extract(file, "test-cid");
-			const md = getMdMetadata(result.metadata);
-
-			// Should trim whitespace from each tag
-			expect(md?.tags).toEqual(["tag1", "tag2", "tag3"]);
 		});
 	});
 

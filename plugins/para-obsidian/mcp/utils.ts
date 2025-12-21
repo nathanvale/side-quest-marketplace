@@ -46,6 +46,40 @@ export interface LogEntry {
 }
 
 /**
+ * Categorize an error based on its message.
+ */
+function categorizeError(error: unknown): {
+	category: string;
+	code: string;
+} {
+	const message =
+		error instanceof Error ? error.message : String(error || "Unknown error");
+
+	// Network errors (transient - can retry)
+	if (/ECONNREFUSED|ENOTFOUND|ETIMEDOUT|fetch failed/i.test(message)) {
+		return { category: "transient", code: "NETWORK_ERROR" };
+	}
+
+	// Not found errors (permanent - won't be fixed by retrying)
+	if (/not found|ENOENT|404/i.test(message)) {
+		return { category: "permanent", code: "NOT_FOUND" };
+	}
+
+	// Validation errors (permanent - requires code/data fix)
+	if (/invalid|validation|schema|required/i.test(message)) {
+		return { category: "permanent", code: "VALIDATION" };
+	}
+
+	// Permission errors (configuration - requires setup/auth fix)
+	if (/permission|EACCES|EPERM|unauthorized/i.test(message)) {
+		return { category: "configuration", code: "PERMISSION" };
+	}
+
+	// Default
+	return { category: "unknown", code: "UNKNOWN_ERROR" };
+}
+
+/**
  * Log an MCP tool event.
  *
  * Uses standard LogTape signature: logger.info(message, properties)
@@ -57,12 +91,39 @@ export interface LogEntry {
  * - success: Whether the tool succeeded
  */
 export function log(entry: LogEntry): void {
-	if (mcpLogger) {
+	if (!mcpLogger) return;
+
+	const { error, success, ...rest } = entry;
+	const timestamp = new Date().toISOString();
+
+	// Successful operation - log as info
+	if (success !== false) {
 		mcpLogger.info("MCP tool response", {
-			...entry,
-			timestamp: new Date().toISOString(),
+			...rest,
+			timestamp,
 		});
+		return;
 	}
+
+	// Failed operation - enhance error logging
+	const errorMessage =
+		error instanceof Error ? error.message : String(error || "Unknown error");
+	const { category, code } = categorizeError(error);
+
+	const properties: Record<string, unknown> = {
+		...rest,
+		error: errorMessage,
+		errorCategory: category,
+		errorCode: code,
+		timestamp,
+	};
+
+	// Add stack trace for Error objects
+	if (error instanceof Error && error.stack) {
+		properties.stack = error.stack;
+	}
+
+	mcpLogger.error("MCP tool response", properties);
 }
 
 // Re-export for convenience

@@ -377,7 +377,6 @@ describe("buildCriticalRules", () => {
 		expect(rules).toContain("Enum values MUST match exactly");
 		expect(rules).toContain("preserve markdown formatting");
 		expect(rules).toContain('CORRECT: "area": null');
-		expect(rules).toContain("Tags MUST include required values");
 	});
 });
 
@@ -547,8 +546,9 @@ describe("buildSourceStructureSection", () => {
 
 describe("DEFAULT_CRITICAL_RULES", () => {
 	test("has expected number of rules", () => {
-		// Rules 1-14 with sub-items for multi-line rules (3, 6, 11, 12, 13, 14)
-		expect(DEFAULT_CRITICAL_RULES.length).toBe(30);
+		// Rules 1-13 with sub-items for multi-line rules (3, 6, 11, 12, 13)
+		// Removed rule 13 (tag validation), remaining rules renumbered
+		expect(DEFAULT_CRITICAL_RULES.length).toBe(28);
 	});
 
 	test("includes rule numbers", () => {
@@ -562,11 +562,6 @@ describe("DEFAULT_CRITICAL_RULES", () => {
 		const joined = DEFAULT_CRITICAL_RULES.join("\n");
 		expect(joined).toContain('CORRECT: "area": null');
 		expect(joined).toContain('WRONG: "area": "[[null]]"');
-	});
-
-	test("includes required tag validation rule", () => {
-		const joined = DEFAULT_CRITICAL_RULES.join("\n");
-		expect(joined).toContain("Tags MUST include required values");
 	});
 
 	test("includes title formatting rule to prevent YAML-breaking colons", () => {

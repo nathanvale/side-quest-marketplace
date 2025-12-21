@@ -20,10 +20,8 @@ import {
 	buildIndex,
 	listAreas,
 	listProjects,
-	listTags,
 	loadIndex,
 	saveIndex,
-	scanTags,
 } from "../search/indexer";
 
 // ============================================================================
@@ -126,7 +124,6 @@ tool(
 		description: `Query cached vault index for fast lookups.
 
 Queries the pre-built index for files matching:
-- Tag filters
 - Frontmatter key=value pairs
 - Directory scoping
 
@@ -134,7 +131,6 @@ Much faster than full-text search for metadata queries.
 
 Requires index to exist (run para_index_prime first).`,
 		inputSchema: {
-			tag: z.string().optional().describe("Filter by tag"),
 			frontmatter: z
 				.string()
 				.optional()
@@ -156,15 +152,14 @@ Requires index to exist (run para_index_prime first).`,
 		},
 	},
 	async (args: Record<string, unknown>) => {
-		const { tag, frontmatter, dir, response_format } = args as {
-			tag?: string;
+		const { frontmatter, dir, response_format } = args as {
 			frontmatter?: string;
 			dir?: string;
 			response_format?: string;
 		};
 		const cid = createCorrelationId();
 		const startTime = Date.now();
-		log({ cid, tool: "para_index_query", event: "request", tag, frontmatter });
+		log({ cid, tool: "para_index_query", event: "request", frontmatter });
 
 		try {
 			const config = loadConfig();
@@ -190,9 +185,6 @@ Requires index to exist (run para_index_prime first).`,
 					});
 					if (!matches) return false;
 				}
-
-				// Tag filter
-				if (tag && !entry.tags.includes(tag)) return false;
 
 				// Frontmatter filters
 				for (const [k, v] of Object.entries(fmFilters)) {
@@ -374,148 +366,6 @@ tool(
 			log({
 				cid,
 				tool: "para_list_projects",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(
-				args.response_format as string | undefined,
-			);
-			return respondError(format, error);
-		}
-	},
-);
-
-// ============================================================================
-// List Tags Tool
-// ============================================================================
-
-tool(
-	"para_list_tags",
-	{
-		description: `List suggested tags from para-obsidian config. Returns the curated list of allowed tags. Use to constrain tag selection when creating/converting notes.`,
-		inputSchema: {
-			response_format: z
-				.enum(["markdown", "json"])
-				.optional()
-				.describe("Output format: 'markdown' (default) or 'json'"),
-		},
-		annotations: {
-			readOnlyHint: true,
-			destructiveHint: false,
-			idempotentHint: true,
-			openWorldHint: false,
-		},
-	},
-	async (args: Record<string, unknown>) => {
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({ cid, tool: "para_list_tags", event: "request" });
-
-		try {
-			const config = loadConfig();
-			const tags = listTags(config);
-			const format = parseResponseFormat(
-				args.response_format as string | undefined,
-			);
-
-			log({
-				cid,
-				tool: "para_list_tags",
-				event: "response",
-				success: true,
-				count: tags.length,
-				durationMs: Date.now() - startTime,
-			});
-
-			if (format === ResponseFormat.JSON) {
-				return respondText(
-					format,
-					JSON.stringify({ tags, count: tags.length }, null, 2),
-				);
-			}
-
-			return respondText(
-				format,
-				tags.length > 0
-					? `# Suggested Tags (${tags.length})\n\n${tags.join(", ")}`
-					: "No suggested tags configured",
-			);
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_list_tags",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(
-				args.response_format as string | undefined,
-			);
-			return respondError(format, error);
-		}
-	},
-);
-
-// ============================================================================
-// Scan Tags Tool
-// ============================================================================
-
-tool(
-	"para_scan_tags",
-	{
-		description: `Scan vault for tags actually used in frontmatter across all notes. Returns unique tags found in use. Useful for understanding tag usage patterns.`,
-		inputSchema: {
-			response_format: z
-				.enum(["markdown", "json"])
-				.optional()
-				.describe("Output format: 'markdown' (default) or 'json'"),
-		},
-		annotations: {
-			readOnlyHint: true,
-			destructiveHint: false,
-			idempotentHint: true,
-			openWorldHint: false,
-		},
-	},
-	async (args: Record<string, unknown>) => {
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({ cid, tool: "para_scan_tags", event: "request" });
-
-		try {
-			const config = loadConfig();
-			const tags = scanTags(config);
-			const format = parseResponseFormat(
-				args.response_format as string | undefined,
-			);
-
-			log({
-				cid,
-				tool: "para_scan_tags",
-				event: "response",
-				success: true,
-				count: tags.length,
-				durationMs: Date.now() - startTime,
-			});
-
-			if (format === ResponseFormat.JSON) {
-				return respondText(
-					format,
-					JSON.stringify({ tags, count: tags.length }, null, 2),
-				);
-			}
-
-			return respondText(
-				format,
-				tags.length > 0
-					? `# Tags In Use (${tags.length})\n\n${tags.join(", ")}`
-					: "No tags found in vault",
-			);
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_scan_tags",
 				durationMs: Date.now() - startTime,
 				success: false,
 				error: error instanceof Error ? error.message : String(error),

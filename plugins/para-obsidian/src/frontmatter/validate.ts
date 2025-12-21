@@ -41,14 +41,6 @@ function isArray(value: unknown): value is ReadonlyArray<unknown> {
 	return Array.isArray(value);
 }
 
-/** Checks if an array contains all required values. */
-function includesRequired(
-	array: ReadonlyArray<unknown>,
-	required: ReadonlyArray<string>,
-) {
-	return required.every((r) => array.includes(r));
-}
-
 /**
  * Format a value for display in error messages.
  * Truncates long values and shows type information.
@@ -132,12 +124,6 @@ function validateField(
 				return {
 					field,
 					message: `expected array, got ${formatValueForError(value)}${optionalHint}`,
-				};
-			}
-			if (rule.includes && !includesRequired(value, rule.includes)) {
-				return {
-					field,
-					message: `must include: ${rule.includes.join(", ")}`,
 				};
 			}
 			return undefined;

@@ -80,12 +80,6 @@ export const bookmarkClassifier: InboxConverter = {
 			requirement: "optional",
 		},
 		{
-			name: "tags",
-			type: "string",
-			description: "Topic tags (comma-separated or array format)",
-			requirement: "optional",
-		},
-		{
 			name: "notes",
 			type: "string",
 			description: "Additional notes or highlights",
@@ -111,7 +105,6 @@ Optional fields:
 - category: Topic or domain (wikilink format)
 - author: Content creator (wikilink format)
 - published: Publication date (YYYY-MM-DD)
-- tags: Relevant topics (comma-separated)
 - notes: Highlights or annotations
 
 Suggest area or project based on URL patterns:
@@ -132,7 +125,6 @@ Suggest area or project based on URL patterns:
 			category: "Category or topic (optional)",
 			author: "Author or creator (optional)",
 			published: "Original publication date (YYYY-MM-DD)",
-			tags: "Topic tags (optional)",
 			notes: "Additional notes (optional)",
 			template_version: "Template version (defaults to 1)",
 		},

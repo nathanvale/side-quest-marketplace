@@ -2,7 +2,6 @@
  * Default configuration values.
  *
  * This module defines default values for:
- * - Suggested tags for autocompletion
  * - Frontmatter validation rules per note type
  * - Template version numbers
  *
@@ -11,40 +10,6 @@
  * @module defaults
  */
 import type { ParaObsidianConfig } from "./index";
-
-/**
- * Default suggested tags for autocompletion and validation.
- * Covers common PARA categories and organizational concepts.
- */
-export const DEFAULT_SUGGESTED_TAGS = [
-	"project",
-	"trip",
-	"area",
-	"resource",
-	"task",
-	"daily",
-	"journal",
-	"review",
-	"weekly",
-	"checklist",
-	"booking",
-	"itinerary",
-	"research",
-	"capture",
-	"inbox",
-	"travel",
-	"work",
-	"family",
-	"health",
-	"learning",
-	"finance",
-	"home",
-	"career",
-	"session",
-	"invoice",
-	"bookmark",
-	"medical-statement",
-] as const;
 
 export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 	ParaObsidianConfig["frontmatterRules"]
@@ -69,7 +34,6 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 				optional: true,
 				description: "Wikilinks to files in flat Attachments/ folder",
 			},
-			tags: { type: "array", includes: ["project"] },
 		},
 	},
 	area: {
@@ -78,7 +42,6 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			created: { type: "date" },
 			type: { type: "enum", enum: ["area"] },
 			status: { type: "enum", enum: ["active", "inactive"] },
-			tags: { type: "array", includes: ["area"] },
 		},
 	},
 	resource: {
@@ -97,7 +60,6 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 				enum: ["to-read", "reading", "completed"],
 				optional: true,
 			},
-			tags: { type: "array", includes: ["resource"] },
 		},
 	},
 	task: {
@@ -120,7 +82,6 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			area: { type: "wikilink", optional: true },
 			depends_on: { type: "array", optional: true },
 			blocks: { type: "array", optional: true },
-			tags: { type: "array", includes: ["task"] },
 		},
 	},
 	daily: {
@@ -136,7 +97,6 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			},
 			mood: { type: "string", optional: true },
 			focus: { type: "string", optional: true },
-			tags: { type: "array", includes: ["daily", "journal"] },
 		},
 	},
 	"weekly-review": {
@@ -147,7 +107,6 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			week: { type: "string" },
 			week_start: { type: "date", optional: true },
 			focus_areas: { type: "string", optional: true },
-			tags: { type: "array", includes: ["review", "weekly"] },
 		},
 	},
 	capture: {
@@ -165,7 +124,6 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 				enum: ["inspiring", "useful", "personal", "surprising"],
 			},
 			urgency: { type: "enum", enum: ["high", "medium", "low"] },
-			tags: { type: "array", includes: ["inbox"] },
 		},
 	},
 	checklist: {
@@ -179,7 +137,6 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			},
 			project: { type: "wikilink" },
 			status: { type: "enum", enum: ["draft", "in-progress", "complete"] },
-			tags: { type: "array", includes: ["checklist"] },
 		},
 		forbidden: ["area"],
 	},
@@ -220,7 +177,6 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 				optional: true,
 				description: "Wikilinks to files in flat Attachments/ folder",
 			},
-			tags: { type: "array", includes: ["booking"] },
 		},
 		forbidden: ["area"],
 	},
@@ -233,7 +189,6 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			trip_date: { type: "date" },
 			day_number: { type: "string" },
 			energy_level: { type: "enum", enum: ["low", "medium", "high"] },
-			tags: { type: "array", includes: ["itinerary"] },
 		},
 		forbidden: ["area"],
 	},
@@ -247,7 +202,6 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 				type: "enum",
 				enum: ["researching", "decided", "superseded"],
 			},
-			tags: { type: "array", includes: ["research"] },
 		},
 		forbidden: ["area"],
 	},
@@ -266,7 +220,6 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			area: { type: "wikilink" },
 			depends_on: { type: "array", optional: true },
 			blocks: { type: "array", optional: true },
-			tags: { type: "array", includes: ["project", "trip"] },
 		},
 	},
 	session: {
@@ -279,7 +232,6 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			project: { type: "wikilink", optional: true },
 			provider: { type: "string" },
 			session_number: { type: "number", optional: true },
-			tags: { type: "array", includes: ["session"] },
 		},
 		oneOfRequired: ["area", "project"],
 	},
@@ -308,7 +260,6 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 				optional: true,
 				description: "Wikilinks to invoice PDF in Attachments/ folder",
 			},
-			tags: { type: "array", includes: ["invoice"] },
 		},
 		oneOfRequired: ["area", "project"],
 	},
@@ -367,7 +318,6 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 				optional: true,
 				description: "Wikilinks to statement PDF in Attachments/ folder",
 			},
-			tags: { type: "array", includes: ["medical-statement"] },
 		},
 	},
 };

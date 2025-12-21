@@ -251,17 +251,6 @@ clipped: 2024-12-16
 				);
 			});
 
-			test("should have optional tags field", () => {
-				const field = bookmarkClassifier.fields.find((f) => f.name === "tags");
-
-				expect(field).toBeDefined();
-				expect(field?.type).toBe("string");
-				expect(field?.requirement).toBe("optional");
-				expect(field?.description).toBe(
-					"Topic tags (comma-separated or array format)",
-				);
-			});
-
 			test("should have optional notes field", () => {
 				const field = bookmarkClassifier.fields.find((f) => f.name === "notes");
 
@@ -339,7 +328,6 @@ clipped: 2024-12-16
 				expect(hint).toContain("category");
 				expect(hint).toContain("author");
 				expect(hint).toContain("published");
-				expect(hint).toContain("tags");
 				expect(hint).toContain("notes");
 			});
 
@@ -494,12 +482,6 @@ clipped: 2024-12-16
 			test("should map optional published field", () => {
 				expect(bookmarkClassifier.template.fieldMappings.published).toBe(
 					"Original publication date (YYYY-MM-DD)",
-				);
-			});
-
-			test("should map optional tags field", () => {
-				expect(bookmarkClassifier.template.fieldMappings.tags).toBe(
-					"Topic tags (optional)",
 				);
 			});
 

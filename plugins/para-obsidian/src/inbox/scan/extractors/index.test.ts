@@ -239,11 +239,9 @@ describe("extractors/index barrel exports", () => {
 				charCount: 500,
 				lineCount: 10,
 				title: "Test Note",
-				tags: ["tag1", "tag2"],
-				frontmatterFields: ["title", "tags"],
+				frontmatterFields: ["title", "type"],
 			};
 			expect(metadata.title).toBe("Test Note");
-			expect(metadata.tags).toEqual(["tag1", "tag2"]);
 		});
 	});
 

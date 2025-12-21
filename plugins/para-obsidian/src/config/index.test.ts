@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 import { createTestVault } from "../testing/utils";
-import { DEFAULT_FRONTMATTER_RULES, DEFAULT_SUGGESTED_TAGS } from "./defaults";
+import { DEFAULT_FRONTMATTER_RULES } from "./defaults";
 import { loadConfig } from "./index";
 
 const originalEnv = { ...process.env };
@@ -33,7 +33,7 @@ describe("loadConfig", () => {
 		const cfg = loadConfig();
 		expect(cfg.vault).toBe(path.resolve(vault));
 		expect(cfg.templatesDir).toBe(path.join(vault, "Templates"));
-		expect(cfg.suggestedTags).toEqual([...DEFAULT_SUGGESTED_TAGS]);
+		expect(cfg.suggestedTags).toEqual([]);
 		expect(cfg.frontmatterRules).toEqual(DEFAULT_FRONTMATTER_RULES);
 	});
 

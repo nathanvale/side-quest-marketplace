@@ -47,8 +47,6 @@ export interface MarkdownExtractionMetadata {
 	hasBody: boolean;
 	/** Title extracted from frontmatter or first heading */
 	title?: string;
-	/** Tags extracted from frontmatter */
-	tags?: readonly string[];
 	/** Note type if specified in frontmatter */
 	noteType?: string;
 }
@@ -82,28 +80,6 @@ function extractTitle(
 	}
 
 	return undefined;
-}
-
-/**
- * Extract tags from frontmatter.
- * Handles both array format and comma-separated string format.
- */
-function extractTags(attributes: Record<string, unknown>): readonly string[] {
-	const tags = attributes.tags;
-
-	if (Array.isArray(tags)) {
-		return tags.filter((t): t is string => typeof t === "string");
-	}
-
-	if (typeof tags === "string") {
-		// Handle comma-separated tags only (not whitespace, which would split multi-word tags)
-		return tags
-			.split(",")
-			.map((t) => t.trim())
-			.filter(Boolean);
-	}
-
-	return [];
 }
 
 /**
@@ -208,7 +184,6 @@ export const markdownExtractor: ContentExtractor = {
 
 				// Extract metadata
 				const title = extractTitle(attributes, body);
-				const tags = extractTags(attributes);
 				const noteType =
 					typeof attributes.type === "string" ? attributes.type : undefined;
 
@@ -243,7 +218,6 @@ export const markdownExtractor: ContentExtractor = {
 					lineCount: trimmedBody ? trimmedBody.split("\n").length : 0,
 					hasBody: trimmedBody.length > 0,
 					title,
-					tags: tags.length > 0 ? tags : undefined,
 					noteType,
 				};
 

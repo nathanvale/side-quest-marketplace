@@ -709,32 +709,10 @@ export async function executeSuggestion(
 									if (typeof value === "string") {
 										attributes[key] = value.replace(/\[\[([^\]]+)\]\]/g, "$1");
 									}
-								} else if (key === "tags") {
-									// Merge tags: existing + extracted + "bookmarks"
-									const existingTags = Array.isArray(attributes.tags)
-										? attributes.tags
-										: [];
-									const extractedTags = Array.isArray(value) ? value : [];
-									const merged = [
-										...new Set([
-											...existingTags,
-											...extractedTags,
-											"bookmarks",
-										]),
-									];
-									attributes.tags = merged;
 								} else if (value !== null && value !== undefined) {
 									attributes[key] = value;
 								}
 							}
-						}
-
-						// Always ensure "bookmarks" tag is present
-						const currentTags = Array.isArray(attributes.tags)
-							? attributes.tags
-							: [];
-						if (!currentTags.includes("bookmarks")) {
-							attributes.tags = [...currentTags, "bookmarks"];
 						}
 
 						// Write updated frontmatter

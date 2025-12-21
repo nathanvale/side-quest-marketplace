@@ -193,4 +193,100 @@ describe("log() with enhanced error handling", () => {
 		// Should preserve extra context
 		expect(props.extraContext).toBe("some value");
 	});
+
+	// =========================================================================
+	// Edge Case Tests for Error Categorization
+	// =========================================================================
+
+	test("ambiguous error matching multiple patterns prioritizes network errors", () => {
+		// Error message that matches both network (ECONNREFUSED) and validation (Invalid)
+		const ambiguousError = new Error("Invalid connection: ECONNREFUSED");
+		const entry: LogEntry = {
+			cid: "test-cid",
+			tool: "test_tool",
+			durationMs: 100,
+			success: false,
+			error: ambiguousError,
+		};
+
+		log(entry);
+
+		const props = logCalls[0]?.properties as Record<string, unknown>;
+		// Network error pattern should win (checked first in categorizeError)
+		expect(props.errorCode).toBe("NETWORK_ERROR");
+		expect(props.errorCategory).toBe("transient");
+	});
+
+	test("handles null error input", () => {
+		const entry: LogEntry = {
+			cid: "test-cid",
+			tool: "test_tool",
+			durationMs: 100,
+			success: false,
+			error: null,
+		};
+
+		log(entry);
+
+		const props = logCalls[0]?.properties as Record<string, unknown>;
+		// Should use fallback "Unknown error" string
+		expect(props.error).toBe("Unknown error");
+		expect(props.errorCode).toBe("UNKNOWN_ERROR");
+		expect(props.errorCategory).toBe("unknown");
+	});
+
+	test("handles undefined error input", () => {
+		const entry: LogEntry = {
+			cid: "test-cid",
+			tool: "test_tool",
+			durationMs: 100,
+			success: false,
+			error: undefined,
+		};
+
+		log(entry);
+
+		const props = logCalls[0]?.properties as Record<string, unknown>;
+		// Should use fallback "Unknown error" string
+		expect(props.error).toBe("Unknown error");
+		expect(props.errorCode).toBe("UNKNOWN_ERROR");
+		expect(props.errorCategory).toBe("unknown");
+	});
+
+	test("unknown error type falls back to UNKNOWN_ERROR category", () => {
+		const unknownError = new Error("Something completely unexpected happened");
+		const entry: LogEntry = {
+			cid: "test-cid",
+			tool: "test_tool",
+			durationMs: 100,
+			success: false,
+			error: unknownError,
+		};
+
+		log(entry);
+
+		const props = logCalls[0]?.properties as Record<string, unknown>;
+		expect(props.error).toBe("Something completely unexpected happened");
+		expect(props.errorCode).toBe("UNKNOWN_ERROR");
+		expect(props.errorCategory).toBe("unknown");
+	});
+
+	test("not-found error takes precedence over validation when both patterns match", () => {
+		// Error message that matches both not-found (404) and validation (Invalid)
+		const ambiguousError = new Error("Invalid resource: 404 not found");
+		const entry: LogEntry = {
+			cid: "test-cid",
+			tool: "test_tool",
+			durationMs: 100,
+			success: false,
+			error: ambiguousError,
+		};
+
+		log(entry);
+
+		const props = logCalls[0]?.properties as Record<string, unknown>;
+		// Not-found pattern should win (checked before validation in categorizeError)
+		expect(props.errorCode).toBe("NOT_FOUND");
+		expect(props.errorCategory).toBe("permanent");
+	});
 });

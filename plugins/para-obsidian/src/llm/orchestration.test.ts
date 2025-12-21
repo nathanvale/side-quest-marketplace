@@ -423,7 +423,7 @@ describe("applyTitlePrefix", () => {
 			"trip",
 			configWithoutPrefixes,
 		);
-		expect(result).toBe("✈️  Tasmania Trip");
+		expect(result).toBe("✈️ Tasmania Trip");
 	});
 
 	test("does not add prefix to project (no default)", () => {

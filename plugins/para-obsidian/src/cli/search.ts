@@ -59,7 +59,6 @@ export const handleIndex: CommandHandler = async (ctx) => {
 	}
 
 	if (action === "query") {
-		const tag = typeof flags.tag === "string" ? flags.tag : undefined;
 		const dirs = parseDirs(
 			normalizeFlagValue(flags.dir),
 			config.defaultSearchDirs,
@@ -72,7 +71,6 @@ export const handleIndex: CommandHandler = async (ctx) => {
 		}
 		const results = index.entries.filter((entry) => {
 			if (!matchesDir(entry.file, dirs)) return false;
-			if (tag && !entry.tags.includes(tag)) return false;
 			for (const [k, v] of Object.entries(frontmatter)) {
 				if (entry.frontmatter[k] !== v) return false;
 			}
@@ -104,7 +102,6 @@ export const handleSearch: CommandHandler = async (ctx) => {
 		return { success: false, exitCode: 1 };
 	}
 
-	const tag = typeof flags.tag === "string" ? flags.tag : undefined;
 	const dirs = parseDirs(
 		normalizeFlagValue(flags.dir),
 		config.defaultSearchDirs,
@@ -122,10 +119,9 @@ export const handleSearch: CommandHandler = async (ctx) => {
 			? Number.parseInt(flags.context, 10)
 			: undefined;
 
-	const hasFrontmatterFilters =
-		Object.keys(frontmatter).length > 0 || Boolean(tag);
+	const hasFrontmatterFilters = Object.keys(frontmatter).length > 0;
 	const fmMatches = hasFrontmatterFilters
-		? await filterByFrontmatter(config, { frontmatter, tag, dir: dirs })
+		? await filterByFrontmatter(config, { frontmatter, dir: dirs })
 		: [];
 
 	const hits = await searchText(config, {

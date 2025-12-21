@@ -19,10 +19,15 @@
 - `/search` - Search notes by content or metadata
 - `/validate` - Validate frontmatter and templates
 - `/commit` - Git commit with auto-staging
+- `/slo` - Monitor SLO health and performance metrics
+- `/trace` - Trace operation logs by correlation ID
 
 **Key Features:**
 - Intelligent inbox processing with LLM-assisted classification
+- **SLO Tracking & Performance Monitoring** - 7 SLOs with burn rate analysis and alerting
+- **Session-based Correlation Tracking** - Track operations across async boundaries with W3C trace context
 - Web bookmark management via Obsidian Web Clipper integration
+- **Registry Restricted to Attachments** - Deduplication now tracks only attachment processing (breaking change)
 - PARA-based organization (Projects/Areas/Resources/Archives)
 - Template versioning and migration system
 - Atomic operations with transaction rollback
@@ -53,6 +58,10 @@ para process-inbox [--auto] [--preview] [--dry-run]
 para export-bookmarks [--filter type:bookmark]
 para create-classifier
 para create-note-template
+
+# Performance & Observability
+para slo [slo-name|--breaches]     # Monitor SLO health, burn rates, violations
+para trace <correlation-id>         # Trace operation logs with parent-child relationships
 ```
 
 ---
@@ -76,7 +85,10 @@ para-obsidian/
 │   │   ├── notes.ts           # CRUD operations
 │   │   ├── process-inbox.ts   # Inbox processing (visual progress bars)
 │   │   ├── registry.ts        # Registry management (list, remove, clear)
-│   │   └── search.ts          # Search commands
+│   │   ├── search.ts          # Search commands
+│   │   └── shared/            # Shared CLI utilities
+│   │       ├── session.ts     # Session tracking with correlation IDs
+│   │       └── index.ts       # Barrel exports
 │   ├── mcp-handlers/          # MCP tool implementations (6 modules)
 │   │   ├── config.ts          # para_config, para_templates
 │   │   ├── files.ts           # para_list, para_read, para_create, etc.
@@ -97,7 +109,14 @@ para-obsidian/
 │   │   ├── scan/              # Content extractors (md, pdf, image)
 │   │   ├── execute/           # Suggestion execution (with filename collision handling)
 │   │   ├── registry/          # Processed item tracking
-│   │   └── ui/                # Interactive CLI adapter (with inline warnings)
+│   │   ├── ui/                # Interactive CLI adapter (with inline warnings)
+│   │   └── shared/            # Cross-cutting concerns
+│   │       ├── errors.ts      # InboxError types
+│   │       ├── context.ts     # Inbox context types
+│   │       ├── slos.ts        # 7 SLO definitions and tracking
+│   │       ├── slos-persistence.ts  # JSONL-based SLO event storage
+│   │       ├── thresholds.ts  # Performance thresholds
+│   │       └── index.ts       # Public exports
 │   ├── frontmatter/           # Frontmatter utilities
 │   │   ├── parse.ts           # YAML parsing
 │   │   ├── validate.ts        # Type-specific validation
@@ -116,6 +135,13 @@ para-obsidian/
 │   ├── git/                   # Git operations, auto-commit
 │   ├── attachments/           # Attachment handling
 │   ├── shared/                # Shared utilities (fs, logger)
+│   │   ├── atomic-fs.ts       # Atomic file operations
+│   │   ├── transaction.ts     # Transaction with rollback
+│   │   ├── file-lock.ts       # File locking
+│   │   ├── instrumentation.ts # Performance tracking
+│   │   ├── logger.ts          # Structured logging
+│   │   ├── resource-metrics.ts # LLM token usage tracking
+│   │   └── validation.ts      # Input validation
 │   ├── testing/               # Test utilities
 │   └── utils/                 # General utilities
 ├── mcp/
@@ -127,7 +153,9 @@ para-obsidian/
 │   ├── create-note-template.md # Template creation guide
 │   ├── search.md
 │   ├── validate.md
-│   └── commit.md
+│   ├── commit.md
+│   ├── slo.md                 # SLO monitoring command
+│   └── trace.md               # Trace analysis command
 ├── skills/                    # Claude skills
 │   ├── template-assistant/    # Template selection skill
 │   └── field-suggestions/     # Field value suggestion skill
@@ -166,6 +194,13 @@ para-obsidian/
 | `src/shared/atomic-fs.ts` | Atomic file operations |
 | `src/shared/transaction.ts` | Transaction with rollback |
 | `src/shared/file-lock.ts` | File locking for concurrency |
+| `src/shared/resource-metrics.ts` | LLM token usage and resource tracking |
+| `commands/slo.md` | SLO health monitoring slash command |
+| `commands/trace.md` | Correlation ID trace analysis command |
+| `src/cli/shared/session.ts` | Session tracking and lifecycle management |
+| `src/inbox/shared/slos.ts` | 7 SLO definitions (latency, success, availability) |
+| `src/inbox/shared/slos-persistence.ts` | JSONL-based SLO event storage |
+| `src/inbox/shared/thresholds.ts` | Performance threshold constants |
 
 ---
 
@@ -259,6 +294,32 @@ acdfe223 (Session: para scan, 3.2s)
 │  └─ 45c84df0: inbox:skipFastPath (parent: e400fff2, session: acdfe223)
 ```
 
+**SLO Tracking & Performance Monitoring:**
+- **7 Production SLOs** with automated tracking and alerting:
+  1. `scan_latency` - 95% scans under 60s (30d window)
+  2. `execute_success` - 99% executions succeed (7d window)
+  3. `llm_availability` - 80% LLM calls succeed (24h window)
+  4. `execute_latency` - 95% executions under 30s (30d window)
+  5. `extraction_latency` - 95% extractions under 5s (7d window)
+  6. `enrichment_latency` - 95% enrichments under 5s (7d window)
+  7. `llm_latency` - 90% LLM calls under 10s (24h window)
+- **Burn Rate Analysis** - Error budget consumption tracking
+- **JSONL Event Log** - Persistent SLO violation history at `~/.claude/logs/slo-events.jsonl`
+- **Dashboard Command** - `/para-obsidian:slo` for real-time health monitoring
+- **Trace Analysis** - `/para-obsidian:trace <cid>` for debugging slow operations
+
+**Session Management:**
+- Every CLI command gets a unique session correlation ID (displayed in prompt)
+- All operations emit structured logs with `sessionCid`, `cid`, and `parentCid`
+- Session summary shows total duration and performance thresholds
+- Resource metrics track LLM token usage per session
+
+**SLO Alerting:**
+- Threshold checks on every operation emit warnings when exceeded
+- Error budget tracking prevents silent degradation
+- Breach dashboard shows recent violations
+- Configurable per-SLO targets and windows
+
 ---
 
 ## Configuration
@@ -271,10 +332,16 @@ acdfe223 (Session: para scan, 3.2s)
 - `PARA_LLM_TIMEOUT_MS` (optional) - Override LLM timeout in milliseconds
 
 **Config Files (merged in order):**
-1. Built-in defaults (autoCommit: true by default)
+1. Built-in defaults (autoCommit: true, restrictRegistryToAttachments: true)
 2. `~/.config/para-obsidian/config.json`
 3. `.para-obsidianrc` (project root)
 4. Environment overrides
+
+**Registry Behavior (Breaking Change in Phase 2):**
+- `restrictRegistryToAttachments: true` (default) - Registry only tracks attachment processing
+- Previous behavior tracked all inbox items - now only attachment moves are deduplicated
+- Rationale: Reduces registry bloat and aligns with actual use case (prevent duplicate attachment moves)
+- Set to `false` in config to restore legacy behavior (tracks all processed inbox items)
 
 **LLM Timeout Configuration (priority order, highest wins):**
 1. `PARA_LLM_TIMEOUT_MS` env var

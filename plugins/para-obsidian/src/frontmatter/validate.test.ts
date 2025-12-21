@@ -24,7 +24,6 @@ start_date: 2025-01-01
 target_completion: 2025-12-31
 area: "[[Health]]"
 template_version: 4
-tags: [project]
 ---
 Body`,
 		);

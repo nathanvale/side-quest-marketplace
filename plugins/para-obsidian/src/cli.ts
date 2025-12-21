@@ -31,13 +31,12 @@ import {
 	handleLinkAttachments,
 	handleList,
 	handleListAreas,
-	handleListTags,
+	handleMigrateRemoveTags,
 	handleProcessInbox,
 	handleRead,
 	handleRegistry,
 	handleRename,
 	handleRewriteLinks,
-	handleScanTags,
 	handleSearch,
 	handleSemantic,
 	handleTemplateFields,
@@ -57,7 +56,7 @@ function printUsage(): void {
 		"  para template-fields <template> [--format md|json]",
 		"  para list [path] [--format md|json]",
 		"  para read <file> [--format md|json]",
-		"  para search <query> [--tag TAG] [--frontmatter key=val] [--regex] [--dir path] [--format md|json]",
+		"  para search <query> [--frontmatter key=val] [--regex] [--dir path] [--format md|json]",
 		"  para index prime [--dir path] [--format md|json]",
 		'  para create --template <name> --title "<Title>" [--dest path] [--arg key=value ...] [--format md|json]',
 		"  para create --template <name> --source <file> [--preview] [--model name] [--format md|json]",
@@ -79,6 +78,9 @@ function printUsage(): void {
 		"  para registry list|remove|clear [--format md|json]",
 		'  para enrich-bookmark <file.md|"*.md"> [--dry-run] [--force] [--delay N] [--yes]',
 		"  para enrich-bookmark --url <url> [--format md|json]",
+		"",
+		"Migration:",
+		"  para migrate:remove-tags [--dry-run] [--verbose] [--format md|json]",
 		"",
 		"Shorter aliases:",
 		"  para scan        (alias for process-inbox)",
@@ -152,18 +154,6 @@ async function main(): Promise<void> {
 
 			case "list-areas": {
 				const result = await handleListAreas(ctx);
-				if (!result.success) process.exit(result.exitCode ?? 1);
-				break;
-			}
-
-			case "list-tags": {
-				const result = await handleListTags(ctx);
-				if (!result.success) process.exit(result.exitCode ?? 1);
-				break;
-			}
-
-			case "scan-tags": {
-				const result = await handleScanTags(ctx);
 				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
@@ -339,6 +329,12 @@ async function main(): Promise<void> {
 			case "enrich": {
 				// Alias for enrich-bookmark
 				const result = await handleEnrichBookmark(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
+				break;
+			}
+
+			case "migrate:remove-tags": {
+				const result = await handleMigrateRemoveTags(ctx);
 				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}

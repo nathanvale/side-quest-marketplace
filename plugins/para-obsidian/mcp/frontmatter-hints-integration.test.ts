@@ -275,35 +275,6 @@ tags:
 		expect(response).toContain("Allowed values: small, medium, large");
 	});
 
-	test("provides array hints for tags field", () => {
-		const initialContent = `---
-title: My Project
-type: project
-status: active
-created: 2024-01-01
-start_date: 2024-01-01
-target_completion: 2024-12-31
-area: "[[Work]]"
-reviewed: 2024-01-01
-review_period: monthly
-tags:
-  - project
----
-
-# My Project`;
-
-		writeTestFile(testVault, "My Project.md", initialContent);
-
-		const config = loadConfig();
-		const response = simulateFrontmatterSetResponse(config, "My Project.md", {
-			tags: ["project", "work"],
-		});
-
-		expect(response).toContain("**Hint for tags:**");
-		expect(response).toContain("Type: array");
-		expect(response).toContain('Example: tags: ["project"]');
-	});
-
 	test("provides date hints for date fields", () => {
 		const initialContent = `---
 title: My Project

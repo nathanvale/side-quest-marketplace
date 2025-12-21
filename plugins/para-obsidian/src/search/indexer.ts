@@ -4,11 +4,10 @@
  * This module builds and manages a lightweight index of the vault's
  * Markdown files, caching:
  * - Frontmatter attributes
- * - Tags
  * - Heading structure
  *
  * The index enables fast queries without parsing every file,
- * useful for tag searches, frontmatter filtering, and heading lookups.
+ * useful for frontmatter filtering and heading lookups.
  *
  * @module indexer
  */
@@ -20,7 +19,6 @@ import {
 	writeJsonFileSync,
 } from "@sidequest/core/fs";
 import { globFilesSync } from "@sidequest/core/glob";
-import { getErrorMessage } from "@sidequest/core/utils";
 
 import type { ParaObsidianConfig } from "../config/index";
 import { parseFrontmatter } from "../frontmatter/index";
@@ -35,8 +33,6 @@ import { searchLogger } from "../shared/logger.js";
 export interface IndexEntry {
 	/** Vault-relative path to the file. */
 	readonly file: string;
-	/** Tags extracted from frontmatter. */
-	readonly tags: string[];
 	/** All frontmatter attributes. */
 	readonly frontmatter: Record<string, unknown>;
 	/** Heading titles extracted from the document. */
@@ -72,7 +68,6 @@ function collectHeadings(content: string): string[] {
  *
  * For each file, extracts:
  * - Frontmatter attributes
- * - Tags from frontmatter
  * - Heading structure
  *
  * @param config - Para-obsidian configuration
@@ -126,13 +121,9 @@ export function buildIndex(
 				const full = path.join(config.vault, rel);
 				const content = readTextFileSync(full);
 				const { attributes } = parseFrontmatter(content);
-				const tags = Array.isArray(attributes.tags)
-					? (attributes.tags as string[])
-					: [];
 				const headings = collectHeadings(content);
 				entries.push({
 					file: path.relative(config.vault, full),
-					tags,
 					frontmatter: attributes,
 					headings,
 				});
@@ -286,102 +277,5 @@ export function listProjects(config: ParaObsidianConfig): string[] {
 			return projects.sort();
 		},
 		{ context: { vaultPath: config.vault } },
-	);
-}
-
-/**
- * Lists suggested tags from config.
- *
- * Returns the curated list of tags from the para-obsidian config.
- * This is the authoritative list that users manage in their config file.
- *
- * @param config - Para-obsidian configuration
- * @returns Array of suggested tag names (sorted)
- *
- * @example
- * ```typescript
- * const tags = listTags(config);
- * console.log(`Available tags: ${tags.join(', ')}`);
- * ```
- */
-export function listTags(config: ParaObsidianConfig): string[] {
-	return observeSync(
-		searchLogger,
-		"search:listTags",
-		() => {
-			return config.suggestedTags ? [...config.suggestedTags].sort() : [];
-		},
-		{ context: { vaultPath: config.vault } },
-	);
-}
-
-/**
- * Scans vault for all tags actually used in frontmatter.
- *
- * Returns tags found in notes across the vault.
- * Uses the vault index if available, otherwise scans all files.
- *
- * @param config - Para-obsidian configuration
- * @returns Array of unique tag names (sorted)
- *
- * @example
- * ```typescript
- * const tags = scanTags(config);
- * console.log(`Found ${tags.length} tags in use: ${tags.join(', ')}`);
- * ```
- */
-export function scanTags(config: ParaObsidianConfig): string[] {
-	return observeSync(
-		searchLogger,
-		"search:scanTags",
-		() => {
-			const tagSet = new Set<string>();
-
-			// Try to use existing index first
-			const index = loadIndex(config);
-			if (index) {
-				for (const entry of index.entries) {
-					for (const tag of entry.tags) {
-						tagSet.add(tag);
-					}
-				}
-				return Array.from(tagSet).sort();
-			}
-
-			// Fallback: scan all markdown files
-			const vaultRoot = config.vault;
-			const markdownFiles = globFilesSync("**/*.md", {
-				cwd: vaultRoot,
-				absolute: false,
-			});
-
-			for (const file of markdownFiles) {
-				const fullPath = path.join(vaultRoot, file);
-				try {
-					const content = fs.readFileSync(fullPath, "utf8");
-					const { attributes } = parseFrontmatter(content);
-					const tags = attributes.tags;
-					if (Array.isArray(tags)) {
-						for (const tag of tags) {
-							if (typeof tag === "string") {
-								tagSet.add(tag);
-							}
-						}
-					}
-				} catch (error) {
-					// Skip files that can't be read (e.g., permission issues)
-					console.warn(
-						`scanTags: failed to read ${file}: ${getErrorMessage(error)}`,
-					);
-				}
-			}
-
-			return Array.from(tagSet).sort();
-		},
-		{
-			context: {
-				vaultPath: config.vault,
-			},
-		},
 	);
 }

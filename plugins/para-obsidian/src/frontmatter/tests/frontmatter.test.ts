@@ -48,14 +48,12 @@ describe("frontmatter validation", () => {
 				title: { type: "string" },
 				created: { type: "date" },
 				type: { type: "enum", enum: ["project"] },
-				tags: { type: "array", includes: ["project"] },
 			},
 		} as const;
 		const attrs = {
 			title: "My Project",
 			created: "2025-01-01",
 			type: "project",
-			tags: ["project", "x"],
 		};
 		const result = validateFrontmatter(attrs, rules);
 		expect(result.valid).toBe(true);
@@ -68,14 +66,12 @@ describe("frontmatter validation", () => {
 				title: { type: "string" },
 				created: { type: "date" },
 				type: { type: "enum", enum: ["project"] },
-				tags: { type: "array", includes: ["project"] },
 			},
 		} as const;
 		const attrs = {
 			title: "My Project",
 			created: "not-a-date",
 			type: "wrong",
-			tags: ["other"],
 		};
 		const result = validateFrontmatter(attrs, rules);
 		expect(result.valid).toBe(false);
@@ -178,7 +174,6 @@ Body`,
 				created: { type: "date" },
 				type: { type: "enum", enum: ["research"] },
 				project: { type: "wikilink" },
-				tags: { type: "array", includes: ["research"] },
 			},
 			forbidden: ["area"],
 		} as const;
@@ -188,7 +183,6 @@ Body`,
 			type: "research",
 			project: "[[Tassie Holiday]]",
 			area: "[[Family]]", // Should fail
-			tags: ["research"],
 		};
 		const resultWithArea = validateFrontmatter(attrsWithArea, rules);
 		expect(resultWithArea.valid).toBe(false);
@@ -199,7 +193,6 @@ Body`,
 			created: "2025-12-07",
 			type: "research",
 			project: "[[Tassie Holiday]]",
-			tags: ["research"],
 		};
 		const resultWithoutArea = validateFrontmatter(attrsWithoutArea, rules);
 		expect(resultWithoutArea.valid).toBe(true);
@@ -367,8 +360,6 @@ type: project
 title: Valid Project
 created: 2024-01-01
 status: active
-tags:
-  - project
 template_version: 2
 ---
 Body`,
@@ -393,8 +384,6 @@ Body`,
 type: area
 title: Valid Area
 created: 2024-01-01
-tags:
-  - area
 template_version: 2
 ---
 Body`,
@@ -412,7 +401,6 @@ Body`,
 						title: { type: "string" },
 						created: { type: "date" },
 						status: { type: "string" },
-						tags: { type: "array", includes: ["project"] },
 						template_version: { type: "number" },
 					},
 				},
@@ -421,7 +409,6 @@ Body`,
 						type: { type: "enum", enum: ["area"] },
 						title: { type: "string" },
 						created: { type: "date" },
-						tags: { type: "array", includes: ["area"] },
 						template_version: { type: "number" },
 					},
 				},
@@ -453,8 +440,6 @@ type: project
 title: Project
 created: 2024-01-01
 status: active
-tags:
-  - project
 template_version: 2
 ---
 Body`,
@@ -467,8 +452,6 @@ Body`,
 type: area
 title: Area
 created: 2024-01-01
-tags:
-  - area
 template_version: 2
 ---
 Body`,
@@ -486,7 +469,6 @@ Body`,
 						title: { type: "string" },
 						created: { type: "date" },
 						status: { type: "string" },
-						tags: { type: "array", includes: ["project"] },
 						template_version: { type: "number" },
 					},
 				},

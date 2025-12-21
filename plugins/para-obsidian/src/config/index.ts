@@ -26,7 +26,6 @@ import {
 	DEFAULT_MODEL,
 	DEFAULT_PARA_FOLDERS,
 	DEFAULT_PARA_SEARCH_FOLDERS,
-	DEFAULT_SUGGESTED_TAGS,
 	DEFAULT_TEMPLATE_VERSIONS,
 	DEFAULT_TITLE_PREFIXES,
 } from "./defaults";
@@ -88,7 +87,7 @@ export interface ParaObsidianConfig {
 	readonly autoCommit?: boolean;
 	/** Template for git commit messages. Supports {summary} and {files} placeholders. */
 	readonly gitCommitMessageTemplate?: string;
-	/** List of suggested tags for autocompletion and validation. */
+	/** List of suggested tags for LLM prompts (no longer used for validation). */
 	readonly suggestedTags?: ReadonlyArray<string>;
 	/** Validation rules keyed by note type (e.g., "project", "area"). */
 	readonly frontmatterRules?: Record<string, FrontmatterRules>;
@@ -312,7 +311,7 @@ export function loadConfig(
 		vault,
 		templatesDir,
 		autoCommit: merged.autoCommit ?? true,
-		suggestedTags: merged.suggestedTags ?? [...DEFAULT_SUGGESTED_TAGS],
+		suggestedTags: merged.suggestedTags ?? [],
 		frontmatterRules: merged.frontmatterRules ?? DEFAULT_FRONTMATTER_RULES,
 		templateVersions: merged.templateVersions ?? DEFAULT_TEMPLATE_VERSIONS,
 		defaultDestinations: merged.defaultDestinations ?? DEFAULT_DESTINATIONS,

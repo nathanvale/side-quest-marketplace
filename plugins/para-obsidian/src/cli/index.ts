@@ -20,8 +20,6 @@
 export {
 	handleConfig,
 	handleListAreas,
-	handleListTags,
-	handleScanTags,
 	handleTemplateFields,
 	handleTemplates,
 } from "./config";
@@ -58,6 +56,8 @@ export {
 	handleRename,
 	handleRewriteLinks,
 } from "./links";
+// Migration commands
+export { handleMigrateRemoveTags } from "./migrate-remove-tags";
 // Notes commands
 export { handleDelete, handleList, handleRead } from "./notes";
 // Process inbox commands

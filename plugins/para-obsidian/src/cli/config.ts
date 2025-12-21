@@ -1,14 +1,12 @@
 /**
  * Config and info CLI commands.
  *
- * Handles commands for displaying configuration, templates, areas, and tags.
+ * Handles commands for displaying configuration, templates, and areas.
  *
  * Commands:
  * - config: Display current configuration
  * - templates: List available templates with versions
  * - list-areas: List all areas in 02_Areas/
- * - list-tags: List suggested tags from config
- * - scan-tags: Scan vault for tags in use
  * - template-fields: Show fields for a specific template
  *
  * @module cli/config
@@ -16,7 +14,7 @@
 
 import { emphasize } from "@sidequest/core/terminal";
 import { listTemplateVersions } from "../config/index";
-import { listAreas, listTags, scanTags } from "../search/indexer";
+import { listAreas } from "../search/indexer";
 import { getTemplate, getTemplateFields } from "../templates/index";
 import type { CommandContext, CommandHandler, CommandResult } from "./types";
 
@@ -94,62 +92,6 @@ export const handleListAreas: CommandHandler = async (
 			console.log(emphasize.info(`Found ${areas.length} areas:`));
 			for (const area of areas) {
 				console.log(`  ${area}`);
-			}
-		}
-	}
-
-	return { success: true };
-};
-
-/**
- * Handle the 'list-tags' command.
- */
-export const handleListTags: CommandHandler = async (
-	ctx: CommandContext,
-): Promise<CommandResult> => {
-	const { config, isJson } = ctx;
-
-	const tags = listTags(config);
-
-	if (isJson) {
-		console.log(JSON.stringify({ tags, count: tags.length }, null, 2));
-	} else {
-		if (tags.length === 0) {
-			console.log(
-				emphasize.warn(
-					"No suggested tags configured (see suggestedTags in config)",
-				),
-			);
-		} else {
-			console.log(emphasize.info(`Configured tags (${tags.length}):`));
-			for (const tag of tags) {
-				console.log(`  ${tag}`);
-			}
-		}
-	}
-
-	return { success: true };
-};
-
-/**
- * Handle the 'scan-tags' command.
- */
-export const handleScanTags: CommandHandler = async (
-	ctx: CommandContext,
-): Promise<CommandResult> => {
-	const { config, isJson } = ctx;
-
-	const tags = scanTags(config);
-
-	if (isJson) {
-		console.log(JSON.stringify({ tags, count: tags.length }, null, 2));
-	} else {
-		if (tags.length === 0) {
-			console.log(emphasize.warn("No tags found in vault frontmatter"));
-		} else {
-			console.log(emphasize.info(`Tags in use (${tags.length}):`));
-			for (const tag of tags) {
-				console.log(`  ${tag}`);
 			}
 		}
 	}

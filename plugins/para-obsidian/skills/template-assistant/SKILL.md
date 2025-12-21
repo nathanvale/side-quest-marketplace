@@ -17,9 +17,6 @@ bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts list-areas --format json
 
 # List existing projects (for task linking)
 bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts list-projects --format json
-
-# Show allowed tags from config
-bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts list-tags --format json
 ```
 
 **CRITICAL: Classification vs Invention**
@@ -42,8 +39,6 @@ When selecting areas/projects, you are CLASSIFYING content into existing categor
 **Via MCP tools:**
 - `para_list_areas` - Get existing areas
 - `para_list_projects` - Get existing projects
-- `para_list_tags` - Get allowed tags
-- `para_scan_tags` - See tags actually in use
 
 **For slash commands:** Use `AskUserQuestion` to present existing areas/projects as options with descriptions of what domain they represent. Include "Other" for new classifications when content doesn't fit existing categories.
 
@@ -189,12 +184,4 @@ await para_create({
 
 ### Tag Selection Pattern
 
-Tags are **hard constrained** - must come from config:
-
-```bash
-# Get allowed tags
-const { tags } = await para_list_tags({ response_format: "json" });
-
-# LLM must choose from: project, area, resource, task, daily, journal...
-# NO new tags allowed
-```
+Tags are **hard constrained** - must come from config. When working with tags, always validate against the allowed tag list defined in your vault configuration. Tags typically include categories like: project, area, resource, task, daily, journal, etc. NO new tags are allowed outside the configured set.
