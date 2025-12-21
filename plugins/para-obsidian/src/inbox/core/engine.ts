@@ -1119,7 +1119,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				const totalLLMCalls = llmStats.successes + llmStats.failures;
 				if (totalLLMCalls > 0) {
 					const availabilityRate = (llmStats.successes / totalLLMCalls) * 100;
-					const llmSLOCheck = checkSLOBreach(
+					const llmSLOCheck = await checkSLOBreach(
 						"llm_availability",
 						availabilityRate,
 					);

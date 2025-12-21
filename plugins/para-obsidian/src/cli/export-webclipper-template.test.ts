@@ -3,6 +3,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import fs from "node:fs";
 import path from "node:path";
 import { createTempDir, pathExists, readJsonFile } from "@sidequest/core/fs";
 import { OutputFormat } from "@sidequest/core/terminal";
@@ -30,12 +31,26 @@ interface WebClipperTemplateType {
 
 describe("export-webclipper-template", () => {
 	let tempDir: string;
+	let vaultDir: string;
+	let originalParaVault: string | undefined;
 
 	beforeEach(() => {
 		tempDir = createTempDir("test-export-webclipper-");
+		// Create a vault directory inside tempDir for this test's isolation
+		vaultDir = path.join(tempDir, "vault");
+		fs.mkdirSync(vaultDir, { recursive: true });
+		// Backup and set PARA_VAULT for test isolation
+		originalParaVault = process.env.PARA_VAULT;
+		process.env.PARA_VAULT = vaultDir;
 	});
 
 	afterEach(() => {
+		// Restore PARA_VAULT
+		if (originalParaVault !== undefined) {
+			process.env.PARA_VAULT = originalParaVault;
+		} else {
+			delete process.env.PARA_VAULT;
+		}
 		cleanupTestDir(tempDir);
 	});
 

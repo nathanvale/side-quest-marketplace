@@ -5,6 +5,11 @@
  * Tests the factory function and all interface methods.
  */
 
+// IMPORTANT: Configure logtape BEFORE importing any modules that use logging
+import { setupTestLogging } from "../../testing/logger";
+
+await setupTestLogging();
+
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

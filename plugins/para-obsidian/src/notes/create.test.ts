@@ -855,12 +855,12 @@ Body content`,
 		});
 
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		// Title gets "✈️ " prefix (emoji + double space) and may or may not be quoted depending on YAML serialization
-		expect(written).toMatch(/title: "?✈️ {2}My Trip"?/);
+		// Title gets "✈️ " prefix (emoji + single space) and may or may not be quoted depending on YAML serialization
+		expect(written).toMatch(/title: "?✈️ My Trip"?/);
 		expect(written).toContain("status: active");
 		expect(written).toContain("start_date: 2025-12-26");
 		expect(written).toContain('area: "[[Travel]]"');
-		expect(written).toContain("# ✈️  My Trip");
+		expect(written).toContain("# ✈️ My Trip");
 		expect(written).not.toMatch(/: null\b/);
 		expect(written).not.toContain("[[null]]");
 	});

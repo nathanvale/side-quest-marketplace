@@ -146,7 +146,7 @@ describe("SLO disk persistence", () => {
 			await ensureEventsLoaded();
 
 			// Get burn rate - should have loaded from disk
-			const burnRate = getBurnRate("scan_latency");
+			const burnRate = await getBurnRate("scan_latency");
 
 			// 2 violations out of 10 = 20% violation rate
 			// Error budget is 5%, so burn rate = 0.20 / 0.05 = 4.0
@@ -160,7 +160,7 @@ describe("SLO disk persistence", () => {
 			resetSLOEvents();
 			await ensureEventsLoaded();
 
-			const burnRate = getBurnRate("scan_latency");
+			const burnRate = await getBurnRate("scan_latency");
 			expect(burnRate).toBe(0);
 		});
 
@@ -174,7 +174,7 @@ describe("SLO disk persistence", () => {
 			resetSLOEvents();
 			await ensureEventsLoaded();
 
-			const burnRate = getBurnRate("scan_latency");
+			const burnRate = await getBurnRate("scan_latency");
 			expect(burnRate).toBe(0);
 		});
 
@@ -204,7 +204,7 @@ describe("SLO disk persistence", () => {
 			resetSLOEvents();
 			await ensureEventsLoaded();
 
-			const burnRate = getBurnRate("scan_latency");
+			const burnRate = await getBurnRate("scan_latency");
 
 			// Should have loaded 2 valid events, skipped 1 malformed
 			// 1 violation out of 2 = 50% violation rate
@@ -244,7 +244,7 @@ describe("SLO disk persistence", () => {
 
 			// Load from disk - should prune old event
 			await ensureEventsLoaded();
-			const burnRate = getBurnRate("scan_latency");
+			const burnRate = await getBurnRate("scan_latency");
 
 			// Should only have 1 recent event (violated)
 			// 1 violation out of 1 = 100% violation rate
@@ -350,7 +350,7 @@ describe("SLO disk persistence", () => {
 			// Simulate second process: clear memory and reload
 			resetSLOEvents();
 			await ensureEventsLoaded();
-			const burnRate = getBurnRate("scan_latency");
+			const burnRate = await getBurnRate("scan_latency");
 
 			// 1 violation out of 3 = 33% violation rate
 			// Error budget is 5%, so burn rate = 0.33 / 0.05 = 6.67
@@ -369,9 +369,9 @@ describe("SLO disk persistence", () => {
 			resetSLOEvents();
 			await ensureEventsLoaded();
 
-			const scanBurn = getBurnRate("scan_latency");
-			const executeBurn = getBurnRate("execute_success");
-			const llmBurn = getBurnRate("llm_availability");
+			const scanBurn = await getBurnRate("scan_latency");
+			const executeBurn = await getBurnRate("execute_success");
+			const llmBurn = await getBurnRate("llm_availability");
 
 			expect(scanBurn).toBeGreaterThan(0);
 			expect(executeBurn).toBe(0);

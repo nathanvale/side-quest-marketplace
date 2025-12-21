@@ -161,6 +161,7 @@ export function createPluginLogger(options: PluginLoggerOptions): PluginLogger {
 	/**
 	 * Initialize the logging system.
 	 * Safe to call multiple times - only initializes once.
+	 * Also safe to call when logtape is already configured (e.g., by test setup).
 	 */
 	async function initLogger(): Promise<void> {
 		if (isInitialized) return;
@@ -174,30 +175,45 @@ export function createPluginLogger(options: PluginLoggerOptions): PluginLogger {
 		// Multiple plugins calling configure() will merge their configs
 		const sinkName = `file_${name}`;
 
-		await configure({
-			sinks: {
-				[sinkName]: getRotatingFileSink(logFile, {
-					formatter: jsonLinesFormatter,
-					maxSize,
-					maxFiles,
-					// @ts-expect-error - lazy option exists in newer versions
-					lazy: true,
-				}),
-			},
-			loggers: [
-				{
-					category: [name],
-					sinks: [sinkName],
-					lowestLevel,
+		try {
+			await configure({
+				sinks: {
+					[sinkName]: getRotatingFileSink(logFile, {
+						formatter: jsonLinesFormatter,
+						maxSize,
+						maxFiles,
+						// @ts-expect-error - lazy option exists in newer versions
+						lazy: true,
+					}),
 				},
-				// Configure LogTape meta logger to reduce MCP server noise
-				{
-					category: ["logtape", "meta"],
-					sinks: [sinkName],
-					lowestLevel: "error",
-				},
-			],
-		});
+				loggers: [
+					{
+						category: [name],
+						sinks: [sinkName],
+						lowestLevel,
+					},
+					// Configure LogTape meta logger to reduce MCP server noise
+					{
+						category: ["logtape", "meta"],
+						sinks: [sinkName],
+						lowestLevel: "error",
+					},
+				],
+			});
+		} catch (error: unknown) {
+			// Handle "Already configured" error gracefully - this happens when:
+			// 1. Tests use setupTestLogging() before importing production code
+			// 2. Multiple plugins try to configure logtape
+			// In both cases, we can safely ignore and continue with existing config
+			if (
+				error instanceof Error &&
+				error.message.includes("Already configured")
+			) {
+				isInitialized = true;
+				return;
+			}
+			throw error;
+		}
 
 		// Log initialization
 		const startupLogger = getLogger([name]);

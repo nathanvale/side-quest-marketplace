@@ -495,7 +495,7 @@ async function scanWithSpinner(
 		}
 
 		// Check SLO breach for scan latency
-		const scanSLOCheck = checkSLOBreach("scan_latency", durationMs);
+		const scanSLOCheck = await checkSLOBreach("scan_latency", durationMs);
 		recordSLOEvent("scan_latency", scanSLOCheck.breached, durationMs);
 		if (scanSLOCheck.breached && inboxLogger) {
 			inboxLogger.error("SLO breach detected", {
@@ -1070,7 +1070,7 @@ async function executeWithSpinner(
 	// Check SLO breach for execute success rate
 	const successRate =
 		total > 0 ? (results.summary.succeeded / total) * 100 : 100;
-	const executeSLOCheck = checkSLOBreach("execute_success", successRate);
+	const executeSLOCheck = await checkSLOBreach("execute_success", successRate);
 	recordSLOEvent("execute_success", executeSLOCheck.breached, successRate);
 	if (executeSLOCheck.breached && inboxLogger) {
 		inboxLogger.error("SLO breach detected", {

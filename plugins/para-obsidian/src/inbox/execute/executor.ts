@@ -63,17 +63,17 @@ export async function rollbackNote(
  * 1. Create note (if action is create-note) - FAIL EARLY
  * 2. Move attachment - ROLLBACK note if this fails
  * 3. Inject attachment link (non-fatal)
- * 4. Update registry
+ * 4. Cleanup registry (remove entry to allow reprocessing)
  *
  * Execution flow (pre-classified from frontmatter):
  * 1. Move existing .md file to destination
- * 2. Update registry
+ * 2. Cleanup registry (remove entry to allow reprocessing)
  * (No attachment moving or link injection - the .md IS the note)
  *
  * This order ensures:
  * - Inbox item stays in place if note creation fails
  * - Note is rolled back if attachment move fails
- * - Registry only updated on full success
+ * - Registry is cleaned after success to allow reprocessing if file re-added
  *
  * @param suggestion - Suggestion to execute
  * @param context - Execution context with config, registry, and cid
@@ -162,21 +162,11 @@ export async function executeSuggestion(
 		// Note: Don't check result - link injection is non-fatal
 	}
 
-	// Step 4: Update registry - only reached on full success
-	registry.markProcessed({
-		sourceHash: moveResult.hash as string,
-		sourcePath: suggestion.source,
-		processedAt: new Date().toISOString(),
-		createdNote: createdNotePath,
-		movedAttachment: moveResult.movedTo as string,
-	});
-
-	// Step 5: Cleanup registry for moved attachments (Phase 1: prevent zombie entries)
+	// Step 4: Cleanup registry for moved attachments
+	// Remove any existing registry entry to allow reprocessing if user re-adds the file
+	// Registry is only used during scan to skip already-processed items
 	if (moveResult.movedTo && moveResult.hash) {
-		// Use the hash computed during the move (source file is already moved)
 		const sourceHash = moveResult.hash;
-
-		// Remove from registry to allow reprocessing if user re-adds the file
 		const removed = registry.removeItem(sourceHash);
 		if (removed) {
 			await registry.save();
@@ -256,14 +246,14 @@ async function executePreClassifiedNote(
 		};
 	}
 
-	// Update registry
-	context.registry.markProcessed({
-		sourceHash,
-		sourcePath: suggestion.source,
-		processedAt: new Date().toISOString(),
-		createdNote: moveResult.notePath,
-		// No movedAttachment - the .md file WAS the source and is now the note
-	});
+	// Cleanup registry - remove entry to allow reprocessing if file re-added
+	const removed = context.registry.removeItem(sourceHash);
+	if (removed) {
+		await context.registry.save();
+		if (logger) {
+			logger.debug`Registry cleaned for pre-classified note: hash=${sourceHash.slice(0, 8)} ${cid}`;
+		}
+	}
 
 	if (logger) {
 		logger.info`Executed pre-classified note id=${suggestion.id} movedTo=${moveResult.notePath} ${cid}`;

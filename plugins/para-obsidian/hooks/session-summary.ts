@@ -66,7 +66,10 @@ async function main(): Promise<void> {
 	const scanOps = summary.slowest.filter((op) => op.tool.includes("scanInbox"));
 	const slowestScan = scanOps[0];
 	if (slowestScan) {
-		const scanSLO = checkSLOBreach("scan_latency", slowestScan.durationMs);
+		const scanSLO = await checkSLOBreach(
+			"scan_latency",
+			slowestScan.durationMs,
+		);
 		recordSLOEvent("scan_latency", scanSLO.breached, slowestScan.durationMs);
 		if (scanSLO.breached) {
 			breaches.push({ name: "scan_latency", result: scanSLO });
@@ -74,7 +77,7 @@ async function main(): Promise<void> {
 	}
 
 	// Check execute_success SLO (use overall success rate)
-	const executeSLO = checkSLOBreach(
+	const executeSLO = await checkSLOBreach(
 		"execute_success",
 		summary.overallSuccessRate,
 	);

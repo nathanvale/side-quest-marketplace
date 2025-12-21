@@ -5,17 +5,17 @@ import {
 	getSLODefinition,
 	getSLONames,
 	recordSLOEvent,
-	resetSLOEvents,
+	resetSLOEventsForTests,
 	SLO_DEFINITIONS,
 } from "./slos";
 
 describe("slos", () => {
 	beforeEach(() => {
-		resetSLOEvents();
+		resetSLOEventsForTests();
 	});
 
 	describe("SLO_DEFINITIONS", () => {
-		test("should define scan_latency SLO", () => {
+		test("should define scan_latency SLO", async () => {
 			const slo = SLO_DEFINITIONS.scan_latency;
 			expect(slo).toBeDefined();
 			if (!slo) throw new Error("scan_latency SLO not defined");
@@ -27,7 +27,7 @@ describe("slos", () => {
 			expect(slo.errorBudget).toBe(0.05);
 		});
 
-		test("should define execute_success SLO", () => {
+		test("should define execute_success SLO", async () => {
 			const slo = SLO_DEFINITIONS.execute_success;
 			expect(slo).toBeDefined();
 			if (!slo) throw new Error("execute_success SLO not defined");
@@ -39,7 +39,7 @@ describe("slos", () => {
 			expect(slo.errorBudget).toBe(0.01);
 		});
 
-		test("should define llm_availability SLO", () => {
+		test("should define llm_availability SLO", async () => {
 			const slo = SLO_DEFINITIONS.llm_availability;
 			expect(slo).toBeDefined();
 			if (!slo) throw new Error("llm_availability SLO not defined");
@@ -51,7 +51,7 @@ describe("slos", () => {
 			expect(slo.errorBudget).toBe(0.2);
 		});
 
-		test("should have error budget equal to 1 - target", () => {
+		test("should have error budget equal to 1 - target", async () => {
 			for (const [_name, slo] of Object.entries(SLO_DEFINITIONS)) {
 				expect(slo.errorBudget).toBeCloseTo(1 - slo.target, 10);
 			}
@@ -60,76 +60,76 @@ describe("slos", () => {
 
 	describe("checkSLOBreach", () => {
 		describe("latency SLOs (ms)", () => {
-			test("should not breach when value is below threshold", () => {
-				const result = checkSLOBreach("scan_latency", 50_000);
+			test("should not breach when value is below threshold", async () => {
+				const result = await checkSLOBreach("scan_latency", 50_000);
 				expect(result.breached).toBe(false);
 				expect(result.burnRate).toBe(0);
 				expect(result.currentValue).toBe(50_000);
 				expect(result.slo.name).toBe("Scan Latency");
 			});
 
-			test("should breach when value is above threshold", () => {
-				const result = checkSLOBreach("scan_latency", 70_000);
+			test("should breach when value is above threshold", async () => {
+				const result = await checkSLOBreach("scan_latency", 70_000);
 				expect(result.breached).toBe(true);
 				expect(result.burnRate).toBe(1); // Simplified burn rate when breached
 				expect(result.currentValue).toBe(70_000);
 				expect(result.slo.name).toBe("Scan Latency");
 			});
 
-			test("should breach when value equals threshold", () => {
-				const result = checkSLOBreach("scan_latency", 60_000);
+			test("should breach when value equals threshold", async () => {
+				const result = await checkSLOBreach("scan_latency", 60_000);
 				expect(result.breached).toBe(false);
 				expect(result.burnRate).toBe(0);
 			});
 		});
 
 		describe("percentage SLOs", () => {
-			test("should not breach when value is above threshold", () => {
-				const result = checkSLOBreach("execute_success", 99.5);
+			test("should not breach when value is above threshold", async () => {
+				const result = await checkSLOBreach("execute_success", 99.5);
 				expect(result.breached).toBe(false);
 				expect(result.burnRate).toBe(0);
 				expect(result.currentValue).toBe(99.5);
 				expect(result.slo.name).toBe("Execute Success Rate");
 			});
 
-			test("should breach when value is below threshold", () => {
-				const result = checkSLOBreach("execute_success", 95);
+			test("should breach when value is below threshold", async () => {
+				const result = await checkSLOBreach("execute_success", 95);
 				expect(result.breached).toBe(true);
 				expect(result.burnRate).toBe(1); // Simplified burn rate when breached
 				expect(result.currentValue).toBe(95);
 				expect(result.slo.name).toBe("Execute Success Rate");
 			});
 
-			test("should not breach when value equals threshold", () => {
-				const result = checkSLOBreach("execute_success", 99);
+			test("should not breach when value equals threshold", async () => {
+				const result = await checkSLOBreach("execute_success", 99);
 				expect(result.breached).toBe(false);
 				expect(result.burnRate).toBe(0);
 			});
 		});
 
 		describe("llm_availability SLO", () => {
-			test("should not breach when availability is high", () => {
-				const result = checkSLOBreach("llm_availability", 85);
+			test("should not breach when availability is high", async () => {
+				const result = await checkSLOBreach("llm_availability", 85);
 				expect(result.breached).toBe(false);
 				expect(result.burnRate).toBe(0);
 			});
 
-			test("should breach when availability is low", () => {
-				const result = checkSLOBreach("llm_availability", 70);
+			test("should breach when availability is low", async () => {
+				const result = await checkSLOBreach("llm_availability", 70);
 				expect(result.breached).toBe(true);
 				expect(result.burnRate).toBe(1); // Simplified burn rate when breached
 			});
 
-			test("should not breach when at threshold", () => {
-				const result = checkSLOBreach("llm_availability", 80);
+			test("should not breach when at threshold", async () => {
+				const result = await checkSLOBreach("llm_availability", 80);
 				expect(result.breached).toBe(false);
 				expect(result.burnRate).toBe(0);
 			});
 		});
 
 		describe("unknown SLO", () => {
-			test("should return safe defaults for unknown SLO", () => {
-				const result = checkSLOBreach("unknown_slo", 100);
+			test("should return safe defaults for unknown SLO", async () => {
+				const result = await checkSLOBreach("unknown_slo", 100);
 				expect(result.breached).toBe(false);
 				expect(result.burnRate).toBe(0);
 				expect(result.currentValue).toBe(100);
@@ -141,20 +141,23 @@ describe("slos", () => {
 		});
 
 		describe("edge cases", () => {
-			test("should handle zero values", () => {
-				const result = checkSLOBreach("scan_latency", 0);
+			test("should handle zero values", async () => {
+				const result = await checkSLOBreach("scan_latency", 0);
 				expect(result.breached).toBe(false);
 				expect(result.currentValue).toBe(0);
 			});
 
-			test("should handle negative values", () => {
-				const result = checkSLOBreach("execute_success", -1);
+			test("should handle negative values", async () => {
+				const result = await checkSLOBreach("execute_success", -1);
 				expect(result.breached).toBe(true);
 				expect(result.currentValue).toBe(-1);
 			});
 
-			test("should handle very large values", () => {
-				const result = checkSLOBreach("scan_latency", Number.MAX_SAFE_INTEGER);
+			test("should handle very large values", async () => {
+				const result = await checkSLOBreach(
+					"scan_latency",
+					Number.MAX_SAFE_INTEGER,
+				);
 				expect(result.breached).toBe(true);
 				expect(result.currentValue).toBe(Number.MAX_SAFE_INTEGER);
 			});
@@ -162,7 +165,7 @@ describe("slos", () => {
 	});
 
 	describe("getSLONames", () => {
-		test("should return all SLO names", () => {
+		test("should return all SLO names", async () => {
 			const names = getSLONames();
 			expect(names).toContain("scan_latency");
 			expect(names).toContain("execute_success");
@@ -174,7 +177,7 @@ describe("slos", () => {
 			expect(names.length).toBe(7);
 		});
 
-		test("should return array of strings", () => {
+		test("should return array of strings", async () => {
 			const names = getSLONames();
 			for (const name of names) {
 				expect(typeof name).toBe("string");
@@ -183,19 +186,19 @@ describe("slos", () => {
 	});
 
 	describe("getSLODefinition", () => {
-		test("should return SLO definition for valid name", () => {
+		test("should return SLO definition for valid name", async () => {
 			const slo = getSLODefinition("scan_latency");
 			expect(slo).toBeDefined();
 			expect(slo?.name).toBe("Scan Latency");
 			expect(slo?.target).toBe(0.95);
 		});
 
-		test("should return undefined for unknown SLO name", () => {
+		test("should return undefined for unknown SLO name", async () => {
 			const slo = getSLODefinition("unknown_slo");
 			expect(slo).toBeUndefined();
 		});
 
-		test("should return all defined SLOs", () => {
+		test("should return all defined SLOs", async () => {
 			expect(getSLODefinition("scan_latency")).toBeDefined();
 			expect(getSLODefinition("execute_success")).toBeDefined();
 			expect(getSLODefinition("llm_availability")).toBeDefined();
@@ -203,8 +206,8 @@ describe("slos", () => {
 	});
 
 	describe("SLOBreachResult type", () => {
-		test("should have correct structure", () => {
-			const result = checkSLOBreach("scan_latency", 50_000);
+		test("should have correct structure", async () => {
+			const result = await checkSLOBreach("scan_latency", 50_000);
 
 			// Verify structure
 			expect(result).toHaveProperty("breached");
@@ -229,7 +232,7 @@ describe("slos", () => {
 	});
 
 	describe("SLO integration", () => {
-		test("should support complete workflow", () => {
+		test("should support complete workflow", async () => {
 			// Get all SLO names
 			const names = getSLONames();
 
@@ -240,21 +243,21 @@ describe("slos", () => {
 				if (!definition) continue;
 
 				// Check breach with a value
-				const result = checkSLOBreach(name, 100);
+				const result = await checkSLOBreach(name, 100);
 				expect(result).toBeDefined();
 				expect(result.slo.name).toBe(definition.name);
 			}
 		});
 
-		test("should allow monitoring multiple SLOs simultaneously", () => {
+		test("should allow monitoring multiple SLOs simultaneously", async () => {
 			const checks = [
 				{ name: "scan_latency", value: 65_000 },
 				{ name: "execute_success", value: 98 },
 				{ name: "llm_availability", value: 75 },
 			];
 
-			const results = checks.map(({ name, value }) =>
-				checkSLOBreach(name, value),
+			const results = await Promise.all(
+				checks.map(({ name, value }) => checkSLOBreach(name, value)),
 			);
 
 			// scan_latency should breach (65s > 60s)
@@ -269,50 +272,50 @@ describe("slos", () => {
 	});
 
 	describe("recordSLOEvent", () => {
-		test("records non-violated event", () => {
+		test("records non-violated event", async () => {
 			recordSLOEvent("scan_latency", false);
 
-			const burnRate = getBurnRate("scan_latency");
+			const burnRate = await getBurnRate("scan_latency");
 			expect(burnRate).toBe(0);
 		});
 
-		test("records violated event", () => {
+		test("records violated event", async () => {
 			recordSLOEvent("scan_latency", true);
 
-			const burnRate = getBurnRate("scan_latency");
+			const burnRate = await getBurnRate("scan_latency");
 			expect(burnRate).toBeGreaterThan(0);
 		});
 
-		test("records multiple events", () => {
+		test("records multiple events", async () => {
 			recordSLOEvent("scan_latency", false);
 			recordSLOEvent("scan_latency", false);
 			recordSLOEvent("scan_latency", true);
 
 			// 1 violation out of 3 events = 33% violation rate
 			// Error budget is 5%, so burn rate = 0.33 / 0.05 = 6.6
-			const burnRate = getBurnRate("scan_latency");
+			const burnRate = await getBurnRate("scan_latency");
 			expect(burnRate).toBeCloseTo(6.67, 1);
 		});
 	});
 
 	describe("getBurnRate", () => {
-		test("returns 0 for unknown SLO", () => {
-			expect(getBurnRate("unknown_slo")).toBe(0);
+		test("returns 0 for unknown SLO", async () => {
+			expect(await getBurnRate("unknown_slo")).toBe(0);
 		});
 
-		test("returns 0 when no events recorded", () => {
-			expect(getBurnRate("scan_latency")).toBe(0);
+		test("returns 0 when no events recorded", async () => {
+			expect(await getBurnRate("scan_latency")).toBe(0);
 		});
 
-		test("returns 0 when all events successful", () => {
+		test("returns 0 when all events successful", async () => {
 			recordSLOEvent("scan_latency", false);
 			recordSLOEvent("scan_latency", false);
 			recordSLOEvent("scan_latency", false);
 
-			expect(getBurnRate("scan_latency")).toBe(0);
+			expect(await getBurnRate("scan_latency")).toBe(0);
 		});
 
-		test("calculates burn rate at exactly error budget", () => {
+		test("calculates burn rate at exactly error budget", async () => {
 			// scan_latency has 5% error budget
 			// 5 violations out of 100 events = 5% violation rate
 			for (let i = 0; i < 95; i++) {
@@ -322,11 +325,11 @@ describe("slos", () => {
 				recordSLOEvent("scan_latency", true);
 			}
 
-			const burnRate = getBurnRate("scan_latency");
+			const burnRate = await getBurnRate("scan_latency");
 			expect(burnRate).toBeCloseTo(1.0, 1);
 		});
 
-		test("calculates burn rate above error budget", () => {
+		test("calculates burn rate above error budget", async () => {
 			// 10 violations out of 100 events = 10% violation rate
 			// Error budget is 5%, so burn rate = 0.10 / 0.05 = 2.0
 			for (let i = 0; i < 90; i++) {
@@ -336,11 +339,11 @@ describe("slos", () => {
 				recordSLOEvent("scan_latency", true);
 			}
 
-			const burnRate = getBurnRate("scan_latency");
+			const burnRate = await getBurnRate("scan_latency");
 			expect(burnRate).toBeCloseTo(2.0, 1);
 		});
 
-		test("calculates burn rate below error budget", () => {
+		test("calculates burn rate below error budget", async () => {
 			// 2 violations out of 100 events = 2% violation rate
 			// Error budget is 5%, so burn rate = 0.02 / 0.05 = 0.4
 			for (let i = 0; i < 98; i++) {
@@ -350,63 +353,63 @@ describe("slos", () => {
 				recordSLOEvent("scan_latency", true);
 			}
 
-			const burnRate = getBurnRate("scan_latency");
+			const burnRate = await getBurnRate("scan_latency");
 			expect(burnRate).toBeCloseTo(0.4, 1);
 		});
 
-		test("tracks different SLOs independently", () => {
+		test("tracks different SLOs independently", async () => {
 			recordSLOEvent("scan_latency", true);
 			recordSLOEvent("execute_success", false);
 
-			expect(getBurnRate("scan_latency")).toBeGreaterThan(0);
-			expect(getBurnRate("execute_success")).toBe(0);
+			expect(await getBurnRate("scan_latency")).toBeGreaterThan(0);
+			expect(await getBurnRate("execute_success")).toBe(0);
 		});
 
-		test("handles 100% violation rate", () => {
+		test("handles 100% violation rate", async () => {
 			recordSLOEvent("scan_latency", true);
 			recordSLOEvent("scan_latency", true);
 			recordSLOEvent("scan_latency", true);
 
 			// 100% violation rate / 5% error budget = 20x burn rate
-			const burnRate = getBurnRate("scan_latency");
+			const burnRate = await getBurnRate("scan_latency");
 			expect(burnRate).toBeCloseTo(20.0, 1);
 		});
 	});
 
 	describe("checkSLOBreach with burn rate", () => {
 		beforeEach(() => {
-			resetSLOEvents();
+			resetSLOEventsForTests();
 		});
 
-		test("includes actual burn rate in breach result", () => {
+		test("includes actual burn rate in breach result", async () => {
 			recordSLOEvent("scan_latency", true);
 			recordSLOEvent("scan_latency", false);
 
-			const result = checkSLOBreach("scan_latency", 50_000);
+			const result = await checkSLOBreach("scan_latency", 50_000);
 
 			expect(result.burnRate).toBeGreaterThan(0);
 			expect(result.burnRate).toBeCloseTo(10.0, 1); // 50% violation / 5% budget = 10x
 		});
 
-		test("returns 0 burn rate when no events recorded", () => {
-			const result = checkSLOBreach("scan_latency", 50_000);
+		test("returns 0 burn rate when no events recorded", async () => {
+			const result = await checkSLOBreach("scan_latency", 50_000);
 
 			expect(result.burnRate).toBe(0);
 		});
 	});
 
 	describe("resetSLOEvents", () => {
-		test("clears all recorded events", () => {
+		test("clears all recorded events", async () => {
 			recordSLOEvent("scan_latency", true);
 			recordSLOEvent("execute_success", true);
 
-			expect(getBurnRate("scan_latency")).toBeGreaterThan(0);
-			expect(getBurnRate("execute_success")).toBeGreaterThan(0);
+			expect(await getBurnRate("scan_latency")).toBeGreaterThan(0);
+			expect(await getBurnRate("execute_success")).toBeGreaterThan(0);
 
-			resetSLOEvents();
+			resetSLOEventsForTests();
 
-			expect(getBurnRate("scan_latency")).toBe(0);
-			expect(getBurnRate("execute_success")).toBe(0);
+			expect(await getBurnRate("scan_latency")).toBe(0);
+			expect(await getBurnRate("execute_success")).toBe(0);
 		});
 	});
 }); // End of main describe block

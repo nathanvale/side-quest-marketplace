@@ -42,6 +42,9 @@ let eventsLoaded = false;
 /** Promise for ongoing load operation (for deduplication) */
 let loadPromise: Promise<void> | null = null;
 
+/** Promise chain for serializing disk writes */
+let writeChain: Promise<void> = Promise.resolve();
+
 /**
  * SLO metric unit type
  */
@@ -342,11 +345,13 @@ export function recordSLOEvent(
 	events.push(event);
 	sloEvents.set(sloName, events);
 
-	// Fire-and-forget append to disk (non-blocking)
-	appendEventToDisk(event).catch((error: unknown) => {
-		// Log error but don't throw - disk persistence is non-critical
-		console.error("Failed to persist SLO event to disk:", error);
-	});
+	// Serialize disk writes to prevent interleaving
+	writeChain = writeChain
+		.then(() => appendEventToDisk(event))
+		.catch((error: unknown) => {
+			// Log error but don't throw - disk persistence is non-critical
+			console.error("Failed to persist SLO event to disk:", error);
+		});
 }
 
 /**
@@ -367,20 +372,15 @@ export function recordSLOEvent(
  * @example
  * ```typescript
  * // Get burn rate for scan_latency SLO
- * const burnRate = getBurnRate("scan_latency");
+ * const burnRate = await getBurnRate("scan_latency");
  * if (burnRate > 1) {
  *   console.warn("Consuming error budget faster than sustainable!");
  * }
  * ```
  */
-export function getBurnRate(sloName: string): number {
-	// Lazy load from disk on first call (non-blocking for subsequent calls)
-	if (!eventsLoaded) {
-		loadEventsFromDisk().catch((error: unknown) => {
-			console.error("Failed to load SLO events from disk:", error);
-		});
-		eventsLoaded = true; // Set immediately to avoid multiple loads
-	}
+export async function getBurnRate(sloName: string): Promise<number> {
+	// Ensure events are loaded from disk before calculating
+	await ensureEventsLoaded();
 
 	const slo = SLO_DEFINITIONS[sloName];
 	if (!slo) {
@@ -419,8 +419,20 @@ export function getBurnRate(sloName: string): number {
  */
 export function resetSLOEvents(): void {
 	sloEvents.clear();
-	eventsLoaded = false;
+	eventsLoaded = false; // Allow reload from disk
 	loadPromise = null;
+	writeChain = Promise.resolve();
+}
+
+/**
+ * Reset SLO events for unit tests (prevents disk loading)
+ * @internal
+ */
+export function resetSLOEventsForTests(): void {
+	sloEvents.clear();
+	eventsLoaded = true; // Mark as loaded to prevent disk reload
+	loadPromise = null;
+	writeChain = Promise.resolve();
 }
 
 /**
@@ -432,16 +444,16 @@ export function resetSLOEvents(): void {
  *
  * @example
  * ```typescript
- * const result = checkSLOBreach("scan_latency", 65_000);
+ * const result = await checkSLOBreach("scan_latency", 65_000);
  * if (result.breached) {
  *   console.log(`SLO breached: ${result.slo.name} (burn rate: ${result.burnRate})`);
  * }
  * ```
  */
-export function checkSLOBreach(
+export async function checkSLOBreach(
 	sloName: string,
 	currentValue: number,
-): SLOBreachResult {
+): Promise<SLOBreachResult> {
 	const slo = SLO_DEFINITIONS[sloName];
 	if (!slo) {
 		return {
@@ -467,7 +479,7 @@ export function checkSLOBreach(
 			: currentValue < slo.threshold;
 
 	// Get actual burn rate from recorded events
-	const calculatedBurnRate = getBurnRate(sloName);
+	const calculatedBurnRate = await getBurnRate(sloName);
 
 	// Use simplified burn rate if no events have been recorded yet:
 	// - 1 = fully consuming error budget (when breached)
