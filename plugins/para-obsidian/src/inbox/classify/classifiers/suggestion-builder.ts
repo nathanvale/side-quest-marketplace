@@ -262,10 +262,10 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 		suggestedDestination = suggestedArea || suggestedProject;
 	} else {
 		// LLM-path: No frontmatter routing → store LLM suggestions for DISPLAY only
-		// User must explicitly accept with y<n> or set with d<n>
+		// Item will be filtered at CLI layer until user adds tags in Obsidian
 		llmSuggestedArea = suggestedArea;
 		llmSuggestedProject = suggestedProject;
-		// Leave suggestedDestination undefined - user MUST set it
+		// Leave suggestedDestination undefined - item will be skipped
 	}
 
 	// Return properly typed discriminated union based on action

@@ -352,7 +352,8 @@ Invoice from Dr. Smith for checkup.
 			// Should preserve frontmatter values
 			expect(suggestion.suggestedNoteType).toBe("invoice");
 			expect(suggestion.suggestedArea).toBe("Health");
-			expect(suggestion.suggestedTitle).toBe("Medical Invoice December");
+			// Title includes emoji prefix for invoice type
+			expect(suggestion.suggestedTitle).toBe("🧾 Medical Invoice December");
 
 			// Should set destination based on area
 			expect(suggestion.suggestedDestination).toBe("02 Areas/Health");
@@ -430,19 +431,8 @@ title: Some Invoice
 			const engine = createTestEngine({ vaultPath: preClassTestPath });
 			const suggestions = await engine.scan();
 
-			expect(suggestions).toHaveLength(1);
-			const suggestion = suggestions[0];
-			expect(suggestion).toBeDefined();
-			if (!suggestion) return;
-
-			// Should use frontmatter fast-path (skips hashing/LLM)
-			// Destination will be unresolved, user picks interactively
-			expect(suggestion.detectionSource).toBe("frontmatter");
-			expect(suggestion.action).toBe("create-note");
-			if (suggestion.action === "create-note") {
-				expect(suggestion.suggestedDestination).toBeUndefined();
-				expect(suggestion.autoRoute).toBe(false);
-			}
+			// v2.0: Files without valid routing are skipped
+			expect(suggestions).toHaveLength(0);
 		});
 
 		test("should use fast-path for typed markdown even without area/project", async () => {
@@ -459,19 +449,8 @@ title: Orphan Invoice
 			const engine = createTestEngine({ vaultPath: preClassTestPath });
 			const suggestions = await engine.scan();
 
-			expect(suggestions).toHaveLength(1);
-			const suggestion = suggestions[0];
-			expect(suggestion).toBeDefined();
-			if (!suggestion) return;
-
-			// Should use frontmatter fast-path (skips hashing/LLM)
-			// No destination, user picks interactively
-			expect(suggestion.detectionSource).toBe("frontmatter");
-			expect(suggestion.action).toBe("create-note");
-			if (suggestion.action === "create-note") {
-				expect(suggestion.suggestedDestination).toBeUndefined();
-				expect(suggestion.autoRoute).toBe(false);
-			}
+			// v2.0: Files without valid routing are skipped
+			expect(suggestions).toHaveLength(0);
 		});
 
 		test("should handle plain text area format (no wikilinks)", async () => {
@@ -905,6 +884,14 @@ amount: 25.00
 			mkdirSync(challengeInboxPath, { recursive: true });
 			mkdirSync(join(challengeTestPath, "01 Projects"), { recursive: true });
 			mkdirSync(join(challengeTestPath, "02 Areas"), { recursive: true });
+			mkdirSync(join(challengeTestPath, "02 Areas", "Finance"), {
+				recursive: true,
+			});
+			// Create Finance area marker file for vault context
+			writeFileSync(
+				join(challengeTestPath, "02 Areas", "Finance", "Finance.md"),
+				"---\ntype: area\n---\n# Finance Area",
+			);
 			mkdirSync(join(challengeTestPath, "Attachments"), { recursive: true });
 			await initGitRepo(challengeTestPath);
 
@@ -999,7 +986,7 @@ amount: 25.00
 			// Create a markdown file in inbox (markdown extractor doesn't need pdftotext)
 			writeFileSync(
 				join(challengeInboxPath, "document.md"),
-				"---\ntitle: Test Document\ntype: invoice\n---\n# Invoice\nAmount: $100\nProvider: Test Co",
+				'---\ntitle: Test Document\ntype: invoice\narea: "[[Finance]]"\nprovider: Test Co\namount: 100\n---\n# Invoice\nAmount: $100\nProvider: Test Co',
 			);
 
 			const engine = createTestEngine({ vaultPath: challengeTestPath });

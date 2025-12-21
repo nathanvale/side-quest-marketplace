@@ -504,6 +504,20 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 							const area = parseWikilink(enrichedFrontmatter.area);
 							const project = parseWikilink(enrichedFrontmatter.project);
 
+							// Skip files without routing tags (user hasn't tagged them yet)
+							if (!destination) {
+								if (inboxLogger) {
+									inboxLogger.info`Markdown note skipped - no routing tags file=${filename} hasArea=${!!area} hasProject=${!!project} sessionCid=${sessionCid} cid=${cid}`;
+								}
+								if (onProgress) {
+									await onProgress({
+										...progressBase,
+										stage: "skip",
+									});
+								}
+								return null; // Skip suggestion entirely
+							}
+
 							// Build suggestion - no hashing needed for markdown notes
 							// Apply emoji prefix for note types that have them configured
 							const paraConfig = loadConfig();
@@ -520,7 +534,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 								id: createSuggestionId(),
 								source: join(resolvedConfig.inboxFolder, filename),
 								processor: "notes",
-								confidence: destination ? "high" : "medium",
+								confidence: "high", // Always high confidence when destination resolved
 								detectionSource: "frontmatter",
 								action: "create-note",
 								suggestedNoteType: noteType,
@@ -529,10 +543,8 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 								suggestedProject: project,
 								suggestedDestination: destination,
 								extractedFields: enrichedFrontmatter,
-								autoRoute: !!destination, // Auto-route only if destination resolved
-								reason: destination
-									? `Pre-routed via frontmatter (${project ? "project" : "area"})`
-									: `Typed markdown note (needs destination)`,
+								autoRoute: true, // Always true when we have a destination
+								reason: `Pre-routed via frontmatter (${project ? "project" : "area"})`,
 							};
 
 							suggestionCache.set(suggestion.id, suggestion);
@@ -543,7 +555,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 								});
 							}
 							if (inboxLogger) {
-								inboxLogger.info`Markdown fast-path file=${filename} type=${noteType} destination=${destination ?? "unresolved"} autoRoute=${!!destination} sessionCid=${sessionCid} cid=${cid}`;
+								inboxLogger.info`Markdown fast-path file=${filename} type=${noteType} destination=${destination} autoRoute=true sessionCid=${sessionCid} cid=${cid}`;
 							}
 							return suggestion;
 						}
@@ -1226,11 +1238,8 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				const total = ids.length;
 
 				for (const id of ids) {
-					// Look up suggestion by ID
-					// Check CLI-modified suggestions first, then fall back to engine cache
-					// This ensures user modifications (e.g., accepted LLM destinations) are respected
-					const suggestion =
-						options?.updatedSuggestions?.get(id) ?? suggestionCache.get(id);
+					// Look up suggestion by ID from engine cache
+					const suggestion = suggestionCache.get(id);
 					if (!suggestion) {
 						const error = new Error(`Suggestion not found: ${id}`);
 						failed.set(id, error);
@@ -1244,6 +1253,22 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 							success: true,
 							action: "skip",
 						});
+						continue;
+					}
+
+					// Defense-in-depth: Validate create-note has destination
+					// This should be filtered at CLI layer, but catch any slip-through
+					if (
+						isCreateNoteSuggestion(suggestion) &&
+						!suggestion.suggestedDestination
+					) {
+						const error = new Error(
+							`Cannot execute: missing destination. Tag the file in Obsidian and re-scan.`,
+						);
+						failed.set(id, error);
+						if (executeLogger) {
+							executeLogger.warn`Skipping create-note without destination id=${id} source=${basename(suggestion.source)} ${cid}`;
+						}
 						continue;
 					}
 

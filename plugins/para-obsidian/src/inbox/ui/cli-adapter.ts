@@ -13,7 +13,6 @@ import { getAreaPathMap, getProjectPathMap } from "../core/vault/context";
 import type {
 	CLICommand,
 	Confidence,
-	CreateNoteSuggestion,
 	DetectionSource,
 	ExecutionResult,
 	InboxEngine,
@@ -31,10 +30,6 @@ import { isCreateNoteSuggestion } from "../types";
  * Using functions for messages that require interpolation.
  */
 const CLI_MESSAGES = {
-	noDestination: (idx: number) =>
-		`⚠️  Skipped item ${idx}: No destination set. Use y${idx} to accept LLM suggestion, or d${idx} <path>`,
-	noItemsApprovedWithDestinations:
-		"\nNo items approved (all either already approved or missing destinations).",
 	noItemsApprovedWithSkipped:
 		"\nNo items approved (all either already approved, skipped, or missing destinations).",
 	invalidItem: (idx: number) => `Invalid item number: ${idx}`,
@@ -164,32 +159,6 @@ export function parseCommand(
 	if (viewMatch?.[1]) {
 		const id = Number.parseInt(viewMatch[1], 10);
 		return { type: "view", id };
-	}
-
-	// Accept suggestion: y<id>
-	const acceptMatch = trimmed.match(/^[yY](\d+)$/);
-	if (acceptMatch?.[1]) {
-		const id = Number.parseInt(acceptMatch[1], 10);
-		return { type: "accept-suggestion", id };
-	}
-
-	// Set destination: d<id> <path>
-	const destMatch = trimmed.match(/^[dD](\d+)\s+(.+)$/);
-	if (destMatch?.[1] && destMatch[2]) {
-		const id = Number.parseInt(destMatch[1], 10);
-		const path = destMatch[2].trim();
-
-		// Security: Prevent path traversal attacks
-		if (path.includes("../")) {
-			return { type: "invalid", input: trimmed };
-		}
-
-		return { type: "set-destination", id, path };
-	}
-
-	// Set destination without path is invalid
-	if (/^[dD]\d*$/.test(trimmed)) {
-		return { type: "invalid", input: trimmed };
 	}
 
 	// Edit command: e<id> <prompt>
@@ -355,7 +324,7 @@ export function formatSuggestion(
 			suggestion.llmSuggestedArea ?? suggestion.llmSuggestedProject;
 		if (llmSuggestion && llmSuggestion !== suggestion.suggestedDestination) {
 			lines.push(
-				`    └─ ${emphasize.dim(`💡 LLM suggests: ${llmSuggestion} (y${index} to accept)`)}`,
+				`    └─ ${emphasize.dim(`💡 LLM suggests: ${llmSuggestion} (use e${index} to reclassify)`)}`,
 			);
 		}
 
@@ -501,18 +470,11 @@ export interface PaginationState {
 
 /**
  * Result of the interactive approval loop.
- * Includes approved IDs and any CLI-modified suggestions.
+ * Includes approved IDs only.
  */
 export interface InteractiveLoopResult {
 	/** IDs of approved suggestions */
 	approvedIds: SuggestionId[];
-	/**
-	 * Map of suggestion IDs to CLI-modified suggestions.
-	 * When user accepts an LLM suggestion (y<n>) or sets a custom destination (d<n>),
-	 * the modified suggestion is stored here. These take precedence over
-	 * the engine's internal cache during execution.
-	 */
-	updatedSuggestions: Map<string, InboxSuggestion>;
 }
 
 /**
@@ -646,8 +608,6 @@ export function getHelpText(): string {
 	const lines = [
 		emphasize.info("═══ Commands ═══"),
 		"",
-		`  ${emphasize.success("y<n>")}        Accept LLM suggestion for item n`,
-		`  ${emphasize.success("d<n> <path>")} Set destination for item n`,
 		`  ${emphasize.success("a")}           Approve all visible items on current page`,
 		`  ${emphasize.success("A")}           Approve ALL remaining items (all pages)`,
 		`  ${emphasize.success("1,2,5")}       Approve specific items by number`,
@@ -660,15 +620,13 @@ export function getHelpText(): string {
 		`  ${emphasize.success("q")}           Quit without processing`,
 		`  ${emphasize.success("?")}           Show this help`,
 		"",
+		emphasize.warn("⚠ Files without area/project tags are skipped."),
+		emphasize.dim("  Tag them in Obsidian UI and re-run scan."),
+		"",
 		emphasize.dim("Examples:"),
-		emphasize.dim("  y1                    - accept LLM suggestion for item 1"),
-		emphasize.dim("  d2 Areas/Health       - set destination for item 2"),
-		emphasize.dim("  d3 Projects/Tax 2024  - multi-word paths supported"),
-		emphasize.dim(
-			"  y1 y2 y3 a            - accept suggestions then approve all",
-		),
 		emphasize.dim("  3                     - approve item 3"),
 		emphasize.dim("  1,3,5                 - approve items 1, 3, and 5"),
+		emphasize.dim("  a                     - approve all visible"),
 		emphasize.dim(
 			"  A                     - approve all remaining (skip confirmation per page)",
 		),
@@ -704,17 +662,6 @@ export interface InteractiveOptions {
 
 	/** Session correlation ID for logging (optional) */
 	sessionCid?: string;
-}
-
-/**
- * Check if a suggestion has a destination set (required for execution).
- * Only create-note suggestions require destinations.
- */
-function hasDestination(suggestion: InboxSuggestion): boolean {
-	if (!isCreateNoteSuggestion(suggestion)) {
-		return true; // Non-create-note suggestions don't need destinations
-	}
-	return suggestion.suggestedDestination !== undefined;
 }
 
 /**
@@ -804,9 +751,6 @@ export async function runInteractiveLoop(
 	const approvalHistory: SuggestionId[] = []; // For undo
 	const skipped = new Set<SuggestionId>();
 	const currentSuggestions = [...suggestions];
-	// Track CLI-modified suggestions (e.g., when user accepts LLM destination)
-	// These take precedence over engine's cache during execution
-	const updatedSuggestions = new Map<string, InboxSuggestion>();
 	let isProcessing = false;
 	let currentPage = 0;
 
@@ -894,148 +838,6 @@ export async function runInteractiveLoop(
 		}
 
 		switch (command.type) {
-			case "accept-suggestion": {
-				// Copy LLM suggestion to suggestedDestination
-				const targetSuggestion = currentSuggestions.find(
-					(s) => originalIndices.get(s.id) === command.id,
-				);
-
-				if (!targetSuggestion) {
-					console.log(emphasize.error(CLI_MESSAGES.invalidItem(command.id)));
-					break;
-				}
-
-				if (!isCreateNoteSuggestion(targetSuggestion)) {
-					console.log(
-						emphasize.error(
-							`Item ${command.id} is not a create-note suggestion`,
-						),
-					);
-					break;
-				}
-
-				// Accept LLM's area or project suggestion
-				const llmSuggestedArea = targetSuggestion.llmSuggestedArea;
-				const llmSuggestedProject = targetSuggestion.llmSuggestedProject;
-				const llmSuggestion = llmSuggestedArea ?? llmSuggestedProject;
-
-				if (!llmSuggestion) {
-					console.log(
-						emphasize.error(
-							`Item ${command.id} has no LLM suggestion to accept`,
-						),
-					);
-					break;
-				}
-
-				// Resolve area/project name to full vault path
-				// e.g., "Health" → "02 Areas/Health"
-				let resolvedPath: string | undefined;
-				if (llmSuggestedArea) {
-					resolvedPath = areaPathMap.get(llmSuggestedArea.toLowerCase());
-				} else if (llmSuggestedProject) {
-					resolvedPath = projectPathMap.get(llmSuggestedProject.toLowerCase());
-				}
-
-				// If resolution failed, warn user but don't set destination
-				// Note will stay in inbox for manual sorting
-				if (!resolvedPath) {
-					console.log(
-						emphasize.warn(
-							`Could not resolve "${llmSuggestion}" to a vault path. Note will stay in inbox.`,
-						),
-					);
-					break;
-				}
-
-				// Update suggestion with resolved destination path
-				const updatedSuggestion: CreateNoteSuggestion = {
-					...targetSuggestion,
-					suggestedDestination: resolvedPath,
-				};
-
-				// Replace in current suggestions array
-				const originalIndex = currentSuggestions.findIndex(
-					(s) => s.id === targetSuggestion.id,
-				);
-				if (originalIndex >= 0) {
-					currentSuggestions[originalIndex] = updatedSuggestion;
-				}
-
-				// Track modified suggestion for engine.execute()
-				updatedSuggestions.set(updatedSuggestion.id, updatedSuggestion);
-
-				// Log destination acceptance
-				if (cliLogger && sessionCid) {
-					cliLogger.info("Accepted LLM destination", {
-						suggestionId: targetSuggestion.id,
-						destination: resolvedPath,
-						cid: sessionCid,
-					});
-				}
-
-				console.log(
-					emphasize.success(
-						`Accepted LLM suggestion for item ${command.id}: ${llmSuggestion} → ${resolvedPath}`,
-					),
-				);
-				break;
-			}
-
-			case "set-destination": {
-				// Set custom destination path
-				const targetSuggestion = currentSuggestions.find(
-					(s) => originalIndices.get(s.id) === command.id,
-				);
-
-				if (!targetSuggestion) {
-					console.log(emphasize.error(CLI_MESSAGES.invalidItem(command.id)));
-					break;
-				}
-
-				if (!isCreateNoteSuggestion(targetSuggestion)) {
-					console.log(
-						emphasize.error(
-							`Item ${command.id} is not a create-note suggestion`,
-						),
-					);
-					break;
-				}
-
-				// Update suggestion with custom destination
-				const updatedSuggestion: CreateNoteSuggestion = {
-					...targetSuggestion,
-					suggestedDestination: command.path,
-				};
-
-				// Replace in current suggestions array
-				const originalIndex = currentSuggestions.findIndex(
-					(s) => s.id === targetSuggestion.id,
-				);
-				if (originalIndex >= 0) {
-					currentSuggestions[originalIndex] = updatedSuggestion;
-				}
-
-				// Track modified suggestion for engine.execute()
-				updatedSuggestions.set(updatedSuggestion.id, updatedSuggestion);
-
-				// Log custom destination
-				if (cliLogger && sessionCid) {
-					cliLogger.info("Set custom destination", {
-						suggestionId: targetSuggestion.id,
-						destination: command.path,
-						cid: sessionCid,
-					});
-				}
-
-				console.log(
-					emphasize.success(
-						`Set destination for item ${command.id}: ${command.path}`,
-					),
-				);
-				break;
-			}
-
 			case "execute":
 				// Explicit execution command (Enter key when items approved)
 				if (cliLogger && sessionCid) {
@@ -1047,7 +849,6 @@ export async function runInteractiveLoop(
 				}
 				return {
 					approvedIds: Array.from(approved),
-					updatedSuggestions,
 				};
 
 			case "quit":
@@ -1061,7 +862,6 @@ export async function runInteractiveLoop(
 				console.log(emphasize.warn("\nQuitting without executing."));
 				return {
 					approvedIds: [],
-					updatedSuggestions: new Map(),
 				};
 
 			case "next-page":
@@ -1127,35 +927,18 @@ export async function runInteractiveLoop(
 				try {
 					// Track which IDs were added in this operation for potential rollback
 					const newlyApproved: SuggestionId[] = [];
-					const skippedNoDestination: number[] = [];
 
 					for (const s of displayable) {
-						if (!approved.has(s.id)) {
-							// Check if suggestion has required destination
-							if (!hasDestination(s)) {
-								const idx = originalIndices.get(s.id) ?? 0;
-								skippedNoDestination.push(idx);
-								console.log(emphasize.error(CLI_MESSAGES.noDestination(idx)));
-								continue;
-							}
-
+						if (!approved.has(s.id) && !skipped.has(s.id)) {
 							approved.add(s.id);
 							approvalHistory.push(s.id);
 							newlyApproved.push(s.id);
 						}
 					}
 
-					if (skippedNoDestination.length > 0) {
-						console.log(
-							emphasize.warn(
-								`\nSkipped ${skippedNoDestination.length} item(s) without destinations: ${skippedNoDestination.join(", ")}`,
-							),
-						);
-					}
-
 					if (newlyApproved.length === 0) {
 						console.log(
-							emphasize.dim(CLI_MESSAGES.noItemsApprovedWithDestinations),
+							emphasize.dim("All visible items already approved or skipped"),
 						);
 						break;
 					}
@@ -1192,7 +975,6 @@ export async function runInteractiveLoop(
 					) {
 						return {
 							approvedIds: Array.from(approved),
-							updatedSuggestions,
 						};
 					}
 
@@ -1239,35 +1021,18 @@ export async function runInteractiveLoop(
 				try {
 					// Track which IDs were added in this operation for potential rollback
 					const newlyApproved: SuggestionId[] = [];
-					const skippedNoDestination: number[] = [];
 
 					// Approve ALL items that aren't skipped (not just displayable/current page)
 					for (const s of currentSuggestions) {
 						if (!approved.has(s.id) && !skipped.has(s.id)) {
-							// Check if suggestion has required destination
-							if (!hasDestination(s)) {
-								const idx = originalIndices.get(s.id) ?? 0;
-								skippedNoDestination.push(idx);
-								console.log(emphasize.error(CLI_MESSAGES.noDestination(idx)));
-								continue;
-							}
-
 							approved.add(s.id);
 							approvalHistory.push(s.id);
 							newlyApproved.push(s.id);
 						}
 					}
 
-					if (skippedNoDestination.length > 0) {
-						console.log(
-							emphasize.warn(
-								`\nSkipped ${skippedNoDestination.length} item(s) without destinations: ${skippedNoDestination.join(", ")}`,
-							),
-						);
-					}
-
 					if (newlyApproved.length === 0) {
-						console.log(emphasize.dim(CLI_MESSAGES.noItemsApprovedWithSkipped));
+						console.log(emphasize.dim("All items already approved or skipped"));
 						break;
 					}
 
@@ -1306,7 +1071,6 @@ export async function runInteractiveLoop(
 					) {
 						return {
 							approvedIds: Array.from(approved),
-							updatedSuggestions,
 						};
 					}
 
@@ -1350,7 +1114,6 @@ export async function runInteractiveLoop(
 				try {
 					// Track which IDs were added in this operation for potential rollback
 					const newlyApproved: SuggestionId[] = [];
-					const skippedNoDestination: number[] = [];
 
 					for (const targetIndex of command.ids) {
 						// Find suggestion by original index, not filtered array position
@@ -1374,28 +1137,11 @@ export async function runInteractiveLoop(
 							continue;
 						}
 
-						// Check if suggestion has required destination
-						if (!hasDestination(targetSuggestion)) {
-							skippedNoDestination.push(targetIndex);
-							console.log(
-								emphasize.error(CLI_MESSAGES.noDestination(targetIndex)),
-							);
-							continue;
-						}
-
 						if (!approved.has(targetSuggestion.id)) {
 							approved.add(targetSuggestion.id);
 							approvalHistory.push(targetSuggestion.id);
 							newlyApproved.push(targetSuggestion.id);
 						}
-					}
-
-					if (skippedNoDestination.length > 0) {
-						console.log(
-							emphasize.warn(
-								`\nSkipped ${skippedNoDestination.length} item(s) without destinations: ${skippedNoDestination.join(", ")}`,
-							),
-						);
 					}
 
 					if (newlyApproved.length === 0) {
@@ -1435,7 +1181,6 @@ export async function runInteractiveLoop(
 					) {
 						return {
 							approvedIds: Array.from(approved),
-							updatedSuggestions,
 						};
 					}
 
@@ -1539,10 +1284,6 @@ export async function runInteractiveLoop(
 					if (originalIndex >= 0) {
 						currentSuggestions[originalIndex] = updated;
 					}
-					// Track modified suggestion for engine.execute()
-					// Note: engine.editWithPrompt also updates its cache, but we track here
-					// to ensure consistency if future changes alter that behavior
-					updatedSuggestions.set(updated.id, updated);
 					const elapsedMs = Date.now() - editStarted;
 					editSpinner.success({
 						text: `Updated item ${command.id} (${updated.confidence}) in ${Math.max(1, Math.round(elapsedMs))}ms`,
@@ -1606,7 +1347,6 @@ export async function runInteractiveLoop(
 
 	return {
 		approvedIds: Array.from(approved),
-		updatedSuggestions,
 	};
 }
 

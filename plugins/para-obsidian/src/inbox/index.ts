@@ -146,11 +146,18 @@ export type {
 	SuccessfulExecutionResult,
 	SuggestionId,
 } from "./types";
-
 // SuggestionId utilities, enum, and constants
+// Type guards for suggestion types
 export {
 	CONFIDENCE_THRESHOLDS,
 	createSuggestionId,
+	isChallengeSuggestion,
+	isCreateNoteSuggestion,
+	isLinkSuggestion,
+	isMoveSuggestion,
+	isRenameSuggestion,
+	isRoutableSuggestion,
+	isSkipSuggestion,
 	isValidSuggestionId,
 	RegistryVersion,
 	validateInboxEngineConfig,

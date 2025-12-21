@@ -316,6 +316,18 @@ export function isChallengeSuggestion(
 }
 
 /**
+ * Type guard to check if a suggestion can be routed (has a destination).
+ * Used to filter items that need user tagging in Obsidian before processing.
+ *
+ * - create-note actions require suggestedDestination to be routable
+ * - All other actions (move, rename, link, skip, challenge) are always routable
+ */
+export function isRoutableSuggestion(s: InboxSuggestion): boolean {
+	if (s.action !== "create-note") return true;
+	return isCreateNoteSuggestion(s) && s.suggestedDestination !== undefined;
+}
+
+/**
  * Result from a single processor (PDF, markdown, image).
  */
 export interface ProcessorResult {
@@ -613,26 +625,6 @@ export interface ExecuteOptions {
 	 * Useful for updating CLI spinners/status lines.
 	 */
 	readonly onProgress?: (progress: ExecuteProgress) => void | Promise<void>;
-
-	/**
-	 * Map of area names (lowercase) to their full vault paths.
-	 * Used to resolve area names from LLM suggestions to actual paths.
-	 */
-	readonly areaPathMap?: Map<string, string>;
-
-	/**
-	 * Map of project names (lowercase) to their full vault paths.
-	 * Used to resolve project names from LLM suggestions to actual paths.
-	 */
-	readonly projectPathMap?: Map<string, string>;
-
-	/**
-	 * Map of suggestion IDs to CLI-modified suggestions.
-	 * When present, these take precedence over the engine's internal cache.
-	 * This allows the CLI to modify suggestions (e.g., accept LLM destination)
-	 * and have those modifications respected during execution.
-	 */
-	readonly updatedSuggestions?: Map<string, InboxSuggestion>;
 
 	/**
 	 * Optional session-level correlation ID to link scan → execute operations.
@@ -991,8 +983,6 @@ export type CLICommand =
 	| { type: "approve-all" } // Approve all visible items (lowercase 'a')
 	| { type: "approve-remaining" } // Approve all non-skipped items across all pages (uppercase 'A')
 	| { type: "approve"; ids: number[] }
-	| { type: "accept-suggestion"; id: number } // Accept LLM suggestion for item (y<n>)
-	| { type: "set-destination"; id: number; path: string } // Set custom destination (d<n> <path>)
 	| { type: "edit"; id: number; prompt: string }
 	| { type: "skip"; id: number }
 	| { type: "view"; id: number }

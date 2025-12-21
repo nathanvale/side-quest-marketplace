@@ -759,6 +759,8 @@ async function handlePreviewMode(
  *
  * By default, shows a preview and asks for confirmation before executing.
  * Use --confirm to skip the prompt, or --dry-run to only show what would happen.
+ *
+ * Items without destinations (untagged files) are filtered out - consistent with interactive mode.
  */
 async function handleAutoMode(
 	engine: ReturnType<typeof createInboxEngine>,
@@ -769,6 +771,55 @@ async function handleAutoMode(
 	sessionCid: string,
 	scanMetrics: ScanMetrics | null,
 ): Promise<CommandResult> {
+	// Filter out unroutable suggestions (consistent with interactive mode)
+	const routableSuggestions = suggestions.filter((s) => {
+		if (s.action !== "create-note") return true;
+		return s.suggestedDestination !== undefined;
+	});
+
+	const skippedCount = suggestions.length - routableSuggestions.length;
+
+	// Report skipped items
+	if (skippedCount > 0 && !isJson) {
+		console.log(
+			color(
+				"yellow",
+				`⚠ Skipped ${skippedCount} item(s) without routing tags. Tag in Obsidian and re-run.`,
+			),
+		);
+	}
+
+	// Handle empty after filtering
+	if (routableSuggestions.length === 0) {
+		const metrics = await collectMetricsSummary();
+		if (isJson) {
+			console.log(
+				JSON.stringify(
+					withLogContext(
+						{
+							success: true,
+							mode: "auto",
+							message: "No routable items. All files need area/project tags.",
+							skippedForMissingTags: skippedCount,
+							sessionCid,
+						},
+						metrics,
+					),
+					null,
+					2,
+				),
+			);
+		} else {
+			console.log(
+				color(
+					"green",
+					"✓ No routable items. All files need area/project tags in Obsidian.",
+				),
+			);
+		}
+		return { success: true };
+	}
+
 	// Dry-run: show what would happen without executing
 	if (dryRun) {
 		const metrics = await collectMetricsSummary();
@@ -778,8 +829,9 @@ async function handleAutoMode(
 					withLogContext(
 						{
 							mode: "dry-run",
-							wouldProcess: suggestions.map((s) => s.id),
-							count: suggestions.length,
+							wouldProcess: routableSuggestions.map((s) => s.id),
+							count: routableSuggestions.length,
+							skippedForMissingTags: skippedCount,
 							success: true,
 							sessionCid,
 							scan: scanMetrics
@@ -801,9 +853,12 @@ async function handleAutoMode(
 			);
 		} else {
 			console.log(
-				color("cyan", `[dry-run] Would process ${suggestions.length} items:`),
+				color(
+					"cyan",
+					`[dry-run] Would process ${routableSuggestions.length} items:`,
+				),
 			);
-			for (const suggestion of suggestions) {
+			for (const suggestion of routableSuggestions) {
 				console.log(`  - ${suggestion.source} → ${suggestion.action}`);
 			}
 			if (metrics) {
@@ -819,15 +874,17 @@ async function handleAutoMode(
 
 	// Default: show preview and ask for confirmation (unless --confirm is passed)
 	if (!skipConfirm && !isJson) {
-		console.log(color("cyan", `\nPreview (${suggestions.length} items):\n`));
-		for (const suggestion of suggestions) {
+		console.log(
+			color("cyan", `\nPreview (${routableSuggestions.length} items):\n`),
+		);
+		for (const suggestion of routableSuggestions) {
 			console.log(`  ${color("green", "→")} ${suggestion.source}`);
 			console.log(`    ${color("dim", suggestion.action)}`);
 		}
 		console.log();
 
 		const proceed = await confirm({
-			message: `Execute these ${suggestions.length} moves?`,
+			message: `Execute these ${routableSuggestions.length} moves?`,
 			default: false,
 		});
 
@@ -842,12 +899,16 @@ async function handleAutoMode(
 	let executeMetrics: ExecuteMetrics | null = null;
 	if (isJson) {
 		batchResult = await engine.execute(
-			suggestions.map((s) => s.id),
+			routableSuggestions.map((s) => s.id),
 			{ sessionCid },
 		);
 		// TODO: Capture execute metrics from JSON mode
 	} else {
-		const result = await executeWithSpinner(engine, suggestions, sessionCid);
+		const result = await executeWithSpinner(
+			engine,
+			routableSuggestions,
+			sessionCid,
+		);
 		batchResult = result.batchResult;
 		executeMetrics = result.metrics;
 	}
@@ -1080,10 +1141,36 @@ async function handleInteractiveMode(
 		return { success: true };
 	}
 
-	// Run interactive loop - returns approved IDs and modified suggestions
-	const { approvedIds, updatedSuggestions } = await runInteractiveLoop({
+	// Filter out suggestions without destinations (untagged files)
+	const routableSuggestions = suggestions.filter((s) => {
+		// Only filter create-note suggestions
+		if (s.action !== "create-note") return true;
+		// Skip if no destination (user hasn't tagged in Obsidian yet)
+		return s.suggestedDestination !== undefined;
+	});
+
+	const skippedCount = suggestions.length - routableSuggestions.length;
+
+	// Show skip summary
+	if (skippedCount > 0) {
+		console.log(
+			color(
+				"yellow",
+				`\n⚠ Skipped ${skippedCount} item(s) without routing tags. Tag in Obsidian and re-run.`,
+			),
+		);
+	}
+
+	// If no routable items, exit early
+	if (routableSuggestions.length === 0) {
+		console.log(color("green", "\n✓ No routable items. All files need tags."));
+		return { success: true };
+	}
+
+	// Run interactive loop - returns approved IDs
+	const { approvedIds } = await runInteractiveLoop({
 		engine,
-		suggestions: suggestions,
+		suggestions: routableSuggestions,
 		vaultPath,
 		paraFolders,
 	});
@@ -1105,7 +1192,6 @@ async function handleInteractiveMode(
 
 			const batchResults = await engine.execute(approvedIds, {
 				sessionCid,
-				updatedSuggestions, // Pass CLI-modified suggestions to ensure destination changes are respected
 				onProgress: ({
 					percentComplete,
 					suggestionId,
