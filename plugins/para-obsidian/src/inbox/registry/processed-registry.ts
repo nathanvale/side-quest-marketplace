@@ -40,6 +40,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
+import pLimit from "p-limit";
 import { executeLogger } from "../../shared/logger";
 import { createInboxError } from "../shared/errors";
 import {
@@ -90,6 +91,13 @@ const log = {
 		}
 	},
 };
+
+// =============================================================================
+// Write Serialization
+// =============================================================================
+
+/** Limit to 1 concurrent write operation (prevents registry corruption from race conditions) */
+const writeLimit = pLimit(1);
 
 // =============================================================================
 // Registry Manager Interface
@@ -163,6 +171,15 @@ export interface RegistryManager {
 	 * @returns true if item was found and removed, false if not found
 	 */
 	removeItem(hash: string): boolean;
+
+	/**
+	 * Remove an item and save atomically.
+	 * Combines removeItem() + save() with write serialization.
+	 *
+	 * @param hash - SHA256 hash of file to remove
+	 * @returns true if item was found and removed, false if not found
+	 */
+	removeAndSave(hash: string): Promise<boolean>;
 
 	/**
 	 * Clear all items from the registry.
@@ -287,12 +304,28 @@ function releaseLock(lockPath: string): void {
 // =============================================================================
 
 /**
+ * Options for creating a registry manager.
+ */
+export interface RegistryOptions {
+	/**
+	 * If true (default), registry only tracks attachment processing.
+	 * If false, tracks all processed inbox items.
+	 */
+	restrictToAttachments?: boolean;
+}
+
+/**
  * Create a registry manager for a vault.
  *
  * @param vaultPath - Path to the Obsidian vault root
+ * @param options - Registry configuration options
  * @returns Registry manager instance
  */
-export function createRegistry(vaultPath: string): RegistryManager {
+export function createRegistry(
+	vaultPath: string,
+	options: RegistryOptions = {},
+): RegistryManager {
+	const { restrictToAttachments = true } = options;
 	const registryPath = join(vaultPath, REGISTRY_FILE);
 	const lockPath = `${registryPath}.lock`;
 
@@ -414,54 +447,68 @@ export function createRegistry(vaultPath: string): RegistryManager {
 	 *
 	 * Writes to a temporary file first, then atomically renames to the target path.
 	 * This prevents corruption if the process crashes mid-write.
+	 *
+	 * Uses write serialization via p-limit to prevent concurrent writes.
 	 */
 	async function save(): Promise<void> {
-		const tempPath = `${registryPath}.tmp`;
+		return writeLimit(async () => {
+			const tempPath = `${registryPath}.tmp`;
+			const lockStartTime = Date.now();
 
-		// Acquire lock before writing
-		await acquireLock(lockPath);
+			// Acquire lock before writing
+			await acquireLock(lockPath);
 
-		try {
-			// Ensure parent directory exists
-			const dir = dirname(registryPath);
-			if (!existsSync(dir)) {
-				mkdirSync(dir, { recursive: true });
+			const lockWaitTime = Date.now() - lockStartTime;
+			if (lockWaitTime > 100) {
+				log.warn("Long lock wait time", {
+					waitMs: lockWaitTime,
+					path: registryPath,
+				});
 			}
 
-			// Build registry object
-			const registry: ProcessedRegistry = {
-				version: REGISTRY_VERSION,
-				items: Array.from(items.values()),
-			};
+			try {
+				// Ensure parent directory exists
+				const dir = dirname(registryPath);
+				if (!existsSync(dir)) {
+					mkdirSync(dir, { recursive: true });
+				}
 
-			// Write to temporary file first
-			await Bun.write(tempPath, JSON.stringify(registry, null, 2));
+				// Build registry object
+				const registry: ProcessedRegistry = {
+					version: REGISTRY_VERSION,
+					items: Array.from(items.values()),
+				};
 
-			// Atomic rename (POSIX guarantees atomicity)
-			await rename(tempPath, registryPath);
+				// Write to temporary file first
+				await Bun.write(tempPath, JSON.stringify(registry, null, 2));
 
-			log.debug("Registry saved", {
-				items: items.size,
-				path: registryPath,
-			});
-		} catch (error) {
-			log.error("Failed to save registry", {
-				path: registryPath,
-				error: String(error),
-			});
-			throw createInboxError(
-				"REG_WRITE_FAILED",
-				{
-					cid: "registry-save",
-					operation: "save",
-					source: registryPath,
-				},
-				`Failed to save registry: ${String(error)}`,
-			);
-		} finally {
-			// Always release lock, even on error
-			releaseLock(lockPath);
-		}
+				// Atomic rename (POSIX guarantees atomicity)
+				await rename(tempPath, registryPath);
+
+				log.debug("Registry saved", {
+					items: items.size,
+					path: registryPath,
+					lockWaitMs: lockWaitTime,
+				});
+			} catch (error) {
+				log.error("Failed to save registry", {
+					path: registryPath,
+					error: String(error),
+				});
+				throw createInboxError(
+					"REG_WRITE_FAILED",
+					{
+						cid: "registry-save",
+						operation: "save",
+						source: registryPath,
+					},
+					`Failed to save registry: ${String(error)}`,
+				);
+			} finally {
+				// Always release lock, even on error
+				releaseLock(lockPath);
+			}
+		});
 	}
 
 	/**
@@ -507,12 +554,41 @@ export function createRegistry(vaultPath: string): RegistryManager {
 	}
 
 	/**
+	 * Validate that an item's type matches the expected type for the registry scope.
+	 * When restrictRegistryToAttachments is true, only attachment items are allowed.
+	 *
+	 * @param item - Item to validate
+	 * @param restrictToAttachments - If true, only attachment items allowed
+	 * @throws If item type doesn't match expected scope
+	 */
+	function validateItemType(
+		item: ProcessedItem,
+		restrictToAttachments: boolean,
+	): void {
+		if (restrictToAttachments) {
+			// In attachment-only mode, item must have movedAttachment and itemType should be "attachment"
+			if (!item.movedAttachment) {
+				throw new Error(
+					"Registry restricted to attachments: item must have movedAttachment field",
+				);
+			}
+			// If itemType is explicitly set, enforce it
+			if (item.itemType && item.itemType !== "attachment") {
+				throw new Error(
+					`Registry restricted to attachments: itemType must be "attachment", got "${item.itemType}"`,
+				);
+			}
+		}
+	}
+
+	/**
 	 * Mark a file as processed.
 	 * Validates required fields before insertion.
 	 *
 	 * @throws If sourceHash is not a 64-character hex string
 	 * @throws If sourcePath is empty
 	 * @throws If processedAt is not a valid ISO8601 timestamp
+	 * @throws If item type doesn't match registry scope (when restrictRegistryToAttachments enabled)
 	 */
 	function markProcessed(item: ProcessedItem): void {
 		// Validate sourceHash (SHA256 = 64 hex chars)
@@ -534,10 +610,14 @@ export function createRegistry(vaultPath: string): RegistryManager {
 			);
 		}
 
+		// Validate item type matches registry scope
+		validateItemType(item, restrictToAttachments);
+
 		items.set(item.sourceHash, item);
 		log.debug("Item marked processed", {
 			hash: `${item.sourceHash.slice(0, 8)}...`,
 			path: item.sourcePath,
+			itemType: item.itemType ?? "attachment",
 		});
 	}
 
@@ -606,6 +686,20 @@ export function createRegistry(vaultPath: string): RegistryManager {
 	}
 
 	/**
+	 * Remove an item and save atomically.
+	 * Uses write serialization to prevent race conditions.
+	 */
+	async function removeAndSave(hash: string): Promise<boolean> {
+		return writeLimit(async () => {
+			const existed = removeItem(hash);
+			if (existed) {
+				await save();
+			}
+			return existed;
+		});
+	}
+
+	/**
 	 * Clear all items from the registry.
 	 * Call save() after to persist the change.
 	 */
@@ -625,6 +719,7 @@ export function createRegistry(vaultPath: string): RegistryManager {
 		markInProgress,
 		clearInProgress,
 		removeItem,
+		removeAndSave,
 		clear,
 	};
 }

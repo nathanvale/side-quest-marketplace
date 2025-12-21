@@ -11,10 +11,10 @@ import { createSpinner } from "nanospinner";
 import { cliLogger } from "../../shared/logger";
 import { getAreaPathMap, getProjectPathMap } from "../core/vault/context";
 import type {
+	BatchResult,
 	CLICommand,
 	Confidence,
 	DetectionSource,
-	ExecutionResult,
 	InboxEngine,
 	InboxSuggestion,
 	SuggestionId,
@@ -1357,17 +1357,21 @@ export async function runInteractiveLoop(
 /**
  * Display execution results in a formatted summary.
  *
- * @param results - Array of execution results to display
+ * @param result - Batch result containing successful and failed executions
  *
  * @example
  * ```typescript
- * const results = await engine.execute(approvedIds);
- * displayResults(results);
+ * const result = await engine.execute(approvedIds);
+ * displayResults(result);
  * ```
  */
-export function displayResults(results: ExecutionResult[]): void {
-	const successes = results.filter((r) => r.success);
-	const failures = results.filter((r) => !r.success);
+export function displayResults(result: BatchResult): void {
+	const successes = result.successful;
+	const failures = Array.from(result.failed.entries()).map(([id, error]) => ({
+		success: false,
+		error: error.message,
+		suggestionId: id,
+	}));
 
 	console.log(`\n${"═".repeat(60)}`);
 	console.log(emphasize.info("Execution Complete"));
@@ -1380,11 +1384,14 @@ export function displayResults(results: ExecutionResult[]): void {
 			),
 		);
 		for (const result of successes) {
-			if (result.createdNote) {
-				console.log(`  → Created: ${result.createdNote}`);
-			}
-			if (result.movedAttachment) {
-				console.log(`  → Moved: ${result.movedAttachment}`);
+			// Type guard: successful array should only contain successful results
+			if (result.success) {
+				if (result.createdNote) {
+					console.log(`  → Created: ${result.createdNote}`);
+				}
+				if (result.movedAttachment) {
+					console.log(`  → Moved: ${result.movedAttachment}`);
+				}
 			}
 		}
 	}

@@ -16,6 +16,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { ParaObsidianConfig } from "../config/index";
+import { withFileLock } from "../shared/file-lock";
 import { gitLogger } from "../shared/logger";
 import {
 	assertGitRepo,
@@ -254,10 +255,16 @@ export async function startSession(
 /**
  * Tracks a file change in the current session.
  *
+ * **Security**: Uses file locking to prevent concurrent writes corrupting the session state.
+ * Multiple async operations may call trackChange concurrently during inbox processing.
+ *
  * @param session - Active session
  * @param filePath - Vault-relative path to modified file
  */
-export function trackChange(session: VaultSession, filePath: string): void {
+export async function trackChange(
+	session: VaultSession,
+	filePath: string,
+): Promise<void> {
 	if (session.finalized) {
 		if (gitLogger) {
 			gitLogger.warn`Attempted to track change on finalized session id=${session.id}`;
@@ -265,10 +272,15 @@ export function trackChange(session: VaultSession, filePath: string): void {
 		return;
 	}
 
-	session.modifiedFiles.add(filePath);
-	if (gitLogger) {
-		gitLogger.debug`Session ${session.id} tracking: ${filePath}`;
-	}
+	// File-level locking prevents concurrent modification corruption
+	// Multiple suggestions may execute in parallel and track changes simultaneously
+	const lockId = `session:${session.id}`;
+	await withFileLock(lockId, async () => {
+		session.modifiedFiles.add(filePath);
+		if (gitLogger) {
+			gitLogger.debug`Session ${session.id} tracking: ${filePath}`;
+		}
+	});
 }
 
 /**

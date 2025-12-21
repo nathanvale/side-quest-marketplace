@@ -133,8 +133,47 @@ export async function moveAttachment(
 		};
 	}
 
+	// Post-move hash verification
+	let postMoveHash: string;
+	try {
+		postMoveHash = await hashFile(finalDest);
+	} catch (error) {
+		if (logger) {
+			logger.error`Failed to verify moved file hash: ${error instanceof Error ? error.message : "unknown"} ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
+		}
+		return {
+			success: false,
+			error: `Failed to verify file after move: ${error instanceof Error ? error.message : "unknown"}`,
+		};
+	}
+
+	// Verify hash matches (corruption check)
+	if (postMoveHash !== hash) {
+		if (logger) {
+			logger.error`Hash mismatch after move! Expected ${getHashPrefix(hash)}, got ${getHashPrefix(postMoveHash)} ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
+		}
+
+		// Delete the incorrectly moved file (safer than trying to move it back)
+		try {
+			const { unlink } = await import("node:fs/promises");
+			await unlink(finalDest);
+			if (logger) {
+				logger.warn`Deleted corrupted file at ${vaultRelativePath} ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
+			}
+		} catch (deleteError) {
+			if (logger) {
+				logger.error`Failed to delete corrupted file: ${deleteError instanceof Error ? deleteError.message : "unknown"} ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
+			}
+		}
+
+		return {
+			success: false,
+			error: `Hash verification failed after move. File may have been corrupted during transfer. Original file remains in inbox.`,
+		};
+	}
+
 	if (logger) {
-		logger.info`Moved attachment to=${vaultRelativePath} ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
+		logger.info`Moved attachment to=${vaultRelativePath} hash verified ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
 	}
 
 	return {

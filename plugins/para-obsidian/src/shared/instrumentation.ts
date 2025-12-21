@@ -33,8 +33,30 @@
  * @module shared/instrumentation
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { Logger } from "@logtape/logtape";
 import { createCorrelationId, type SUBSYSTEMS } from "./logger.js";
+
+/**
+ * AsyncLocalStorage for automatic correlation ID propagation across async boundaries.
+ * This enables automatic parent-child relationship tracking without manual propagation.
+ */
+const asyncLocalStorage = new AsyncLocalStorage<{
+	cid: string;
+	parentCid?: string;
+}>();
+
+/**
+ * Get the current correlation context from AsyncLocalStorage.
+ * Returns undefined if not running within an observe/observeSync context.
+ *
+ * This is useful for manual correlation tracking in code that doesn't use observe/observeSync.
+ */
+export function getCurrentContext():
+	| { cid: string; parentCid?: string }
+	| undefined {
+	return asyncLocalStorage.getStore();
+}
 
 /** Message format required for MetricsCollector compatibility */
 const MCP_TOOL_RESPONSE = "MCP tool response" as const;
@@ -67,7 +89,15 @@ interface HistogramData {
 	name: string;
 	labels: MetricLabels;
 	observations: HistogramObservation[];
+	/** Incremental bucket counts for O(1) bucket queries */
+	buckets: number[];
 }
+
+/** Maximum number of observations to retain per histogram (FIFO cleanup) */
+const MAX_HISTOGRAM_OBSERVATIONS = 1000;
+
+/** Time-to-live for histogram observations in milliseconds (24 hours) */
+const HISTOGRAM_TTL_MS = 24 * 60 * 60 * 1000;
 
 /** In-memory counter storage */
 const counters = new Map<string, CounterData>();
@@ -116,8 +146,73 @@ export function incrementCounter(
 }
 
 /**
+ * Cleanup old observations from a histogram based on TTL and max size.
+ * Implements FIFO eviction to prevent unbounded memory growth.
+ *
+ * @param histogram - Histogram data to cleanup
+ */
+function cleanupHistogramObservations(histogram: HistogramData): void {
+	const now = Date.now();
+	const cutoffTime = now - HISTOGRAM_TTL_MS;
+
+	// Remove observations older than TTL
+	histogram.observations = histogram.observations.filter(
+		(obs) => obs.timestamp >= cutoffTime,
+	);
+
+	// If still over max size, remove oldest observations (FIFO)
+	if (histogram.observations.length > MAX_HISTOGRAM_OBSERVATIONS) {
+		const excess = histogram.observations.length - MAX_HISTOGRAM_OBSERVATIONS;
+		histogram.observations = histogram.observations.slice(excess);
+	}
+
+	// Recalculate buckets after cleanup
+	recalculateBuckets(histogram);
+}
+
+/**
+ * Recalculate histogram buckets from observations.
+ * Used after cleanup or when creating a new histogram.
+ *
+ * @param histogram - Histogram data to recalculate
+ */
+function recalculateBuckets(histogram: HistogramData): void {
+	histogram.buckets = new Array(SLO_HISTOGRAM_BUCKETS.length).fill(0);
+
+	for (const obs of histogram.observations) {
+		updateBucketsForValue(histogram.buckets, obs.value);
+	}
+}
+
+/**
+ * Update bucket counts for a single value (incremental update).
+ * This maintains cumulative bucket counts efficiently.
+ *
+ * @param buckets - Bucket array to update
+ * @param value - Value to add to buckets
+ */
+function updateBucketsForValue(buckets: number[], value: number): void {
+	// Find the first bucket this value fits into
+	for (let i = 0; i < SLO_HISTOGRAM_BUCKETS.length; i++) {
+		const boundary = SLO_HISTOGRAM_BUCKETS[i];
+		if (boundary !== undefined && value <= boundary) {
+			// Increment this bucket and all subsequent buckets (cumulative)
+			for (let j = i; j < SLO_HISTOGRAM_BUCKETS.length; j++) {
+				buckets[j] = (buckets[j] ?? 0) + 1;
+			}
+			break;
+		}
+	}
+}
+
+/**
  * Observe a value in a histogram metric.
  * Histograms track distributions of values using SLO-aligned buckets.
+ *
+ * This implementation includes:
+ * - FIFO cleanup: Keeps max 1000 recent observations per metric
+ * - TTL-based cleanup: Removes observations older than 24 hours
+ * - O(1) incremental bucket updates: No recalculation on query
  *
  * @param name - Metric name (e.g., "operation_duration_seconds")
  * @param value - Value to observe (in seconds for duration metrics)
@@ -143,11 +238,27 @@ export function observeHistogram(
 
 	if (existing) {
 		existing.observations.push(observation);
+		// Incremental bucket update (O(1) instead of O(n))
+		updateBucketsForValue(existing.buckets, value);
+
+		// Cleanup if needed (TTL or max size exceeded)
+		const needsCleanup =
+			existing.observations.length > MAX_HISTOGRAM_OBSERVATIONS ||
+			observation.timestamp - existing.observations[0]!.timestamp >
+				HISTOGRAM_TTL_MS;
+
+		if (needsCleanup) {
+			cleanupHistogramObservations(existing);
+		}
 	} else {
+		const buckets = new Array(SLO_HISTOGRAM_BUCKETS.length).fill(0);
+		updateBucketsForValue(buckets, value);
+
 		histograms.set(key, {
 			name,
 			labels,
 			observations: [observation],
+			buckets,
 		});
 	}
 }
@@ -174,6 +285,8 @@ export function getHistograms(): HistogramData[] {
  * Get histogram bucket counts for a specific metric.
  * Returns counts of observations that fall into each SLO-aligned bucket.
  *
+ * This is now O(1) instead of O(n²) because buckets are maintained incrementally.
+ *
  * @param name - Metric name
  * @param labels - Labels to filter by
  * @returns Object with bucket counts and bucket boundaries
@@ -192,23 +305,8 @@ export function getHistogramBuckets(
 		};
 	}
 
-	const buckets = new Array(SLO_HISTOGRAM_BUCKETS.length).fill(0);
-
-	// Count observations in each bucket (cumulative)
-	for (const obs of histogram.observations) {
-		for (let i = 0; i < SLO_HISTOGRAM_BUCKETS.length; i++) {
-			const boundary = SLO_HISTOGRAM_BUCKETS[i];
-			if (boundary !== undefined && obs.value <= boundary) {
-				// Increment this bucket and all subsequent buckets (cumulative)
-				for (let j = i; j < SLO_HISTOGRAM_BUCKETS.length; j++) {
-					buckets[j] = (buckets[j] ?? 0) + 1;
-				}
-				break;
-			}
-		}
-	}
-
-	return { buckets, boundaries: SLO_HISTOGRAM_BUCKETS };
+	// Return pre-calculated buckets (O(1) instead of O(n²))
+	return { buckets: [...histogram.buckets], boundaries: SLO_HISTOGRAM_BUCKETS };
 }
 
 /**
@@ -357,8 +455,32 @@ export interface ObserveOptions<T> {
 }
 
 /**
+ * Safe logging wrapper that prevents logging failures from crashing operations.
+ * All logger calls are wrapped in try-catch with console fallback.
+ *
+ * @param fn - Logging function to execute
+ */
+function safeLog(fn: () => void): void {
+	try {
+		fn();
+	} catch (error) {
+		// Fallback to console if logging fails
+		try {
+			console.error("[instrumentation] Logging failed:", error);
+		} catch {
+			// Silent fallback - logging is completely broken
+		}
+	}
+}
+
+/**
  * Adds observability to async operations WITHOUT changing return type.
  * Uses "MCP tool response" message format for MetricsCollector compatibility.
+ *
+ * Automatic correlation tracking:
+ * - Uses AsyncLocalStorage for automatic parent-child CID propagation
+ * - Manual parentCid in options takes precedence over AsyncLocalStorage
+ * - All nested operations automatically inherit the current operation's CID as parent
  *
  * Required properties for session summaries:
  * - tool: Tool name with subsystem prefix
@@ -391,63 +513,82 @@ export async function observe<T>(
 	options?: ObserveOptions<T>,
 ): Promise<T> {
 	const cid = createCorrelationId();
-	const parentCid = options?.parentCid;
+	// Priority: explicit parentCid > AsyncLocalStorage > undefined
+	const currentContext = getCurrentContext();
+	const parentCid = options?.parentCid ?? currentContext?.cid;
 	const startTime = Date.now();
 
-	try {
-		const result = await operation();
-		const durationMs = Math.max(0, Date.now() - startTime);
-		const success = options?.isSuccess ? options.isSuccess(result) : true;
+	// Run operation within AsyncLocalStorage context for automatic propagation
+	return asyncLocalStorage.run({ cid, parentCid }, async () => {
+		try {
+			const result = await operation();
+			const durationMs = Math.max(0, Date.now() - startTime);
+			const success = options?.isSuccess ? options.isSuccess(result) : true;
 
-		logger.info(MCP_TOOL_RESPONSE, {
-			cid,
-			...(parentCid && { parentCid }),
-			tool,
-			durationMs,
-			latencyBucket: getLatencyBucket(durationMs),
-			success,
-			timestamp: new Date().toISOString(),
-			...options?.context,
-		});
+			safeLog(() => {
+				logger.info(MCP_TOOL_RESPONSE, {
+					cid,
+					...(parentCid && { parentCid }),
+					tool,
+					durationMs,
+					latencyBucket: getLatencyBucket(durationMs),
+					success,
+					timestamp: new Date().toISOString(),
+					...options?.context,
+				});
+			});
 
-		// Record metrics
-		incrementCounter("operations_total", { tool, success });
-		observeHistogram("operation_duration_seconds", durationMs / 1000, { tool });
+			// Record metrics
+			incrementCounter("operations_total", { tool, success });
+			observeHistogram("operation_duration_seconds", durationMs / 1000, {
+				tool,
+			});
 
-		return result;
-	} catch (error: unknown) {
-		const durationMs = Math.max(0, Date.now() - startTime);
-		const errorMessage = error instanceof Error ? error.message : String(error);
-		const errorStack = error instanceof Error ? error.stack : undefined;
-		const errorCode = categorizeError(error);
-		const errorCategory = getErrorCategory(error);
+			return result;
+		} catch (error: unknown) {
+			const durationMs = Math.max(0, Date.now() - startTime);
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
+			const errorStack = error instanceof Error ? error.stack : undefined;
+			const errorCode = categorizeError(error);
+			const errorCategory = getErrorCategory(error);
 
-		logger.error(MCP_TOOL_RESPONSE, {
-			cid,
-			...(parentCid && { parentCid }),
-			tool,
-			durationMs,
-			latencyBucket: getLatencyBucket(durationMs),
-			success: false,
-			timestamp: new Date().toISOString(),
-			error: errorMessage,
-			errorCode,
-			errorCategory,
-			stack: errorStack,
-			...options?.context,
-		});
+			safeLog(() => {
+				logger.error(MCP_TOOL_RESPONSE, {
+					cid,
+					...(parentCid && { parentCid }),
+					tool,
+					durationMs,
+					latencyBucket: getLatencyBucket(durationMs),
+					success: false,
+					timestamp: new Date().toISOString(),
+					error: errorMessage,
+					errorCode,
+					errorCategory,
+					stack: errorStack,
+					...options?.context,
+				});
+			});
 
-		// Record metrics (error case)
-		incrementCounter("operations_total", { tool, success: false });
-		observeHistogram("operation_duration_seconds", durationMs / 1000, { tool });
+			// Record metrics (error case)
+			incrementCounter("operations_total", { tool, success: false });
+			observeHistogram("operation_duration_seconds", durationMs / 1000, {
+				tool,
+			});
 
-		throw error;
-	}
+			throw error;
+		}
+	});
 }
 
 /**
  * Sync version for non-async operations.
  * Same behavior as observe() but for synchronous functions.
+ *
+ * Automatic correlation tracking:
+ * - Uses AsyncLocalStorage for automatic parent-child CID propagation
+ * - Manual parentCid in options takes precedence over AsyncLocalStorage
+ * - All nested operations automatically inherit the current operation's CID as parent
  *
  * @throws Re-throws any error from the operation after logging
  */
@@ -458,56 +599,70 @@ export function observeSync<T>(
 	options?: ObserveOptions<T>,
 ): T {
 	const cid = createCorrelationId();
-	const parentCid = options?.parentCid;
+	// Priority: explicit parentCid > AsyncLocalStorage > undefined
+	const currentContext = getCurrentContext();
+	const parentCid = options?.parentCid ?? currentContext?.cid;
 	const startTime = Date.now();
 
-	try {
-		const result = operation();
-		const durationMs = Math.max(0, Date.now() - startTime);
-		const success = options?.isSuccess ? options.isSuccess(result) : true;
+	// Run operation within AsyncLocalStorage context for automatic propagation
+	return asyncLocalStorage.run({ cid, parentCid }, () => {
+		try {
+			const result = operation();
+			const durationMs = Math.max(0, Date.now() - startTime);
+			const success = options?.isSuccess ? options.isSuccess(result) : true;
 
-		logger.info(MCP_TOOL_RESPONSE, {
-			cid,
-			...(parentCid && { parentCid }),
-			tool,
-			durationMs,
-			latencyBucket: getLatencyBucket(durationMs),
-			success,
-			timestamp: new Date().toISOString(),
-			...options?.context,
-		});
+			safeLog(() => {
+				logger.info(MCP_TOOL_RESPONSE, {
+					cid,
+					...(parentCid && { parentCid }),
+					tool,
+					durationMs,
+					latencyBucket: getLatencyBucket(durationMs),
+					success,
+					timestamp: new Date().toISOString(),
+					...options?.context,
+				});
+			});
 
-		// Record metrics
-		incrementCounter("operations_total", { tool, success });
-		observeHistogram("operation_duration_seconds", durationMs / 1000, { tool });
+			// Record metrics
+			incrementCounter("operations_total", { tool, success });
+			observeHistogram("operation_duration_seconds", durationMs / 1000, {
+				tool,
+			});
 
-		return result;
-	} catch (error: unknown) {
-		const durationMs = Math.max(0, Date.now() - startTime);
-		const errorMessage = error instanceof Error ? error.message : String(error);
-		const errorStack = error instanceof Error ? error.stack : undefined;
-		const errorCode = categorizeError(error);
-		const errorCategory = getErrorCategory(error);
+			return result;
+		} catch (error: unknown) {
+			const durationMs = Math.max(0, Date.now() - startTime);
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
+			const errorStack = error instanceof Error ? error.stack : undefined;
+			const errorCode = categorizeError(error);
+			const errorCategory = getErrorCategory(error);
 
-		logger.error(MCP_TOOL_RESPONSE, {
-			cid,
-			...(parentCid && { parentCid }),
-			tool,
-			durationMs,
-			latencyBucket: getLatencyBucket(durationMs),
-			success: false,
-			timestamp: new Date().toISOString(),
-			error: errorMessage,
-			errorCode,
-			errorCategory,
-			stack: errorStack,
-			...options?.context,
-		});
+			safeLog(() => {
+				logger.error(MCP_TOOL_RESPONSE, {
+					cid,
+					...(parentCid && { parentCid }),
+					tool,
+					durationMs,
+					latencyBucket: getLatencyBucket(durationMs),
+					success: false,
+					timestamp: new Date().toISOString(),
+					error: errorMessage,
+					errorCode,
+					errorCategory,
+					stack: errorStack,
+					...options?.context,
+				});
+			});
 
-		// Record metrics (error case)
-		incrementCounter("operations_total", { tool, success: false });
-		observeHistogram("operation_duration_seconds", durationMs / 1000, { tool });
+			// Record metrics (error case)
+			incrementCounter("operations_total", { tool, success: false });
+			observeHistogram("operation_duration_seconds", durationMs / 1000, {
+				tool,
+			});
 
-		throw error;
-	}
+			throw error;
+		}
+	});
 }

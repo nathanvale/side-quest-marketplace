@@ -54,10 +54,10 @@ Based on the argument `$1`:
 
 ### 3. Dashboard Mode (No Argument)
 
-Show all SLOs with health status:
+Show all SLOs with health status (limited to 5000 most recent events):
 
 ```bash
-cat ~/.claude/logs/slo-events.jsonl | jq -s '
+tail -n 5000 ~/.claude/logs/slo-events.jsonl | jq -s '
   # Define metadata mapping
   {
     scan_latency: {target: 0.95, threshold: 60000, unit: "ms", window: "30d", error_budget: 0.05},
@@ -149,8 +149,8 @@ case "$1" in
     ;;
 esac
 
-# Filter events for specific SLO
-cat ~/.claude/logs/slo-events.jsonl | jq -s --arg slo "$1" '
+# Filter events for specific SLO (limit to 5000 most recent)
+tail -n 5000 ~/.claude/logs/slo-events.jsonl | jq -s --arg slo "$1" '
   [.[] | select(.sloName == $slo)] as $events |
 
   # Define SLO metadata
@@ -271,7 +271,8 @@ Show only recent SLO violations:
 
 ```bash
 # Get violations in last 7 days (7 * 24 * 60 * 60 * 1000 = 604800000 ms)
-cat ~/.claude/logs/slo-events.jsonl | jq -s '
+# Limit to 5000 most recent events to prevent OOM
+tail -n 5000 ~/.claude/logs/slo-events.jsonl | jq -s '
   # Calculate cutoff time
   ((now * 1000) - 604800000) as $cutoff |
 
@@ -346,6 +347,22 @@ Burn rate indicates how fast error budget is being consumed:
 - **✓ PASSING** - Compliance >= target
 - **⚠️ AT RISK** - Error budget < 30%
 - **✗ BREACHED** - Compliance < target
+
+---
+
+## Implementation Notes
+
+**Memory Safety:**
+- **CRITICAL:** Use `tail -n 5000` before `jq -s` to prevent OOM on large logs
+- SLO events file can grow unbounded - always limit before slurp mode
+- For streaming analysis, use `jq '.'` instead of `jq -s '.'`
+- 5000 events ~= 30 days of high-volume operations (safe limit)
+
+**File Location:**
+- Default: `~/.claude/logs/slo-events.jsonl`
+- Each line is a self-contained JSON object (JSONL format)
+- Events are appended chronologically (newest at bottom)
+- `tail` reads from end, so we get most recent events first
 
 ---
 

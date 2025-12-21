@@ -1224,7 +1224,7 @@ async function handleInteractiveMode(
 			execSpinner.success({
 				text: `${finalBar}${statsStr} in ${elapsed}s`,
 			});
-			displayResults(batchResults.successful);
+			displayResults(batchResults);
 
 			const metrics = await collectMetricsSummary();
 			if (metrics) {

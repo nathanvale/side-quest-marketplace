@@ -117,10 +117,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	// Note: fileIO concurrency is defined but execution is sequential by design
 	// to ensure registry saves are atomic and don't conflict. The config option
 	// is preserved for future parallel execution support.
-	const resolvedConfig: Required<
-		Omit<InboxEngineConfig, "llmModel" | "concurrency" | "llmClient">
-	> &
-		Pick<InboxEngineConfig, "llmModel" | "concurrency" | "llmClient"> = {
+	const resolvedConfig = {
 		vaultPath: config.vaultPath,
 		inboxFolder: config.inboxFolder ?? "00 Inbox",
 		attachmentsFolder: config.attachmentsFolder ?? "Attachments",
@@ -133,7 +130,8 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			llmCalls: 3,
 			fileIO: 10,
 		},
-	};
+		restrictRegistryToAttachments: config.restrictRegistryToAttachments ?? true,
+	} as const;
 
 	// Use injected LLM client if provided, otherwise use real callLLM
 	const llmClient = resolvedConfig.llmClient ?? callLLM;
@@ -192,7 +190,10 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	async function loadAndCleanRegistry(
 		sessionCid: string,
 	): Promise<ReturnType<typeof createRegistry>> {
-		const registry = createRegistry(resolvedConfig.vaultPath);
+		const registry = createRegistry(resolvedConfig.vaultPath, {
+			restrictToAttachments:
+				resolvedConfig.restrictRegistryToAttachments ?? true,
+		});
 		await registry.load();
 		await cleanupOrphanedStaging(resolvedConfig.vaultPath, registry, {
 			sessionCid,
@@ -1229,7 +1230,10 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				);
 
 				// Load the registry for updating after successful execution
-				const registry = createRegistry(resolvedConfig.vaultPath);
+				const registry = createRegistry(resolvedConfig.vaultPath, {
+					restrictToAttachments:
+						resolvedConfig.restrictRegistryToAttachments ?? true,
+				});
 				await registry.load();
 
 				const successful: ExecutionResult[] = [];
@@ -1290,14 +1294,14 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 							// Track file changes in session for batch commit
 							// Track source file deletion for git staging
 							if (result.movedFrom) {
-								trackChange(session, result.movedFrom);
+								await trackChange(session, result.movedFrom);
 							}
 							// Track destination files for git staging
 							if (result.createdNote) {
-								trackChange(session, result.createdNote);
+								await trackChange(session, result.createdNote);
 							}
 							if (result.movedAttachment) {
-								trackChange(session, result.movedAttachment);
+								await trackChange(session, result.movedAttachment);
 							}
 						} else {
 							// Track as failed even though executeSuggestion returned a result

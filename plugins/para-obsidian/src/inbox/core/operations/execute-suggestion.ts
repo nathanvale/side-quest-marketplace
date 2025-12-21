@@ -9,6 +9,7 @@
  * @module inbox/core/operations/execute-suggestion
  */
 
+import { realpathSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import {
 	ensureDirSync,
@@ -25,6 +26,7 @@ import {
 } from "../../../frontmatter/parse";
 // Note: autoCommitChanges removed - commits are now batched at session level in engine.ts
 import { createFromTemplate, injectSections } from "../../../notes/create";
+import { withFileLock } from "../../../shared/file-lock";
 import { resolveVaultPath } from "../../../shared/fs";
 import { categorizeError, observe } from "../../../shared/instrumentation";
 import { executeLogger } from "../../../shared/logger";
@@ -57,6 +59,9 @@ export interface ExecuteSuggestionConfig {
 /**
  * Validate that a destination path is safe and doesn't escape the vault boundary.
  *
+ * **Security**: Uses realpath canonicalization to prevent symlink-based path traversal attacks.
+ * This defends against attackers creating symlinks that escape the vault boundary.
+ *
  * @param destination - The destination path to validate
  * @param vaultPath - The vault root path
  * @throws Error if path contains unsafe patterns or escapes vault
@@ -71,11 +76,43 @@ function validatePathSafety(destination: string, vaultPath: string): void {
 		throw new Error(`Unsafe path pattern in destination: "${destination}"`);
 	}
 
-	// Ensure resolved path stays inside vault
+	// Resolve symbolic links and normalize paths to prevent symlink attacks
 	const resolved = resolve(vaultPath, destination);
 	const vaultResolved = resolve(vaultPath);
 
-	if (!resolved.startsWith(`${vaultResolved}/`) && resolved !== vaultResolved) {
+	// Canonicalize paths using realpath if they exist
+	// This prevents symlink-based path traversal (e.g., symlink pointing outside vault)
+	let canonicalResolved = resolved;
+	let canonicalVault = vaultResolved;
+
+	try {
+		// Try to canonicalize vault path (should always exist)
+		canonicalVault = realpathSync(vaultResolved);
+	} catch {
+		// Vault doesn't exist - use resolved path (safe for validation)
+	}
+
+	try {
+		// Try to canonicalize destination (may not exist yet)
+		// Walk up to find existing parent and canonicalize from there
+		let current = resolved;
+		while (!pathExistsSync(current) && current !== vaultResolved) {
+			current = dirname(current);
+		}
+		if (pathExistsSync(current)) {
+			const canonicalParent = realpathSync(current);
+			const relativeSuffix = resolved.slice(current.length);
+			canonicalResolved = canonicalParent + relativeSuffix;
+		}
+	} catch {
+		// Path doesn't exist yet - use resolved path (creation will fail if symlink attack)
+	}
+
+	// Check boundary using canonicalized paths
+	if (
+		!canonicalResolved.startsWith(`${canonicalVault}/`) &&
+		canonicalResolved !== canonicalVault
+	) {
 		throw new Error(
 			`Path traversal detected: "${destination}" escapes vault boundary`,
 		);
@@ -511,28 +548,22 @@ export async function executeSuggestion(
 			// Now move the file (bookmark or attachment)
 			ensureDirSync(dirname(actualDestination));
 
-			// TOCTOU protection: Check file still exists before moving
-			// File was hashed earlier, but could have been deleted by another process
-			if (!pathExistsSync(sourcePath)) {
-				// ROLLBACK: Clean up staging note and in-progress marker
-				await rollbackOperation(
-					config.vaultPath,
-					stagingNotePath,
-					hash,
-					registry,
-					cid,
-				);
-
-				return {
-					suggestionId: suggestion.id,
-					success: false,
-					action: suggestion.action,
-					error: `Source file no longer exists: ${sourcePath}. It may have been moved or deleted by another process.`,
-				};
-			}
-
+			// File-level locking to prevent TOCTOU race conditions
+			// Protects against file being deleted/modified between existence check and move
+			const lockId = `file:${basename(sourcePath)}`;
 			try {
-				await moveFile(sourcePath, actualDestination);
+				await withFileLock(lockId, async () => {
+					// TOCTOU protection: Check file still exists before moving
+					// File was hashed earlier, but could have been deleted by another process
+					if (!pathExistsSync(sourcePath)) {
+						throw new Error(
+							`Source file no longer exists: ${sourcePath}. It may have been moved or deleted by another process.`,
+						);
+					}
+
+					// Move file atomically while holding lock
+					await moveFile(sourcePath, actualDestination);
+				});
 			} catch (error) {
 				const _errorCode = categorizeError(error);
 				// ROLLBACK: Clean up staging note and in-progress marker

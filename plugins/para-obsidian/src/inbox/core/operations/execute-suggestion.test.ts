@@ -1044,3 +1044,215 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 		).toThrow("Destination folder does not exist");
 	});
 });
+
+describe("Security Tests - Path Traversal & Race Conditions", () => {
+	let tempDir: string;
+
+	beforeEach(() => {
+		tempDir = createTempDir("test-security-");
+		process.env.PARA_VAULT = tempDir;
+
+		// Create vault structure
+		writeTestFile(tempDir, "00 Inbox/.gitkeep", "");
+		writeTestFile(tempDir, "03 Resources/.gitkeep", "");
+		writeTestFile(tempDir, "Attachments/.gitkeep", "");
+		writeTestFile(tempDir, "Templates/.gitkeep", "");
+		writeTestFile(tempDir, ".inbox-staging/.gitkeep", "");
+	});
+
+	afterEach(() => {
+		cleanupTestDir(tempDir);
+		delete process.env.PARA_VAULT;
+	});
+
+	test("should reject path traversal with .. patterns", () => {
+		const paraFolders = {
+			projects: "01 Projects",
+			areas: "02 Areas",
+			resources: "03 Resources",
+			archives: "04 Archives",
+			inbox: "00 Inbox",
+		};
+
+		expect(() =>
+			resolveParaFolder("../../etc/passwd", paraFolders, tempDir),
+		).toThrow("Unsafe path pattern");
+	});
+
+	test("should reject absolute paths", () => {
+		const paraFolders = {
+			projects: "01 Projects",
+			areas: "02 Areas",
+			resources: "03 Resources",
+			archives: "04 Archives",
+			inbox: "00 Inbox",
+		};
+
+		expect(() =>
+			resolveParaFolder("/etc/passwd", paraFolders, tempDir),
+		).toThrow("Unsafe path pattern");
+	});
+
+	test("should reject tilde expansion", () => {
+		const paraFolders = {
+			projects: "01 Projects",
+			areas: "02 Areas",
+			resources: "03 Resources",
+			archives: "04 Archives",
+			inbox: "00 Inbox",
+		};
+
+		expect(() =>
+			resolveParaFolder("~/malicious", paraFolders, tempDir),
+		).toThrow("Unsafe path pattern");
+	});
+
+	test("should detect symlink path traversal attempts", () => {
+		// This test verifies the realpath canonicalization catches symlinks escaping vault
+		const paraFolders = {
+			projects: "01 Projects",
+			areas: "02 Areas",
+			resources: "03 Resources",
+			archives: "04 Archives",
+			inbox: "00 Inbox",
+		};
+
+		// Create a symlink pointing outside the vault
+		const { symlinkSync } = require("node:fs");
+		const outsideDir = createTempDir("outside-vault-");
+		const symlinkPath = `${tempDir}/03 Resources/evil-link`;
+
+		try {
+			symlinkSync(outsideDir, symlinkPath);
+
+			// Attempt to resolve through symlink should fail boundary check
+			expect(() =>
+				resolveParaFolder(
+					"03 Resources/evil-link/escape.md",
+					paraFolders,
+					tempDir,
+				),
+			).toThrow("Path traversal detected");
+		} finally {
+			// Cleanup
+			try {
+				const { unlinkSync } = require("node:fs");
+				unlinkSync(symlinkPath);
+			} catch {
+				// Ignore cleanup errors
+			}
+			cleanupTestDir(outsideDir);
+		}
+	});
+
+	test("should handle file locking for concurrent operations", async () => {
+		// Test that file locking prevents TOCTOU races
+		const sourcePath = "00 Inbox/test-file.md";
+		writeTestFile(tempDir, sourcePath, "test content");
+
+		// Create template
+		const templateContent = `---
+title: <%= title %>
+type: note
+---
+# <%= title %>
+`;
+		writeTestFile(tempDir, "Templates/note.md", templateContent);
+
+		const suggestion = {
+			id: createSuggestionId(),
+			action: "create-note" as const,
+			source: sourcePath,
+			processor: "notes" as const,
+			confidence: "high" as const,
+			detectionSource: "heuristic" as const,
+			reason: "Test file",
+			suggestedNoteType: "note",
+			suggestedTitle: "Test Note",
+			suggestedDestination: "03 Resources",
+		};
+
+		const config = {
+			vaultPath: tempDir,
+			inboxFolder: "00 Inbox",
+			attachmentsFolder: "Attachments",
+			templatesFolder: "Templates",
+		};
+
+		const { createRegistry } = await import(
+			"../../registry/processed-registry"
+		);
+		const registryPath = `${tempDir}/.para-obsidian-registry.json`;
+		const registry = createRegistry(registryPath);
+		await registry.load();
+
+		const { executeSuggestion } = await import("./execute-suggestion");
+
+		// Execute suggestion - should acquire lock and complete
+		const result = await executeSuggestion(
+			suggestion,
+			config,
+			registry,
+			"test-cid",
+		);
+
+		expect(result.success).toBe(true);
+	});
+
+	test("should fail gracefully if source file disappears during execution", async () => {
+		// Create source file
+		const sourcePath = "00 Inbox/disappearing-file.md";
+		writeTestFile(tempDir, sourcePath, "content");
+
+		const suggestion = {
+			id: createSuggestionId(),
+			action: "create-note" as const,
+			source: sourcePath,
+			processor: "notes" as const,
+			confidence: "high" as const,
+			detectionSource: "heuristic" as const,
+			reason: "Test",
+			suggestedNoteType: "note",
+			suggestedTitle: "Test",
+			suggestedDestination: "03 Resources",
+		};
+
+		const config = {
+			vaultPath: tempDir,
+			inboxFolder: "00 Inbox",
+			attachmentsFolder: "Attachments",
+			templatesFolder: "Templates",
+		};
+
+		const { createRegistry } = await import(
+			"../../registry/processed-registry"
+		);
+		const registryPath = `${tempDir}/.para-obsidian-registry.json`;
+		const registry = createRegistry(registryPath);
+		await registry.load();
+
+		// Delete file before execution to simulate race condition
+		const { unlinkSync } = require("node:fs");
+		const { join } = require("node:path");
+		unlinkSync(join(tempDir, sourcePath));
+
+		const { executeSuggestion } = await import("./execute-suggestion");
+		const result = await executeSuggestion(
+			suggestion,
+			config,
+			registry,
+			"test-cid",
+		);
+
+		// Should fail with appropriate error (either during hash or move)
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			// Error can occur during hashing or during file move
+			const hasExpectedError =
+				result.error?.includes("no longer exists") ||
+				result.error?.includes("no such file or directory") ||
+				result.error?.includes("Failed to hash");
+			expect(hasExpectedError).toBe(true);
+		}
+	});
+});

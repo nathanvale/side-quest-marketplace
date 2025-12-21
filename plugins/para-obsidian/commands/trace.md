@@ -32,11 +32,13 @@ grep "$1" ~/.claude/logs/para-obsidian.jsonl | wc -l
 
 If the count is 0, skip to Step 6 (Handle Missing Logs). Otherwise continue.
 
-Fetch all logs for this session and parse as JSON array:
+Fetch logs for this session (limited to 1000 most recent entries) and parse as JSON stream:
 
 ```bash
-grep "$1" ~/.claude/logs/para-obsidian.jsonl | jq -s 'sort_by(.["@timestamp"])'
+grep "$1" ~/.claude/logs/para-obsidian.jsonl | tail -n 1000 | jq -c 'select(.) | .' | jq -s 'sort_by(.["@timestamp"])'
 ```
+
+**Note:** Result limit prevents memory exhaustion on large log files. To analyze older entries, filter by timestamp or use smaller correlation ID queries.
 
 **Note:** Log file location defaults to `~/.claude/logs/para-obsidian.jsonl`
 - Override with: `PARA_OBSIDIAN_LOG_DIR=/custom/path`
@@ -243,9 +245,16 @@ grep '"sessionCid"' ~/.claude/logs/para-obsidian.jsonl | jq -r '[."@timestamp", 
 ## Implementation Notes
 
 **JSON Parsing:**
-- Use `jq -s '.'` to parse multiple JSON lines into array
+- **CRITICAL:** Use `tail -n 1000` before `jq -s` to prevent OOM on large logs
+- Stream mode: `jq -c 'select(.) | .'` filters and compacts before slurp
+- Slurp mode: `jq -s '.'` only after limiting results (safe for arrays)
 - Sort by timestamp: `sort_by(.["@timestamp"])`
 - Group by field: `group_by(.properties.cid)`
+
+**Memory Safety:**
+- Always limit grep results before using `jq -s` (slurp mode)
+- For large result sets, use streaming `jq '.'` instead of `jq -s '.'`
+- Maximum 1000 log entries processed to prevent resource exhaustion
 
 **Duration Formatting:**
 - <1000ms: Display as "XXXms"

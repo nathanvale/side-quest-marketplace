@@ -686,6 +686,14 @@ export interface ProcessedItem {
 
 	/** Flag indicating operation is still in progress (Layer 2 tracking) */
 	readonly inProgress?: boolean;
+
+	/**
+	 * Type of item being tracked (for registry scope enforcement).
+	 * - "attachment": File moved to attachments folder
+	 * - "note": Created note from inbox item
+	 * - "all": Any processed inbox item (legacy behavior)
+	 */
+	readonly itemType?: "attachment" | "note" | "all";
 }
 
 /**
@@ -781,6 +789,15 @@ export interface InboxEngineConfig {
 		/** Max concurrent file I/O operations (default: 10) */
 		readonly fileIO?: number;
 	};
+
+	/**
+	 * If true (default), registry only tracks attachment processing.
+	 * If false, tracks all processed inbox items.
+	 *
+	 * Breaking change in Phase 2: Previous behavior tracked all items.
+	 * Now defaults to attachment-only tracking to reduce registry bloat.
+	 */
+	readonly restrictRegistryToAttachments?: boolean;
 }
 
 /**

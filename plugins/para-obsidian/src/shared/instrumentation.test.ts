@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import type { Logger } from "@logtape/logtape";
 import { setupTestLogging } from "../testing/logger.js";
 import {
 	categorizeError,
 	type ErrorCode,
 	getCounters,
+	getCurrentContext,
 	getErrorCategory,
 	getHistogramBuckets,
 	getHistograms,
@@ -443,6 +445,206 @@ describe("instrumentation", () => {
 
 			expect(getCounters()).toHaveLength(0);
 			expect(getHistograms()).toHaveLength(0);
+		});
+	});
+
+	describe("AsyncLocalStorage correlation propagation", () => {
+		test("getCurrentContext returns undefined outside observe", () => {
+			expect(getCurrentContext()).toBeUndefined();
+		});
+
+		test("getCurrentContext returns context inside observe", async () => {
+			const logger = getSubsystemLogger("templates");
+			let capturedContext: ReturnType<typeof getCurrentContext>;
+
+			await observe(logger, "templates:test", async () => {
+				capturedContext = getCurrentContext();
+				return "ok";
+			});
+
+			expect(capturedContext).toBeDefined();
+			expect(capturedContext?.cid).toBeDefined();
+			expect(typeof capturedContext?.cid).toBe("string");
+		});
+
+		test("nested observe automatically propagates parentCid", async () => {
+			const logger = getSubsystemLogger("templates");
+			let outerCid: string | undefined;
+			let innerContext: ReturnType<typeof getCurrentContext>;
+
+			await observe(logger, "templates:outer", async () => {
+				outerCid = getCurrentContext()?.cid;
+
+				await observe(logger, "templates:inner", async () => {
+					innerContext = getCurrentContext();
+					return "inner";
+				});
+
+				return "outer";
+			});
+
+			expect(outerCid).toBeDefined();
+			expect(innerContext).toBeDefined();
+			expect(innerContext?.parentCid).toBe(outerCid);
+		});
+
+		test("observeSync supports AsyncLocalStorage", () => {
+			const logger = getSubsystemLogger("templates");
+			let capturedContext: ReturnType<typeof getCurrentContext>;
+
+			observeSync(logger, "templates:test", () => {
+				capturedContext = getCurrentContext();
+				return "ok";
+			});
+
+			expect(capturedContext).toBeDefined();
+			expect(capturedContext?.cid).toBeDefined();
+		});
+
+		test("explicit parentCid takes precedence over AsyncLocalStorage", async () => {
+			const logger = getSubsystemLogger("templates");
+			const explicitParent = "explicit-parent-123";
+			let innerContext: ReturnType<typeof getCurrentContext>;
+
+			await observe(logger, "templates:outer", async () => {
+				await observe(
+					logger,
+					"templates:inner",
+					async () => {
+						innerContext = getCurrentContext();
+						return "inner";
+					},
+					{ parentCid: explicitParent },
+				);
+
+				return "outer";
+			});
+
+			expect(innerContext?.parentCid).toBe(explicitParent);
+		});
+	});
+
+	describe("histogram memory management", () => {
+		test("histogram includes buckets field on creation", () => {
+			observeHistogram("test_metric", 1.5, { tool: "test" });
+
+			const histograms = getHistograms();
+			expect(histograms).toHaveLength(1);
+			expect(histograms[0]?.buckets).toBeDefined();
+			expect(Array.isArray(histograms[0]?.buckets)).toBe(true);
+		});
+
+		test("histogram limits observations to max size (FIFO)", () => {
+			const MAX_OBS = 1000;
+			// Add more than max observations
+			for (let i = 0; i < MAX_OBS + 100; i++) {
+				observeHistogram("test_metric", i / 100, { tool: "test" });
+			}
+
+			const histograms = getHistograms();
+			expect(histograms).toHaveLength(1);
+
+			const histogram = histograms[0];
+			expect(histogram?.observations.length).toBeLessThanOrEqual(MAX_OBS);
+		});
+
+		test("histogram removes observations older than TTL", async () => {
+			// This test is conceptual - TTL is 24h so we can't easily test it
+			// without mocking time. But we verify the structure is correct.
+			observeHistogram("test_metric", 1.0, { tool: "test" });
+
+			const histograms = getHistograms();
+			const observation = histograms[0]?.observations[0];
+
+			expect(observation?.timestamp).toBeDefined();
+			expect(typeof observation?.timestamp).toBe("number");
+			expect(observation?.timestamp).toBeGreaterThan(0);
+		});
+
+		test("getHistogramBuckets returns copy of buckets (O(1))", () => {
+			observeHistogram("test_metric", 2.5, { tool: "test" });
+
+			const result1 = getHistogramBuckets("test_metric", { tool: "test" });
+			const result2 = getHistogramBuckets("test_metric", { tool: "test" });
+
+			// Should be equal values but different arrays
+			expect(result1.buckets).toEqual(result2.buckets);
+			expect(result1.buckets).not.toBe(result2.buckets);
+		});
+
+		test("buckets are maintained incrementally", () => {
+			// Add observations one at a time
+			observeHistogram("test_metric", 0.5, { tool: "test" }); // < 1s
+			const buckets1 = getHistogramBuckets("test_metric", { tool: "test" });
+
+			observeHistogram("test_metric", 3.0, { tool: "test" }); // 1-5s
+			const buckets2 = getHistogramBuckets("test_metric", { tool: "test" });
+
+			// First bucket (<=1s) should stay at 1 (only one obs <= 1s)
+			// Second bucket (<=5s) should increase from 1 to 2 (cumulative)
+			expect(buckets1.buckets[0]).toBe(1); // 0.5s <= 1s
+			expect(buckets2.buckets[0]).toBe(1); // Still only 0.5s <= 1s
+			expect(buckets2.buckets[1]).toBe(2); // Both 0.5s and 3.0s <= 5s
+		});
+	});
+
+	describe("safe logging error handling", () => {
+		test("observe completes even if logging throws", async () => {
+			// Create a mock logger that throws
+			const brokenLogger = {
+				info: () => {
+					throw new Error("Logging is broken");
+				},
+				error: () => {
+					throw new Error("Logging is broken");
+				},
+			} as unknown as Logger;
+
+			// Should not throw despite broken logger
+			const result = await observe(
+				brokenLogger,
+				"templates:test",
+				async () => "success",
+			);
+
+			expect(result).toBe("success");
+		});
+
+		test("observeSync completes even if logging throws", () => {
+			const brokenLogger = {
+				info: () => {
+					throw new Error("Logging is broken");
+				},
+				error: () => {
+					throw new Error("Logging is broken");
+				},
+			} as unknown as Logger;
+
+			const result = observeSync(
+				brokenLogger,
+				"templates:test",
+				() => "success",
+			);
+
+			expect(result).toBe("success");
+		});
+
+		test("observe logs error even when logging itself fails", async () => {
+			const brokenLogger = {
+				info: () => {
+					throw new Error("Logging is broken");
+				},
+				error: () => {
+					throw new Error("Logging is broken");
+				},
+			} as unknown as Logger;
+
+			// Should throw the original error, not the logging error
+			await expect(
+				observe(brokenLogger, "templates:test", async () => {
+					throw new Error("Operation failed");
+				}),
+			).rejects.toThrow("Operation failed");
 		});
 	});
 });

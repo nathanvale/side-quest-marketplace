@@ -165,15 +165,13 @@ export async function executeSuggestion(
 	// Step 4: Cleanup registry for moved attachments
 	// Remove any existing registry entry to allow reprocessing if user re-adds the file
 	// Registry is only used during scan to skip already-processed items
+	// Use atomic removeAndSave() to prevent race conditions
 	if (moveResult.movedTo && moveResult.hash) {
 		const sourceHash = moveResult.hash;
-		const removed = registry.removeItem(sourceHash);
-		if (removed) {
-			await registry.save();
+		const removed = await registry.removeAndSave(sourceHash);
 
-			if (logger) {
-				logger.debug`Registry cleaned: hash=${sourceHash.slice(0, 8)} file=${basename(suggestion.source)} ${cid}`;
-			}
+		if (removed && logger) {
+			logger.debug`Registry cleaned: hash=${sourceHash.slice(0, 8)} file=${basename(suggestion.source)} ${cid}`;
 		}
 	}
 
@@ -247,12 +245,10 @@ async function executePreClassifiedNote(
 	}
 
 	// Cleanup registry - remove entry to allow reprocessing if file re-added
-	const removed = context.registry.removeItem(sourceHash);
-	if (removed) {
-		await context.registry.save();
-		if (logger) {
-			logger.debug`Registry cleaned for pre-classified note: hash=${sourceHash.slice(0, 8)} ${cid}`;
-		}
+	// Use atomic removeAndSave() to prevent race conditions
+	const removed = await context.registry.removeAndSave(sourceHash);
+	if (removed && logger) {
+		logger.debug`Registry cleaned for pre-classified note: hash=${sourceHash.slice(0, 8)} ${cid}`;
 	}
 
 	if (logger) {
