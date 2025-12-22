@@ -486,8 +486,9 @@ describe("extractors/registry", () => {
 		test("should create registry with default extractors", async () => {
 			const registry = await createDefaultRegistry();
 
-			expect(registry.size).toBe(3);
+			expect(registry.size).toBe(4);
 			expect(registry.get("pdf")).toBeDefined();
+			expect(registry.get("docx")).toBeDefined();
 			expect(registry.get("image")).toBeDefined();
 			expect(registry.get("markdown")).toBeDefined();
 		});
@@ -545,8 +546,9 @@ describe("extractors/registry", () => {
 		test("should have default extractors", async () => {
 			const registry = await getDefaultRegistry();
 
-			expect(registry.size).toBe(3);
+			expect(registry.size).toBe(4);
 			expect(registry.get("pdf")).toBeDefined();
+			expect(registry.get("docx")).toBeDefined();
 			expect(registry.get("image")).toBeDefined();
 			expect(registry.get("markdown")).toBeDefined();
 		});

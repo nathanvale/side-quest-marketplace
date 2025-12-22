@@ -21,6 +21,10 @@ import { enrichLogger } from "../../shared/logger";
 import type { InboxFile } from "../scan/extractors";
 import { applyBookmarkEnrichment } from "./strategies/bookmark-strategy";
 import {
+	applyYouTubeEnrichment,
+	YouTubeEnrichmentError,
+} from "./strategies/youtube-strategy";
+import {
 	BookmarkEnrichmentError,
 	type EnrichmentContext,
 	type EnrichmentOptions,
@@ -38,13 +42,15 @@ const log = enrichLogger;
 
 // Import strategies
 import { bookmarkEnrichmentStrategy } from "./strategies/bookmark-strategy";
+import { youtubeEnrichmentStrategy } from "./strategies/youtube-strategy";
 
 /**
  * Default enrichment strategies in priority order.
  * Higher priority strategies are checked first.
  */
 export const DEFAULT_ENRICHMENT_STRATEGIES: readonly EnrichmentStrategy[] = [
-	bookmarkEnrichmentStrategy,
+	youtubeEnrichmentStrategy, // Priority 100
+	bookmarkEnrichmentStrategy, // Priority 75 (disabled, but kept for reference)
 	// Future strategies: PDFEnrichmentStrategy, ImageEnrichmentStrategy, etc.
 ];
 
@@ -160,14 +166,31 @@ export function createEnrichmentPipeline(config: EnrichmentPipelineConfig) {
 			};
 			const result = await strategy.enrich(ctx, mergedOptions);
 
-			// Apply enrichment to frontmatter based on result type
+			// Apply enrichment to frontmatter and body based on result type
 			let updatedFrontmatter = frontmatter;
+			let updatedBody = body;
+
 			if (result.type === "bookmark") {
 				updatedFrontmatter = applyBookmarkEnrichment(frontmatter, result.data);
+			} else if (result.type === "youtube") {
+				updatedFrontmatter = applyYouTubeEnrichment(frontmatter, result.data);
+
+				// Update body: replace placeholder or append transcript
+				if (body.includes("<!-- transcript:pending -->")) {
+					updatedBody = body.replace(
+						"<!-- transcript:pending -->",
+						result.data.transcript,
+					);
+				} else {
+					updatedBody = `${body}\n\n## Transcript\n\n${result.data.transcript}`;
+				}
 			}
 
 			// Write updated content back to file
-			const updatedContent = serializeFrontmatter(updatedFrontmatter, body);
+			const updatedContent = serializeFrontmatter(
+				updatedFrontmatter,
+				updatedBody,
+			);
 			await Bun.write(file.path, updatedContent);
 
 			const duration = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -183,25 +206,68 @@ export function createEnrichmentPipeline(config: EnrichmentPipelineConfig) {
 				result,
 			};
 		} catch (error) {
-			// Return error result (don't throw - let caller decide how to handle)
-			const enrichmentError =
-				error instanceof BookmarkEnrichmentError
-					? error
-					: new BookmarkEnrichmentError(
-							error instanceof Error ? error.message : "Unknown error",
-							"FIRECRAWL_ERROR",
-							(frontmatter.url as string) || "unknown",
-							false,
-						);
-
+			// Handle enrichment failures with graceful degradation
 			const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-			if (log) {
-				log.error`Enrichment failed file=${file.filename} strategy=${strategy.id} error=${enrichmentError.message} duration=${duration}s cid=${cid}`;
+
+			// Preserve original error type for proper categorization
+			let enrichmentError: BookmarkEnrichmentError | YouTubeEnrichmentError;
+
+			if (error instanceof BookmarkEnrichmentError) {
+				enrichmentError = error;
+			} else if (error instanceof YouTubeEnrichmentError) {
+				enrichmentError = error;
+			} else {
+				// Unknown error - categorize based on strategy type
+				if (strategy.id === "youtube-transcript") {
+					enrichmentError = new YouTubeEnrichmentError(
+						error instanceof Error ? error.message : "Unknown error",
+						"YOUTUBE_NETWORK_ERROR",
+						(frontmatter.video_id as string) || "unknown",
+						true,
+					);
+				} else {
+					enrichmentError = new BookmarkEnrichmentError(
+						error instanceof Error ? error.message : "Unknown error",
+						"FIRECRAWL_ERROR",
+						(frontmatter.url as string) || "unknown",
+						false,
+					);
+				}
 			}
 
+			if (log) {
+				log.warn`Enrichment failed file=${file.filename} strategy=${strategy.id} error=${enrichmentError.message} duration=${duration}s cid=${cid}`;
+			}
+
+			// Graceful degradation: Mark file as failed so we don't retry forever
+			let updatedFrontmatter = frontmatter;
+
+			if (strategy.id === "youtube-transcript") {
+				// Mark YouTube transcript as failed (not pending)
+				updatedFrontmatter = {
+					...frontmatter,
+					transcript_status: "failed",
+					transcript_error: enrichmentError.message,
+					transcript_error_code:
+						enrichmentError instanceof YouTubeEnrichmentError
+							? enrichmentError.code
+							: "UNKNOWN",
+					transcript_failed_at: new Date().toISOString(),
+				};
+
+				// Write updated frontmatter to file
+				const updatedContent = serializeFrontmatter(updatedFrontmatter, body);
+				await Bun.write(file.path, updatedContent);
+
+				if (log) {
+					log.info`Marked transcript as failed file=${file.filename} error_code=${updatedFrontmatter.transcript_error_code} cid=${cid}`;
+				}
+			}
+
+			// Return non-blocking error result
 			return {
 				file,
-				frontmatter,
+				frontmatter: updatedFrontmatter,
 				enriched: false,
 				strategyId: strategy.id,
 				error: enrichmentError,

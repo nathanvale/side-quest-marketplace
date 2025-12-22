@@ -138,7 +138,7 @@ describe("engine utilities", () => {
 			const unknownId = createSuggestionId();
 
 			await expect(engine.challenge(unknownId, "test hint")).rejects.toThrow(
-				/suggestion.*not.*found/i,
+				/invalid.*item.*id/i,
 			);
 		});
 

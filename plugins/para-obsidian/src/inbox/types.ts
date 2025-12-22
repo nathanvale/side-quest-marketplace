@@ -182,6 +182,12 @@ export interface CreateNoteSuggestion extends BaseSuggestion {
 
 	/** LLM's suggested project (display only - shows what LLM detected before user override) */
 	readonly llmSuggestedProject?: string;
+
+	/** Markdown body content for Type A documents (embedded in note) */
+	readonly suggestedContent?: string;
+
+	/** Source of truth strategy from classifier */
+	readonly sourceOfTruth?: "markdown" | "binary";
 }
 
 /**

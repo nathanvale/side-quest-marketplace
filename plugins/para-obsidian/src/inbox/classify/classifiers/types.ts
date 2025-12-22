@@ -95,6 +95,20 @@ export interface ScoringConfig {
 }
 
 /**
+ * Source of truth strategy for document processing.
+ *
+ * - "markdown": Content is extracted and embedded in note body (Type A)
+ *   - User edits markdown directly
+ *   - Original file is archived/deleted
+ *   - Export back to DOCX via pandoc when needed
+ *
+ * - "binary": Original file remains source of truth (Type B)
+ *   - Note contains metadata + attachment reference
+ *   - Edit the original file, not the note
+ */
+export type SourceOfTruth = "markdown" | "binary";
+
+/**
  * Complete inbox converter configuration.
  * Defines how to detect, extract, and create notes for a document type.
  *
@@ -116,6 +130,13 @@ export interface InboxConverter {
 	readonly enabled: boolean;
 	/** Priority for matching (higher = checked first, range: 0-100) */
 	readonly priority: number;
+	/**
+	 * Source of truth strategy for this document type.
+	 * - "markdown": Extract content to note body, archive original (Type A)
+	 * - "binary": Keep attachment as source, note is metadata (Type B)
+	 * @default "binary"
+	 */
+	readonly sourceOfTruth?: SourceOfTruth;
 	/** Heuristic detection configuration */
 	readonly heuristics: HeuristicConfig;
 	/** Field definitions for LLM extraction */

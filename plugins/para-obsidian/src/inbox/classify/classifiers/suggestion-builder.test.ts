@@ -2,8 +2,8 @@
  * Suggestion Builder Tests - Classifier Version
  *
  * Tests for the buildSuggestion() routing logic with two paths:
- * 1. Fast-path: Items with frontmatter routing (area/project) → auto-route with destination
- * 2. LLM-path: Items without routing frontmatter → no destination until user sets
+ * 1. Fast-path: Items with frontmatter routing (area/project) → auto-route to area/project
+ * 2. LLM-path: Items without routing frontmatter → created in inbox folder
  *
  * @module classifiers/suggestion-builder.test
  */
@@ -129,7 +129,7 @@ describe("classifiers/suggestion-builder", () => {
 		});
 
 		describe("LLM-path routing (no frontmatter routing)", () => {
-			test("should NOT set destination for LLM-detected bookmark with area", () => {
+			test("should set destination to inbox folder for LLM-detected bookmark with area", () => {
 				const input = createInput({
 					llmResult: createLLMResult({
 						confidence: 0.85,
@@ -143,14 +143,14 @@ describe("classifiers/suggestion-builder", () => {
 
 				expect(result.action).toBe("create-note");
 				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedDestination).toBeUndefined(); // No destination set
-					expect(result.llmSuggestedArea).toBe("Resources"); // LLM suggestion stored
+					expect(result.suggestedDestination).toBe("00 Inbox"); // Note created in inbox
+					expect(result.llmSuggestedArea).toBe("Resources"); // LLM suggestion stored for display
 					expect(result.llmSuggestedProject).toBeUndefined();
 					expect(result.suggestedArea).toBe("Resources"); // Original field preserved
 				}
 			});
 
-			test("should NOT set destination for LLM-detected item with project", () => {
+			test("should set destination to inbox folder for LLM-detected item with project", () => {
 				const input = createInput({
 					llmResult: createLLMResult({
 						confidence: 0.85,
@@ -163,9 +163,9 @@ describe("classifiers/suggestion-builder", () => {
 
 				expect(result.action).toBe("create-note");
 				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedDestination).toBeUndefined(); // No destination
+					expect(result.suggestedDestination).toBe("00 Inbox"); // Note created in inbox
 					expect(result.llmSuggestedArea).toBeUndefined();
-					expect(result.llmSuggestedProject).toBe("Tax 2024"); // LLM suggestion stored
+					expect(result.llmSuggestedProject).toBe("Tax 2024"); // LLM suggestion stored for display
 					expect(result.suggestedProject).toBe("Tax 2024"); // Original preserved
 				}
 			});
@@ -184,7 +184,7 @@ describe("classifiers/suggestion-builder", () => {
 
 				expect(result.action).toBe("create-note");
 				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedDestination).toBeUndefined(); // No destination
+					expect(result.suggestedDestination).toBe("00 Inbox"); // Note created in inbox
 					expect(result.llmSuggestedArea).toBe("Travel"); // Stored for display
 					expect(result.llmSuggestedProject).toBe("Europe Trip"); // Stored for display
 					expect(result.suggestedArea).toBe("Travel");
@@ -192,7 +192,7 @@ describe("classifiers/suggestion-builder", () => {
 				}
 			});
 
-			test("should handle heuristic-only detection (no LLM suggestions)", () => {
+			test("should set destination to inbox folder for heuristic-only detection", () => {
 				const input = createInput({
 					heuristicResult: createHeuristicResult({
 						detected: true,
@@ -206,7 +206,7 @@ describe("classifiers/suggestion-builder", () => {
 
 				expect(result.action).toBe("create-note");
 				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedDestination).toBeUndefined();
+					expect(result.suggestedDestination).toBe("00 Inbox"); // Note created in inbox
 					expect(result.llmSuggestedArea).toBeUndefined();
 					expect(result.llmSuggestedProject).toBeUndefined();
 					expect(result.suggestedArea).toBeUndefined();
@@ -214,7 +214,7 @@ describe("classifiers/suggestion-builder", () => {
 				}
 			});
 
-			test("should handle LLM+heuristic detection without routing fields", () => {
+			test("should set destination to inbox folder for LLM+heuristic detection without routing fields", () => {
 				const input = createInput({
 					heuristicResult: createHeuristicResult({
 						detected: true,
@@ -233,7 +233,7 @@ describe("classifiers/suggestion-builder", () => {
 				expect(result.confidence).toBe("high"); // Boosted by agreement
 				expect(result.action).toBe("create-note");
 				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedDestination).toBeUndefined();
+					expect(result.suggestedDestination).toBe("00 Inbox"); // Note created in inbox
 					expect(result.llmSuggestedArea).toBeUndefined();
 					expect(result.llmSuggestedProject).toBeUndefined();
 				}
@@ -241,7 +241,7 @@ describe("classifiers/suggestion-builder", () => {
 		});
 
 		describe("Edge cases", () => {
-			test("should handle frontmatter detection without routing fields", () => {
+			test("should set destination to inbox folder for frontmatter detection without routing fields", () => {
 				const input = createInput({
 					llmResult: createLLMResult({
 						confidence: 0.85,
@@ -255,8 +255,8 @@ describe("classifiers/suggestion-builder", () => {
 
 				expect(result.action).toBe("create-note");
 				if (isCreateNoteSuggestion(result)) {
-					// Frontmatter flag is set but no routing fields → treated as LLM-path
-					expect(result.suggestedDestination).toBeUndefined();
+					// Frontmatter flag is set but no routing fields → created in inbox
+					expect(result.suggestedDestination).toBe("00 Inbox");
 					expect(result.llmSuggestedArea).toBeUndefined();
 					expect(result.llmSuggestedProject).toBeUndefined();
 				}
@@ -289,7 +289,7 @@ describe("classifiers/suggestion-builder", () => {
 		});
 
 		describe("Backward compatibility", () => {
-			test("should preserve existing behavior for non-bookmark types", () => {
+			test("should create notes in inbox folder for non-bookmark types", () => {
 				const input = createInput({
 					llmResult: createLLMResult({
 						confidence: 0.85,
@@ -304,8 +304,8 @@ describe("classifiers/suggestion-builder", () => {
 				if (isCreateNoteSuggestion(result)) {
 					expect(result.suggestedNoteType).toBe("invoice");
 					expect(result.suggestedArea).toBe("Finance");
-					// LLM-path: no destination
-					expect(result.suggestedDestination).toBeUndefined();
+					// LLM-path: destination is inbox folder
+					expect(result.suggestedDestination).toBe("00 Inbox");
 					expect(result.llmSuggestedArea).toBe("Finance");
 				}
 			});

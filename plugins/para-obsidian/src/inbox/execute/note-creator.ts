@@ -152,23 +152,48 @@ export async function createNoteFromSuggestion(
 			}
 		}
 
-		// Add area/project if suggested (use exact Templater prompt text as keys)
-		// Wrap in wikilink format [[...]] as required by frontmatter validation
-		if (suggestion.suggestedArea) {
-			args["Area (leave empty if using project)"] =
-				`[[${suggestion.suggestedArea}]]`;
-		}
-		if (suggestion.suggestedProject) {
-			args["Project (leave empty if using area)"] =
-				`[[${suggestion.suggestedProject}]]`;
+		// For LLM-path items (created in inbox), add LLM suggestions as separate fields
+		// These are hints for the user - they still need to manually set area/project
+		// Check if this is an LLM-path item (has llmSuggested* fields)
+		const isLlmPathItem =
+			suggestion.llmSuggestedArea || suggestion.llmSuggestedProject;
+
+		// Build extra frontmatter for LLM suggestions
+		const extraFrontmatter: Record<string, unknown> = {};
+
+		if (isLlmPathItem) {
+			// Add LLM suggestions as hint fields (user sees what LLM detected)
+			if (suggestion.llmSuggestedArea) {
+				extraFrontmatter.suggested_area = `[[${suggestion.llmSuggestedArea}]]`;
+			}
+			if (suggestion.llmSuggestedProject) {
+				extraFrontmatter.suggested_project = `[[${suggestion.llmSuggestedProject}]]`;
+			}
+			// Leave actual area/project empty for user to fill in
+		} else {
+			// Fast-path items: use suggested area/project directly
+			// Wrap in wikilink format [[...]] as required by frontmatter validation
+			if (suggestion.suggestedArea) {
+				args["Area (leave empty if using project)"] =
+					`[[${suggestion.suggestedArea}]]`;
+			}
+			if (suggestion.suggestedProject) {
+				args["Project (leave empty if using area)"] =
+					`[[${suggestion.suggestedProject}]]`;
+			}
 		}
 
 		// Create the note
+		// For Type A documents (sourceOfTruth: "markdown"), suggestedContent contains
+		// the extracted markdown to embed in the note body via {{content}} placeholder
 		const result = createFromTemplate(paraConfig, {
 			template: suggestion.suggestedNoteType,
 			title: suggestion.suggestedTitle,
 			dest: suggestion.suggestedDestination,
 			args,
+			extraFrontmatter:
+				Object.keys(extraFrontmatter).length > 0 ? extraFrontmatter : undefined,
+			content: suggestion.suggestedContent,
 		});
 
 		if (logger) {

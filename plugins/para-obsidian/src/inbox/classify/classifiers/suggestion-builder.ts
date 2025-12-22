@@ -55,6 +55,10 @@ export interface SuggestionInput {
 	readonly detectionSource?: DetectionSource;
 	/** SHA256 hash of file content (links note title to attachment filename) */
 	readonly hash?: string;
+	/** Extracted markdown content for Type A documents (embedded in note body) */
+	readonly extractedMarkdown?: string;
+	/** Source of truth from classifier ("markdown" for Type A, "binary" for Type B) */
+	readonly sourceOfTruth?: "markdown" | "binary";
 }
 
 // =============================================================================
@@ -236,9 +240,11 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 
 	// Generate attachment name using hash (guarantees uniqueness)
 	// Format mirrors note title: date-hash-type-provider.ext (lowercase, hyphens)
-	const suggestedAttachmentName = hash
-		? generateFilename(filename, hash, suggestedNoteType, extractedFields)
-		: undefined;
+	// ONLY for Type B (binary source of truth) - Type A embeds content in markdown
+	const suggestedAttachmentName =
+		hash && input.sourceOfTruth !== "markdown"
+			? generateFilename(filename, hash, suggestedNoteType, extractedFields)
+			: undefined;
 
 	// Pass through extraction warnings from LLM
 	const extractionWarnings =
@@ -247,8 +253,8 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 			: undefined;
 
 	// Set destination based on routing source
-	// Fast-path items (have area/project frontmatter) get auto-routed with destination
-	// LLM-path items (no routing fields) do NOT get destination - user must choose
+	// Fast-path items (have area/project frontmatter) get auto-routed to their destination
+	// LLM-path items (no routing fields) get created in inbox - user adds tags in Obsidian later
 	let suggestedDestination: string | undefined;
 	let llmSuggestedArea: string | undefined;
 	let llmSuggestedProject: string | undefined;
@@ -261,15 +267,24 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 		// Fast-path: Has area/project in frontmatter → set destination for auto-routing
 		suggestedDestination = suggestedArea || suggestedProject;
 	} else {
-		// LLM-path: No frontmatter routing → store LLM suggestions for DISPLAY only
-		// Item will be filtered at CLI layer until user adds tags in Obsidian
+		// LLM-path: No frontmatter routing → create note in inbox folder
+		// Store LLM suggestions for DISPLAY (user sees what LLM detected)
+		// Note created in inbox with null area/project - user updates in Obsidian
 		llmSuggestedArea = suggestedArea;
 		llmSuggestedProject = suggestedProject;
-		// Leave suggestedDestination undefined - item will be skipped
+		// Set destination to inbox folder so note is created there
+		suggestedDestination = inboxFolder;
 	}
 
 	// Return properly typed discriminated union based on action
 	if (action === "create-note") {
+		// Debug: Log Type A/B fields being set on suggestion
+		if (input.extractedMarkdown || input.sourceOfTruth) {
+			console.error(
+				`[buildSuggestion] Type A/B fields: sourceOfTruth=${input.sourceOfTruth ?? "undefined"} extractedMarkdownLength=${input.extractedMarkdown?.length ?? 0}`,
+			);
+		}
+
 		return {
 			id: createSuggestionId(),
 			source,
@@ -288,6 +303,9 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 			reason,
 			llmSuggestedArea,
 			llmSuggestedProject,
+			// Type A/B document processing fields
+			suggestedContent: input.extractedMarkdown,
+			sourceOfTruth: input.sourceOfTruth,
 		};
 	}
 

@@ -41,6 +41,13 @@ export interface CreateOptions {
 	readonly dest?: string;
 	/** Arguments to substitute for Templater prompts in the template. */
 	readonly args?: Record<string, string>;
+	/** Extra frontmatter fields to add (merged after template processing). */
+	readonly extraFrontmatter?: Record<string, unknown>;
+	/**
+	 * Content to embed in the note body (replaces {{content}} placeholder).
+	 * Used for Type A documents where markdown is the source of truth.
+	 */
+	readonly content?: string;
 }
 
 /**
@@ -366,9 +373,23 @@ export function createFromTemplate(
 		body = body.replace(/^#\s+null\s*$/m, `# ${displayTitle}`);
 	}
 
+	// Replace {{content}} placeholder with embedded content (Type A documents)
+	// This enables extracted markdown to become the note body
+	if (options.content) {
+		body = body.replace(/\{\{content\}\}/g, options.content);
+	} else {
+		// Remove {{content}} placeholder if no content provided
+		body = body.replace(/\{\{content\}\}/g, "");
+	}
+
 	// Inject title if not provided by args/template substitution
 	if (!attributes.title || attributes.title === "null") {
 		attributes.title = displayTitle;
+	}
+
+	// Merge in extra frontmatter fields (e.g., LLM suggestions)
+	if (options.extraFrontmatter) {
+		Object.assign(attributes, options.extraFrontmatter);
 	}
 
 	// Template version should come from the template file itself, not config

@@ -38,7 +38,7 @@ export interface InboxFile {
 /**
  * Source type indicating how content was extracted.
  */
-export type ExtractionSource = "pdf" | "image" | "markdown" | "text";
+export type ExtractionSource = "pdf" | "docx" | "image" | "markdown" | "text";
 
 /**
  * Result of content extraction from a file.
@@ -52,6 +52,11 @@ export interface ExtractedContent {
 	readonly filePath: string;
 	/** Optional metadata from extraction (e.g., page count, image dimensions) */
 	readonly metadata?: ExtractedMetadata;
+	/**
+	 * Optional formatted markdown for Type A documents (CV, Letter).
+	 * When present, this is embedded directly in the note body.
+	 */
+	readonly markdown?: string;
 }
 
 /**

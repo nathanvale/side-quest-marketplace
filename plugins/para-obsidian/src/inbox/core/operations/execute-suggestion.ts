@@ -385,6 +385,21 @@ export async function executeSuggestion(
 				suggestion.action === "create-note" &&
 				suggestion.suggestedNoteType === "bookmark";
 
+			// Type A documents: markdown is the source of truth (e.g., CVs, letters)
+			// The extracted markdown is embedded directly in the note body
+			// The source file (DOCX) is deleted - NOT moved to Attachments
+			const isTypeA =
+				suggestion.action === "create-note" &&
+				"sourceOfTruth" in suggestion &&
+				suggestion.sourceOfTruth === "markdown" &&
+				"suggestedContent" in suggestion &&
+				typeof suggestion.suggestedContent === "string" &&
+				suggestion.suggestedContent.length > 0;
+
+			if (executeLogger) {
+				executeLogger.debug`Type detection: isBookmark=${isBookmark} isTypeA=${isTypeA} sourceOfTruth=${"sourceOfTruth" in suggestion ? suggestion.sourceOfTruth : "n/a"} contentLength=${"suggestedContent" in suggestion ? ((suggestion.suggestedContent as string)?.length ?? 0) : 0} ${cid}`;
+			}
+
 			// Create note FIRST if action is create-note (before moving attachment)
 			// Layer 1: Use staging directory pattern for atomic operations
 			if (
@@ -444,6 +459,37 @@ export async function executeSuggestion(
 
 					if (executeLogger) {
 						executeLogger.info`Created note in staging path=${stagingNotePath} ${cid}`;
+					}
+
+					// TYPE A: Inject extracted markdown content into the note body
+					// This replaces the default empty note with the actual DOCX content
+					if (isTypeA && "suggestedContent" in suggestion) {
+						try {
+							const stagingAbsolute = join(config.vaultPath, stagingNotePath);
+							const existingContent = readTextFileSync(stagingAbsolute);
+
+							// Parse existing frontmatter and body
+							const { attributes, body: existingBody } =
+								parseFrontmatter(existingContent);
+
+							// Build new body with extracted markdown
+							// Keep heading and any template comments, append the extracted content
+							const extractedMarkdown = suggestion.suggestedContent as string;
+							const newBody = `${existingBody.trim()}\n\n${extractedMarkdown}`;
+
+							// Serialize and write back
+							const updatedContent = serializeFrontmatter(attributes, newBody);
+							writeTextFileSync(stagingAbsolute, updatedContent);
+
+							if (executeLogger) {
+								executeLogger.info`Type A: Injected extracted markdown content (${extractedMarkdown.length} chars) into note ${cid}`;
+							}
+						} catch (error) {
+							if (executeLogger) {
+								executeLogger.warn`Failed to inject Type A content: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
+							}
+							// Non-fatal - note still created with template content
+						}
 					}
 				} catch (error) {
 					// Note creation failed - clean up in-progress marker
@@ -539,53 +585,73 @@ export async function executeSuggestion(
 				if (executeLogger) {
 					executeLogger.info`Moving bookmark to ${movedFilePath} ${cid}`;
 				}
+			} else if (isTypeA) {
+				// TYPE A: Delete source file (content already embedded in note)
+				// No attachment to move - the DOCX content is now in the markdown note
+				try {
+					const { unlink } = await import("node:fs/promises");
+					await unlink(sourcePath);
+					if (executeLogger) {
+						executeLogger.info`Type A: Deleted source DOCX (content embedded in note) ${cid}`;
+					}
+				} catch (error) {
+					// Non-fatal - log warning but continue
+					if (executeLogger) {
+						executeLogger.warn`Type A: Failed to delete source file: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
+					}
+				}
+				// No attachment path for Type A
+				actualDestination = "";
+				movedFilePath = "";
 			} else {
 				// Standard attachment workflow
 				actualDestination = attachmentDest;
 				movedFilePath = movedAttachmentPath;
 			}
 
-			// Now move the file (bookmark or attachment)
-			ensureDirSync(dirname(actualDestination));
+			// Now move the file (bookmark or standard attachment - NOT Type A)
+			if (!isTypeA && actualDestination) {
+				ensureDirSync(dirname(actualDestination));
 
-			// File-level locking to prevent TOCTOU race conditions
-			// Protects against file being deleted/modified between existence check and move
-			const lockId = `file:${basename(sourcePath)}`;
-			try {
-				await withFileLock(lockId, async () => {
-					// TOCTOU protection: Check file still exists before moving
-					// File was hashed earlier, but could have been deleted by another process
-					if (!pathExistsSync(sourcePath)) {
-						throw new Error(
-							`Source file no longer exists: ${sourcePath}. It may have been moved or deleted by another process.`,
-						);
+				// File-level locking to prevent TOCTOU race conditions
+				// Protects against file being deleted/modified between existence check and move
+				const lockId = `file:${basename(sourcePath)}`;
+				try {
+					await withFileLock(lockId, async () => {
+						// TOCTOU protection: Check file still exists before moving
+						// File was hashed earlier, but could have been deleted by another process
+						if (!pathExistsSync(sourcePath)) {
+							throw new Error(
+								`Source file no longer exists: ${sourcePath}. It may have been moved or deleted by another process.`,
+							);
+						}
+
+						// Move file atomically while holding lock
+						await moveFile(sourcePath, actualDestination);
+					});
+				} catch (error) {
+					const _errorCode = categorizeError(error);
+					// ROLLBACK: Clean up staging note and in-progress marker
+					await rollbackOperation(
+						config.vaultPath,
+						stagingNotePath,
+						hash,
+						registry,
+						cid,
+					);
+
+					// Log the failure and return error
+					if (executeLogger) {
+						executeLogger.error`Failed to move file: ${error instanceof Error ? error.message : "unknown"} - file remains in inbox ${cid}`;
 					}
 
-					// Move file atomically while holding lock
-					await moveFile(sourcePath, actualDestination);
-				});
-			} catch (error) {
-				const _errorCode = categorizeError(error);
-				// ROLLBACK: Clean up staging note and in-progress marker
-				await rollbackOperation(
-					config.vaultPath,
-					stagingNotePath,
-					hash,
-					registry,
-					cid,
-				);
-
-				// Log the failure and return error
-				if (executeLogger) {
-					executeLogger.error`Failed to move file: ${error instanceof Error ? error.message : "unknown"} - file remains in inbox ${cid}`;
+					return {
+						suggestionId: suggestion.id,
+						success: false,
+						action: suggestion.action,
+						error: `Operation failed and was rolled back: ${error instanceof Error ? error.message : "unknown"}. File remains in inbox - fix the issue and retry.`,
+					};
 				}
-
-				return {
-					suggestionId: suggestion.id,
-					success: false,
-					action: suggestion.action,
-					error: `Operation failed and was rolled back: ${error instanceof Error ? error.message : "unknown"}. File remains in inbox - fix the issue and retry.`,
-				};
 			}
 
 			// SUCCESS: Move staged note to final destination atomically
@@ -761,8 +827,9 @@ export async function executeSuggestion(
 						// Don't fail - file moved successfully, just missing frontmatter updates
 					}
 				}
-			} else if (createdNotePath) {
-				// Inject attachment link into the note (if note was created)
+			} else if (createdNotePath && !isTypeA) {
+				// Inject attachment link into the note (if note was created and NOT Type A)
+				// Type A documents have content embedded in the note body - no attachments
 				try {
 					const attachmentWikilink = `![[${movedFilePath}]]`;
 					const injectionResult = injectSections(paraConfig, createdNotePath, {
@@ -797,19 +864,30 @@ export async function executeSuggestion(
 
 			// Update registry - clear in-progress flag and mark as completed
 			registry.clearInProgress(hash);
-			registry.markProcessed({
-				sourceHash: hash,
-				sourcePath: suggestion.source,
-				processedAt: new Date().toISOString(),
-				createdNote: createdNotePath,
-				movedAttachment: isBookmark ? undefined : movedFilePath,
-			});
+
+			// Only mark processed if there's an attachment to track
+			// Type A and bookmarks don't have attachments, so skip registry entry
+			// (when restrictRegistryToAttachments is enabled, entries without movedAttachment are rejected)
+			if (!isBookmark && !isTypeA && movedFilePath) {
+				registry.markProcessed({
+					sourceHash: hash,
+					sourcePath: suggestion.source,
+					processedAt: new Date().toISOString(),
+					createdNote: createdNotePath,
+					movedAttachment: movedFilePath,
+				});
+			}
 
 			// Note: Auto-commit removed from per-operation execution
 			// Commits are now batched at session level in engine.ts for cleaner history
 
 			if (executeLogger) {
-				executeLogger.info`Executed suggestion id=${suggestion.id} movedTo=${isBookmark ? movedFilePath : hashedFilename} createdNote=${createdNotePath ?? "none"} ${cid}`;
+				const attachment = isTypeA
+					? "(Type A: content embedded)"
+					: isBookmark
+						? movedFilePath
+						: hashedFilename;
+				executeLogger.info`Executed suggestion id=${suggestion.id} movedTo=${attachment} createdNote=${createdNotePath ?? "none"} ${cid}`;
 			}
 
 			return {
@@ -817,7 +895,8 @@ export async function executeSuggestion(
 				success: true,
 				action: suggestion.action,
 				createdNote: createdNotePath,
-				movedAttachment: isBookmark ? undefined : movedFilePath,
+				// Type A and bookmarks don't have attachments
+				movedAttachment: isBookmark || isTypeA ? undefined : movedFilePath,
 				movedFrom: suggestion.source,
 			};
 		},

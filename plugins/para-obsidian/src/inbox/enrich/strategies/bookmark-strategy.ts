@@ -32,43 +32,21 @@ const log = enrichLogger;
  *
  * Handles files with type:bookmark frontmatter that have a URL.
  * Uses Firecrawl to scrape the page and LLM to improve metadata.
+ *
+ * **DISABLED**: This strategy has been disabled in favor of YouTube enrichment.
+ * Set priority to 50 (lower than YouTube's 100) and canEnrich always returns ineligible.
  */
 export const bookmarkEnrichmentStrategy: EnrichmentStrategy = {
 	id: "bookmark",
 	name: "Bookmark Enricher",
-	priority: 100, // High priority - check bookmarks first
+	priority: 50, // Lowered from 100 (below YouTube's 100)
 
-	canEnrich(ctx: EnrichmentContext): EnrichmentEligibility {
-		const { frontmatter, file } = ctx;
-
-		// Must be a bookmark type
-		if (frontmatter.type !== "bookmark") {
-			return { eligible: false, reason: "Not a bookmark (type !== bookmark)" };
-		}
-
-		// Must have a URL
-		if (typeof frontmatter.url !== "string" || !frontmatter.url) {
-			if (log) {
-				log.debug`Bookmark eligibility: no URL file=${file.filename}`;
-			}
-			return { eligible: false, reason: "No URL in frontmatter" };
-		}
-
-		// Skip if already enriched (unless force option is used)
-		if (frontmatter.enrichedAt) {
-			if (log) {
-				log.debug`Bookmark eligibility: already enriched file=${file.filename} enrichedAt=${frontmatter.enrichedAt}`;
-			}
-			return {
-				eligible: false,
-				reason: "Already enriched (use force to re-enrich)",
-			};
-		}
-
-		if (log) {
-			log.debug`Bookmark eligibility: eligible file=${file.filename} url=${frontmatter.url}`;
-		}
-		return { eligible: true };
+	canEnrich(_ctx: EnrichmentContext): EnrichmentEligibility {
+		// Always return ineligible - bookmark enrichment is disabled
+		return {
+			eligible: false,
+			reason: "Bookmark enrichment disabled (replaced by YouTube enrichment)",
+		};
 	},
 
 	async enrich(

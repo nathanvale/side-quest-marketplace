@@ -42,6 +42,7 @@ export const SUBSYSTEMS = [
 	"mcp",
 	"inbox",
 	"pdf",
+	"docx",
 	"llm",
 	"execute",
 	"git",
@@ -192,6 +193,11 @@ export const inboxLogger = subsystemLoggers.inbox!;
  * Logger for PDF processing operations.
  */
 export const pdfLogger = subsystemLoggers.pdf!;
+
+/**
+ * Logger for DOCX processing operations.
+ */
+export const docxLogger = subsystemLoggers.docx!;
 
 /**
  * Logger for LLM operations.

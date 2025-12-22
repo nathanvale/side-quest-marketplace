@@ -9,12 +9,16 @@
 	},
 	"dependencies": {
 		"@inquirer/prompts": "^8.0.2",
+		"@modelcontextprotocol/sdk": "^1.25.1",
 		"@sidequest/core": "workspace:*",
 		"@sidequest/firecrawl": "workspace:*",
+		"@types/turndown": "^5.0.6",
 		"date-fns": "^4.1.0",
 		"glob": "^13.0.0",
+		"mammoth": "^1.11.0",
 		"nanospinner": "^1.2.2",
 		"p-limit": "^7.2.0",
+		"turndown": "^7.2.2",
 		"yaml": "^2.6.0"
 	},
 	"scripts": {

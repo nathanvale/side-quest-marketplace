@@ -75,24 +75,37 @@ export function generateFilename(
 /**
  * Generate a PARA-formatted attachment name from extracted fields.
  *
- * Format: YYYY-MM-DD-type-provider-slug.ext
+ * Format: YYYY-MM-DD-type-description-slug.ext
  *
  * This is used as a fallback when the LLM doesn't provide suggestedFilenameDescription.
  * Unlike generateFilename(), this doesn't require a hash - it uses extracted data.
  *
  * @param originalPath - Original file path (for extension)
- * @param noteType - Document type (invoice, booking, etc.)
- * @param fields - Extracted fields from document (date, provider, etc.)
+ * @param noteType - Document type (invoice, booking, letter, cv, etc.)
+ * @param fields - Extracted fields from document (date, provider, recipient, etc.)
  * @returns Generated filename or undefined if insufficient data
  *
  * @example
  * ```typescript
+ * // Invoice:
  * generateAttachmentName(
  *   "/inbox/statement.pdf",
  *   "medical-statement",
  *   { date: "2025-10-21", provider: "PV Foulkes Medical Services" }
  * );
  * // "2025-10-21-medical-statement-pv-foulkes-medical-services.pdf"
+ *
+ * // Letter:
+ * generateAttachmentName(
+ *   "/inbox/letter.docx",
+ *   "letter",
+ *   { date_sent: "2025-12-15", recipient: "Bunnings HR" }
+ * );
+ * // "2025-12-15-letter-bunnings-hr.docx"
+ *
+ * // CV (fallback to today's date):
+ * generateAttachmentName("/inbox/cv.docx", "cv", { title: "Nathan Vale CV 2025" });
+ * // "2025-12-22-cv-nathan-vale-cv-2025.docx"
  * ```
  */
 export function generateAttachmentName(
@@ -100,25 +113,22 @@ export function generateAttachmentName(
 	noteType?: string,
 	fields?: Record<string, unknown>,
 ): string | undefined {
-	// Get date from various field names
-	const date = (fields?.date ??
-		fields?.statementDate ??
-		fields?.invoice_date ??
-		fields?.invoiceDate) as string | undefined;
+	// Get date using helper (with fallback to today for attachments)
+	const date = extractDateField(fields, true);
 
-	// Get provider
-	const provider = fields?.provider as string | undefined;
+	// Get description using helper (type-aware: provider/recipient/title)
+	const description = extractDescriptionField(fields, noteType);
 
-	// Need at least date and type to generate a meaningful name
-	if (!date || !noteType) {
+	// Need at least type to generate a meaningful name (date has fallback)
+	if (!noteType) {
 		return undefined;
 	}
 
 	const ext = extname(originalPath);
 
-	// Build slug from provider (if available) or just use type
-	const providerSlug = provider
-		? provider
+	// Build slug from description (if available)
+	const descriptionSlug = description
+		? description
 				.toLowerCase()
 				.replace(/[^a-z0-9]+/g, "-")
 				.replace(/^-+|-+$/g, "")
@@ -130,8 +140,8 @@ export function generateAttachmentName(
 		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/^-+|-+$/g, "");
 
-	// Format: date-type-provider.ext
-	const parts = [date, typeSlug, providerSlug].filter(Boolean);
+	// Format: date-type-description.ext
+	const parts = [date, typeSlug, descriptionSlug].filter(Boolean);
 	return `${parts.join("-")}${ext}`;
 }
 
@@ -167,6 +177,68 @@ export function formatDateWithSpaces(date: string): string {
 }
 
 /**
+ * Extract the best date field from extracted fields.
+ *
+ * Checks multiple date field names in priority order, with fallback to today's date.
+ *
+ * @param fields - Extracted fields from document
+ * @param fallbackToToday - If true, return today's date when no date found (default: false)
+ * @returns Date string in YYYY-MM-DD format, or undefined
+ */
+export function extractDateField(
+	fields?: Record<string, unknown>,
+	fallbackToToday = false,
+): string | undefined {
+	// Check multiple date field variations in priority order
+	const date = (fields?.date ??
+		fields?.date_sent ?? // Letter date
+		fields?.statementDate ??
+		fields?.invoice_date ??
+		fields?.invoiceDate) as string | undefined;
+
+	if (date) return date;
+
+	// Fallback to today's date if requested
+	if (fallbackToToday) {
+		return new Date().toISOString().split("T")[0];
+	}
+
+	return undefined;
+}
+
+/**
+ * Extract the best description field from extracted fields.
+ *
+ * Different document types use different fields for their "description" part:
+ * - Invoice/Medical: provider (e.g., "Amazon", "PV Foulkes Medical")
+ * - Letter: recipient (e.g., "Bunnings HR")
+ * - CV: name or version (e.g., "Nathan Vale", "2025-v1")
+ *
+ * @param fields - Extracted fields from document
+ * @param noteType - Document type to determine which field to use
+ * @returns Description string, or undefined
+ */
+export function extractDescriptionField(
+	fields?: Record<string, unknown>,
+	noteType?: string,
+): string | undefined {
+	// Letter: use recipient as description
+	if (noteType === "letter") {
+		return (fields?.recipient ?? fields?.provider) as string | undefined;
+	}
+
+	// CV: use title or version as description
+	if (noteType === "cv") {
+		return (fields?.title ?? fields?.version ?? fields?.provider) as
+			| string
+			| undefined;
+	}
+
+	// Default: use provider (invoice, medical-statement, booking, etc.)
+	return fields?.provider as string | undefined;
+}
+
+/**
  * Generate a suggested title from filename and extracted data.
  *
  * When a hash is provided (from source attachment), the format is:
@@ -189,6 +261,14 @@ export function formatDateWithSpaces(date: string): string {
  * generateTitle("invoice.pdf", "invoice", { provider: "Amazon", date: "2024-12-10" }, "a7b3...");
  * // "2024 12 10 a7b3 Invoice Amazon"
  *
+ * // Letter with hash:
+ * generateTitle("letter.docx", "letter", { recipient: "Bunnings HR", date_sent: "2024-12-10" }, "b2c3...");
+ * // "2024 12 10 b2c3 Letter Bunnings HR"
+ *
+ * // CV with hash (falls back to today's date):
+ * generateTitle("cv.docx", "cv", { title: "Nathan Vale CV 2025" }, "c3d4...");
+ * // "2024 12 22 c3d4 Cv Nathan Vale CV 2025"
+ *
  * // Without hash (manual note):
  * generateTitle("notes.md", "note", { provider: "Meeting" });
  * // "Note - Meeting"
@@ -200,13 +280,10 @@ export function generateTitle(
 	fields?: Record<string, unknown>,
 	hash?: string,
 ): string {
-	// Try to use extracted provider and date
-	// Check multiple date field variations (date, statementDate, invoice_date, invoiceDate)
-	const provider = fields?.provider as string | undefined;
-	const date = (fields?.date ??
-		fields?.statementDate ??
-		fields?.invoice_date ??
-		fields?.invoiceDate) as string | undefined;
+	// Try to use extracted description and date
+	// For attachments (with hash), always fallback to today's date for sorting
+	const description = extractDescriptionField(fields, noteType);
+	const date = extractDateField(fields, !!hash);
 
 	// Title case: "medical-statement" → "Medical Statement"
 	const typeLabel = noteType
@@ -221,25 +298,25 @@ export function generateTitle(
 		const hashPrefix = getHashPrefix(hash);
 		const formattedDate = date ? formatDateWithSpaces(date) : "";
 
-		// Format: YYYY MM DD Type Provider hash4 (hash at end for visual cleanliness)
-		const parts = [formattedDate, typeLabel, provider, hashPrefix].filter(
+		// Format: YYYY MM DD Type Description hash4 (hash at end for visual cleanliness)
+		const parts = [formattedDate, typeLabel, description, hashPrefix].filter(
 			Boolean,
 		);
 		return parts.join(" ");
 	}
 
 	// No hash - use traditional format with hyphens (manual notes, markdown files)
-	// Format: Date - Type - Provider (date first for chronological sorting)
-	if (provider && date) {
-		return `${date} - ${typeLabel} - ${provider}`;
+	// Format: Date - Type - Description (date first for chronological sorting)
+	if (description && date) {
+		return `${date} - ${typeLabel} - ${description}`;
 	}
 
 	if (date) {
 		return `${date} - ${typeLabel}`;
 	}
 
-	if (provider) {
-		return `${typeLabel} - ${provider}`;
+	if (description) {
+		return `${typeLabel} - ${description}`;
 	}
 
 	// Fall back to cleaned filename

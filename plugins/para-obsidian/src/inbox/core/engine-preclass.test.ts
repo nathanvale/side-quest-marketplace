@@ -79,7 +79,7 @@ describe("pre-classification (frontmatter detection)", () => {
 
 	test("should pre-classify markdown note with valid type and area (skip LLM)", async () => {
 		const mdContent = `---
-type: note
+type: bookmark
 area: "[[Health]]"
 title: "My Health Journal"
 ---
@@ -98,7 +98,7 @@ This is my health journal entry for today.`;
 		const suggestion = suggestions[0];
 
 		if (suggestion?.action === "create-note") {
-			expect(suggestion.suggestedDestination).toBe("02 Areas");
+			expect(suggestion.suggestedDestination).toBe("02 Areas/Health");
 			expect(suggestion.suggestedTitle).toBe("My Health Journal");
 			expect(suggestion.confidence).toBe("high");
 			expect(suggestion.source).toContain("health-journal.md");
@@ -109,7 +109,7 @@ This is my health journal entry for today.`;
 
 	test("should pre-classify markdown note with valid type and project (skip LLM)", async () => {
 		const mdContent = `---
-type: note
+type: bookmark
 project: "[[Vacation Planning]]"
 title: "Flight Research"
 ---
@@ -128,7 +128,9 @@ Looking into flights for vacation.`;
 		const suggestion = suggestions[0];
 
 		if (suggestion?.action === "create-note") {
-			expect(suggestion.suggestedDestination).toBe("01 Projects");
+			expect(suggestion.suggestedDestination).toBe(
+				"01 Projects/Vacation Planning",
+			);
 			expect(suggestion.suggestedTitle).toBe("Flight Research");
 			expect(suggestion.confidence).toBe("high");
 		} else {
@@ -233,7 +235,7 @@ Area specified without wikilinks.`;
 		const suggestion = suggestions[0];
 
 		if (suggestion?.action === "create-note") {
-			expect(suggestion.suggestedDestination).toBe("02 Areas");
+			expect(suggestion.suggestedDestination).toBe("02 Areas/Health");
 			expect(suggestion.suggestedTitle).toBe("Plain Text Area");
 		} else {
 			throw new Error("Expected create-note suggestion");
@@ -263,7 +265,9 @@ Should go to project folder.`;
 
 		if (suggestion?.action === "create-note") {
 			// Project should take priority
-			expect(suggestion.suggestedDestination).toBe("01 Projects");
+			expect(suggestion.suggestedDestination).toBe(
+				"01 Projects/Vacation Planning",
+			);
 			expect(suggestion.suggestedTitle).toBe("Conflicting Assignment");
 		} else {
 			throw new Error("Expected create-note suggestion");

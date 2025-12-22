@@ -10,3 +10,10 @@ export {
 	applyBookmarkEnrichment,
 	bookmarkEnrichmentStrategy,
 } from "./bookmark-strategy";
+
+export {
+	applyYouTubeEnrichment,
+	YouTubeEnrichmentError,
+	type YouTubeErrorCode,
+	youtubeEnrichmentStrategy,
+} from "./youtube-strategy";

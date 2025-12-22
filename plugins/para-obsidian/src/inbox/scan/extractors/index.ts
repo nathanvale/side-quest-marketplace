@@ -6,6 +6,7 @@
  * @module extractors
  */
 
+export { docxExtractor } from "./docx";
 export type { ImageExtension, ImageExtractionMetadata } from "./image";
 // Extractors
 export {

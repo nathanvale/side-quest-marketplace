@@ -71,7 +71,7 @@ describe("inbox/engine-utils", () => {
 			);
 		});
 
-		test("should handle missing date", () => {
+		test("should fallback to today when date is missing (for attachments with hash)", () => {
 			const result = generateFilename(
 				"/path/to/doc.pdf",
 				TEST_HASH,
@@ -81,8 +81,9 @@ describe("inbox/engine-utils", () => {
 				},
 			);
 
-			// No date: type-provider-hash.ext
-			expect(result).toBe("invoice-amazon-a7b3.pdf");
+			// With hash, date falls back to today for chronological sorting
+			// Format: YYYY-MM-DD-type-provider-hash.ext
+			expect(result).toMatch(/^\d{4}-\d{2}-\d{2}-invoice-amazon-a7b3\.pdf$/);
 		});
 
 		test("should handle missing provider", () => {
@@ -113,11 +114,12 @@ describe("inbox/engine-utils", () => {
 			expect(result).toBe("2024-12-10-document-amazon-a7b3.pdf");
 		});
 
-		test("should handle only hash (no date, type, or provider)", () => {
+		test("should handle only hash (no date, type, or provider) - still gets today's date", () => {
 			const result = generateFilename("/path/to/doc.pdf", TEST_HASH);
 
-			// Minimum: document-hash.ext
-			expect(result).toBe("document-a7b3.pdf");
+			// With hash, date falls back to today for chronological sorting
+			// Format: YYYY-MM-DD-document-hash.ext
+			expect(result).toMatch(/^\d{4}-\d{2}-\d{2}-document-a7b3\.pdf$/);
 		});
 
 		test("should use statementDate when date is not available", () => {
@@ -338,7 +340,7 @@ describe("inbox/engine-utils", () => {
 				expect(result).toBe("2024 12 10 Invoice Amazon a7b3");
 			});
 
-			test("should handle missing date with hash", () => {
+			test("should fallback to today when date is missing with hash", () => {
 				const result = generateTitle(
 					"invoice.pdf",
 					"invoice",
@@ -348,8 +350,9 @@ describe("inbox/engine-utils", () => {
 					TEST_HASH,
 				);
 
-				// No date, so just: Type Provider hash4
-				expect(result).toBe("Invoice Amazon a7b3");
+				// With hash, date falls back to today for chronological sorting
+				// Format: YYYY MM DD Type Provider hash4
+				expect(result).toMatch(/^\d{4} \d{2} \d{2} Invoice Amazon a7b3$/);
 			});
 
 			test("should handle missing provider with hash", () => {
@@ -366,11 +369,12 @@ describe("inbox/engine-utils", () => {
 				expect(result).toBe("2024 12 10 Invoice a7b3");
 			});
 
-			test("should handle only hash (no date, no provider)", () => {
+			test("should fallback to today when only hash provided (no date, no provider)", () => {
 				const result = generateTitle("invoice.pdf", "invoice", {}, TEST_HASH);
 
-				// Just: Type hash4
-				expect(result).toBe("Invoice a7b3");
+				// With hash, date falls back to today
+				// Format: YYYY MM DD Type hash4
+				expect(result).toMatch(/^\d{4} \d{2} \d{2} Invoice a7b3$/);
 			});
 
 			test("should use statementDate with hash", () => {
@@ -550,12 +554,14 @@ describe("inbox/engine-utils", () => {
 			expect(result).toBe("2025-01-15-invoice-test-co.pdf");
 		});
 
-		test("should return undefined when date is missing", () => {
+		test("should fallback to today when date is missing", () => {
 			const result = generateAttachmentName("/inbox/doc.pdf", "invoice", {
 				provider: "Acme",
 			});
 
-			expect(result).toBeUndefined();
+			// With attachments, date falls back to today for chronological sorting
+			// Format: YYYY-MM-DD-type-provider.ext
+			expect(result).toMatch(/^\d{4}-\d{2}-\d{2}-invoice-acme\.pdf$/);
 		});
 
 		test("should return undefined when noteType is missing", () => {
@@ -603,6 +609,62 @@ describe("inbox/engine-utils", () => {
 			});
 
 			expect(result).toBe("2025-01-15-receipt-shop.PNG");
+		});
+
+		// Letter document type tests
+		test("should use date_sent for letter documents", () => {
+			const result = generateAttachmentName("/inbox/letter.docx", "letter", {
+				date_sent: "2025-12-15",
+				recipient: "Bunnings HR",
+			});
+
+			expect(result).toBe("2025-12-15-letter-bunnings-hr.docx");
+		});
+
+		test("should use recipient as description for letter documents", () => {
+			const result = generateAttachmentName("/inbox/letter.docx", "letter", {
+				date_sent: "2025-12-15",
+				recipient: "John Smith at Acme Corp",
+			});
+
+			expect(result).toBe("2025-12-15-letter-john-smith-at-acme-corp.docx");
+		});
+
+		test("should fallback to provider for letter if recipient missing", () => {
+			const result = generateAttachmentName("/inbox/letter.docx", "letter", {
+				date_sent: "2025-12-15",
+				provider: "HR Department",
+			});
+
+			expect(result).toBe("2025-12-15-letter-hr-department.docx");
+		});
+
+		// CV document type tests
+		test("should use title as description for CV documents", () => {
+			const result = generateAttachmentName("/inbox/cv.docx", "cv", {
+				date: "2025-01-10",
+				title: "Nathan Vale CV 2025",
+			});
+
+			expect(result).toBe("2025-01-10-cv-nathan-vale-cv-2025.docx");
+		});
+
+		test("should fallback to version for CV if title missing", () => {
+			const result = generateAttachmentName("/inbox/cv.docx", "cv", {
+				date: "2025-01-10",
+				version: "2025-v1",
+			});
+
+			expect(result).toBe("2025-01-10-cv-2025-v1.docx");
+		});
+
+		test("should fallback to today for CV without date", () => {
+			const result = generateAttachmentName("/inbox/cv.docx", "cv", {
+				title: "Resume 2025",
+			});
+
+			// Date falls back to today
+			expect(result).toMatch(/^\d{4}-\d{2}-\d{2}-cv-resume-2025\.docx$/);
 		});
 	});
 });

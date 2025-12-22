@@ -104,6 +104,23 @@ export async function executeSuggestion(
 	let createdNotePath: string | undefined;
 	const { sessionCid } = context;
 
+	// Check if this is a Type A document (markdown source of truth)
+	// Type A documents embed content in note body - no attachment needed
+	const isTypeA =
+		isCreateNoteSuggestion(suggestion) &&
+		suggestion.sourceOfTruth === "markdown" &&
+		suggestion.suggestedContent;
+
+	// Debug Type A detection - always log to stderr for debugging
+	console.error(
+		`[executor] isCreateNote=${isCreateNoteSuggestion(suggestion)} sourceOfTruth=${isCreateNoteSuggestion(suggestion) ? (suggestion as any).sourceOfTruth : "n/a"} hasSuggestedContent=${isCreateNoteSuggestion(suggestion) ? !!(suggestion as any).suggestedContent : false} contentLen=${isCreateNoteSuggestion(suggestion) ? ((suggestion as any).suggestedContent?.length ?? 0) : 0} isTypeA=${isTypeA}`,
+	);
+
+	// Debug Type A detection
+	if (logger && isCreateNoteSuggestion(suggestion)) {
+		logger.debug`Type A check: sourceOfTruth=${suggestion.sourceOfTruth ?? "undefined"} hasSuggestedContent=${!!suggestion.suggestedContent} contentLength=${suggestion.suggestedContent?.length ?? 0} isTypeA=${isTypeA} ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
+	}
+
 	// Step 1: Create note FIRST (if needed) - fail early before touching inbox
 	if (
 		suggestion.action === "create-note" &&
@@ -120,14 +137,58 @@ export async function executeSuggestion(
 				suggestionId: suggestion.id,
 				success: false,
 				action: suggestion.action,
-				error: `${noteResult.error}. Attachment remains in inbox - fix the issue and retry.`,
+				error: `${noteResult.error}. Source file remains in inbox - fix the issue and retry.`,
 			};
 		}
 
 		createdNotePath = noteResult.notePath;
 	}
 
-	// Step 2: Move attachment - ROLLBACK note if this fails
+	// Step 2: Handle source file based on document type
+	// Type A (markdown): Archive/delete source DOCX (content is embedded in note)
+	// Type B (binary): Move attachment to Attachments folder
+	if (isTypeA) {
+		// Type A: Delete source file (content is now in the markdown note)
+		// Future: Could archive to Archives/Source Files/ instead
+		const sourcePath = join(context.vaultPath, suggestion.source);
+
+		// Hash the file BEFORE deleting (for registry cleanup)
+		const sourceHash = await hashFile(sourcePath).catch(() => null);
+
+		try {
+			await unlink(sourcePath);
+			if (logger) {
+				logger.info`Type A document: deleted source file=${basename(suggestion.source)} (content embedded in note) ${cid}`;
+			}
+		} catch (error) {
+			// Non-fatal - log warning but continue
+			if (logger) {
+				logger.warn`Failed to delete source file: ${error instanceof Error ? error.message : "unknown"} ${cid}`;
+			}
+		}
+
+		// Cleanup registry (using hash computed before deletion)
+		if (sourceHash) {
+			const removed = await registry.removeAndSave(sourceHash);
+			if (removed && logger) {
+				logger.debug`Registry cleaned for Type A: hash=${sourceHash.slice(0, 8)} ${cid}`;
+			}
+		}
+
+		if (logger) {
+			logger.info`Executed Type A suggestion id=${suggestion.id} createdNote=${createdNotePath ?? "none"} (no attachment) ${cid}`;
+		}
+
+		return {
+			suggestionId: suggestion.id,
+			success: true,
+			action: suggestion.action,
+			createdNote: createdNotePath,
+			// No movedAttachment for Type A - content is embedded
+		};
+	}
+
+	// Type B (binary): Move attachment - ROLLBACK note if this fails
 	const moveResult = await moveAttachment(suggestion, context, logger, cid, {
 		sessionCid,
 	});

@@ -11,6 +11,8 @@
  */
 
 import type { InboxFile } from "../scan/extractors";
+// YouTubeEnrichmentError imported via type-only import to avoid circular dependency
+import type { YouTubeEnrichmentError } from "./strategies/youtube-strategy";
 
 /**
  * Result of enriching a bookmark with Firecrawl.
@@ -37,6 +39,21 @@ export interface BookmarkEnrichment {
 
 	/** True if this was a cache hit (already enriched) */
 	readonly fromCache?: boolean;
+}
+
+/**
+ * Result of enriching a YouTube video with transcript.
+ * Contains transcript text and metadata.
+ */
+export interface YouTubeEnrichment {
+	/** Full transcript text (all items combined) */
+	readonly transcript: string;
+
+	/** Length of transcript in characters */
+	readonly transcriptLength: number;
+
+	/** ISO timestamp of when enrichment was performed */
+	readonly enrichedAt: string;
 }
 
 /**
@@ -215,6 +232,7 @@ export interface EnrichmentEligibility {
  */
 export type EnrichmentResult =
 	| { readonly type: "bookmark"; readonly data: BookmarkEnrichment }
+	| { readonly type: "youtube"; readonly data: YouTubeEnrichment }
 	| { readonly type: "none"; readonly reason: string };
 
 /**
@@ -285,8 +303,8 @@ export interface EnrichmentPipelineResult {
 	readonly strategyId?: string;
 	/** Enrichment data (if performed) */
 	readonly result?: EnrichmentResult;
-	/** Error if enrichment failed */
-	readonly error?: BookmarkEnrichmentError;
+	/** Error if enrichment failed (supports both bookmark and YouTube errors) */
+	readonly error?: BookmarkEnrichmentError | YouTubeEnrichmentError;
 }
 
 /**

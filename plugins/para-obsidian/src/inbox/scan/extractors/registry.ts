@@ -158,6 +158,7 @@ export class ExtractorRegistry {
  *
  * Currently includes:
  * - PDF extractor (pdftotext)
+ * - DOCX extractor (mammoth + turndown for markdown)
  * - Image extractor (Vision AI - placeholder until API configured)
  * - Markdown extractor (frontmatter + content)
  *
@@ -174,6 +175,13 @@ export async function createDefaultRegistry(): Promise<ExtractorRegistry> {
 			load: async () => {
 				const mod = await import("./pdf");
 				return mod.pdfExtractor;
+			},
+		},
+		{
+			name: "docx",
+			load: async () => {
+				const mod = await import("./docx");
+				return mod.docxExtractor;
 			},
 		},
 		{

@@ -88,6 +88,7 @@ type: resource
 			sourceHash: hash,
 			sourcePath: "00 Inbox/test-document.pdf",
 			processedAt: new Date().toISOString(),
+			movedAttachment: "Attachments/test-document.pdf", // Required for registry
 		});
 		await registry.save();
 
@@ -154,6 +155,7 @@ type: resource
 			sourceHash: hash,
 			sourcePath: "00 Inbox/test-image.png",
 			processedAt: new Date().toISOString(),
+			movedAttachment: "Attachments/test-image.png", // Required for registry
 		});
 		await registry.save();
 
@@ -219,6 +221,7 @@ type: resource
 			sourceHash: hash,
 			sourcePath: "00 Inbox/test-document.pdf",
 			processedAt: new Date().toISOString(),
+			movedAttachment: "Attachments/test-document.pdf", // Required for registry
 		});
 		await registry.save();
 
@@ -287,6 +290,7 @@ Bookmark content`;
 			sourceHash: hash,
 			sourcePath: "00 Inbox/test-bookmark.md",
 			processedAt: new Date().toISOString(),
+			movedAttachment: "03 Resources/test-bookmark.md", // Required for registry (pre-classified note destination)
 		});
 		await registry.save();
 
@@ -354,6 +358,7 @@ Bookmark content`;
 			sourceHash: hash,
 			sourcePath: "00 Inbox/test-document.pdf",
 			processedAt: new Date().toISOString(),
+			movedAttachment: "Attachments/test-document.pdf", // Required for registry
 		});
 		await registry.save();
 

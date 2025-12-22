@@ -468,23 +468,19 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 								);
 
 								if (enrichmentResult.error) {
-									// Enrichment failed - BLOCKING error
-									// Skip this file, let user know, they can retry later
+									// Enrichment failed but was handled gracefully
+									// File has been updated with failure status (e.g., transcript_status: failed)
+									// Continue processing - don't block or count as error
 									const error = enrichmentResult.error;
 									const errorMessage = `${error.code}: ${error.message}`;
 
 									if (inboxLogger) {
-										inboxLogger.warn`Enrichment failed file=${filename} strategy=${enrichmentResult.strategyId} error=${errorMessage} sessionCid=${sessionCid} cid=${cid}`;
+										inboxLogger.warn`Enrichment failed (gracefully handled) file=${filename} strategy=${enrichmentResult.strategyId} error=${errorMessage} sessionCid=${sessionCid} cid=${cid}`;
 									}
-									if (onProgress) {
-										await onProgress({
-											...progressBase,
-											stage: "error",
-											error: `Enrichment failed: ${errorMessage}`,
-										});
-									}
-									// Return null to skip this file - blocking behavior
-									return null;
+									// Use enrichmentResult.frontmatter which contains the failure metadata
+									enrichedFrontmatter = enrichmentResult.frontmatter;
+									// Note: Don't emit "error" stage - this was handled gracefully
+									// The file will continue to be processed/classified normally
 								}
 
 								if (enrichmentResult.enriched) {
@@ -632,6 +628,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			// Extract text using the appropriate extractor
 			let text: string;
 			let extractedMetadata: unknown;
+			let extractedMarkdown: string | undefined;
 			try {
 				if (onProgress) {
 					await onProgress({ ...progressBase, stage: "extract" });
@@ -647,6 +644,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				);
 				text = extracted.text;
 				extractedMetadata = extracted.metadata;
+				extractedMarkdown = extracted.markdown;
 			} catch (error) {
 				if (inboxLogger) {
 					inboxLogger.warn`Failed to extract content: ${filename} sessionCid=${sessionCid} cid=${cid}`;
@@ -875,14 +873,47 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				}
 			}
 
-			// Build suggestion
-			const suggestion = buildSuggestion({
+			// Build suggestion first - this determines the final document type
+			// using all priority logic (authoritative filename, LLM, heuristics)
+			let suggestion = buildSuggestion({
 				filename,
 				inboxFolder: resolvedConfig.inboxFolder,
 				heuristicResult,
 				llmResult,
 				hash: fileHash,
 			});
+
+			// Now look up classifier using the FINAL type from the suggestion
+			// This ensures Type A/B determination uses the same type as the suggestion
+			const finalType = isCreateNoteSuggestion(suggestion)
+				? suggestion.suggestedNoteType
+				: undefined;
+
+			const classifier = finalType
+				? DEFAULT_CLASSIFIERS.find((c) => c.id === finalType && c.enabled)
+				: undefined;
+
+			// If this is a Type A document (markdown source of truth), add the extracted content
+			if (
+				classifier?.sourceOfTruth === "markdown" &&
+				extractedMarkdown &&
+				isCreateNoteSuggestion(suggestion)
+			) {
+				// Rebuild suggestion with Type A fields
+				suggestion = buildSuggestion({
+					filename,
+					inboxFolder: resolvedConfig.inboxFolder,
+					heuristicResult,
+					llmResult,
+					hash: fileHash,
+					extractedMarkdown,
+					sourceOfTruth: classifier.sourceOfTruth,
+				});
+
+				if (inboxLogger) {
+					inboxLogger.debug`Type A document: type=${finalType} sourceOfTruth=${classifier.sourceOfTruth} markdownLength=${extractedMarkdown.length} sessionCid=${sessionCid} cid=${cid}`;
+				}
+			}
 
 			// Log the final suggestion source
 			if (inboxLogger) {
