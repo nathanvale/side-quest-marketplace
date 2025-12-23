@@ -1,14 +1,22 @@
-import { describe, expect, it } from "bun:test";
-import fs from "node:fs";
+import { afterEach, describe, expect, it } from "bun:test";
 import path from "node:path";
-import { createTestVault } from "../testing/utils";
+import {
+	createTestVault,
+	useTestVaultCleanup,
+	writeVaultFile,
+} from "../testing/utils";
 import { listDir, readFile, resolveVaultPath } from "./fs";
 
 describe("fs helpers", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	it("resolves vault-relative paths", () => {
 		const vault = createTestVault();
+		trackVault(vault);
+
+		writeVaultFile(vault, "01_Projects/.gitkeep", "");
 		const target = path.join(vault, "01_Projects");
-		fs.mkdirSync(target);
 		const result = resolveVaultPath(vault, "01_Projects");
 		expect(result.absolute).toBe(target);
 		expect(result.relative).toBe("01_Projects");
@@ -16,21 +24,26 @@ describe("fs helpers", () => {
 
 	it("prevents escaping vault", () => {
 		const vault = createTestVault();
+		trackVault(vault);
+
 		expect(() => resolveVaultPath(vault, "../evil")).toThrow("escapes");
 	});
 
 	it("lists directories", () => {
 		const vault = createTestVault();
-		fs.mkdirSync(path.join(vault, "a"));
-		fs.mkdirSync(path.join(vault, "b"));
+		trackVault(vault);
+
+		writeVaultFile(vault, "a/.gitkeep", "");
+		writeVaultFile(vault, "b/.gitkeep", "");
 		const items = listDir(vault, ".");
 		expect(items).toEqual(["a", "b"]);
 	});
 
 	it("reads files", () => {
 		const vault = createTestVault();
-		const file = path.join(vault, "note.md");
-		fs.writeFileSync(file, "hello");
+		trackVault(vault);
+
+		writeVaultFile(vault, "note.md", "hello");
 		const content = readFile(vault, "note.md");
 		expect(content).toBe("hello");
 	});

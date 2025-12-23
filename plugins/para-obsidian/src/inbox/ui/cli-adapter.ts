@@ -9,7 +9,6 @@ import { input } from "@inquirer/prompts";
 import { emphasize } from "@sidequest/core/terminal";
 import { createSpinner } from "nanospinner";
 import { cliLogger } from "../../shared/logger";
-import { getAreaPathMap, getProjectPathMap } from "../core/vault/context";
 import type {
 	BatchResult,
 	CLICommand,
@@ -304,28 +303,13 @@ export function formatSuggestion(
 	// Details on subsequent lines (only for create-note suggestions)
 	if (isCreateNoteSuggestion(suggestion)) {
 		lines.push(`    Title: ${suggestion.suggestedTitle}`);
-		// Compact area/type/confidence line
-		const metaParts: string[] = [];
-		if (suggestion.suggestedArea) {
-			metaParts.push(`Area: ${suggestion.suggestedArea}`);
-		}
-		metaParts.push(`Type: ${suggestion.suggestedNoteType}`);
-		lines.push(`    ${metaParts.join(" • ")}`);
+		lines.push(`    Type: ${suggestion.suggestedNoteType}`);
 
 		// Show destination status
 		if (suggestion.suggestedDestination) {
 			lines.push(`    ├─ Destination: ${suggestion.suggestedDestination}`);
 		} else {
 			lines.push(`    ├─ ${emphasize.error("⚠️ NO DESTINATION SET")}`);
-		}
-
-		// Show LLM suggestion if available and different from current destination
-		const llmSuggestion =
-			suggestion.llmSuggestedArea ?? suggestion.llmSuggestedProject;
-		if (llmSuggestion && llmSuggestion !== suggestion.suggestedDestination) {
-			lines.push(
-				`    └─ ${emphasize.dim(`💡 LLM suggests: ${llmSuggestion} (use e${index} to reclassify)`)}`,
-			);
 		}
 
 		// Show renamed attachment if different from source
@@ -398,12 +382,6 @@ export function formatSuggestionDetails(
 		lines.push(`    Title:     ${suggestion.suggestedTitle}`);
 		if (suggestion.suggestedDestination) {
 			lines.push(`    Dest:      ${suggestion.suggestedDestination}`);
-		}
-		if (suggestion.suggestedArea) {
-			lines.push(`    Area:      ${suggestion.suggestedArea}`);
-		}
-		if (suggestion.suggestedProject) {
-			lines.push(`    Project:   ${suggestion.suggestedProject}`);
 		}
 
 		// Show extracted fields if available
@@ -675,8 +653,6 @@ export interface InteractiveOptions {
 function formatConfirmationPreview(
 	suggestions: InboxSuggestion[],
 	originalIndices: Map<SuggestionId, number>,
-	areaPathMap?: Map<string, string>,
-	projectPathMap?: Map<string, string>,
 ): string {
 	const lines: string[] = [];
 	lines.push("");
@@ -689,23 +665,8 @@ function formatConfirmationPreview(
 		const idx = originalIndices.get(s.id) ?? "?";
 		const filename = s.source.split("/").pop() ?? s.source;
 		if (isCreateNoteSuggestion(s)) {
-			// Resolve the destination for display
-			let noteDestination = "00 Inbox"; // Default
-			if (s.suggestedDestination) {
-				noteDestination = s.suggestedDestination;
-			} else if (s.suggestedArea && areaPathMap) {
-				const areaPath = areaPathMap.get(s.suggestedArea.toLowerCase());
-				if (areaPath) {
-					noteDestination = areaPath;
-				}
-			} else if (s.suggestedProject && projectPathMap) {
-				const projectPath = projectPathMap.get(
-					s.suggestedProject.toLowerCase(),
-				);
-				if (projectPath) {
-					noteDestination = projectPath;
-				}
-			}
+			// All items go to inbox - no area/project routing
+			const noteDestination = s.suggestedDestination ?? "00 Inbox";
 
 			lines.push(`  [${idx}] ${filename}`);
 			lines.push(`       → Create note in: ${noteDestination}/`);
@@ -739,14 +700,7 @@ function formatConfirmationPreview(
 export async function runInteractiveLoop(
 	options: InteractiveOptions,
 ): Promise<InteractiveLoopResult> {
-	const {
-		engine,
-		suggestions,
-		pageSize = PAGE_SIZE,
-		vaultPath,
-		paraFolders,
-		sessionCid,
-	} = options;
+	const { engine, suggestions, pageSize = PAGE_SIZE, sessionCid } = options;
 	const approved = new Set<SuggestionId>();
 	const approvalHistory: SuggestionId[] = []; // For undo
 	const skipped = new Set<SuggestionId>();
@@ -761,15 +715,6 @@ export async function runInteractiveLoop(
 			cid: sessionCid,
 		});
 	}
-
-	// Build path maps for resolving area/project names to full vault paths
-	// e.g., "Health" → "02 Areas/Health", "Tax 2024" → "01 Projects/Tax 2024"
-	const areaPathMap = vaultPath
-		? getAreaPathMap(vaultPath, paraFolders)
-		: new Map<string, string>();
-	const projectPathMap = vaultPath
-		? getProjectPathMap(vaultPath, paraFolders)
-		: new Map<string, string>();
 
 	// Create stable ID-to-suggestion map and original index mapping
 	const suggestionById = new Map<SuggestionId, InboxSuggestion>();
@@ -953,14 +898,7 @@ export async function runInteractiveLoop(
 					const toExecute = currentSuggestions.filter((s) =>
 						approved.has(s.id),
 					);
-					console.log(
-						formatConfirmationPreview(
-							toExecute,
-							originalIndices,
-							areaPathMap,
-							projectPathMap,
-						),
-					);
+					console.log(formatConfirmationPreview(toExecute, originalIndices));
 
 					const confirmInput = await input({
 						message: "Execute? [Enter=yes, no=cancel]: ",
@@ -1049,14 +987,7 @@ export async function runInteractiveLoop(
 					const toExecute = currentSuggestions.filter((s) =>
 						approved.has(s.id),
 					);
-					console.log(
-						formatConfirmationPreview(
-							toExecute,
-							originalIndices,
-							areaPathMap,
-							projectPathMap,
-						),
-					);
+					console.log(formatConfirmationPreview(toExecute, originalIndices));
 
 					const confirmInput = await input({
 						message: "Execute? [Enter=yes, no=cancel]: ",
@@ -1159,14 +1090,7 @@ export async function runInteractiveLoop(
 					const toExecute = currentSuggestions.filter((s) =>
 						approved.has(s.id),
 					);
-					console.log(
-						formatConfirmationPreview(
-							toExecute,
-							originalIndices,
-							areaPathMap,
-							projectPathMap,
-						),
-					);
+					console.log(formatConfirmationPreview(toExecute, originalIndices));
 
 					const confirmInput = await input({
 						message: "Execute? [Enter=yes, no=cancel]: ",

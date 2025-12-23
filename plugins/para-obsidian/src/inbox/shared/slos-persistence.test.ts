@@ -8,6 +8,7 @@ import {
 	unlink,
 	writeTextFile,
 } from "@sidequest/core/fs";
+import { useTestVaultCleanup } from "../../testing/utils";
 import {
 	ensureEventsLoaded,
 	getBurnRate,
@@ -20,6 +21,8 @@ import {
  * Tests for SLO disk persistence
  */
 describe("SLO disk persistence", () => {
+	const { getAfterEachHook } = useTestVaultCleanup();
+
 	const sloFilePath = join(homedir(), ".claude", "logs", "slo-events.jsonl");
 	const backupPath = `${sloFilePath}.backup`;
 
@@ -53,6 +56,9 @@ describe("SLO disk persistence", () => {
 
 		// Clear in-memory events
 		resetSLOEvents();
+
+		// Call the vault cleanup hook
+		await getAfterEachHook()();
 	});
 
 	describe("recordSLOEvent", () => {

@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 import { ensureDirSync, writeTextFileSync } from "@sidequest/core/fs";
 import { spawn } from "bun";
 
 import { loadConfig } from "../../config/index";
-import { createTestVault } from "../../testing/utils";
+import { createTestVault, useTestVaultCleanup } from "../../testing/utils";
 
 function writeTemplate(dir: string, name: string, content: string) {
 	ensureDirSync(dir);
@@ -53,8 +53,12 @@ describe("cli", () => {
 });
 
 describe("cli convert (compat)", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	it("fails with a clear message when template is missing", async () => {
 		const vault = createTestVault({ gitInit: true });
+		trackVault(vault);
 		const templatesDir = path.join(vault, "Templates");
 		fs.mkdirSync(templatesDir, { recursive: true });
 		writeTemplate(
@@ -78,8 +82,12 @@ type: task
 });
 
 describe("cli create --content", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	it("creates note and injects content into sections", async () => {
 		const vault = createTestVault({ gitInit: true });
+		trackVault(vault);
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -135,6 +143,7 @@ type: project
 
 	it("handles invalid JSON in --content flag", async () => {
 		const vault = createTestVault({ gitInit: true });
+		trackVault(vault);
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -168,6 +177,7 @@ type: project
 
 	it("reports partial success when some headings missing", async () => {
 		const vault = createTestVault({ gitInit: true });
+		trackVault(vault);
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -222,6 +232,7 @@ type: project
 
 	it("outputs markdown format by default with injection results", async () => {
 		const vault = createTestVault({ gitInit: true });
+		trackVault(vault);
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -262,6 +273,7 @@ type: project
 
 	it("creates note without content when --content not provided", async () => {
 		const vault = createTestVault({ gitInit: true });
+		trackVault(vault);
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -299,6 +311,7 @@ type: project
 
 	it("skips empty content values in --content", async () => {
 		const vault = createTestVault({ gitInit: true });
+		trackVault(vault);
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -345,8 +358,12 @@ type: project
 });
 
 describe("cli frontmatter set", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	it("shows 'Would update' when validation fails", async () => {
 		const vault = createTestVault({ gitInit: true });
+		trackVault(vault);
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,
@@ -403,6 +420,7 @@ tags: [project]
 
 	it("shows 'Updated' when set succeeds", async () => {
 		const vault = createTestVault({ gitInit: true });
+		trackVault(vault);
 		const templatesDir = path.join(vault, "Templates");
 		writeTemplate(
 			templatesDir,

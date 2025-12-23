@@ -2,29 +2,71 @@ import { describe, expect, test } from "bun:test";
 import type { RollbackOperation } from "./transaction";
 import { executeTransaction, Transaction } from "./transaction";
 
+/**
+ * Helper to create a simple operation for testing
+ */
+function createOperation(
+	name: string,
+	executeResult: unknown,
+	onRollback?: () => unknown,
+): RollbackOperation {
+	return {
+		name,
+		execute: async () => executeResult,
+		rollback: async () => {
+			await onRollback?.();
+		},
+	};
+}
+
+/**
+ * Helper to create a failing operation for testing
+ */
+function createFailingOperation(
+	name: string,
+	errorMessage: string,
+	onRollback?: () => unknown,
+): RollbackOperation {
+	return {
+		name,
+		execute: async () => {
+			throw new Error(errorMessage);
+		},
+		rollback: async () => {
+			await onRollback?.();
+		},
+	};
+}
+
+/**
+ * Helper to create an operation that tracks execution order
+ */
+function createTrackedOperation(
+	name: string,
+	executeResult: unknown,
+	tracker: string[],
+	onRollback?: () => void,
+): RollbackOperation {
+	return {
+		name,
+		execute: async () => {
+			tracker.push(name);
+			return executeResult;
+		},
+		rollback: async () => {
+			onRollback?.();
+		},
+	};
+}
+
 describe("transaction", () => {
 	describe("Transaction", () => {
 		test("executes operations sequentially", async () => {
 			const tx = new Transaction();
 			const order: string[] = [];
 
-			tx.add({
-				name: "op1",
-				execute: async () => {
-					order.push("op1");
-					return "result1";
-				},
-				rollback: async () => {},
-			});
-
-			tx.add({
-				name: "op2",
-				execute: async () => {
-					order.push("op2");
-					return "result2";
-				},
-				rollback: async () => {},
-			});
+			tx.add(createTrackedOperation("op1", "result1", order));
+			tx.add(createTrackedOperation("op2", "result2", order));
 
 			const result = await tx.execute<string>();
 
@@ -38,17 +80,8 @@ describe("transaction", () => {
 		test("returns success with last operation result", async () => {
 			const tx = new Transaction();
 
-			tx.add({
-				name: "op1",
-				execute: async () => ({ value: 1 }),
-				rollback: async () => {},
-			});
-
-			tx.add({
-				name: "op2",
-				execute: async () => ({ value: 2 }),
-				rollback: async () => {},
-			});
+			tx.add(createOperation("op1", { value: 1 }));
+			tx.add(createOperation("op2", { value: 2 }));
 
 			const result = await tx.execute<{ value: number }>();
 
@@ -62,31 +95,13 @@ describe("transaction", () => {
 			const tx = new Transaction();
 			const rollbacks: string[] = [];
 
-			tx.add({
-				name: "op1",
-				execute: async () => "result1",
-				rollback: async () => {
-					rollbacks.push("op1");
-				},
-			});
-
-			tx.add({
-				name: "op2",
-				execute: async () => {
-					throw new Error("op2 failed");
-				},
-				rollback: async () => {
-					rollbacks.push("op2");
-				},
-			});
-
-			tx.add({
-				name: "op3",
-				execute: async () => "result3",
-				rollback: async () => {
-					rollbacks.push("op3");
-				},
-			});
+			tx.add(createOperation("op1", "result1", () => rollbacks.push("op1")));
+			tx.add(
+				createFailingOperation("op2", "op2 failed", () =>
+					rollbacks.push("op2"),
+				),
+			);
+			tx.add(createOperation("op3", "result3", () => rollbacks.push("op3")));
 
 			const result = await tx.execute();
 
@@ -128,31 +143,15 @@ describe("transaction", () => {
 			const tx = new Transaction();
 			const rollbackOrder: string[] = [];
 
-			tx.add({
-				name: "op1",
-				execute: async () => {},
-				rollback: async () => {
-					rollbackOrder.push("op1");
-				},
-			});
-
-			tx.add({
-				name: "op2",
-				execute: async () => {},
-				rollback: async () => {
-					rollbackOrder.push("op2");
-				},
-			});
-
-			tx.add({
-				name: "op3",
-				execute: async () => {
-					throw new Error("fail");
-				},
-				rollback: async () => {
-					rollbackOrder.push("op3");
-				},
-			});
+			tx.add(
+				createOperation("op1", undefined, () => rollbackOrder.push("op1")),
+			);
+			tx.add(
+				createOperation("op2", undefined, () => rollbackOrder.push("op2")),
+			);
+			tx.add(
+				createFailingOperation("op3", "fail", () => rollbackOrder.push("op3")),
+			);
 
 			await tx.execute();
 
@@ -164,32 +163,18 @@ describe("transaction", () => {
 			const tx = new Transaction();
 			const rollbacks: string[] = [];
 
-			tx.add({
-				name: "op1",
-				execute: async () => {},
-				rollback: async () => {
-					rollbacks.push("op1");
-				},
-			});
-
-			tx.add({
-				name: "op2",
-				execute: async () => {},
-				rollback: async () => {
+			tx.add(createOperation("op1", undefined, () => rollbacks.push("op1")));
+			tx.add(
+				createOperation("op2", undefined, () => {
 					rollbacks.push("op2-start");
 					throw new Error("Rollback failed");
-				},
-			});
-
-			tx.add({
-				name: "op3",
-				execute: async () => {
-					throw new Error("Execute failed");
-				},
-				rollback: async () => {
-					rollbacks.push("op3");
-				},
-			});
+				}),
+			);
+			tx.add(
+				createFailingOperation("op3", "Execute failed", () =>
+					rollbacks.push("op3"),
+				),
+			);
 
 			await tx.execute();
 
@@ -200,17 +185,8 @@ describe("transaction", () => {
 		test("clear removes all operations", () => {
 			const tx = new Transaction();
 
-			tx.add({
-				name: "op1",
-				execute: async () => {},
-				rollback: async () => {},
-			});
-
-			tx.add({
-				name: "op2",
-				execute: async () => {},
-				rollback: async () => {},
-			});
+			tx.add(createOperation("op1", undefined));
+			tx.add(createOperation("op2", undefined));
 
 			expect(tx.pendingCount).toBe(2);
 			tx.clear();
@@ -223,17 +199,8 @@ describe("transaction", () => {
 			expect(tx.pendingCount).toBe(0);
 			expect(tx.completedCount).toBe(0);
 
-			tx.add({
-				name: "op1",
-				execute: async () => {},
-				rollback: async () => {},
-			});
-
-			tx.add({
-				name: "op2",
-				execute: async () => {},
-				rollback: async () => {},
-			});
+			tx.add(createOperation("op1", undefined));
+			tx.add(createOperation("op2", undefined));
 
 			expect(tx.pendingCount).toBe(2);
 			expect(tx.completedCount).toBe(0);
@@ -256,22 +223,8 @@ describe("transaction", () => {
 			const executed: string[] = [];
 
 			const result = await executeTransaction<string>([
-				{
-					name: "op1",
-					execute: async () => {
-						executed.push("op1");
-						return "result1";
-					},
-					rollback: async () => {},
-				},
-				{
-					name: "op2",
-					execute: async () => {
-						executed.push("op2");
-						return "result2";
-					},
-					rollback: async () => {},
-				},
+				createTrackedOperation("op1", "result1", executed),
+				createTrackedOperation("op2", "result2", executed),
 			]);
 
 			expect(result.success).toBe(true);
@@ -285,22 +238,8 @@ describe("transaction", () => {
 			const rollbacks: string[] = [];
 
 			const result = await executeTransaction([
-				{
-					name: "op1",
-					execute: async () => {},
-					rollback: async () => {
-						rollbacks.push("op1");
-					},
-				},
-				{
-					name: "op2",
-					execute: async () => {
-						throw new Error("failed");
-					},
-					rollback: async () => {
-						rollbacks.push("op2");
-					},
-				},
+				createOperation("op1", undefined, () => rollbacks.push("op1")),
+				createFailingOperation("op2", "failed", () => rollbacks.push("op2")),
 			]);
 
 			expect(result.success).toBe(false);
@@ -360,22 +299,13 @@ describe("transaction", () => {
 			const tx = new Transaction();
 			const delays: number[] = [];
 
-			tx.add({
-				name: "op1",
-				execute: async () => {},
-				rollback: async () => {
+			tx.add(
+				createOperation("op1", undefined, async () => {
 					await new Promise((resolve) => setTimeout(resolve, 10));
 					delays.push(1);
-				},
-			});
-
-			tx.add({
-				name: "op2",
-				execute: async () => {
-					throw new Error("fail");
-				},
-				rollback: async () => {},
-			});
+				}),
+			);
+			tx.add(createFailingOperation("op2", "fail"));
 
 			const start = Date.now();
 			await tx.execute();

@@ -1,9 +1,13 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 
 import type { ParaObsidianConfig } from "../config/index";
-import { createTestVault, initGitRepo } from "../testing/utils";
+import {
+	createTestVault,
+	initGitRepo,
+	useTestVaultCleanup,
+} from "../testing/utils";
 import { gitStatus } from "./index";
 
 function makeConfig(vault: string): ParaObsidianConfig {
@@ -18,8 +22,12 @@ function makeConfig(vault: string): ParaObsidianConfig {
 }
 
 describe("git helpers", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	it("reports clean/dirty status", async () => {
 		const dir = createTestVault();
+		trackVault(dir);
 		await initGitRepo(dir);
 		const clean = await gitStatus(dir);
 		expect(clean.clean).toBe(true);
@@ -99,9 +107,14 @@ describe("unescapeGitPath", () => {
 });
 
 describe("getUncommittedFiles with emoji filenames", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	it("correctly decodes git's octal-escaped unicode paths", async () => {
 		const { getUncommittedFiles } = await import("./index");
 		const dir = createTestVault();
+		trackVault(dir);
+		trackVault(dir);
 		await initGitRepo(dir);
 
 		// Create file with emoji in name
@@ -123,6 +136,8 @@ describe("getUncommittedFiles with emoji filenames", () => {
 	it("handles files with spaces and emoji combined", async () => {
 		const { getUncommittedFiles } = await import("./index");
 		const dir = createTestVault();
+		trackVault(dir);
+		trackVault(dir);
 		await initGitRepo(dir);
 
 		const filename = "📝 My Important Note.md";
@@ -135,6 +150,8 @@ describe("getUncommittedFiles with emoji filenames", () => {
 	it("handles Japanese characters in filenames", async () => {
 		const { getUncommittedFiles } = await import("./index");
 		const dir = createTestVault();
+		trackVault(dir);
+		trackVault(dir);
 		await initGitRepo(dir);
 
 		const filename = "日本語ノート.md";
@@ -147,6 +164,8 @@ describe("getUncommittedFiles with emoji filenames", () => {
 	it("handles subdirectories with emoji filenames", async () => {
 		const { getUncommittedFiles } = await import("./index");
 		const dir = createTestVault();
+		trackVault(dir);
+		trackVault(dir);
 		await initGitRepo(dir);
 
 		fs.mkdirSync(path.join(dir, "invoices"), { recursive: true });
@@ -159,9 +178,14 @@ describe("getUncommittedFiles with emoji filenames", () => {
 });
 
 describe("getUncommittedFiles with allFileTypes", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	it("returns all file types (not just .md)", async () => {
 		const { getUncommittedFiles } = await import("./index");
 		const dir = createTestVault();
+		trackVault(dir);
+		trackVault(dir);
 		await initGitRepo(dir);
 
 		// Create mixed file types
@@ -181,6 +205,8 @@ describe("getUncommittedFiles with allFileTypes", () => {
 	it("returns empty array when working tree is clean", async () => {
 		const { getUncommittedFiles } = await import("./index");
 		const dir = createTestVault();
+		trackVault(dir);
+		trackVault(dir);
 		await initGitRepo(dir);
 
 		const files = await getUncommittedFiles(dir, { allFileTypes: true });
@@ -190,6 +216,8 @@ describe("getUncommittedFiles with allFileTypes", () => {
 	it("returns files from subdirectories with relative paths", async () => {
 		const { getUncommittedFiles } = await import("./index");
 		const dir = createTestVault();
+		trackVault(dir);
+		trackVault(dir);
 		await initGitRepo(dir);
 
 		// Create subdirectory with files
@@ -206,6 +234,8 @@ describe("getUncommittedFiles with allFileTypes", () => {
 	it("handles staged and unstaged files", async () => {
 		const { getUncommittedFiles } = await import("./index");
 		const dir = createTestVault();
+		trackVault(dir);
+		trackVault(dir);
 		await initGitRepo(dir);
 
 		// Create and stage a file
@@ -224,6 +254,8 @@ describe("getUncommittedFiles with allFileTypes", () => {
 	it("handles modified existing files", async () => {
 		const { getUncommittedFiles } = await import("./index");
 		const dir = createTestVault();
+		trackVault(dir);
+		trackVault(dir);
 		await initGitRepo(dir);
 
 		// Create and commit a file
@@ -241,9 +273,14 @@ describe("getUncommittedFiles with allFileTypes", () => {
 });
 
 describe("getUncommittedFiles", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	it("returns unstaged new .md files (status ??)", async () => {
 		const { getUncommittedFiles } = await import("./index");
 		const dir = createTestVault();
+		trackVault(dir);
+		trackVault(dir);
 		await initGitRepo(dir);
 
 		// Create new .md files (untracked)
@@ -259,6 +296,8 @@ describe("getUncommittedFiles", () => {
 	it("returns staged .md files (status A)", async () => {
 		const { getUncommittedFiles } = await import("./index");
 		const dir = createTestVault();
+		trackVault(dir);
+		trackVault(dir);
 		await initGitRepo(dir);
 
 		// Create and stage a new file
@@ -273,6 +312,7 @@ describe("getUncommittedFiles", () => {
 	it("returns modified .md files (status M)", async () => {
 		const { getUncommittedFiles } = await import("./index");
 		const dir = createTestVault();
+		trackVault(dir);
 		await initGitRepo(dir);
 
 		// Create and commit a file, then modify it
@@ -291,6 +331,7 @@ describe("getUncommittedFiles", () => {
 	it("handles files with both staged and unstaged changes (status MM)", async () => {
 		const { getUncommittedFiles } = await import("./index");
 		const dir = createTestVault();
+		trackVault(dir);
 		await initGitRepo(dir);
 
 		// Create and commit a file
@@ -313,6 +354,7 @@ describe("getUncommittedFiles", () => {
 	it("filters out non-.md files", async () => {
 		const { getUncommittedFiles } = await import("./index");
 		const dir = createTestVault();
+		trackVault(dir);
 		await initGitRepo(dir);
 
 		// Create mixed file types
@@ -332,6 +374,7 @@ describe("getUncommittedFiles", () => {
 	it("returns empty array when working tree is clean", async () => {
 		const { getUncommittedFiles } = await import("./index");
 		const dir = createTestVault();
+		trackVault(dir);
 		await initGitRepo(dir);
 
 		const files = await getUncommittedFiles(dir);
@@ -341,6 +384,7 @@ describe("getUncommittedFiles", () => {
 	it("returns files from subdirectories with relative paths", async () => {
 		const { getUncommittedFiles } = await import("./index");
 		const dir = createTestVault();
+		trackVault(dir);
 		await initGitRepo(dir);
 
 		// Create subdirectory with notes
@@ -354,9 +398,13 @@ describe("getUncommittedFiles", () => {
 });
 
 describe("extractLinkedAttachments", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	it("extracts wikilink embeds ![[image.png]]", async () => {
 		const { extractLinkedAttachments } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		fs.mkdirSync(path.join(vault, "attachments"), { recursive: true });
 
 		// Create note with wikilink embeds
@@ -379,6 +427,7 @@ describe("extractLinkedAttachments", () => {
 	it("extracts markdown embeds ![](path/to/file.png)", async () => {
 		const { extractLinkedAttachments } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		fs.mkdirSync(path.join(vault, "images"), { recursive: true });
 
 		const notePath = path.join(vault, "note.md");
@@ -399,6 +448,7 @@ describe("extractLinkedAttachments", () => {
 	it("handles relative paths in embeds", async () => {
 		const { extractLinkedAttachments } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		fs.mkdirSync(path.join(vault, "notes"), { recursive: true });
 		fs.mkdirSync(path.join(vault, "files"), { recursive: true });
 
@@ -415,6 +465,7 @@ describe("extractLinkedAttachments", () => {
 	it("skips .md file links (notes, not attachments)", async () => {
 		const { extractLinkedAttachments } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		const notePath = path.join(vault, "note.md");
 		fs.writeFileSync(
 			notePath,
@@ -436,6 +487,7 @@ describe("extractLinkedAttachments", () => {
 	it("only returns existing files", async () => {
 		const { extractLinkedAttachments } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		const notePath = path.join(vault, "note.md");
 		fs.writeFileSync(notePath, "# Note\n![[exists.png]]\n![[missing.png]]\n");
 
@@ -451,6 +503,7 @@ describe("extractLinkedAttachments", () => {
 	it("returns empty array for note with no embeds", async () => {
 		const { extractLinkedAttachments } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		const notePath = path.join(vault, "note.md");
 		fs.writeFileSync(notePath, "# Note\nJust text, no embeds.\n");
 
@@ -461,6 +514,7 @@ describe("extractLinkedAttachments", () => {
 	it("handles mixed wikilink and markdown embeds", async () => {
 		const { extractLinkedAttachments } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		const notePath = path.join(vault, "note.md");
 		fs.writeFileSync(
 			notePath,
@@ -479,6 +533,7 @@ describe("extractLinkedAttachments", () => {
 	it("deduplicates attachment paths", async () => {
 		const { extractLinkedAttachments } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		const notePath = path.join(vault, "note.md");
 		fs.writeFileSync(
 			notePath,
@@ -494,9 +549,13 @@ describe("extractLinkedAttachments", () => {
 });
 
 describe("commitNote", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	it("commits a single note with message 'docs: <note title>'", async () => {
 		const { commitNote } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		// Create a note
@@ -516,6 +575,7 @@ describe("commitNote", () => {
 	it("includes linked attachments in same commit", async () => {
 		const { commitNote } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		// Create note with attachment reference
@@ -541,6 +601,7 @@ describe("commitNote", () => {
 	it("title extracted from filename without .md extension", async () => {
 		const { commitNote } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		fs.writeFileSync(
@@ -556,6 +617,7 @@ describe("commitNote", () => {
 	it("handles notes in subdirectories", async () => {
 		const { commitNote } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		fs.mkdirSync(path.join(vault, "projects"), { recursive: true });
@@ -577,6 +639,7 @@ describe("commitNote", () => {
 	it("fails gracefully if note does not exist", async () => {
 		const { commitNote } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		await expect(
@@ -587,6 +650,7 @@ describe("commitNote", () => {
 	it("commits note with multiple attachments", async () => {
 		const { commitNote } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		const notePath = path.join(vault, "Research.md");
@@ -610,6 +674,7 @@ describe("commitNote", () => {
 	it("commits staged deletions without re-adding missing files", async () => {
 		const { commitNote } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		const filename = "🧾 Receipt.md";
@@ -637,9 +702,13 @@ describe("commitNote", () => {
 });
 
 describe("commitAllNotes", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	it("creates one commit per uncommitted .md file", async () => {
 		const { commitAllNotes } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		// Create PARA folder structure
@@ -665,6 +734,7 @@ describe("commitAllNotes", () => {
 	it("returns accurate count of committed notes", async () => {
 		const { commitAllNotes } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		// Create PARA folder
@@ -686,6 +756,7 @@ describe("commitAllNotes", () => {
 	it("handles empty case (nothing to commit)", async () => {
 		const { commitAllNotes } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		// Clean working tree
@@ -699,6 +770,7 @@ describe("commitAllNotes", () => {
 	it("commits notes with their attachments", async () => {
 		const { commitAllNotes } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		// Create PARA folder
@@ -738,6 +810,7 @@ describe("commitAllNotes", () => {
 	it("skips non-.md files", async () => {
 		const { commitAllNotes } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		// Create PARA folder
@@ -761,6 +834,7 @@ describe("commitAllNotes", () => {
 	it("commits notes in subdirectories", async () => {
 		const { commitAllNotes } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		// Create PARA folder structure with nested dirs
@@ -791,6 +865,7 @@ describe("commitAllNotes", () => {
 	it("ignores files outside PARA folders", async () => {
 		const { commitAllNotes } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		// Create PARA folder and non-PARA folders
@@ -819,9 +894,13 @@ describe("commitAllNotes", () => {
 });
 
 describe("ensureGitGuard", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	it("throws when PARA folders have uncommitted changes", async () => {
 		const { ensureGitGuard } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		// Create uncommitted file in PARA folder
@@ -836,6 +915,7 @@ describe("ensureGitGuard", () => {
 	it("allows non-PARA folders to have uncommitted changes", async () => {
 		const { ensureGitGuard } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		// Create uncommitted files ONLY in non-PARA folders
@@ -855,6 +935,7 @@ describe("ensureGitGuard", () => {
 	it("passes when PARA folders are clean", async () => {
 		const { ensureGitGuard } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		// Clean working tree
@@ -864,6 +945,7 @@ describe("ensureGitGuard", () => {
 	it("lists uncommitted PARA files in error message", async () => {
 		const { ensureGitGuard } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		fs.mkdirSync(path.join(vault, "01 Projects"), { recursive: true });
@@ -880,6 +962,7 @@ describe("ensureGitGuard", () => {
 	it("allows PDFs in PARA folders by default (only checks .md)", async () => {
 		const { ensureGitGuard } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		// Create uncommitted PDF in PARA folder
@@ -893,6 +976,7 @@ describe("ensureGitGuard", () => {
 	it("throws when checkAllFileTypes=true and PARA folders have uncommitted PDFs", async () => {
 		const { ensureGitGuard } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		// Create uncommitted PDF in PARA folder
@@ -908,6 +992,7 @@ describe("ensureGitGuard", () => {
 	it("throws when checkAllFileTypes=true and PARA folders have uncommitted JSON", async () => {
 		const { ensureGitGuard } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		// Create uncommitted JSON in PARA folder
@@ -926,6 +1011,7 @@ describe("ensureGitGuard", () => {
 	it("checkAllFileTypes=true lists all uncommitted file types in error", async () => {
 		const { ensureGitGuard } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		// Create mixed uncommitted files in PARA folder
@@ -946,6 +1032,7 @@ describe("ensureGitGuard", () => {
 	it("checkAllFileTypes=true allows non-.md files outside PARA folders", async () => {
 		const { ensureGitGuard } = await import("./index");
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		// Create uncommitted PDF outside PARA folders

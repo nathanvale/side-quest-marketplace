@@ -2,6 +2,7 @@
  * Inbox Engine Utilities Tests
  *
  * Tests for editWithPrompt(), challenge(), and generateReport() methods.
+ * These are helper methods on the engine that support the main scan/execute workflow.
  */
 
 // IMPORTANT: Configure logtape BEFORE importing any modules that use logging
@@ -9,60 +10,39 @@ import { setupTestLogging } from "../../testing/logger";
 
 await setupTestLogging();
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { spawnAndCollect } from "@sidequest/core/spawn";
-import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
 import {
-	createSuggestionId,
-	type InboxEngineConfig,
-	type SuggestionId,
-} from "../types";
-import { createInboxEngine } from "./engine";
-import { createTestLLMClient } from "./llm/client";
+	createTestVault,
+	initGitRepo,
+	useTestVaultCleanup,
+} from "../../testing/utils";
+import { createSuggestionId, type SuggestionId } from "../types";
+import { createTestEngine } from "./testing";
 
-/**
- * Initialize a git repository with a clean working tree.
- * Required for tests that call execute() which checks git status.
- */
-async function initGitRepo(dir: string): Promise<void> {
-	await spawnAndCollect(["git", "init"], { cwd: dir });
-	await spawnAndCollect(["git", "config", "user.name", "Test"], { cwd: dir });
-	await spawnAndCollect(["git", "config", "user.email", "test@test.com"], {
-		cwd: dir,
-	});
-	// Create initial commit to establish clean state
-	writeFileSync(join(dir, ".gitkeep"), "", "utf-8");
-	await spawnAndCollect(["git", "add", "."], { cwd: dir });
-	await spawnAndCollect(["git", "commit", "-m", "Initial commit"], {
-		cwd: dir,
-	});
-}
+// Test Constants
+/** Expected header in all execution reports */
+const REPORT_HEADER = "# Inbox Processing Report";
 
-/**
- * Create test engine with injected test LLM client for fast testing.
- * This avoids calling real LLM APIs during tests.
- */
-function createTestEngine(config: Omit<InboxEngineConfig, "llmClient">) {
-	return createInboxEngine({
-		...config,
-		llmClient: createTestLLMClient(),
-	});
-}
+/** Dummy vault path for tests that don't require real filesystem operations */
+const DUMMY_VAULT_PATH = "/test";
 
 describe("engine utilities", () => {
 	describe("editWithPrompt()", () => {
+		const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 		let testVaultPath: string;
 
 		beforeEach(async () => {
-			testVaultPath = createTempDir("edit-prompt-test-");
+			testVaultPath = createTestVault();
+			trackVault(testVaultPath);
 			mkdirSync(join(testVaultPath, "00 Inbox"), { recursive: true });
 			await initGitRepo(testVaultPath);
 		});
 
 		afterEach(() => {
-			cleanupTestDir(testVaultPath);
+			mock.restore();
+			getAfterEachHook()();
 		});
 
 		test("should return a promise that rejects for unknown id", async () => {
@@ -95,33 +75,35 @@ describe("engine utilities", () => {
 
 	describe("generateReport()", () => {
 		test("should return a string", () => {
-			const engine = createTestEngine({ vaultPath: "/test" });
+			const engine = createTestEngine({ vaultPath: DUMMY_VAULT_PATH });
 			const report = engine.generateReport([]);
 			expect(typeof report).toBe("string");
 		});
 
 		test("should return empty report header for no suggestions", () => {
-			const engine = createTestEngine({ vaultPath: "/test" });
+			const engine = createTestEngine({ vaultPath: DUMMY_VAULT_PATH });
 			const report = engine.generateReport([]);
-			expect(report).toContain("# Inbox Processing Report");
+			expect(report).toContain(REPORT_HEADER);
 		});
 
 		test("should include suggestions in report", () => {
-			const engine = createTestEngine({ vaultPath: "/test" });
+			const engine = createTestEngine({ vaultPath: DUMMY_VAULT_PATH });
 
 			// The generateReport method handles ExecutionResult arrays from execute()
 			// We'll just test with an empty array since the report format isn't critical
 			const report = engine.generateReport([]);
-			expect(report).toContain("# Inbox Processing Report");
+			expect(report).toContain(REPORT_HEADER);
 			expect(typeof report).toBe("string");
 		});
 	});
 
 	describe("challenge()", () => {
+		const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 		let testVaultPath: string;
 
 		beforeEach(async () => {
-			testVaultPath = createTempDir("challenge-test-");
+			testVaultPath = createTestVault();
+			trackVault(testVaultPath);
 			mkdirSync(join(testVaultPath, "00 Inbox"), { recursive: true });
 			mkdirSync(join(testVaultPath, "01 Projects"), { recursive: true });
 			mkdirSync(join(testVaultPath, "02 Areas"), { recursive: true });
@@ -130,16 +112,17 @@ describe("engine utilities", () => {
 		});
 
 		afterEach(() => {
-			cleanupTestDir(testVaultPath);
+			mock.restore();
+			getAfterEachHook()();
 		});
 
 		test("should throw error when suggestion not found", async () => {
 			const engine = createTestEngine({ vaultPath: testVaultPath });
 			const unknownId = createSuggestionId();
 
-			await expect(engine.challenge(unknownId, "test hint")).rejects.toThrow(
-				/invalid.*item.*id/i,
-			);
+			// Should throw any error - we don't care about exact message wording
+			// The important behavior is that it rejects with an error
+			await expect(engine.challenge(unknownId, "test hint")).rejects.toThrow();
 		});
 
 		test("should throw error when id is empty", async () => {

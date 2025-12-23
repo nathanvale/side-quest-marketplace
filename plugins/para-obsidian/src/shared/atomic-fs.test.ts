@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
+import { createTempDir } from "@sidequest/core/testing";
+import { useTestVaultCleanup } from "../testing/utils";
 import {
 	atomicWriteFile,
 	createBackup,
@@ -10,18 +11,18 @@ import {
 } from "./atomic-fs";
 
 describe("atomic-fs", () => {
-	let tempDir: string;
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
 
-	beforeEach(() => {
-		tempDir = createTempDir("atomic-fs-test-");
-	});
-
-	afterEach(() => {
-		cleanupTestDir(tempDir);
-	});
+	function createTestDir(): string {
+		const dir = createTempDir("atomic-fs-test-");
+		trackVault(dir);
+		return dir;
+	}
 
 	describe("atomicWriteFile", () => {
 		test("writes file successfully", async () => {
+			const tempDir = createTestDir();
 			const filePath = join(tempDir, "test.txt");
 			await atomicWriteFile(filePath, "content");
 
@@ -30,6 +31,7 @@ describe("atomic-fs", () => {
 		});
 
 		test("creates parent directories if missing", async () => {
+			const tempDir = createTestDir();
 			const filePath = join(tempDir, "nested", "deep", "test.txt");
 			await atomicWriteFile(filePath, "content");
 
@@ -38,6 +40,7 @@ describe("atomic-fs", () => {
 		});
 
 		test("overwrites existing file", async () => {
+			const tempDir = createTestDir();
 			const filePath = join(tempDir, "test.txt");
 			await writeFile(filePath, "old", "utf-8");
 			await atomicWriteFile(filePath, "new");
@@ -47,6 +50,7 @@ describe("atomic-fs", () => {
 		});
 
 		test("cleans up temp file on failure", async () => {
+			const tempDir = createTestDir();
 			// Cause failure by trying to write to invalid location
 			// (simulated by mocking rename to fail)
 			try {
@@ -61,6 +65,7 @@ describe("atomic-fs", () => {
 		});
 
 		test("maintains atomicity - no partial writes", async () => {
+			const tempDir = createTestDir();
 			const filePath = join(tempDir, "test.txt");
 			const largeContent = "x".repeat(1000000);
 
@@ -75,6 +80,7 @@ describe("atomic-fs", () => {
 
 	describe("safeReadJSON", () => {
 		test("reads valid JSON file", async () => {
+			const tempDir = createTestDir();
 			const filePath = join(tempDir, "data.json");
 			const data = { key: "value", number: 42 };
 			await writeFile(filePath, JSON.stringify(data), "utf-8");
@@ -84,6 +90,7 @@ describe("atomic-fs", () => {
 		});
 
 		test("restores from backup on corrupted main file", async () => {
+			const tempDir = createTestDir();
 			const filePath = join(tempDir, "data.json");
 			const backupPath = `${filePath}.backup`;
 			const data = { restored: true };
@@ -103,6 +110,7 @@ describe("atomic-fs", () => {
 		});
 
 		test("throws if both main and backup are invalid", async () => {
+			const tempDir = createTestDir();
 			const filePath = join(tempDir, "data.json");
 			const backupPath = `${filePath}.backup`;
 
@@ -116,6 +124,7 @@ describe("atomic-fs", () => {
 		});
 
 		test("throws if file doesn't exist", async () => {
+			const tempDir = createTestDir();
 			const filePath = join(tempDir, "nonexistent.json");
 			await expect(safeReadJSON(filePath)).rejects.toThrow();
 		});
@@ -123,6 +132,7 @@ describe("atomic-fs", () => {
 
 	describe("createBackup", () => {
 		test("creates backup copy", async () => {
+			const tempDir = createTestDir();
 			const filePath = join(tempDir, "data.json");
 			const data = { original: true };
 			await writeFile(filePath, JSON.stringify(data), "utf-8");
@@ -135,6 +145,7 @@ describe("atomic-fs", () => {
 		});
 
 		test("overwrites existing backup", async () => {
+			const tempDir = createTestDir();
 			const filePath = join(tempDir, "data.json");
 			const backupPath = `${filePath}.backup`;
 
@@ -150,6 +161,7 @@ describe("atomic-fs", () => {
 		});
 
 		test("throws if source file doesn't exist", async () => {
+			const tempDir = createTestDir();
 			const filePath = join(tempDir, "nonexistent.json");
 			await expect(createBackup(filePath)).rejects.toThrow();
 		});
@@ -157,6 +169,7 @@ describe("atomic-fs", () => {
 
 	describe("restoreFromBackup", () => {
 		test("restores file from backup", async () => {
+			const tempDir = createTestDir();
 			const filePath = join(tempDir, "data.json");
 			const backupPath = `${filePath}.backup`;
 
@@ -174,6 +187,7 @@ describe("atomic-fs", () => {
 		});
 
 		test("throws if backup doesn't exist", async () => {
+			const tempDir = createTestDir();
 			const filePath = join(tempDir, "data.json");
 			await expect(restoreFromBackup(filePath)).rejects.toThrow();
 		});
@@ -181,6 +195,7 @@ describe("atomic-fs", () => {
 
 	describe("atomic operations - failure scenarios", () => {
 		test("handles write interruption gracefully", async () => {
+			const tempDir = createTestDir();
 			const filePath = join(tempDir, "test.txt");
 
 			// Simulate power loss by writing large content
@@ -199,6 +214,7 @@ describe("atomic-fs", () => {
 		});
 
 		test("no temp files left after failures", async () => {
+			const tempDir = createTestDir();
 			// Multiple failed writes
 			for (let i = 0; i < 5; i++) {
 				try {

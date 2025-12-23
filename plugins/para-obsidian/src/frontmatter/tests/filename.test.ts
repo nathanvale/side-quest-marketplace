@@ -1,48 +1,32 @@
 /**
  * Tests for filename validation in frontmatter validation.
  */
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import fs from "node:fs";
-import path from "node:path";
-import {
-	cleanupTestDir,
-	createTempDir,
-	writeTestFile,
-} from "@sidequest/core/testing";
+import { afterEach, describe, expect, test } from "bun:test";
 import { loadConfig } from "../../config/index";
+import {
+	setupTestVault,
+	useTestVaultCleanup,
+	writeVaultFile,
+} from "../../testing/utils";
 import { validateFrontmatterFile } from "../index";
 
 describe("filename validation", () => {
-	let testVault: string;
-	const originalEnv = process.env.PARA_VAULT;
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
 
-	beforeEach(() => {
-		testVault = createTempDir("para-test-");
-		process.env.PARA_VAULT = testVault;
-
-		// Create .paraobsidianrc with title prefixes
-		writeTestFile(
-			testVault,
-			".paraobsidianrc",
-			JSON.stringify({
+	test("accepts Title Case filenames", () => {
+		const testVault = setupTestVault({
+			".paraobsidianrc": JSON.stringify({
 				titlePrefixes: {
 					booking: "🎫 Booking -",
 					research: "📊 Research -",
 					trip: "✈️ Trip -",
 				},
 			}),
-		);
-	});
+		});
+		trackVault(testVault);
 
-	afterEach(() => {
-		process.env.PARA_VAULT = originalEnv;
-		if (fs.existsSync(testVault)) {
-			cleanupTestDir(testVault);
-		}
-	});
-
-	test("accepts Title Case filenames", () => {
-		writeTestFile(
+		writeVaultFile(
 			testVault,
 			"My Project Note.md",
 			`---
@@ -67,7 +51,18 @@ Content`,
 	});
 
 	test("rejects lowercase filenames", () => {
-		writeTestFile(
+		const testVault = setupTestVault({
+			".paraobsidianrc": JSON.stringify({
+				titlePrefixes: {
+					booking: "🎫 Booking -",
+					research: "📊 Research -",
+					trip: "✈️ Trip -",
+				},
+			}),
+		});
+		trackVault(testVault);
+
+		writeVaultFile(
 			testVault,
 			"my project note.md",
 			`---
@@ -94,7 +89,18 @@ Content`,
 	});
 
 	test("accepts emoji prefixes in filenames", () => {
-		writeTestFile(
+		const testVault = setupTestVault({
+			".paraobsidianrc": JSON.stringify({
+				titlePrefixes: {
+					booking: "🎫 Booking -",
+					research: "📊 Research -",
+					trip: "✈️ Trip -",
+				},
+			}),
+		});
+		trackVault(testVault);
+
+		writeVaultFile(
 			testVault,
 			"🎫 Booking - Hotel Stay.md",
 			`---
@@ -124,7 +130,18 @@ Content`,
 	});
 
 	test("requires expected prefix for booking type", () => {
-		writeTestFile(
+		const testVault = setupTestVault({
+			".paraobsidianrc": JSON.stringify({
+				titlePrefixes: {
+					booking: "🎫 Booking -",
+					research: "📊 Research -",
+					trip: "✈️ Trip -",
+				},
+			}),
+		});
+		trackVault(testVault);
+
+		writeVaultFile(
 			testVault,
 			"Hotel Stay.md",
 			`---
@@ -153,28 +170,16 @@ Content`,
 	});
 
 	test("rejects invalid filename characters", () => {
-		const _file = path.join(testVault, "Invalid/Name.md");
-		// Note: This test may fail on actual filesystems that don't allow /
-		// In practice, we test the validation logic itself
-		const _config = loadConfig({ cwd: testVault });
-
-		// Create a valid file but test with invalid path
-		writeTestFile(
-			testVault,
-			"ValidName.md",
-			`---
-title: ValidName
-type: project
-status: active
-created: 2025-01-01
-start_date: 2025-01-01
-target_completion: 2025-12-31
-area: "[[Work]]"
-template_version: 4
-tags: [project]
----
-Content`,
-		);
+		const testVault = setupTestVault({
+			".paraobsidianrc": JSON.stringify({
+				titlePrefixes: {
+					booking: "🎫 Booking -",
+					research: "📊 Research -",
+					trip: "✈️ Trip -",
+				},
+			}),
+		});
+		trackVault(testVault);
 
 		// The validation logic checks the filename string itself
 		// We can verify this by checking the regex pattern
@@ -184,7 +189,18 @@ Content`,
 	});
 
 	test("allows files without type-specific prefix if no prefix configured", () => {
-		writeTestFile(
+		const testVault = setupTestVault({
+			".paraobsidianrc": JSON.stringify({
+				titlePrefixes: {
+					booking: "🎫 Booking -",
+					research: "📊 Research -",
+					trip: "✈️ Trip -",
+				},
+			}),
+		});
+		trackVault(testVault);
+
+		writeVaultFile(
 			testVault,
 			"My Project.md",
 			`---

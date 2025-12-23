@@ -1,17 +1,24 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
 import path from "node:path";
 import { pathExistsSync, readTextFileSync } from "@sidequest/core/fs";
 
 import { loadConfig } from "../config/index";
-import { createTestVault, writeVaultFile } from "../testing/utils";
+import {
+	createTestVault,
+	useTestVaultCleanup,
+	writeVaultFile,
+} from "../testing/utils";
 import { renameWithLinkRewrite } from "./index";
 
 describe("renameWithLinkRewrite", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	it("renames file and rewrites wikilinks", () => {
 		const vault = createTestVault();
+		trackVault(vault);
 		writeVaultFile(vault, "old.md", "# Old");
 		writeVaultFile(vault, "other.md", "See [[old]]");
-		process.env.PARA_VAULT = vault;
 		const cfg = loadConfig({ cwd: vault });
 
 		const result = renameWithLinkRewrite(cfg, {
@@ -28,9 +35,9 @@ describe("renameWithLinkRewrite", () => {
 
 	it("supports dry-run", () => {
 		const vault = createTestVault();
+		trackVault(vault);
 		writeVaultFile(vault, "old.md", "# Old");
 		writeVaultFile(vault, "other.md", "See [[old]]");
-		process.env.PARA_VAULT = vault;
 		const cfg = loadConfig({ cwd: vault });
 
 		const result = renameWithLinkRewrite(cfg, {

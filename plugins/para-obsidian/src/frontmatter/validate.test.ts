@@ -1,13 +1,30 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 import { loadConfig } from "../config/index";
-import { createTestVault, writeVaultFile } from "../testing/utils";
+import {
+	createTestVault,
+	useTestVaultCleanup,
+	writeVaultFile,
+} from "../testing/utils";
 import { validateFrontmatterFile } from "./index";
 
 describe("frontmatter file validation", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	let originalEnv: NodeJS.ProcessEnv;
+
+	beforeEach(() => {
+		originalEnv = { ...process.env };
+	});
+
+	afterEach(() => {
+		process.env = originalEnv;
+		getAfterEachHook()();
+	});
+
 	it("validates a project frontmatter", () => {
 		const vault = createTestVault();
+		trackVault(vault);
 		const templatesDir = path.join(vault, "Templates");
 		fs.mkdirSync(templatesDir, { recursive: true });
 		process.env.PARA_VAULT = vault;
@@ -36,6 +53,7 @@ Body`,
 
 	it("reports issues for missing required fields", () => {
 		const vault = createTestVault();
+		trackVault(vault);
 		const templatesDir = path.join(vault, "Templates");
 		fs.mkdirSync(templatesDir, { recursive: true });
 		process.env.PARA_VAULT = vault;

@@ -1,8 +1,9 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it, test } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
-import { createTempDir, writeTestFile } from "@sidequest/core/testing";
+import { writeTestFile } from "@sidequest/core/testing";
 import type { ParaObsidianConfig } from "../../config/index";
+import { createTestVault, useTestVaultCleanup } from "../../testing/utils";
 import {
 	parseFrontmatter,
 	serializeFrontmatter,
@@ -11,6 +12,34 @@ import {
 	validateFrontmatterBulk,
 	validateFrontmatterFile,
 } from "../index";
+
+// Shared validation rules used across multiple tests
+const PROJECT_RULES = {
+	required: {
+		title: { type: "string" },
+		created: { type: "date" },
+		type: { type: "enum", enum: ["project"] },
+	},
+} as const;
+
+const RESEARCH_RULES = {
+	required: {
+		title: { type: "string" },
+		created: { type: "date" },
+		type: { type: "enum", enum: ["research"] },
+		project: { type: "wikilink" },
+	},
+	forbidden: ["area"],
+} as const;
+
+const ONE_OF_REQUIRED_RULES = {
+	required: {
+		title: { type: "string" },
+		area: { type: "wikilink", optional: true },
+		project: { type: "wikilink", optional: true },
+	},
+	oneOfRequired: ["area", "project"],
+} as const;
 
 describe("frontmatter parsing", () => {
 	it("parses frontmatter and body", () => {
@@ -43,43 +72,29 @@ Body text`;
 
 describe("frontmatter validation", () => {
 	it("validates required fields", () => {
-		const rules = {
-			required: {
-				title: { type: "string" },
-				created: { type: "date" },
-				type: { type: "enum", enum: ["project"] },
-			},
-		} as const;
 		const attrs = {
 			title: "My Project",
 			created: "2025-01-01",
 			type: "project",
 		};
-		const result = validateFrontmatter(attrs, rules);
+		const result = validateFrontmatter(attrs, PROJECT_RULES);
 		expect(result.valid).toBe(true);
 		expect(result.issues).toHaveLength(0);
 	});
 
 	it("reports missing and invalid fields", () => {
-		const rules = {
-			required: {
-				title: { type: "string" },
-				created: { type: "date" },
-				type: { type: "enum", enum: ["project"] },
-			},
-		} as const;
 		const attrs = {
 			title: "My Project",
 			created: "not-a-date",
 			type: "wrong",
 		};
-		const result = validateFrontmatter(attrs, rules);
+		const result = validateFrontmatter(attrs, PROJECT_RULES);
 		expect(result.valid).toBe(false);
 		expect(result.issues.length).toBeGreaterThan(0);
 	});
 
 	it("flags missing or outdated template_version", () => {
-		const vault = createTempDir("para-fm-");
+		const vault = createTestVault();
 		writeTestFile(
 			vault,
 			"note.md",
@@ -103,20 +118,22 @@ Body`,
 		);
 	});
 
+	// Forbidden field tests - using shared FORBIDDEN_FIELD_RULES
+	const FORBIDDEN_FIELD_RULES = {
+		required: {
+			title: { type: "string" },
+			project: { type: "wikilink" },
+		},
+		forbidden: ["area"],
+	} as const;
+
 	it("rejects forbidden fields when present", () => {
-		const rules = {
-			required: {
-				title: { type: "string" },
-				project: { type: "wikilink" },
-			},
-			forbidden: ["area"],
-		} as const;
 		const attrs = {
 			title: "Research Note",
 			project: "[[My Project]]",
 			area: "[[Family]]", // Forbidden field
 		};
-		const result = validateFrontmatter(attrs, rules);
+		const result = validateFrontmatter(attrs, FORBIDDEN_FIELD_RULES);
 		expect(result.valid).toBe(false);
 		expect(result.issues).toHaveLength(1);
 		expect(result.issues[0]?.field).toBe("area");
@@ -126,36 +143,22 @@ Body`,
 	});
 
 	it("passes validation when forbidden field is absent", () => {
-		const rules = {
-			required: {
-				title: { type: "string" },
-				project: { type: "wikilink" },
-			},
-			forbidden: ["area"],
-		} as const;
 		const attrs = {
 			title: "Research Note",
 			project: "[[My Project]]",
 		};
-		const result = validateFrontmatter(attrs, rules);
+		const result = validateFrontmatter(attrs, FORBIDDEN_FIELD_RULES);
 		expect(result.valid).toBe(true);
 		expect(result.issues).toHaveLength(0);
 	});
 
 	it("ignores forbidden field when null or empty string", () => {
-		const rules = {
-			required: {
-				title: { type: "string" },
-				project: { type: "wikilink" },
-			},
-			forbidden: ["area"],
-		} as const;
 		const attrsNull = {
 			title: "Research Note",
 			project: "[[My Project]]",
 			area: null,
 		};
-		const resultNull = validateFrontmatter(attrsNull, rules);
+		const resultNull = validateFrontmatter(attrsNull, FORBIDDEN_FIELD_RULES);
 		expect(resultNull.valid).toBe(true);
 
 		const attrsEmpty = {
@@ -163,20 +166,11 @@ Body`,
 			project: "[[My Project]]",
 			area: "",
 		};
-		const resultEmpty = validateFrontmatter(attrsEmpty, rules);
+		const resultEmpty = validateFrontmatter(attrsEmpty, FORBIDDEN_FIELD_RULES);
 		expect(resultEmpty.valid).toBe(true);
 	});
 
 	it("validates research note with forbidden area field", () => {
-		const rules = {
-			required: {
-				title: { type: "string" },
-				created: { type: "date" },
-				type: { type: "enum", enum: ["research"] },
-				project: { type: "wikilink" },
-			},
-			forbidden: ["area"],
-		} as const;
 		const attrsWithArea = {
 			title: "Hiking Research",
 			created: "2025-12-07",
@@ -184,7 +178,7 @@ Body`,
 			project: "[[Tassie Holiday]]",
 			area: "[[Family]]", // Should fail
 		};
-		const resultWithArea = validateFrontmatter(attrsWithArea, rules);
+		const resultWithArea = validateFrontmatter(attrsWithArea, RESEARCH_RULES);
 		expect(resultWithArea.valid).toBe(false);
 		expect(resultWithArea.issues.some((i) => i.field === "area")).toBe(true);
 
@@ -194,123 +188,75 @@ Body`,
 			type: "research",
 			project: "[[Tassie Holiday]]",
 		};
-		const resultWithoutArea = validateFrontmatter(attrsWithoutArea, rules);
+		const resultWithoutArea = validateFrontmatter(
+			attrsWithoutArea,
+			RESEARCH_RULES,
+		);
 		expect(resultWithoutArea.valid).toBe(true);
 	});
 
-	it("passes oneOfRequired when area is present", () => {
-		const rules = {
-			required: {
-				title: { type: "string" },
-				area: { type: "wikilink", optional: true },
-				project: { type: "wikilink", optional: true },
-			},
-			oneOfRequired: ["area", "project"],
-		} as const;
-		const attrs = {
-			title: "Session 1",
-			area: "[[Psychotherapy]]",
-		};
-		const result = validateFrontmatter(attrs, rules);
-		expect(result.valid).toBe(true);
-	});
+	// oneOfRequired tests - using parameterized testing
+	const oneOfRequiredCases: Array<[string, Record<string, unknown>, boolean]> =
+		[
+			[
+				"area is present",
+				{ title: "Session 1", area: "[[Psychotherapy]]" },
+				true,
+			],
+			[
+				"project is present",
+				{ title: "Session 1", project: "[[My Project]]" },
+				true,
+			],
+			[
+				"both area and project are present",
+				{
+					title: "Session 1",
+					area: "[[Psychotherapy]]",
+					project: "[[My Project]]",
+				},
+				true,
+			],
+			["neither area nor project is present", { title: "Session 1" }, false],
+			[
+				"fields are null",
+				{ title: "Session 1", area: null, project: null },
+				false,
+			],
+			[
+				"fields are empty strings",
+				{ title: "Session 1", area: "", project: "   " },
+				false,
+			],
+		];
 
-	it("passes oneOfRequired when project is present", () => {
-		const rules = {
-			required: {
-				title: { type: "string" },
-				area: { type: "wikilink", optional: true },
-				project: { type: "wikilink", optional: true },
-			},
-			oneOfRequired: ["area", "project"],
-		} as const;
-		const attrs = {
-			title: "Session 1",
-			project: "[[My Project]]",
-		};
-		const result = validateFrontmatter(attrs, rules);
-		expect(result.valid).toBe(true);
-	});
+	test.each(
+		oneOfRequiredCases,
+	)("oneOfRequired: %s", (_, attrs, shouldBeValid) => {
+		const result = validateFrontmatter(attrs, ONE_OF_REQUIRED_RULES);
+		expect(result.valid).toBe(shouldBeValid);
 
-	it("passes oneOfRequired when both area and project are present", () => {
-		const rules = {
-			required: {
-				title: { type: "string" },
-				area: { type: "wikilink", optional: true },
-				project: { type: "wikilink", optional: true },
-			},
-			oneOfRequired: ["area", "project"],
-		} as const;
-		const attrs = {
-			title: "Session 1",
-			area: "[[Psychotherapy]]",
-			project: "[[My Project]]",
-		};
-		const result = validateFrontmatter(attrs, rules);
-		expect(result.valid).toBe(true);
-	});
-
-	it("fails oneOfRequired when neither area nor project is present", () => {
-		const rules = {
-			required: {
-				title: { type: "string" },
-				area: { type: "wikilink", optional: true },
-				project: { type: "wikilink", optional: true },
-			},
-			oneOfRequired: ["area", "project"],
-		} as const;
-		const attrs = {
-			title: "Session 1",
-		};
-		const result = validateFrontmatter(attrs, rules);
-		expect(result.valid).toBe(false);
-		expect(result.issues.some((i) => i.field === "area|project")).toBe(true);
-		expect(
-			result.issues.some((i) =>
-				i.message.includes("at least one of [area, project] is required"),
-			),
-		).toBe(true);
-	});
-
-	it("fails oneOfRequired when fields are null or empty", () => {
-		const rules = {
-			required: {
-				title: { type: "string" },
-				area: { type: "wikilink", optional: true },
-				project: { type: "wikilink", optional: true },
-			},
-			oneOfRequired: ["area", "project"],
-		} as const;
-		const attrsNull = {
-			title: "Session 1",
-			area: null,
-			project: null,
-		};
-		const resultNull = validateFrontmatter(attrsNull, rules);
-		expect(resultNull.valid).toBe(false);
-
-		const attrsEmpty = {
-			title: "Session 1",
-			area: "",
-			project: "   ",
-		};
-		const resultEmpty = validateFrontmatter(attrsEmpty, rules);
-		expect(resultEmpty.valid).toBe(false);
+		if (!shouldBeValid) {
+			expect(result.issues.some((i) => i.field === "area|project")).toBe(true);
+		}
 	});
 });
 
 describe("frontmatter update", () => {
-	const makeVault = () => createTempDir("para-fm-update-");
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
 
 	it("sets and unsets keys while preserving body", () => {
-		const vault = makeVault();
-		const notePath = path.join(vault, "note.md");
+		const vault = createTestVault();
+		trackVault(vault);
+
 		writeTestFile(
 			vault,
 			"note.md",
 			"---\ntitle: Start\nstatus: draft\nold: keep\n---\n\nBody text",
 		);
 
+		const notePath = path.join(vault, "note.md");
 		const config: ParaObsidianConfig = { vault };
 
 		const dryRun = updateFrontmatterFile(config, "note.md", {
@@ -337,8 +283,12 @@ describe("frontmatter update", () => {
 });
 
 describe("bulk frontmatter validation", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	const makeVault = () => {
-		const vault = createTempDir("para-fm-bulk-");
+		const vault = createTestVault();
+		trackVault(vault);
 
 		// Create test directory structure
 		const projectsDir = path.join(vault, "01_Projects");
@@ -517,7 +467,8 @@ Body`,
 	});
 
 	it("handles validation errors gracefully", () => {
-		const vault = createTempDir("para-fm-bulk-");
+		const vault = createTestVault();
+		trackVault(vault);
 
 		// Create file with invalid YAML
 		writeTestFile(

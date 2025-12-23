@@ -1,16 +1,19 @@
-import { describe, expect, it } from "bun:test";
-import fs from "node:fs";
-import path from "node:path";
+import { afterEach, describe, expect, it } from "bun:test";
 import { loadConfig } from "../../config/index";
 import { validateFrontmatterFile } from "../../frontmatter/index";
-import { createTestVault, writeVaultFile } from "../../testing/utils";
+import {
+	setupTestVault,
+	useTestVaultCleanup,
+	writeVaultFile,
+} from "../../testing/utils";
 
 describe("frontmatter file validation", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	it("validates a project frontmatter", () => {
-		const vault = createTestVault();
-		const templatesDir = path.join(vault, "Templates");
-		fs.mkdirSync(templatesDir, { recursive: true });
-		process.env.PARA_VAULT = vault;
+		const vault = setupTestVault({}, { createTemplatesDir: true });
+		trackVault(vault);
 
 		writeVaultFile(
 			vault,
@@ -36,10 +39,8 @@ Body`,
 	});
 
 	it("reports issues for missing required fields", () => {
-		const vault = createTestVault();
-		const templatesDir = path.join(vault, "Templates");
-		fs.mkdirSync(templatesDir, { recursive: true });
-		process.env.PARA_VAULT = vault;
+		const vault = setupTestVault({}, { createTemplatesDir: true });
+		trackVault(vault);
 
 		writeVaultFile(
 			vault,

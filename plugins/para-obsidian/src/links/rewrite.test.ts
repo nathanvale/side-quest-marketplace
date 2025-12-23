@@ -1,25 +1,25 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import fs from "node:fs";
+import { afterEach, describe, expect, it } from "bun:test";
 import {
 	createTestVault,
 	readVaultFile,
+	useTestVaultCleanup,
 	writeVaultFile,
 } from "../testing/utils";
 import { rewriteLinks } from "./rewrite";
 
 describe("rewriteLinks", () => {
-	let vault: string;
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
 
-	beforeEach(() => {
-		vault = createTestVault();
-	});
-
-	afterEach(() => {
-		fs.rmSync(vault, { recursive: true, force: true });
-	});
+	function createVault(): string {
+		const vault = createTestVault();
+		trackVault(vault);
+		return vault;
+	}
 
 	describe("body wikilinks", () => {
 		it("replaces simple wikilinks", () => {
+			const vault = createVault();
 			writeVaultFile(vault, "note.md", "Link to [[old-file]] here.");
 
 			const result = rewriteLinks(vault, [
@@ -34,6 +34,7 @@ describe("rewriteLinks", () => {
 		});
 
 		it("preserves aliases", () => {
+			const vault = createVault();
 			writeVaultFile(vault, "note.md", "Link to [[old-file|My Alias]] here.");
 
 			const result = rewriteLinks(vault, [
@@ -47,6 +48,7 @@ describe("rewriteLinks", () => {
 		});
 
 		it("preserves headings", () => {
+			const vault = createVault();
 			writeVaultFile(vault, "note.md", "Link to [[old-file#Section]] here.");
 
 			const result = rewriteLinks(vault, [
@@ -60,6 +62,7 @@ describe("rewriteLinks", () => {
 		});
 
 		it("preserves block references", () => {
+			const vault = createVault();
 			writeVaultFile(vault, "note.md", "Link to [[old-file^block123]] here.");
 
 			const result = rewriteLinks(vault, [
@@ -73,6 +76,7 @@ describe("rewriteLinks", () => {
 		});
 
 		it("preserves heading + alias combinations", () => {
+			const vault = createVault();
 			writeVaultFile(
 				vault,
 				"note.md",
@@ -90,6 +94,7 @@ describe("rewriteLinks", () => {
 		});
 
 		it("handles path-based links", () => {
+			const vault = createVault();
 			writeVaultFile(
 				vault,
 				"note.md",
@@ -107,6 +112,7 @@ describe("rewriteLinks", () => {
 		});
 
 		it("replaces multiple occurrences in same file", () => {
+			const vault = createVault();
 			writeVaultFile(
 				vault,
 				"note.md",
@@ -123,6 +129,7 @@ describe("rewriteLinks", () => {
 		});
 
 		it("is case insensitive", () => {
+			const vault = createVault();
 			writeVaultFile(vault, "note.md", "Link to [[Old-File]] here.");
 
 			const result = rewriteLinks(vault, [
@@ -136,6 +143,7 @@ describe("rewriteLinks", () => {
 		});
 
 		it("does not match partial links", () => {
+			const vault = createVault();
 			writeVaultFile(vault, "note.md", "Link to [[old-file-extended]] here.");
 
 			const result = rewriteLinks(vault, [
@@ -151,6 +159,7 @@ describe("rewriteLinks", () => {
 
 	describe("markdown links", () => {
 		it("replaces markdown links", () => {
+			const vault = createVault();
 			writeVaultFile(
 				vault,
 				"note.md",
@@ -168,6 +177,7 @@ describe("rewriteLinks", () => {
 		});
 
 		it("replaces markdown links with .md extension", () => {
+			const vault = createVault();
 			writeVaultFile(
 				vault,
 				"note.md",
@@ -187,6 +197,7 @@ describe("rewriteLinks", () => {
 
 	describe("frontmatter", () => {
 		it("replaces links in frontmatter strings", () => {
+			const vault = createVault();
 			writeVaultFile(
 				vault,
 				"note.md",
@@ -206,6 +217,7 @@ Body content.`,
 		});
 
 		it("replaces links in frontmatter arrays", () => {
+			const vault = createVault();
 			writeVaultFile(
 				vault,
 				"note.md",
@@ -228,6 +240,7 @@ Body content.`,
 		});
 
 		it("preserves other frontmatter fields", () => {
+			const vault = createVault();
 			writeVaultFile(
 				vault,
 				"note.md",
@@ -250,6 +263,7 @@ Body content.`,
 
 	describe("options", () => {
 		it("respects dryRun option", () => {
+			const vault = createVault();
 			writeVaultFile(vault, "note.md", "Link to [[old]] here.");
 
 			const result = rewriteLinks(vault, [{ from: "old", to: "new" }], {
@@ -263,6 +277,7 @@ Body content.`,
 		});
 
 		it("respects dirs scoping", () => {
+			const vault = createVault();
 			writeVaultFile(vault, "Projects/note.md", "Link to [[old]] here.");
 			writeVaultFile(vault, "Areas/note.md", "Link to [[old]] here.");
 
@@ -282,6 +297,7 @@ Body content.`,
 		});
 
 		it("handles multiple dirs", () => {
+			const vault = createVault();
 			writeVaultFile(vault, "Projects/note.md", "Link to [[old]] here.");
 			writeVaultFile(vault, "Areas/note.md", "Link to [[old]] here.");
 			writeVaultFile(vault, "Archive/note.md", "Link to [[old]] here.");
@@ -307,6 +323,7 @@ Body content.`,
 
 	describe("multiple mappings", () => {
 		it("applies multiple mappings", () => {
+			const vault = createVault();
 			writeVaultFile(
 				vault,
 				"note.md",
@@ -325,6 +342,7 @@ Body content.`,
 		});
 
 		it("applies mappings across multiple files", () => {
+			const vault = createVault();
 			writeVaultFile(vault, "note1.md", "Link to [[old]] here.");
 			writeVaultFile(vault, "note2.md", "Another [[old]] link.");
 			writeVaultFile(vault, "note3.md", "No matching links.");
@@ -338,6 +356,7 @@ Body content.`,
 
 	describe("edge cases", () => {
 		it("handles empty mappings array", () => {
+			const vault = createVault();
 			writeVaultFile(vault, "note.md", "Link to [[old]] here.");
 
 			const result = rewriteLinks(vault, []);
@@ -347,6 +366,7 @@ Body content.`,
 		});
 
 		it("handles no matching links", () => {
+			const vault = createVault();
 			writeVaultFile(vault, "note.md", "Link to [[something-else]] here.");
 
 			const result = rewriteLinks(vault, [{ from: "old", to: "new" }]);
@@ -356,6 +376,7 @@ Body content.`,
 		});
 
 		it("handles files without frontmatter", () => {
+			const vault = createVault();
 			writeVaultFile(vault, "note.md", "Just body with [[old]] link.");
 
 			const result = rewriteLinks(vault, [{ from: "old", to: "new" }]);
@@ -367,6 +388,7 @@ Body content.`,
 		});
 
 		it("handles regex metacharacters in link names", () => {
+			const vault = createVault();
 			writeVaultFile(vault, "note.md", "Link to [[file (2023)]] here.");
 
 			const result = rewriteLinks(vault, [
@@ -380,6 +402,7 @@ Body content.`,
 		});
 
 		it("skips hidden files and directories", () => {
+			const vault = createVault();
 			writeVaultFile(vault, ".hidden/note.md", "Link to [[old]] here.");
 			writeVaultFile(vault, "visible/note.md", "Link to [[old]] here.");
 
@@ -390,6 +413,7 @@ Body content.`,
 		});
 
 		it("reports correct locations in result", () => {
+			const vault = createVault();
 			writeVaultFile(
 				vault,
 				"note.md",

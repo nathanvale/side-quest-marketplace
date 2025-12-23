@@ -6,10 +6,11 @@
  * @module extractors/markdown.test
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
+import { createTempDir } from "@sidequest/core/testing";
+import { useTestVaultCleanup } from "../../../testing/utils";
 import type { MarkdownExtractionMetadata } from "./markdown";
 import {
 	createMarkdownInboxFile,
@@ -31,15 +32,14 @@ function getMdMetadata(
 }
 
 describe("markdownExtractor", () => {
-	let testDir: string;
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
 
-	beforeEach(() => {
-		testDir = createTempDir("markdown-extractor-test-");
-	});
-
-	afterEach(() => {
-		cleanupTestDir(testDir);
-	});
+	function setupTestDir(): string {
+		const dir = createTempDir("markdown-extractor-test-");
+		trackVault(dir);
+		return dir;
+	}
 
 	describe("metadata", () => {
 		test("should have correct id", () => {
@@ -115,6 +115,7 @@ describe("markdownExtractor", () => {
 
 	describe("extract", () => {
 		test("should extract content from file with frontmatter", async () => {
+			const testDir = setupTestDir();
 			const mdPath = join(testDir, "with-frontmatter.md");
 			writeFileSync(
 				mdPath,
@@ -150,6 +151,7 @@ This is the body content.
 		});
 
 		test("should extract content from file without frontmatter", async () => {
+			const testDir = setupTestDir();
 			const mdPath = join(testDir, "no-frontmatter.md");
 			writeFileSync(
 				mdPath,
@@ -174,6 +176,7 @@ Just some content without frontmatter.
 		});
 
 		test("should extract title from frontmatter", async () => {
+			const testDir = setupTestDir();
 			const mdPath = join(testDir, "titled.md");
 			writeFileSync(
 				mdPath,
@@ -197,6 +200,7 @@ title: Custom Title
 		});
 
 		test("should extract title from H1 if no frontmatter title", async () => {
+			const testDir = setupTestDir();
 			const mdPath = join(testDir, "h1-title.md");
 			writeFileSync(
 				mdPath,
@@ -222,6 +226,7 @@ Content here.
 		});
 
 		test("should include word count in metadata", async () => {
+			const testDir = setupTestDir();
 			const mdPath = join(testDir, "word-count.md");
 			writeFileSync(mdPath, "one two three four five");
 
@@ -238,6 +243,7 @@ Content here.
 		});
 
 		test("should include line count in metadata", async () => {
+			const testDir = setupTestDir();
 			const mdPath = join(testDir, "line-count.md");
 			writeFileSync(mdPath, "line 1\nline 2\nline 3");
 
@@ -254,6 +260,7 @@ Content here.
 		});
 
 		test("should track hasFrontmatter metadata", async () => {
+			const testDir = setupTestDir();
 			const mdWithFm = join(testDir, "with-fm.md");
 			writeFileSync(mdWithFm, "---\ntitle: Test\n---\nContent");
 
@@ -288,6 +295,7 @@ Content here.
 		});
 
 		test("should track hasBody metadata", async () => {
+			const testDir = setupTestDir();
 			const mdWithBody = join(testDir, "with-body.md");
 			writeFileSync(mdWithBody, "---\ntitle: Test\n---\nContent here");
 
@@ -320,6 +328,7 @@ Content here.
 		});
 
 		test("should track frontmatterFields in metadata", async () => {
+			const testDir = setupTestDir();
 			const mdPath = join(testDir, "fields.md");
 			writeFileSync(
 				mdPath,
@@ -351,6 +360,7 @@ Content
 		});
 
 		test("should extract content successfully", async () => {
+			const testDir = setupTestDir();
 			const mdPath = join(testDir, "duration.md");
 			writeFileSync(mdPath, "Content");
 
@@ -368,6 +378,7 @@ Content
 		});
 
 		test("should handle empty file", async () => {
+			const testDir = setupTestDir();
 			const mdPath = join(testDir, "empty.md");
 			writeFileSync(mdPath, "");
 
@@ -387,6 +398,7 @@ Content
 		});
 
 		test("should extract noteType from frontmatter", async () => {
+			const testDir = setupTestDir();
 			const mdPath = join(testDir, "typed-note.md");
 			writeFileSync(
 				mdPath,
@@ -473,17 +485,17 @@ describe("createMarkdownInboxFile", () => {
 });
 
 describe("extractFrontmatterOnly", () => {
-	let testDir: string;
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
 
-	beforeEach(() => {
-		testDir = createTempDir("frontmatter-only-test-");
-	});
-
-	afterEach(() => {
-		cleanupTestDir(testDir);
-	});
+	function setupTestDir(): string {
+		const dir = createTempDir("frontmatter-only-test-");
+		trackVault(dir);
+		return dir;
+	}
 
 	test("should extract frontmatter from file", async () => {
+		const testDir = setupTestDir();
 		const mdPath = join(testDir, "test.md");
 		writeFileSync(
 			mdPath,
@@ -502,6 +514,7 @@ Body content
 	});
 
 	test("should return empty object for file without frontmatter", async () => {
+		const testDir = setupTestDir();
 		const mdPath = join(testDir, "no-fm.md");
 		writeFileSync(mdPath, "Just content");
 
@@ -512,18 +525,18 @@ Body content
 });
 
 describe("bug fixes", () => {
-	let testDir: string;
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
 
-	beforeEach(() => {
-		testDir = createTempDir("markdown-bugfix-test-");
-	});
-
-	afterEach(() => {
-		cleanupTestDir(testDir);
-	});
+	function setupTestDir(): string {
+		const dir = createTempDir("markdown-bugfix-test-");
+		trackVault(dir);
+		return dir;
+	}
 
 	describe("Windows line endings (CRLF)", () => {
 		test("should handle Windows line endings in frontmatter", async () => {
+			const testDir = setupTestDir();
 			const mdPath = join(testDir, "windows-crlf.md");
 			// Write file with explicit \r\n line endings
 			writeFileSync(
@@ -545,6 +558,7 @@ describe("bug fixes", () => {
 		});
 
 		test("should handle mixed line endings", async () => {
+			const testDir = setupTestDir();
 			const mdPath = join(testDir, "mixed-endings.md");
 			// Mix of \r\n and \n
 			writeFileSync(
@@ -569,6 +583,7 @@ describe("bug fixes", () => {
 
 	describe("H1 extraction from code blocks", () => {
 		test("should NOT extract H1 from inside fenced code block", async () => {
+			const testDir = setupTestDir();
 			const mdPath = join(testDir, "h1-in-code.md");
 			writeFileSync(
 				mdPath,
@@ -602,6 +617,7 @@ More content.
 		});
 
 		test("should extract H1 when no code blocks present", async () => {
+			const testDir = setupTestDir();
 			const mdPath = join(testDir, "no-code-blocks.md");
 			writeFileSync(mdPath, "# First Title\n\nContent here.");
 
@@ -618,6 +634,7 @@ More content.
 		});
 
 		test("should handle multiple code blocks", async () => {
+			const testDir = setupTestDir();
 			const mdPath = join(testDir, "multiple-code-blocks.md");
 			writeFileSync(
 				mdPath,
@@ -652,6 +669,7 @@ More content.
 
 	describe("file read validation", () => {
 		test("should throw descriptive error for non-existent file", async () => {
+			const testDir = setupTestDir();
 			const file: InboxFile = {
 				path: join(testDir, "does-not-exist.md"),
 				extension: ".md",
@@ -664,6 +682,7 @@ More content.
 		});
 
 		test("should include file path in error message", async () => {
+			const testDir = setupTestDir();
 			const nonExistentPath = join(testDir, "missing-file.md");
 			const file: InboxFile = {
 				path: nonExistentPath,
@@ -682,6 +701,7 @@ More content.
 
 	describe("word count edge cases", () => {
 		test("should handle text starting with whitespace", async () => {
+			const testDir = setupTestDir();
 			const mdPath = join(testDir, "leading-whitespace.md");
 			writeFileSync(mdPath, "   one two three");
 
@@ -699,6 +719,7 @@ More content.
 		});
 
 		test("should handle text with multiple consecutive spaces", async () => {
+			const testDir = setupTestDir();
 			const mdPath = join(testDir, "multi-space.md");
 			writeFileSync(mdPath, "one    two     three");
 
@@ -715,6 +736,7 @@ More content.
 		});
 
 		test("should handle empty file", async () => {
+			const testDir = setupTestDir();
 			const mdPath = join(testDir, "empty.md");
 			writeFileSync(mdPath, "");
 
@@ -732,6 +754,7 @@ More content.
 		});
 
 		test("should handle whitespace-only file", async () => {
+			const testDir = setupTestDir();
 			const mdPath = join(testDir, "whitespace-only.md");
 			writeFileSync(mdPath, "   \n\n   \t   ");
 

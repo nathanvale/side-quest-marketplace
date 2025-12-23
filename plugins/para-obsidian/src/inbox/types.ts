@@ -159,12 +159,6 @@ export interface CreateNoteSuggestion extends BaseSuggestion {
 	/** Target PARA folder for the note */
 	readonly suggestedDestination?: string;
 
-	/** [[Area]] wikilink */
-	readonly suggestedArea?: string;
-
-	/** [[Project]] wikilink */
-	readonly suggestedProject?: string;
-
 	/** Fields extracted from content (amount, provider, date, etc.) */
 	readonly extractedFields?: Record<string, unknown>;
 
@@ -173,15 +167,6 @@ export interface CreateNoteSuggestion extends BaseSuggestion {
 
 	/** [[Attachments/...]] wikilink */
 	readonly attachmentLink?: string;
-
-	/** If true, auto-route without user review (for high-confidence suggestions) */
-	readonly autoRoute?: boolean;
-
-	/** LLM's suggested area (display only - shows what LLM detected before user override) */
-	readonly llmSuggestedArea?: string;
-
-	/** LLM's suggested project (display only - shows what LLM detected before user override) */
-	readonly llmSuggestedProject?: string;
 
 	/** Markdown body content for Type A documents (embedded in note) */
 	readonly suggestedContent?: string;

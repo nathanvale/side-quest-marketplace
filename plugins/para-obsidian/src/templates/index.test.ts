@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { addDays, format } from "date-fns";
 
+import { createTestTemplate } from "../testing/utils";
 import {
 	applyDateSubstitutions,
 	convertTemplaterFormat,
@@ -8,7 +9,6 @@ import {
 	extractSourceHeadings,
 	getTemplateSections,
 	suggestSectionMapping,
-	type TemplateInfo,
 } from "./index";
 
 describe("convertTemplaterFormat", () => {
@@ -122,17 +122,8 @@ Tomorrow: <% tp.date.now("YYYY-MM-DD", 1) %>`;
 });
 
 describe("detectTitlePromptKey", () => {
-	function makeTemplate(content: string): TemplateInfo {
-		return {
-			name: "test",
-			path: "/test.md",
-			version: 1,
-			content,
-		};
-	}
-
 	test("detects 'Resource title' prompt key", () => {
-		const template = makeTemplate(`---
+		const template = createTestTemplate(`---
 title: "<% tp.system.prompt("Resource title") %>"
 type: resource
 ---
@@ -142,7 +133,7 @@ type: resource
 	});
 
 	test("detects 'Project title' prompt key", () => {
-		const template = makeTemplate(`---
+		const template = createTestTemplate(`---
 title: "<% tp.system.prompt("Project title") %>"
 type: project
 ---
@@ -152,7 +143,7 @@ Body`);
 	});
 
 	test("detects 'Area title' prompt key", () => {
-		const template = makeTemplate(`---
+		const template = createTestTemplate(`---
 title: "<% tp.system.prompt("Area title") %>"
 type: area
 ---
@@ -162,7 +153,7 @@ Body`);
 	});
 
 	test("detects generic 'Title' prompt key", () => {
-		const template = makeTemplate(`---
+		const template = createTestTemplate(`---
 title: "<% tp.system.prompt("Title") %>"
 type: capture
 ---
@@ -172,7 +163,7 @@ Body`);
 	});
 
 	test("is case-insensitive when matching 'title'", () => {
-		const template = makeTemplate(`---
+		const template = createTestTemplate(`---
 title: "<% tp.system.prompt("My TITLE Here") %>"
 type: test
 ---
@@ -182,7 +173,7 @@ Body`);
 	});
 
 	test("falls back to 'Title' when no title prompt found", () => {
-		const template = makeTemplate(`---
+		const template = createTestTemplate(`---
 type: test
 other_field: "<% tp.system.prompt("Something else") %>"
 ---
@@ -192,7 +183,7 @@ Body`);
 	});
 
 	test("falls back to 'Title' for empty frontmatter", () => {
-		const template = makeTemplate(`---
+		const template = createTestTemplate(`---
 ---
 Body only`);
 
@@ -200,14 +191,14 @@ Body only`);
 	});
 
 	test("falls back to 'Title' for no frontmatter", () => {
-		const template = makeTemplate(`# Just markdown
+		const template = createTestTemplate(`# Just markdown
 No frontmatter here`);
 
 		expect(detectTitlePromptKey(template)).toBe("Title");
 	});
 
 	test("only matches prompts in frontmatter, not body", () => {
-		const template = makeTemplate(`---
+		const template = createTestTemplate(`---
 type: test
 ---
 # <% tp.system.prompt("Body title") %>
@@ -219,7 +210,7 @@ This is body content with a title prompt.`);
 	});
 
 	test("handles whitespace variations in prompt syntax", () => {
-		const template = makeTemplate(`---
+		const template = createTestTemplate(`---
 title: "<%  tp.system.prompt("Spaced title")  %>"
 ---
 Body`);
@@ -229,17 +220,8 @@ Body`);
 });
 
 describe("getTemplateSections", () => {
-	function makeTemplate(content: string): TemplateInfo {
-		return {
-			name: "test",
-			path: "/test.md",
-			version: 1,
-			content,
-		};
-	}
-
 	test("extracts h2 headings from template body", () => {
-		const template = makeTemplate(`---
+		const template = createTestTemplate(`---
 title: "Test"
 ---
 ## Section One
@@ -255,7 +237,7 @@ more content`);
 	});
 
 	test("returns empty array for template with no body headings", () => {
-		const template = makeTemplate(`---
+		const template = createTestTemplate(`---
 title: "Test"
 ---
 No headings here, just plain text.`);
@@ -264,7 +246,7 @@ No headings here, just plain text.`);
 	});
 
 	test("ignores h1 and h3+ headings", () => {
-		const template = makeTemplate(`---
+		const template = createTestTemplate(`---
 title: "Test"
 ---
 # H1 Heading
@@ -276,7 +258,7 @@ title: "Test"
 	});
 
 	test("strips Templater prompts from heading text", () => {
-		const template = makeTemplate(`---
+		const template = createTestTemplate(`---
 title: "Test"
 ---
 ## <% tp.system.prompt("Title") %>
@@ -287,7 +269,7 @@ title: "Test"
 	});
 
 	test("handles template without frontmatter", () => {
-		const template = makeTemplate(`# Just markdown
+		const template = createTestTemplate(`# Just markdown
 ## Section One
 ## Section Two`);
 
@@ -298,7 +280,7 @@ title: "Test"
 	});
 
 	test("handles empty frontmatter", () => {
-		const template = makeTemplate(`---
+		const template = createTestTemplate(`---
 ---
 ## Only Section`);
 
@@ -306,7 +288,7 @@ title: "Test"
 	});
 
 	test("handles real booking template sections", () => {
-		const template = makeTemplate(`---
+		const template = createTestTemplate(`---
 title: "<% tp.system.prompt("Booking title") %>"
 type: booking
 ---

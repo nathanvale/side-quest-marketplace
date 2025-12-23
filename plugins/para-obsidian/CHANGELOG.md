@@ -98,6 +98,57 @@ The migration script will:
 - Wiki-style links between notes
 - Backlinks panel for discovering connections
 
+## [Unreleased]
+
+### BREAKING CHANGES
+
+#### Registry Restricted to Attachments Only
+
+**Impact:** The processed items registry now only tracks attachment processing, not all inbox items.
+
+**Previous Behavior:**
+- Registry tracked ALL processed inbox items to prevent reprocessing
+- Every scanned inbox file was added to the registry after processing
+
+**New Behavior:**
+- Registry ONLY tracks attachment moves for deduplication
+- Inbox items are not added to registry, only attachment file operations
+
+**Why This Change?**
+- **Reduces registry bloat** - No need to track items that won't be reprocessed anyway
+- **Aligns with actual use case** - Registry was primarily used to prevent duplicate attachment moves
+- **Simplifies cleanup** - Fewer registry entries to manage over time
+
+**Migration Required:**
+
+If you need the old behavior (track all processed inbox items), update your configuration:
+
+**Option 1: Global configuration** (`~/.config/para-obsidian/config.json`)
+```json
+{
+  "restrictRegistryToAttachments": false
+}
+```
+
+**Option 2: Project configuration** (`.para-obsidianrc` in vault root)
+```json
+{
+  "restrictRegistryToAttachments": false
+}
+```
+
+**Registry Data:**
+- Existing registry entries remain intact but won't be used for non-attachment items
+- No migration script needed - the change is purely behavioral
+- Use `para registry list` to view current registry entries
+- Use `para registry clear` to reset if desired
+
+**Recommended Action:**
+- **Most users:** No action required - the new behavior is optimal for typical workflows
+- **Power users tracking custom workflows:** Set `restrictRegistryToAttachments: false` if you rely on full item tracking
+
+---
+
 ## [0.1.0] - 2025-12-XX
 
 ### Added

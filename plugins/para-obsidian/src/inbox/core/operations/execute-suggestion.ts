@@ -433,23 +433,18 @@ export async function executeSuggestion(
 						}
 					}
 
-					// Add area/project if suggested (use exact Templater prompt text as keys)
-					// Wrap in wikilink format [[...]] as required by frontmatter validation
-					if (suggestion.suggestedArea) {
-						args["Area (leave empty if using project)"] =
-							`[[${suggestion.suggestedArea}]]`;
-					}
-					if (suggestion.suggestedProject) {
-						args["Project (leave empty if using area)"] =
-							`[[${suggestion.suggestedProject}]]`;
-					}
+					// Note: Area/project routing removed - all items go to inbox
+					// User assigns area/project manually in Obsidian after review
 
 					// Create note in staging directory first (.inbox-staging)
 					const stagingDir = join(config.vaultPath, ".inbox-staging");
 					ensureDirSync(stagingDir);
 
+					// Use classifier's template name if available (e.g., "generic" ID → "document" template)
+					const templateName =
+						converter?.template.name ?? suggestion.suggestedNoteType;
 					const result = createFromTemplate(paraConfig, {
-						template: suggestion.suggestedNoteType,
+						template: templateName,
 						title: suggestion.suggestedTitle,
 						dest: ".inbox-staging", // Stage in temp location
 						args,
@@ -662,7 +657,8 @@ export async function executeSuggestion(
 					// 2. Resolve suggestedArea to "02 Areas/{area}" if area exists in vault
 					// 3. Resolve suggestedProject to "01 Projects/{project}" if project exists in vault
 					// 4. Fall back to defaultDestinations for the note type
-					// 5. Default to "00 Inbox" (PARA method)
+					// All items now go to inbox - no area/project routing
+					// User assigns area/project manually in Obsidian after review
 					let finalDest: string;
 					if (
 						"suggestedDestination" in suggestion &&
@@ -675,49 +671,6 @@ export async function executeSuggestion(
 							config.vaultPath,
 							options,
 						);
-					} else if (
-						suggestion.action === "create-note" &&
-						suggestion.suggestedArea &&
-						options?.areaPathMap
-					) {
-						// Try to resolve suggestedArea to a vault path
-						const areaPath = options.areaPathMap.get(
-							suggestion.suggestedArea.toLowerCase(),
-						);
-						if (areaPath) {
-							finalDest = areaPath;
-						} else {
-							// Area doesn't exist in vault, fall back to inbox
-							finalDest =
-								paraConfig.defaultDestinations?.[
-									suggestion.suggestedNoteType
-								] ?? "00 Inbox";
-						}
-					} else if (
-						suggestion.action === "create-note" &&
-						suggestion.suggestedProject &&
-						options?.projectPathMap
-					) {
-						// Try to resolve suggestedProject to a vault path
-						const projectPath = options.projectPathMap.get(
-							suggestion.suggestedProject.toLowerCase(),
-						);
-						if (projectPath) {
-							finalDest = projectPath;
-						} else {
-							// Project doesn't exist in vault, fall back to inbox
-							finalDest =
-								paraConfig.defaultDestinations?.[
-									suggestion.suggestedNoteType
-								] ?? "00 Inbox";
-						}
-					} else if (
-						suggestion.action === "create-note" &&
-						suggestion.suggestedNoteType
-					) {
-						finalDest =
-							paraConfig.defaultDestinations?.[suggestion.suggestedNoteType] ??
-							"00 Inbox";
 					} else {
 						// PARA method: all notes go to inbox by default
 						finalDest = "00 Inbox";
@@ -781,34 +734,26 @@ export async function executeSuggestion(
 				createdNotePath = movedFilePath;
 
 				// Update frontmatter with extracted fields
-				if (
-					suggestion.action === "create-note" &&
-					(suggestion.extractedFields || suggestion.suggestedArea)
-				) {
+				if (suggestion.action === "create-note" && suggestion.extractedFields) {
 					try {
 						const target = resolveVaultPath(paraConfig.vault, createdNotePath);
 						const content = readTextFileSync(target.absolute);
 						const { attributes, body } = parseFrontmatter(content);
 
-						// Add para field from suggestedArea
-						if (suggestion.suggestedArea) {
-							attributes.para = suggestion.suggestedArea;
-						}
+						// Note: Area/project routing removed - user assigns manually
 
 						// Update fields from LLM extraction
-						if (suggestion.extractedFields) {
-							for (const [key, value] of Object.entries(
-								suggestion.extractedFields,
-							)) {
-								if (key === "category" || key === "author") {
-									// Strip wikilinks from category/author fields
-									// "[[Documentation]]" → "Documentation"
-									if (typeof value === "string") {
-										attributes[key] = value.replace(/\[\[([^\]]+)\]\]/g, "$1");
-									}
-								} else if (value !== null && value !== undefined) {
-									attributes[key] = value;
+						for (const [key, value] of Object.entries(
+							suggestion.extractedFields,
+						)) {
+							if (key === "category" || key === "author") {
+								// Strip wikilinks from category/author fields
+								// "[[Documentation]]" → "Documentation"
+								if (typeof value === "string") {
+									attributes[key] = value.replace(/\[\[([^\]]+)\]\]/g, "$1");
 								}
+							} else if (value !== null && value !== undefined) {
+								attributes[key] = value;
 							}
 						}
 

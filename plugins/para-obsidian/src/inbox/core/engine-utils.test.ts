@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { createTempDir } from "@sidequest/core/testing";
+import { createTestVault, useTestVaultCleanup } from "../../testing/utils";
 import {
 	capitalizeFirst,
 	formatDateWithSpaces,
@@ -394,13 +394,13 @@ describe("inbox/engine-utils", () => {
 	});
 
 	describe("generateUniquePath", () => {
-		let tempDir: string;
-
-		beforeEach(() => {
-			tempDir = createTempDir("engine-utils-test-");
-		});
+		const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+		afterEach(getAfterEachHook());
 
 		test("should return original path when file does not exist", () => {
+			const tempDir = createTestVault();
+			trackVault(tempDir);
+
 			const path = `${tempDir}/new-file.pdf`;
 			const result = generateUniquePath(path);
 
@@ -408,6 +408,9 @@ describe("inbox/engine-utils", () => {
 		});
 
 		test("should add counter suffix when file exists", () => {
+			const tempDir = createTestVault();
+			trackVault(tempDir);
+
 			const path = `${tempDir}/existing.pdf`;
 			writeFileSync(path, "content");
 
@@ -418,6 +421,9 @@ describe("inbox/engine-utils", () => {
 		});
 
 		test("should increment counter when multiple files exist", () => {
+			const tempDir = createTestVault();
+			trackVault(tempDir);
+
 			const basePath = `${tempDir}/existing.pdf`;
 			writeFileSync(basePath, "content");
 			writeFileSync(`${tempDir}/existing-2.pdf`, "content");
@@ -430,6 +436,9 @@ describe("inbox/engine-utils", () => {
 		});
 
 		test("should handle files without extension", () => {
+			const tempDir = createTestVault();
+			trackVault(tempDir);
+
 			const path = `${tempDir}/README`;
 			writeFileSync(path, "content");
 
@@ -439,6 +448,9 @@ describe("inbox/engine-utils", () => {
 		});
 
 		test("should preserve extension correctly", () => {
+			const tempDir = createTestVault();
+			trackVault(tempDir);
+
 			const path = `${tempDir}/file.tar.gz`;
 			writeFileSync(path, "content");
 
@@ -449,6 +461,9 @@ describe("inbox/engine-utils", () => {
 		});
 
 		test("should handle directory paths", () => {
+			const tempDir = createTestVault();
+			trackVault(tempDir);
+
 			const dirPath = `${tempDir}/subdir`;
 			mkdirSync(dirPath);
 
@@ -459,13 +474,13 @@ describe("inbox/engine-utils", () => {
 	});
 
 	describe("generateUniqueNotePath", () => {
-		let tempDir: string;
-
-		beforeEach(() => {
-			tempDir = createTempDir("engine-utils-note-test-");
-		});
+		const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+		afterEach(getAfterEachHook());
 
 		test("should return original path if file does not exist", () => {
+			const tempDir = createTestVault();
+			trackVault(tempDir);
+
 			const path = `${tempDir}/My Note.md`;
 
 			const result = generateUniqueNotePath(path);
@@ -474,6 +489,9 @@ describe("inbox/engine-utils", () => {
 		});
 
 		test("should add parenthetical counter when file exists", () => {
+			const tempDir = createTestVault();
+			trackVault(tempDir);
+
 			const path = `${tempDir}/My Note.md`;
 			writeFileSync(path, "content");
 
@@ -484,6 +502,9 @@ describe("inbox/engine-utils", () => {
 		});
 
 		test("should increment counter when multiple notes exist", () => {
+			const tempDir = createTestVault();
+			trackVault(tempDir);
+
 			const basePath = `${tempDir}/Invoice - Amazon - 2024-12-10.md`;
 			writeFileSync(basePath, "content");
 			writeFileSync(
@@ -502,6 +523,9 @@ describe("inbox/engine-utils", () => {
 		});
 
 		test("should handle files without extension", () => {
+			const tempDir = createTestVault();
+			trackVault(tempDir);
+
 			const path = `${tempDir}/README`;
 			writeFileSync(path, "content");
 

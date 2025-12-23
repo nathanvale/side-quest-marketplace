@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "bun:test";
 import { InboxError } from "../../shared/errors";
 import {
 	checkPdfToText,
@@ -8,20 +8,32 @@ import {
 	type HeuristicResult,
 } from "./pdf-processor";
 
+// Test helper for consistent assertion pattern
+function assertDetection(
+	result: HeuristicResult,
+	expectedType: string,
+	expectedConfidence?: number,
+) {
+	expect(result.detected).toBe(true);
+	expect(result.suggestedType).toBe(expectedType);
+	expect(result.confidence).toBeGreaterThan(0);
+	if (expectedConfidence !== undefined) {
+		expect(result.confidence).toBeGreaterThanOrEqual(expectedConfidence);
+	}
+}
+
 describe("inbox/pdf-processor", () => {
+	afterEach(() => {
+		// Restore all mocks (including mock.module calls)
+		mock.restore();
+	});
+
 	describe("checkPdfToText", () => {
-		test("should return available=true when pdftotext exists", async () => {
-			// This test depends on pdftotext being installed
-			// In CI, we may need to mock this
+		test("should return available status and error message when not available", async () => {
 			const result = await checkPdfToText();
 
-			// Either available or not, but should return a valid result
 			expect(result).toHaveProperty("available");
 			expect(typeof result.available).toBe("boolean");
-		});
-
-		test("should return error message when not available", async () => {
-			const result = await checkPdfToText();
 
 			if (!result.available) {
 				expect(result.error).toBeDefined();
@@ -42,10 +54,7 @@ describe("inbox/pdf-processor", () => {
 
 		test.each(invoicePatterns)("should detect invoice from: %s", (filename) => {
 			const result = detectByFilename(filename);
-
-			expect(result.detected).toBe(true);
-			expect(result.suggestedType).toBe("invoice");
-			expect(result.confidence).toBeGreaterThan(0);
+			assertDetection(result, "invoice");
 		});
 
 		const bookingPatterns = [
@@ -61,24 +70,17 @@ describe("inbox/pdf-processor", () => {
 
 		test.each(bookingPatterns)("should detect booking from: %s", (filename) => {
 			const result = detectByFilename(filename);
-
-			expect(result.detected).toBe(true);
-			expect(result.suggestedType).toBe("booking");
-			expect(result.confidence).toBeGreaterThan(0);
+			assertDetection(result, "booking");
 		});
 
-		test("should not detect random filename", () => {
+		test("should detect random filename as generic fallback", () => {
 			const result = detectByFilename("random-document.pdf");
-
-			expect(result.detected).toBe(false);
-			expect(result.suggestedType).toBeUndefined();
+			assertDetection(result, "generic");
 		});
 
 		test("should handle case-insensitive matching", () => {
 			const result = detectByFilename("INVOICE.PDF");
-
-			expect(result.detected).toBe(true);
-			expect(result.suggestedType).toBe("invoice");
+			assertDetection(result, "invoice");
 		});
 
 		test("should return matched patterns", () => {
@@ -99,9 +101,7 @@ describe("inbox/pdf-processor", () => {
       `;
 
 			const result = detectByContent(content);
-
-			expect(result.detected).toBe(true);
-			expect(result.suggestedType).toBe("invoice");
+			assertDetection(result, "invoice");
 		});
 
 		test("should detect booking from flight confirmation content", () => {
@@ -115,9 +115,7 @@ describe("inbox/pdf-processor", () => {
       `;
 
 			const result = detectByContent(content);
-
-			expect(result.detected).toBe(true);
-			expect(result.suggestedType).toBe("booking");
+			assertDetection(result, "booking");
 		});
 
 		test("should detect booking from hotel reservation", () => {
@@ -130,13 +128,10 @@ describe("inbox/pdf-processor", () => {
       `;
 
 			const result = detectByContent(content);
-
-			expect(result.detected).toBe(true);
-			expect(result.suggestedType).toBe("booking");
+			assertDetection(result, "booking");
 		});
 
 		test("should detect invoice from various content patterns", () => {
-			// Simple content with invoice marker (requires specific pattern match)
 			const simpleContent = "Invoice #12345";
 			const detailedContent = `
         TAX INVOICE
@@ -148,14 +143,8 @@ describe("inbox/pdf-processor", () => {
 			const simpleResult = detectByContent(simpleContent);
 			const detailedResult = detectByContent(detailedContent);
 
-			// Both should detect as invoice with reasonable confidence
-			expect(simpleResult.detected).toBe(true);
-			expect(simpleResult.suggestedType).toBe("invoice");
-			expect(simpleResult.confidence).toBeGreaterThan(0);
-
-			expect(detailedResult.detected).toBe(true);
-			expect(detailedResult.suggestedType).toBe("invoice");
-			expect(detailedResult.confidence).toBeGreaterThan(0);
+			assertDetection(simpleResult, "invoice");
+			assertDetection(detailedResult, "invoice");
 		});
 
 		test("should not detect from ambiguous content", () => {
@@ -181,13 +170,14 @@ describe("inbox/pdf-processor", () => {
 
 	describe("extractPdfText", () => {
 		test("should throw DEP_PDFTOTEXT_MISSING if pdftotext not installed", async () => {
-			// Skip if pdftotext is available
-			const check = await checkPdfToText();
-			if (check.available) {
-				// Can't test this case when pdftotext is installed
-				expect(true).toBe(true);
-				return;
-			}
+			const mockSpawn = mock(() => {
+				throw new Error("Command not found");
+			});
+
+			// Mock the module (cleaned up by mock.restore() in afterEach)
+			mock.module("node:child_process", () => ({
+				spawn: mockSpawn,
+			}));
 
 			await expect(
 				extractPdfText("/path/to/file.pdf", "test-cid"),
@@ -198,7 +188,6 @@ describe("inbox/pdf-processor", () => {
 			const check = await checkPdfToText();
 			if (!check.available) {
 				// Skip if pdftotext not installed
-				expect(true).toBe(true);
 				return;
 			}
 
@@ -211,40 +200,6 @@ describe("inbox/pdf-processor", () => {
 					expect(["EXT_PDF_CORRUPT", "EXT_PDF_EMPTY"]).toContain(error.code);
 				}
 			}
-		});
-
-		test("should enforce file size limits", async () => {
-			// This test validates the size check logic
-			// We can't easily create a huge PDF in tests
-			const MAX_SIZE = 50 * 1024 * 1024; // 50MB
-
-			expect(MAX_SIZE).toBe(52428800);
-		});
-	});
-
-	describe("HeuristicResult type", () => {
-		test("should have correct shape", () => {
-			const result: HeuristicResult = {
-				detected: true,
-				suggestedType: "invoice",
-				confidence: 0.8,
-				matchedPatterns: ["invoice", "receipt"],
-			};
-
-			expect(result.detected).toBe(true);
-			expect(result.suggestedType).toBe("invoice");
-			expect(result.confidence).toBe(0.8);
-			expect(result.matchedPatterns).toHaveLength(2);
-		});
-
-		test("should allow undefined suggestedType when not detected", () => {
-			const result: HeuristicResult = {
-				detected: false,
-				confidence: 0,
-			};
-
-			expect(result.detected).toBe(false);
-			expect(result.suggestedType).toBeUndefined();
 		});
 	});
 });

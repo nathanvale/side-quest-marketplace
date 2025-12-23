@@ -28,6 +28,7 @@ export { handleCreate } from "./create";
 export { handleCreateClassifier } from "./create-classifier";
 export { handleCreateNoteTemplate } from "./create-note-template";
 // Enrich commands
+export { handleEnrich } from "./enrich";
 export { handleEnrichBookmark } from "./enrich-bookmark";
 // Export commands
 export { handleExportBookmarks } from "./export-bookmarks";
@@ -48,6 +49,8 @@ export {
 } from "./frontmatter";
 // Git commands
 export { handleGit, handleInsert } from "./git";
+// Inbox commands
+export { handleInboxMove } from "./inbox-move";
 // Links commands
 export {
 	handleCleanBrokenLinks,

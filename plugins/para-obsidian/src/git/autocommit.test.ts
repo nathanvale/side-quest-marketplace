@@ -1,14 +1,22 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 
 import type { ParaObsidianConfig } from "../config/index";
-import { createTestVault, initGitRepo } from "../testing/utils";
+import {
+	createTestVault,
+	initGitRepo,
+	useTestVaultCleanup,
+} from "../testing/utils";
 import { autoCommitChanges } from "./index";
 
 describe("autoCommitChanges", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	it("stages and commits when autoCommit is enabled", async () => {
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		const target = path.join(vault, "note.md");
@@ -34,6 +42,7 @@ describe("autoCommitChanges", () => {
 
 	it("skips when autoCommit is disabled", async () => {
 		const vault = createTestVault();
+		trackVault(vault);
 		await initGitRepo(vault);
 
 		fs.writeFileSync(path.join(vault, "note.md"), "content", "utf8");

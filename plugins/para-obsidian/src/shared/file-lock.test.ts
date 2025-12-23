@@ -6,6 +6,15 @@ import { cleanupStaleLocks, withFileLock } from "./file-lock";
 
 const LOCK_DIR = join(tmpdir(), "para-obsidian-locks");
 
+// Test timing constants - chosen to be longer than typical system overhead
+// to reduce flakiness while keeping tests reasonably fast
+const LOCK_RELEASE_INSTANT_MS = 50; // Max time for lock release to be considered "instant"
+const SHORT_OPERATION_MS = 100; // Duration for operation that blocks another
+const PARALLEL_TIMEOUT_MS = 100; // Max time for parallel operations (should be ~50ms, buffer for overhead)
+const MEDIUM_OPERATION_MS = 50; // Duration for queue test operations
+const SHORT_DELAY_MS = 10; // Minimal delay for race condition tests
+const TINY_DELAY_MS = 5; // Minimal delay for corruption simulation
+
 describe("file-lock", () => {
 	beforeEach(async () => {
 		// Clean up any existing locks
@@ -48,8 +57,8 @@ describe("file-lock", () => {
 			});
 			const duration = Date.now() - start;
 
-			// Should be nearly instant (< 50ms)
-			expect(duration).toBeLessThan(50);
+			// Should be nearly instant
+			expect(duration).toBeLessThan(LOCK_RELEASE_INSTANT_MS);
 		});
 
 		test("releases lock even if operation throws", async () => {
@@ -74,7 +83,7 @@ describe("file-lock", () => {
 			const executions: number[] = [];
 			const operation1 = withFileLock("test-resource", async () => {
 				executions.push(1);
-				await new Promise((resolve) => setTimeout(resolve, 100));
+				await new Promise((resolve) => setTimeout(resolve, SHORT_OPERATION_MS));
 				executions.push(2);
 			});
 
@@ -96,15 +105,21 @@ describe("file-lock", () => {
 			const operations = [
 				withFileLock("test-resource", async () => {
 					results.push(1);
-					await new Promise((resolve) => setTimeout(resolve, 50));
+					await new Promise((resolve) =>
+						setTimeout(resolve, MEDIUM_OPERATION_MS),
+					);
 				}),
 				withFileLock("test-resource", async () => {
 					results.push(2);
-					await new Promise((resolve) => setTimeout(resolve, 50));
+					await new Promise((resolve) =>
+						setTimeout(resolve, MEDIUM_OPERATION_MS),
+					);
 				}),
 				withFileLock("test-resource", async () => {
 					results.push(3);
-					await new Promise((resolve) => setTimeout(resolve, 50));
+					await new Promise((resolve) =>
+						setTimeout(resolve, MEDIUM_OPERATION_MS),
+					);
 				}),
 			];
 
@@ -119,17 +134,22 @@ describe("file-lock", () => {
 
 			await Promise.all([
 				withFileLock("resource-1", async () => {
-					await new Promise((resolve) => setTimeout(resolve, 50));
+					await new Promise((resolve) =>
+						setTimeout(resolve, MEDIUM_OPERATION_MS),
+					);
 				}),
 				withFileLock("resource-2", async () => {
-					await new Promise((resolve) => setTimeout(resolve, 50));
+					await new Promise((resolve) =>
+						setTimeout(resolve, MEDIUM_OPERATION_MS),
+					);
 				}),
 			]);
 
 			const duration = Date.now() - start;
 
 			// Both should run in parallel (< 100ms total, not ~100ms sequential)
-			expect(duration).toBeLessThan(100);
+			// Using buffer to account for system overhead
+			expect(duration).toBeLessThan(PARALLEL_TIMEOUT_MS);
 		});
 
 		test("throws on timeout", async () => {
@@ -215,7 +235,7 @@ describe("file-lock", () => {
 			const attempts = Array.from({ length: 5 }, () =>
 				withFileLock("race-resource", async () => {
 					successes.push(true);
-					await new Promise((resolve) => setTimeout(resolve, 10));
+					await new Promise((resolve) => setTimeout(resolve, SHORT_DELAY_MS));
 				}),
 			);
 
@@ -230,9 +250,10 @@ describe("file-lock", () => {
 
 			const operations = Array.from({ length: 10 }, (_, i) =>
 				withFileLock("counter-resource", async () => {
-					// Simulate read-modify-write
+					// Simulate read-modify-write with small delay to increase chance of
+					// race condition if locking is broken
 					const current = counter;
-					await new Promise((resolve) => setTimeout(resolve, 5));
+					await new Promise((resolve) => setTimeout(resolve, TINY_DELAY_MS));
 					counter = current + 1;
 				}),
 			);

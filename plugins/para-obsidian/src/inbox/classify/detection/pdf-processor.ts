@@ -437,17 +437,29 @@ export function detectByFilename(
 		return { detected: false, confidence: 0 };
 	}
 
+	// Sort by priority (highest first) so specific classifiers are checked before generic fallback
+	const sortedConverters = [...activeConverters].sort(
+		(a, b) => (b.priority ?? 0) - (a.priority ?? 0),
+	);
+
 	const name = basename(filename.trim());
 	let bestScore = 0;
+	let bestPriority = -1;
 	let bestType = "";
 	const matchedPatterns: string[] = [];
 
-	for (const converter of activeConverters) {
+	for (const converter of sortedConverters) {
 		if (!converter?.heuristics?.filenamePatterns) continue;
 
 		const score = scoreFilename(name, converter.heuristics.filenamePatterns);
-		if (score > bestScore) {
+		const priority = converter.priority ?? 0;
+
+		// Update best match if:
+		// 1. Score is higher, OR
+		// 2. Score is equal but priority is higher (prefer specific over generic)
+		if (score > bestScore || (score === bestScore && priority > bestPriority)) {
 			bestScore = score;
+			bestPriority = priority;
 			bestType = converter.id;
 			// Collect pattern info for debugging
 			matchedPatterns.push(`${converter.id}(${score.toFixed(2)})`);
@@ -492,6 +504,11 @@ export function detectByContent(
 		return { detected: false, confidence: 0 };
 	}
 
+	// Sort by priority (highest first) so specific classifiers are checked before generic fallback
+	const sortedConverters = [...activeConverters].sort(
+		(a, b) => (b.priority ?? 0) - (a.priority ?? 0),
+	);
+
 	// Optimize for large content by limiting analysis to first portion
 	const analysisContent =
 		content.length > 10000
@@ -499,18 +516,25 @@ export function detectByContent(
 			: content;
 
 	let bestScore = 0;
+	let bestPriority = -1;
 	let bestType = "";
 	const matchedPatterns: string[] = [];
 
-	for (const converter of activeConverters) {
+	for (const converter of sortedConverters) {
 		if (!converter?.heuristics?.contentMarkers) continue;
 
 		const score = scoreContent(
 			analysisContent,
 			converter.heuristics.contentMarkers,
 		);
-		if (score > bestScore) {
+		const priority = converter.priority ?? 0;
+
+		// Update best match if:
+		// 1. Score is higher, OR
+		// 2. Score is equal but priority is higher (prefer specific over generic)
+		if (score > bestScore || (score === bestScore && priority > bestPriority)) {
 			bestScore = score;
+			bestPriority = priority;
 			bestType = converter.id;
 			// Collect pattern info for debugging
 			matchedPatterns.push(`${converter.id}(${score.toFixed(2)})`);
@@ -535,6 +559,12 @@ export function detectByContent(
 /**
  * Combine filename and content heuristics for overall detection.
  *
+ * Priority logic:
+ * 1. Strong filename match (≥0.9) is AUTHORITATIVE - users name files intentionally
+ * 2. If both agree, boost confidence
+ * 3. If content detected with high confidence, use it
+ * 4. Otherwise fall back to filename
+ *
  * @param filename - Filename to analyze
  * @param content - Text content to analyze
  * @returns Combined detection result
@@ -546,7 +576,30 @@ export function combineHeuristics(
 	const filenameResult = detectByFilename(filename);
 	const contentResult = detectByContent(content);
 
-	// If both agree, high confidence
+	// PRIORITY 1: Strong filename match is AUTHORITATIVE
+	// When a user explicitly names a file with a type keyword (e.g., "agreement", "invoice"),
+	// that signal should NOT be overridden by content detection
+	if (filenameResult.detected && filenameResult.confidence >= 0.9) {
+		// If content agrees, boost confidence
+		if (
+			contentResult.detected &&
+			contentResult.suggestedType === filenameResult.suggestedType
+		) {
+			return {
+				detected: true,
+				suggestedType: filenameResult.suggestedType,
+				confidence: 1.0,
+				matchedPatterns: [
+					...(filenameResult.matchedPatterns ?? []),
+					...(contentResult.matchedPatterns ?? []),
+				],
+			};
+		}
+		// Filename is authoritative even if content disagrees
+		return filenameResult;
+	}
+
+	// PRIORITY 2: If both agree on type, high confidence
 	if (
 		filenameResult.detected &&
 		contentResult.detected &&
@@ -566,12 +619,12 @@ export function combineHeuristics(
 		};
 	}
 
-	// If only content detected (stronger signal for content)
-	if (contentResult.detected && contentResult.confidence > 0.5) {
+	// PRIORITY 3: Content detected with high confidence
+	if (contentResult.detected && contentResult.confidence > 0.7) {
 		return contentResult;
 	}
 
-	// If only filename detected
+	// PRIORITY 4: If filename detected (moderate confidence)
 	if (filenameResult.detected) {
 		return {
 			...filenameResult,
@@ -580,7 +633,7 @@ export function combineHeuristics(
 		};
 	}
 
-	// Content detected but low confidence
+	// PRIORITY 5: Content detected but low confidence
 	if (contentResult.detected) {
 		return contentResult;
 	}

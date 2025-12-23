@@ -55,6 +55,31 @@ function createHeuristicResult(
 	};
 }
 
+/** Create input with LLM result (convenience for LLM-focused tests) */
+function createInputWithLLM(
+	llmOverrides: Partial<DocumentTypeResult> = {},
+	inputOverrides: Partial<SuggestionInput> = {},
+): SuggestionInput {
+	return createInput({
+		llmResult: createLLMResult(llmOverrides),
+		...inputOverrides,
+	});
+}
+
+/** Assert result is a create-note suggestion with expected type */
+function expectCreateNoteSuggestion(
+	result: ReturnType<typeof buildSuggestion>,
+	expectedType: string,
+): void {
+	expect(result.action).toBe("create-note");
+	if (isCreateNoteSuggestion(result)) {
+		expect(result.suggestedNoteType).toBe(expectedType);
+	}
+}
+
+// Note: This test file is self-contained and does not require vault fixtures.
+// It tests pure suggestion building logic without file system operations.
+
 // =============================================================================
 // Tests
 // =============================================================================
@@ -63,81 +88,40 @@ describe("converters/suggestion-builder", () => {
 	describe("buildSuggestion", () => {
 		describe("LLM high confidence (≥0.7)", () => {
 			test("should use LLM result with very high confidence (≥0.9) → HIGH", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.95,
-						documentType: "invoice",
-					}),
+				const input = createInputWithLLM({
+					confidence: 0.95,
+					documentType: "invoice",
 				});
 
 				const result = buildSuggestion(input);
 
 				expect(result.confidence).toBe("high");
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedNoteType).toBe("invoice");
-				}
+				expectCreateNoteSuggestion(result, "invoice");
 			});
 
 			test("should use LLM result with high confidence (0.7-0.9) → MEDIUM", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.75,
-						documentType: "booking",
-					}),
+				const input = createInputWithLLM({
+					confidence: 0.75,
+					documentType: "booking",
 				});
 
 				const result = buildSuggestion(input);
 
 				expect(result.confidence).toBe("medium");
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedNoteType).toBe("booking");
-				}
+				expectCreateNoteSuggestion(result, "booking");
 			});
 
-			test("should extract suggestedArea from LLM result", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.85,
-						suggestedArea: "Health",
-					}),
-				});
-
-				const result = buildSuggestion(input);
-
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedArea).toBe("Health");
-				}
-			});
-
-			test("should extract suggestedProject from LLM result", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.85,
-						suggestedProject: "2024 Tax Return",
-					}),
-				});
-
-				const result = buildSuggestion(input);
-
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedProject).toBe("2024 Tax Return");
-				}
-			});
+			// Note: suggestedArea and suggestedProject tests removed
+			// Area/project routing is no longer supported - all items go to inbox
 
 			test("should extract extractedFields from LLM result", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.85,
-						extractedFields: {
-							amount: "$150.00",
-							provider: "Dr Smith",
-							date: "2024-01-15",
-						},
-					}),
+				const input = createInputWithLLM({
+					confidence: 0.85,
+					extractedFields: {
+						amount: "$150.00",
+						provider: "Dr Smith",
+						date: "2024-01-15",
+					},
 				});
 
 				const result = buildSuggestion(input);
@@ -153,11 +137,9 @@ describe("converters/suggestion-builder", () => {
 			});
 
 			test("should use LLM reasoning if provided", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.85,
-						reasoning: "Document contains invoice header and ABN",
-					}),
+				const input = createInputWithLLM({
+					confidence: 0.85,
+					reasoning: "Document contains invoice header and ABN",
 				});
 
 				const result = buildSuggestion(input);
@@ -166,12 +148,10 @@ describe("converters/suggestion-builder", () => {
 			});
 
 			test("should generate default reason if no reasoning provided", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.85,
-						documentType: "receipt",
-						reasoning: undefined,
-					}),
+				const input = createInputWithLLM({
+					confidence: 0.85,
+					documentType: "receipt",
+					reasoning: undefined,
 				});
 
 				const result = buildSuggestion(input);
@@ -181,11 +161,9 @@ describe("converters/suggestion-builder", () => {
 			});
 
 			test("should use suggestedFilenameDescription as suggestedAttachmentName", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.85,
-						suggestedFilenameDescription: "dr-smith-invoice-jan-2024",
-					}),
+				const input = createInputWithLLM({
+					confidence: 0.85,
+					suggestedFilenameDescription: "dr-smith-invoice-jan-2024",
 				});
 
 				const result = buildSuggestion(input);
@@ -199,14 +177,12 @@ describe("converters/suggestion-builder", () => {
 			});
 
 			test("should pass through extractionWarnings from LLM result", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.7,
-						extractionWarnings: [
-							"Could not find invoice date",
-							"Provider name unclear",
-						],
-					}),
+				const input = createInputWithLLM({
+					confidence: 0.7,
+					extractionWarnings: [
+						"Could not find invoice date",
+						"Provider name unclear",
+					],
 				});
 
 				const result = buildSuggestion(input);
@@ -218,11 +194,9 @@ describe("converters/suggestion-builder", () => {
 			});
 
 			test("should not include extractionWarnings when empty", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.85,
-						extractionWarnings: [],
-					}),
+				const input = createInputWithLLM({
+					confidence: 0.85,
+					extractionWarnings: [],
 				});
 
 				const result = buildSuggestion(input);
@@ -267,10 +241,7 @@ describe("converters/suggestion-builder", () => {
 				const result = buildSuggestion(input);
 
 				expect(result.confidence).toBe("medium"); // No boost
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedNoteType).toBe("invoice"); // Uses LLM
-				}
+				expectCreateNoteSuggestion(result, "invoice"); // Uses LLM
 			});
 
 			test("should NOT boost when heuristics not detected", () => {
@@ -305,10 +276,7 @@ describe("converters/suggestion-builder", () => {
 				const result = buildSuggestion(input);
 
 				expect(result.confidence).toBe("medium");
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedNoteType).toBe("booking");
-				}
+				expectCreateNoteSuggestion(result, "booking");
 				expect(result.reason).toContain("Heuristic detection: booking");
 				expect(result.reason).toContain("85%");
 			});
@@ -326,10 +294,7 @@ describe("converters/suggestion-builder", () => {
 				const result = buildSuggestion(input);
 
 				expect(result.confidence).toBe("low");
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedNoteType).toBe("receipt");
-				}
+				expectCreateNoteSuggestion(result, "receipt");
 			});
 
 			test("should prefer LLM over heuristics when LLM confidence ≥0.7", () => {
@@ -348,10 +313,7 @@ describe("converters/suggestion-builder", () => {
 				const result = buildSuggestion(input);
 
 				// LLM takes precedence even with lower confidence than heuristics
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedNoteType).toBe("invoice");
-				}
+				expectCreateNoteSuggestion(result, "invoice");
 			});
 
 			test("should use heuristics when LLM confidence <0.7", () => {
@@ -370,10 +332,7 @@ describe("converters/suggestion-builder", () => {
 				const result = buildSuggestion(input);
 
 				// Heuristics take over because LLM is below threshold
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedNoteType).toBe("booking");
-				}
+				expectCreateNoteSuggestion(result, "booking");
 				expect(result.confidence).toBe("low"); // 0.7 < 0.8, so low
 			});
 		});
@@ -394,10 +353,7 @@ describe("converters/suggestion-builder", () => {
 				const result = buildSuggestion(input);
 
 				expect(result.confidence).toBe("low");
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedNoteType).toBe("session");
-				}
+				expectCreateNoteSuggestion(result, "session");
 				expect(result.reason).toContain("Low confidence LLM detection");
 			});
 
@@ -497,10 +453,10 @@ describe("converters/suggestion-builder", () => {
 			});
 
 			test("should generate suggestedTitle from filename", () => {
-				const input = createInput({
-					filename: "2024-01-15-invoice.pdf",
-					llmResult: createLLMResult({ confidence: 0.85 }),
-				});
+				const input = createInputWithLLM(
+					{ confidence: 0.85 },
+					{ filename: "2024-01-15-invoice.pdf" },
+				);
 
 				const result = buildSuggestion(input);
 
@@ -512,44 +468,13 @@ describe("converters/suggestion-builder", () => {
 		});
 
 		describe("edge cases", () => {
-			test("should handle null suggestedArea in LLM result", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.85,
-						suggestedArea: null,
-					}),
-				});
-
-				const result = buildSuggestion(input);
-
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedArea).toBeUndefined();
-				}
-			});
-
-			test("should handle null suggestedProject in LLM result", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.85,
-						suggestedProject: null,
-					}),
-				});
-
-				const result = buildSuggestion(input);
-
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedProject).toBeUndefined();
-				}
-			});
+			// Note: suggestedArea and suggestedProject tests removed
+			// Area/project routing is no longer supported - all items go to inbox
 
 			test("should handle null extractedFields in LLM result", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.85,
-						extractedFields: null,
-					}),
+				const input = createInputWithLLM({
+					confidence: 0.85,
+					extractedFields: null,
 				});
 
 				const result = buildSuggestion(input);
@@ -561,29 +486,22 @@ describe("converters/suggestion-builder", () => {
 			});
 
 			test("should handle confidence exactly at 0.7 threshold", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.7, // Exactly at threshold
-						documentType: "invoice",
-					}),
+				const input = createInputWithLLM({
+					confidence: 0.7, // Exactly at threshold
+					documentType: "invoice",
 				});
 
 				const result = buildSuggestion(input);
 
 				// 0.7 should trigger LLM path (>= 0.7)
 				expect(result.confidence).toBe("medium");
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedNoteType).toBe("invoice");
-				}
+				expectCreateNoteSuggestion(result, "invoice");
 			});
 
 			test("should handle confidence exactly at 0.9 threshold", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.9, // Exactly at threshold
-						documentType: "invoice",
-					}),
+				const input = createInputWithLLM({
+					confidence: 0.9, // Exactly at threshold
+					documentType: "invoice",
 				});
 
 				const result = buildSuggestion(input);
@@ -621,10 +539,7 @@ describe("converters/suggestion-builder", () => {
 				const result = buildSuggestion(input);
 
 				// 0.51 should trigger heuristic path
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedNoteType).toBe("invoice");
-				}
+				expectCreateNoteSuggestion(result, "invoice");
 			});
 		});
 	});

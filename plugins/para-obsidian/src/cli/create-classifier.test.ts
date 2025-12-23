@@ -38,11 +38,15 @@ import {
 	cleanupTestVault,
 	createTestVault,
 	readVaultFile,
+	useTestVaultCleanup,
 	vaultFileExists,
 	writeVaultFile,
 } from "../testing/utils";
 
 describe("create-classifier - Happy Path Tests", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	let vault: string;
 	let classifiersDir: string;
 	let templatesDir: string;
@@ -50,6 +54,7 @@ describe("create-classifier - Happy Path Tests", () => {
 
 	beforeEach(() => {
 		vault = createTestVault();
+		trackVault(vault);
 		classifiersDir = join(
 			vault,
 			".plugin-workspace",
@@ -66,10 +71,6 @@ describe("create-classifier - Happy Path Tests", () => {
 			"",
 		);
 		writeVaultFile(vault, "Templates/.gitkeep", "");
-	});
-
-	afterEach(() => {
-		cleanupTestVault(vault);
 	});
 
 	test("generates valid TypeScript classifier code", () => {
@@ -328,12 +329,16 @@ export const DEFAULT_CLASSIFIERS: readonly InboxConverter[] = [
 });
 
 describe("create-classifier - Failure Scenario Tests", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	let vault: string;
 	let classifiersDir: string;
 	let registryPath: string;
 
 	beforeEach(() => {
 		vault = createTestVault();
+		trackVault(vault);
 		classifiersDir = join(
 			vault,
 			".plugin-workspace",
@@ -348,10 +353,6 @@ describe("create-classifier - Failure Scenario Tests", () => {
 			"",
 		);
 		writeVaultFile(vault, "Templates/.gitkeep", "");
-	});
-
-	afterEach(() => {
-		cleanupTestVault(vault);
 	});
 
 	test("rollback removes classifier when registry update fails", async () => {
@@ -673,15 +674,15 @@ export const invalidClassifier: InboxConverter = {
 });
 
 describe("create-classifier - End-to-End Tests", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	let vault: string;
 
 	beforeEach(() => {
 		vault = createTestVault();
+		trackVault(vault);
 		writeVaultFile(vault, "Templates/.gitkeep", "");
-	});
-
-	afterEach(() => {
-		cleanupTestVault(vault);
 	});
 
 	test("full workflow: classifier + template → functional", async () => {

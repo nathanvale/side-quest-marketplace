@@ -1,10 +1,11 @@
-import { describe, expect, test } from "bun:test";
-import {
-	type CreateNoteSuggestion,
-	createSuggestionId,
-	type InboxSuggestion,
-	type SkipSuggestion,
+import { afterEach, describe, expect, mock, test } from "bun:test";
+import { createTestSuggestion } from "../../testing/utils";
+import type {
+	CreateNoteSuggestion,
+	InboxSuggestion,
+	SkipSuggestion,
 } from "../types";
+import { createSuggestionId } from "../types";
 import {
 	formatConfidence,
 	formatSuggestion,
@@ -15,6 +16,31 @@ import {
 	paginateSuggestions,
 	parseCommand,
 } from "./cli-adapter";
+
+/**
+ * Factory for creating test suggestions with consistent defaults
+ * Uses the shared createTestSuggestion utility as a base
+ */
+function createBaseSuggestion(
+	overrides?: Partial<InboxSuggestion>,
+): InboxSuggestion {
+	const defaults = createTestSuggestion({
+		id: createSuggestionId("abc12300-0000-4000-8000-000000000001"),
+		source: "/vault/Inbox/invoice-2024.pdf",
+		processor: "attachments",
+		confidence: "high",
+		suggestedNoteType: "invoice",
+		suggestedTitle: "Invoice from Acme Corp",
+		detectionSource: "llm+heuristic",
+		reason: "PDF filename contains 'invoice' pattern",
+	});
+	return { ...defaults, ...overrides } as InboxSuggestion;
+}
+
+// Cleanup all mocks after each test to prevent leakage
+afterEach(() => {
+	mock.restore();
+});
 
 describe("inbox/cli-adapter", () => {
 	describe("parseCommand", () => {
@@ -52,14 +78,6 @@ describe("inbox/cli-adapter", () => {
 			});
 		});
 
-		test("should parse 'E3 put in Health area' as edit (case insensitive)", () => {
-			expect(parseCommand("E3 put in Health area")).toEqual({
-				type: "edit",
-				id: 3,
-				prompt: "put in Health area",
-			});
-		});
-
 		test("should parse 'e3 \"put in Health area\"' as edit (quoted prompt)", () => {
 			expect(parseCommand('e3 "put in Health area"')).toEqual({
 				type: "edit",
@@ -80,28 +98,39 @@ describe("inbox/cli-adapter", () => {
 			expect(parseCommand("s3")).toEqual({ type: "skip", id: 3 });
 		});
 
-		test("should parse 'S3' as skip (case insensitive)", () => {
-			expect(parseCommand("S3")).toEqual({ type: "skip", id: 3 });
-		});
-
 		test("should parse 's15' as skip with larger id", () => {
 			expect(parseCommand("s15")).toEqual({ type: "skip", id: 15 });
 		});
 
-		test("should parse 'q' as quit", () => {
-			expect(parseCommand("q")).toEqual({ type: "quit" });
-		});
+		test.each([
+			["e", "E", { type: "edit", id: 3, prompt: "put in Health area" }],
+			["s", "S", { type: "skip", id: 3 }],
+			["v", "V", { type: "view", id: 12 }],
+			["q", "Q", { type: "quit" }],
+			["h", "H", { type: "help" }],
+			["u", "U", { type: "undo" }],
+			["n", "N", { type: "next-page" }],
+			["p", "P", { type: "prev-page" }],
+		] as const)("should parse '%s' and '%s' as case-insensitive", (lower, upper, expected) => {
+			const testInput =
+				expected.type === "edit"
+					? `${lower}3 put in Health area`
+					: expected.type === "view"
+						? `${lower}12`
+						: expected.type === "skip"
+							? `${lower}3`
+							: lower;
+			const testInputUpper =
+				expected.type === "edit"
+					? `${upper}3 put in Health area`
+					: expected.type === "view"
+						? `${upper}12`
+						: expected.type === "skip"
+							? `${upper}3`
+							: upper;
 
-		test("should parse 'Q' as quit (case insensitive)", () => {
-			expect(parseCommand("Q")).toEqual({ type: "quit" });
-		});
-
-		test("should parse 'h' as help", () => {
-			expect(parseCommand("h")).toEqual({ type: "help" });
-		});
-
-		test("should parse 'H' as help (case insensitive)", () => {
-			expect(parseCommand("H")).toEqual({ type: "help" });
+			expect(parseCommand(testInput)).toEqual(expected);
+			expect(parseCommand(testInputUpper)).toEqual(expected);
 		});
 
 		test("should parse '?' as help", () => {
@@ -133,40 +162,8 @@ describe("inbox/cli-adapter", () => {
 			expect(parseCommand("s")).toEqual({ type: "invalid", input: "s" });
 		});
 
-		test("should parse 'v3' as view", () => {
-			expect(parseCommand("v3")).toEqual({ type: "view", id: 3 });
-		});
-
-		test("should parse 'V12' as view (case insensitive)", () => {
-			expect(parseCommand("V12")).toEqual({ type: "view", id: 12 });
-		});
-
 		test("should parse 'v' without id as invalid", () => {
 			expect(parseCommand("v")).toEqual({ type: "invalid", input: "v" });
-		});
-
-		test("should parse 'u' as undo", () => {
-			expect(parseCommand("u")).toEqual({ type: "undo" });
-		});
-
-		test("should parse 'U' as undo (case insensitive)", () => {
-			expect(parseCommand("U")).toEqual({ type: "undo" });
-		});
-
-		test("should parse 'n' as next-page", () => {
-			expect(parseCommand("n")).toEqual({ type: "next-page" });
-		});
-
-		test("should parse 'N' as next-page (case insensitive)", () => {
-			expect(parseCommand("N")).toEqual({ type: "next-page" });
-		});
-
-		test("should parse 'p' as prev-page", () => {
-			expect(parseCommand("p")).toEqual({ type: "prev-page" });
-		});
-
-		test("should parse 'P' as prev-page (case insensitive)", () => {
-			expect(parseCommand("P")).toEqual({ type: "prev-page" });
 		});
 
 		test("should parse 'e3' without prompt as invalid", () => {
@@ -196,58 +193,45 @@ describe("inbox/cli-adapter", () => {
 	});
 
 	describe("formatSuggestion", () => {
-		const baseSuggestion: InboxSuggestion = {
-			id: createSuggestionId("abc12300-0000-4000-8000-000000000001"),
-			source: "/vault/Inbox/invoice-2024.pdf",
-			processor: "attachments",
-			confidence: "high",
-			action: "create-note",
-			suggestedNoteType: "invoice",
-			suggestedTitle: "Invoice from Acme Corp",
-			suggestedArea: "Finance",
-			detectionSource: "llm+heuristic",
-			reason: "PDF filename contains 'invoice' pattern",
-		};
-
 		test("should include index number", () => {
-			const result = formatSuggestion(baseSuggestion, 1);
+			const suggestion = createBaseSuggestion();
+			const result = formatSuggestion(suggestion, 1);
 			expect(result).toContain("1");
 		});
 
 		test("should include filename from source path", () => {
-			const result = formatSuggestion(baseSuggestion, 1);
+			const suggestion = createBaseSuggestion();
+			const result = formatSuggestion(suggestion, 1);
 			expect(result).toContain("invoice-2024.pdf");
 		});
 
 		test("should include confidence indicator", () => {
-			const result = formatSuggestion(baseSuggestion, 1);
+			const suggestion = createBaseSuggestion();
+			const result = formatSuggestion(suggestion, 1);
 			expect(result).toContain("✅"); // high confidence = green checkmark
 		});
 
 		test("should include action", () => {
-			const result = formatSuggestion(baseSuggestion, 1);
+			const suggestion = createBaseSuggestion();
+			const result = formatSuggestion(suggestion, 1);
 			expect(result).toContain("create-note");
 		});
 
 		test("should include suggested title when present", () => {
-			const result = formatSuggestion(baseSuggestion, 1);
+			const suggestion = createBaseSuggestion();
+			const result = formatSuggestion(suggestion, 1);
 			expect(result).toContain("Invoice from Acme Corp");
 		});
 
-		test("should include suggested area when present", () => {
-			const result = formatSuggestion(baseSuggestion, 1);
-			expect(result).toContain("Finance");
-		});
-
 		test("should include confidence explanation in output", () => {
-			const result = formatSuggestion(baseSuggestion, 1);
-			// Confidence line shows detection method
+			const suggestion = createBaseSuggestion();
+			const result = formatSuggestion(suggestion, 1);
 			expect(result).toContain("Confidence: HIGH");
 			expect(result).toContain("LLM + heuristics agree");
 		});
 
 		test("should handle suggestion without optional fields", () => {
-			const minimalSuggestion: InboxSuggestion = {
+			const minimalSuggestion = createBaseSuggestion({
 				id: createSuggestionId("a1b78900-0000-4000-8000-000000000002"),
 				source: "/vault/Inbox/random-file.md",
 				processor: "notes",
@@ -255,7 +239,7 @@ describe("inbox/cli-adapter", () => {
 				action: "skip",
 				detectionSource: "none",
 				reason: "Could not determine type",
-			};
+			});
 			const result = formatSuggestion(minimalSuggestion, 2);
 			expect(result).toContain("2");
 			expect(result).toContain("random-file.md");
@@ -263,13 +247,10 @@ describe("inbox/cli-adapter", () => {
 		});
 
 		test("should display extraction warnings inline with preview", () => {
-			const suggestionWithWarnings: InboxSuggestion = {
+			const suggestionWithWarnings = createBaseSuggestion({
 				id: createSuggestionId("abc12345-0000-4000-8000-000000000003"),
 				source: "/vault/Inbox/mystery-invoice.pdf",
-				processor: "attachments",
 				confidence: "low",
-				action: "create-note",
-				suggestedNoteType: "invoice",
 				suggestedTitle: "Unknown Invoice",
 				detectionSource: "heuristic",
 				reason: "Detected invoice pattern but missing key fields",
@@ -277,33 +258,60 @@ describe("inbox/cli-adapter", () => {
 					"Could not find invoice date",
 					"Provider name unclear",
 				],
-			};
+			});
 			const result = formatSuggestion(suggestionWithWarnings, 1);
-			// Warnings now show inline - first warning visible, plus count of more
 			expect(result).toContain("Could not find invoice date");
 			expect(result).toContain("+1 more");
 			expect(result).toContain("v1 for full details");
 		});
 
 		test("should not display warnings section when no warnings", () => {
-			const result = formatSuggestion(baseSuggestion, 1);
+			const suggestion = createBaseSuggestion();
+			const result = formatSuggestion(suggestion, 1);
 			expect(result).not.toContain("Warnings");
 		});
 
 		test("should display suggestedAttachmentName when present", () => {
-			const suggestionWithAttachment: InboxSuggestion = {
-				...baseSuggestion,
+			const suggestionWithAttachment = createBaseSuggestion({
 				suggestedAttachmentName: "2024-01-15-acme-corp-invoice.pdf",
-			};
+			});
 			const result = formatSuggestion(suggestionWithAttachment, 1);
 			expect(result).toContain("Attachment:");
 			expect(result).toContain("2024-01-15-acme-corp-invoice.pdf");
 		});
 
 		test("should not display attachment line when suggestedAttachmentName is absent", () => {
-			// baseSuggestion has no suggestedAttachmentName
-			const result = formatSuggestion(baseSuggestion, 1);
+			const suggestion = createBaseSuggestion();
+			const result = formatSuggestion(suggestion, 1);
 			expect(result).not.toContain("Attachment:");
+		});
+
+		test("should show destination when set", () => {
+			const suggestion = createBaseSuggestion({
+				suggestedDestination: "Areas/Finance",
+			});
+			const result = formatSuggestion(suggestion, 1);
+			expect(result).toContain("├─ Destination: Areas/Finance");
+			expect(result).not.toContain("NO DESTINATION SET");
+		});
+
+		test("should show warning when no destination set", () => {
+			const suggestion = createBaseSuggestion();
+			const result = formatSuggestion(suggestion, 1);
+			expect(result).toContain("⚠️ NO DESTINATION SET");
+			expect(result).not.toContain("├─ Destination:");
+		});
+
+		test("should not show destination info for non-create-note suggestions", () => {
+			const suggestion = createBaseSuggestion({
+				action: "skip",
+				confidence: "low",
+				detectionSource: "none",
+				reason: "Cannot process",
+			});
+			const result = formatSuggestion(suggestion, 1);
+			expect(result).not.toContain("Destination");
+			expect(result).not.toContain("NO DESTINATION SET");
 		});
 	});
 
@@ -405,42 +413,47 @@ describe("inbox/cli-adapter", () => {
 	});
 
 	describe("formatSuggestionDetails", () => {
-		const baseSuggestion: InboxSuggestion = {
-			id: createSuggestionId("abc12345-0000-4000-8000-000000000001"),
-			source: "/vault/Inbox/invoice-test.pdf",
-			processor: "attachments",
-			confidence: "high",
-			action: "create-note",
-			suggestedNoteType: "invoice",
-			suggestedTitle: "Test Invoice 2024",
-			suggestedDestination: "02 Areas/Finance",
-			suggestedAttachmentName: "2024-01-invoice-test.pdf",
-			detectionSource: "llm+heuristic",
-			reason: "Detected invoice with all required fields",
-			extractedFields: {
-				invoiceDate: "2024-01-15",
-				provider: "Test Provider Inc",
-				amount: "$150.00",
-			},
-		};
-
 		test("should display item number in header", () => {
-			const result = formatSuggestionDetails(baseSuggestion, 3);
+			const suggestion = createBaseSuggestion({
+				source: "/vault/Inbox/invoice-test.pdf",
+				suggestedTitle: "Test Invoice 2024",
+				suggestedDestination: "02 Areas/Finance",
+				suggestedAttachmentName: "2024-01-invoice-test.pdf",
+				extractedFields: {
+					invoiceDate: "2024-01-15",
+					provider: "Test Provider Inc",
+					amount: "$150.00",
+				},
+			});
+			const result = formatSuggestionDetails(suggestion, 3);
 			expect(result).toContain("Item 3");
 		});
 
 		test("should display filename", () => {
-			const result = formatSuggestionDetails(baseSuggestion, 1);
+			const suggestion = createBaseSuggestion({
+				source: "/vault/Inbox/invoice-test.pdf",
+			});
+			const result = formatSuggestionDetails(suggestion, 1);
 			expect(result).toContain("invoice-test.pdf");
 		});
 
 		test("should display suggested title", () => {
-			const result = formatSuggestionDetails(baseSuggestion, 1);
+			const suggestion = createBaseSuggestion({
+				suggestedTitle: "Test Invoice 2024",
+			});
+			const result = formatSuggestionDetails(suggestion, 1);
 			expect(result).toContain("Test Invoice 2024");
 		});
 
 		test("should display extracted fields", () => {
-			const result = formatSuggestionDetails(baseSuggestion, 1);
+			const suggestion = createBaseSuggestion({
+				extractedFields: {
+					invoiceDate: "2024-01-15",
+					provider: "Test Provider Inc",
+					amount: "$150.00",
+				},
+			});
+			const result = formatSuggestionDetails(suggestion, 1);
 			expect(result).toContain("invoiceDate");
 			expect(result).toContain("2024-01-15");
 			expect(result).toContain("provider");
@@ -450,28 +463,30 @@ describe("inbox/cli-adapter", () => {
 		});
 
 		test("should display warnings with recovery options", () => {
-			const suggestionWithWarnings: InboxSuggestion = {
-				...baseSuggestion,
+			const suggestionWithWarnings = createBaseSuggestion({
 				extractionWarnings: ["Missing invoice number", "Date format unclear"],
-			};
+			});
 			const result = formatSuggestionDetails(suggestionWithWarnings, 1);
 			expect(result).toContain("Missing invoice number");
 			expect(result).toContain("Date format unclear");
-			// Should include recovery options
 			expect(result).toContain("Recovery options");
-			expect(result).toContain("e1"); // Edit hint
-			expect(result).toContain("s1"); // Skip hint
+			expect(result).toContain("e1");
+			expect(result).toContain("s1");
 		});
 
 		test("should display destination", () => {
-			const result = formatSuggestionDetails(baseSuggestion, 1);
+			const suggestion = createBaseSuggestion({
+				suggestedDestination: "02 Areas/Finance",
+			});
+			const result = formatSuggestionDetails(suggestion, 1);
 			expect(result).toContain("02 Areas/Finance");
 		});
 
 		test("should display confidence and detection source", () => {
-			const result = formatSuggestionDetails(baseSuggestion, 1);
-			expect(result).toContain("HIGH"); // Now uppercase
-			expect(result).toContain("LLM + heuristics agree"); // Descriptive text instead of raw value
+			const suggestion = createBaseSuggestion();
+			const result = formatSuggestionDetails(suggestion, 1);
+			expect(result).toContain("HIGH");
+			expect(result).toContain("LLM + heuristics agree");
 		});
 	});
 
@@ -525,143 +540,27 @@ describe("inbox/cli-adapter", () => {
 		});
 	});
 
-	describe("formatSuggestion - destination display", () => {
-		test("should show destination when set", () => {
-			const suggestion: InboxSuggestion = {
-				id: createSuggestionId(),
-				action: "create-note",
-				source: "/inbox/test.pdf",
-				processor: "attachments",
-				confidence: "high",
-				detectionSource: "llm+heuristic",
-				reason: "Test",
-				suggestedNoteType: "invoice",
-				suggestedTitle: "Test Invoice",
-				suggestedDestination: "Areas/Finance",
-			};
-
-			const result = formatSuggestion(suggestion, 1);
-			expect(result).toContain("├─ Destination: Areas/Finance");
-			expect(result).not.toContain("NO DESTINATION SET");
-		});
-
-		test("should show warning when no destination set", () => {
-			const suggestion: InboxSuggestion = {
-				id: createSuggestionId(),
-				action: "create-note",
-				source: "/inbox/test.pdf",
-				processor: "attachments",
-				confidence: "high",
-				detectionSource: "llm+heuristic",
-				reason: "Test",
-				suggestedNoteType: "invoice",
-				suggestedTitle: "Test Invoice",
-				// No suggestedDestination
-			};
-
-			const result = formatSuggestion(suggestion, 1);
-			expect(result).toContain("⚠️ NO DESTINATION SET");
-			expect(result).not.toContain("├─ Destination:");
-		});
-
-		test("should show LLM suggestion when available and different", () => {
-			const suggestion: InboxSuggestion = {
-				id: createSuggestionId(),
-				action: "create-note",
-				source: "/inbox/test.pdf",
-				processor: "attachments",
-				confidence: "high",
-				detectionSource: "llm+heuristic",
-				reason: "Test",
-				suggestedNoteType: "invoice",
-				suggestedTitle: "Test Invoice",
-				llmSuggestedArea: "Areas/Health",
-				// No suggestedDestination yet
-			};
-
-			const result = formatSuggestion(suggestion, 1);
-			expect(result).toContain("💡 LLM suggests: Areas/Health");
-			expect(result).toContain("use e1 to reclassify");
-		});
-
-		test("should not show LLM suggestion when same as destination", () => {
-			const suggestion: InboxSuggestion = {
-				id: createSuggestionId(),
-				action: "create-note",
-				source: "/inbox/test.pdf",
-				processor: "attachments",
-				confidence: "high",
-				detectionSource: "llm+heuristic",
-				reason: "Test",
-				suggestedNoteType: "invoice",
-				suggestedTitle: "Test Invoice",
-				suggestedDestination: "Areas/Health",
-				llmSuggestedArea: "Areas/Health",
-			};
-
-			const result = formatSuggestion(suggestion, 1);
-			expect(result).toContain("├─ Destination: Areas/Health");
-			expect(result).not.toContain("💡 LLM suggests");
-		});
-
-		test("should show LLM project suggestion when area not available", () => {
-			const suggestion: InboxSuggestion = {
-				id: createSuggestionId(),
-				action: "create-note",
-				source: "/inbox/test.pdf",
-				processor: "attachments",
-				confidence: "high",
-				detectionSource: "llm+heuristic",
-				reason: "Test",
-				suggestedNoteType: "booking",
-				suggestedTitle: "Test Booking",
-				llmSuggestedProject: "Projects/Travel 2024",
-				// No suggestedDestination yet
-			};
-
-			const result = formatSuggestion(suggestion, 2);
-			expect(result).toContain("💡 LLM suggests: Projects/Travel 2024");
-			expect(result).toContain("use e2 to reclassify");
-		});
-
-		test("should not show destination info for non-create-note suggestions", () => {
-			const suggestion: InboxSuggestion = {
-				id: createSuggestionId(),
-				action: "skip",
-				source: "/inbox/test.pdf",
-				processor: "attachments",
-				confidence: "low",
-				detectionSource: "none",
-				reason: "Cannot process",
-			};
-
-			const result = formatSuggestion(suggestion, 1);
-			expect(result).not.toContain("Destination");
-			expect(result).not.toContain("NO DESTINATION SET");
-		});
-	});
-
 	describe("approval blocking behavior", () => {
 		// Helper to create test suggestions (returns CreateNoteSuggestion)
-		const createTestSuggestion = (
+		const createApprovalTestSuggestion = (
 			id: string,
 			hasDestination: boolean,
-		): CreateNoteSuggestion => ({
-			id: createSuggestionId(id),
-			action: "create-note",
-			source: `/inbox/test-${id}.pdf`,
-			processor: "attachments",
-			confidence: "high",
-			detectionSource: "llm+heuristic",
-			reason: "Test",
-			suggestedNoteType: "invoice",
-			suggestedTitle: `Test ${id}`,
-			...(hasDestination && { suggestedDestination: "Areas/Finance" }),
-		});
+		): CreateNoteSuggestion =>
+			createTestSuggestion({
+				id: createSuggestionId(id),
+				source: `/inbox/test-${id}.pdf`,
+				processor: "attachments",
+				confidence: "high",
+				detectionSource: "llm+heuristic",
+				reason: "Test",
+				suggestedNoteType: "invoice",
+				suggestedTitle: `Test ${id}`,
+				...(hasDestination && { suggestedDestination: "Areas/Finance" }),
+			});
 
 		test("should reject approval of item without destination", () => {
 			// Single item without destination
-			const suggestion = createTestSuggestion(
+			const suggestion = createApprovalTestSuggestion(
 				"00000001-0000-4000-8000-000000000001",
 				false,
 			);
@@ -672,7 +571,7 @@ describe("inbox/cli-adapter", () => {
 
 		test("should accept approval of item with destination", () => {
 			// Single item with destination
-			const suggestion = createTestSuggestion(
+			const suggestion = createApprovalTestSuggestion(
 				"00000002-0000-4000-8000-000000000002",
 				true,
 			);
@@ -684,9 +583,18 @@ describe("inbox/cli-adapter", () => {
 		test("should handle mixed items - some with, some without destinations", () => {
 			// Mix of items
 			const suggestions = [
-				createTestSuggestion("00000003-0000-4000-8000-000000000003", true), // Has destination
-				createTestSuggestion("00000004-0000-4000-8000-000000000004", false), // No destination
-				createTestSuggestion("00000005-0000-4000-8000-000000000005", true), // Has destination
+				createApprovalTestSuggestion(
+					"00000003-0000-4000-8000-000000000003",
+					true,
+				), // Has destination
+				createApprovalTestSuggestion(
+					"00000004-0000-4000-8000-000000000004",
+					false,
+				), // No destination
+				createApprovalTestSuggestion(
+					"00000005-0000-4000-8000-000000000005",
+					true,
+				), // Has destination
 			];
 
 			// Verify expectations
@@ -698,9 +606,18 @@ describe("inbox/cli-adapter", () => {
 		test("should handle all items missing destinations", () => {
 			// All items without destinations
 			const suggestions = [
-				createTestSuggestion("00000006-0000-4000-8000-000000000006", false),
-				createTestSuggestion("00000007-0000-4000-8000-000000000007", false),
-				createTestSuggestion("00000008-0000-4000-8000-000000000008", false),
+				createApprovalTestSuggestion(
+					"00000006-0000-4000-8000-000000000006",
+					false,
+				),
+				createApprovalTestSuggestion(
+					"00000007-0000-4000-8000-000000000007",
+					false,
+				),
+				createApprovalTestSuggestion(
+					"00000008-0000-4000-8000-000000000008",
+					false,
+				),
 			];
 
 			// All should be missing destinations
@@ -725,38 +642,12 @@ describe("inbox/cli-adapter", () => {
 			expect(skipSuggestion.action).toBe("skip");
 		});
 
-		test("should handle destination set via LLM suggestion acceptance", () => {
-			// Item initially without destination but has LLM suggestion
-			const suggestion: CreateNoteSuggestion = {
-				id: createSuggestionId("0000000a-0000-4000-8000-00000000000a"),
-				action: "create-note",
-				source: "/inbox/llm-test.pdf",
-				processor: "attachments",
-				confidence: "high",
-				detectionSource: "llm+heuristic",
-				reason: "Test",
-				suggestedNoteType: "invoice",
-				suggestedTitle: "LLM Test",
-				llmSuggestedArea: "Areas/Health",
-				// No suggestedDestination yet
-			};
-
-			// Before accepting LLM suggestion
-			expect(suggestion.suggestedDestination).toBeUndefined();
-			expect(suggestion.llmSuggestedArea).toBe("Areas/Health");
-
-			// After accepting (simulated - in real code this would update suggestedDestination)
-			const accepted: CreateNoteSuggestion = {
-				...suggestion,
-				suggestedDestination: suggestion.llmSuggestedArea,
-			};
-
-			expect(accepted.suggestedDestination).toBe("Areas/Health");
-		});
+		// Note: "should handle destination set via LLM suggestion acceptance" test removed
+		// Area/project routing is no longer supported - all items go to inbox
 
 		test("should handle destination set via manual command", () => {
 			// Item initially without destination
-			const suggestion = createTestSuggestion(
+			const suggestion = createApprovalTestSuggestion(
 				"0000000b-0000-4000-8000-00000000000b",
 				false,
 			);
@@ -774,7 +665,7 @@ describe("inbox/cli-adapter", () => {
 		});
 
 		test("should format warning message for items without destinations", () => {
-			const suggestion = createTestSuggestion(
+			const suggestion = createApprovalTestSuggestion(
 				"0000000c-0000-4000-8000-00000000000c",
 				false,
 			);
@@ -786,7 +677,7 @@ describe("inbox/cli-adapter", () => {
 		});
 
 		test("should not show warning for items with destinations", () => {
-			const suggestion = createTestSuggestion(
+			const suggestion = createApprovalTestSuggestion(
 				"0000000d-0000-4000-8000-00000000000d",
 				true,
 			);
@@ -822,15 +713,24 @@ describe("inbox/cli-adapter", () => {
 			// Valid destination formats
 			const validSuggestions = [
 				{
-					...createTestSuggestion("0000000f-0000-4000-8000-00000000000f", true),
+					...createApprovalTestSuggestion(
+						"0000000f-0000-4000-8000-00000000000f",
+						true,
+					),
 					suggestedDestination: "Areas/Finance",
 				},
 				{
-					...createTestSuggestion("00000010-0000-4000-8000-000000000010", true),
+					...createApprovalTestSuggestion(
+						"00000010-0000-4000-8000-000000000010",
+						true,
+					),
 					suggestedDestination: "Projects/Tax 2024",
 				},
 				{
-					...createTestSuggestion("00000011-0000-4000-8000-000000000011", true),
+					...createApprovalTestSuggestion(
+						"00000011-0000-4000-8000-000000000011",
+						true,
+					),
 					suggestedDestination: "Resources",
 				},
 			];

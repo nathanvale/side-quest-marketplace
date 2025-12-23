@@ -3,160 +3,111 @@
  */
 
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { createTestContext } from "../../../testing/utils";
 import type { EnrichmentContext } from "../types";
-import {
-	applyYouTubeEnrichment,
-	YouTubeEnrichmentError,
-	youtubeEnrichmentStrategy,
-} from "./youtube-strategy";
 
-// Mock the youtube-transcript library
-const mockFetchTranscript = mock(async (videoId: string) => {
-	if (videoId === "AmdLVWMdjOk") {
-		return [
-			{ text: "This is the first part of the transcript." },
-			{ text: "This is the second part." },
-			{ text: "And here is the final part." },
-		];
+// Test constants for video IDs
+const VALID_VIDEO_ID = "AmdLVWMdjOk";
+const UNAVAILABLE_VIDEO_ID = "unavailabl1";
+const NOT_FOUND_VIDEO_ID = "notfound_12";
+const NETWORK_ERROR_VIDEO_ID = "networkerr_";
+
+// Create mock function with implementation
+const mockFetchTranscriptViaMcp = mock(async (videoId: string) => {
+	if (videoId === VALID_VIDEO_ID) {
+		return {
+			title: "Test Video",
+			transcript:
+				"This is the first part of the transcript. This is the second part. And here is the final part.",
+		};
 	}
-	if (videoId === "unavailabl1") {
+	if (videoId === UNAVAILABLE_VIDEO_ID) {
 		throw new Error("Transcript unavailable for this video");
 	}
-	if (videoId === "notfound_12") {
+	if (videoId === NOT_FOUND_VIDEO_ID) {
 		throw new Error("Video unavailable or not found");
 	}
-	if (videoId === "networkerr_") {
+	if (videoId === NETWORK_ERROR_VIDEO_ID) {
 		throw new Error("ENOTFOUND youtube.com");
 	}
 	throw new Error(`Unexpected video ID: ${videoId}`);
 });
 
-// Mock the YoutubeTranscript module
-mock.module("youtube-transcript", () => ({
-	YoutubeTranscript: {
-		fetchTranscript: mockFetchTranscript,
-	},
+// Set up module mock BEFORE importing the module under test
+mock.module("../mcp-youtube-client", () => ({
+	fetchTranscriptViaMcp: mockFetchTranscriptViaMcp,
 }));
+
+// NOW import the module under test (after mock is set up)
+// Dynamic import ensures mock is applied before module loads
+const { applyYouTubeEnrichment, youtubeEnrichmentStrategy } = await import(
+	"./youtube-strategy"
+);
+
+// Factory function to create test contexts
+function createYouTubeContext(
+	overrides: Partial<EnrichmentContext["frontmatter"]> = {},
+): EnrichmentContext {
+	return {
+		file: {
+			path: "/vault/inbox/test.md",
+			filename: "test.md",
+			extension: ".md",
+			size: 100,
+		},
+		frontmatter: {
+			type: "youtube",
+			video_id: VALID_VIDEO_ID,
+			transcript_status: "pending",
+			...overrides,
+		},
+		body: "",
+		vaultPath: "/vault",
+	};
+}
 
 describe("YouTube Enrichment Strategy", () => {
 	beforeEach(() => {
-		mockFetchTranscript.mockClear();
+		// Clear call history but keep the implementation
+		mockFetchTranscriptViaMcp.mockClear();
 	});
 
 	afterEach(() => {
-		mockFetchTranscript.mockClear();
+		// Restore module mocks
+		mock.restore();
 	});
 
 	describe("canEnrich", () => {
 		test("returns eligible for valid YouTube video with pending transcript", () => {
-			const ctx: EnrichmentContext = {
-				file: {
-					path: "/vault/inbox/test.md",
-					filename: "test.md",
-					extension: ".md",
-					size: 100,
-				},
-				frontmatter: {
-					type: "youtube",
-					video_id: "AmdLVWMdjOk",
-					transcript_status: "pending",
-				},
-				body: "",
-				vaultPath: "/vault",
-			};
-
+			const ctx = createYouTubeContext();
 			const result = youtubeEnrichmentStrategy.canEnrich(ctx);
-
 			expect(result.eligible).toBe(true);
 		});
 
 		test("returns not eligible when type is not youtube", () => {
-			const ctx: EnrichmentContext = {
-				file: {
-					path: "/vault/inbox/test.md",
-					filename: "test.md",
-					extension: ".md",
-					size: 100,
-				},
-				frontmatter: {
-					type: "bookmark",
-					video_id: "AmdLVWMdjOk",
-					transcript_status: "pending",
-				},
-				body: "",
-				vaultPath: "/vault",
-			};
-
+			const ctx = createYouTubeContext({ type: "bookmark" });
 			const result = youtubeEnrichmentStrategy.canEnrich(ctx);
-
 			expect(result.eligible).toBe(false);
 			expect(result.reason).toContain("Not a YouTube video");
 		});
 
 		test("returns not eligible when transcript_status is already processed", () => {
-			const ctx: EnrichmentContext = {
-				file: {
-					path: "/vault/inbox/test.md",
-					filename: "test.md",
-					extension: ".md",
-					size: 100,
-				},
-				frontmatter: {
-					type: "youtube",
-					video_id: "AmdLVWMdjOk",
-					transcript_status: "processed",
-				},
-				body: "",
-				vaultPath: "/vault",
-			};
-
+			const ctx = createYouTubeContext({ transcript_status: "processed" });
 			const result = youtubeEnrichmentStrategy.canEnrich(ctx);
-
 			expect(result.eligible).toBe(false);
 			expect(result.reason).toContain("Transcript not pending");
 		});
 
 		test("returns not eligible when video_id is missing", () => {
-			const ctx: EnrichmentContext = {
-				file: {
-					path: "/vault/inbox/test.md",
-					filename: "test.md",
-					extension: ".md",
-					size: 100,
-				},
-				frontmatter: {
-					type: "youtube",
-					transcript_status: "pending",
-				},
-				body: "",
-				vaultPath: "/vault",
-			};
-
+			const ctx = createYouTubeContext({ video_id: undefined });
 			const result = youtubeEnrichmentStrategy.canEnrich(ctx);
-
 			expect(result.eligible).toBe(false);
 			expect(result.reason).toContain("Invalid or missing video_id");
 		});
 
 		test("returns not eligible when video_id is not 11 chars", () => {
-			const ctx: EnrichmentContext = {
-				file: {
-					path: "/vault/inbox/test.md",
-					filename: "test.md",
-					extension: ".md",
-					size: 100,
-				},
-				frontmatter: {
-					type: "youtube",
-					video_id: "short",
-					transcript_status: "pending",
-				},
-				body: "",
-				vaultPath: "/vault",
-			};
-
+			const ctx = createYouTubeContext({ video_id: "short" });
 			const result = youtubeEnrichmentStrategy.canEnrich(ctx);
-
 			expect(result.eligible).toBe(false);
 			expect(result.reason).toContain("Invalid or missing video_id");
 		});
@@ -164,25 +115,12 @@ describe("YouTube Enrichment Strategy", () => {
 
 	describe("enrich", () => {
 		test("successfully fetches and combines transcript", async () => {
-			const ctx: EnrichmentContext = {
-				file: {
-					path: "/vault/inbox/test.md",
-					filename: "test.md",
-					extension: ".md",
-					size: 100,
-				},
-				frontmatter: {
-					type: "youtube",
-					video_id: "AmdLVWMdjOk",
-					transcript_status: "pending",
-				},
-				body: "",
-				vaultPath: "/vault",
-			};
-
+			const ctx = createYouTubeContext();
+			// Use shared context factory for consistent test data
+			const testContext = createTestContext("/vault");
 			const result = await youtubeEnrichmentStrategy.enrich(ctx, {
-				cid: "test-cid",
-				sessionCid: "test-session-cid",
+				cid: testContext.cid,
+				sessionCid: testContext.sessionCid,
 			});
 
 			expect(result.type).toBe("youtube");
@@ -193,108 +131,63 @@ describe("YouTube Enrichment Strategy", () => {
 				expect(result.data.transcriptLength).toBeGreaterThan(0);
 				expect(result.data.enrichedAt).toBeDefined();
 			}
-			expect(mockFetchTranscript).toHaveBeenCalledWith("AmdLVWMdjOk");
+			expect(mockFetchTranscriptViaMcp).toHaveBeenCalledWith(VALID_VIDEO_ID);
 		});
 
 		test("throws YouTubeEnrichmentError for unavailable transcript", async () => {
-			const ctx: EnrichmentContext = {
-				file: {
-					path: "/vault/inbox/test.md",
-					filename: "test.md",
-					extension: ".md",
-					size: 100,
-				},
-				frontmatter: {
-					type: "youtube",
-					video_id: "unavailabl1",
-					transcript_status: "pending",
-				},
-				body: "",
-				vaultPath: "/vault",
-			};
+			const ctx = createYouTubeContext({ video_id: UNAVAILABLE_VIDEO_ID });
+			const testContext = createTestContext("/vault");
 
 			await expect(
 				youtubeEnrichmentStrategy.enrich(ctx, {
-					cid: "test-cid",
-					sessionCid: "test-session-cid",
+					cid: testContext.cid,
+					sessionCid: testContext.sessionCid,
 				}),
-			).rejects.toThrow(YouTubeEnrichmentError);
-
-			try {
-				await youtubeEnrichmentStrategy.enrich(ctx, {
-					cid: "test-cid",
-					sessionCid: "test-session-cid",
-				});
-			} catch (error) {
-				expect(error).toBeInstanceOf(YouTubeEnrichmentError);
-				const ytError = error as YouTubeEnrichmentError;
-				expect(ytError.code).toBe("YOUTUBE_TRANSCRIPT_UNAVAILABLE");
-				expect(ytError.videoId).toBe("unavailabl1");
-				expect(ytError.retryable).toBe(false);
-			}
+			).rejects.toThrow(
+				expect.objectContaining({
+					name: "YouTubeEnrichmentError",
+					code: "YOUTUBE_TRANSCRIPT_UNAVAILABLE",
+					videoId: UNAVAILABLE_VIDEO_ID,
+					retryable: false,
+				}),
+			);
 		});
 
 		test("throws YouTubeEnrichmentError for video not found", async () => {
-			const ctx: EnrichmentContext = {
-				file: {
-					path: "/vault/inbox/test.md",
-					filename: "test.md",
-					extension: ".md",
-					size: 100,
-				},
-				frontmatter: {
-					type: "youtube",
-					video_id: "notfound_12",
-					transcript_status: "pending",
-				},
-				body: "",
-				vaultPath: "/vault",
-			};
+			const ctx = createYouTubeContext({ video_id: NOT_FOUND_VIDEO_ID });
+			const testContext = createTestContext("/vault");
 
-			try {
-				await youtubeEnrichmentStrategy.enrich(ctx, {
-					cid: "test-cid",
-					sessionCid: "test-session-cid",
-				});
-			} catch (error) {
-				expect(error).toBeInstanceOf(YouTubeEnrichmentError);
-				const ytError = error as YouTubeEnrichmentError;
-				expect(ytError.code).toBe("YOUTUBE_VIDEO_NOT_FOUND");
-				expect(ytError.retryable).toBe(false);
-			}
+			await expect(
+				youtubeEnrichmentStrategy.enrich(ctx, {
+					cid: testContext.cid,
+					sessionCid: testContext.sessionCid,
+				}),
+			).rejects.toThrow(
+				expect.objectContaining({
+					name: "YouTubeEnrichmentError",
+					code: "YOUTUBE_VIDEO_NOT_FOUND",
+					retryable: false,
+				}),
+			);
 		});
 
 		test("throws retryable error for network failures", async () => {
-			const ctx: EnrichmentContext = {
-				file: {
-					path: "/vault/inbox/test.md",
-					filename: "test.md",
-					extension: ".md",
-					size: 100,
-				},
-				frontmatter: {
-					type: "youtube",
-					video_id: "networkerr_",
-					transcript_status: "pending",
-				},
-				body: "",
-				vaultPath: "/vault",
-			};
+			const ctx = createYouTubeContext({ video_id: NETWORK_ERROR_VIDEO_ID });
+			const testContext = createTestContext("/vault");
 
-			try {
-				await youtubeEnrichmentStrategy.enrich(ctx, {
-					cid: "test-cid",
-					sessionCid: "test-session-cid",
+			await expect(
+				youtubeEnrichmentStrategy.enrich(ctx, {
+					cid: testContext.cid,
+					sessionCid: testContext.sessionCid,
 					maxRetries: 1, // Reduce retries to speed up test
-				});
-				// Force failure if no error thrown
-				throw new Error("Expected YouTubeEnrichmentError to be thrown");
-			} catch (error) {
-				expect(error).toBeInstanceOf(YouTubeEnrichmentError);
-				const ytError = error as YouTubeEnrichmentError;
-				expect(ytError.code).toBe("YOUTUBE_NETWORK_ERROR");
-				expect(ytError.retryable).toBe(true);
-			}
+				}),
+			).rejects.toThrow(
+				expect.objectContaining({
+					name: "YouTubeEnrichmentError",
+					code: "YOUTUBE_NETWORK_ERROR",
+					retryable: true,
+				}),
+			);
 		});
 	});
 

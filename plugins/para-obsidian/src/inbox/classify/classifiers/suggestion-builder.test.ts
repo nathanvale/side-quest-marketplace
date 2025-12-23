@@ -1,15 +1,15 @@
 /**
  * Suggestion Builder Tests - Classifier Version
  *
- * Tests for the buildSuggestion() routing logic with two paths:
- * 1. Fast-path: Items with frontmatter routing (area/project) → auto-route to area/project
- * 2. LLM-path: Items without routing frontmatter → created in inbox folder
+ * Tests for the buildSuggestion() routing logic.
+ * All items are now created in the inbox folder - no area/project auto-routing.
  *
  * @module classifiers/suggestion-builder.test
  */
 
-import { describe, expect, test } from "bun:test";
-import { isCreateNoteSuggestion } from "../../types";
+import { afterEach, describe, expect, test } from "bun:test";
+import { createTestVault, useTestVaultCleanup } from "../../../testing/utils";
+import type { CreateNoteSuggestion } from "../../types";
 import type { DocumentTypeResult } from "../llm-classifier";
 import {
 	buildSuggestion,
@@ -20,6 +20,17 @@ import {
 // =============================================================================
 // Test Helpers
 // =============================================================================
+
+/**
+ * Type guard helper - asserts result is CreateNoteSuggestion and allows testing fields
+ */
+function expectCreateNoteSuggestion(
+	result: unknown,
+	assertions: (suggestion: CreateNoteSuggestion) => void,
+): void {
+	expect(result).toHaveProperty("action", "create-note");
+	assertions(result as CreateNoteSuggestion);
+}
 
 /** Create a base input for testing */
 function createInput(
@@ -62,137 +73,33 @@ function createHeuristicResult(
 // =============================================================================
 
 describe("classifiers/suggestion-builder", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	describe("buildSuggestion", () => {
-		describe("Fast-path routing (frontmatter with area/project)", () => {
-			test("should set destination for frontmatter-routed item with area", () => {
+		describe("Inbox destination (all items go to inbox)", () => {
+			test("should set destination to inbox folder for LLM detection", () => {
+				const vault = createTestVault();
+				trackVault(vault);
+
 				const input = createInput({
 					llmResult: createLLMResult({
 						confidence: 0.85,
 						documentType: "invoice",
-						suggestedArea: "Finance",
-					}),
-					detectionSource: "frontmatter", // Frontmatter fast-path
-				});
-
-				const result = buildSuggestion(input);
-
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedDestination).toBe("Finance");
-					expect(result.suggestedArea).toBe("Finance");
-					expect(result.llmSuggestedArea).toBeUndefined();
-					expect(result.llmSuggestedProject).toBeUndefined();
-				}
-			});
-
-			test("should set destination for frontmatter-routed item with project", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.85,
-						documentType: "bookmark",
-						suggestedProject: "Tax 2024",
-					}),
-					detectionSource: "frontmatter", // Frontmatter fast-path
-				});
-
-				const result = buildSuggestion(input);
-
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedDestination).toBe("Tax 2024");
-					expect(result.suggestedProject).toBe("Tax 2024");
-					expect(result.llmSuggestedArea).toBeUndefined();
-					expect(result.llmSuggestedProject).toBeUndefined();
-				}
-			});
-
-			test("should prefer area over project when both present (frontmatter)", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.85,
-						documentType: "invoice",
-						suggestedArea: "Health",
-						suggestedProject: "Medical 2024",
-					}),
-					detectionSource: "frontmatter", // Frontmatter fast-path
-				});
-
-				const result = buildSuggestion(input);
-
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedDestination).toBe("Health");
-					expect(result.suggestedArea).toBe("Health");
-					expect(result.suggestedProject).toBe("Medical 2024");
-				}
-			});
-		});
-
-		describe("LLM-path routing (no frontmatter routing)", () => {
-			test("should set destination to inbox folder for LLM-detected bookmark with area", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.85,
-						documentType: "bookmark",
-						suggestedArea: "Resources",
-					}),
-					// No detectionSource override - defaults to "llm"
-				});
-
-				const result = buildSuggestion(input);
-
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedDestination).toBe("00 Inbox"); // Note created in inbox
-					expect(result.llmSuggestedArea).toBe("Resources"); // LLM suggestion stored for display
-					expect(result.llmSuggestedProject).toBeUndefined();
-					expect(result.suggestedArea).toBe("Resources"); // Original field preserved
-				}
-			});
-
-			test("should set destination to inbox folder for LLM-detected item with project", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.85,
-						documentType: "invoice",
-						suggestedProject: "Tax 2024",
 					}),
 				});
 
 				const result = buildSuggestion(input);
 
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedDestination).toBe("00 Inbox"); // Note created in inbox
-					expect(result.llmSuggestedArea).toBeUndefined();
-					expect(result.llmSuggestedProject).toBe("Tax 2024"); // LLM suggestion stored for display
-					expect(result.suggestedProject).toBe("Tax 2024"); // Original preserved
-				}
-			});
-
-			test("should store both LLM suggestions when area and project present", () => {
-				const input = createInput({
-					llmResult: createLLMResult({
-						confidence: 0.85,
-						documentType: "booking",
-						suggestedArea: "Travel",
-						suggestedProject: "Europe Trip",
-					}),
+				expectCreateNoteSuggestion(result, (suggestion) => {
+					expect(suggestion.suggestedDestination).toBe("00 Inbox");
 				});
-
-				const result = buildSuggestion(input);
-
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedDestination).toBe("00 Inbox"); // Note created in inbox
-					expect(result.llmSuggestedArea).toBe("Travel"); // Stored for display
-					expect(result.llmSuggestedProject).toBe("Europe Trip"); // Stored for display
-					expect(result.suggestedArea).toBe("Travel");
-					expect(result.suggestedProject).toBe("Europe Trip");
-				}
 			});
 
-			test("should set destination to inbox folder for heuristic-only detection", () => {
+			test("should set destination to inbox folder for heuristic detection", () => {
+				const vault = createTestVault();
+				trackVault(vault);
+
 				const input = createInput({
 					heuristicResult: createHeuristicResult({
 						detected: true,
@@ -204,17 +111,15 @@ describe("classifiers/suggestion-builder", () => {
 
 				const result = buildSuggestion(input);
 
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedDestination).toBe("00 Inbox"); // Note created in inbox
-					expect(result.llmSuggestedArea).toBeUndefined();
-					expect(result.llmSuggestedProject).toBeUndefined();
-					expect(result.suggestedArea).toBeUndefined();
-					expect(result.suggestedProject).toBeUndefined();
-				}
+				expectCreateNoteSuggestion(result, (suggestion) => {
+					expect(suggestion.suggestedDestination).toBe("00 Inbox");
+				});
 			});
 
-			test("should set destination to inbox folder for LLM+heuristic detection without routing fields", () => {
+			test("should set destination to inbox folder for LLM+heuristic detection", () => {
+				const vault = createTestVault();
+				trackVault(vault);
+
 				const input = createInput({
 					heuristicResult: createHeuristicResult({
 						detected: true,
@@ -224,45 +129,42 @@ describe("classifiers/suggestion-builder", () => {
 					llmResult: createLLMResult({
 						confidence: 0.85,
 						documentType: "invoice",
-						// No suggestedArea or suggestedProject
 					}),
 				});
 
 				const result = buildSuggestion(input);
 
 				expect(result.confidence).toBe("high"); // Boosted by agreement
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedDestination).toBe("00 Inbox"); // Note created in inbox
-					expect(result.llmSuggestedArea).toBeUndefined();
-					expect(result.llmSuggestedProject).toBeUndefined();
-				}
+				expectCreateNoteSuggestion(result, (suggestion) => {
+					expect(suggestion.suggestedDestination).toBe("00 Inbox");
+				});
 			});
 		});
 
 		describe("Edge cases", () => {
-			test("should set destination to inbox folder for frontmatter detection without routing fields", () => {
+			test("should set destination to inbox folder for frontmatter detection", () => {
+				const vault = createTestVault();
+				trackVault(vault);
+
 				const input = createInput({
 					llmResult: createLLMResult({
 						confidence: 0.85,
 						documentType: "invoice",
-						// No suggestedArea or suggestedProject
 					}),
 					detectionSource: "frontmatter",
 				});
 
 				const result = buildSuggestion(input);
 
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					// Frontmatter flag is set but no routing fields → created in inbox
-					expect(result.suggestedDestination).toBe("00 Inbox");
-					expect(result.llmSuggestedArea).toBeUndefined();
-					expect(result.llmSuggestedProject).toBeUndefined();
-				}
+				expectCreateNoteSuggestion(result, (suggestion) => {
+					expect(suggestion.suggestedDestination).toBe("00 Inbox");
+				});
 			});
 
 			test("should handle 'none' detection source (no LLM suggestions)", () => {
+				const vault = createTestVault();
+				trackVault(vault);
+
 				const input = createInput({
 					detectionSource: "none",
 				});
@@ -274,6 +176,9 @@ describe("classifiers/suggestion-builder", () => {
 			});
 
 			test("should handle skip action (no create-note fields)", () => {
+				const vault = createTestVault();
+				trackVault(vault);
+
 				const input = createInput({
 					llmResult: createLLMResult({
 						confidence: 0.3, // Low confidence
@@ -288,35 +193,34 @@ describe("classifiers/suggestion-builder", () => {
 			});
 		});
 
-		describe("Backward compatibility", () => {
-			test("should create notes in inbox folder for non-bookmark types", () => {
+		describe("Field extraction", () => {
+			test("should create notes in inbox folder", () => {
+				const vault = createTestVault();
+				trackVault(vault);
+
 				const input = createInput({
 					llmResult: createLLMResult({
 						confidence: 0.85,
 						documentType: "invoice",
-						suggestedArea: "Finance",
 					}),
 				});
 
 				const result = buildSuggestion(input);
 
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedNoteType).toBe("invoice");
-					expect(result.suggestedArea).toBe("Finance");
-					// LLM-path: destination is inbox folder
-					expect(result.suggestedDestination).toBe("00 Inbox");
-					expect(result.llmSuggestedArea).toBe("Finance");
-				}
+				expectCreateNoteSuggestion(result, (suggestion) => {
+					expect(suggestion.suggestedNoteType).toBe("invoice");
+					expect(suggestion.suggestedDestination).toBe("00 Inbox");
+				});
 			});
 
 			test("should extract all fields from LLM result", () => {
+				const vault = createTestVault();
+				trackVault(vault);
+
 				const input = createInput({
 					llmResult: createLLMResult({
 						confidence: 0.85,
 						documentType: "invoice",
-						suggestedArea: "Finance",
-						suggestedProject: "Tax 2024",
 						extractedFields: {
 							amount: "100.00",
 							provider: "Acme Corp",
@@ -328,23 +232,23 @@ describe("classifiers/suggestion-builder", () => {
 
 				const result = buildSuggestion(input);
 
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedNoteType).toBe("invoice");
-					expect(result.suggestedArea).toBe("Finance");
-					expect(result.suggestedProject).toBe("Tax 2024");
-					expect(result.extractedFields).toEqual({
+				expectCreateNoteSuggestion(result, (suggestion) => {
+					expect(suggestion.suggestedNoteType).toBe("invoice");
+					expect(suggestion.extractedFields).toEqual({
 						amount: "100.00",
 						provider: "Acme Corp",
 						date: "2024-01-15",
 					});
-					expect(result.reason).toContain("Detected invoice");
-				}
+					expect(suggestion.reason).toContain("Detected invoice");
+				});
 			});
 		});
 
 		describe("Attachment naming with hash", () => {
-			test("should generate timestamped attachment name when hash provided", () => {
+			test("should generate ideal attachment name without hash (collision check at execute)", () => {
+				const vault = createTestVault();
+				trackVault(vault);
+
 				const input = createInput({
 					filename: "receipt.pdf",
 					llmResult: createLLMResult({
@@ -360,17 +264,23 @@ describe("classifiers/suggestion-builder", () => {
 
 				const result = buildSuggestion(input);
 
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedAttachmentName).toBeDefined();
-					// Hash is truncated to short form (first 4 chars) in filename
-					expect(result.suggestedAttachmentName).toContain("abc1");
-					expect(result.suggestedAttachmentName).toContain("invoice");
-					expect(result.suggestedAttachmentName).toContain("2024-01-15");
-				}
+				expectCreateNoteSuggestion(result, (suggestion) => {
+					expect(suggestion.suggestedAttachmentName).toBeDefined();
+					// Preview shows ideal name WITHOUT hash (hash added at execute if collision)
+					expect(suggestion.suggestedAttachmentName).not.toContain("abc1");
+					expect(suggestion.suggestedAttachmentName).toContain("invoice");
+					expect(suggestion.suggestedAttachmentName).toContain("2024-01-15");
+					// Pattern match instead of exact string - allows flexibility in implementation
+					expect(suggestion.suggestedAttachmentName).toMatch(
+						/2024-01-15-invoice-.*\.pdf/,
+					);
+				});
 			});
 
 			test("should NOT generate attachment name without hash", () => {
+				const vault = createTestVault();
+				trackVault(vault);
+
 				const input = createInput({
 					filename: "receipt.pdf",
 					llmResult: createLLMResult({
@@ -382,10 +292,9 @@ describe("classifiers/suggestion-builder", () => {
 
 				const result = buildSuggestion(input);
 
-				expect(result.action).toBe("create-note");
-				if (isCreateNoteSuggestion(result)) {
-					expect(result.suggestedAttachmentName).toBeUndefined();
-				}
+				expectCreateNoteSuggestion(result, (suggestion) => {
+					expect(suggestion.suggestedAttachmentName).toBeUndefined();
+				});
 			});
 		});
 	});

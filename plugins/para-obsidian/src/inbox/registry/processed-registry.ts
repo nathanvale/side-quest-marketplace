@@ -443,6 +443,69 @@ export function createRegistry(
 	}
 
 	/**
+	 * Internal save implementation without write serialization.
+	 * This is used by removeAndSave which already uses writeLimit.
+	 */
+	async function _saveInternal(): Promise<void> {
+		const tempPath = `${registryPath}.tmp`;
+		const lockStartTime = Date.now();
+
+		// Acquire lock before writing
+		await acquireLock(lockPath);
+
+		const lockWaitTime = Date.now() - lockStartTime;
+		if (lockWaitTime > 100) {
+			log.warn("Long lock wait time", {
+				waitMs: lockWaitTime,
+				path: registryPath,
+			});
+		}
+
+		try {
+			// Ensure parent directory exists
+			const dir = dirname(registryPath);
+			if (!existsSync(dir)) {
+				mkdirSync(dir, { recursive: true });
+			}
+
+			// Build registry object
+			const registry: ProcessedRegistry = {
+				version: REGISTRY_VERSION,
+				items: Array.from(items.values()),
+			};
+
+			// Write to temporary file first
+			await Bun.write(tempPath, JSON.stringify(registry, null, 2));
+
+			// Atomic rename (POSIX guarantees atomicity)
+			await rename(tempPath, registryPath);
+
+			log.debug("Registry saved", {
+				items: items.size,
+				path: registryPath,
+				lockWaitMs: lockWaitTime,
+			});
+		} catch (error) {
+			log.error("Failed to save registry", {
+				path: registryPath,
+				error: String(error),
+			});
+			throw createInboxError(
+				"REG_WRITE_FAILED",
+				{
+					cid: "registry-save",
+					operation: "save",
+					source: registryPath,
+				},
+				`Failed to save registry: ${String(error)}`,
+			);
+		} finally {
+			// Always release lock, even on error
+			releaseLock(lockPath);
+		}
+	}
+
+	/**
 	 * Save registry to disk using atomic write pattern.
 	 *
 	 * Writes to a temporary file first, then atomically renames to the target path.
@@ -451,64 +514,7 @@ export function createRegistry(
 	 * Uses write serialization via p-limit to prevent concurrent writes.
 	 */
 	async function save(): Promise<void> {
-		return writeLimit(async () => {
-			const tempPath = `${registryPath}.tmp`;
-			const lockStartTime = Date.now();
-
-			// Acquire lock before writing
-			await acquireLock(lockPath);
-
-			const lockWaitTime = Date.now() - lockStartTime;
-			if (lockWaitTime > 100) {
-				log.warn("Long lock wait time", {
-					waitMs: lockWaitTime,
-					path: registryPath,
-				});
-			}
-
-			try {
-				// Ensure parent directory exists
-				const dir = dirname(registryPath);
-				if (!existsSync(dir)) {
-					mkdirSync(dir, { recursive: true });
-				}
-
-				// Build registry object
-				const registry: ProcessedRegistry = {
-					version: REGISTRY_VERSION,
-					items: Array.from(items.values()),
-				};
-
-				// Write to temporary file first
-				await Bun.write(tempPath, JSON.stringify(registry, null, 2));
-
-				// Atomic rename (POSIX guarantees atomicity)
-				await rename(tempPath, registryPath);
-
-				log.debug("Registry saved", {
-					items: items.size,
-					path: registryPath,
-					lockWaitMs: lockWaitTime,
-				});
-			} catch (error) {
-				log.error("Failed to save registry", {
-					path: registryPath,
-					error: String(error),
-				});
-				throw createInboxError(
-					"REG_WRITE_FAILED",
-					{
-						cid: "registry-save",
-						operation: "save",
-						source: registryPath,
-					},
-					`Failed to save registry: ${String(error)}`,
-				);
-			} finally {
-				// Always release lock, even on error
-				releaseLock(lockPath);
-			}
-		});
+		return writeLimit(async () => _saveInternal());
 	}
 
 	/**
@@ -693,7 +699,7 @@ export function createRegistry(
 		return writeLimit(async () => {
 			const existed = removeItem(hash);
 			if (existed) {
-				await save();
+				await _saveInternal();
 			}
 			return existed;
 		});

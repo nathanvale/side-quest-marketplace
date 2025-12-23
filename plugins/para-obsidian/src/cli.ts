@@ -20,12 +20,14 @@ import {
 	handleCreateClassifier,
 	handleCreateNoteTemplate,
 	handleDelete,
+	handleEnrich,
 	handleEnrichBookmark,
 	handleExportBookmarks,
 	handleExportWebClipperTemplate,
 	handleFindOrphans,
 	handleFrontmatter,
 	handleGit,
+	handleInboxMove,
 	handleIndex,
 	handleInsert,
 	handleLinkAttachments,
@@ -71,6 +73,9 @@ function printUsage(): void {
 		"",
 		"Inbox Processing:",
 		"  para process-inbox [--auto] [--preview] [--dry-run] [--filter pattern] [--force]",
+		"  para inbox move [--format md|json]",
+		"  para enrich <action> [target|--all] [--dry-run] [--format md|json]",
+		"    Actions: youtube",
 		"  para export-bookmarks [--filter type:bookmark] [--out path] [--format md|json]",
 		"  para export-webclipper-template [-o path] [--format md|json]",
 		"  para create-classifier [--quick]",
@@ -85,9 +90,9 @@ function printUsage(): void {
 		"Shorter aliases:",
 		"  para scan        (alias for process-inbox)",
 		"  para execute     (alias for process-inbox --auto)",
+		"  para move        (alias for inbox move)",
 		"  para export      (alias for export-bookmarks)",
 		"  para init        (alias for create-classifier)",
-		"  para enrich      (alias for enrich-bookmark)",
 		"",
 		"Options:",
 		"  --format md|json  Output format (default: md)",
@@ -106,6 +111,8 @@ function printUsage(): void {
 		'  bun run src/cli.ts create --template task --source "inbox/rough-notes.md" --model qwen:7b --arg "priority=high"',
 		'  bun run src/cli.ts create --template area --source-text "Managing Muffin: vet visits, grooming, food subscription"',
 		'  bun run src/cli.ts rename "01_Projects/Old.md" "01_Projects/New.md" --dry-run',
+		"  bun run src/cli.ts enrich youtube --all",
+		'  bun run src/cli.ts enrich youtube "00 Inbox/my-video.md"',
 	];
 	console.log(
 		lines.map((line) => (line === "" ? "" : color("cyan", line))).join("\n"),
@@ -327,8 +334,28 @@ async function main(): Promise<void> {
 			}
 
 			case "enrich": {
-				// Alias for enrich-bookmark
-				const result = await handleEnrichBookmark(ctx);
+				// Standalone enrich command (YouTube, etc.)
+				const result = await handleEnrich(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
+				break;
+			}
+
+			case "inbox": {
+				// Handle inbox subcommands
+				if (subcommand === "move") {
+					const result = await handleInboxMove(ctx);
+					if (!result.success) process.exit(result.exitCode ?? 1);
+				} else {
+					console.error(`Unknown inbox subcommand: ${subcommand}`);
+					printUsage();
+					process.exit(1);
+				}
+				break;
+			}
+
+			case "move": {
+				// Alias for 'inbox move'
+				const result = await handleInboxMove(ctx);
 				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}

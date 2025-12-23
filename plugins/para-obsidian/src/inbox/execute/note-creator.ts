@@ -152,52 +152,25 @@ export async function createNoteFromSuggestion(
 			}
 		}
 
-		// For LLM-path items (created in inbox), add LLM suggestions as separate fields
-		// These are hints for the user - they still need to manually set area/project
-		// Check if this is an LLM-path item (has llmSuggested* fields)
-		const isLlmPathItem =
-			suggestion.llmSuggestedArea || suggestion.llmSuggestedProject;
-
-		// Build extra frontmatter for LLM suggestions
-		const extraFrontmatter: Record<string, unknown> = {};
-
-		if (isLlmPathItem) {
-			// Add LLM suggestions as hint fields (user sees what LLM detected)
-			if (suggestion.llmSuggestedArea) {
-				extraFrontmatter.suggested_area = `[[${suggestion.llmSuggestedArea}]]`;
-			}
-			if (suggestion.llmSuggestedProject) {
-				extraFrontmatter.suggested_project = `[[${suggestion.llmSuggestedProject}]]`;
-			}
-			// Leave actual area/project empty for user to fill in
-		} else {
-			// Fast-path items: use suggested area/project directly
-			// Wrap in wikilink format [[...]] as required by frontmatter validation
-			if (suggestion.suggestedArea) {
-				args["Area (leave empty if using project)"] =
-					`[[${suggestion.suggestedArea}]]`;
-			}
-			if (suggestion.suggestedProject) {
-				args["Project (leave empty if using area)"] =
-					`[[${suggestion.suggestedProject}]]`;
-			}
-		}
+		// Area and project fields are left empty - user fills them in manually in Obsidian
+		// No longer auto-suggesting or auto-routing based on LLM classification
 
 		// Create the note
 		// For Type A documents (sourceOfTruth: "markdown"), suggestedContent contains
 		// the extracted markdown to embed in the note body via {{content}} placeholder
+		// Use classifier's template name if available (e.g., "generic" ID → "document" template)
+		const templateName =
+			converter?.template.name ?? suggestion.suggestedNoteType;
 		const result = createFromTemplate(paraConfig, {
-			template: suggestion.suggestedNoteType,
+			template: templateName,
 			title: suggestion.suggestedTitle,
 			dest: suggestion.suggestedDestination,
 			args,
-			extraFrontmatter:
-				Object.keys(extraFrontmatter).length > 0 ? extraFrontmatter : undefined,
 			content: suggestion.suggestedContent,
 		});
 
 		if (logger) {
-			logger.info`Created note from template=${suggestion.suggestedNoteType} path=${result.filePath} ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
+			logger.info`Created note from template=${templateName} path=${result.filePath} ${cid}${sessionCid ? ` ${sessionCid}` : ""}`;
 		}
 
 		return {

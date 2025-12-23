@@ -94,12 +94,6 @@ export interface DocumentTypeResult {
 	/** Confidence in the detection (0-1) */
 	readonly confidence: number;
 
-	/** Suggested area wikilink (e.g., "Health", "Travel") */
-	readonly suggestedArea?: string | null;
-
-	/** Suggested project wikilink (e.g., "2024 Tax Return") */
-	readonly suggestedProject?: string | null;
-
 	/** Extracted fields from the document */
 	readonly extractedFields?: FieldExtractionResult | null;
 
@@ -130,13 +124,21 @@ const DEFAULT_DOCUMENT_TYPES = [
 ] as const;
 
 /**
+ * Maximum length for user-provided content in prompts to prevent context overflow
+ */
+const MAX_CONTENT_LENGTH = 10000;
+
+/**
+ * Maximum length for user hints and filenames to prevent prompt injection
+ */
+const MAX_USER_INPUT_LENGTH = 500;
+
+/**
  * Example JSON response format for the prompt.
  */
 const EXAMPLE_RESPONSE = {
 	documentType: "invoice",
 	confidence: 0.92,
-	suggestedArea: "Health",
-	suggestedProject: "Medical Expenses 2024",
 	suggestedFilenameDescription: "2024-12-01-dr-smith-medical-practice-invoice",
 	extractedFields: {
 		amount: "220.00",
@@ -149,6 +151,63 @@ const EXAMPLE_RESPONSE = {
 		"Document contains TAX INVOICE header, ABN, amount due, and medical provider details",
 	extractionWarnings: [],
 };
+
+// =============================================================================
+// Sanitization
+// =============================================================================
+
+/**
+ * Sanitize user-provided content for safe inclusion in LLM prompts.
+ *
+ * Protects against prompt injection by:
+ * - Escaping markdown code blocks that could contain control sequences
+ * - Removing potential instruction injection patterns
+ * - Applying length limits to prevent context overflow
+ * - Preserving readability for legitimate content
+ *
+ * @param text - Raw user input (file content, hints, filenames)
+ * @param maxLength - Maximum allowed length (default: MAX_CONTENT_LENGTH)
+ * @returns Sanitized text safe for prompt inclusion
+ *
+ * @example
+ * ```typescript
+ * const safe = sanitizeForPrompt(userContent)
+ * const prompt = `Analyze this: ${safe}`
+ * ```
+ */
+function sanitizeForPrompt(
+	text: string,
+	maxLength = MAX_CONTENT_LENGTH,
+): string {
+	// Apply length limit first
+	let sanitized = text.slice(0, maxLength);
+
+	// Escape markdown code blocks that could contain control sequences
+	sanitized = sanitized.replace(/```/g, "\\`\\`\\`");
+
+	// Remove potential instruction injection patterns (attempts to override system instructions)
+	// These patterns are common in prompt injection attacks
+	const injectionPatterns = [
+		/ignore\s+(previous|above|all)\s+instructions/gi,
+		/disregard\s+(previous|above|all)/gi,
+		/forget\s+(previous|above|all)/gi,
+		/new\s+instructions:/gi,
+		/system\s*:/gi,
+		/\[INST\]/gi,
+		/\[\/INST\]/gi,
+		/<\|im_start\|>/gi,
+		/<\|im_end\|>/gi,
+	];
+
+	for (const pattern of injectionPatterns) {
+		sanitized = sanitized.replace(pattern, "[REDACTED]");
+	}
+
+	// Escape special markdown headers that could structure prompts
+	sanitized = sanitized.replace(/^#{1,6}\s/gm, "\\$&");
+
+	return sanitized;
+}
 
 // =============================================================================
 // Converter Support
@@ -213,6 +272,73 @@ const FILENAME_TYPE_KEYWORDS = [
 ] as const;
 
 /**
+ * Build vault context section for the LLM prompt.
+ * Provides available areas and projects so LLM can suggest appropriate values.
+ */
+function buildVaultContextSection(vaultContext: InboxVaultContext): string {
+	const sections: string[] = [];
+
+	if (vaultContext.areas.length > 0) {
+		sections.push(`## Available Areas (PARA)
+Choose from these existing areas when setting the "area" field:
+${vaultContext.areas.map((a) => `- ${a}`).join("\n")}
+
+**IMPORTANT:** Use the EXACT area name from this list. Do not abbreviate or modify.`);
+	}
+
+	if (vaultContext.projects.length > 0) {
+		sections.push(`## Available Projects
+Choose from these existing projects when setting the "project" field:
+${vaultContext.projects.map((p) => `- ${p}`).join("\n")}
+
+**IMPORTANT:** Use the EXACT project name from this list. Do not abbreviate or modify.`);
+	}
+
+	return sections.length > 0 ? `\n${sections.join("\n\n")}\n` : "";
+}
+
+/**
+ * Build content preview for LLM prompt.
+ * For longer documents, includes both beginning and end to capture
+ * appendices, schedules, and summary sections that often contain key data.
+ *
+ * Sanitizes content to prevent prompt injection.
+ *
+ * @param content - Full document content
+ * @returns Formatted content preview section
+ */
+function buildContentPreview(content: string): string {
+	const START_CHARS = 5000;
+	const END_CHARS = 3000;
+	const TOTAL_LIMIT = 8000;
+
+	// Short documents: include everything (sanitized)
+	if (content.length <= TOTAL_LIMIT) {
+		const sanitized = sanitizeForPrompt(content, TOTAL_LIMIT);
+		return `- Content (${content.length} chars):
+
+${sanitized}`;
+	}
+
+	// Long documents: include start + end (sanitized)
+	const startSection = sanitizeForPrompt(
+		content.slice(0, START_CHARS),
+		START_CHARS,
+	);
+	const endSection = sanitizeForPrompt(content.slice(-END_CHARS), END_CHARS);
+
+	return `- Content preview (first ${START_CHARS} chars):
+
+${startSection}
+
+[... ${content.length - START_CHARS - END_CHARS} chars omitted ...]
+
+- Content end (last ${END_CHARS} chars - often contains schedules/appendices):
+
+${endSection}`;
+}
+
+/**
  * Detect type keywords in a filename and return a hint for the LLM.
  */
 function detectFilenameTypeHint(filename: string): string | null {
@@ -236,20 +362,21 @@ export function buildInboxPrompt(
 ): string {
 	const { content, filename, vaultContext, userHint } = options;
 
-	const areasSection =
-		vaultContext.areas.length > 0
-			? `Available areas in vault: ${vaultContext.areas.join(", ")}`
-			: "No areas defined in vault";
+	// Sanitize user-provided inputs
+	const sanitizedFilename = sanitizeForPrompt(filename, MAX_USER_INPUT_LENGTH);
+	const sanitizedUserHint = userHint
+		? sanitizeForPrompt(userHint, MAX_USER_INPUT_LENGTH)
+		: null;
 
-	const projectsSection =
-		vaultContext.projects.length > 0
-			? `Available projects in vault: ${vaultContext.projects.join(", ")}`
-			: "No projects defined in vault";
+	const userHintSection = sanitizedUserHint
+		? `\nUser hint: "${sanitizedUserHint}"`
+		: "";
 
-	const userHintSection = userHint ? `\nUser hint: "${userHint}"` : "";
+	// Build vault context section for area/project suggestions
+	const vaultContextSection = buildVaultContextSection(vaultContext);
 
-	// Detect filename type hint
-	const filenameHint = detectFilenameTypeHint(filename);
+	// Detect filename type hint (using sanitized filename)
+	const filenameHint = detectFilenameTypeHint(sanitizedFilename);
 	const filenameHintSection = filenameHint ? `\n${filenameHint}\n` : "";
 
 	// Use converters if provided, otherwise fall back to DEFAULT_DOCUMENT_TYPES
@@ -279,40 +406,30 @@ export function buildInboxPrompt(
 		}
 	}
 
+	// Build content preview - include both start and end for documents with appendices/schedules
+	const contentPreview = buildContentPreview(content);
+
 	return `You are analyzing a document from an inbox to determine its type and extract key information.
 
 ## Document Information
-- Filename: ${filename}
-- Content preview (first 6000 chars):
-
-${content.slice(0, 6000)}
+- Filename: ${sanitizedFilename}
+${contentPreview}
 ${filenameHintSection}
 ## Available Document Types
 ${documentTypes}
-
-## Vault Context
-${areasSection}
-${projectsSection}
-${userHintSection}
+${vaultContextSection}${userHintSection}
 
 ## Task
 1. Determine the document type from the available types
 2. Estimate your confidence (0.0 to 1.0) in this classification
-3. Suggest an appropriate area from the vault (if any matches) - return JUST the name without brackets
-4. Suggest an appropriate project from the vault (if any matches) - return JUST the name without brackets
-5. Extract relevant fields based on document type
-6. Generate a descriptive filename slug for the attachment (lowercase, hyphen-separated)
+3. Extract relevant fields based on document type
+4. Generate a descriptive filename slug for the attachment (lowercase, hyphen-separated)
    - For invoices: date (YYYY-MM-DD) + "-" + provider slug + "-invoice" (e.g., "2025-09-30-pv-foulkes-invoice")
    - For bookings: date (YYYY-MM-DD) + "-" + provider slug + "-booking" (e.g., "2025-01-15-qantas-booking")
    - For receipts: date (YYYY-MM-DD) + "-" + provider slug + "-receipt" (e.g., "2024-12-01-woolworths-receipt")
    - Keep it concise (max 50 chars), use only a-z, 0-9, and hyphens
    - If you CANNOT extract the date or provider, set suggestedFilenameDescription to null
-7. Report any fields you were asked to extract but could not find in extractionWarnings array
-
-**CRITICAL for area/project fields:**
-- suggestedArea: Return ONLY the area name (e.g., "Health" not "[[Health]]")
-- suggestedProject: Return ONLY the project name (e.g., "2025 Tassie Holiday" not "[[2025 Tassie Holiday]]")
-- Wikilink brackets will be added automatically - do NOT include them
+5. Report any fields you were asked to extract but could not find in extractionWarnings array
 
 **CRITICAL for extractionWarnings:**
 - If a required field cannot be extracted, add a clear warning message
@@ -404,8 +521,6 @@ export function parseDetectionResponse(response: string): DocumentTypeResult {
 	return {
 		documentType,
 		confidence: Math.max(0, Math.min(1, obj.confidence)),
-		suggestedArea: obj.suggestedArea as string | null | undefined,
-		suggestedProject: obj.suggestedProject as string | null | undefined,
 		extractedFields: obj.extractedFields as
 			| FieldExtractionResult
 			| null
@@ -426,43 +541,34 @@ export function parseDetectionResponse(response: string): DocumentTypeResult {
 /**
  * Build a follow-up prompt for editing a suggestion with user input.
  *
+ * Sanitizes user input to prevent prompt injection.
+ *
  * @param originalContent - Original document content
  * @param previousResult - Previous detection result
  * @param userPrompt - User's editing instructions
- * @param vaultContext - Vault context
  * @returns Follow-up prompt string
  */
 export function buildEditPrompt(
 	originalContent: string,
 	previousResult: DocumentTypeResult,
 	userPrompt: string,
-	vaultContext: InboxVaultContext,
 ): string {
-	const areasSection =
-		vaultContext.areas.length > 0
-			? `Available areas: ${vaultContext.areas.join(", ")}`
-			: "No areas defined";
-
-	const projectsSection =
-		vaultContext.projects.length > 0
-			? `Available projects: ${vaultContext.projects.join(", ")}`
-			: "No projects defined";
+	// Sanitize user inputs
+	const sanitizedPrompt = sanitizeForPrompt(userPrompt, MAX_USER_INPUT_LENGTH);
+	const sanitizedContent = sanitizeForPrompt(
+		originalContent.slice(0, 2000),
+		2000,
+	);
 
 	return `You previously analyzed this document and classified it as:
 - Type: ${previousResult.documentType}
-- Area: ${previousResult.suggestedArea ?? "none"}
-- Project: ${previousResult.suggestedProject ?? "none"}
 - Confidence: ${previousResult.confidence}
 
 The user has provided additional instructions:
-"${userPrompt}"
-
-## Vault Context
-${areasSection}
-${projectsSection}
+"${sanitizedPrompt}"
 
 ## Document Content (first 2000 chars)
-${originalContent.slice(0, 2000)}
+${sanitizedContent}
 
 ## Task
 Re-analyze the document considering the user's instructions.

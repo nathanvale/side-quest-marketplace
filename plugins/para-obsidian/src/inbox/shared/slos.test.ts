@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { useTestVaultCleanup } from "../../testing/utils";
 import {
 	checkSLOBreach,
 	getBurnRate,
@@ -10,9 +11,14 @@ import {
 } from "./slos";
 
 describe("slos", () => {
+	const { getAfterEachHook } = useTestVaultCleanup();
+
+	// Reset SLO events before each test
 	beforeEach(() => {
 		resetSLOEventsForTests();
 	});
+
+	afterEach(getAfterEachHook());
 
 	describe("SLO_DEFINITIONS", () => {
 		test("should define scan_latency SLO", async () => {
@@ -377,10 +383,6 @@ describe("slos", () => {
 	});
 
 	describe("checkSLOBreach with burn rate", () => {
-		beforeEach(() => {
-			resetSLOEventsForTests();
-		});
-
 		test("includes actual burn rate in breach result", async () => {
 			recordSLOEvent("scan_latency", true);
 			recordSLOEvent("scan_latency", false);

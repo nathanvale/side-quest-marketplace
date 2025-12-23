@@ -5,19 +5,19 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { writeTextFile } from "@sidequest/core/fs";
-import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
+import { createTestVault, useTestVaultCleanup } from "../testing/utils";
 import { detectTemplate } from "./detection";
 
 describe("detectTemplate", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	let tempDir: string;
 
 	beforeEach(() => {
-		tempDir = createTempDir("template-detection-test-");
+		tempDir = createTestVault();
+		trackVault(tempDir);
 	});
 
-	afterEach(() => {
-		cleanupTestDir(tempDir);
-	});
+	afterEach(getAfterEachHook());
 
 	test("returns exists: true when template exists", async () => {
 		// Setup - create template

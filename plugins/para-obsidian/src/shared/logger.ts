@@ -56,6 +56,7 @@ export const SUBSYSTEMS = [
 	"tx",
 	"cli",
 	"classify",
+	"routing",
 ] as const;
 
 export type PluginSubsystem = (typeof SUBSYSTEMS)[number];
@@ -259,6 +260,11 @@ export const cliLogger = subsystemLoggers.cli!;
  */
 export const classifyLogger = subsystemLoggers.classify!;
 
+/**
+ * Logger for routing operations (inbox move to PARA destinations).
+ */
+export const routingLogger = subsystemLoggers.routing!;
+
 // =============================================================================
 // Re-exports for convenience
 // =============================================================================
@@ -293,4 +299,5 @@ export const loggers = {
 	lock: lockLogger,
 	tx: txLogger,
 	cli: cliLogger,
+	routing: routingLogger,
 } as const;

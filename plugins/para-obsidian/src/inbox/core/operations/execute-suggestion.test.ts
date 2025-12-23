@@ -7,11 +7,19 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
 	cleanupTestDir,
+	cleanupTestVault,
 	createTempDir,
+	createTestContext,
+	createTestSuggestion,
+	createTestVault,
+	useTestVaultCleanup,
 	writeTestFile,
-} from "@sidequest/core/testing";
+	writeVaultFile,
+} from "../../../testing/utils";
+import { createRegistry } from "../../registry/processed-registry";
+import type { InboxSuggestion } from "../../types";
 import { createSuggestionId } from "../../types";
-import { resolveParaFolder } from "./execute-suggestion";
+import { executeSuggestion, resolveParaFolder } from "./execute-suggestion";
 
 describe("resolveParaFolder", () => {
 	test("maps semantic PARA names to numbered folders (lowercase)", () => {
@@ -199,27 +207,38 @@ describe("resolveParaFolder", () => {
 });
 
 describe("executeSuggestion - movedFrom field", () => {
-	let tempDir: string;
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
 
-	beforeEach(() => {
-		tempDir = createTempDir("test-execute-suggestion-");
-		process.env.PARA_VAULT = tempDir;
+	// Helper: Setup standard vault structure
+	function setupExecuteSuggestionVault(vaultPath: string) {
+		writeVaultFile(vaultPath, "00 Inbox/.gitkeep", "");
+		writeVaultFile(vaultPath, "03 Resources/.gitkeep", "");
+		writeVaultFile(vaultPath, "02 Areas/Health/.gitkeep", "");
+		writeVaultFile(vaultPath, "Attachments/.gitkeep", "");
+		writeVaultFile(vaultPath, "Templates/.gitkeep", "");
+		writeVaultFile(vaultPath, ".inbox-staging/.gitkeep", "");
+	}
 
-		// Create necessary folders
-		writeTestFile(tempDir, "00 Inbox/.gitkeep", "");
-		writeTestFile(tempDir, "03 Resources/.gitkeep", "");
-		writeTestFile(tempDir, "02 Areas/Health/.gitkeep", "");
-		writeTestFile(tempDir, "Attachments/.gitkeep", "");
-		writeTestFile(tempDir, "Templates/.gitkeep", "");
-		writeTestFile(tempDir, ".inbox-staging/.gitkeep", "");
-	});
-
-	afterEach(() => {
-		cleanupTestDir(tempDir);
-		delete process.env.PARA_VAULT;
-	});
+	// Helper: Assert successful move
+	function expectSuccessfulMove(
+		result: Awaited<ReturnType<typeof executeSuggestion>>,
+		expectedDestinationPattern: RegExp,
+		expectedMovedFrom: string,
+	) {
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.movedFrom).toBe(expectedMovedFrom);
+			expect(result.createdNote).toMatch(expectedDestinationPattern);
+		}
+	}
 
 	test("should return movedFrom when executing bookmark suggestion", async () => {
+		// Setup vault
+		const vault = createTestVault();
+		trackVault(vault);
+		setupExecuteSuggestionVault(vault);
+
 		// Setup: Create a bookmark file in inbox
 		const bookmarkPath = "00 Inbox/test-bookmark.md";
 		const bookmarkContent = `---
@@ -229,39 +248,28 @@ type: bookmark
 ---
 # Test Bookmark Content
 `;
-		writeTestFile(tempDir, bookmarkPath, bookmarkContent);
+		writeVaultFile(vault, bookmarkPath, bookmarkContent);
 
 		// Create suggestion for bookmark
-		const suggestion = {
-			id: createSuggestionId(),
-			action: "create-note" as const,
+		const suggestion = createTestSuggestion({
 			source: bookmarkPath,
-			processor: "notes" as const,
-			confidence: "high" as const,
-			detectionSource: "frontmatter" as const,
 			reason: "Pre-classified bookmark from Web Clipper",
 			suggestedNoteType: "bookmark",
 			suggestedTitle: "Test Bookmark",
 			suggestedDestination: "03 Resources",
-		};
+		});
 
+		// Create config and registry
 		const config = {
-			vaultPath: tempDir,
+			vaultPath: vault,
 			inboxFolder: "00 Inbox",
 			attachmentsFolder: "Attachments",
 			templatesFolder: "Templates",
 		};
-
-		// Create registry
-		const { createRegistry } = await import(
-			"../../registry/processed-registry"
-		);
-		const registryPath = `${tempDir}/.para-obsidian-registry.json`;
-		const registry = createRegistry(registryPath);
+		const registry = createRegistry(`${vault}/.para-obsidian-registry.json`);
 		await registry.load();
 
 		// Execute suggestion
-		const { executeSuggestion } = await import("./execute-suggestion");
 		const result = await executeSuggestion(
 			suggestion,
 			config,
@@ -270,16 +278,19 @@ type: bookmark
 		);
 
 		// Verify result
-		expect(result.success).toBe(true);
+		expectSuccessfulMove(result, /03 Resources\/.+\.md$/, bookmarkPath);
 		if (result.success) {
-			expect(result.movedFrom).toBe(bookmarkPath);
-			expect(result.createdNote).toMatch(/03 Resources\/.+\.md$/);
 			// Bookmark should not have movedAttachment
 			expect(result.movedAttachment).toBeUndefined();
 		}
 	});
 
 	test("should return movedFrom when executing pre-classified note suggestion", async () => {
+		// Setup vault
+		const vault = createTestVault();
+		trackVault(vault);
+		setupExecuteSuggestionVault(vault);
+
 		// Setup: Create a pre-classified markdown file in inbox
 		const notePath = "00 Inbox/Medical Statement.md";
 		const noteContent = `---
@@ -289,7 +300,7 @@ type: medical-statement
 # Medical Statement
 Pre-classified content
 `;
-		writeTestFile(tempDir, notePath, noteContent);
+		writeVaultFile(vault, notePath, noteContent);
 
 		// Create a template for medical-statement
 		const templateContent = `---
@@ -300,66 +311,53 @@ type: medical-statement
 
 ## Attachments
 `;
-		writeTestFile(tempDir, "Templates/medical-statement.md", templateContent);
+		writeVaultFile(vault, "Templates/medical-statement.md", templateContent);
 
 		// Create suggestion for pre-classified note
-		const suggestion = {
-			id: createSuggestionId(),
-			action: "create-note" as const,
+		const suggestion = createTestSuggestion({
 			source: notePath,
-			processor: "notes" as const,
-			confidence: "high" as const,
-			detectionSource: "frontmatter" as const,
 			reason: "Pre-classified medical statement from frontmatter",
 			suggestedNoteType: "medical-statement",
 			suggestedTitle: "Medical Statement",
-			suggestedArea: "Health",
-		};
+			suggestedDestination: "02 Areas/Health",
+		});
 
+		// Create config and registry
 		const config = {
-			vaultPath: tempDir,
+			vaultPath: vault,
 			inboxFolder: "00 Inbox",
 			attachmentsFolder: "Attachments",
 			templatesFolder: "Templates",
 		};
-
-		// Create registry
-		const { createRegistry } = await import(
-			"../../registry/processed-registry"
-		);
-		const registryPath = `${tempDir}/.para-obsidian-registry.json`;
-		const registry = createRegistry(registryPath);
+		const registry = createRegistry(`${vault}/.para-obsidian-registry.json`);
 		await registry.load();
 
-		// Create area path map to resolve "Health" to "02 Areas/Health"
-		const areaPathMap = new Map([["health", "02 Areas/Health"]]);
-		const projectPathMap = new Map();
-
 		// Execute suggestion
-		const { executeSuggestion } = await import("./execute-suggestion");
 		const result = await executeSuggestion(
 			suggestion,
 			config,
 			registry,
 			"test-cid",
-			{ areaPathMap, projectPathMap },
 		);
 
 		// Verify result
-		expect(result.success).toBe(true);
+		expectSuccessfulMove(result, /02 Areas\/Health\/.+\.md$/, notePath);
 		if (result.success) {
-			expect(result.movedFrom).toBe(notePath);
-			expect(result.createdNote).toMatch(/02 Areas\/Health\/.+\.md$/);
 			// Pre-classified note should have movedAttachment
 			expect(result.movedAttachment).toMatch(/Attachments\/.+\.md$/);
 		}
 	});
 
 	test("should return movedFrom for PDF attachment with created note", async () => {
+		// Setup vault
+		const vault = createTestVault();
+		trackVault(vault);
+		setupExecuteSuggestionVault(vault);
+
 		// Setup: Create a PDF file in inbox
 		const pdfPath = "00 Inbox/invoice.pdf";
 		const pdfContent = "Mock PDF content for testing";
-		writeTestFile(tempDir, pdfPath, pdfContent);
+		writeVaultFile(vault, pdfPath, pdfContent);
 
 		// Create a template for invoice
 		const templateContent = `---
@@ -370,16 +368,16 @@ type: invoice
 
 ## Attachments
 `;
-		writeTestFile(tempDir, "Templates/invoice.md", templateContent);
+		writeVaultFile(vault, "Templates/invoice.md", templateContent);
+
+		// Create Finance area
+		writeVaultFile(vault, "02 Areas/Finance/.gitkeep", "");
 
 		// Create suggestion for PDF with note creation
-		const suggestion = {
-			id: createSuggestionId(),
-			action: "create-note" as const,
+		const suggestion = createTestSuggestion({
 			source: pdfPath,
-			processor: "attachments" as const,
-			confidence: "high" as const,
-			detectionSource: "llm+heuristic" as const,
+			processor: "attachments",
+			detectionSource: "llm+heuristic",
 			reason: "Detected invoice from PDF content and filename",
 			suggestedNoteType: "invoice",
 			suggestedTitle: "Invoice 2024-001",
@@ -390,28 +388,19 @@ type: invoice
 				date: "2024-01-15",
 			},
 			suggestedAttachmentName: "20240115-abcd-invoice.pdf",
-		};
+		});
 
+		// Create config and registry
 		const config = {
-			vaultPath: tempDir,
+			vaultPath: vault,
 			inboxFolder: "00 Inbox",
 			attachmentsFolder: "Attachments",
 			templatesFolder: "Templates",
 		};
-
-		// Create Finance area
-		writeTestFile(tempDir, "02 Areas/Finance/.gitkeep", "");
-
-		// Create registry
-		const { createRegistry } = await import(
-			"../../registry/processed-registry"
-		);
-		const registryPath = `${tempDir}/.para-obsidian-registry.json`;
-		const registry = createRegistry(registryPath);
+		const registry = createRegistry(`${vault}/.para-obsidian-registry.json`);
 		await registry.load();
 
 		// Execute suggestion
-		const { executeSuggestion } = await import("./execute-suggestion");
 		const result = await executeSuggestion(
 			suggestion,
 			config,
@@ -420,49 +409,44 @@ type: invoice
 		);
 
 		// Verify result
-		expect(result.success).toBe(true);
+		expectSuccessfulMove(result, /02 Areas\/Finance\/.+\.md$/, pdfPath);
 		if (result.success) {
-			expect(result.movedFrom).toBe(pdfPath);
 			expect(result.createdNote).toBeDefined();
 			expect(result.movedAttachment).toMatch(/Attachments\/.+\.pdf$/);
 		}
 	});
 
 	test("should return movedFrom even when note creation fails", async () => {
+		// Setup vault
+		const vault = createTestVault();
+		trackVault(vault);
+		setupExecuteSuggestionVault(vault);
+
 		// Setup: Create a file in inbox
 		const filePath = "00 Inbox/test.pdf";
-		writeTestFile(tempDir, filePath, "test content");
+		writeVaultFile(vault, filePath, "test content");
 
 		// Create suggestion with invalid template (will fail note creation)
-		const suggestion = {
-			id: createSuggestionId(),
-			action: "create-note" as const,
+		const suggestion = createTestSuggestion({
 			source: filePath,
-			processor: "attachments" as const,
-			confidence: "high" as const,
-			detectionSource: "llm" as const,
+			processor: "attachments",
+			detectionSource: "llm",
 			reason: "Test suggestion with invalid template",
 			suggestedNoteType: "nonexistent-template",
 			suggestedTitle: "Test Note",
-		};
+		});
 
+		// Create config and registry
 		const config = {
-			vaultPath: tempDir,
+			vaultPath: vault,
 			inboxFolder: "00 Inbox",
 			attachmentsFolder: "Attachments",
 			templatesFolder: "Templates",
 		};
-
-		// Create registry
-		const { createRegistry } = await import(
-			"../../registry/processed-registry"
-		);
-		const registryPath = `${tempDir}/.para-obsidian-registry.json`;
-		const registry = createRegistry(registryPath);
+		const registry = createRegistry(`${vault}/.para-obsidian-registry.json`);
 		await registry.load();
 
 		// Execute suggestion (will fail due to missing template)
-		const { executeSuggestion } = await import("./execute-suggestion");
 		const result = await executeSuggestion(
 			suggestion,
 			config,
@@ -482,82 +466,85 @@ type: invoice
 });
 
 describe("resolveParaFolder - vault validation", () => {
-	let tempDir: string;
-
-	beforeEach(() => {
-		tempDir = createTempDir("test-resolve-para-");
-	});
-
-	afterEach(() => {
-		cleanupTestDir(tempDir);
-	});
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
 
 	test("validates semantic PARA names exist when vaultPath provided", () => {
+		const vault = createTestVault();
+		trackVault(vault);
+
 		// Create vault structure
-		writeTestFile(tempDir, "01 Projects/.gitkeep", "");
-		writeTestFile(tempDir, "02 Areas/.gitkeep", "");
-		writeTestFile(tempDir, "03 Resources/.gitkeep", "");
+		writeVaultFile(vault, "01 Projects/.gitkeep", "");
+		writeVaultFile(vault, "02 Areas/.gitkeep", "");
+		writeVaultFile(vault, "03 Resources/.gitkeep", "");
 
 		// Should succeed - folders exist
-		expect(resolveParaFolder("projects", undefined, tempDir)).toBe(
-			"01 Projects",
-		);
-		expect(resolveParaFolder("areas", undefined, tempDir)).toBe("02 Areas");
-		expect(resolveParaFolder("resources", undefined, tempDir)).toBe(
+		expect(resolveParaFolder("projects", undefined, vault)).toBe("01 Projects");
+		expect(resolveParaFolder("areas", undefined, vault)).toBe("02 Areas");
+		expect(resolveParaFolder("resources", undefined, vault)).toBe(
 			"03 Resources",
 		);
 
 		// Should fail - folder doesn't exist
-		expect(() => resolveParaFolder("archives", undefined, tempDir)).toThrow(
+		expect(() => resolveParaFolder("archives", undefined, vault)).toThrow(
 			"Destination folder does not exist: 04 Archives",
 		);
 	});
 
 	test("validates full paths exist when vaultPath provided", () => {
+		const vault = createTestVault();
+		trackVault(vault);
+
 		// Create nested structure
-		writeTestFile(tempDir, "02 Areas/Finance/.gitkeep", "");
-		writeTestFile(tempDir, "01 Projects/Vacation/.gitkeep", "");
+		writeVaultFile(vault, "02 Areas/Finance/.gitkeep", "");
+		writeVaultFile(vault, "01 Projects/Vacation/.gitkeep", "");
 
 		// Should succeed - paths exist
-		expect(resolveParaFolder("02 Areas/Finance", undefined, tempDir)).toBe(
+		expect(resolveParaFolder("02 Areas/Finance", undefined, vault)).toBe(
 			"02 Areas/Finance",
 		);
-		expect(resolveParaFolder("01 Projects/Vacation", undefined, tempDir)).toBe(
+		expect(resolveParaFolder("01 Projects/Vacation", undefined, vault)).toBe(
 			"01 Projects/Vacation",
 		);
 
 		// Should fail - path doesn't exist
 		expect(() =>
-			resolveParaFolder("02 Areas/Health", undefined, tempDir),
+			resolveParaFolder("02 Areas/Health", undefined, vault),
 		).toThrow("Destination folder does not exist: 02 Areas/Health");
 	});
 
 	test("validates custom folder paths exist when vaultPath provided", () => {
+		const vault = createTestVault();
+		trackVault(vault);
+
 		// Create custom folders
-		writeTestFile(tempDir, "Custom Folder/.gitkeep", "");
+		writeVaultFile(vault, "Custom Folder/.gitkeep", "");
 
 		// Should succeed - folder exists
-		expect(resolveParaFolder("Custom Folder", undefined, tempDir)).toBe(
+		expect(resolveParaFolder("Custom Folder", undefined, vault)).toBe(
 			"Custom Folder",
 		);
 
 		// Should fail - folder doesn't exist
-		expect(() => resolveParaFolder("Non Existent", undefined, tempDir)).toThrow(
+		expect(() => resolveParaFolder("Non Existent", undefined, vault)).toThrow(
 			"Destination folder does not exist: Non Existent",
 		);
 	});
 
 	test("validates numbered folders exist when vaultPath provided", () => {
+		const vault = createTestVault();
+		trackVault(vault);
+
 		// Create numbered folders
-		writeTestFile(tempDir, "01 Projects/.gitkeep", "");
+		writeVaultFile(vault, "01 Projects/.gitkeep", "");
 
 		// Should succeed - folder exists
-		expect(resolveParaFolder("01 Projects", undefined, tempDir)).toBe(
+		expect(resolveParaFolder("01 Projects", undefined, vault)).toBe(
 			"01 Projects",
 		);
 
 		// Should fail - folder doesn't exist
-		expect(() => resolveParaFolder("99 Unknown", undefined, tempDir)).toThrow(
+		expect(() => resolveParaFolder("99 Unknown", undefined, vault)).toThrow(
 			"Destination folder does not exist: 99 Unknown",
 		);
 	});
@@ -574,9 +561,12 @@ describe("resolveParaFolder - vault validation", () => {
 	});
 
 	test("validates with custom paraFolders mapping", () => {
+		const vault = createTestVault();
+		trackVault(vault);
+
 		// Create custom folder structure
-		writeTestFile(tempDir, "Projects/.gitkeep", "");
-		writeTestFile(tempDir, "Areas/.gitkeep", "");
+		writeVaultFile(vault, "Projects/.gitkeep", "");
+		writeVaultFile(vault, "Areas/.gitkeep", "");
 
 		const custom = {
 			projects: "Projects",
@@ -587,11 +577,11 @@ describe("resolveParaFolder - vault validation", () => {
 		};
 
 		// Should succeed - custom folder exists
-		expect(resolveParaFolder("projects", custom, tempDir)).toBe("Projects");
-		expect(resolveParaFolder("areas", custom, tempDir)).toBe("Areas");
+		expect(resolveParaFolder("projects", custom, vault)).toBe("Projects");
+		expect(resolveParaFolder("areas", custom, vault)).toBe("Areas");
 
 		// Should fail - custom folder doesn't exist
-		expect(() => resolveParaFolder("resources", custom, tempDir)).toThrow(
+		expect(() => resolveParaFolder("resources", custom, vault)).toThrow(
 			"Destination folder does not exist: Resources",
 		);
 	});
@@ -667,7 +657,9 @@ describe("resolveParaFolder - Security", () => {
 });
 
 describe("resolveParaFolder - Area/Project Resolution", () => {
-	let tempDir: string;
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
 	const paraFolders = {
 		inbox: "00 Inbox",
 		areas: "02 Areas",
@@ -676,18 +668,12 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 		archives: "04 Archives",
 	};
 
-	beforeEach(() => {
-		tempDir = createTempDir("test-area-project-");
-	});
-
-	afterEach(() => {
-		cleanupTestDir(tempDir);
-	});
-
 	test("resolves area names to full paths (case-insensitive)", () => {
+		const vault = createTestVault();
+		trackVault(vault);
 		// Create vault structure
-		writeTestFile(tempDir, "02 Areas/Health/.gitkeep", "");
-		writeTestFile(tempDir, "02 Areas/Finance/.gitkeep", "");
+		writeVaultFile(vault, "02 Areas/Health/.gitkeep", "");
+		writeVaultFile(vault, "02 Areas/Finance/.gitkeep", "");
 
 		const areaPathMap = new Map([
 			["health", "02 Areas/Health"],
@@ -697,7 +683,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 
 		// Lowercase
 		expect(
-			resolveParaFolder("health", paraFolders, tempDir, {
+			resolveParaFolder("health", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			}),
@@ -705,7 +691,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 
 		// Mixed case
 		expect(
-			resolveParaFolder("Health", paraFolders, tempDir, {
+			resolveParaFolder("Health", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			}),
@@ -713,7 +699,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 
 		// Uppercase
 		expect(
-			resolveParaFolder("FINANCE", paraFolders, tempDir, {
+			resolveParaFolder("FINANCE", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			}),
@@ -721,9 +707,11 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("resolves project names to full paths (case-insensitive)", () => {
+		const vault = createTestVault();
+		trackVault(vault);
 		// Create vault structure
-		writeTestFile(tempDir, "01 Projects/Tax 2024/.gitkeep", "");
-		writeTestFile(tempDir, "01 Projects/Vacation Planning/.gitkeep", "");
+		writeVaultFile(vault, "01 Projects/Tax 2024/.gitkeep", "");
+		writeVaultFile(vault, "01 Projects/Vacation Planning/.gitkeep", "");
 
 		const areaPathMap = new Map();
 		const projectPathMap = new Map([
@@ -733,7 +721,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 
 		// Lowercase
 		expect(
-			resolveParaFolder("tax 2024", paraFolders, tempDir, {
+			resolveParaFolder("tax 2024", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			}),
@@ -741,7 +729,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 
 		// Mixed case
 		expect(
-			resolveParaFolder("Vacation Planning", paraFolders, tempDir, {
+			resolveParaFolder("Vacation Planning", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			}),
@@ -749,7 +737,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 
 		// Uppercase
 		expect(
-			resolveParaFolder("TAX 2024", paraFolders, tempDir, {
+			resolveParaFolder("TAX 2024", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			}),
@@ -757,16 +745,18 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("PARA folder names take precedence over area names", () => {
+		const vault = createTestVault();
+		trackVault(vault);
 		// Create a folder structure where an area is named "areas"
-		writeTestFile(tempDir, "02 Areas/.gitkeep", "");
-		writeTestFile(tempDir, "02 Areas/Areas/.gitkeep", "");
+		writeVaultFile(vault, "02 Areas/.gitkeep", "");
+		writeVaultFile(vault, "02 Areas/Areas/.gitkeep", "");
 
 		const areaPathMap = new Map([["areas", "02 Areas/Areas"]]);
 		const projectPathMap = new Map();
 
 		// "areas" should resolve to PARA folder (02 Areas), not the area path
 		expect(
-			resolveParaFolder("areas", paraFolders, tempDir, {
+			resolveParaFolder("areas", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			}),
@@ -774,16 +764,18 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("PARA folder names take precedence over project names", () => {
+		const vault = createTestVault();
+		trackVault(vault);
 		// Create a folder structure where a project is named "projects"
-		writeTestFile(tempDir, "01 Projects/.gitkeep", "");
-		writeTestFile(tempDir, "01 Projects/Projects/.gitkeep", "");
+		writeVaultFile(vault, "01 Projects/.gitkeep", "");
+		writeVaultFile(vault, "01 Projects/Projects/.gitkeep", "");
 
 		const areaPathMap = new Map();
 		const projectPathMap = new Map([["projects", "01 Projects/Projects"]]);
 
 		// "projects" should resolve to PARA folder (01 Projects), not the project path
 		expect(
-			resolveParaFolder("projects", paraFolders, tempDir, {
+			resolveParaFolder("projects", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			}),
@@ -791,11 +783,13 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("throws error for unknown destination with maps provided", () => {
+		const vault = createTestVault();
+		trackVault(vault);
 		const areaPathMap = new Map([["health", "02 Areas/Health"]]);
 		const projectPathMap = new Map([["tax", "01 Projects/Tax"]]);
 
 		expect(() =>
-			resolveParaFolder("unknown", paraFolders, tempDir, {
+			resolveParaFolder("unknown", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			}),
@@ -803,6 +797,8 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("helpful error message lists available areas and projects", () => {
+		const vault = createTestVault();
+		trackVault(vault);
 		const areaPathMap = new Map([
 			["health", "02 Areas/Health"],
 			["finance", "02 Areas/Finance"],
@@ -813,7 +809,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 		]);
 
 		try {
-			resolveParaFolder("unknown", paraFolders, tempDir, {
+			resolveParaFolder("unknown", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			});
@@ -831,11 +827,13 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("error message shows 'none' for empty area list", () => {
+		const vault = createTestVault();
+		trackVault(vault);
 		const areaPathMap = new Map(); // Empty
 		const projectPathMap = new Map([["tax", "01 Projects/Tax"]]);
 
 		try {
-			resolveParaFolder("unknown", paraFolders, tempDir, {
+			resolveParaFolder("unknown", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			});
@@ -847,11 +845,13 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("error message omits projects section when empty", () => {
+		const vault = createTestVault();
+		trackVault(vault);
 		const areaPathMap = new Map([["health", "02 Areas/Health"]]);
 		const projectPathMap = new Map(); // Empty
 
 		try {
-			resolveParaFolder("unknown", paraFolders, tempDir, {
+			resolveParaFolder("unknown", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			});
@@ -864,8 +864,10 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("validates area folder exists when vaultPath provided", () => {
+		const vault = createTestVault();
+		trackVault(vault);
 		// Create only one area
-		writeTestFile(tempDir, "02 Areas/Health/.gitkeep", "");
+		writeVaultFile(vault, "02 Areas/Health/.gitkeep", "");
 
 		const areaPathMap = new Map([
 			["health", "02 Areas/Health"],
@@ -875,7 +877,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 
 		// Should succeed - folder exists
 		expect(
-			resolveParaFolder("health", paraFolders, tempDir, {
+			resolveParaFolder("health", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			}),
@@ -883,7 +885,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 
 		// Should fail - folder doesn't exist
 		expect(() =>
-			resolveParaFolder("finance", paraFolders, tempDir, {
+			resolveParaFolder("finance", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			}),
@@ -891,8 +893,10 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("validates project folder exists when vaultPath provided", () => {
+		const vault = createTestVault();
+		trackVault(vault);
 		// Create only one project
-		writeTestFile(tempDir, "01 Projects/Tax/.gitkeep", "");
+		writeVaultFile(vault, "01 Projects/Tax/.gitkeep", "");
 
 		const areaPathMap = new Map();
 		const projectPathMap = new Map([
@@ -902,7 +906,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 
 		// Should succeed - folder exists
 		expect(
-			resolveParaFolder("tax", paraFolders, tempDir, {
+			resolveParaFolder("tax", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			}),
@@ -910,7 +914,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 
 		// Should fail - folder doesn't exist
 		expect(() =>
-			resolveParaFolder("vacation", paraFolders, tempDir, {
+			resolveParaFolder("vacation", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			}),
@@ -918,35 +922,41 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("backward compatibility: falls through when no maps provided", () => {
+		const vault = createTestVault();
+		trackVault(vault);
 		// Create a custom folder
-		writeTestFile(tempDir, "Custom Folder/.gitkeep", "");
+		writeVaultFile(vault, "Custom Folder/.gitkeep", "");
 
 		// Without maps, should fall through to custom folder validation
-		expect(resolveParaFolder("Custom Folder", paraFolders, tempDir)).toBe(
+		expect(resolveParaFolder("Custom Folder", paraFolders, vault)).toBe(
 			"Custom Folder",
 		);
 
 		// Without maps, unknown folder should fail on existence check
 		expect(() =>
-			resolveParaFolder("Unknown Folder", paraFolders, tempDir),
+			resolveParaFolder("Unknown Folder", paraFolders, vault),
 		).toThrow("Destination folder does not exist: Unknown Folder");
 	});
 
 	test("backward compatibility: no error for unknown destination without maps", () => {
+		const vault = createTestVault();
+		trackVault(vault);
 		// Without maps, should just pass through and validate existence
 		// (existing behavior - doesn't throw "Unknown destination" error)
 		expect(() =>
-			resolveParaFolder("Some Random Name", paraFolders, tempDir),
+			resolveParaFolder("Some Random Name", paraFolders, vault),
 		).toThrow("Destination folder does not exist");
 
 		expect(() =>
-			resolveParaFolder("Some Random Name", paraFolders, tempDir),
+			resolveParaFolder("Some Random Name", paraFolders, vault),
 		).not.toThrow("Unknown destination");
 	});
 
 	test("area names with special characters", () => {
+		const vault = createTestVault();
+		trackVault(vault);
 		// Create area with special chars
-		writeTestFile(tempDir, "02 Areas/Health & Fitness/.gitkeep", "");
+		writeVaultFile(vault, "02 Areas/Health & Fitness/.gitkeep", "");
 
 		const areaPathMap = new Map([
 			["health & fitness", "02 Areas/Health & Fitness"],
@@ -954,7 +964,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 		const projectPathMap = new Map();
 
 		expect(
-			resolveParaFolder("health & fitness", paraFolders, tempDir, {
+			resolveParaFolder("health & fitness", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			}),
@@ -962,8 +972,10 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("project names with numbers", () => {
+		const vault = createTestVault();
+		trackVault(vault);
 		// Create project with numbers
-		writeTestFile(tempDir, "01 Projects/Q1 2024 Planning/.gitkeep", "");
+		writeVaultFile(vault, "01 Projects/Q1 2024 Planning/.gitkeep", "");
 
 		const areaPathMap = new Map();
 		const projectPathMap = new Map([
@@ -971,7 +983,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 		]);
 
 		expect(
-			resolveParaFolder("q1 2024 planning", paraFolders, tempDir, {
+			resolveParaFolder("q1 2024 planning", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			}),
@@ -979,23 +991,25 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("both areaPathMap and projectPathMap can contain entries", () => {
+		const vault = createTestVault();
+		trackVault(vault);
 		// Create both areas and projects
-		writeTestFile(tempDir, "02 Areas/Health/.gitkeep", "");
-		writeTestFile(tempDir, "01 Projects/Tax/.gitkeep", "");
+		writeVaultFile(vault, "02 Areas/Health/.gitkeep", "");
+		writeVaultFile(vault, "01 Projects/Tax/.gitkeep", "");
 
 		const areaPathMap = new Map([["health", "02 Areas/Health"]]);
 		const projectPathMap = new Map([["tax", "01 Projects/Tax"]]);
 
 		// Should resolve both correctly
 		expect(
-			resolveParaFolder("health", paraFolders, tempDir, {
+			resolveParaFolder("health", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			}),
 		).toBe("02 Areas/Health");
 
 		expect(
-			resolveParaFolder("tax", paraFolders, tempDir, {
+			resolveParaFolder("tax", paraFolders, vault, {
 				areaPathMap,
 				projectPathMap,
 			}),
@@ -1003,42 +1017,46 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("only areaPathMap provided (no projectPathMap)", () => {
+		const vault = createTestVault();
+		trackVault(vault);
 		// Create area
-		writeTestFile(tempDir, "02 Areas/Health/.gitkeep", "");
+		writeVaultFile(vault, "02 Areas/Health/.gitkeep", "");
 
 		const areaPathMap = new Map([["health", "02 Areas/Health"]]);
 
 		// Should resolve area correctly (no projectPathMap in options)
 		expect(
-			resolveParaFolder("health", paraFolders, tempDir, {
+			resolveParaFolder("health", paraFolders, vault, {
 				areaPathMap,
 			}),
 		).toBe("02 Areas/Health");
 
 		// Unknown should fall through to custom folder logic (no maps check requires BOTH maps)
 		expect(() =>
-			resolveParaFolder("unknown", paraFolders, tempDir, {
+			resolveParaFolder("unknown", paraFolders, vault, {
 				areaPathMap,
 			}),
 		).toThrow("Destination folder does not exist");
 	});
 
 	test("only projectPathMap provided (no areaPathMap)", () => {
+		const vault = createTestVault();
+		trackVault(vault);
 		// Create project
-		writeTestFile(tempDir, "01 Projects/Tax/.gitkeep", "");
+		writeVaultFile(vault, "01 Projects/Tax/.gitkeep", "");
 
 		const projectPathMap = new Map([["tax", "01 Projects/Tax"]]);
 
 		// Should resolve project correctly (no areaPathMap in options)
 		expect(
-			resolveParaFolder("tax", paraFolders, tempDir, {
+			resolveParaFolder("tax", paraFolders, vault, {
 				projectPathMap,
 			}),
 		).toBe("01 Projects/Tax");
 
 		// Unknown should fall through to custom folder logic (no maps check requires BOTH maps)
 		expect(() =>
-			resolveParaFolder("unknown", paraFolders, tempDir, {
+			resolveParaFolder("unknown", paraFolders, vault, {
 				projectPathMap,
 			}),
 		).toThrow("Destination folder does not exist");
@@ -1046,26 +1064,22 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 });
 
 describe("Security Tests - Path Traversal & Race Conditions", () => {
-	let tempDir: string;
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
 
-	beforeEach(() => {
-		tempDir = createTempDir("test-security-");
-		process.env.PARA_VAULT = tempDir;
-
-		// Create vault structure
-		writeTestFile(tempDir, "00 Inbox/.gitkeep", "");
-		writeTestFile(tempDir, "03 Resources/.gitkeep", "");
-		writeTestFile(tempDir, "Attachments/.gitkeep", "");
-		writeTestFile(tempDir, "Templates/.gitkeep", "");
-		writeTestFile(tempDir, ".inbox-staging/.gitkeep", "");
-	});
-
-	afterEach(() => {
-		cleanupTestDir(tempDir);
-		delete process.env.PARA_VAULT;
-	});
+	// Helper: Setup standard vault structure
+	function setupSecurityVault(vaultPath: string) {
+		writeVaultFile(vaultPath, "00 Inbox/.gitkeep", "");
+		writeVaultFile(vaultPath, "03 Resources/.gitkeep", "");
+		writeVaultFile(vaultPath, "Attachments/.gitkeep", "");
+		writeVaultFile(vaultPath, "Templates/.gitkeep", "");
+		writeVaultFile(vaultPath, ".inbox-staging/.gitkeep", "");
+	}
 
 	test("should reject path traversal with .. patterns", () => {
+		const vault = createTestVault();
+		trackVault(vault);
+		setupSecurityVault(vault);
 		const paraFolders = {
 			projects: "01 Projects",
 			areas: "02 Areas",
@@ -1075,11 +1089,14 @@ describe("Security Tests - Path Traversal & Race Conditions", () => {
 		};
 
 		expect(() =>
-			resolveParaFolder("../../etc/passwd", paraFolders, tempDir),
+			resolveParaFolder("../../etc/passwd", paraFolders, vault),
 		).toThrow("Unsafe path pattern");
 	});
 
 	test("should reject absolute paths", () => {
+		const vault = createTestVault();
+		trackVault(vault);
+		setupSecurityVault(vault);
 		const paraFolders = {
 			projects: "01 Projects",
 			areas: "02 Areas",
@@ -1088,12 +1105,15 @@ describe("Security Tests - Path Traversal & Race Conditions", () => {
 			inbox: "00 Inbox",
 		};
 
-		expect(() =>
-			resolveParaFolder("/etc/passwd", paraFolders, tempDir),
-		).toThrow("Unsafe path pattern");
+		expect(() => resolveParaFolder("/etc/passwd", paraFolders, vault)).toThrow(
+			"Unsafe path pattern",
+		);
 	});
 
 	test("should reject tilde expansion", () => {
+		const vault = createTestVault();
+		trackVault(vault);
+		setupSecurityVault(vault);
 		const paraFolders = {
 			projects: "01 Projects",
 			areas: "02 Areas",
@@ -1102,12 +1122,15 @@ describe("Security Tests - Path Traversal & Race Conditions", () => {
 			inbox: "00 Inbox",
 		};
 
-		expect(() =>
-			resolveParaFolder("~/malicious", paraFolders, tempDir),
-		).toThrow("Unsafe path pattern");
+		expect(() => resolveParaFolder("~/malicious", paraFolders, vault)).toThrow(
+			"Unsafe path pattern",
+		);
 	});
 
 	test("should detect symlink path traversal attempts", () => {
+		const vault = createTestVault();
+		trackVault(vault);
+		setupSecurityVault(vault);
 		// This test verifies the realpath canonicalization catches symlinks escaping vault
 		const paraFolders = {
 			projects: "01 Projects",
@@ -1120,7 +1143,7 @@ describe("Security Tests - Path Traversal & Race Conditions", () => {
 		// Create a symlink pointing outside the vault
 		const { symlinkSync } = require("node:fs");
 		const outsideDir = createTempDir("outside-vault-");
-		const symlinkPath = `${tempDir}/03 Resources/evil-link`;
+		const symlinkPath = `${vault}/03 Resources/evil-link`;
 
 		try {
 			symlinkSync(outsideDir, symlinkPath);
@@ -1130,7 +1153,7 @@ describe("Security Tests - Path Traversal & Race Conditions", () => {
 				resolveParaFolder(
 					"03 Resources/evil-link/escape.md",
 					paraFolders,
-					tempDir,
+					vault,
 				),
 			).toThrow("Path traversal detected");
 		} finally {
@@ -1146,9 +1169,12 @@ describe("Security Tests - Path Traversal & Race Conditions", () => {
 	});
 
 	test("should handle file locking for concurrent operations", async () => {
+		const vault = createTestVault();
+		trackVault(vault);
+		setupSecurityVault(vault);
 		// Test that file locking prevents TOCTOU races
 		const sourcePath = "00 Inbox/test-file.md";
-		writeTestFile(tempDir, sourcePath, "test content");
+		writeVaultFile(vault, sourcePath, "test content");
 
 		// Create template
 		const templateContent = `---
@@ -1157,36 +1183,22 @@ type: note
 ---
 # <%= title %>
 `;
-		writeTestFile(tempDir, "Templates/note.md", templateContent);
+		writeVaultFile(vault, "Templates/note.md", templateContent);
 
-		const suggestion = {
-			id: createSuggestionId(),
-			action: "create-note" as const,
+		const suggestion = createTestSuggestion({
 			source: sourcePath,
-			processor: "notes" as const,
-			confidence: "high" as const,
-			detectionSource: "heuristic" as const,
 			reason: "Test file",
-			suggestedNoteType: "note",
-			suggestedTitle: "Test Note",
-			suggestedDestination: "03 Resources",
-		};
+			suggestedNoteType: "note", // Match the template we created
+		});
 
 		const config = {
-			vaultPath: tempDir,
+			vaultPath: vault,
 			inboxFolder: "00 Inbox",
 			attachmentsFolder: "Attachments",
 			templatesFolder: "Templates",
 		};
-
-		const { createRegistry } = await import(
-			"../../registry/processed-registry"
-		);
-		const registryPath = `${tempDir}/.para-obsidian-registry.json`;
-		const registry = createRegistry(registryPath);
+		const registry = createRegistry(`${vault}/.para-obsidian-registry.json`);
 		await registry.load();
-
-		const { executeSuggestion } = await import("./execute-suggestion");
 
 		// Execute suggestion - should acquire lock and complete
 		const result = await executeSuggestion(
@@ -1200,43 +1212,33 @@ type: note
 	});
 
 	test("should fail gracefully if source file disappears during execution", async () => {
+		const vault = createTestVault();
+		trackVault(vault);
+		setupSecurityVault(vault);
 		// Create source file
 		const sourcePath = "00 Inbox/disappearing-file.md";
-		writeTestFile(tempDir, sourcePath, "content");
+		writeVaultFile(vault, sourcePath, "content");
 
-		const suggestion = {
-			id: createSuggestionId(),
-			action: "create-note" as const,
+		const suggestion = createTestSuggestion({
 			source: sourcePath,
-			processor: "notes" as const,
-			confidence: "high" as const,
-			detectionSource: "heuristic" as const,
 			reason: "Test",
-			suggestedNoteType: "note",
 			suggestedTitle: "Test",
-			suggestedDestination: "03 Resources",
-		};
+		});
 
 		const config = {
-			vaultPath: tempDir,
+			vaultPath: vault,
 			inboxFolder: "00 Inbox",
 			attachmentsFolder: "Attachments",
 			templatesFolder: "Templates",
 		};
-
-		const { createRegistry } = await import(
-			"../../registry/processed-registry"
-		);
-		const registryPath = `${tempDir}/.para-obsidian-registry.json`;
-		const registry = createRegistry(registryPath);
+		const registry = createRegistry(`${vault}/.para-obsidian-registry.json`);
 		await registry.load();
 
 		// Delete file before execution to simulate race condition
 		const { unlinkSync } = require("node:fs");
 		const { join } = require("node:path");
-		unlinkSync(join(tempDir, sourcePath));
+		unlinkSync(join(vault, sourcePath));
 
-		const { executeSuggestion } = await import("./execute-suggestion");
 		const result = await executeSuggestion(
 			suggestion,
 			config,

@@ -11,6 +11,9 @@ import {
 	validateWeight,
 } from "./validation";
 
+// Note: This test file does not require vault setup utilities as it tests
+// pure validation functions with no filesystem dependencies.
+
 describe("validation", () => {
 	describe("validateClassifierId", () => {
 		test("accepts valid kebab-case IDs", () => {

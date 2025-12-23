@@ -2,26 +2,24 @@ import { describe, expect, it } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 
-import { loadConfig } from "../config/index";
-import { createTestVault, writeVaultFile } from "../testing/utils";
+import { withTempVault, writeVaultFile } from "../testing/utils";
 import { renameWithLinkRewrite } from "./index";
 
 describe("cli rename helper", () => {
-	it("renames and rewrites links", () => {
-		const vault = createTestVault();
-		writeVaultFile(vault, "old.md", "# Old");
-		writeVaultFile(vault, "other.md", "See [[old]]");
-		process.env.PARA_VAULT = vault;
-		const cfg = loadConfig({ cwd: vault });
+	it("renames and rewrites links", async () => {
+		await withTempVault(async (vault, config) => {
+			writeVaultFile(vault, "old.md", "# Old");
+			writeVaultFile(vault, "other.md", "See [[old]]");
 
-		const result = renameWithLinkRewrite(cfg, {
-			from: "old.md",
-			to: "new.md",
+			const result = renameWithLinkRewrite(config, {
+				from: "old.md",
+				to: "new.md",
+			});
+
+			expect(result.moved).toBe(true);
+			expect(fs.existsSync(path.join(vault, "new.md"))).toBe(true);
+			const updated = fs.readFileSync(path.join(vault, "other.md"), "utf8");
+			expect(updated.includes("[[new]]")).toBe(true);
 		});
-
-		expect(result.moved).toBe(true);
-		expect(fs.existsSync(path.join(vault, "new.md"))).toBe(true);
-		const updated = fs.readFileSync(path.join(vault, "other.md"), "utf8");
-		expect(updated.includes("[[new]]")).toBe(true);
 	});
 });

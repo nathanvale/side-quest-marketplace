@@ -165,10 +165,16 @@ export function setupTestVault(
 /**
  * Clean up a test vault directory
  *
+ * Removes the directory and cleans up PARA_VAULT environment variable.
+ *
  * @param vault - Vault directory to remove
  */
 export function cleanupTestVault(vault: string): void {
 	cleanupTestDir(vault);
+	// Clean up environment variable to prevent pollution between tests
+	if (process.env.PARA_VAULT === vault) {
+		delete process.env.PARA_VAULT;
+	}
 }
 
 /**
@@ -186,6 +192,220 @@ export async function initGitRepo(dir: string): Promise<void> {
 	writeTestFile(dir, ".gitignore", "node_modules\n");
 	await Bun.$`git add .`.cwd(dir).quiet();
 	await Bun.$`git commit -m init`.cwd(dir).quiet();
+}
+
+/**
+ * Higher-order function that creates a vault, runs a test, and cleans up.
+ *
+ * Automatically manages PARA_VAULT environment variable and cleanup.
+ * Simplifies test setup by eliminating boilerplate vault creation/cleanup.
+ *
+ * @param fn - Test function to run with vault and config
+ * @returns Promise that resolves with test function's return value
+ *
+ * @example
+ * ```ts
+ * await withTempVault(async (vault, config) => {
+ *   writeVaultFile(vault, "00 Inbox/test.md", "content");
+ *   const result = await someOperation(config);
+ *   expect(result).toBe("expected");
+ * });
+ * ```
+ */
+export async function withTempVault<T>(
+	fn: (
+		vault: string,
+		config: import("../config/index").ParaObsidianConfig,
+	) => T | Promise<T>,
+): Promise<T> {
+	const vault = createTestVault();
+	const originalEnv = process.env.PARA_VAULT;
+	process.env.PARA_VAULT = vault;
+
+	try {
+		const { loadConfig } = await import("../config/index");
+		const config = loadConfig();
+		return await fn(vault, config);
+	} finally {
+		// Restore environment
+		if (originalEnv !== undefined) {
+			process.env.PARA_VAULT = originalEnv;
+		} else {
+			delete process.env.PARA_VAULT;
+		}
+		cleanupTestVault(vault);
+	}
+}
+
+/**
+ * Create a test execution context for inbox operations.
+ *
+ * Factory that provides sensible defaults for ExecutionContext,
+ * reducing boilerplate in executor tests.
+ *
+ * @param vault - Absolute path to vault directory
+ * @param options - Optional overrides for context properties
+ * @returns ExecutionContext with defaults and overrides merged
+ *
+ * @example
+ * ```ts
+ * const vault = createTestVault();
+ * const registry = createRegistry(vault);
+ * await registry.load();
+ *
+ * const context = createTestContext(vault, { registry });
+ * const result = await executeSuggestion(suggestion, context);
+ * ```
+ */
+export function createTestContext(
+	vault: string,
+	options?: Partial<import("../inbox/execute/types").ExecutionContext>,
+): import("../inbox/execute/types").ExecutionContext {
+	// Import createRegistry inline to avoid circular dependency
+	const { createRegistry } = require("../inbox/registry/processed-registry");
+
+	// Create default registry if not provided
+	const defaultRegistry = createRegistry(vault);
+
+	return {
+		vaultPath: vault,
+		inboxFolder: "00 Inbox",
+		attachmentsFolder: "Attachments",
+		templatesFolder: "Templates",
+		registry: defaultRegistry,
+		cid: `test-cid-${Date.now()}`,
+		sessionCid: `test-session-${Date.now()}`,
+		...options,
+	};
+}
+
+/**
+ * Hook for managing vault cleanup in describe blocks.
+ *
+ * Tracks vaults created during tests and provides afterEach hook
+ * for automatic cleanup. Useful when tests create multiple vaults
+ * or need manual vault tracking.
+ *
+ * @returns Object with trackVault and getAfterEachHook functions
+ *
+ * @example
+ * ```ts
+ * describe("My tests", () => {
+ *   const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+ *   afterEach(getAfterEachHook());
+ *
+ *   test("creates vault", () => {
+ *     const vault = createTestVault();
+ *     trackVault(vault);
+ *     // ... test code ...
+ *   });
+ * });
+ * ```
+ */
+export function useTestVaultCleanup() {
+	const vaults: string[] = [];
+	const originalEnv = process.env.PARA_VAULT;
+
+	return {
+		/**
+		 * Track a vault for automatic cleanup
+		 * @param vault - Vault path to track
+		 */
+		trackVault: (vault: string) => {
+			vaults.push(vault);
+		},
+
+		/**
+		 * Get afterEach hook function for cleanup
+		 * @returns Function to use as afterEach hook
+		 */
+		getAfterEachHook: () => {
+			return () => {
+				// Clean up all tracked vaults
+				for (const vault of vaults) {
+					cleanupTestVault(vault);
+				}
+				vaults.length = 0;
+
+				// Restore original environment
+				if (originalEnv !== undefined) {
+					process.env.PARA_VAULT = originalEnv;
+				} else {
+					delete process.env.PARA_VAULT;
+				}
+			};
+		},
+	};
+}
+
+/**
+ * Create a test suggestion with sensible defaults.
+ *
+ * Factory for CreateNoteSuggestion that reduces boilerplate in tests.
+ * All fields can be overridden via the overrides parameter.
+ *
+ * @param overrides - Partial suggestion to override defaults
+ * @returns Complete CreateNoteSuggestion with defaults and overrides
+ *
+ * @example
+ * ```ts
+ * const suggestion = createTestSuggestion({
+ *   suggestedTitle: "My Document",
+ *   suggestedNoteType: "project"
+ * });
+ * ```
+ */
+export function createTestSuggestion(
+	overrides?: Partial<import("../inbox/types").CreateNoteSuggestion>,
+): import("../inbox/types").CreateNoteSuggestion {
+	const { createSuggestionId } = require("../inbox/types");
+
+	return {
+		id: createSuggestionId(),
+		action: "create-note",
+		source: "00 Inbox/test-document.pdf",
+		processor: "attachments",
+		confidence: "high",
+		reason: "Test document",
+		suggestedTitle: "Test Document",
+		suggestedNoteType: "resource",
+		detectionSource: "heuristic",
+		...overrides,
+	};
+}
+
+/**
+ * Create a test template with sensible defaults.
+ *
+ * Factory for TemplateInfo that reduces boilerplate in template tests.
+ *
+ * @param content - Template content (frontmatter + body)
+ * @param overrides - Optional overrides for name, path, or version
+ * @returns Complete TemplateInfo object
+ *
+ * @example
+ * ```ts
+ * const template = createTestTemplate(`---
+ * title: "<% tp.system.prompt("Title") %>"
+ * ---
+ * ## Section One
+ * `);
+ * ```
+ */
+export function createTestTemplate(
+	content: string,
+	overrides?: {
+		name?: string;
+		path?: string;
+		version?: number;
+	},
+): import("../templates/index").TemplateInfo {
+	return {
+		name: overrides?.name ?? "test",
+		path: overrides?.path ?? "/test.md",
+		version: overrides?.version ?? 1,
+		content,
+	};
 }
 
 // Re-export core testing utilities for convenience

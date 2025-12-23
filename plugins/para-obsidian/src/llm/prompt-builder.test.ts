@@ -17,6 +17,27 @@ import {
 	type PromptTemplate,
 } from "./prompt-builder";
 
+// Helper functions
+function createMinimalConstraintSet(): ConstraintSet {
+	return {
+		fields: [
+			{
+				key: "testField",
+				type: "string",
+				required: true,
+				location: "frontmatter",
+			},
+		],
+		outputSchema: {
+			sections: [],
+			format: "json",
+			argsExample: {},
+			contentExample: {},
+		},
+		vaultContext: undefined,
+	};
+}
+
 describe("buildStructuredPrompt", () => {
 	test("includes all sections in correct order", () => {
 		const template: PromptTemplate = {
@@ -685,24 +706,3 @@ describe("Integration: full prompt generation", () => {
 		expect(prompt).not.toContain("VAULT CONTEXT:");
 	});
 });
-
-// Helper functions
-function createMinimalConstraintSet(): ConstraintSet {
-	return {
-		fields: [
-			{
-				key: "testField",
-				type: "string",
-				required: true,
-				location: "frontmatter",
-			},
-		],
-		outputSchema: {
-			sections: [],
-			format: "json",
-			argsExample: {},
-			contentExample: {},
-		},
-		vaultContext: undefined,
-	};
-}

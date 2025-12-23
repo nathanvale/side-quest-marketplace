@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import type { Logger } from "@logtape/logtape";
 import { setupTestLogging } from "../testing/logger.js";
 import {
@@ -17,9 +17,54 @@ import {
 } from "./instrumentation.js";
 import { getSubsystemLogger } from "./logger.js";
 
+/**
+ * Assertion helper for counter metrics.
+ * Verifies a counter exists with expected value and optional label matching.
+ */
+function expectCounter(
+	name: string,
+	expectedValue: number,
+	labels?: Record<string, string | number | boolean>,
+) {
+	const counters = getCounters();
+	const counter = counters.find((c) => c.name === name);
+	expect(counter).toBeDefined();
+	expect(counter?.value).toBe(expectedValue);
+	if (labels) {
+		for (const [key, value] of Object.entries(labels)) {
+			expect(counter?.labels[key]).toBe(value);
+		}
+	}
+}
+
+/**
+ * Assertion helper for histogram metrics.
+ * Verifies a histogram exists with expected observation count and optional label matching.
+ */
+function expectHistogram(
+	name: string,
+	expectedObservationCount: number,
+	labels?: Record<string, string | number | boolean>,
+) {
+	const histograms = getHistograms();
+	const histogram = histograms.find((h) => h.name === name);
+	expect(histogram).toBeDefined();
+	expect(histogram?.observations).toHaveLength(expectedObservationCount);
+	if (labels) {
+		for (const [key, value] of Object.entries(labels)) {
+			expect(histogram?.labels[key]).toBe(value);
+		}
+	}
+}
+
 describe("instrumentation", () => {
 	beforeEach(async () => {
 		await setupTestLogging();
+		resetMetrics();
+	});
+
+	afterEach(() => {
+		// Ensure all mocks are cleaned up
 		resetMetrics();
 	});
 
@@ -218,17 +263,28 @@ describe("instrumentation", () => {
 	});
 
 	describe("timing edge cases", () => {
+		let mathMaxSpy: ReturnType<typeof spyOn> | undefined;
+
+		afterEach(() => {
+			// Clean up Math.max spy if it exists
+			if (mathMaxSpy) {
+				mathMaxSpy.mockRestore();
+				mathMaxSpy = undefined;
+			}
+		});
+
 		test("durationMs is never negative even with clock drift", async () => {
 			const logger = getSubsystemLogger("templates");
+			mathMaxSpy = spyOn(Math, "max");
 
-			// This is a behavioral test - the observe function uses Math.max(0, ...)
-			// We can't easily mock Date.now, but we can verify the function completes
 			const result = await observe(logger, "templates:test", async () => {
 				// Very fast operation
 				return "fast";
 			});
 
 			expect(result).toBe("fast");
+			// Verify Math.max was called with (0, duration) to clamp negative values
+			expect(mathMaxSpy).toHaveBeenCalledWith(0, expect.any(Number) as number);
 		});
 
 		test("handles zero-duration operations", () => {
@@ -237,6 +293,9 @@ describe("instrumentation", () => {
 			const result = observeSync(logger, "templates:test", () => "instant");
 
 			expect(result).toBe("instant");
+			// Zero-duration operations should still record metrics
+			expectCounter("operations_total", 1, { success: true });
+			expectHistogram("operation_duration_seconds", 1);
 		});
 	});
 
@@ -393,14 +452,8 @@ describe("instrumentation", () => {
 
 			await observe(logger, "templates:test", async () => "ok");
 
-			const counters = getCounters();
-			const histograms = getHistograms();
-
-			expect(counters).toHaveLength(1);
-			expect(counters[0]?.labels.success).toBe(true);
-
-			expect(histograms).toHaveLength(1);
-			expect(histograms[0]?.observations).toHaveLength(1);
+			expectCounter("operations_total", 1, { success: true });
+			expectHistogram("operation_duration_seconds", 1);
 		});
 
 		test("records counter and histogram on error", async () => {
@@ -412,14 +465,8 @@ describe("instrumentation", () => {
 				}),
 			).rejects.toThrow("fail");
 
-			const counters = getCounters();
-			const histograms = getHistograms();
-
-			expect(counters).toHaveLength(1);
-			expect(counters[0]?.labels.success).toBe(false);
-
-			expect(histograms).toHaveLength(1);
-			expect(histograms[0]?.observations).toHaveLength(1);
+			expectCounter("operations_total", 1, { success: false });
+			expectHistogram("operation_duration_seconds", 1);
 		});
 
 		test("observeSync records metrics", () => {
@@ -427,9 +474,7 @@ describe("instrumentation", () => {
 
 			observeSync(logger, "templates:test", () => "ok");
 
-			const counters = getCounters();
-			expect(counters).toHaveLength(1);
-			expect(counters[0]?.labels.success).toBe(true);
+			expectCounter("operations_total", 1, { success: true });
 		});
 	});
 
@@ -589,6 +634,17 @@ describe("instrumentation", () => {
 	});
 
 	describe("safe logging error handling", () => {
+		// Suppress console.error from safeLog fallback to prevent test output pollution
+		let consoleErrorSpy: ReturnType<typeof spyOn>;
+
+		beforeEach(() => {
+			consoleErrorSpy = spyOn(console, "error").mockImplementation(() => {});
+		});
+
+		afterEach(() => {
+			consoleErrorSpy.mockRestore();
+		});
+
 		test("observe completes even if logging throws", async () => {
 			// Create a mock logger that throws
 			const brokenLogger = {
@@ -608,6 +664,8 @@ describe("instrumentation", () => {
 			);
 
 			expect(result).toBe("success");
+			// Verify console.error was called as fallback
+			expect(consoleErrorSpy).toHaveBeenCalled();
 		});
 
 		test("observeSync completes even if logging throws", () => {
@@ -627,6 +685,8 @@ describe("instrumentation", () => {
 			);
 
 			expect(result).toBe("success");
+			// Verify console.error was called as fallback
+			expect(consoleErrorSpy).toHaveBeenCalled();
 		});
 
 		test("observe logs error even when logging itself fails", async () => {
@@ -645,6 +705,8 @@ describe("instrumentation", () => {
 					throw new Error("Operation failed");
 				}),
 			).rejects.toThrow("Operation failed");
+			// Verify console.error was called as fallback
+			expect(consoleErrorSpy).toHaveBeenCalled();
 		});
 	});
 });

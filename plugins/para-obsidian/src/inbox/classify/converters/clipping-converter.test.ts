@@ -6,16 +6,26 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { VaultContext } from "../../core/vault/context";
 import { convertClippingToBookmark } from "./clipping-converter";
 
+/**
+ * Create a test vault context with common PARA areas and projects
+ */
+function createTestVaultContext(
+	overrides?: Partial<VaultContext>,
+): VaultContext {
+	return {
+		areas: ["Finance", "Health", "Development", "Learning"],
+		projects: ["Tax 2024", "Website Redesign"],
+		...overrides,
+	};
+}
+
 describe("convertClippingToBookmark", () => {
 	let originalApiKey: string | undefined;
 	let vaultContext: VaultContext;
 
 	beforeEach(() => {
 		originalApiKey = process.env.FIRECRAWL_API_KEY;
-		vaultContext = {
-			areas: ["Finance", "Health", "Development", "Learning"],
-			projects: ["Tax 2024", "Website Redesign"],
-		};
+		vaultContext = createTestVaultContext();
 	});
 
 	afterEach(() => {
@@ -25,6 +35,8 @@ describe("convertClippingToBookmark", () => {
 		} else {
 			delete process.env.FIRECRAWL_API_KEY;
 		}
+		// Restore module mocks
+		mock.restore();
 	});
 
 	describe("basic conversion", () => {
@@ -332,10 +344,10 @@ describe("convertClippingToBookmark", () => {
 		});
 
 		test("returns no suggestion when pattern doesn't match vault areas", async () => {
-			const vaultContextWithoutFinance: VaultContext = {
+			const vaultContextWithoutFinance = createTestVaultContext({
 				areas: ["Work", "Personal"],
 				projects: [],
-			};
+			});
 
 			const frontmatter = {
 				url: "https://mybank.com/account",

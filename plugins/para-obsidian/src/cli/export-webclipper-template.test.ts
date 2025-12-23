@@ -2,13 +2,14 @@
  * Tests for export-webclipper-template CLI handler.
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
-import { createTempDir, pathExists, readJsonFile } from "@sidequest/core/fs";
+import { pathExists, readJsonFile } from "@sidequest/core/fs";
 import { OutputFormat } from "@sidequest/core/terminal";
-import { cleanupTestDir } from "@sidequest/core/testing";
+import { createTempDir } from "@sidequest/core/testing";
 import { loadConfig } from "../config";
+import { useTestVaultCleanup } from "../testing/utils";
 import { handleExportWebClipperTemplate } from "./export-webclipper-template";
 import type { CommandContext } from "./types";
 
@@ -30,33 +31,14 @@ interface WebClipperTemplateType {
 }
 
 describe("export-webclipper-template", () => {
-	let tempDir: string;
-	let vaultDir: string;
-	let originalParaVault: string | undefined;
-
-	beforeEach(() => {
-		tempDir = createTempDir("test-export-webclipper-");
-		// Create a vault directory inside tempDir for this test's isolation
-		vaultDir = path.join(tempDir, "vault");
-		fs.mkdirSync(vaultDir, { recursive: true });
-		// Backup and set PARA_VAULT for test isolation
-		originalParaVault = process.env.PARA_VAULT;
-		process.env.PARA_VAULT = vaultDir;
-	});
-
-	afterEach(() => {
-		// Restore PARA_VAULT
-		if (originalParaVault !== undefined) {
-			process.env.PARA_VAULT = originalParaVault;
-		} else {
-			delete process.env.PARA_VAULT;
-		}
-		cleanupTestDir(tempDir);
-	});
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
 
 	test("exports template to default filename", async () => {
+		const tempDir = createTempDir("test-export-webclipper-");
+		trackVault(tempDir);
+
 		const config = loadConfig();
-		// Use temp directory to avoid polluting repo root
 		const defaultPath = path.join(tempDir, "para-bookmark-template.json");
 		const ctx: CommandContext = {
 			config,
@@ -79,10 +61,12 @@ describe("export-webclipper-template", () => {
 		expect(template.behavior).toBe("create");
 		expect(template.noteNameFormat).toBe("{{title|safe_name}}");
 		expect(template.path).toBe("00 Inbox");
-		// Cleanup handled by afterEach
 	});
 
 	test("exports template to custom output path", async () => {
+		const tempDir = createTempDir("test-export-webclipper-");
+		trackVault(tempDir);
+
 		const config = loadConfig();
 		const outputPath = path.join(tempDir, "custom-template.json");
 
@@ -104,6 +88,9 @@ describe("export-webclipper-template", () => {
 	});
 
 	test("exports template with correct properties", async () => {
+		const tempDir = createTempDir("test-export-webclipper-");
+		trackVault(tempDir);
+
 		const config = loadConfig();
 		const outputPath = path.join(tempDir, "template.json");
 
@@ -148,6 +135,9 @@ describe("export-webclipper-template", () => {
 	});
 
 	test("exports template with correct content format", async () => {
+		const tempDir = createTempDir("test-export-webclipper-");
+		trackVault(tempDir);
+
 		const config = loadConfig();
 		const outputPath = path.join(tempDir, "template.json");
 
@@ -175,6 +165,9 @@ describe("export-webclipper-template", () => {
 	});
 
 	test("fails when parent directory does not exist", async () => {
+		const tempDir = createTempDir("test-export-webclipper-");
+		trackVault(tempDir);
+
 		const config = loadConfig();
 		const invalidPath = path.join(tempDir, "nonexistent-dir", "template.json");
 
@@ -193,6 +186,9 @@ describe("export-webclipper-template", () => {
 	});
 
 	test("returns JSON format when --format json", async () => {
+		const tempDir = createTempDir("test-export-webclipper-");
+		trackVault(tempDir);
+
 		const config = loadConfig();
 		const outputPath = path.join(tempDir, "template.json");
 
@@ -211,38 +207,50 @@ describe("export-webclipper-template", () => {
 	});
 
 	test("expands tilde in output path", async () => {
+		const tempDir = createTempDir("test-export-webclipper-");
+		trackVault(tempDir);
+
 		const config = loadConfig();
-		// Use temp directory with unique filename to avoid polluting home dir
-		const relativePath = `test-tilde-expand-${Date.now()}.json`;
-		const homeDir = process.env.HOME ?? "/tmp";
-		const tildeOutput = `~/${relativePath}`;
-		const expectedPath = path.join(homeDir, relativePath);
+		// Create a subdirectory in tempDir to simulate home directory expansion
+		const simulatedHome = path.join(tempDir, "simulated-home");
+		fs.mkdirSync(simulatedHome, { recursive: true });
 
-		const ctx: CommandContext = {
-			config,
-			positional: [],
-			flags: { output: tildeOutput },
-			format: OutputFormat.MARKDOWN,
-			isJson: false,
-		};
+		// Override HOME temporarily for this test
+		const originalHome = process.env.HOME;
+		process.env.HOME = simulatedHome;
 
-		const result = await handleExportWebClipperTemplate(ctx);
-
-		expect(result.success).toBe(true);
-		expect(await pathExists(expectedPath)).toBe(true);
-
-		// Cleanup - actually delete the file
-		const { unlinkSync } = await import("node:fs");
 		try {
-			unlinkSync(expectedPath);
-		} catch {
-			// Ignore cleanup errors
+			const relativePath = "test-template.json";
+			const tildeOutput = `~/${relativePath}`;
+			const expectedPath = path.join(simulatedHome, relativePath);
+
+			const ctx: CommandContext = {
+				config,
+				positional: [],
+				flags: { output: tildeOutput },
+				format: OutputFormat.MARKDOWN,
+				isJson: false,
+			};
+
+			const result = await handleExportWebClipperTemplate(ctx);
+
+			expect(result.success).toBe(true);
+			expect(await pathExists(expectedPath)).toBe(true);
+		} finally {
+			// Restore HOME
+			if (originalHome !== undefined) {
+				process.env.HOME = originalHome;
+			} else {
+				delete process.env.HOME;
+			}
 		}
 	});
 
 	test("handles relative paths correctly", async () => {
+		const tempDir = createTempDir("test-export-webclipper-");
+		trackVault(tempDir);
+
 		const config = loadConfig();
-		// Use temp directory to avoid polluting repo root
 		const outputPath = path.join(tempDir, "relative-test.json");
 
 		const ctx: CommandContext = {
@@ -257,6 +265,5 @@ describe("export-webclipper-template", () => {
 
 		expect(result.success).toBe(true);
 		expect(await pathExists(outputPath)).toBe(true);
-		// Cleanup handled by afterEach
 	});
 });

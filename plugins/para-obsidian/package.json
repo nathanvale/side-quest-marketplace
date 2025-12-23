@@ -30,7 +30,8 @@
 		"format": "biome format --write .",
 		"format:check": "biome format .",
 		"lint": "biome lint .",
-		"check": "biome check --write ."
+		"check": "biome check --write .",
+		"check:test-cleanup": "bun run scripts/check-test-cleanup.ts"
 	},
 	"devDependencies": {
 		"@logtape/logtape": "^0.12.0",

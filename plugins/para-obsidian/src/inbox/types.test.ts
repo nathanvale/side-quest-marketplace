@@ -1,273 +1,178 @@
 import { describe, expect, test } from "bun:test";
+import { createTestSuggestion as baseCreateTestSuggestion } from "../testing/utils";
 import {
-	type Confidence,
 	createSuggestionId,
-	type ErrorCategory,
-	type ErrorCode,
-	type ErrorContext,
-	type ExecutionResult,
-	type InboxAction,
-	type InboxEngine,
 	type InboxEngineConfig,
 	type InboxSuggestion,
-	type ProcessedRegistry,
-	type ProcessorResult,
-	type ProcessorType,
-	RegistryVersion,
-	type SuggestionId,
+	isCreateNoteSuggestion,
+	isRoutableSuggestion,
+	isValidSuggestionId,
+	validateInboxEngineConfig,
 } from "./types";
 
+// Local test helper that allows creating any suggestion type
+function createTestSuggestion(
+	overrides: Partial<InboxSuggestion> = {},
+): InboxSuggestion {
+	const base = baseCreateTestSuggestion();
+	return { ...base, ...overrides } as InboxSuggestion;
+}
+
 describe("inbox/types", () => {
-	describe("InboxSuggestion", () => {
-		test("should have all required fields for a complete suggestion", () => {
-			const testId = createSuggestionId("abc12300-0000-4000-8000-000000000001");
-			const suggestion: InboxSuggestion = {
-				id: testId,
-				source: "/vault/00 Inbox/invoice-001.pdf",
-				processor: "attachments",
-				confidence: "high",
-				action: "create-note",
-				suggestedNoteType: "invoice",
-				suggestedTitle: "Dr Smith Invoice Dec 2024",
-				suggestedDestination: "/vault/03 Resources/Receipts",
-				suggestedArea: "[[Health]]",
-				suggestedProject: undefined,
-				extractedFields: {
-					amount: "$220 AUD",
-					provider: "Dr Smith",
-					date: "2024-12-01",
-				},
-				suggestedAttachmentName: "2024-12-01-invoice-001.pdf",
-				attachmentLink: "[[Attachments/2024-12-01-invoice-001.pdf]]",
-				detectionSource: "llm+heuristic",
-				reason: "Detected invoice pattern in filename and content",
-			};
-
-			expect(suggestion.id).toBe(testId);
-			expect(suggestion.processor).toBe("attachments");
-			expect(suggestion.confidence).toBe("high");
-			expect(suggestion.action).toBe("create-note");
-			expect(suggestion.extractedFields?.amount).toBe("$220 AUD");
+	describe("createSuggestionId", () => {
+		test("should generate valid UUID v4 when called without args", () => {
+			const id = createSuggestionId();
+			expect(isValidSuggestionId(id)).toBe(true);
+			expect(id).toMatch(
+				/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+			);
 		});
 
-		test("should allow minimal suggestion for skip action", () => {
-			const suggestion: InboxSuggestion = {
-				id: createSuggestionId("def45600-0000-4000-8000-000000000002"),
-				source: "/vault/00 Inbox/random.txt",
-				processor: "notes",
-				confidence: "low",
-				action: "skip",
-				detectionSource: "none",
-				reason: "Unsupported file type",
-			};
+		test("should accept valid UUID v4 strings", () => {
+			const validUuid = "abc12300-0000-4000-8000-000000000001";
+			const id = createSuggestionId(validUuid);
+			expect(id as string).toBe(validUuid);
+		});
 
-			expect(suggestion.action).toBe("skip");
-			// SkipSuggestion doesn't have suggestedTitle field (type safety!)
+		test("should reject invalid UUID formats", () => {
+			expect(() => createSuggestionId("not-a-uuid")).toThrow(
+				"Invalid suggestion ID format",
+			);
+			expect(() =>
+				createSuggestionId("12345678-1234-1234-1234-123456789012"),
+			).toThrow("Invalid suggestion ID format");
+			expect(() => createSuggestionId("")).toThrow(
+				"Invalid suggestion ID format",
+			);
+		});
+
+		test("should generate unique IDs on each call", () => {
+			const id1 = createSuggestionId();
+			const id2 = createSuggestionId();
+			expect(id1).not.toBe(id2);
 		});
 	});
 
-	describe("ProcessorResult", () => {
-		test("should aggregate suggestions and errors from a processor", () => {
-			const result: ProcessorResult = {
-				processor: "attachments",
-				itemsScanned: 5,
-				suggestions: [
-					{
-						id: createSuggestionId("11111111-0000-4000-8000-000000000001"),
-						source: "/vault/00 Inbox/file1.pdf",
-						processor: "attachments",
-						confidence: "high",
-						action: "create-note",
-						suggestedNoteType: "invoice",
-						suggestedTitle: "Invoice",
-						detectionSource: "llm",
-						reason: "Invoice detected",
-					},
-				],
-				errors: [
-					{ file: "/vault/00 Inbox/corrupt.pdf", error: "PDF is corrupted" },
-				],
-			};
+	describe("isValidSuggestionId", () => {
+		test("should validate UUID v4 format", () => {
+			expect(isValidSuggestionId("abc12300-0000-4000-8000-000000000001")).toBe(
+				true,
+			);
+			expect(isValidSuggestionId("11111111-2222-4333-8444-555555555555")).toBe(
+				true,
+			);
+		});
 
-			expect(result.itemsScanned).toBe(5);
-			expect(result.suggestions).toHaveLength(1);
-			expect(result.errors).toHaveLength(1);
+		test("should reject non-UUID v4 formats", () => {
+			expect(isValidSuggestionId("not-a-uuid")).toBe(false);
+			expect(isValidSuggestionId("12345678-1234-1234-1234-123456789012")).toBe(
+				false,
+			);
+			expect(isValidSuggestionId("abc12300-0000-3000-8000-000000000001")).toBe(
+				false,
+			); // Wrong version (3 instead of 4)
+			expect(isValidSuggestionId("")).toBe(false);
 		});
 	});
 
-	describe("ExecutionResult", () => {
-		test("should track successful execution", () => {
-			const result: ExecutionResult = {
-				suggestionId: createSuggestionId(
-					"abc12300-0000-4000-8000-000000000003",
-				),
-				success: true,
-				action: "create-note",
-				createdNote: "/vault/03 Resources/Receipts/Invoice Dec 2024.md",
-				movedAttachment: "/vault/Attachments/2024-12-01-invoice.pdf",
-			};
+	describe("Type Guards", () => {
+		describe("isCreateNoteSuggestion", () => {
+			test("should identify create-note suggestions", () => {
+				const suggestion = createTestSuggestion({ action: "create-note" });
+				expect(isCreateNoteSuggestion(suggestion)).toBe(true);
+			});
 
-			expect(result.success).toBe(true);
-			expect(result.createdNote).toBeDefined();
+			test("should reject other suggestion types", () => {
+				const skipSuggestion = createTestSuggestion({ action: "skip" });
+				expect(isCreateNoteSuggestion(skipSuggestion)).toBe(false);
+			});
 		});
 
-		test("should track failed execution", () => {
-			const result: ExecutionResult = {
-				suggestionId: createSuggestionId(
-					"def45600-0000-4000-8000-000000000004",
-				),
-				success: false,
-				action: "create-note",
-				error: "Template not found: invoice.md",
-			};
+		describe("isRoutableSuggestion", () => {
+			test("should return true for non-create-note actions", () => {
+				expect(
+					isRoutableSuggestion(createTestSuggestion({ action: "skip" })),
+				).toBe(true);
+				expect(
+					isRoutableSuggestion(createTestSuggestion({ action: "move" })),
+				).toBe(true);
+			});
 
-			expect(result.success).toBe(false);
-			expect(result.error).toBeDefined();
-		});
-	});
+			test("should return true for create-note with destination", () => {
+				const suggestion = createTestSuggestion({
+					action: "create-note",
+					suggestedDestination: "/vault/03 Resources",
+				});
+				expect(isRoutableSuggestion(suggestion)).toBe(true);
+			});
 
-	describe("ProcessedRegistry", () => {
-		test("should track processed items with hashes", () => {
-			const registry: ProcessedRegistry = {
-				version: RegistryVersion.V1,
-				items: [
-					{
-						sourceHash: "sha256-abc123...",
-						sourcePath: "/vault/00 Inbox/invoice.pdf",
-						processedAt: "2024-12-01T10:00:00.000Z",
-						createdNote: "/vault/03 Resources/Invoice.md",
-						movedAttachment: "/vault/Attachments/invoice.pdf",
-					},
-				],
-			};
-
-			expect(registry.version).toBe(1);
-			expect(registry.items).toHaveLength(1);
-			expect(registry.items[0]?.sourceHash).toContain("sha256");
+			test("should return false for create-note without destination", () => {
+				const suggestion = createTestSuggestion({
+					action: "create-note",
+					suggestedDestination: undefined,
+				});
+				expect(isRoutableSuggestion(suggestion)).toBe(false);
+			});
 		});
 	});
 
-	describe("InboxEngineConfig", () => {
-		test("should configure engine with vault path and options", () => {
+	describe("validateInboxEngineConfig", () => {
+		test("should accept valid configuration", () => {
 			const config: InboxEngineConfig = {
 				vaultPath: "/Users/me/vault",
 				inboxFolder: "00 Inbox",
 				attachmentsFolder: "Attachments",
-				templatesFolder: "Templates",
-				llmProvider: "haiku",
 				concurrency: {
 					pdfExtraction: 5,
 					llmCalls: 3,
 					fileIO: 10,
 				},
 			};
-
-			expect(config.vaultPath).toBe("/Users/me/vault");
-			expect(config.concurrency?.llmCalls).toBe(3);
+			expect(validateInboxEngineConfig(config)).toEqual(config);
 		});
-	});
 
-	describe("InboxEngine interface", () => {
-		test("should define the engine contract", () => {
-			// This test validates the interface shape at compile time
-			const testId = createSuggestionId("12345678-0000-4000-8000-000000000005");
-			const mockEngine: InboxEngine = {
-				scan: async () => [],
-				editWithPrompt: async (_id: SuggestionId, _prompt: string) => ({
-					id: testId,
-					source: "/test",
-					processor: "attachments",
-					confidence: "medium",
-					action: "create-note",
-					suggestedNoteType: "document",
-					suggestedTitle: "Updated Document",
-					detectionSource: "llm",
-					reason: "Updated",
-				}),
-				execute: async (_ids: SuggestionId[]) => ({
-					successful: [],
-					failed: new Map(),
-					summary: { total: 0, succeeded: 0, failed: 0 },
-				}),
-				generateReport: (_suggestions: InboxSuggestion[]) => "# Report",
-				challenge: async (_id: SuggestionId, _hint: string) => ({
-					id: testId,
-					source: "/test",
-					processor: "attachments",
-					confidence: "high",
-					action: "create-note",
-					suggestedNoteType: "document",
-					suggestedTitle: "Re-classified Document",
-					detectionSource: "llm",
-					reason: "Re-classified",
-				}),
+		test("should reject missing vaultPath", () => {
+			const config = {} as InboxEngineConfig;
+			expect(() => validateInboxEngineConfig(config)).toThrow(
+				"vaultPath is required",
+			);
+		});
+
+		test("should reject invalid vaultPath type", () => {
+			const config = { vaultPath: 123 } as unknown as InboxEngineConfig;
+			expect(() => validateInboxEngineConfig(config)).toThrow(
+				"vaultPath is required and must be a string",
+			);
+		});
+
+		test("should reject negative concurrency limits", () => {
+			const config: InboxEngineConfig = {
+				vaultPath: "/vault",
+				concurrency: { pdfExtraction: -1 },
 			};
-
-			expect(mockEngine.scan).toBeDefined();
-			expect(mockEngine.editWithPrompt).toBeDefined();
-			expect(mockEngine.execute).toBeDefined();
-			expect(mockEngine.generateReport).toBeDefined();
-			expect(mockEngine.challenge).toBeDefined();
+			expect(() => validateInboxEngineConfig(config)).toThrow(
+				"concurrency.pdfExtraction must be positive",
+			);
 		});
-	});
 
-	describe("ErrorContext", () => {
-		test("should capture error context for debugging", () => {
-			const context: ErrorContext = {
-				source: "/vault/00 Inbox/file.pdf",
-				itemId: createSuggestionId("abc12300-0000-4000-8000-000000000006"),
-				operation: "pdf-extraction",
-				cid: "corr-xyz",
-				additionalData: { fileSize: 1024 },
+		test("should reject zero concurrency limits", () => {
+			const config: InboxEngineConfig = {
+				vaultPath: "/vault",
+				concurrency: { llmCalls: 0 },
 			};
-
-			expect(context.cid).toBe("corr-xyz");
-			expect(context.operation).toBe("pdf-extraction");
-		});
-	});
-
-	describe("Type unions", () => {
-		test("Confidence should be high | medium | low", () => {
-			const high: Confidence = "high";
-			const medium: Confidence = "medium";
-			const low: Confidence = "low";
-
-			expect([high, medium, low]).toEqual(["high", "medium", "low"]);
+			expect(() => validateInboxEngineConfig(config)).toThrow(
+				"concurrency.llmCalls must be positive",
+			);
 		});
 
-		test("ProcessorType should be attachments | notes | images", () => {
-			const types: ProcessorType[] = ["attachments", "notes", "images"];
-			expect(types).toHaveLength(3);
-		});
-
-		test("InboxAction should cover all actions", () => {
-			const actions: InboxAction[] = [
-				"create-note",
-				"move",
-				"rename",
-				"link",
-				"skip",
-			];
-			expect(actions).toHaveLength(5);
-		});
-
-		test("ErrorCategory should cover all categories", () => {
-			const categories: ErrorCategory[] = [
-				"dependency",
-				"extraction",
-				"detection",
-				"validation",
-				"execution",
-				"registry",
-				"user",
-				"system",
-			];
-			expect(categories).toHaveLength(8);
-		});
-
-		test("ErrorCode should be a string literal union", () => {
-			const code: ErrorCode = "DEP_PDFTOTEXT_MISSING";
-			expect(code).toBe("DEP_PDFTOTEXT_MISSING");
+		test("should reject invalid fileIO concurrency", () => {
+			const config: InboxEngineConfig = {
+				vaultPath: "/vault",
+				concurrency: { fileIO: -5 },
+			};
+			expect(() => validateInboxEngineConfig(config)).toThrow(
+				"concurrency.fileIO must be positive",
+			);
 		});
 	});
 });

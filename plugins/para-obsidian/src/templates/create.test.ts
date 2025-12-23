@@ -2,27 +2,23 @@
  * Tests for template creation service
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { access, constants } from "node:fs/promises";
 import { join } from "node:path";
 import { pathExists, readTextFile } from "@sidequest/core/fs";
-import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
+import { createTestVault, useTestVaultCleanup } from "../testing/utils";
 import { createTemplate } from "./create";
 
 describe("createTemplate", () => {
-	let tempDir: string;
-
-	beforeEach(() => {
-		tempDir = createTempDir("template-create-test-");
-	});
-
-	afterEach(() => {
-		cleanupTestDir(tempDir);
-	});
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
 
 	test("skips creation when action is 'skip'", async () => {
+		const vault = createTestVault();
+		trackVault(vault);
+
 		const result = await createTemplate({
-			vaultPath: tempDir,
+			vaultPath: vault,
 			templateName: "test",
 			noteType: "test",
 			version: 1,
@@ -37,8 +33,11 @@ describe("createTemplate", () => {
 	});
 
 	test("skips creation when action is 'use-existing'", async () => {
+		const vault = createTestVault();
+		trackVault(vault);
+
 		const result = await createTemplate({
-			vaultPath: tempDir,
+			vaultPath: vault,
 			templateName: "test",
 			noteType: "test",
 			version: 1,
@@ -53,8 +52,11 @@ describe("createTemplate", () => {
 	});
 
 	test("creates basic template when action is 'create-new'", async () => {
+		const vault = createTestVault();
+		trackVault(vault);
+
 		const result = await createTemplate({
-			vaultPath: tempDir,
+			vaultPath: vault,
 			templateName: "invoice",
 			noteType: "invoice",
 			version: 1,
@@ -81,7 +83,7 @@ describe("createTemplate", () => {
 
 		expect(result.created).toBe(true);
 		expect(result.finalName).toBe("invoice");
-		expect(result.templatePath).toBe(join(tempDir, "Templates", "invoice.md"));
+		expect(result.templatePath).toBe(join(vault, "Templates", "invoice.md"));
 
 		// Verify file was created
 		const exists = await pathExists(result.templatePath!);
@@ -97,8 +99,11 @@ describe("createTemplate", () => {
 	});
 
 	test("creates template with suffix when provided", async () => {
+		const vault = createTestVault();
+		trackVault(vault);
+
 		const result = await createTemplate({
-			vaultPath: tempDir,
+			vaultPath: vault,
 			templateName: "invoice",
 			noteType: "invoice",
 			version: 1,
@@ -118,9 +123,7 @@ describe("createTemplate", () => {
 
 		expect(result.created).toBe(true);
 		expect(result.finalName).toBe("invoice-v2");
-		expect(result.templatePath).toBe(
-			join(tempDir, "Templates", "invoice-v2.md"),
-		);
+		expect(result.templatePath).toBe(join(vault, "Templates", "invoice-v2.md"));
 
 		// Verify file was created with suffixed name
 		const exists = await pathExists(result.templatePath!);
@@ -128,8 +131,11 @@ describe("createTemplate", () => {
 	});
 
 	test("uses atomic file write", async () => {
+		const vault = createTestVault();
+		trackVault(vault);
+
 		const result = await createTemplate({
-			vaultPath: tempDir,
+			vaultPath: vault,
 			templateName: "test",
 			noteType: "test",
 			version: 1,
@@ -155,8 +161,11 @@ describe("createTemplate", () => {
 	});
 
 	test("handles rich mode by falling back to basic (not yet implemented)", async () => {
+		const vault = createTestVault();
+		trackVault(vault);
+
 		const result = await createTemplate({
-			vaultPath: tempDir,
+			vaultPath: vault,
 			templateName: "test",
 			noteType: "test",
 			version: 1,
@@ -181,8 +190,11 @@ describe("createTemplate", () => {
 	});
 
 	test("creates Templates directory if it doesn't exist", async () => {
+		const vault = createTestVault();
+		trackVault(vault);
+
 		// Templates dir doesn't exist initially
-		const templatesDir = join(tempDir, "Templates");
+		const templatesDir = join(vault, "Templates");
 
 		// Verify directory doesn't exist before
 		await expect(async () => {
@@ -190,7 +202,7 @@ describe("createTemplate", () => {
 		}).toThrow();
 
 		const result = await createTemplate({
-			vaultPath: tempDir,
+			vaultPath: vault,
 			templateName: "test",
 			noteType: "test",
 			version: 1,

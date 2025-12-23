@@ -337,11 +337,12 @@ acdfe223 (Session: para scan, 3.2s)
 3. `.para-obsidianrc` (project root)
 4. Environment overrides
 
-**Registry Behavior (Breaking Change in Phase 2):**
+**Registry Behavior (Breaking Change - See CHANGELOG.md):**
 - `restrictRegistryToAttachments: true` (default) - Registry only tracks attachment processing
 - Previous behavior tracked all inbox items - now only attachment moves are deduplicated
 - Rationale: Reduces registry bloat and aligns with actual use case (prevent duplicate attachment moves)
 - Set to `false` in config to restore legacy behavior (tracks all processed inbox items)
+- **Migration guide:** See `@./CHANGELOG.md` for detailed migration instructions and rationale
 
 **LLM Timeout Configuration (priority order, highest wins):**
 1. `PARA_LLM_TIMEOUT_MS` env var

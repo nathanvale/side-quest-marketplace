@@ -6,10 +6,11 @@
  * @module extractors/image.test
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
+import { createTempDir } from "@sidequest/core/testing";
+import { useTestVaultCleanup } from "../../../testing/utils";
 import {
 	createImageInboxFile,
 	getImageFileSize,
@@ -23,15 +24,14 @@ import {
 import type { InboxFile } from "./types";
 
 describe("imageExtractor", () => {
-	let testDir: string;
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
 
-	beforeEach(() => {
-		testDir = createTempDir("image-extractor-test-");
-	});
-
-	afterEach(() => {
-		cleanupTestDir(testDir);
-	});
+	function setupTestDir(): string {
+		const dir = createTempDir("image-extractor-test-");
+		trackVault(dir);
+		return dir;
+	}
 
 	describe("metadata", () => {
 		test("should have correct id", () => {
@@ -163,6 +163,7 @@ describe("imageExtractor", () => {
 
 	describe("extract", () => {
 		test("should return placeholder content for images", async () => {
+			const testDir = setupTestDir();
 			// Create a test image file (just bytes, doesn't need to be valid image)
 			const imagePath = join(testDir, "test-image.png");
 			writeFileSync(imagePath, Buffer.from([0x89, 0x50, 0x4e, 0x47])); // PNG magic bytes
@@ -185,6 +186,7 @@ describe("imageExtractor", () => {
 		});
 
 		test("should include file metadata in placeholder", async () => {
+			const testDir = setupTestDir();
 			const imagePath = join(testDir, "photo.jpg");
 			// Create a ~1KB test file
 			writeFileSync(imagePath, Buffer.alloc(1024, "x"));
@@ -202,6 +204,7 @@ describe("imageExtractor", () => {
 		});
 
 		test("should extract placeholder content successfully", async () => {
+			const testDir = setupTestDir();
 			const imagePath = join(testDir, "quick.png");
 			writeFileSync(imagePath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
 
@@ -315,18 +318,18 @@ describe("createImageInboxFile", () => {
 });
 
 describe("bug fixes", () => {
-	let testDir: string;
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
 
-	beforeEach(() => {
-		testDir = createTempDir("image-bugfix-test-");
-	});
-
-	afterEach(() => {
-		cleanupTestDir(testDir);
-	});
+	function setupTestDir(): string {
+		const dir = createTempDir("image-bugfix-test-");
+		trackVault(dir);
+		return dir;
+	}
 
 	describe("file existence validation", () => {
 		test("extract should throw for non-existent file", async () => {
+			const testDir = setupTestDir();
 			const file: InboxFile = {
 				path: join(testDir, "does-not-exist.png"),
 				extension: ".png",
@@ -339,6 +342,7 @@ describe("bug fixes", () => {
 		});
 
 		test("getImageFileSize should throw for non-existent file", async () => {
+			const testDir = setupTestDir();
 			const nonExistentPath = join(testDir, "missing.jpg");
 
 			await expect(getImageFileSize(nonExistentPath)).rejects.toThrow(
@@ -347,6 +351,7 @@ describe("bug fixes", () => {
 		});
 
 		test("readImageAsBase64 should throw for non-existent file", async () => {
+			const testDir = setupTestDir();
 			const nonExistentPath = join(testDir, "missing.png");
 
 			await expect(readImageAsBase64(nonExistentPath)).rejects.toThrow(
@@ -357,6 +362,7 @@ describe("bug fixes", () => {
 
 	describe("file size limit", () => {
 		test("extract should throw for file exceeding size limit", async () => {
+			const testDir = setupTestDir();
 			// Create a file that exceeds the limit
 			// We'll use a mock approach - create a small file but test the logic
 			const imagePath = join(testDir, "huge.png");
@@ -395,6 +401,7 @@ describe("bug fixes", () => {
 		});
 
 		test("extract should work with uppercase extension in InboxFile", async () => {
+			const testDir = setupTestDir();
 			const imagePath = join(testDir, "test.PNG");
 			writeFileSync(imagePath, Buffer.alloc(100)); // Create dummy file
 
@@ -411,6 +418,7 @@ describe("bug fixes", () => {
 
 	describe("error messages", () => {
 		test("should include file path in error message for missing file", async () => {
+			const testDir = setupTestDir();
 			const missingPath = join(testDir, "specific-missing-file.png");
 			const file: InboxFile = {
 				path: missingPath,
@@ -429,6 +437,7 @@ describe("bug fixes", () => {
 
 	describe("successful extraction", () => {
 		test("should extract from valid file", async () => {
+			const testDir = setupTestDir();
 			const imagePath = join(testDir, "valid.png");
 			writeFileSync(imagePath, Buffer.alloc(256)); // Create dummy file
 

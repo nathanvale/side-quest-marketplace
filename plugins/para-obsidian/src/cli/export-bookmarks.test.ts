@@ -2,24 +2,20 @@
  * Tests for export-bookmarks CLI command
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import path from "node:path";
 import { readTextFileSync } from "@sidequest/core/fs";
 import { OutputFormat } from "@sidequest/core/terminal";
 import { loadConfig } from "../config/index";
-import {
-	cleanupTestVault,
-	createTestVault,
-	setupTestVault,
-} from "../testing/utils";
+import { setupTestVault, useTestVaultCleanup } from "../testing/utils";
 import { handleExportBookmarks } from "./export-bookmarks";
 import type { CommandContext } from "./types";
 
 /**
  * Helper to create test vault with standard PARA folders
  */
-function setupTestVaultWithParaFolders(files: Record<string, string>) {
-	setupTestVault({
+function setupTestVaultWithParaFolders(files: Record<string, string>): string {
+	return setupTestVault({
 		"00 Inbox/.gitkeep": "",
 		"01 Projects/.gitkeep": "",
 		"02 Areas/.gitkeep": "",
@@ -34,19 +30,12 @@ function setupTestVaultWithParaFolders(files: Record<string, string>) {
 }
 
 describe("handleExportBookmarks", () => {
-	let vault: string;
-
-	beforeEach(() => {
-		vault = createTestVault();
-	});
-
-	afterEach(() => {
-		cleanupTestVault(vault);
-	});
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
 
 	test("exports bookmarks grouped by PARA category", async () => {
 		// Setup vault with bookmarks
-		setupTestVaultWithParaFolders({
+		const vault = setupTestVaultWithParaFolders({
 			"01 Projects/github.md": `---
 type: bookmark
 url: https://github.com
@@ -72,6 +61,7 @@ created: 2024-01-03T00:00:00Z
 ---
 `,
 		});
+		trackVault(vault);
 
 		const outputPath = path.join(vault, "bookmarks.html");
 		const config = loadConfig();
@@ -117,13 +107,14 @@ created: 2024-01-03T00:00:00Z
 	});
 
 	test("handles vault with no bookmarks", async () => {
-		setupTestVaultWithParaFolders({
+		const vault = setupTestVaultWithParaFolders({
 			"01 Projects/note.md": `---
 type: note
 title: Regular Note
 ---
 `,
 		});
+		trackVault(vault);
 
 		const outputPath = path.join(vault, "bookmarks.html");
 		const config = loadConfig();
@@ -146,7 +137,7 @@ title: Regular Note
 	});
 
 	test("skips bookmarks without url field", async () => {
-		setupTestVaultWithParaFolders({
+		const vault = setupTestVaultWithParaFolders({
 			"03 Resources/invalid.md": `---
 type: bookmark
 title: Invalid Bookmark
@@ -162,6 +153,7 @@ created: 2024-01-01T00:00:00Z
 ---
 `,
 		});
+		trackVault(vault);
 
 		const outputPath = path.join(vault, "bookmarks.html");
 		const config = loadConfig();
@@ -189,7 +181,7 @@ created: 2024-01-01T00:00:00Z
 	});
 
 	test("normalizes PARA categories from frontmatter", async () => {
-		setupTestVaultWithParaFolders({
+		const vault = setupTestVaultWithParaFolders({
 			"01 Projects/bookmark1.md": `---
 type: bookmark
 url: https://example1.com
@@ -215,6 +207,7 @@ created: 2024-01-03T00:00:00Z
 ---
 `,
 		});
+		trackVault(vault);
 
 		const outputPath = path.join(vault, "bookmarks.html");
 		const config = loadConfig();
@@ -243,7 +236,7 @@ created: 2024-01-03T00:00:00Z
 	});
 
 	test("escapes HTML special characters in titles and URLs", async () => {
-		setupTestVaultWithParaFolders({
+		const vault = setupTestVaultWithParaFolders({
 			"03 Resources/special.md": `---
 type: bookmark
 url: https://example.com?foo=bar&baz=qux
@@ -253,6 +246,7 @@ created: 2024-01-01T00:00:00Z
 ---
 `,
 		});
+		trackVault(vault);
 
 		const outputPath = path.join(vault, "bookmarks.html");
 		const config = loadConfig();
@@ -343,7 +337,7 @@ created: 2024-01-01T00:00:00Z
 	});
 
 	test("outputs JSON format when isJson is true", async () => {
-		setupTestVaultWithParaFolders({
+		const vault = setupTestVaultWithParaFolders({
 			"03 Resources/bookmark.md": `---
 type: bookmark
 url: https://example.com
@@ -353,6 +347,7 @@ created: 2024-01-01T00:00:00Z
 ---
 `,
 		});
+		trackVault(vault);
 
 		const outputPath = path.join(vault, "bookmarks.html");
 		const config = loadConfig();
@@ -388,7 +383,7 @@ created: 2024-01-01T00:00:00Z
 	});
 
 	test("handles invalid date strings gracefully (defense-in-depth)", async () => {
-		setupTestVaultWithParaFolders({
+		const vault = setupTestVaultWithParaFolders({
 			"03 Resources/invalid-date.md": `---
 type: bookmark
 url: https://example.com
@@ -406,6 +401,7 @@ created: 2024-06-15T10:30:00Z
 ---
 `,
 		});
+		trackVault(vault);
 
 		const outputPath = path.join(vault, "bookmarks.html");
 		const config = loadConfig();

@@ -84,8 +84,6 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 	let confidence: Confidence;
 	let action: InboxAction;
 	let suggestedNoteType: string | undefined;
-	let suggestedArea: string | undefined;
-	let suggestedProject: string | undefined;
 	let extractedFields: Record<string, unknown> | undefined;
 	let reason: string;
 	let detectionSource: "llm+heuristic" | "llm" | "heuristic" | "none";
@@ -96,8 +94,6 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 			llmResult.confidence >= CONFIDENCE_THRESHOLDS.HIGH ? "high" : "medium";
 		action = "create-note";
 		suggestedNoteType = llmResult.documentType;
-		suggestedArea = llmResult.suggestedArea ?? undefined;
-		suggestedProject = llmResult.suggestedProject ?? undefined;
 		extractedFields = llmResult.extractedFields ?? undefined;
 		reason =
 			llmResult.reasoning ??
@@ -172,8 +168,6 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 			action: "create-note" as const,
 			suggestedNoteType: suggestedNoteType ?? "generic",
 			suggestedTitle: suggestedTitle ?? filename,
-			suggestedArea,
-			suggestedProject,
 			extractedFields,
 			suggestedAttachmentName,
 			extractionWarnings,

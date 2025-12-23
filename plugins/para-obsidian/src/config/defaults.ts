@@ -443,4 +443,8 @@ export const DEFAULT_TITLE_PREFIXES: Partial<Record<string, string>> = {
 	invoice: "🧾 ",
 	bookmark: "✂️ ",
 	"medical-statement": "🏥 ",
+	"employment-contract": "📄 ",
+	document: "📄 ",
+	letter: "📄 ",
+	cv: "📄 ",
 };

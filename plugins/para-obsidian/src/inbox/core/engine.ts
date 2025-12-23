@@ -29,7 +29,6 @@ import {
 	initLoggerWithNotice,
 } from "../../shared/logger";
 import { captureResourceMetrics } from "../../shared/resource-metrics";
-import { applyTitlePrefix } from "../../utils/title";
 import { buildSuggestion, DEFAULT_CLASSIFIERS } from "../classify/classifiers";
 import {
 	checkPdfToText,
@@ -40,7 +39,6 @@ import {
 	type DocumentTypeResult,
 	parseDetectionResponse,
 } from "../classify/llm-classifier";
-import { createDefaultEnrichmentPipeline } from "../enrich";
 import { createRegistry, hashFile } from "../registry/processed-registry";
 import {
 	createInboxFile,
@@ -48,16 +46,11 @@ import {
 	getDefaultRegistry,
 	type InboxFile,
 } from "../scan/extractors";
-import {
-	extractFrontmatterOnly,
-	type MarkdownExtractionMetadata,
-} from "../scan/extractors/markdown";
 import { createInboxError } from "../shared/errors";
 import { checkSLOBreach, recordSLOEvent } from "../shared/slos";
 import {
 	type BatchResult,
 	type ChallengeSuggestion,
-	type CreateNoteSuggestion,
 	createSuggestionId,
 	type ExecuteOptions,
 	type ExecutionResult,
@@ -69,7 +62,7 @@ import {
 	type SuggestionId,
 	validateInboxEngineConfig,
 } from "../types";
-import { generateTitle, parseWikilink } from "./engine-utils";
+// generateTitle removed - no longer needed after markdown processing removal
 import { callLLM, callLLMWithMetadata } from "./llm";
 import { executeSuggestion } from "./operations";
 import { generateReport } from "./operations/report";
@@ -90,10 +83,14 @@ import {
  * Creates a new inbox processing engine.
  *
  * The engine provides methods to:
- * - Scan the inbox for items and generate suggestions
+ * - Scan the inbox for attachment files (PDF, DOCX) and generate suggestions
  * - Execute approved suggestions (create notes, move attachments)
  * - Edit suggestions with additional prompts
  * - Generate markdown reports
+ *
+ * Note: Markdown file processing is deprecated. Only PDF and DOCX attachments
+ * are processed by the engine. Use the separate `para enrich` command for
+ * markdown enrichment.
  *
  * @param config - Engine configuration including vault path and options
  * @returns InboxEngine instance
@@ -202,7 +199,8 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	}
 
 	/**
-	 * Find and filter supported files in the inbox.
+	 * Find and filter attachment files in the inbox.
+	 * Only processes PDF and DOCX files - markdown processing is deprecated.
 	 * @internal
 	 */
 	async function findSupportedFiles(cid: string): Promise<{
@@ -230,20 +228,21 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			return null;
 		}
 
-		// Get extractor registry and filter to supported files
+		// Get extractor registry
 		const extractorRegistry = await getDefaultRegistry();
-		const supportedExtensions = new Set(
-			extractorRegistry.getSupportedExtensions(),
-		);
 
-		// Convert to InboxFile and filter to supported formats
+		// IMPORTANT: Only process attachment files (PDF, DOCX)
+		// Markdown files are no longer supported by the inbox engine
+		const attachmentExtensions = new Set([".pdf", ".docx"]);
+
+		// Convert to InboxFile and filter to attachments only
 		const supportedFiles: InboxFile[] = files
 			.map((f) => createInboxFile(join(inboxPath, f)))
-			.filter((f) => supportedExtensions.has(f.extension));
+			.filter((f) => attachmentExtensions.has(f.extension));
 
 		if (supportedFiles.length === 0) {
 			if (inboxLogger) {
-				inboxLogger.info`No supported files found in inbox cid=${cid}`;
+				inboxLogger.info`No attachment files found in inbox cid=${cid}`;
 			}
 			return null;
 		}
@@ -292,16 +291,17 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	/**
 	 * Determine if a file should be tracked in the processed registry.
 	 *
-	 * Registry Scope (Phase 2):
-	 * - Attachments (PDFs, images): YES - tracked via content hash
-	 * - Markdown files (bookmarks): NO - tracked via frontmatter enrichedAt field
+	 * Registry Scope (Phase 4):
+	 * - Attachments (PDFs, DOCX): YES - tracked via content hash
+	 * - Markdown files: Not processed by engine (handled separately via enrich command)
 	 *
 	 * @param file - Inbox file to check
 	 * @returns true if file should be tracked in registry
 	 */
-	function shouldTrackInRegistry(file: InboxFile): boolean {
-		// Only track attachments (non-markdown files)
-		return file.extension !== ".md";
+	function shouldTrackInRegistry(_file: InboxFile): boolean {
+		// All files processed by engine are attachments (PDF, DOCX)
+		// since markdown is no longer supported
+		return true;
 	}
 
 	/**
@@ -343,34 +343,6 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 	}
 
 	/**
-	 * Resolve destination path from frontmatter fields.
-	 * Returns undefined if routing fields are missing or invalid.
-	 *
-	 * @param frontmatter - Extracted frontmatter fields
-	 * @param vaultContext - Vault context with areas and projects
-	 * @returns Resolved destination path or undefined
-	 * @internal
-	 */
-	function resolveDestinationFromFrontmatter(
-		frontmatter: Record<string, unknown>,
-		vaultContext: VaultContext,
-	): string | undefined {
-		const area = parseWikilink(frontmatter.area);
-		const project = parseWikilink(frontmatter.project);
-
-		// Project takes precedence over area if both are set
-		if (project && vaultContext.projects.includes(project)) {
-			return `01 Projects/${project}`;
-		}
-		if (area && vaultContext.areas.includes(area)) {
-			return `02 Areas/${area}`;
-		}
-
-		// No valid routing fields found
-		return undefined;
-	}
-
-	/**
 	 * Process a single inbox file: hash check, extraction, LLM detection, suggestion building.
 	 * @internal
 	 */
@@ -408,165 +380,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			}
 
 			// =================================================================
-			// MARKDOWN FAST-PATH: Check for typed markdown files BEFORE hashing
-			// Markdown files with valid type frontmatter are already notes -
-			// they just need to be moved, not processed through the full pipeline.
-			// =================================================================
-			if (file.extension === ".md") {
-				try {
-					const frontmatter = await extractFrontmatterOnly(file.path);
-					const noteType = frontmatter.type as string | undefined;
-
-					if (noteType) {
-						// Check if noteType matches a known classifier
-						const matchingClassifier = DEFAULT_CLASSIFIERS.find(
-							(c) => c.id === noteType && c.enabled,
-						);
-
-						if (matchingClassifier) {
-							// =============================================================
-							// ENRICHMENT PIPELINE: Enrich content before classification
-							// Uses Strategy Pattern - currently supports bookmarks
-							// =============================================================
-							let enrichedFrontmatter = frontmatter;
-
-							// Create enrichment pipeline for this file
-							const enrichmentPipeline = createDefaultEnrichmentPipeline(
-								resolvedConfig.vaultPath,
-								{
-									maxRetries: 3,
-									baseDelayMs: 1000,
-									cid,
-									sessionCid,
-									parentCid: cid,
-								},
-							);
-
-							// Check if file needs enrichment
-							const needsEnrichment =
-								await enrichmentPipeline.needsEnrichment(file);
-
-							if (needsEnrichment) {
-								if (onProgress) {
-									await onProgress({
-										...progressBase,
-										stage: "enrich",
-									});
-								}
-
-								// Process through enrichment pipeline with CID for correlation
-								const enrichmentResult = await observe(
-									inboxLogger,
-									"inbox:enrichFile",
-									async () =>
-										enrichmentPipeline.processFile(file, {
-											cid,
-											sessionCid,
-											parentCid,
-										}),
-									{ parentCid, context: { filename } },
-								);
-
-								if (enrichmentResult.error) {
-									// Enrichment failed but was handled gracefully
-									// File has been updated with failure status (e.g., transcript_status: failed)
-									// Continue processing - don't block or count as error
-									const error = enrichmentResult.error;
-									const errorMessage = `${error.code}: ${error.message}`;
-
-									if (inboxLogger) {
-										inboxLogger.warn`Enrichment failed (gracefully handled) file=${filename} strategy=${enrichmentResult.strategyId} error=${errorMessage} sessionCid=${sessionCid} cid=${cid}`;
-									}
-									// Use enrichmentResult.frontmatter which contains the failure metadata
-									enrichedFrontmatter = enrichmentResult.frontmatter;
-									// Note: Don't emit "error" stage - this was handled gracefully
-									// The file will continue to be processed/classified normally
-								}
-
-								if (enrichmentResult.enriched) {
-									enrichedFrontmatter = enrichmentResult.frontmatter;
-
-									if (inboxLogger) {
-										inboxLogger.info`File enriched file=${filename} strategy=${enrichmentResult.strategyId} sessionCid=${sessionCid} cid=${cid}`;
-									}
-								}
-							}
-
-							// Try to resolve destination from frontmatter
-							const destination = resolveDestinationFromFrontmatter(
-								enrichedFrontmatter,
-								vaultContext,
-							);
-
-							const area = parseWikilink(enrichedFrontmatter.area);
-							const project = parseWikilink(enrichedFrontmatter.project);
-
-							// Skip files without routing tags (user hasn't tagged them yet)
-							if (!destination) {
-								if (inboxLogger) {
-									inboxLogger.info`Markdown note skipped - no routing tags file=${filename} hasArea=${!!area} hasProject=${!!project} sessionCid=${sessionCid} cid=${cid}`;
-								}
-								if (onProgress) {
-									await onProgress({
-										...progressBase,
-										stage: "skip",
-									});
-								}
-								return null; // Skip suggestion entirely
-							}
-
-							// Build suggestion - no hashing needed for markdown notes
-							// Apply emoji prefix for note types that have them configured
-							const paraConfig = loadConfig();
-							const baseTitle =
-								(enrichedFrontmatter.title as string) ||
-								generateTitle(filename, noteType);
-							const titleWithPrefix = applyTitlePrefix(
-								baseTitle,
-								noteType,
-								paraConfig,
-							);
-
-							const suggestion: CreateNoteSuggestion = {
-								id: createSuggestionId(),
-								source: join(resolvedConfig.inboxFolder, filename),
-								processor: "notes",
-								confidence: "high", // Always high confidence when destination resolved
-								detectionSource: "frontmatter",
-								action: "create-note",
-								suggestedNoteType: noteType,
-								suggestedTitle: titleWithPrefix,
-								suggestedArea: area,
-								suggestedProject: project,
-								suggestedDestination: destination,
-								extractedFields: enrichedFrontmatter,
-								autoRoute: true, // Always true when we have a destination
-								reason: `Pre-routed via frontmatter (${project ? "project" : "area"})`,
-							};
-
-							suggestionCache.set(suggestion.id, suggestion);
-							if (onProgress) {
-								await onProgress({
-									...progressBase,
-									stage: "done",
-								});
-							}
-							if (inboxLogger) {
-								inboxLogger.info`Markdown fast-path file=${filename} type=${noteType} destination=${destination} autoRoute=true sessionCid=${sessionCid} cid=${cid}`;
-							}
-							return suggestion;
-						}
-					}
-				} catch (_error) {
-					// Frontmatter extraction failed - fall through to normal processing
-					if (inboxLogger) {
-						inboxLogger.debug`Markdown fast-path skipped (frontmatter error): ${filename} sessionCid=${sessionCid} cid=${cid}`;
-					}
-				}
-			}
-
-			// =================================================================
-			// STANDARD PATH: Hash, extract, classify (for PDFs, images, untyped markdown)
+			// ATTACHMENT PROCESSING: Hash, extract, classify PDF and DOCX files
 			// =================================================================
 
 			// Calculate hash for dedup check and linking note title to attachment
@@ -627,7 +441,6 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 
 			// Extract text using the appropriate extractor
 			let text: string;
-			let extractedMetadata: unknown;
 			let extractedMarkdown: string | undefined;
 			try {
 				if (onProgress) {
@@ -643,7 +456,6 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					{ parentCid, context: { filename } },
 				);
 				text = extracted.text;
-				extractedMetadata = extracted.metadata;
 				extractedMarkdown = extracted.markdown;
 			} catch (error) {
 				if (inboxLogger) {
@@ -668,15 +480,6 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				};
 				suggestionCache.set(errorSuggestion.id, errorSuggestion);
 				return errorSuggestion;
-			}
-
-			// Preserve frontmatter for potential merge with LLM results (for untyped markdown)
-			let preservedFrontmatter: Record<string, unknown> | undefined;
-			if (file.extension === ".md" && extractedMetadata) {
-				const mdMetadata = extractedMetadata as MarkdownExtractionMetadata;
-				if (mdMetadata.hasFrontmatter) {
-					preservedFrontmatter = await extractFrontmatterOnly(file.path);
-				}
 			}
 
 			// Run heuristic detection
@@ -761,7 +564,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 								}
 								const result = parseDetectionResponse(llmCallResult.response);
 								if (inboxLogger) {
-									inboxLogger.info`LLM success file=${filename} type=${result.documentType} confidence=${result.confidence.toFixed(2)} area=${result.suggestedArea ?? "none"} fallback=${llmFallbackUsed} sessionCid=${sessionCid} cid=${cid}`;
+									inboxLogger.info`LLM success file=${filename} type=${result.documentType} confidence=${result.confidence.toFixed(2)} fallback=${llmFallbackUsed} sessionCid=${sessionCid} cid=${cid}`;
 								}
 								return result;
 							}
@@ -777,7 +580,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 							}
 							const result = parseDetectionResponse(response);
 							if (inboxLogger) {
-								inboxLogger.info`LLM success file=${filename} type=${result.documentType} confidence=${result.confidence.toFixed(2)} area=${result.suggestedArea ?? "none"} sessionCid=${sessionCid} cid=${cid}`;
+								inboxLogger.info`LLM success file=${filename} type=${result.documentType} confidence=${result.confidence.toFixed(2)} sessionCid=${sessionCid} cid=${cid}`;
 							}
 							return result;
 						}),
@@ -805,21 +608,6 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				llmErrorMessage = errorMsg;
 			}
 
-			// If LLM failed and we have a markdown file, extract frontmatter for fallback data
-			let fallbackExtractedFields: Record<string, unknown> | undefined;
-			if (llmErrorMessage && file.extension === ".md") {
-				try {
-					fallbackExtractedFields = await extractFrontmatterOnly(file.path);
-					if (inboxLogger) {
-						inboxLogger.debug`Extracted fallback frontmatter fields=${Object.keys(fallbackExtractedFields).join(", ")} file=${filename} sessionCid=${sessionCid} cid=${cid}`;
-					}
-				} catch (err) {
-					if (inboxLogger) {
-						inboxLogger.warn`Failed to extract fallback frontmatter file=${filename} error=${err instanceof Error ? err.message : "unknown"} sessionCid=${sessionCid} cid=${cid}`;
-					}
-				}
-			}
-
 			// Inject LLM error into llmResult for buildSuggestion to handle
 			if (llmErrorMessage) {
 				// Create a synthetic llmResult with error warnings
@@ -839,38 +627,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 									? "LLM service unavailable - using heuristic classification"
 									: `LLM error: ${llmErrorMessage}`,
 					],
-					extractedFields: fallbackExtractedFields,
 				};
-			}
-
-			// Merge preserved frontmatter with LLM extracted fields
-			// Original frontmatter values take precedence (they're already validated)
-			// LLM fills in gaps for missing fields only
-			if (preservedFrontmatter && llmResult?.extractedFields) {
-				const mergedFields = {
-					...llmResult.extractedFields,
-					...preservedFrontmatter, // Frontmatter overrides LLM values
-				};
-				llmResult = {
-					...llmResult,
-					extractedFields: mergedFields,
-				};
-				if (inboxLogger) {
-					inboxLogger.debug`Merged frontmatter with LLM fields file=${filename} frontmatterKeys=${Object.keys(preservedFrontmatter).join(", ")} mergedKeys=${Object.keys(mergedFields).join(", ")} sessionCid=${sessionCid} cid=${cid}`;
-				}
-			} else if (
-				preservedFrontmatter &&
-				!llmResult?.extractedFields &&
-				llmResult
-			) {
-				// LLM didn't extract any fields, use frontmatter as the extracted fields
-				llmResult = {
-					...llmResult,
-					extractedFields: preservedFrontmatter,
-				};
-				if (inboxLogger) {
-					inboxLogger.debug`Using frontmatter as extracted fields (LLM had none) file=${filename} sessionCid=${sessionCid} cid=${cid}`;
-				}
 			}
 
 			// Build suggestion first - this determines the final document type

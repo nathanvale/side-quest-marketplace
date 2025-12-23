@@ -2,6 +2,10 @@
  * Classifier Generator Tests
  *
  * Tests for TypeScript classifier code generation from configuration.
+ *
+ * These tests validate code generation utilities that convert classifier
+ * configurations into TypeScript code. No vault operations are needed,
+ * so vault cleanup utilities are not used here.
  */
 
 import { describe, expect, test } from "bun:test";

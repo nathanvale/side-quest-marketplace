@@ -4,10 +4,10 @@
  * Tests for the idempotency registry that tracks processed inbox items.
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
+import { useTestVaultCleanup } from "../../testing/utils";
 import {
 	type ProcessedItem,
 	type ProcessedRegistry,
@@ -37,15 +37,16 @@ function createLegacyRegistry(vaultPath: string) {
 }
 
 describe("inbox/registry", () => {
-	let TEST_DIR: string;
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
 
-	beforeEach(() => {
-		TEST_DIR = createTempDir("inbox-registry-test-");
-	});
-
-	afterEach(() => {
-		cleanupTestDir(TEST_DIR);
-	});
+	// Helper to create and track a test directory
+	function createTestDir(): string {
+		const { createTempDir } = require("@sidequest/core/testing");
+		const dir = createTempDir("inbox-registry-test-");
+		trackVault(dir);
+		return dir;
+	}
 
 	// =========================================================================
 	// hashFile Tests
@@ -53,6 +54,7 @@ describe("inbox/registry", () => {
 
 	describe("hashFile", () => {
 		test("should generate SHA256 hash of file contents", async () => {
+			const TEST_DIR = createTestDir();
 			const testFile = join(TEST_DIR, "test.txt");
 			writeFileSync(testFile, "hello world");
 
@@ -65,6 +67,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should return different hashes for different contents", async () => {
+			const TEST_DIR = createTestDir();
 			const file1 = join(TEST_DIR, "file1.txt");
 			const file2 = join(TEST_DIR, "file2.txt");
 			writeFileSync(file1, "content one");
@@ -77,6 +80,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should return same hash for identical contents", async () => {
+			const TEST_DIR = createTestDir();
 			const file1 = join(TEST_DIR, "file1.txt");
 			const file2 = join(TEST_DIR, "file2.txt");
 			writeFileSync(file1, "identical content");
@@ -89,12 +93,14 @@ describe("inbox/registry", () => {
 		});
 
 		test("should throw error for non-existent file", async () => {
+			const TEST_DIR = createTestDir();
 			const nonExistent = join(TEST_DIR, "does-not-exist.txt");
 
 			await expect(hashFile(nonExistent)).rejects.toThrow();
 		});
 
 		test("should handle empty files", async () => {
+			const TEST_DIR = createTestDir();
 			const emptyFile = join(TEST_DIR, "empty.txt");
 			writeFileSync(emptyFile, "");
 
@@ -107,6 +113,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should handle binary files", async () => {
+			const TEST_DIR = createTestDir();
 			const binaryFile = join(TEST_DIR, "binary.bin");
 			writeFileSync(binaryFile, Buffer.from([0x00, 0xff, 0x42, 0x13]));
 
@@ -122,6 +129,7 @@ describe("inbox/registry", () => {
 
 	describe("createRegistry", () => {
 		test("should create a registry manager for a vault path", () => {
+			const TEST_DIR = createTestDir();
 			const registry = createLegacyRegistry(TEST_DIR);
 
 			expect(registry).toBeDefined();
@@ -139,6 +147,7 @@ describe("inbox/registry", () => {
 
 	describe("registry.load", () => {
 		test("should create empty registry if file does not exist", async () => {
+			const TEST_DIR = createTestDir();
 			const registry = createLegacyRegistry(TEST_DIR);
 
 			await registry.load();
@@ -148,6 +157,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should load existing registry from disk", async () => {
+			const TEST_DIR = createTestDir();
 			const existingRegistry: ProcessedRegistry = {
 				version: RegistryVersion.V1,
 				items: [
@@ -174,6 +184,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should handle corrupt JSON gracefully and recover with empty registry", async () => {
+			const TEST_DIR = createTestDir();
 			writeFileSync(join(TEST_DIR, REGISTRY_FILE), "{ invalid json }");
 
 			const registry = createLegacyRegistry(TEST_DIR);
@@ -184,6 +195,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should handle invalid registry structure gracefully", async () => {
+			const TEST_DIR = createTestDir();
 			// Missing version or items
 			writeFileSync(
 				join(TEST_DIR, REGISTRY_FILE),
@@ -198,6 +210,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should handle registry with wrong version gracefully", async () => {
+			const TEST_DIR = createTestDir();
 			writeFileSync(
 				join(TEST_DIR, REGISTRY_FILE),
 				JSON.stringify({ version: 999, items: [] }),
@@ -217,6 +230,7 @@ describe("inbox/registry", () => {
 
 	describe("registry.save", () => {
 		test("should save registry to disk", async () => {
+			const TEST_DIR = createTestDir();
 			const registry = createLegacyRegistry(TEST_DIR);
 			await registry.load();
 			registry.markProcessed({
@@ -236,6 +250,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should overwrite existing registry file", async () => {
+			const TEST_DIR = createTestDir();
 			const existingRegistry: ProcessedRegistry = {
 				version: RegistryVersion.V1,
 				items: [
@@ -273,6 +288,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should create parent directories if they do not exist", async () => {
+			const TEST_DIR = createTestDir();
 			const nestedDir = join(TEST_DIR, "nested", "vault");
 
 			const registry = createLegacyRegistry(nestedDir);
@@ -294,6 +310,7 @@ describe("inbox/registry", () => {
 
 	describe("registry.isProcessed", () => {
 		test("should return false for unknown hash", async () => {
+			const TEST_DIR = createTestDir();
 			const registry = createLegacyRegistry(TEST_DIR);
 			await registry.load();
 
@@ -301,6 +318,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should return true for known hash", async () => {
+			const TEST_DIR = createTestDir();
 			const registry = createLegacyRegistry(TEST_DIR);
 			await registry.load();
 			registry.markProcessed({
@@ -313,6 +331,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should return true for hash loaded from disk", async () => {
+			const TEST_DIR = createTestDir();
 			const existingRegistry: ProcessedRegistry = {
 				version: RegistryVersion.V1,
 				items: [
@@ -341,6 +360,7 @@ describe("inbox/registry", () => {
 
 	describe("registry.markProcessed", () => {
 		test("should add item to registry", async () => {
+			const TEST_DIR = createTestDir();
 			const registry = createLegacyRegistry(TEST_DIR);
 			await registry.load();
 
@@ -359,6 +379,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should update existing item with same hash", async () => {
+			const TEST_DIR = createTestDir();
 			const registry = createLegacyRegistry(TEST_DIR);
 			await registry.load();
 
@@ -388,6 +409,7 @@ describe("inbox/registry", () => {
 
 	describe("registry.getItem", () => {
 		test("should return undefined for unknown hash", async () => {
+			const TEST_DIR = createTestDir();
 			const registry = createLegacyRegistry(TEST_DIR);
 			await registry.load();
 
@@ -395,6 +417,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should return item for known hash", async () => {
+			const TEST_DIR = createTestDir();
 			const registry = createLegacyRegistry(TEST_DIR);
 			await registry.load();
 
@@ -409,6 +432,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should return item loaded from disk", async () => {
+			const TEST_DIR = createTestDir();
 			const item: ProcessedItem = {
 				sourceHash: testHash("disk-item"),
 				sourcePath: "/inbox/disk.pdf",
@@ -437,6 +461,7 @@ describe("inbox/registry", () => {
 
 	describe("concurrent access", () => {
 		test("should handle multiple registries reading same file", async () => {
+			const TEST_DIR = createTestDir();
 			const existingRegistry: ProcessedRegistry = {
 				version: RegistryVersion.V1,
 				items: [
@@ -462,6 +487,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should re-read from disk on load to get latest state", async () => {
+			const TEST_DIR = createTestDir();
 			const registry1 = createLegacyRegistry(TEST_DIR);
 			const registry2 = createLegacyRegistry(TEST_DIR);
 
@@ -492,6 +518,7 @@ describe("inbox/registry", () => {
 
 	describe("edge cases", () => {
 		test("should handle empty items array in registry", async () => {
+			const TEST_DIR = createTestDir();
 			const emptyRegistry: ProcessedRegistry = {
 				version: RegistryVersion.V1,
 				items: [],
@@ -508,6 +535,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should handle many items in registry", async () => {
+			const TEST_DIR = createTestDir();
 			const registry = createLegacyRegistry(TEST_DIR);
 			await registry.load();
 
@@ -534,6 +562,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should handle special characters in paths", async () => {
+			const TEST_DIR = createTestDir();
 			const registry = createLegacyRegistry(TEST_DIR);
 			await registry.load();
 
@@ -560,6 +589,7 @@ describe("inbox/registry", () => {
 
 	describe("registry scope enforcement", () => {
 		test("should allow attachment items when restrictToAttachments=true", async () => {
+			const TEST_DIR = createTestDir();
 			const registry = createRegistry(TEST_DIR, {
 				restrictToAttachments: true,
 			});
@@ -579,6 +609,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should reject non-attachment items when restrictToAttachments=true", async () => {
+			const TEST_DIR = createTestDir();
 			const registry = createRegistry(TEST_DIR, {
 				restrictToAttachments: true,
 			});
@@ -599,6 +630,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should reject items without movedAttachment when restrictToAttachments=true", async () => {
+			const TEST_DIR = createTestDir();
 			const registry = createRegistry(TEST_DIR, {
 				restrictToAttachments: true,
 			});
@@ -617,6 +649,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should allow all items when restrictToAttachments=false", async () => {
+			const TEST_DIR = createTestDir();
 			const registry = createRegistry(TEST_DIR, {
 				restrictToAttachments: false,
 			});
@@ -647,6 +680,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should default to restrictToAttachments=true", async () => {
+			const TEST_DIR = createTestDir();
 			const registry = createRegistry(TEST_DIR); // No options
 			await registry.load();
 
@@ -670,6 +704,7 @@ describe("inbox/registry", () => {
 
 	describe("removeAndSave", () => {
 		test("should remove item and save atomically", async () => {
+			const TEST_DIR = createTestDir();
 			const registry = createRegistry(TEST_DIR, {
 				restrictToAttachments: false,
 			});
@@ -703,6 +738,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should return false when removing non-existent item", async () => {
+			const TEST_DIR = createTestDir();
 			const registry = createRegistry(TEST_DIR);
 			await registry.load();
 
@@ -712,6 +748,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should handle concurrent removeAndSave calls", async () => {
+			const TEST_DIR = createTestDir();
 			const registry = createRegistry(TEST_DIR, {
 				restrictToAttachments: false,
 			});
@@ -754,6 +791,7 @@ describe("inbox/registry", () => {
 
 	describe("write serialization", () => {
 		test("should serialize concurrent save() calls", async () => {
+			const TEST_DIR = createTestDir();
 			const registry = createRegistry(TEST_DIR, {
 				restrictToAttachments: false,
 			});
@@ -785,6 +823,7 @@ describe("inbox/registry", () => {
 		});
 
 		test("should log warning for long lock wait times", async () => {
+			const TEST_DIR = createTestDir();
 			// This test verifies the logging behavior exists
 			// Actual implementation will log when lock wait > 100ms
 			const registry = createRegistry(TEST_DIR);

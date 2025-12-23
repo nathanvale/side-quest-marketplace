@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { createTempDir } from "@sidequest/core/testing";
+import { useTestVaultCleanup } from "../../../testing/utils";
 import {
 	getAreaPathMap,
 	getProjectPathMap,
@@ -10,19 +10,16 @@ import {
 } from "./context";
 
 describe("inbox/core/vault/context", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	let tempVault: string;
-	let cleanup: () => void;
 
 	beforeEach(() => {
-		tempVault = createTempDir("vault-context-test-");
-		cleanup = () => {
-			// Cleanup handled by createTempDir
-		};
+		const { createTestVault } = require("../../../testing/utils");
+		tempVault = createTestVault();
+		trackVault(tempVault);
 	});
 
-	afterEach(() => {
-		cleanup();
-	});
+	afterEach(getAfterEachHook());
 
 	describe("getAreaPathMap", () => {
 		test("should return empty map when areas folder does not exist", () => {

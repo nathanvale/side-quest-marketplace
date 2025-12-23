@@ -12,38 +12,34 @@
 import { basename, dirname, join } from "node:path";
 import { ensureDirSync, moveFile, pathExistsSync } from "@sidequest/core/fs";
 import type { executeLogger } from "../../shared/logger";
-import { generateFilename, getHashPrefix } from "../core/engine-utils";
+import {
+	generateSmartAttachmentName,
+	getHashPrefix,
+} from "../core/engine-utils";
 import { hashFile } from "../registry";
 import type { OperationContext } from "../shared/context";
 import type { InboxSuggestion } from "../types";
 import type { AttachmentMoveResult } from "./types";
 
 /**
- * Generate a hash-based filename for an attachment.
+ * Generate a smart filename for an attachment.
  *
- * Format: YYYYMMDD-hash4-description.ext
- *
- * The hash prefix guarantees uniqueness and links to the corresponding note.
+ * Strategy (collision-aware):
+ * 1. Try ideal name from extracted fields (date-type-provider.ext)
+ * 2. If ideal name exists in attachments folder, add hash suffix
+ * 3. Hash suffix only added when needed to prevent collisions
  *
  * @param suggestion - Suggestion containing source path and optional attachment name
  * @param hash - SHA256 hash of the file contents
- * @returns Hash-based filename
+ * @param attachmentsDir - Absolute path to attachments folder (for collision check)
+ * @returns Smart filename (with hash only if needed)
  */
 export function generateHashedFilename(
 	suggestion: InboxSuggestion,
 	hash: string,
+	attachmentsDir?: string,
 ): string {
-	// Use pre-generated attachment name if available (from scan phase)
-	const suggestedName =
-		"suggestedAttachmentName" in suggestion
-			? suggestion.suggestedAttachmentName
-			: undefined;
-
-	if (suggestedName) {
-		return suggestedName;
-	}
-
-	// Fallback: generate filename using available suggestion data
+	// Extract available data from suggestion
 	const noteType =
 		"suggestedNoteType" in suggestion
 			? suggestion.suggestedNoteType
@@ -51,7 +47,14 @@ export function generateHashedFilename(
 	const fields =
 		"extractedFields" in suggestion ? suggestion.extractedFields : undefined;
 
-	return generateFilename(suggestion.source, hash, noteType, fields);
+	// Use smart naming that only adds hash on collision
+	return generateSmartAttachmentName(
+		suggestion.source,
+		hash,
+		noteType,
+		fields,
+		attachmentsDir,
+	);
 }
 
 /**
@@ -96,8 +99,13 @@ export async function moveAttachment(
 		};
 	}
 
-	// Generate filename with hash prefix - guaranteed unique
-	const hashedFilename = generateHashedFilename(suggestion, hash);
+	// Generate filename - uses ideal name, only adds hash on collision
+	const attachmentsDir = join(config.vaultPath, config.attachmentsFolder);
+	const hashedFilename = generateHashedFilename(
+		suggestion,
+		hash,
+		attachmentsDir,
+	);
 	const finalDest = join(
 		config.vaultPath,
 		config.attachmentsFolder,

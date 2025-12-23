@@ -22,17 +22,18 @@ import type { InboxConverter } from "../types";
  */
 export const documentClassifier: InboxConverter = {
 	schemaVersion: 1,
-	id: "document",
-	displayName: "Document",
+	id: "generic",
+	displayName: "Generic Document",
 	enabled: true,
 	priority: 10, // Very low - fallback only after specific classifiers
 	sourceOfTruth: "binary", // Type B: attachment is source of truth
 
 	heuristics: {
 		filenamePatterns: [
-			// Match any DOCX or PDF file (very broad fallback)
-			{ pattern: "\\.docx$", weight: 1.0 },
-			{ pattern: "\\.pdf$", weight: 1.0 },
+			// Match any DOCX or PDF file - low weight so specific classifiers win
+			// (invoice has "receipt" at 0.9, booking has "itinerary" at 0.9, etc.)
+			{ pattern: "\\.docx$", weight: 0.1 },
+			{ pattern: "\\.pdf$", weight: 0.1 },
 		],
 		contentMarkers: [],
 		threshold: 0.1, // Always match DOCX/PDF files as fallback
@@ -69,7 +70,7 @@ Edit the original file directly when making changes.`,
 	},
 
 	template: {
-		name: "document",
+		name: "document", // Uses document.md template
 		fieldMappings: {
 			title: "Document title",
 			area: "Area",

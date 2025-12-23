@@ -9,7 +9,9 @@
  */
 
 import { join } from "node:path";
-import { generateFilename, generateTitle } from "../../core/engine-utils";
+import { loadConfig } from "../../../config/index";
+import { applyTitlePrefix } from "../../../utils/title";
+import { generateAttachmentName, generateTitle } from "../../core/engine-utils";
 import {
 	CONFIDENCE_THRESHOLDS,
 	type Confidence,
@@ -106,8 +108,6 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 	let confidence: Confidence;
 	let action: InboxAction;
 	let suggestedNoteType: string | undefined;
-	let suggestedArea: string | undefined;
-	let suggestedProject: string | undefined;
 	let extractedFields: Record<string, unknown> | undefined;
 	let reason: string;
 	let detectionSource: DetectionSource;
@@ -133,9 +133,7 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 		confidence = "high";
 		action = "create-note";
 		suggestedNoteType = heuristicResult.suggestedType;
-		// Still use LLM for field extraction, area, and project (if available)
-		suggestedArea = llmResult?.suggestedArea ?? undefined;
-		suggestedProject = llmResult?.suggestedProject ?? undefined;
+		// Still use LLM for field extraction (if available)
 		extractedFields = llmResult?.extractedFields ?? undefined;
 
 		// Check if LLM agreed or disagreed
@@ -165,8 +163,6 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 		confidence = "high";
 		action = "create-note";
 		suggestedNoteType = llmResult.documentType;
-		suggestedArea = llmResult.suggestedArea ?? undefined;
-		suggestedProject = llmResult.suggestedProject ?? undefined;
 		extractedFields = llmResult.extractedFields ?? undefined;
 		reason = `Heuristics and LLM agree: ${llmResult.documentType}`;
 		detectionSource = "llm+heuristic";
@@ -181,8 +177,6 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 			llmResult.confidence >= CONFIDENCE_THRESHOLDS.HIGH ? "high" : "medium";
 		action = "create-note";
 		suggestedNoteType = llmResult.documentType;
-		suggestedArea = llmResult.suggestedArea ?? undefined;
-		suggestedProject = llmResult.suggestedProject ?? undefined;
 		extractedFields = llmResult.extractedFields ?? undefined;
 		reason =
 			llmResult.reasoning ??
@@ -231,19 +225,26 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 	}
 
 	// Generate suggested title (with hash for linking to attachment)
-	const suggestedTitle = generateTitle(
+	const baseTitle = generateTitle(
 		filename,
 		suggestedNoteType,
 		extractedFields,
 		hash,
 	);
 
-	// Generate attachment name using hash (guarantees uniqueness)
-	// Format mirrors note title: date-hash-type-provider.ext (lowercase, hyphens)
+	// Apply emoji prefix from config (e.g., "📄 " for employment-contract)
+	// This ensures the preview matches what will be created
+	const config = loadConfig();
+	const suggestedTitle = suggestedNoteType
+		? applyTitlePrefix(baseTitle, suggestedNoteType, config)
+		: baseTitle;
+
+	// Generate attachment name preview (ideal name without hash)
+	// Hash suffix only added at execute time if there's a collision
 	// ONLY for Type B (binary source of truth) - Type A embeds content in markdown
 	const suggestedAttachmentName =
 		hash && input.sourceOfTruth !== "markdown"
-			? generateFilename(filename, hash, suggestedNoteType, extractedFields)
+			? generateAttachmentName(filename, suggestedNoteType, extractedFields)
 			: undefined;
 
 	// Pass through extraction warnings from LLM
@@ -252,39 +253,12 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 			? llmResult.extractionWarnings
 			: undefined;
 
-	// Set destination based on routing source
-	// Fast-path items (have area/project frontmatter) get auto-routed to their destination
-	// LLM-path items (no routing fields) get created in inbox - user adds tags in Obsidian later
-	let suggestedDestination: string | undefined;
-	let llmSuggestedArea: string | undefined;
-	let llmSuggestedProject: string | undefined;
-
-	// Check if this is a fast-path item with frontmatter routing
-	const hasFrontmatterRouting =
-		detectionSource === "frontmatter" && (suggestedArea || suggestedProject);
-
-	if (hasFrontmatterRouting) {
-		// Fast-path: Has area/project in frontmatter → set destination for auto-routing
-		suggestedDestination = suggestedArea || suggestedProject;
-	} else {
-		// LLM-path: No frontmatter routing → create note in inbox folder
-		// Store LLM suggestions for DISPLAY (user sees what LLM detected)
-		// Note created in inbox with null area/project - user updates in Obsidian
-		llmSuggestedArea = suggestedArea;
-		llmSuggestedProject = suggestedProject;
-		// Set destination to inbox folder so note is created there
-		suggestedDestination = inboxFolder;
-	}
+	// All items get created in inbox folder (no auto-routing)
+	// User adds area/project tags in Obsidian later
+	const suggestedDestination = inboxFolder;
 
 	// Return properly typed discriminated union based on action
 	if (action === "create-note") {
-		// Debug: Log Type A/B fields being set on suggestion
-		if (input.extractedMarkdown || input.sourceOfTruth) {
-			console.error(
-				`[buildSuggestion] Type A/B fields: sourceOfTruth=${input.sourceOfTruth ?? "undefined"} extractedMarkdownLength=${input.extractedMarkdown?.length ?? 0}`,
-			);
-		}
-
 		return {
 			id: createSuggestionId(),
 			source,
@@ -294,15 +268,11 @@ export function buildSuggestion(input: SuggestionInput): InboxSuggestion {
 			action: "create-note" as const,
 			suggestedNoteType: suggestedNoteType ?? "generic",
 			suggestedTitle: suggestedTitle ?? filename,
-			suggestedArea,
-			suggestedProject,
 			suggestedDestination,
 			extractedFields,
 			suggestedAttachmentName,
 			extractionWarnings,
 			reason,
-			llmSuggestedArea,
-			llmSuggestedProject,
 			// Type A/B document processing fields
 			suggestedContent: input.extractedMarkdown,
 			sourceOfTruth: input.sourceOfTruth,

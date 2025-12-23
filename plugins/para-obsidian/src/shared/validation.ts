@@ -267,3 +267,77 @@ export function validateWeight(weight: number): number {
 	}
 	return weight;
 }
+
+/**
+ * Validate that a path is safe and doesn't escape the vault boundary.
+ *
+ * **Security**: Uses realpath canonicalization to prevent symlink-based path traversal attacks.
+ * This defends against attackers creating symlinks that escape the vault boundary.
+ *
+ * @param inputPath - Path to validate (relative or absolute)
+ * @param vaultPath - The vault root path
+ * @throws Error if path contains unsafe patterns or escapes vault
+ *
+ * @example
+ * ```ts
+ * validatePathSafety('00 Inbox/note.md', '/vault'); // OK
+ * validatePathSafety('../../etc/passwd', '/vault'); // throws - path traversal
+ * validatePathSafety('~/secrets', '/vault'); // throws - unsafe pattern
+ * ```
+ */
+export function validatePathSafety(inputPath: string, vaultPath: string): void {
+	const { resolve, dirname } = require("node:path");
+	const { realpathSync } = require("node:fs");
+	const { pathExistsSync } = require("@sidequest/core/fs");
+
+	// Reject suspicious patterns immediately
+	if (
+		inputPath.includes("..") ||
+		inputPath.includes("~") ||
+		(inputPath.startsWith("/") && !inputPath.startsWith(vaultPath))
+	) {
+		throw new Error(`Unsafe path pattern: "${inputPath}"`);
+	}
+
+	// Resolve symbolic links and normalize paths to prevent symlink attacks
+	const resolved = resolve(vaultPath, inputPath);
+	const vaultResolved = resolve(vaultPath);
+
+	// Canonicalize paths using realpath if they exist
+	// This prevents symlink-based path traversal (e.g., symlink pointing outside vault)
+	let canonicalResolved = resolved;
+	let canonicalVault = vaultResolved;
+
+	try {
+		// Try to canonicalize vault path (should always exist)
+		canonicalVault = realpathSync(vaultResolved);
+	} catch {
+		// Vault doesn't exist - use resolved path (safe for validation)
+	}
+
+	try {
+		// Try to canonicalize destination (may not exist yet)
+		// Walk up to find existing parent and canonicalize from there
+		let current = resolved;
+		while (!pathExistsSync(current) && current !== vaultResolved) {
+			current = dirname(current);
+		}
+		if (pathExistsSync(current)) {
+			const canonicalParent = realpathSync(current);
+			const relativeSuffix = resolved.slice(current.length);
+			canonicalResolved = canonicalParent + relativeSuffix;
+		}
+	} catch {
+		// Path doesn't exist yet - use resolved path (creation will fail if symlink attack)
+	}
+
+	// Check boundary using canonicalized paths
+	if (
+		!canonicalResolved.startsWith(`${canonicalVault}/`) &&
+		canonicalResolved !== canonicalVault
+	) {
+		throw new Error(
+			`Path traversal detected: "${inputPath}" escapes vault boundary`,
+		);
+	}
+}
