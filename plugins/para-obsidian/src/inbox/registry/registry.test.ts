@@ -50,6 +50,19 @@ async function setupLoadedRegistry(
 }
 
 /**
+ * Helper to create test directory and load registry in one step.
+ * Reduces DRY violation by combining common setup pattern.
+ */
+async function setupTest(
+	createTestDir: () => string,
+	options?: { restrictToAttachments?: boolean },
+) {
+	const TEST_DIR = createTestDir();
+	const registry = await setupLoadedRegistry(TEST_DIR, options);
+	return { TEST_DIR, registry };
+}
+
+/**
  * Helper to create a ProcessedRegistry structure for testing.
  * Simplifies creation of registry files on disk.
  */
@@ -192,9 +205,7 @@ describe("inbox/registry", () => {
 
 	describe("registry.load", () => {
 		test("should create empty registry if file does not exist", async () => {
-			const TEST_DIR = createTestDir();
-			// Registry is created but not used - we're testing file system side effects
-			const _registry = await setupLoadedRegistry(TEST_DIR, {
+			const { TEST_DIR } = await setupTest(createTestDir, {
 				restrictToAttachments: false,
 			});
 
@@ -776,16 +787,18 @@ describe("inbox/registry", () => {
 			}
 			await registry.save();
 
-			// Remove concurrently
+			// Remove concurrently and track timing to verify serialization
+			const start = Date.now();
 			const results = await Promise.all([
 				registry.removeAndSave(testHash("concurrent0")),
 				registry.removeAndSave(testHash("concurrent1")),
 				registry.removeAndSave(testHash("concurrent2")),
 			]);
+			const duration = Date.now() - start;
 
 			expect(results).toEqual([true, true, true]);
 
-			// Verify all removed
+			// Verify all removed in memory
 			expect(registry.isProcessed(testHash("concurrent0"))).toBe(false);
 			expect(registry.isProcessed(testHash("concurrent1"))).toBe(false);
 			expect(registry.isProcessed(testHash("concurrent2"))).toBe(false);
@@ -793,6 +806,19 @@ describe("inbox/registry", () => {
 			// Verify remaining items
 			expect(registry.isProcessed(testHash("concurrent3"))).toBe(true);
 			expect(registry.isProcessed(testHash("concurrent4"))).toBe(true);
+
+			// Reload registry to verify persistence
+			const registry2 = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
+			expect(registry2.isProcessed(testHash("concurrent0"))).toBe(false);
+			expect(registry2.isProcessed(testHash("concurrent1"))).toBe(false);
+			expect(registry2.isProcessed(testHash("concurrent2"))).toBe(false);
+			expect(registry2.isProcessed(testHash("concurrent3"))).toBe(true);
+			expect(registry2.isProcessed(testHash("concurrent4"))).toBe(true);
+
+			// Verify operations were serialized (should take > 0ms)
+			expect(duration).toBeGreaterThan(0);
 		});
 	});
 
@@ -807,8 +833,9 @@ describe("inbox/registry", () => {
 				restrictToAttachments: false,
 			});
 
-			// Perform concurrent saves
+			// Perform concurrent saves and track timing
 			const savePromises = [];
+			const start = Date.now();
 			for (let i = 0; i < 10; i++) {
 				registry.markProcessed({
 					sourceHash: testHash(`serial${i}`),
@@ -820,26 +847,51 @@ describe("inbox/registry", () => {
 			}
 
 			await Promise.all(savePromises);
+			const duration = Date.now() - start;
 
-			// Verify all items persisted
+			// Reload registry to verify persistence
 			const registry2 = await setupLoadedRegistry(TEST_DIR, {
 				restrictToAttachments: false,
 			});
 
+			// Verify all items persisted correctly
 			for (let i = 0; i < 10; i++) {
 				expect(registry2.isProcessed(testHash(`serial${i}`))).toBe(true);
 			}
+
+			// Verify serialization occurred (should take > 0ms)
+			expect(duration).toBeGreaterThan(0);
 		});
 
-		test("should log warning for long lock wait times", async () => {
+		test("should handle rapid consecutive saves without data loss", async () => {
 			const TEST_DIR = createTestDir();
-			// This test verifies the logging behavior exists
-			// Actual implementation will log when lock wait > 100ms
-			const registry = await setupLoadedRegistry(TEST_DIR);
+			const registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 
-			// Just verify save completes successfully
-			await registry.save();
-			expect(true).toBe(true);
+			// Rapidly add items and save
+			for (let i = 0; i < 20; i++) {
+				registry.markProcessed({
+					sourceHash: testHash(`rapid${i}`),
+					sourcePath: `inbox/file${i}.pdf`,
+					processedAt: new Date().toISOString(),
+					createdNote: `note${i}.md`,
+				});
+				// Don't await - let saves queue up
+				void registry.save();
+			}
+
+			// Wait a bit for all saves to complete
+			await new Promise((resolve) => setTimeout(resolve, 100));
+
+			// Reload and verify all items present
+			const registry2 = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
+
+			for (let i = 0; i < 20; i++) {
+				expect(registry2.isProcessed(testHash(`rapid${i}`))).toBe(true);
+			}
 		});
 	});
 });

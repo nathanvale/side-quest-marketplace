@@ -408,6 +408,50 @@ export function createTestTemplate(
 	};
 }
 
+/**
+ * Setup a test vault with classifier-specific directory structure.
+ *
+ * Creates the standard directories needed for classifier tests:
+ * - .plugin-workspace/classifiers/definitions/
+ * - Templates/
+ *
+ * @returns Object with vault path and key directory paths
+ *
+ * @example
+ * ```ts
+ * const { vault, classifiersDir, templatesDir, registryPath } = createClassifierTestVault();
+ * // Directories are already created with .gitkeep files
+ * ```
+ */
+export function createClassifierTestVault() {
+	const vault = createTestVault();
+	const { join } = require("node:path");
+
+	const classifiersDir = join(
+		vault,
+		".plugin-workspace",
+		"classifiers",
+		"definitions",
+	);
+	const templatesDir = join(vault, "Templates");
+	const registryPath = join(classifiersDir, "index.ts");
+
+	// Create directory structure
+	writeVaultFile(
+		vault,
+		".plugin-workspace/classifiers/definitions/.gitkeep",
+		"",
+	);
+	writeVaultFile(vault, "Templates/.gitkeep", "");
+
+	return {
+		vault,
+		classifiersDir,
+		templatesDir,
+		registryPath,
+	};
+}
+
 // Re-export core testing utilities for convenience
 export {
 	cleanupTestDir,

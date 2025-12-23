@@ -25,7 +25,7 @@ describe("fs helpers", () => {
 	it("resolves vault-relative paths", () => {
 		const vault = setupTest();
 
-		writeVaultFile(vault, "01_Projects/.gitkeep", "");
+		writeVaultFile(vault, "01_Projects/dummy.md", "");
 		const target = path.join(vault, "01_Projects");
 		const result = resolveVaultPath(vault, "01_Projects");
 		expect(result.absolute).toBe(target);
@@ -35,14 +35,16 @@ describe("fs helpers", () => {
 	it("prevents escaping vault", () => {
 		const vault = setupTest();
 
-		expect(() => resolveVaultPath(vault, "../evil")).toThrow("escapes");
+		expect(() => resolveVaultPath(vault, "../evil")).toThrow(
+			/path.*escapes vault/i,
+		);
 	});
 
 	it("lists directories", () => {
 		const vault = setupTest();
 
-		writeVaultFile(vault, "a/.gitkeep", "");
-		writeVaultFile(vault, "b/.gitkeep", "");
+		writeVaultFile(vault, "a/dummy.md", "");
+		writeVaultFile(vault, "b/dummy.md", "");
 		const items = listDir(vault, ".");
 		expect(items).toEqual(["a", "b"]);
 	});

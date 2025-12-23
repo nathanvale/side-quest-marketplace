@@ -4,7 +4,7 @@
  * Focuses on the resolveParaFolder helper function.
  */
 
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
 	cleanupTestDir,
 	createTempDir,
@@ -667,6 +667,22 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 		return vault;
 	}
 
+	// Helper: Assert error with expected message snippets
+	function expectErrorWithMessage(
+		fn: () => void,
+		expectedSnippets: string[],
+	): void {
+		try {
+			fn();
+			expect.unreachable("Should have thrown error");
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			for (const snippet of expectedSnippets) {
+				expect(message).toContain(snippet);
+			}
+		}
+	}
+
 	const paraFolders = {
 		inbox: "00 Inbox",
 		areas: "02 Areas",
@@ -809,22 +825,22 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 			["vacation", "01 Projects/Vacation"],
 		]);
 
-		try {
-			resolveParaFolder("unknown", paraFolders, vault, {
-				areaPathMap,
-				projectPathMap,
-			});
-			expect.unreachable("Should have thrown error");
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			expect(message).toContain("Unknown destination");
-			expect(message).toContain("Available areas:");
-			expect(message).toContain("02 Areas/Health");
-			expect(message).toContain("02 Areas/Finance");
-			expect(message).toContain("Available projects:");
-			expect(message).toContain("01 Projects/Tax");
-			expect(message).toContain("01 Projects/Vacation");
-		}
+		expectErrorWithMessage(
+			() =>
+				resolveParaFolder("unknown", paraFolders, vault, {
+					areaPathMap,
+					projectPathMap,
+				}),
+			[
+				"Unknown destination",
+				"Available areas:",
+				"02 Areas/Health",
+				"02 Areas/Finance",
+				"Available projects:",
+				"01 Projects/Tax",
+				"01 Projects/Vacation",
+			],
+		);
 	});
 
 	test("error message shows 'none' for empty area list", () => {
@@ -832,16 +848,14 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 		const areaPathMap = new Map(); // Empty
 		const projectPathMap = new Map([["tax", "01 Projects/Tax"]]);
 
-		try {
-			resolveParaFolder("unknown", paraFolders, vault, {
-				areaPathMap,
-				projectPathMap,
-			});
-			expect.unreachable("Should have thrown error");
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			expect(message).toContain("Available areas: none");
-		}
+		expectErrorWithMessage(
+			() =>
+				resolveParaFolder("unknown", paraFolders, vault, {
+					areaPathMap,
+					projectPathMap,
+				}),
+			["Available areas: none"],
+		);
 	});
 
 	test("error message omits projects section when empty", () => {
@@ -1057,6 +1071,15 @@ describe("Security Tests - Path Traversal & Race Conditions", () => {
 	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	afterEach(getAfterEachHook());
 
+	// Shared PARA folders constant
+	const SECURITY_PARA_FOLDERS = {
+		projects: "01 Projects",
+		areas: "02 Areas",
+		resources: "03 Resources",
+		archives: "04 Archives",
+		inbox: "00 Inbox",
+	};
+
 	// Helper: Create and track vault in one step
 	function setupTest(): string {
 		const vault = createTestVault();
@@ -1073,65 +1096,32 @@ describe("Security Tests - Path Traversal & Race Conditions", () => {
 		writeVaultFile(vaultPath, ".inbox-staging/.gitkeep", "");
 	}
 
-	test("should reject path traversal with .. patterns", () => {
-		const vault = setupTest();
+	let vault: string;
+	beforeEach(() => {
+		vault = setupTest();
 		setupSecurityVault(vault);
-		const paraFolders = {
-			projects: "01 Projects",
-			areas: "02 Areas",
-			resources: "03 Resources",
-			archives: "04 Archives",
-			inbox: "00 Inbox",
-		};
+	});
 
+	test("should reject path traversal with .. patterns", () => {
 		expect(() =>
-			resolveParaFolder("../../etc/passwd", paraFolders, vault),
+			resolveParaFolder("../../etc/passwd", SECURITY_PARA_FOLDERS, vault),
 		).toThrow("Unsafe path pattern");
 	});
 
 	test("should reject absolute paths", () => {
-		const vault = setupTest();
-		setupSecurityVault(vault);
-		const paraFolders = {
-			projects: "01 Projects",
-			areas: "02 Areas",
-			resources: "03 Resources",
-			archives: "04 Archives",
-			inbox: "00 Inbox",
-		};
-
-		expect(() => resolveParaFolder("/etc/passwd", paraFolders, vault)).toThrow(
-			"Unsafe path pattern",
-		);
+		expect(() =>
+			resolveParaFolder("/etc/passwd", SECURITY_PARA_FOLDERS, vault),
+		).toThrow("Unsafe path pattern");
 	});
 
 	test("should reject tilde expansion", () => {
-		const vault = setupTest();
-		setupSecurityVault(vault);
-		const paraFolders = {
-			projects: "01 Projects",
-			areas: "02 Areas",
-			resources: "03 Resources",
-			archives: "04 Archives",
-			inbox: "00 Inbox",
-		};
-
-		expect(() => resolveParaFolder("~/malicious", paraFolders, vault)).toThrow(
-			"Unsafe path pattern",
-		);
+		expect(() =>
+			resolveParaFolder("~/malicious", SECURITY_PARA_FOLDERS, vault),
+		).toThrow("Unsafe path pattern");
 	});
 
 	test("should detect symlink path traversal attempts", () => {
-		const vault = setupTest();
-		setupSecurityVault(vault);
 		// This test verifies the realpath canonicalization catches symlinks escaping vault
-		const paraFolders = {
-			projects: "01 Projects",
-			areas: "02 Areas",
-			resources: "03 Resources",
-			archives: "04 Archives",
-			inbox: "00 Inbox",
-		};
 
 		// Create a symlink pointing outside the vault
 		const { symlinkSync } = require("node:fs");
@@ -1145,7 +1135,7 @@ describe("Security Tests - Path Traversal & Race Conditions", () => {
 			expect(() =>
 				resolveParaFolder(
 					"03 Resources/evil-link/escape.md",
-					paraFolders,
+					SECURITY_PARA_FOLDERS,
 					vault,
 				),
 			).toThrow("Path traversal detected");
@@ -1162,8 +1152,6 @@ describe("Security Tests - Path Traversal & Race Conditions", () => {
 	});
 
 	test("should handle file locking for concurrent operations", async () => {
-		const vault = setupTest();
-		setupSecurityVault(vault);
 		// Test that file locking prevents TOCTOU races
 		const sourcePath = "00 Inbox/test-file.md";
 		writeVaultFile(vault, sourcePath, "test content");
@@ -1204,8 +1192,6 @@ type: note
 	});
 
 	test("should fail gracefully if source file disappears during execution", async () => {
-		const vault = setupTest();
-		setupSecurityVault(vault);
 		// Create source file
 		const sourcePath = "00 Inbox/disappearing-file.md";
 		writeVaultFile(vault, sourcePath, "content");

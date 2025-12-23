@@ -1,14 +1,27 @@
 /**
  * Suggestion Builder Tests - Classifier Version
  *
- * Tests for the buildSuggestion() routing logic.
+ * Tests for the buildSuggestion() pure function.
+ * No filesystem operations needed - all tests operate on in-memory data structures.
  * All items are now created in the inbox folder - no area/project auto-routing.
  *
  * @module classifiers/suggestion-builder.test
  */
 
-import { afterEach, describe, expect, test } from "bun:test";
-import { createTestVault, useTestVaultCleanup } from "../../../testing/utils";
+import { afterEach, describe, expect, mock, test } from "bun:test";
+
+// Mock loadConfig BEFORE importing suggestion-builder
+// The function calls loadConfig() to apply title prefixes
+mock.module("../../../config/index", () => ({
+	loadConfig: () => ({
+		vaultPath: "/mock/vault",
+		inboxFolder: "00 Inbox",
+		attachmentsFolder: "Attachments",
+		templatesFolder: "Templates",
+		titlePrefixes: {},
+	}),
+}));
+
 import type { CreateNoteSuggestion } from "../../types";
 import type { DocumentTypeResult } from "../llm-classifier";
 import {
@@ -73,24 +86,13 @@ function createHeuristicResult(
 // =============================================================================
 
 describe("classifiers/suggestion-builder", () => {
-	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
-	afterEach(getAfterEachHook());
-
-	/**
-	 * Setup test vault and track for cleanup
-	 * Combines vault creation and tracking into a single call
-	 */
-	function setupTest(): string {
-		const vault = createTestVault();
-		trackVault(vault);
-		return vault;
-	}
+	afterEach(() => {
+		mock.restore();
+	});
 
 	describe("buildSuggestion", () => {
 		describe("Inbox destination (all items go to inbox)", () => {
 			test("should set destination to inbox folder for LLM detection", () => {
-				setupTest();
-
 				const input = createInput({
 					llmResult: createLLMResult({
 						confidence: 0.85,
@@ -106,8 +108,6 @@ describe("classifiers/suggestion-builder", () => {
 			});
 
 			test("should set destination to inbox folder for heuristic detection", () => {
-				setupTest();
-
 				const input = createInput({
 					heuristicResult: createHeuristicResult({
 						detected: true,
@@ -125,8 +125,6 @@ describe("classifiers/suggestion-builder", () => {
 			});
 
 			test("should set destination to inbox folder for LLM+heuristic detection", () => {
-				setupTest();
-
 				const input = createInput({
 					heuristicResult: createHeuristicResult({
 						detected: true,
@@ -150,8 +148,6 @@ describe("classifiers/suggestion-builder", () => {
 
 		describe("Edge cases", () => {
 			test("should set destination to inbox folder for frontmatter detection", () => {
-				setupTest();
-
 				const input = createInput({
 					llmResult: createLLMResult({
 						confidence: 0.85,
@@ -168,8 +164,6 @@ describe("classifiers/suggestion-builder", () => {
 			});
 
 			test("should handle 'none' detection source (no LLM suggestions)", () => {
-				setupTest();
-
 				const input = createInput({
 					detectionSource: "none",
 				});
@@ -181,8 +175,6 @@ describe("classifiers/suggestion-builder", () => {
 			});
 
 			test("should handle skip action (no create-note fields)", () => {
-				setupTest();
-
 				const input = createInput({
 					llmResult: createLLMResult({
 						confidence: 0.3, // Low confidence
@@ -199,8 +191,6 @@ describe("classifiers/suggestion-builder", () => {
 
 		describe("Field extraction", () => {
 			test("should create notes in inbox folder", () => {
-				setupTest();
-
 				const input = createInput({
 					llmResult: createLLMResult({
 						confidence: 0.85,
@@ -217,8 +207,6 @@ describe("classifiers/suggestion-builder", () => {
 			});
 
 			test("should extract all fields from LLM result", () => {
-				setupTest();
-
 				const input = createInput({
 					llmResult: createLLMResult({
 						confidence: 0.85,
@@ -248,8 +236,6 @@ describe("classifiers/suggestion-builder", () => {
 
 		describe("Attachment naming with hash", () => {
 			test("should generate ideal attachment name without hash (collision check at execute)", () => {
-				setupTest();
-
 				const input = createInput({
 					filename: "receipt.pdf",
 					llmResult: createLLMResult({
@@ -279,8 +265,6 @@ describe("classifiers/suggestion-builder", () => {
 			});
 
 			test("should NOT generate attachment name without hash", () => {
-				setupTest();
-
 				const input = createInput({
 					filename: "receipt.pdf",
 					llmResult: createLLMResult({
