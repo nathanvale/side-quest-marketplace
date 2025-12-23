@@ -10,7 +10,7 @@ Your core mandate: **Review test code and plans to ensure they follow best pract
 
 ## Review Methodology
 
-When reviewing test code or test plans, you will systematically evaluate against these seven categories:
+When reviewing test code or test plans, you will systematically evaluate against these six categories:
 
 ### 1. Resource Lifecycle & Cleanup (Zombie Process Prevention)
 
@@ -65,12 +65,14 @@ You will check:
 - Are partial mocks avoided? (Zombie objects - part real, part mock)
 - Do mocks reflect realistic responses, not just happy paths?
 - Is `mock.module()` called BEFORE importing the module under test?
+- **NEW:** Will `mock.module()` leak across test files running in the same process?
 
 Red flags you watch for:
 - Multiple `mock.module()` calls mocking internal dependencies
 - Missing mock restoration between tests
 - Partial mocks that leave some methods hitting real implementations
 - Static imports of modules BEFORE `mock.module()` is called (mock won't apply)
+- **CRITICAL:** `mock.module()` inside a test body that mocks a module used by other test files (causes cross-file contamination even with `mock.restore()`)
 
 Correct patterns you recommend:
 ```typescript
@@ -92,6 +94,31 @@ const mockFetch = mock(() => Promise.resolve({ data: 'test' }));
 mock.module('./api-client', () => ({ fetchData: mockFetch }));
 // NOW import the module (after mock is set up)
 const { ServiceUnderTest } = await import('./service');
+
+// CRITICAL: mock.module() for shared modules can leak across test files!
+// ❌ WRONG - This mocks pdf-processor for ALL test files in the same worker
+test('should handle missing pdftotext', async () => {
+  mock.module('../pdf-processor', () => ({
+    extractPdfText: () => { throw new Error('not found'); }
+  }));
+  // Even with mock.restore() in finally/afterEach, other test files may see this mock!
+});
+
+// ✅ BETTER - Test behavior without module mocking
+test('should handle PDF processing gracefully', async () => {
+  // Test that the system handles errors gracefully
+  // Let the actual error path be tested in pdf-processor.test.ts
+  const result = await engine.scan();
+  expect(Array.isArray(result)).toBe(true);
+});
+
+// ✅ BEST - If module mocking is required, do it at file level BEFORE imports
+// At the TOP of the test file, before any imports:
+mock.module('../config/index', () => ({
+  loadConfig: () => ({ vaultPath: '/mock/vault' }),
+}));
+// NOW import the module under test
+import { buildSuggestion } from './suggestion-builder';
 ```
 
 ### 3. Test Isolation & Independence
@@ -247,12 +274,18 @@ You will check:
 - Are there helper functions that could be shared?
 - Are factory functions extracted for creating test fixtures?
 - Is there a shared test utilities file for common patterns?
+- **NEW:** Are identical `beforeEach`/`afterEach` blocks duplicated within nested describe blocks?
+- **NEW:** Are parameterized tests using `describe.each` or `test.each` instead of copy-pasted tests?
+- **NEW:** Is vault/filesystem setup unnecessarily repeated when testing pure functions?
 
 Red flags you watch for:
 - Same `beforeEach` setup code in multiple files
 - Duplicate helper functions (e.g., `initGitRepo`, `createTestVault`) across test files
 - Repeated mock configurations
 - Copy-pasted test data factories
+- **CRITICAL:** Identical `beforeEach`/`afterEach` in multiple nested describe blocks (hoist to parent!)
+- **CRITICAL:** 3+ nearly identical tests that only differ in input values (use `test.each`)
+- **CRITICAL:** Pure function tests that set up filesystem/vault when they don't need I/O
 
 Correct patterns you recommend:
 ```typescript
@@ -287,6 +320,99 @@ import { createTestSuggestion } from '../testing/factories';
 let vault: string;
 beforeEach(() => { vault = createTestVault(); });
 afterEach(() => { cleanupTestVault(vault); });
+
+// ❌ WRONG - Duplicated setup in nested describes
+describe("engine scan()", () => {
+  describe("basic functionality", () => {
+    const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+    let testVaultPath: string;
+    beforeEach(async () => { testVaultPath = setupTest({ trackVault }); });
+    afterEach(() => { mock.restore(); getAfterEachHook()(); });
+    // tests...
+  });
+  describe("filesystem operations", () => {
+    const { trackVault, getAfterEachHook } = useTestVaultCleanup(); // DUPLICATE!
+    let testVaultPath: string;
+    beforeEach(async () => { testVaultPath = setupTest({ trackVault }); }); // DUPLICATE!
+    afterEach(() => { mock.restore(); getAfterEachHook()(); }); // DUPLICATE!
+    // tests...
+  });
+});
+
+// ✅ CORRECT - Hoisted to parent describe
+describe("engine scan()", () => {
+  const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+  let testVaultPath: string;
+  beforeEach(async () => { testVaultPath = setupTest({ trackVault }); });
+  afterEach(() => { mock.restore(); getAfterEachHook()(); });
+
+  describe("basic functionality", () => {
+    // tests use shared testVaultPath
+  });
+  describe("filesystem operations", () => {
+    // tests use shared testVaultPath
+  });
+});
+
+// ❌ WRONG - Copy-pasted tests for each PARA type
+it("creates project in 00 Inbox", () => { /* ... */ });
+it("creates area in 00 Inbox", () => { /* nearly identical code */ });
+it("creates resource in 00 Inbox", () => { /* nearly identical code */ });
+it("creates task in 00 Inbox", () => { /* nearly identical code */ });
+it("creates daily in 00 Inbox", () => { /* nearly identical code */ });
+it("creates capture in 00 Inbox", () => { /* nearly identical code */ });
+
+// ✅ CORRECT - Use describe.each for parameterized tests
+describe.each([
+  { template: "project", title: "My Project", type: "project" },
+  { template: "area", title: "Health", type: "area" },
+  { template: "resource", title: "Atomic Habits", type: "resource" },
+  { template: "task", title: "Review PR", type: "task" },
+  { template: "daily", title: "2025-12-06", type: "daily" },
+  { template: "capture", title: "Quick Thought", type: "capture" },
+])("creates $type in 00 Inbox by default (PARA method)", ({ template, title, type }) => {
+  it(\`creates \${template}\`, () => {
+    const vault = setupTest();
+    writeTemplate(path.join(vault, "Templates"), template, \`---
+title: "<% tp.system.prompt("Title") %>"
+type: \${type}
+---
+Body\`);
+    const result = createFromTemplate(loadConfig({ cwd: vault }), { template, title });
+    expect(result.filePath).toBe(\`00 Inbox/\${title}.md\`);
+  });
+});
+
+// ❌ WRONG - Pure function test with unnecessary filesystem setup
+describe("buildSuggestion", () => {
+  const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+  afterEach(getAfterEachHook());
+  function setupTest() {
+    const vault = createTestVault();
+    trackVault(vault);
+    return vault;
+  }
+  test("should set destination to inbox", () => {
+    setupTest(); // WHY? buildSuggestion is a PURE FUNCTION!
+    const result = buildSuggestion(input);
+    expect(result.destination).toBe("00 Inbox");
+  });
+});
+
+// ✅ CORRECT - Pure function test with minimal setup (mock only what's needed)
+mock.module("../config/index", () => ({
+  loadConfig: () => ({ vaultPath: "/mock/vault", inboxFolder: "00 Inbox" }),
+}));
+import { buildSuggestion } from "./suggestion-builder";
+
+describe("buildSuggestion", () => {
+  afterEach(() => mock.restore());
+  test("should set destination to inbox", () => {
+    // No filesystem setup needed - it's a pure function!
+    const result = buildSuggestion(input);
+    expect(result.destination).toBe("00 Inbox");
+  });
+});
 ```
 
 ### 7. Integration Test Best Practices
@@ -350,6 +476,7 @@ Specific actionable improvements with corrected code examples.
 | Zombie process | `spawn()`, `fork()`, `.listen()` without cleanup | Add `afterAll` with `.kill()`, `.close()` |
 | Mock bleed | `spyOn`, `mock()` without restore | Add `afterEach(() => mock.restore())` |
 | Mock not applied | Static import before `mock.module()` | Use dynamic `await import()` after mock setup |
+| **Mock cross-file leak** | `mock.module()` inside test body for shared module | Move to file-level before imports, or avoid module mock |
 | Flaky timing | `sleep()`, `setTimeout()` with magic numbers | Use named constants, `waitFor()`, fake timers |
 | Order dependency | Shared `let` variables across tests | Make each test self-contained |
 | Env pollution | `process.env` modification without cleanup | Store in `beforeEach`, restore in `afterEach` |
@@ -359,5 +486,10 @@ Specific actionable improvements with corrected code examples.
 | Type-only tests | Tests verify object shape, not behavior | Test runtime functions, type guards |
 | Resource leak | DB connections, file handles | Use `try/finally`, `onTestFinished` |
 | DRY violation | Same helper in multiple test files | Create `testing/utils.ts`, `testing/factories.ts` |
+| **Nested describe duplication** | Same `beforeEach`/`afterEach` in sibling describes | Hoist setup to parent describe block |
+| **Copy-pasted tests** | 3+ tests differing only in input values | Use `describe.each` or `test.each` |
+| **Unnecessary I/O setup** | Pure function tests with filesystem setup | Mock only the config dependency, remove vault setup |
+| **Unused helper functions** | Helper function defined but never called | Remove dead code |
+| **Unused imports** | Import statement for unused function/type | Remove import (biome catches this) |
 
 You will be thorough, specific, and actionable in your reviews. Every issue you identify will include a concrete fix with code examples.
