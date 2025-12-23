@@ -28,6 +28,16 @@ import { executeSuggestion, rollbackNote } from "./executor";
 // ============================================================================
 
 /**
+ * Setup test vault and register for cleanup.
+ * Combines vault creation and tracking into a single operation.
+ */
+function setupTest(cleanup: ReturnType<typeof useTestVaultCleanup>): string {
+	const vault = createTestVault();
+	cleanup.trackVault(vault);
+	return vault;
+}
+
+/**
  * Compute SHA256 hash of a file for registry tracking.
  */
 async function computeTestHash(filePath: string): Promise<string> {
@@ -83,13 +93,12 @@ type: resource
 }
 
 describe("Registry Cleanup - Phase 1", () => {
-	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	const cleanup = useTestVaultCleanup();
 	let vaultPath: string;
 	let inboxPath: string;
 
 	beforeEach(() => {
-		vaultPath = createTestVault();
-		trackVault(vaultPath);
+		vaultPath = setupTest(cleanup);
 		inboxPath = join(vaultPath, "00 Inbox");
 
 		// Create basic vault structure
@@ -100,7 +109,7 @@ describe("Registry Cleanup - Phase 1", () => {
 		// Restore all mocks and spies to prevent test pollution
 		mock.restore();
 		// Cleanup vaults tracked during test
-		getAfterEachHook()();
+		cleanup.getAfterEachHook()();
 	});
 
 	test("removes registry entry after successful PDF attachment move", async () => {
@@ -326,12 +335,11 @@ Test content`;
 });
 
 describe("executeSuggestion - attachment handling", () => {
-	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	const cleanup = useTestVaultCleanup();
 	let vaultPath: string;
 
 	beforeEach(() => {
-		vaultPath = createTestVault();
-		trackVault(vaultPath);
+		vaultPath = setupTest(cleanup);
 
 		// Create basic vault structure
 		createVaultStructure(vaultPath);
@@ -341,7 +349,7 @@ describe("executeSuggestion - attachment handling", () => {
 		// Restore all mocks and spies to prevent test pollution
 		mock.restore();
 		// Cleanup vaults tracked during test
-		getAfterEachHook()();
+		cleanup.getAfterEachHook()();
 	});
 
 	test("moves PDF attachment to attachments folder", async () => {

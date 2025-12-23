@@ -12,13 +12,49 @@ import {
 	validateModel,
 } from "../client";
 
+/**
+ * Creates a mock LLM response object.
+ *
+ * @param args - Frontmatter arguments
+ * @param content - Content sections
+ * @param title - Note title
+ * @returns JSON string representation
+ */
+function createMockResponse(
+	args: Record<string, unknown> = {},
+	content: Record<string, string> = {},
+	title = "Untitled",
+): string {
+	return JSON.stringify({ args, content, title });
+}
+
+/**
+ * Wraps content in markdown JSON code fence.
+ *
+ * @param content - JSON string to wrap
+ * @returns Markdown-wrapped JSON
+ */
+function wrapInJsonFence(content: string): string {
+	return `\`\`\`json\n${content}\n\`\`\``;
+}
+
+/**
+ * Wraps content in plain code fence.
+ *
+ * @param content - Content to wrap
+ * @returns Markdown-wrapped content
+ */
+function wrapInPlainFence(content: string): string {
+	return `\`\`\`\n${content}\n\`\`\``;
+}
+
 describe("parseOllamaResponse", () => {
 	test("parses valid JSON response", () => {
-		const response = JSON.stringify({
-			args: { title: "Test", status: "confirmed" },
-			content: { "Booking Details": "Some details here" },
-			title: "Test Booking",
-		});
+		const response = createMockResponse(
+			{ title: "Test", status: "confirmed" },
+			{ "Booking Details": "Some details here" },
+			"Test Booking",
+		);
 
 		const result = parseOllamaResponse(response);
 
@@ -28,13 +64,12 @@ describe("parseOllamaResponse", () => {
 	});
 
 	test("handles markdown json code fence", () => {
-		const response = `\`\`\`json
-{
-  "args": { "booking_type": "flight" },
-  "content": {},
-  "title": "Flight Booking"
-}
-\`\`\``;
+		const jsonContent = createMockResponse(
+			{ booking_type: "flight" },
+			{},
+			"Flight Booking",
+		);
+		const response = wrapInJsonFence(jsonContent);
 
 		const result = parseOllamaResponse(response);
 
@@ -43,9 +78,8 @@ describe("parseOllamaResponse", () => {
 	});
 
 	test("handles plain code fence", () => {
-		const response = `\`\`\`
-{"args": {}, "content": {}, "title": "Untitled"}
-\`\`\``;
+		const jsonContent = createMockResponse();
+		const response = wrapInPlainFence(jsonContent);
 
 		const result = parseOllamaResponse(response);
 
@@ -53,7 +87,7 @@ describe("parseOllamaResponse", () => {
 	});
 
 	test("provides defaults for missing fields", () => {
-		const response = JSON.stringify({});
+		const response = createMockResponse();
 
 		const result = parseOllamaResponse(response);
 

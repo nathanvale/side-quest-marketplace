@@ -164,12 +164,26 @@ describe("inbox/routing/scanner", () => {
 		mock.restore();
 	});
 
+	/**
+	 * Helper function to reduce DRY violations in test setup
+	 * Creates test vault and optionally sets up inbox with PARA folders
+	 */
+	function setupTest(folders: string[] = []): string {
+		const vault = createTestVault();
+		trackVault(vault);
+		if (folders.length > 0) {
+			setupInboxWithFolders(vault, folders);
+		} else {
+			// Still create inbox folder even when no PARA folders specified
+			mkdirSync(join(vault, "00 Inbox"), { recursive: true });
+		}
+		return vault;
+	}
+
 	describe("scanForRoutableNotes", () => {
 		describe("basic scanning", () => {
 			test("returns empty arrays when inbox is empty", async () => {
-				vaultPath = createTestVault();
-				trackVault(vaultPath);
-				setupInboxWithFolders(vaultPath, []);
+				vaultPath = setupTest();
 
 				const result = await scanForRoutableNotes(vaultPath, "00 Inbox");
 
@@ -177,9 +191,7 @@ describe("inbox/routing/scanner", () => {
 			});
 
 			test("finds note with area field", async () => {
-				vaultPath = createTestVault();
-				trackVault(vaultPath);
-				setupInboxWithFolders(vaultPath, ["02 Areas/Health"]);
+				vaultPath = setupTest(["02 Areas/Health"]);
 
 				writeVaultFile(
 					vaultPath,
@@ -203,9 +215,7 @@ describe("inbox/routing/scanner", () => {
 			});
 
 			test("finds note with project field", async () => {
-				vaultPath = createTestVault();
-				trackVault(vaultPath);
-				setupInboxWithFolders(vaultPath, ["01 Projects/Alpha"]);
+				vaultPath = setupTest(["01 Projects/Alpha"]);
 
 				writeVaultFile(
 					vaultPath,
@@ -228,12 +238,7 @@ describe("inbox/routing/scanner", () => {
 			});
 
 			test("prioritizes project over area", async () => {
-				vaultPath = createTestVault();
-				trackVault(vaultPath);
-				setupInboxWithFolders(vaultPath, [
-					"01 Projects/Alpha",
-					"02 Areas/Health",
-				]);
+				vaultPath = setupTest(["01 Projects/Alpha", "02 Areas/Health"]);
 
 				writeVaultFile(
 					vaultPath,
@@ -249,9 +254,7 @@ describe("inbox/routing/scanner", () => {
 			});
 
 			test("handles wikilink format in frontmatter", async () => {
-				vaultPath = createTestVault();
-				trackVault(vaultPath);
-				setupInboxWithFolders(vaultPath, ["02 Areas/Health"]);
+				vaultPath = setupTest(["02 Areas/Health"]);
 
 				writeVaultFile(
 					vaultPath,
@@ -270,9 +273,7 @@ describe("inbox/routing/scanner", () => {
 
 		describe("array field handling", () => {
 			test("takes first element when area is array", async () => {
-				vaultPath = createTestVault();
-				trackVault(vaultPath);
-				setupInboxWithFolders(vaultPath, ["02 Areas/Health"]);
+				vaultPath = setupTest(["02 Areas/Health"]);
 
 				writeVaultFile(
 					vaultPath,
@@ -287,9 +288,7 @@ describe("inbox/routing/scanner", () => {
 			});
 
 			test("takes first element when project is array", async () => {
-				vaultPath = createTestVault();
-				trackVault(vaultPath);
-				setupInboxWithFolders(vaultPath, ["01 Projects/Alpha"]);
+				vaultPath = setupTest(["01 Projects/Alpha"]);
 
 				writeVaultFile(
 					vaultPath,
@@ -306,9 +305,7 @@ describe("inbox/routing/scanner", () => {
 
 		describe("colocate detection", () => {
 			test("detects when area is a file and needs colocate", async () => {
-				vaultPath = createTestVault();
-				trackVault(vaultPath);
-				setupInboxWithFolders(vaultPath, ["02 Areas"]);
+				vaultPath = setupTest(["02 Areas"]);
 
 				writeVaultFile(
 					vaultPath,
@@ -332,9 +329,7 @@ describe("inbox/routing/scanner", () => {
 			});
 
 			test("detects when project is a file and needs colocate", async () => {
-				vaultPath = createTestVault();
-				trackVault(vaultPath);
-				setupInboxWithFolders(vaultPath, ["01 Projects"]);
+				vaultPath = setupTest(["01 Projects"]);
 
 				writeVaultFile(
 					vaultPath,
@@ -360,9 +355,7 @@ describe("inbox/routing/scanner", () => {
 
 		describe("skipped items", () => {
 			test("skips notes without title", async () => {
-				vaultPath = createTestVault();
-				trackVault(vaultPath);
-				setupInboxWithFolders(vaultPath, ["02 Areas/Health"]);
+				vaultPath = setupTest(["02 Areas/Health"]);
 
 				writeVaultFile(
 					vaultPath,
@@ -380,9 +373,7 @@ describe("inbox/routing/scanner", () => {
 			});
 
 			test("skips notes without area or project", async () => {
-				vaultPath = createTestVault();
-				trackVault(vaultPath);
-				setupInboxWithFolders(vaultPath, []);
+				vaultPath = setupTest();
 
 				writeVaultFile(
 					vaultPath,
@@ -400,9 +391,7 @@ describe("inbox/routing/scanner", () => {
 			});
 
 			test("skips notes when destination does not exist", async () => {
-				vaultPath = createTestVault();
-				trackVault(vaultPath);
-				setupInboxWithFolders(vaultPath, []);
+				vaultPath = setupTest();
 				// Don't create the Health area folder
 
 				writeVaultFile(
@@ -421,9 +410,7 @@ describe("inbox/routing/scanner", () => {
 			});
 
 			test("skips notes with parse errors", async () => {
-				vaultPath = createTestVault();
-				trackVault(vaultPath);
-				setupInboxWithFolders(vaultPath, []);
+				vaultPath = setupTest();
 
 				writeVaultFile(
 					vaultPath,
@@ -447,12 +434,7 @@ Content.
 
 		describe("multiple files", () => {
 			test("processes multiple valid files", async () => {
-				vaultPath = createTestVault();
-				trackVault(vaultPath);
-				setupInboxWithFolders(vaultPath, [
-					"01 Projects/Alpha",
-					"02 Areas/Health",
-				]);
+				vaultPath = setupTest(["01 Projects/Alpha", "02 Areas/Health"]);
 
 				writeVaultFile(
 					vaultPath,
@@ -474,9 +456,7 @@ Content.
 			});
 
 			test("handles mix of valid and skipped files", async () => {
-				vaultPath = createTestVault();
-				trackVault(vaultPath);
-				setupInboxWithFolders(vaultPath, ["02 Areas/Health"]);
+				vaultPath = setupTest(["02 Areas/Health"]);
 
 				writeVaultFile(
 					vaultPath,
@@ -526,6 +506,7 @@ Content.
 			test("finds notes in subdirectories", async () => {
 				vaultPath = createTestVault();
 				trackVault(vaultPath);
+				// Custom setup needed - creating subdirectory within inbox
 				mkdirSync(join(vaultPath, "00 Inbox/subfolder"), { recursive: true });
 				mkdirSync(join(vaultPath, "02 Areas/Health"), { recursive: true });
 
@@ -544,9 +525,7 @@ Content.
 
 		describe("correlation context", () => {
 			test("accepts correlation context", async () => {
-				vaultPath = createTestVault();
-				trackVault(vaultPath);
-				setupInboxWithFolders(vaultPath, []);
+				vaultPath = setupTest();
 
 				const ctx = {
 					sessionCid: "test-session-123",
@@ -565,7 +544,7 @@ Content.
 			test("handles inbox folder that does not exist", async () => {
 				vaultPath = createTestVault();
 				trackVault(vaultPath);
-				// Don't create inbox folder
+				// Don't create inbox folder - testing edge case
 
 				const result = await scanForRoutableNotes(vaultPath, "00 Inbox");
 
@@ -573,9 +552,7 @@ Content.
 			});
 
 			test("handles non-markdown files in inbox", async () => {
-				vaultPath = createTestVault();
-				trackVault(vaultPath);
-				setupInboxWithFolders(vaultPath, []);
+				vaultPath = setupTest();
 
 				writeVaultFile(vaultPath, "00 Inbox/file.txt", "Not a markdown file");
 				writeVaultFile(vaultPath, "00 Inbox/file.pdf", "Binary content");
@@ -587,9 +564,7 @@ Content.
 			});
 
 			test("handles empty frontmatter", async () => {
-				vaultPath = createTestVault();
-				trackVault(vaultPath);
-				setupInboxWithFolders(vaultPath, []);
+				vaultPath = setupTest();
 
 				writeVaultFile(vaultPath, "00 Inbox/Empty.md", FRONTMATTER.empty());
 
@@ -599,9 +574,7 @@ Content.
 			});
 
 			test("handles markdown without frontmatter", async () => {
-				vaultPath = createTestVault();
-				trackVault(vaultPath);
-				setupInboxWithFolders(vaultPath, []);
+				vaultPath = setupTest();
 
 				writeVaultFile(
 					vaultPath,

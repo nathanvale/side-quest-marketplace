@@ -2,46 +2,44 @@
  * Tests for MCP utils enhanced error logging.
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	mock,
+	spyOn,
+	test,
+} from "bun:test";
 import { mcpLogger } from "../src/shared/logger";
 import { type LogEntry, log } from "./utils";
 
 describe("log() with enhanced error handling", () => {
 	let logCalls: Array<{ level: string; message: string; properties: unknown }> =
 		[];
-	let originalInfo: typeof mcpLogger.info | null = null;
-	let originalError: typeof mcpLogger.error | null = null;
 
 	beforeEach(() => {
 		logCalls = [];
-		// Mock the logger to capture calls
-		if (mcpLogger) {
-			originalInfo = mcpLogger.info.bind(mcpLogger);
-			originalError = mcpLogger.error.bind(mcpLogger);
+		// Mock the logger to capture calls using spyOn
+		// Use mockImplementation with any to handle overloaded function signatures
+		spyOn(mcpLogger, "info").mockImplementation(((
+			message: string,
+			properties?: unknown,
+		) => {
+			logCalls.push({ level: "info", message, properties });
+		}) as typeof mcpLogger.info);
 
-			// Replace with mock that only captures - cast to any to bypass overload types
-			(mcpLogger as { info: unknown }).info = (
-				message: string,
-				properties?: unknown,
-			) => {
-				logCalls.push({ level: "info", message, properties });
-			};
-
-			(mcpLogger as { error: unknown }).error = (
-				message: string,
-				properties?: unknown,
-			) => {
-				logCalls.push({ level: "error", message, properties });
-			};
-		}
+		spyOn(mcpLogger, "error").mockImplementation(((
+			message: string,
+			properties?: unknown,
+		) => {
+			logCalls.push({ level: "error", message, properties });
+		}) as typeof mcpLogger.error);
 	});
 
 	afterEach(() => {
-		// Restore original methods
-		if (mcpLogger && originalInfo && originalError) {
-			(mcpLogger as { info: unknown }).info = originalInfo;
-			(mcpLogger as { error: unknown }).error = originalError;
-		}
+		// Restore all mocks automatically
+		mock.restore();
 		logCalls = [];
 	});
 

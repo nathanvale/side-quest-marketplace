@@ -13,9 +13,17 @@ describe("createTemplate", () => {
 	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	afterEach(getAfterEachHook());
 
-	test("skips creation when action is 'skip'", async () => {
+	/**
+	 * Helper to setup test vault with automatic cleanup tracking
+	 */
+	const setupTest = () => {
 		const vault = createTestVault();
 		trackVault(vault);
+		return vault;
+	};
+
+	test("skips creation when action is 'skip'", async () => {
+		const vault = setupTest();
 
 		const result = await createTemplate({
 			vaultPath: vault,
@@ -33,8 +41,7 @@ describe("createTemplate", () => {
 	});
 
 	test("skips creation when action is 'use-existing'", async () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 
 		const result = await createTemplate({
 			vaultPath: vault,
@@ -52,8 +59,7 @@ describe("createTemplate", () => {
 	});
 
 	test("creates basic template when action is 'create-new'", async () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 
 		const result = await createTemplate({
 			vaultPath: vault,
@@ -99,8 +105,7 @@ describe("createTemplate", () => {
 	});
 
 	test("creates template with suffix when provided", async () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 
 		const result = await createTemplate({
 			vaultPath: vault,
@@ -131,8 +136,7 @@ describe("createTemplate", () => {
 	});
 
 	test("uses atomic file write", async () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 
 		const result = await createTemplate({
 			vaultPath: vault,
@@ -161,8 +165,7 @@ describe("createTemplate", () => {
 	});
 
 	test("handles rich mode by falling back to basic (not yet implemented)", async () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 
 		const result = await createTemplate({
 			vaultPath: vault,
@@ -190,8 +193,7 @@ describe("createTemplate", () => {
 	});
 
 	test("creates Templates directory if it doesn't exist", async () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 
 		// Templates dir doesn't exist initially
 		const templatesDir = join(vault, "Templates");

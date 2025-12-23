@@ -13,6 +13,15 @@ function writeJson(filePath: string, data: unknown) {
 describe("loadConfig", () => {
 	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 
+	/**
+	 * Helper function to create and track a test vault
+	 */
+	function setupTest() {
+		const vault = createTestVault();
+		trackVault(vault);
+		return vault;
+	}
+
 	// Track config-specific environment variables for cleanup
 	const originalHome = process.env.HOME;
 	const originalConfig = process.env.PARA_OBSIDIAN_CONFIG;
@@ -38,8 +47,7 @@ describe("loadConfig", () => {
 	});
 
 	it("resolves vault and default templates dir", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		// Default templates dir is now vault/Templates (not 06_Metadata/Templates)
 		fs.mkdirSync(path.join(vault, "Templates"), {
 			recursive: true,
@@ -54,10 +62,8 @@ describe("loadConfig", () => {
 	});
 
 	it("applies user config overrides", () => {
-		const vault = createTestVault();
-		trackVault(vault);
-		const home = createTestVault();
-		trackVault(home);
+		const vault = setupTest();
+		const home = setupTest();
 		fs.mkdirSync(path.join(vault, "Templates"), {
 			recursive: true,
 		});
@@ -76,15 +82,13 @@ describe("loadConfig", () => {
 	});
 
 	it("applies explicit config path from PARA_OBSIDIAN_CONFIG", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		fs.mkdirSync(path.join(vault, "Templates"), {
 			recursive: true,
 		});
 		process.env.PARA_VAULT = vault;
 
-		const explicit = createTestVault();
-		trackVault(explicit);
+		const explicit = setupTest();
 		const explicitConfigPath = path.join(explicit, "rc.json");
 		writeJson(explicitConfigPath, {
 			gitCommitMessageTemplate: "docs(vault): <title>",
@@ -96,12 +100,9 @@ describe("loadConfig", () => {
 	});
 
 	it("prefers user config over project rc", () => {
-		const vault = createTestVault();
-		trackVault(vault);
-		const home = createTestVault();
-		trackVault(home);
-		const cwd = createTestVault();
-		trackVault(cwd);
+		const vault = setupTest();
+		const home = setupTest();
+		const cwd = setupTest();
 		fs.mkdirSync(path.join(vault, "Templates"), {
 			recursive: true,
 		});
@@ -120,8 +121,7 @@ describe("loadConfig", () => {
 	});
 
 	it("errors when PARA_VAULT is not a directory", () => {
-		const tempVault = createTestVault();
-		trackVault(tempVault);
+		const tempVault = setupTest();
 		const vault = path.join(tempVault, "missing");
 		process.env.PARA_VAULT = vault;
 		expect(() => loadConfig()).toThrow("does not point to a directory");

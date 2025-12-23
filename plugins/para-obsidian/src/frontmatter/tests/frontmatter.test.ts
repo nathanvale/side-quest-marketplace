@@ -246,9 +246,15 @@ describe("frontmatter update", () => {
 	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	afterEach(getAfterEachHook());
 
-	it("sets and unsets keys while preserving body", () => {
+	/** Helper to create and track a test vault */
+	const setupTest = () => {
 		const vault = createTestVault();
 		trackVault(vault);
+		return vault;
+	};
+
+	it("sets and unsets keys while preserving body", () => {
+		const vault = setupTest();
 
 		writeTestFile(
 			vault,
@@ -286,9 +292,15 @@ describe("bulk frontmatter validation", () => {
 	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	afterEach(getAfterEachHook());
 
-	const makeVault = () => {
+	/** Helper to create and track a test vault */
+	const setupTest = () => {
 		const vault = createTestVault();
 		trackVault(vault);
+		return vault;
+	};
+
+	const makeVault = () => {
+		const vault = setupTest();
 
 		// Create test directory structure
 		const projectsDir = path.join(vault, "01_Projects");
@@ -467,8 +479,7 @@ Body`,
 	});
 
 	it("handles validation errors gracefully", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 
 		// Create file with invalid YAML
 		writeTestFile(

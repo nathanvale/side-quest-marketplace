@@ -397,9 +397,18 @@ describe("inbox/engine-utils", () => {
 		const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 		afterEach(getAfterEachHook());
 
+		/**
+		 * Setup helper that creates and tracks a test vault.
+		 * Combines createTestVault() + trackVault() into one call.
+		 */
+		function setupTest(): string {
+			const vault = createTestVault();
+			trackVault(vault);
+			return vault;
+		}
+
 		test("should return original path when file does not exist", () => {
-			const tempDir = createTestVault();
-			trackVault(tempDir);
+			const tempDir = setupTest();
 
 			const path = `${tempDir}/new-file.pdf`;
 			const result = generateUniquePath(path);
@@ -408,8 +417,7 @@ describe("inbox/engine-utils", () => {
 		});
 
 		test("should add counter suffix when file exists", () => {
-			const tempDir = createTestVault();
-			trackVault(tempDir);
+			const tempDir = setupTest();
 
 			const path = `${tempDir}/existing.pdf`;
 			writeFileSync(path, "content");
@@ -421,8 +429,7 @@ describe("inbox/engine-utils", () => {
 		});
 
 		test("should increment counter when multiple files exist", () => {
-			const tempDir = createTestVault();
-			trackVault(tempDir);
+			const tempDir = setupTest();
 
 			const basePath = `${tempDir}/existing.pdf`;
 			writeFileSync(basePath, "content");
@@ -436,8 +443,7 @@ describe("inbox/engine-utils", () => {
 		});
 
 		test("should handle files without extension", () => {
-			const tempDir = createTestVault();
-			trackVault(tempDir);
+			const tempDir = setupTest();
 
 			const path = `${tempDir}/README`;
 			writeFileSync(path, "content");
@@ -448,8 +454,7 @@ describe("inbox/engine-utils", () => {
 		});
 
 		test("should preserve extension correctly", () => {
-			const tempDir = createTestVault();
-			trackVault(tempDir);
+			const tempDir = setupTest();
 
 			const path = `${tempDir}/file.tar.gz`;
 			writeFileSync(path, "content");
@@ -461,8 +466,7 @@ describe("inbox/engine-utils", () => {
 		});
 
 		test("should handle directory paths", () => {
-			const tempDir = createTestVault();
-			trackVault(tempDir);
+			const tempDir = setupTest();
 
 			const dirPath = `${tempDir}/subdir`;
 			mkdirSync(dirPath);
@@ -477,9 +481,18 @@ describe("inbox/engine-utils", () => {
 		const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 		afterEach(getAfterEachHook());
 
+		/**
+		 * Setup helper that creates and tracks a test vault.
+		 * Combines createTestVault() + trackVault() into one call.
+		 */
+		function setupTest(): string {
+			const vault = createTestVault();
+			trackVault(vault);
+			return vault;
+		}
+
 		test("should return original path if file does not exist", () => {
-			const tempDir = createTestVault();
-			trackVault(tempDir);
+			const tempDir = setupTest();
 
 			const path = `${tempDir}/My Note.md`;
 
@@ -489,8 +502,7 @@ describe("inbox/engine-utils", () => {
 		});
 
 		test("should add parenthetical counter when file exists", () => {
-			const tempDir = createTestVault();
-			trackVault(tempDir);
+			const tempDir = setupTest();
 
 			const path = `${tempDir}/My Note.md`;
 			writeFileSync(path, "content");
@@ -502,8 +514,7 @@ describe("inbox/engine-utils", () => {
 		});
 
 		test("should increment counter when multiple notes exist", () => {
-			const tempDir = createTestVault();
-			trackVault(tempDir);
+			const tempDir = setupTest();
 
 			const basePath = `${tempDir}/Invoice - Amazon - 2024-12-10.md`;
 			writeFileSync(basePath, "content");
@@ -523,8 +534,7 @@ describe("inbox/engine-utils", () => {
 		});
 
 		test("should handle files without extension", () => {
-			const tempDir = createTestVault();
-			trackVault(tempDir);
+			const tempDir = setupTest();
 
 			const path = `${tempDir}/README`;
 			writeFileSync(path, "content");

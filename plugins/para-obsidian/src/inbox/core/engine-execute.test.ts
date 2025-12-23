@@ -18,6 +18,18 @@ import type { SuggestionId } from "../types";
 import { createTestEngine, createVaultStructure, initGitRepo } from "./testing";
 
 describe("engine execute()", () => {
+	/**
+	 * Helper to set up a test vault with git repo.
+	 * Consolidates the repeated createTestVault + trackVault pattern.
+	 */
+	async function setupTest(trackVault: (vault: string) => void) {
+		const vault = createTestVault();
+		trackVault(vault);
+		createVaultStructure(vault);
+		await initGitRepo(vault);
+		return vault;
+	}
+
 	describe("basic execute functionality", () => {
 		const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 
@@ -26,16 +38,8 @@ describe("engine execute()", () => {
 			getAfterEachHook()();
 		});
 
-		async function setupVault() {
-			const vault = createTestVault();
-			trackVault(vault);
-			createVaultStructure(vault);
-			await initGitRepo(vault);
-			return vault;
-		}
-
 		test("should return a promise", async () => {
-			const vault = await setupVault();
+			const vault = await setupTest(trackVault);
 			const engine = createTestEngine({ vaultPath: vault });
 			const result = engine.execute([]);
 			expect(result).toBeInstanceOf(Promise);
@@ -43,14 +47,14 @@ describe("engine execute()", () => {
 		});
 
 		test("should resolve to an array of execution results", async () => {
-			const vault = await setupVault();
+			const vault = await setupTest(trackVault);
 			const engine = createTestEngine({ vaultPath: vault });
 			const result = await engine.execute([]);
 			expect(Array.isArray(result.successful)).toBe(true);
 		});
 
 		test("should return empty batch result for empty input", async () => {
-			const vault = await setupVault();
+			const vault = await setupTest(trackVault);
 			const engine = createTestEngine({ vaultPath: vault });
 			const result = await engine.execute([]);
 			expect(result).toEqual({
@@ -65,7 +69,7 @@ describe("engine execute()", () => {
 		});
 
 		test("happy path: verifies execute logic with unknown ID (cache limitation)", async () => {
-			const vault = await setupVault();
+			const vault = await setupTest(trackVault);
 			const engine = createTestEngine({ vaultPath: vault });
 
 			// Execute with a dummy suggestion ID (would fail in real scenario)
@@ -90,16 +94,8 @@ describe("engine execute()", () => {
 			getAfterEachHook()();
 		});
 
-		async function setupVault() {
-			const vault = createTestVault();
-			trackVault(vault);
-			createVaultStructure(vault);
-			await initGitRepo(vault);
-			return vault;
-		}
-
 		test("should generate unique filename when collision occurs", async () => {
-			const vault = await setupVault();
+			const vault = await setupTest(trackVault);
 
 			// Create existing attachment to force collision
 			const existingPath = join(vault, "Attachments", "document.pdf");
@@ -118,7 +114,7 @@ describe("engine execute()", () => {
 		});
 
 		test("should handle multiple collisions sequentially", async () => {
-			const vault = await setupVault();
+			const vault = await setupTest(trackVault);
 
 			// Create multiple existing files
 			const names = ["doc.pdf", "doc-1.pdf", "doc-2.pdf"];
@@ -133,7 +129,7 @@ describe("engine execute()", () => {
 		});
 
 		test("should record actual moved path in registry", async () => {
-			const vault = await setupVault();
+			const vault = await setupTest(trackVault);
 
 			// Create PDF file in inbox (engine only processes attachments)
 			const pdfPath = join(vault, "00 Inbox", "registry-test.pdf");
@@ -147,7 +143,7 @@ describe("engine execute()", () => {
 		});
 
 		test("should use correct attachment link in note", async () => {
-			const vault = await setupVault();
+			const vault = await setupTest(trackVault);
 			const engine = createTestEngine({ vaultPath: vault });
 
 			// This test verifies that attachment links use the actual moved filename
@@ -165,16 +161,8 @@ describe("engine execute()", () => {
 			getAfterEachHook()();
 		});
 
-		async function setupVault() {
-			const vault = createTestVault();
-			trackVault(vault);
-			createVaultStructure(vault);
-			await initGitRepo(vault);
-			return vault;
-		}
-
 		test("execute() accepts sessionCid option and logs it", async () => {
-			const vault = await setupVault();
+			const vault = await setupTest(trackVault);
 			const engine = createTestEngine({ vaultPath: vault });
 			const customSessionCid = "session-456-def";
 
@@ -185,7 +173,7 @@ describe("engine execute()", () => {
 		});
 
 		test("scan() and execute() can share the same sessionCid for correlation", async () => {
-			const vault = await setupVault();
+			const vault = await setupTest(trackVault);
 
 			// Create a test PDF
 			const pdfPath = join(vault, "00 Inbox", "invoice.pdf");

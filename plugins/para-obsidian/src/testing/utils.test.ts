@@ -76,44 +76,43 @@ describe("withTempVault", () => {
 });
 
 describe("createTestContext", () => {
-	test("creates context with sensible defaults", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
+	/**
+	 * Helper to create and track a test vault in one call
+	 */
+	const setupTest = () => {
 		const vault = createTestVault();
+		trackVault(vault);
+		return vault;
+	};
 
-		try {
-			const context = createTestContext(vault);
+	test("creates context with sensible defaults", () => {
+		const vault = setupTest();
 
-			expect(context.vaultPath).toBe(vault);
-			expect(context.inboxFolder).toBe("00 Inbox");
-			expect(context.attachmentsFolder).toBe("Attachments");
-			expect(context.templatesFolder).toBe("Templates");
-			expect(context.registry).toBeDefined();
-			expect(context.cid).toMatch(/^test-cid-\d+$/);
-			expect(context.sessionCid).toMatch(/^test-session-\d+$/);
-		} finally {
-			// Manual cleanup since we're not using withTempVault
-			if (process.env.PARA_VAULT === vault) {
-				delete process.env.PARA_VAULT;
-			}
-		}
+		const context = createTestContext(vault);
+
+		expect(context.vaultPath).toBe(vault);
+		expect(context.inboxFolder).toBe("00 Inbox");
+		expect(context.attachmentsFolder).toBe("Attachments");
+		expect(context.templatesFolder).toBe("Templates");
+		expect(context.registry).toBeDefined();
+		expect(context.cid).toMatch(/^test-cid-\d+$/);
+		expect(context.sessionCid).toMatch(/^test-session-\d+$/);
 	});
 
 	test("allows overriding defaults", () => {
-		const vault = createTestVault();
+		const vault = setupTest();
 
-		try {
-			const context = createTestContext(vault, {
-				inboxFolder: "Custom Inbox",
-				cid: "custom-cid",
-			});
+		const context = createTestContext(vault, {
+			inboxFolder: "Custom Inbox",
+			cid: "custom-cid",
+		});
 
-			expect(context.inboxFolder).toBe("Custom Inbox");
-			expect(context.cid).toBe("custom-cid");
-			expect(context.attachmentsFolder).toBe("Attachments"); // Default preserved
-		} finally {
-			if (process.env.PARA_VAULT === vault) {
-				delete process.env.PARA_VAULT;
-			}
-		}
+		expect(context.inboxFolder).toBe("Custom Inbox");
+		expect(context.cid).toBe("custom-cid");
+		expect(context.attachmentsFolder).toBe("Attachments"); // Default preserved
 	});
 });
 
@@ -156,15 +155,22 @@ describe("createTestSuggestion", () => {
 });
 
 describe("useTestVaultCleanup", () => {
+	/**
+	 * Helper to create and track a test vault in one call
+	 */
+	const setupTestVault = (cleanup: { trackVault: (vault: string) => void }) => {
+		const vault = createTestVault();
+		cleanup.trackVault(vault);
+		return vault;
+	};
+
 	test("tracks and cleans up multiple vaults", () => {
 		const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 
 		// Create and track vaults
-		const vault1 = createTestVault();
-		trackVault(vault1);
+		const vault1 = setupTestVault({ trackVault });
 
-		const vault2 = createTestVault();
-		trackVault(vault2);
+		const vault2 = setupTestVault({ trackVault });
 
 		// Both should exist
 		expect(pathExistsSync(vault1)).toBe(true);
@@ -183,8 +189,7 @@ describe("useTestVaultCleanup", () => {
 		const originalEnv = process.env.PARA_VAULT;
 		const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTestVault({ trackVault });
 
 		// Modify PARA_VAULT
 		process.env.PARA_VAULT = vault;
@@ -206,17 +211,24 @@ describe("useTestVaultCleanup integration", () => {
 	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	afterEach(getAfterEachHook());
 
-	test("first test creates vault", () => {
+	/**
+	 * Helper to create and track a test vault in one call
+	 */
+	const setupTest = () => {
 		const vault = createTestVault();
 		trackVault(vault);
+		return vault;
+	};
+
+	test("first test creates vault", () => {
+		const vault = setupTest();
 
 		writeVaultFile(vault, "test1.md", "# Test 1");
 		expect(pathExistsSync(join(vault, "test1.md"))).toBe(true);
 	});
 
 	test("second test creates different vault", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 
 		writeVaultFile(vault, "test2.md", "# Test 2");
 		expect(pathExistsSync(join(vault, "test2.md"))).toBe(true);

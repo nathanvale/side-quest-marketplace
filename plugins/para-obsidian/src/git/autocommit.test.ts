@@ -14,9 +14,18 @@ describe("autoCommitChanges", () => {
 	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	afterEach(getAfterEachHook());
 
-	it("stages and commits when autoCommit is enabled", async () => {
+	/**
+	 * Sets up a test vault and registers it for cleanup
+	 * @returns The path to the created test vault
+	 */
+	const setupTest = (): string => {
 		const vault = createTestVault();
 		trackVault(vault);
+		return vault;
+	};
+
+	it("stages and commits when autoCommit is enabled", async () => {
+		const vault = setupTest();
 		await initGitRepo(vault);
 
 		const target = path.join(vault, "note.md");
@@ -41,8 +50,7 @@ describe("autoCommitChanges", () => {
 	});
 
 	it("skips when autoCommit is disabled", async () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		await initGitRepo(vault);
 
 		fs.writeFileSync(path.join(vault, "note.md"), "content", "utf8");

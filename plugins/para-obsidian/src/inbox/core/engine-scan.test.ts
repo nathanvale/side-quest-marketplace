@@ -21,14 +21,23 @@ import {
 import { hashFile } from "../registry/processed-registry";
 import { createTestEngine, createVaultStructure } from "./testing";
 
+/**
+ * Helper function to set up test vault with cleanup tracking
+ * @returns Test vault path with cleanup already registered
+ */
+function setupTest(cleanup: { trackVault: (path: string) => void }): string {
+	const vault = createTestVault();
+	cleanup.trackVault(vault);
+	return vault;
+}
+
 describe("engine scan()", () => {
 	describe("basic scan functionality", () => {
 		const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 		let testVaultPath: string;
 
 		beforeEach(async () => {
-			testVaultPath = createTestVault();
-			trackVault(testVaultPath);
+			testVaultPath = setupTest({ trackVault });
 			createVaultStructure(testVaultPath);
 			await initGitRepo(testVaultPath);
 		});
@@ -57,8 +66,7 @@ describe("engine scan()", () => {
 		let testVaultPath: string;
 
 		beforeEach(async () => {
-			testVaultPath = createTestVault();
-			trackVault(testVaultPath);
+			testVaultPath = setupTest({ trackVault });
 			createVaultStructure(testVaultPath);
 			await initGitRepo(testVaultPath);
 		});
@@ -173,8 +181,7 @@ describe("engine scan()", () => {
 		let testVaultPath: string;
 
 		beforeEach(async () => {
-			testVaultPath = createTestVault();
-			trackVault(testVaultPath);
+			testVaultPath = setupTest({ trackVault });
 			createVaultStructure(testVaultPath);
 			await initGitRepo(testVaultPath);
 		});

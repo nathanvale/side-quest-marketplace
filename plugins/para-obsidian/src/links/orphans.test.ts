@@ -10,10 +10,19 @@ describe("findOrphans", () => {
 	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	afterEach(getAfterEachHook());
 
+	/**
+	 * Helper to create and track a test vault in one call.
+	 * Combines createTestVault() + trackVault() to eliminate DRY violations.
+	 */
+	const setupTest = () => {
+		const vault = createTestVault();
+		trackVault(vault);
+		return vault;
+	};
+
 	describe("attachment links", () => {
 		it("does not report PDF attachments as broken when correctly linked", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			// Create attachment
 			writeVaultFile(vault, "Attachments/document.pdf", "PDF content");
 			// Create note linking to it
@@ -33,8 +42,7 @@ See [[Attachments/document.pdf]] for details.`,
 		});
 
 		it("does not report image attachments as broken when correctly linked", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(vault, "Attachments/photo.png", "PNG content");
 			writeVaultFile(vault, "note.md", "![[Attachments/photo.png]]");
 
@@ -45,8 +53,7 @@ See [[Attachments/document.pdf]] for details.`,
 		});
 
 		it("reports orphan attachments not referenced by any note", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(vault, "Attachments/unused.pdf", "PDF content");
 			writeVaultFile(vault, "note.md", "No links here");
 
@@ -56,8 +63,7 @@ See [[Attachments/document.pdf]] for details.`,
 		});
 
 		it("reports broken links to non-existent attachments", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(vault, "note.md", "See [[Attachments/missing.pdf]]");
 
 			const result = findOrphans(vault);
@@ -67,8 +73,7 @@ See [[Attachments/document.pdf]] for details.`,
 		});
 
 		it("handles various file extensions correctly", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			// Create various attachment types
 			writeVaultFile(vault, "Attachments/doc.pdf", "content");
 			writeVaultFile(vault, "Attachments/image.jpg", "content");
@@ -98,8 +103,7 @@ See [[Attachments/document.pdf]] for details.`,
 
 	describe("markdown note links", () => {
 		it("reports broken links to non-existent notes", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(vault, "note.md", "See [[Missing Note]] for details.");
 
 			const result = findOrphans(vault);
@@ -109,8 +113,7 @@ See [[Attachments/document.pdf]] for details.`,
 		});
 
 		it("does not report links to existing notes", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(vault, "Target Note.md", "Target content");
 			writeVaultFile(vault, "source.md", "Link to [[Target Note]]");
 
@@ -120,8 +123,7 @@ See [[Attachments/document.pdf]] for details.`,
 		});
 
 		it("handles links with aliases correctly", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(vault, "Target.md", "content");
 			writeVaultFile(vault, "source.md", "[[Target|My Alias]]");
 
@@ -131,8 +133,7 @@ See [[Attachments/document.pdf]] for details.`,
 		});
 
 		it("handles links with headings correctly", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(vault, "Target.md", "# Section\ncontent");
 			writeVaultFile(vault, "source.md", "[[Target#Section]]");
 
@@ -142,8 +143,7 @@ See [[Attachments/document.pdf]] for details.`,
 		});
 
 		it("handles links with block references correctly", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(vault, "Target.md", "content ^block1");
 			writeVaultFile(vault, "source.md", "[[Target^block1]]");
 
@@ -155,8 +155,7 @@ See [[Attachments/document.pdf]] for details.`,
 
 	describe("frontmatter links", () => {
 		it("detects broken links in frontmatter arrays", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(
 				vault,
 				"note.md",
@@ -174,8 +173,7 @@ Body content`,
 		});
 
 		it("detects broken links in frontmatter strings", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(
 				vault,
 				"note.md",
@@ -194,8 +192,7 @@ Body content`,
 
 	describe("directory scoping", () => {
 		it("respects dirs option", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(vault, "Projects/note.md", "[[Missing]]");
 			writeVaultFile(vault, "Areas/note.md", "[[Also Missing]]");
 
@@ -211,10 +208,19 @@ describe("suggestFixes", () => {
 	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	afterEach(getAfterEachHook());
 
+	/**
+	 * Helper to create and track a test vault in one call.
+	 * Combines createTestVault() + trackVault() to eliminate DRY violations.
+	 */
+	const setupTest = () => {
+		const vault = createTestVault();
+		trackVault(vault);
+		return vault;
+	};
+
 	describe("attachment links", () => {
 		it("suggests fix from broken link array directly", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(vault, "Attachments/document.pdf", "PDF content");
 
 			const brokenLinks = [
@@ -229,8 +235,7 @@ describe("suggestFixes", () => {
 		});
 
 		it("does not suggest fix when file does not exist in Attachments", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			const brokenLinks = [
 				{
 					note: "note.md",
@@ -244,8 +249,7 @@ describe("suggestFixes", () => {
 		});
 
 		it("deduplicates suggestions for same link", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(vault, "Attachments/shared.pdf", "PDF content");
 			const brokenLinks = [
 				{ note: "note1.md", link: "shared.pdf", location: "body" as const },
@@ -257,8 +261,7 @@ describe("suggestFixes", () => {
 		});
 
 		it("handles case-insensitive matching", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(vault, "Attachments/Document.PDF", "PDF content");
 			const brokenLinks = [
 				{ note: "note.md", link: "document.pdf", location: "body" as const },
@@ -270,8 +273,7 @@ describe("suggestFixes", () => {
 		});
 
 		it("fuzzy matches similar attachment filenames", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(vault, "Attachments/booking-confirmation.pdf", "PDF");
 			const brokenLinks = [
 				{
@@ -288,8 +290,7 @@ describe("suggestFixes", () => {
 		});
 
 		it("fuzzy matches wrong filename in Attachments/ prefix", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(vault, "Attachments/receipt-2024.pdf", "PDF");
 			const brokenLinks = [
 				{
@@ -308,8 +309,7 @@ describe("suggestFixes", () => {
 
 	describe("note links", () => {
 		it("suggests fix for broken note link with exact case mismatch", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(vault, "Projects/My Project.md", "content");
 			const brokenLinks = [
 				{
@@ -326,8 +326,7 @@ describe("suggestFixes", () => {
 		});
 
 		it("fuzzy matches similar note titles", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(vault, "Projects/2025 Camping Trip.md", "content");
 			const brokenLinks = [
 				{
@@ -344,8 +343,7 @@ describe("suggestFixes", () => {
 		});
 
 		it("fuzzy matches note titles with typos", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(vault, "Areas/Command Center.md", "content");
 			const brokenLinks = [
 				{
@@ -362,8 +360,7 @@ describe("suggestFixes", () => {
 		});
 
 		it("does not suggest when no similar notes exist", () => {
-			const vault = createTestVault();
-			trackVault(vault);
+			const vault = setupTest();
 			writeVaultFile(vault, "Projects/Unrelated.md", "content");
 			const brokenLinks = [
 				{

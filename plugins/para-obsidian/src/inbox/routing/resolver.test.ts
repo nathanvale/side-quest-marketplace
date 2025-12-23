@@ -19,6 +19,12 @@ describe("inbox/routing/resolver", () => {
 	afterEach(getAfterEachHook());
 
 	// Test helpers
+	const setupTest = (): string => {
+		const vault = createTestVault();
+		trackVault(vault);
+		return vault;
+	};
+
 	const createProject = (vaultPath: string, name: string) => {
 		mkdirSync(join(vaultPath, `01 Projects/${name}`), { recursive: true });
 	};
@@ -60,8 +66,7 @@ describe("inbox/routing/resolver", () => {
 	describe("resolveDestination", () => {
 		describe("project resolution", () => {
 			test("resolves to existing project folder", () => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				createProject(vaultPath, "Alpha");
 
 				const result = resolveDestination({ project: "Alpha" }, vaultPath);
@@ -71,8 +76,7 @@ describe("inbox/routing/resolver", () => {
 			});
 
 			test("resolves to existing project folder with wikilink format", () => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				createProject(vaultPath, "Alpha");
 
 				const result = resolveDestination({ project: "[[Alpha]]" }, vaultPath);
@@ -82,8 +86,7 @@ describe("inbox/routing/resolver", () => {
 			});
 
 			test("handles case-insensitive project folder match", () => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				createProject(vaultPath, "MyProject");
 
 				const result = resolveDestination({ project: "myproject" }, vaultPath);
@@ -92,8 +95,7 @@ describe("inbox/routing/resolver", () => {
 			});
 
 			test("resolves project file and returns colocate info", () => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				createProjectWithNote(vaultPath, "Alpha", "---\ntitle: Alpha\n---\n");
 
 				const result = resolveDestination({ project: "Alpha" }, vaultPath);
@@ -106,8 +108,7 @@ describe("inbox/routing/resolver", () => {
 			});
 
 			test("returns null when project does not exist", () => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				mkdirSync(join(vaultPath, "01 Projects"), { recursive: true });
 
 				const result = resolveDestination(
@@ -119,16 +120,14 @@ describe("inbox/routing/resolver", () => {
 			});
 
 			test("returns null when projects folder does not exist", () => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				const result = resolveDestination({ project: "Alpha" }, vaultPath);
 
 				expectNull(result);
 			});
 
 			test("prioritizes project over area when both present", () => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				createProject(vaultPath, "Alpha");
 				createArea(vaultPath, "Health");
 
@@ -143,8 +142,7 @@ describe("inbox/routing/resolver", () => {
 
 		describe("area resolution", () => {
 			test("resolves to existing area folder", () => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				createArea(vaultPath, "Health");
 
 				const result = resolveDestination({ area: "Health" }, vaultPath);
@@ -154,8 +152,7 @@ describe("inbox/routing/resolver", () => {
 			});
 
 			test("resolves to existing area folder with wikilink format", () => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				createArea(vaultPath, "Health");
 
 				const result = resolveDestination({ area: "[[Health]]" }, vaultPath);
@@ -164,8 +161,7 @@ describe("inbox/routing/resolver", () => {
 			});
 
 			test("handles case-insensitive area folder match", () => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				createArea(vaultPath, "MyArea");
 
 				const result = resolveDestination({ area: "myarea" }, vaultPath);
@@ -174,8 +170,7 @@ describe("inbox/routing/resolver", () => {
 			});
 
 			test("resolves area file and returns colocate info", () => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				createAreaWithNote(
 					vaultPath,
 					"Career & Contracting",
@@ -195,8 +190,7 @@ describe("inbox/routing/resolver", () => {
 			});
 
 			test("returns null when area does not exist", () => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				mkdirSync(join(vaultPath, "02 Areas"), { recursive: true });
 
 				const result = resolveDestination({ area: "Nonexistent" }, vaultPath);
@@ -205,8 +199,7 @@ describe("inbox/routing/resolver", () => {
 			});
 
 			test("returns null when areas folder does not exist", () => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				const result = resolveDestination({ area: "Health" }, vaultPath);
 
 				expectNull(result);
@@ -244,8 +237,7 @@ describe("inbox/routing/resolver", () => {
 					input: { project: "test\x00null" },
 				},
 			])("$testName", ({ input }) => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				mkdirSync(join(vaultPath, "01 Projects"), { recursive: true });
 				mkdirSync(join(vaultPath, "02 Areas"), { recursive: true });
 
@@ -255,8 +247,7 @@ describe("inbox/routing/resolver", () => {
 			});
 
 			test("rejects empty or whitespace-only names", () => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				mkdirSync(join(vaultPath, "01 Projects"), { recursive: true });
 				mkdirSync(join(vaultPath, "02 Areas"), { recursive: true });
 
@@ -269,16 +260,14 @@ describe("inbox/routing/resolver", () => {
 
 		describe("edge cases", () => {
 			test("returns null when both area and project are missing", () => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				const result = resolveDestination({}, vaultPath);
 
 				expectNull(result);
 			});
 
 			test("returns null when both area and project are undefined", () => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				const result = resolveDestination(
 					{ area: undefined, project: undefined },
 					vaultPath,
@@ -288,8 +277,7 @@ describe("inbox/routing/resolver", () => {
 			});
 
 			test("handles special characters in folder names", () => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				createArea(vaultPath, "Health & Fitness");
 
 				const result = resolveDestination(
@@ -301,8 +289,7 @@ describe("inbox/routing/resolver", () => {
 			});
 
 			test("handles spaces in folder names", () => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				createProject(vaultPath, "My Big Project");
 
 				const result = resolveDestination(
@@ -314,8 +301,7 @@ describe("inbox/routing/resolver", () => {
 			});
 
 			test("strips wikilink brackets with trailing spaces", () => {
-				const vaultPath = createTestVault();
-				trackVault(vaultPath);
+				const vaultPath = setupTest();
 				createArea(vaultPath, "Health");
 
 				const result = resolveDestination({ area: "[[ Health ]]" }, vaultPath);

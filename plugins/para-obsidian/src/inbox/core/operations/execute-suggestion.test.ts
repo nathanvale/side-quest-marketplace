@@ -215,6 +215,13 @@ describe("executeSuggestion - movedFrom field", () => {
 		writeVaultFile(vaultPath, ".inbox-staging/.gitkeep", "");
 	}
 
+	// Helper: Create and track vault in one step
+	function setupTest(): string {
+		const vault = createTestVault();
+		trackVault(vault);
+		return vault;
+	}
+
 	// Helper: Assert successful move
 	function expectSuccessfulMove(
 		result: Awaited<ReturnType<typeof executeSuggestion>>,
@@ -230,8 +237,7 @@ describe("executeSuggestion - movedFrom field", () => {
 
 	test("should return movedFrom when executing bookmark suggestion", async () => {
 		// Setup vault
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		setupExecuteSuggestionVault(vault);
 
 		// Setup: Create a bookmark file in inbox
@@ -282,8 +288,7 @@ type: bookmark
 
 	test("should return movedFrom when executing pre-classified note suggestion", async () => {
 		// Setup vault
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		setupExecuteSuggestionVault(vault);
 
 		// Setup: Create a pre-classified markdown file in inbox
@@ -345,8 +350,7 @@ type: medical-statement
 
 	test("should return movedFrom for PDF attachment with created note", async () => {
 		// Setup vault
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		setupExecuteSuggestionVault(vault);
 
 		// Setup: Create a PDF file in inbox
@@ -413,8 +417,7 @@ type: invoice
 
 	test("should return movedFrom even when note creation fails", async () => {
 		// Setup vault
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		setupExecuteSuggestionVault(vault);
 
 		// Setup: Create a file in inbox
@@ -464,9 +467,15 @@ describe("resolveParaFolder - vault validation", () => {
 	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	afterEach(getAfterEachHook());
 
-	test("validates semantic PARA names exist when vaultPath provided", () => {
+	// Helper: Create and track vault in one step
+	function setupTest(): string {
 		const vault = createTestVault();
 		trackVault(vault);
+		return vault;
+	}
+
+	test("validates semantic PARA names exist when vaultPath provided", () => {
+		const vault = setupTest();
 
 		// Create vault structure
 		writeVaultFile(vault, "01 Projects/.gitkeep", "");
@@ -487,8 +496,7 @@ describe("resolveParaFolder - vault validation", () => {
 	});
 
 	test("validates full paths exist when vaultPath provided", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 
 		// Create nested structure
 		writeVaultFile(vault, "02 Areas/Finance/.gitkeep", "");
@@ -509,8 +517,7 @@ describe("resolveParaFolder - vault validation", () => {
 	});
 
 	test("validates custom folder paths exist when vaultPath provided", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 
 		// Create custom folders
 		writeVaultFile(vault, "Custom Folder/.gitkeep", "");
@@ -527,8 +534,7 @@ describe("resolveParaFolder - vault validation", () => {
 	});
 
 	test("validates numbered folders exist when vaultPath provided", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 
 		// Create numbered folders
 		writeVaultFile(vault, "01 Projects/.gitkeep", "");
@@ -556,8 +562,7 @@ describe("resolveParaFolder - vault validation", () => {
 	});
 
 	test("validates with custom paraFolders mapping", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 
 		// Create custom folder structure
 		writeVaultFile(vault, "Projects/.gitkeep", "");
@@ -655,6 +660,13 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	afterEach(getAfterEachHook());
 
+	// Helper: Create and track vault in one step
+	function setupTest(): string {
+		const vault = createTestVault();
+		trackVault(vault);
+		return vault;
+	}
+
 	const paraFolders = {
 		inbox: "00 Inbox",
 		areas: "02 Areas",
@@ -664,8 +676,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	};
 
 	test("resolves area names to full paths (case-insensitive)", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		// Create vault structure
 		writeVaultFile(vault, "02 Areas/Health/.gitkeep", "");
 		writeVaultFile(vault, "02 Areas/Finance/.gitkeep", "");
@@ -702,8 +713,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("resolves project names to full paths (case-insensitive)", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		// Create vault structure
 		writeVaultFile(vault, "01 Projects/Tax 2024/.gitkeep", "");
 		writeVaultFile(vault, "01 Projects/Vacation Planning/.gitkeep", "");
@@ -740,8 +750,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("PARA folder names take precedence over area names", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		// Create a folder structure where an area is named "areas"
 		writeVaultFile(vault, "02 Areas/.gitkeep", "");
 		writeVaultFile(vault, "02 Areas/Areas/.gitkeep", "");
@@ -759,8 +768,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("PARA folder names take precedence over project names", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		// Create a folder structure where a project is named "projects"
 		writeVaultFile(vault, "01 Projects/.gitkeep", "");
 		writeVaultFile(vault, "01 Projects/Projects/.gitkeep", "");
@@ -778,8 +786,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("throws error for unknown destination with maps provided", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		const areaPathMap = new Map([["health", "02 Areas/Health"]]);
 		const projectPathMap = new Map([["tax", "01 Projects/Tax"]]);
 
@@ -792,8 +799,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("helpful error message lists available areas and projects", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		const areaPathMap = new Map([
 			["health", "02 Areas/Health"],
 			["finance", "02 Areas/Finance"],
@@ -822,8 +828,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("error message shows 'none' for empty area list", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		const areaPathMap = new Map(); // Empty
 		const projectPathMap = new Map([["tax", "01 Projects/Tax"]]);
 
@@ -840,8 +845,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("error message omits projects section when empty", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		const areaPathMap = new Map([["health", "02 Areas/Health"]]);
 		const projectPathMap = new Map(); // Empty
 
@@ -859,8 +863,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("validates area folder exists when vaultPath provided", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		// Create only one area
 		writeVaultFile(vault, "02 Areas/Health/.gitkeep", "");
 
@@ -888,8 +891,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("validates project folder exists when vaultPath provided", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		// Create only one project
 		writeVaultFile(vault, "01 Projects/Tax/.gitkeep", "");
 
@@ -917,8 +919,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("backward compatibility: falls through when no maps provided", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		// Create a custom folder
 		writeVaultFile(vault, "Custom Folder/.gitkeep", "");
 
@@ -934,8 +935,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("backward compatibility: no error for unknown destination without maps", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		// Without maps, should just pass through and validate existence
 		// (existing behavior - doesn't throw "Unknown destination" error)
 		expect(() =>
@@ -948,8 +948,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("area names with special characters", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		// Create area with special chars
 		writeVaultFile(vault, "02 Areas/Health & Fitness/.gitkeep", "");
 
@@ -967,8 +966,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("project names with numbers", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		// Create project with numbers
 		writeVaultFile(vault, "01 Projects/Q1 2024 Planning/.gitkeep", "");
 
@@ -986,8 +984,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("both areaPathMap and projectPathMap can contain entries", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		// Create both areas and projects
 		writeVaultFile(vault, "02 Areas/Health/.gitkeep", "");
 		writeVaultFile(vault, "01 Projects/Tax/.gitkeep", "");
@@ -1012,8 +1009,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("only areaPathMap provided (no projectPathMap)", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		// Create area
 		writeVaultFile(vault, "02 Areas/Health/.gitkeep", "");
 
@@ -1035,8 +1031,7 @@ describe("resolveParaFolder - Area/Project Resolution", () => {
 	});
 
 	test("only projectPathMap provided (no areaPathMap)", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		// Create project
 		writeVaultFile(vault, "01 Projects/Tax/.gitkeep", "");
 
@@ -1062,6 +1057,13 @@ describe("Security Tests - Path Traversal & Race Conditions", () => {
 	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	afterEach(getAfterEachHook());
 
+	// Helper: Create and track vault in one step
+	function setupTest(): string {
+		const vault = createTestVault();
+		trackVault(vault);
+		return vault;
+	}
+
 	// Helper: Setup standard vault structure
 	function setupSecurityVault(vaultPath: string) {
 		writeVaultFile(vaultPath, "00 Inbox/.gitkeep", "");
@@ -1072,8 +1074,7 @@ describe("Security Tests - Path Traversal & Race Conditions", () => {
 	}
 
 	test("should reject path traversal with .. patterns", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		setupSecurityVault(vault);
 		const paraFolders = {
 			projects: "01 Projects",
@@ -1089,8 +1090,7 @@ describe("Security Tests - Path Traversal & Race Conditions", () => {
 	});
 
 	test("should reject absolute paths", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		setupSecurityVault(vault);
 		const paraFolders = {
 			projects: "01 Projects",
@@ -1106,8 +1106,7 @@ describe("Security Tests - Path Traversal & Race Conditions", () => {
 	});
 
 	test("should reject tilde expansion", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		setupSecurityVault(vault);
 		const paraFolders = {
 			projects: "01 Projects",
@@ -1123,8 +1122,7 @@ describe("Security Tests - Path Traversal & Race Conditions", () => {
 	});
 
 	test("should detect symlink path traversal attempts", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		setupSecurityVault(vault);
 		// This test verifies the realpath canonicalization catches symlinks escaping vault
 		const paraFolders = {
@@ -1164,8 +1162,7 @@ describe("Security Tests - Path Traversal & Race Conditions", () => {
 	});
 
 	test("should handle file locking for concurrent operations", async () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		setupSecurityVault(vault);
 		// Test that file locking prevents TOCTOU races
 		const sourcePath = "00 Inbox/test-file.md";
@@ -1207,8 +1204,7 @@ type: note
 	});
 
 	test("should fail gracefully if source file disappears during execution", async () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		setupSecurityVault(vault);
 		// Create source file
 		const sourcePath = "00 Inbox/disappearing-file.md";

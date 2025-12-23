@@ -14,9 +14,17 @@ describe("deleteFile", () => {
 	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	afterEach(getAfterEachHook());
 
-	it("deletes a file when confirmed", () => {
+	/**
+	 * Helper to create and track a test vault
+	 */
+	const setupTest = () => {
 		const vault = createTestVault();
 		trackVault(vault);
+		return vault;
+	};
+
+	it("deletes a file when confirmed", () => {
+		const vault = setupTest();
 		writeVaultFile(vault, "note.md", "hi");
 		const cfg = loadConfig({ cwd: vault });
 		const result = deleteFile(cfg, { file: "note.md", confirm: true });
@@ -25,8 +33,7 @@ describe("deleteFile", () => {
 	});
 
 	it("throws without confirm", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		writeVaultFile(vault, "note.md", "hi");
 		const cfg = loadConfig({ cwd: vault });
 		expect(() =>

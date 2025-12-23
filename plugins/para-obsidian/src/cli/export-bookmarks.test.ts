@@ -2,7 +2,8 @@
  * Tests for export-bookmarks CLI command
  */
 
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, onTestFinished, test } from "bun:test";
+import { existsSync, unlinkSync } from "node:fs";
 import path from "node:path";
 import { readTextFileSync } from "@sidequest/core/fs";
 import { OutputFormat } from "@sidequest/core/terminal";
@@ -288,6 +289,14 @@ created: 2024-01-01T00:00:00Z
 		const config = loadConfig();
 		const homeDir = process.env.HOME ?? "";
 		const outputPath = `~/bookmarks-test-${Date.now()}.html`;
+		const expandedPath = path.join(homeDir, outputPath.slice(2));
+
+		// Register cleanup IMMEDIATELY - runs even on test failure
+		onTestFinished(() => {
+			if (existsSync(expandedPath)) {
+				unlinkSync(expandedPath);
+			}
+		});
 
 		const ctx: CommandContext = {
 			config,
@@ -303,17 +312,6 @@ created: 2024-01-01T00:00:00Z
 		const result = await handleExportBookmarks(ctx);
 
 		expect(result.success).toBe(true);
-
-		// Cleanup expanded path
-		const expandedPath = path.join(homeDir, outputPath.slice(2));
-		try {
-			const fs = await import("node:fs");
-			if (fs.existsSync(expandedPath)) {
-				fs.unlinkSync(expandedPath);
-			}
-		} catch {
-			// Ignore cleanup errors
-		}
 	});
 
 	test("rejects filter without type:bookmark", async () => {

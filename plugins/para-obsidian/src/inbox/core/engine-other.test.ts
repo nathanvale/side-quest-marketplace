@@ -28,14 +28,23 @@ const REPORT_HEADER = "# Inbox Processing Report";
 /** Dummy vault path for tests that don't require real filesystem operations */
 const DUMMY_VAULT_PATH = "/test";
 
+/**
+ * Helper function to set up a test vault and register it for cleanup.
+ * Combines createTestVault() and trackVault() to reduce duplication.
+ */
+function setupTest(trackVault: (path: string) => void): string {
+	const vault = createTestVault();
+	trackVault(vault);
+	return vault;
+}
+
 describe("engine utilities", () => {
 	describe("editWithPrompt()", () => {
 		const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 		let testVaultPath: string;
 
 		beforeEach(async () => {
-			testVaultPath = createTestVault();
-			trackVault(testVaultPath);
+			testVaultPath = setupTest(trackVault);
 			mkdirSync(join(testVaultPath, "00 Inbox"), { recursive: true });
 			await initGitRepo(testVaultPath);
 		});
@@ -102,8 +111,7 @@ describe("engine utilities", () => {
 		let testVaultPath: string;
 
 		beforeEach(async () => {
-			testVaultPath = createTestVault();
-			trackVault(testVaultPath);
+			testVaultPath = setupTest(trackVault);
 			mkdirSync(join(testVaultPath, "00 Inbox"), { recursive: true });
 			mkdirSync(join(testVaultPath, "01 Projects"), { recursive: true });
 			mkdirSync(join(testVaultPath, "02 Areas"), { recursive: true });

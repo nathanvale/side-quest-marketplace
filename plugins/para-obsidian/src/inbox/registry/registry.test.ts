@@ -36,6 +36,51 @@ function createLegacyRegistry(vaultPath: string) {
 	return createRegistry(vaultPath, { restrictToAttachments: false });
 }
 
+/**
+ * Helper to setup and load a registry in one step.
+ * Returns the loaded registry instance.
+ */
+async function setupLoadedRegistry(
+	vaultPath: string,
+	options?: { restrictToAttachments?: boolean },
+) {
+	const registry = createRegistry(vaultPath, options);
+	await registry.load();
+	return registry;
+}
+
+/**
+ * Helper to create a ProcessedRegistry structure for testing.
+ * Simplifies creation of registry files on disk.
+ */
+function createRegistryStructure(
+	items: Omit<ProcessedItem, "sourceHash" | "processedAt">[] = [],
+): ProcessedRegistry {
+	return {
+		version: RegistryVersion.V1,
+		items: items.map((item) => ({
+			...item,
+			sourceHash: testHash(item.sourcePath),
+			processedAt: "2024-01-01T00:00:00Z",
+		})),
+	};
+}
+
+/**
+ * Helper to write a registry file to disk.
+ * Combines structure creation and file writing.
+ */
+function writeRegistryFile(
+	testDir: string,
+	items: Omit<ProcessedItem, "sourceHash" | "processedAt">[] = [],
+) {
+	const registry = createRegistryStructure(items);
+	writeFileSync(
+		join(testDir, REGISTRY_FILE),
+		JSON.stringify(registry, null, 2),
+	);
+}
+
 describe("inbox/registry", () => {
 	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	afterEach(getAfterEachHook());
@@ -148,9 +193,10 @@ describe("inbox/registry", () => {
 	describe("registry.load", () => {
 		test("should create empty registry if file does not exist", async () => {
 			const TEST_DIR = createTestDir();
-			const registry = createLegacyRegistry(TEST_DIR);
-
-			await registry.load();
+			// Registry is created but not used - we're testing file system side effects
+			const _registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 
 			// File should not be created on load
 			expect(existsSync(join(TEST_DIR, REGISTRY_FILE))).toBe(false);
@@ -158,37 +204,30 @@ describe("inbox/registry", () => {
 
 		test("should load existing registry from disk", async () => {
 			const TEST_DIR = createTestDir();
-			const existingRegistry: ProcessedRegistry = {
-				version: RegistryVersion.V1,
-				items: [
-					{
-						sourceHash: testHash("abc123"),
-						sourcePath: "/inbox/test.pdf",
-						processedAt: "2024-01-01T00:00:00Z",
-						createdNote: "/notes/test.md",
-					},
-				],
-			};
-			writeFileSync(
-				join(TEST_DIR, REGISTRY_FILE),
-				JSON.stringify(existingRegistry, null, 2),
-			);
+			writeRegistryFile(TEST_DIR, [
+				{
+					sourcePath: "/inbox/test.pdf",
+					createdNote: "/notes/test.md",
+				},
+			]);
 
-			const registry = createLegacyRegistry(TEST_DIR);
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 
-			expect(registry.isProcessed(testHash("abc123"))).toBe(true);
-			expect(registry.getItem(testHash("abc123"))).toEqual(
-				existingRegistry.items[0],
-			);
+			expect(registry.isProcessed(testHash("/inbox/test.pdf"))).toBe(true);
+			const item = registry.getItem(testHash("/inbox/test.pdf"));
+			expect(item?.sourcePath).toBe("/inbox/test.pdf");
+			expect(item?.createdNote).toBe("/notes/test.md");
 		});
 
 		test("should handle corrupt JSON gracefully and recover with empty registry", async () => {
 			const TEST_DIR = createTestDir();
 			writeFileSync(join(TEST_DIR, REGISTRY_FILE), "{ invalid json }");
 
-			const registry = createLegacyRegistry(TEST_DIR);
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 
 			// Should recover with empty registry
 			expect(registry.isProcessed(testHash("anything"))).toBe(false);
@@ -202,8 +241,9 @@ describe("inbox/registry", () => {
 				JSON.stringify({ foo: "bar" }),
 			);
 
-			const registry = createLegacyRegistry(TEST_DIR);
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 
 			// Should recover with empty registry
 			expect(registry.isProcessed(testHash("anything"))).toBe(false);
@@ -216,8 +256,9 @@ describe("inbox/registry", () => {
 				JSON.stringify({ version: 999, items: [] }),
 			);
 
-			const registry = createLegacyRegistry(TEST_DIR);
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 
 			// Should recover with empty registry for unsupported version
 			expect(registry.isProcessed(testHash("anything"))).toBe(false);
@@ -231,8 +272,9 @@ describe("inbox/registry", () => {
 	describe("registry.save", () => {
 		test("should save registry to disk", async () => {
 			const TEST_DIR = createTestDir();
-			const registry = createLegacyRegistry(TEST_DIR);
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 			registry.markProcessed({
 				sourceHash: testHash("hash123"),
 				sourcePath: "/inbox/file.pdf",
@@ -251,23 +293,15 @@ describe("inbox/registry", () => {
 
 		test("should overwrite existing registry file", async () => {
 			const TEST_DIR = createTestDir();
-			const existingRegistry: ProcessedRegistry = {
-				version: RegistryVersion.V1,
-				items: [
-					{
-						sourceHash: testHash("old"),
-						sourcePath: "/inbox/old.pdf",
-						processedAt: "2024-01-01T00:00:00Z",
-					},
-				],
-			};
-			writeFileSync(
-				join(TEST_DIR, REGISTRY_FILE),
-				JSON.stringify(existingRegistry),
-			);
+			writeRegistryFile(TEST_DIR, [
+				{
+					sourcePath: "/inbox/old.pdf",
+				},
+			]);
 
-			const registry = createLegacyRegistry(TEST_DIR);
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 			registry.markProcessed({
 				sourceHash: testHash("new"),
 				sourcePath: "/inbox/new.pdf",
@@ -279,9 +313,9 @@ describe("inbox/registry", () => {
 				await Bun.file(join(TEST_DIR, REGISTRY_FILE)).text(),
 			) as ProcessedRegistry;
 			expect(saved.items).toHaveLength(2);
-			expect(saved.items.some((i) => i.sourceHash === testHash("old"))).toBe(
-				true,
-			);
+			expect(
+				saved.items.some((i) => i.sourceHash === testHash("/inbox/old.pdf")),
+			).toBe(true);
 			expect(saved.items.some((i) => i.sourceHash === testHash("new"))).toBe(
 				true,
 			);
@@ -291,8 +325,9 @@ describe("inbox/registry", () => {
 			const TEST_DIR = createTestDir();
 			const nestedDir = join(TEST_DIR, "nested", "vault");
 
-			const registry = createLegacyRegistry(nestedDir);
-			await registry.load();
+			const registry = await setupLoadedRegistry(nestedDir, {
+				restrictToAttachments: false,
+			});
 			registry.markProcessed({
 				sourceHash: testHash("test"),
 				sourcePath: "/inbox/test.pdf",
@@ -311,16 +346,18 @@ describe("inbox/registry", () => {
 	describe("registry.isProcessed", () => {
 		test("should return false for unknown hash", async () => {
 			const TEST_DIR = createTestDir();
-			const registry = createLegacyRegistry(TEST_DIR);
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 
 			expect(registry.isProcessed(testHash("unknown-hash"))).toBe(false);
 		});
 
 		test("should return true for known hash", async () => {
 			const TEST_DIR = createTestDir();
-			const registry = createLegacyRegistry(TEST_DIR);
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 			registry.markProcessed({
 				sourceHash: testHash("known-hash"),
 				sourcePath: "/inbox/file.pdf",
@@ -332,25 +369,17 @@ describe("inbox/registry", () => {
 
 		test("should return true for hash loaded from disk", async () => {
 			const TEST_DIR = createTestDir();
-			const existingRegistry: ProcessedRegistry = {
-				version: RegistryVersion.V1,
-				items: [
-					{
-						sourceHash: testHash("disk-hash"),
-						sourcePath: "/inbox/disk.pdf",
-						processedAt: "2024-01-01T00:00:00Z",
-					},
-				],
-			};
-			writeFileSync(
-				join(TEST_DIR, REGISTRY_FILE),
-				JSON.stringify(existingRegistry),
-			);
+			writeRegistryFile(TEST_DIR, [
+				{
+					sourcePath: "/inbox/disk.pdf",
+				},
+			]);
 
-			const registry = createLegacyRegistry(TEST_DIR);
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 
-			expect(registry.isProcessed(testHash("disk-hash"))).toBe(true);
+			expect(registry.isProcessed(testHash("/inbox/disk.pdf"))).toBe(true);
 		});
 	});
 
@@ -361,8 +390,9 @@ describe("inbox/registry", () => {
 	describe("registry.markProcessed", () => {
 		test("should add item to registry", async () => {
 			const TEST_DIR = createTestDir();
-			const registry = createLegacyRegistry(TEST_DIR);
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 
 			const item: ProcessedItem = {
 				sourceHash: testHash("new-hash"),
@@ -380,8 +410,9 @@ describe("inbox/registry", () => {
 
 		test("should update existing item with same hash", async () => {
 			const TEST_DIR = createTestDir();
-			const registry = createLegacyRegistry(TEST_DIR);
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 
 			const item1: ProcessedItem = {
 				sourceHash: testHash("same-hash"),
@@ -410,16 +441,18 @@ describe("inbox/registry", () => {
 	describe("registry.getItem", () => {
 		test("should return undefined for unknown hash", async () => {
 			const TEST_DIR = createTestDir();
-			const registry = createLegacyRegistry(TEST_DIR);
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 
 			expect(registry.getItem(testHash("unknown"))).toBeUndefined();
 		});
 
 		test("should return item for known hash", async () => {
 			const TEST_DIR = createTestDir();
-			const registry = createLegacyRegistry(TEST_DIR);
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 
 			const item: ProcessedItem = {
 				sourceHash: testHash("item-hash"),
@@ -439,17 +472,14 @@ describe("inbox/registry", () => {
 				processedAt: "2024-01-01T00:00:00Z",
 				createdNote: "/notes/disk.md",
 			};
-			const existingRegistry: ProcessedRegistry = {
-				version: RegistryVersion.V1,
-				items: [item],
-			};
 			writeFileSync(
 				join(TEST_DIR, REGISTRY_FILE),
-				JSON.stringify(existingRegistry),
+				JSON.stringify({ version: RegistryVersion.V1, items: [item] }),
 			);
 
-			const registry = createLegacyRegistry(TEST_DIR);
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 
 			expect(registry.getItem(testHash("disk-item"))).toEqual(item);
 		});
@@ -462,28 +492,20 @@ describe("inbox/registry", () => {
 	describe("concurrent access", () => {
 		test("should handle multiple registries reading same file", async () => {
 			const TEST_DIR = createTestDir();
-			const existingRegistry: ProcessedRegistry = {
-				version: RegistryVersion.V1,
-				items: [
-					{
-						sourceHash: testHash("shared"),
-						sourcePath: "/inbox/shared.pdf",
-						processedAt: "2024-01-01T00:00:00Z",
-					},
-				],
-			};
-			writeFileSync(
-				join(TEST_DIR, REGISTRY_FILE),
-				JSON.stringify(existingRegistry),
-			);
+			writeRegistryFile(TEST_DIR, [
+				{
+					sourcePath: "/inbox/shared.pdf",
+				},
+			]);
 
 			// Load in parallel
-			const registry1 = createLegacyRegistry(TEST_DIR);
-			const registry2 = createLegacyRegistry(TEST_DIR);
-			await Promise.all([registry1.load(), registry2.load()]);
+			const [registry1, registry2] = await Promise.all([
+				setupLoadedRegistry(TEST_DIR, { restrictToAttachments: false }),
+				setupLoadedRegistry(TEST_DIR, { restrictToAttachments: false }),
+			]);
 
-			expect(registry1.isProcessed(testHash("shared"))).toBe(true);
-			expect(registry2.isProcessed(testHash("shared"))).toBe(true);
+			expect(registry1.isProcessed(testHash("/inbox/shared.pdf"))).toBe(true);
+			expect(registry2.isProcessed(testHash("/inbox/shared.pdf"))).toBe(true);
 		});
 
 		test("should re-read from disk on load to get latest state", async () => {
@@ -519,25 +541,20 @@ describe("inbox/registry", () => {
 	describe("edge cases", () => {
 		test("should handle empty items array in registry", async () => {
 			const TEST_DIR = createTestDir();
-			const emptyRegistry: ProcessedRegistry = {
-				version: RegistryVersion.V1,
-				items: [],
-			};
-			writeFileSync(
-				join(TEST_DIR, REGISTRY_FILE),
-				JSON.stringify(emptyRegistry),
-			);
+			writeRegistryFile(TEST_DIR, []);
 
-			const registry = createLegacyRegistry(TEST_DIR);
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 
 			expect(registry.isProcessed(testHash("any"))).toBe(false);
 		});
 
 		test("should handle many items in registry", async () => {
 			const TEST_DIR = createTestDir();
-			const registry = createLegacyRegistry(TEST_DIR);
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 
 			// Add 1000 items
 			for (let i = 0; i < 1000; i++) {
@@ -551,8 +568,9 @@ describe("inbox/registry", () => {
 			await registry.save();
 
 			// Create new registry and load
-			const registry2 = createLegacyRegistry(TEST_DIR);
-			await registry2.load();
+			const registry2 = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 
 			// Spot check
 			expect(registry2.isProcessed(testHash("hash-0"))).toBe(true);
@@ -563,8 +581,9 @@ describe("inbox/registry", () => {
 
 		test("should handle special characters in paths", async () => {
 			const TEST_DIR = createTestDir();
-			const registry = createLegacyRegistry(TEST_DIR);
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 
 			const item: ProcessedItem = {
 				sourceHash: testHash("special"),
@@ -574,8 +593,9 @@ describe("inbox/registry", () => {
 			registry.markProcessed(item);
 			await registry.save();
 
-			const registry2 = createLegacyRegistry(TEST_DIR);
-			await registry2.load();
+			const registry2 = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
 
 			expect(registry2.getItem(testHash("special"))?.sourcePath).toBe(
 				item.sourcePath,
@@ -590,10 +610,9 @@ describe("inbox/registry", () => {
 	describe("registry scope enforcement", () => {
 		test("should allow attachment items when restrictToAttachments=true", async () => {
 			const TEST_DIR = createTestDir();
-			const registry = createRegistry(TEST_DIR, {
+			const registry = await setupLoadedRegistry(TEST_DIR, {
 				restrictToAttachments: true,
 			});
-			await registry.load();
 
 			const item: ProcessedItem = {
 				sourceHash: testHash("attachment1"),
@@ -610,10 +629,9 @@ describe("inbox/registry", () => {
 
 		test("should reject non-attachment items when restrictToAttachments=true", async () => {
 			const TEST_DIR = createTestDir();
-			const registry = createRegistry(TEST_DIR, {
+			const registry = await setupLoadedRegistry(TEST_DIR, {
 				restrictToAttachments: true,
 			});
-			await registry.load();
 
 			const item: ProcessedItem = {
 				sourceHash: testHash("note1"),
@@ -631,10 +649,9 @@ describe("inbox/registry", () => {
 
 		test("should reject items without movedAttachment when restrictToAttachments=true", async () => {
 			const TEST_DIR = createTestDir();
-			const registry = createRegistry(TEST_DIR, {
+			const registry = await setupLoadedRegistry(TEST_DIR, {
 				restrictToAttachments: true,
 			});
-			await registry.load();
 
 			const item: ProcessedItem = {
 				sourceHash: testHash("invalid1"),
@@ -650,10 +667,9 @@ describe("inbox/registry", () => {
 
 		test("should allow all items when restrictToAttachments=false", async () => {
 			const TEST_DIR = createTestDir();
-			const registry = createRegistry(TEST_DIR, {
+			const registry = await setupLoadedRegistry(TEST_DIR, {
 				restrictToAttachments: false,
 			});
-			await registry.load();
 
 			const noteItem: ProcessedItem = {
 				sourceHash: testHash("note2"),
@@ -681,8 +697,7 @@ describe("inbox/registry", () => {
 
 		test("should default to restrictToAttachments=true", async () => {
 			const TEST_DIR = createTestDir();
-			const registry = createRegistry(TEST_DIR); // No options
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR); // No options - uses default
 
 			const item: ProcessedItem = {
 				sourceHash: testHash("test1"),
@@ -705,10 +720,9 @@ describe("inbox/registry", () => {
 	describe("removeAndSave", () => {
 		test("should remove item and save atomically", async () => {
 			const TEST_DIR = createTestDir();
-			const registry = createRegistry(TEST_DIR, {
+			const registry = await setupLoadedRegistry(TEST_DIR, {
 				restrictToAttachments: false,
 			});
-			await registry.load();
 
 			const item: ProcessedItem = {
 				sourceHash: testHash("atomic1"),
@@ -730,17 +744,15 @@ describe("inbox/registry", () => {
 			expect(registry.isProcessed(testHash("atomic1"))).toBe(false);
 
 			// Verify persisted to disk
-			const registry2 = createRegistry(TEST_DIR, {
+			const registry2 = await setupLoadedRegistry(TEST_DIR, {
 				restrictToAttachments: false,
 			});
-			await registry2.load();
 			expect(registry2.isProcessed(testHash("atomic1"))).toBe(false);
 		});
 
 		test("should return false when removing non-existent item", async () => {
 			const TEST_DIR = createTestDir();
-			const registry = createRegistry(TEST_DIR);
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR);
 
 			const removed = await registry.removeAndSave(testHash("nonexistent"));
 
@@ -749,10 +761,9 @@ describe("inbox/registry", () => {
 
 		test("should handle concurrent removeAndSave calls", async () => {
 			const TEST_DIR = createTestDir();
-			const registry = createRegistry(TEST_DIR, {
+			const registry = await setupLoadedRegistry(TEST_DIR, {
 				restrictToAttachments: false,
 			});
-			await registry.load();
 
 			// Add multiple items
 			for (let i = 0; i < 5; i++) {
@@ -792,10 +803,9 @@ describe("inbox/registry", () => {
 	describe("write serialization", () => {
 		test("should serialize concurrent save() calls", async () => {
 			const TEST_DIR = createTestDir();
-			const registry = createRegistry(TEST_DIR, {
+			const registry = await setupLoadedRegistry(TEST_DIR, {
 				restrictToAttachments: false,
 			});
-			await registry.load();
 
 			// Perform concurrent saves
 			const savePromises = [];
@@ -812,10 +822,9 @@ describe("inbox/registry", () => {
 			await Promise.all(savePromises);
 
 			// Verify all items persisted
-			const registry2 = createRegistry(TEST_DIR, {
+			const registry2 = await setupLoadedRegistry(TEST_DIR, {
 				restrictToAttachments: false,
 			});
-			await registry2.load();
 
 			for (let i = 0; i < 10; i++) {
 				expect(registry2.isProcessed(testHash(`serial${i}`))).toBe(true);
@@ -826,8 +835,7 @@ describe("inbox/registry", () => {
 			const TEST_DIR = createTestDir();
 			// This test verifies the logging behavior exists
 			// Actual implementation will log when lock wait > 100ms
-			const registry = createRegistry(TEST_DIR);
-			await registry.load();
+			const registry = await setupLoadedRegistry(TEST_DIR);
 
 			// Just verify save completes successfully
 			await registry.save();

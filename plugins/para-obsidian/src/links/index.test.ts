@@ -14,9 +14,17 @@ describe("renameWithLinkRewrite", () => {
 	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	afterEach(getAfterEachHook());
 
-	it("renames file and rewrites wikilinks", () => {
+	/**
+	 * Helper function to set up test vault with automatic cleanup tracking
+	 */
+	function setupTest(): string {
 		const vault = createTestVault();
 		trackVault(vault);
+		return vault;
+	}
+
+	it("renames file and rewrites wikilinks", () => {
+		const vault = setupTest();
 		writeVaultFile(vault, "old.md", "# Old");
 		writeVaultFile(vault, "other.md", "See [[old]]");
 		const cfg = loadConfig({ cwd: vault });
@@ -34,8 +42,7 @@ describe("renameWithLinkRewrite", () => {
 	});
 
 	it("supports dry-run", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		writeVaultFile(vault, "old.md", "# Old");
 		writeVaultFile(vault, "other.md", "See [[old]]");
 		const cfg = loadConfig({ cwd: vault });

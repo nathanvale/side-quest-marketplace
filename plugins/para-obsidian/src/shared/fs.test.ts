@@ -11,9 +11,19 @@ describe("fs helpers", () => {
 	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	afterEach(getAfterEachHook());
 
-	it("resolves vault-relative paths", () => {
+	/**
+	 * Helper function to set up a test vault with automatic cleanup tracking.
+	 * Combines createTestVault() and trackVault() operations.
+	 * @returns Path to the created test vault
+	 */
+	const setupTest = (): string => {
 		const vault = createTestVault();
 		trackVault(vault);
+		return vault;
+	};
+
+	it("resolves vault-relative paths", () => {
+		const vault = setupTest();
 
 		writeVaultFile(vault, "01_Projects/.gitkeep", "");
 		const target = path.join(vault, "01_Projects");
@@ -23,15 +33,13 @@ describe("fs helpers", () => {
 	});
 
 	it("prevents escaping vault", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 
 		expect(() => resolveVaultPath(vault, "../evil")).toThrow("escapes");
 	});
 
 	it("lists directories", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 
 		writeVaultFile(vault, "a/.gitkeep", "");
 		writeVaultFile(vault, "b/.gitkeep", "");
@@ -40,8 +48,7 @@ describe("fs helpers", () => {
 	});
 
 	it("reads files", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 
 		writeVaultFile(vault, "note.md", "hello");
 		const content = readFile(vault, "note.md");

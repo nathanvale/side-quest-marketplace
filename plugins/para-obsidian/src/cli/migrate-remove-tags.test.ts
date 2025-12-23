@@ -15,9 +15,18 @@ describe("migrateRemoveTags", () => {
 	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	afterEach(getAfterEachHook());
 
+	/**
+	 * Helper function to setup a test vault and track it for cleanup.
+	 * @returns Test vault path
+	 */
+	function setupTest(): string {
+		const vault = createTestVault();
+		trackVault(vault);
+		return vault;
+	}
+
 	test("removes tags from notes with string tags", async () => {
-		const testVault = createTestVault();
-		trackVault(testVault);
+		const testVault = setupTest();
 		const config = { vault: testVault };
 
 		const filePath = path.join(testVault, "note.md");
@@ -48,8 +57,7 @@ status: active
 	});
 
 	test("removes tags from notes with array tags", async () => {
-		const testVault = createTestVault();
-		trackVault(testVault);
+		const testVault = setupTest();
 		const config = { vault: testVault };
 
 		const filePath = path.join(testVault, "note.md");
@@ -87,8 +95,7 @@ status: active
 	});
 
 	test("skips notes without tags", async () => {
-		const testVault = createTestVault();
-		trackVault(testVault);
+		const testVault = setupTest();
 		const config = { vault: testVault };
 
 		const filePath = path.join(testVault, "note.md");
@@ -114,8 +121,7 @@ status: active
 	});
 
 	test("preserves other frontmatter fields", async () => {
-		const testVault = createTestVault();
-		trackVault(testVault);
+		const testVault = setupTest();
 		const config = { vault: testVault };
 
 		const filePath = path.join(testVault, "note.md");
@@ -152,8 +158,7 @@ target_completion: 2025-12-31
 	});
 
 	test("dry-run doesn't modify files", async () => {
-		const testVault = createTestVault();
-		trackVault(testVault);
+		const testVault = setupTest();
 		const config = { vault: testVault };
 
 		const filePath = path.join(testVault, "note.md");
@@ -182,8 +187,7 @@ status: active
 	});
 
 	test("handles multiple files", async () => {
-		const testVault = createTestVault();
-		trackVault(testVault);
+		const testVault = setupTest();
 		const config = { vault: testVault };
 
 		// Create multiple files
@@ -250,8 +254,7 @@ Content 3`,
 	});
 
 	test("handles nested directories", async () => {
-		const testVault = createTestVault();
-		trackVault(testVault);
+		const testVault = setupTest();
 		const config = { vault: testVault };
 
 		// Create nested structure
@@ -281,8 +284,7 @@ Content`;
 	});
 
 	test("handles invalid YAML gracefully", async () => {
-		const testVault = createTestVault();
-		trackVault(testVault);
+		const testVault = setupTest();
 		const config = { vault: testVault };
 
 		const filePath = path.join(testVault, "broken.md");
@@ -305,8 +307,7 @@ Content`;
 	});
 
 	test("handles files without frontmatter", async () => {
-		const testVault = createTestVault();
-		trackVault(testVault);
+		const testVault = setupTest();
 		const config = { vault: testVault };
 
 		const filePath = path.join(testVault, "no-frontmatter.md");
@@ -326,8 +327,7 @@ Content`;
 	});
 
 	test("verbose mode tracks all operations", async () => {
-		const testVault = createTestVault();
-		trackVault(testVault);
+		const testVault = setupTest();
 		const config = { vault: testVault };
 
 		const files = [
@@ -364,8 +364,7 @@ Content`,
 	});
 
 	test("preserves body content exactly", async () => {
-		const testVault = createTestVault();
-		trackVault(testVault);
+		const testVault = setupTest();
 		const config = { vault: testVault };
 
 		const filePath = path.join(testVault, "note.md");
@@ -401,8 +400,7 @@ ${bodyContent}`;
 	});
 
 	test("handles empty tags field", async () => {
-		const testVault = createTestVault();
-		trackVault(testVault);
+		const testVault = setupTest();
 		const config = { vault: testVault };
 
 		const filePath = path.join(testVault, "note.md");
@@ -428,8 +426,7 @@ status: active
 	});
 
 	test("reports correct file paths relative to vault", async () => {
-		const testVault = createTestVault();
-		trackVault(testVault);
+		const testVault = setupTest();
 		const config = { vault: testVault };
 
 		const subdir = path.join(testVault, "Projects");

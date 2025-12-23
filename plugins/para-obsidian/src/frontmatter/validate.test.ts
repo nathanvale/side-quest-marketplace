@@ -13,6 +13,16 @@ describe("frontmatter file validation", () => {
 	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	let originalEnv: NodeJS.ProcessEnv;
 
+	/**
+	 * Helper function to set up a test vault and track it for cleanup.
+	 * Combines createTestVault() and trackVault() operations.
+	 */
+	const setupTest = () => {
+		const vault = createTestVault();
+		trackVault(vault);
+		return vault;
+	};
+
 	beforeEach(() => {
 		originalEnv = { ...process.env };
 	});
@@ -23,8 +33,7 @@ describe("frontmatter file validation", () => {
 	});
 
 	it("validates a project frontmatter", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		const templatesDir = path.join(vault, "Templates");
 		fs.mkdirSync(templatesDir, { recursive: true });
 		process.env.PARA_VAULT = vault;
@@ -52,8 +61,7 @@ Body`,
 	});
 
 	it("reports issues for missing required fields", () => {
-		const vault = createTestVault();
-		trackVault(vault);
+		const vault = setupTest();
 		const templatesDir = path.join(vault, "Templates");
 		fs.mkdirSync(templatesDir, { recursive: true });
 		process.env.PARA_VAULT = vault;

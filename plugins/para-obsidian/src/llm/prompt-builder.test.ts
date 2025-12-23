@@ -38,12 +38,46 @@ function createMinimalConstraintSet(): ConstraintSet {
 	};
 }
 
+/**
+ * Creates a basic PromptTemplate with optional overrides
+ */
+function createBasicTemplate(
+	overrides: Partial<PromptTemplate> = {},
+): PromptTemplate {
+	return {
+		systemRole: "Test",
+		sourceContent: "Content",
+		constraints: createMinimalConstraintSet(),
+		...overrides,
+	};
+}
+
+/**
+ * Verifies prompt sections appear in the correct order
+ */
+function verifySectionOrder(prompt: string, expectedSections: string[]): void {
+	const indices: number[] = [];
+	for (const section of expectedSections) {
+		const idx = prompt.indexOf(section);
+		expect(idx).toBeGreaterThan(-1);
+		indices.push(idx);
+	}
+
+	// Verify sections appear in ascending order
+	for (let i = 1; i < indices.length; i++) {
+		const prev = indices[i - 1];
+		const curr = indices[i];
+		if (prev !== undefined && curr !== undefined) {
+			expect(curr).toBeGreaterThan(prev);
+		}
+	}
+}
+
 describe("buildStructuredPrompt", () => {
 	test("includes all sections in correct order", () => {
-		const template: PromptTemplate = {
+		const template = createBasicTemplate({
 			systemRole: "You are a test assistant",
 			sourceContent: "# Test Note\nSome content here",
-			constraints: createMinimalConstraintSet(),
 			criticalRules: ["Rule 1", "Rule 2"],
 			examples: [
 				{
@@ -51,35 +85,27 @@ describe("buildStructuredPrompt", () => {
 					output: { args: {}, content: {}, title: "Test" },
 				},
 			],
-		};
+		});
 
 		const prompt = buildStructuredPrompt(template);
 
-		// Check section order
-		const systemRoleIdx = prompt.indexOf("You are a test assistant");
-		const contentIdx = prompt.indexOf("EXISTING NOTE CONTENT:");
-		const constraintsIdx = prompt.indexOf("REQUIRED FIELDS");
-		const rulesIdx = prompt.indexOf("CRITICAL RULES:");
-		const examplesIdx = prompt.indexOf("EXAMPLES:");
-		const outputIdx = prompt.indexOf("OUTPUT (JSON only");
-
-		expect(systemRoleIdx).toBeGreaterThan(-1);
-		expect(contentIdx).toBeGreaterThan(systemRoleIdx);
-		expect(constraintsIdx).toBeGreaterThan(contentIdx);
-		expect(rulesIdx).toBeGreaterThan(constraintsIdx);
-		expect(examplesIdx).toBeGreaterThan(rulesIdx);
-		expect(outputIdx).toBeGreaterThan(examplesIdx);
+		verifySectionOrder(prompt, [
+			"You are a test assistant",
+			"EXISTING NOTE CONTENT:",
+			"REQUIRED FIELDS",
+			"CRITICAL RULES:",
+			"EXAMPLES:",
+			"OUTPUT (JSON only",
+		]);
 	});
 
 	test("handles missing vault context gracefully", () => {
-		const template: PromptTemplate = {
-			systemRole: "Test",
-			sourceContent: "Content",
+		const template = createBasicTemplate({
 			constraints: {
 				...createMinimalConstraintSet(),
 				vaultContext: undefined,
 			},
-		};
+		});
 
 		const prompt = buildStructuredPrompt(template);
 
@@ -89,10 +115,7 @@ describe("buildStructuredPrompt", () => {
 	});
 
 	test("includes examples when provided", () => {
-		const template: PromptTemplate = {
-			systemRole: "Test",
-			sourceContent: "Content",
-			constraints: createMinimalConstraintSet(),
+		const template = createBasicTemplate({
 			examples: [
 				{
 					input: "Sample input",
@@ -103,7 +126,7 @@ describe("buildStructuredPrompt", () => {
 					},
 				},
 			],
-		};
+		});
 
 		const prompt = buildStructuredPrompt(template);
 
@@ -114,11 +137,7 @@ describe("buildStructuredPrompt", () => {
 	});
 
 	test("applies default critical rules when none provided", () => {
-		const template: PromptTemplate = {
-			systemRole: "Test",
-			sourceContent: "Content",
-			constraints: createMinimalConstraintSet(),
-		};
+		const template = createBasicTemplate();
 
 		const prompt = buildStructuredPrompt(template);
 
@@ -130,12 +149,9 @@ describe("buildStructuredPrompt", () => {
 	});
 
 	test("allows custom critical rules", () => {
-		const template: PromptTemplate = {
-			systemRole: "Test",
-			sourceContent: "Content",
-			constraints: createMinimalConstraintSet(),
+		const template = createBasicTemplate({
 			criticalRules: ["Custom rule 1", "Custom rule 2"],
-		};
+		});
 
 		const prompt = buildStructuredPrompt(template);
 
@@ -147,11 +163,9 @@ describe("buildStructuredPrompt", () => {
 	});
 
 	test("wraps source content in delimiter", () => {
-		const template: PromptTemplate = {
-			systemRole: "Test",
+		const template = createBasicTemplate({
 			sourceContent: "# My Note\n\nContent here",
-			constraints: createMinimalConstraintSet(),
-		};
+		});
 
 		const prompt = buildStructuredPrompt(template);
 
@@ -677,9 +691,7 @@ describe("Integration: full prompt generation", () => {
 	});
 
 	test("minimal prompt without optional sections", () => {
-		const template: PromptTemplate = {
-			systemRole: "Test",
-			sourceContent: "Content",
+		const template = createBasicTemplate({
 			constraints: {
 				fields: [],
 				outputSchema: {
@@ -690,7 +702,7 @@ describe("Integration: full prompt generation", () => {
 				},
 				vaultContext: undefined,
 			},
-		};
+		});
 
 		const prompt = buildStructuredPrompt(template);
 

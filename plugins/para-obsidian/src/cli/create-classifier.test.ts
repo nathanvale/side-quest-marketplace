@@ -52,24 +52,12 @@ describe("create-classifier - Happy Path Tests", () => {
 	let _registryPath: string;
 
 	beforeEach(() => {
-		vault = createTestVault();
+		const setup = setupClassifierTestVault();
+		vault = setup.vault;
+		classifiersDir = setup.classifiersDir;
+		templatesDir = setup.templatesDir;
+		_registryPath = setup.registryPath;
 		trackVault(vault);
-		classifiersDir = join(
-			vault,
-			".plugin-workspace",
-			"classifiers",
-			"definitions",
-		);
-		templatesDir = join(vault, "Templates");
-		_registryPath = join(classifiersDir, "index.ts");
-
-		// Setup minimal directory structure
-		writeVaultFile(
-			vault,
-			".plugin-workspace/classifiers/definitions/.gitkeep",
-			"",
-		);
-		writeVaultFile(vault, "Templates/.gitkeep", "");
 	});
 
 	test("generates valid TypeScript classifier code", () => {
@@ -336,22 +324,11 @@ describe("create-classifier - Failure Scenario Tests", () => {
 	let registryPath: string;
 
 	beforeEach(() => {
-		vault = createTestVault();
+		const setup = setupClassifierTestVault();
+		vault = setup.vault;
+		classifiersDir = setup.classifiersDir;
+		registryPath = setup.registryPath;
 		trackVault(vault);
-		classifiersDir = join(
-			vault,
-			".plugin-workspace",
-			"classifiers",
-			"definitions",
-		);
-		registryPath = join(classifiersDir, "index.ts");
-
-		writeVaultFile(
-			vault,
-			".plugin-workspace/classifiers/definitions/.gitkeep",
-			"",
-		);
-		writeVaultFile(vault, "Templates/.gitkeep", "");
 	});
 
 	test("rollback removes classifier when registry update fails", async () => {
@@ -359,30 +336,8 @@ describe("create-classifier - Failure Scenario Tests", () => {
 		const classifierCode = "export const rollbackTestClassifier = {};";
 
 		const tx = new Transaction();
-
-		// Add create classifier operation
-		tx.add({
-			name: "create-classifier",
-			execute: async () => {
-				await atomicWriteFile(classifierPath, classifierCode);
-				return { path: classifierPath };
-			},
-			rollback: async (result?: unknown) => {
-				const fileResult = result as FileRollbackResult | undefined;
-				if (fileResult?.path) {
-					await unlink(fileResult.path).catch(() => {});
-				}
-			},
-		});
-
-		// Add failing registry update
-		tx.add({
-			name: "update-registry",
-			execute: async () => {
-				throw new Error("Registry update failed");
-			},
-			rollback: async () => {},
-		});
+		tx.add(createFileOperation(classifierPath, classifierCode));
+		tx.add(createFailingOperation("update-registry", "Registry update failed"));
 
 		// Execute transaction (should fail and rollback)
 		const result = await tx.execute();
@@ -400,30 +355,10 @@ describe("create-classifier - Failure Scenario Tests", () => {
 		const templateContent = "---\ntype: test\n---\nContent";
 
 		const tx = new Transaction();
-
-		// Create template
-		tx.add({
-			name: "create-template",
-			execute: async () => {
-				await atomicWriteFile(templatePath, templateContent);
-				return { path: templatePath };
-			},
-			rollback: async (result?: unknown) => {
-				const fileResult = result as FileRollbackResult | undefined;
-				if (fileResult?.path) {
-					await unlink(fileResult.path).catch(() => {});
-				}
-			},
-		});
-
-		// Validation fails
-		tx.add({
-			name: "validate-template",
-			execute: async () => {
-				throw new Error("Template validation failed");
-			},
-			rollback: async () => {},
-		});
+		tx.add(createFileOperation(templatePath, templateContent));
+		tx.add(
+			createFailingOperation("validate-template", "Template validation failed"),
+		);
 
 		const result = await tx.execute();
 
@@ -436,55 +371,19 @@ describe("create-classifier - Failure Scenario Tests", () => {
 
 	test("complete rollback on multi-step failure", async () => {
 		const classifierPath = join(classifiersDir, "multi-step.ts");
-		const _templatePath = join(vault, "Templates", "multi-step.md");
-		const backupPath = `${registryPath}.backup`;
 
 		const tx = new Transaction();
-
-		// Step 1: Create classifier
-		tx.add({
-			name: "create-classifier",
-			execute: async () => {
-				await atomicWriteFile(classifierPath, "export const test = {};");
-				return { path: classifierPath };
-			},
-			rollback: async (result?: unknown) => {
-				const fileResult = result as FileRollbackResult | undefined;
-				if (fileResult?.path) await unlink(fileResult.path).catch(() => {});
-			},
-		});
-
-		// Step 2: Update registry (with backup)
-		tx.add({
-			name: "update-registry",
-			execute: async () => {
-				const original = "original registry content";
-				await atomicWriteFile(registryPath, original);
-				await atomicWriteFile(backupPath, original);
-
-				const updated = "updated registry content";
-				await atomicWriteFile(registryPath, updated);
-
-				return { backup: original, backupPath };
-			},
-			rollback: async (result?: unknown) => {
-				const registryResult = result as RegistryRollbackResult | undefined;
-				if (registryResult?.backup && registryResult?.backupPath) {
-					await atomicWriteFile(registryPath, registryResult.backup).catch(
-						() => {},
-					);
-				}
-			},
-		});
-
-		// Step 3: Create template (FAILS)
-		tx.add({
-			name: "create-template",
-			execute: async () => {
-				throw new Error("Template creation failed");
-			},
-			rollback: async () => {},
-		});
+		tx.add(createFileOperation(classifierPath, "export const test = {};"));
+		tx.add(
+			createRegistryUpdateOperation(
+				registryPath,
+				"original registry content",
+				"updated registry content",
+			),
+		);
+		tx.add(
+			createFailingOperation("create-template", "Template creation failed"),
+		);
 
 		const result = await tx.execute();
 
@@ -599,27 +498,13 @@ export const invalidClassifier: InboxConverter = {
 `;
 
 		const tx = new Transaction();
-
-		tx.add({
-			name: "create-classifier",
-			execute: async () => {
-				await atomicWriteFile(classifierPath, invalidCode);
-				return { path: classifierPath };
-			},
-			rollback: async (result?: unknown) => {
-				const fileResult = result as FileRollbackResult | undefined;
-				if (fileResult?.path) await unlink(fileResult.path).catch(() => {});
-			},
-		});
-
-		tx.add({
-			name: "validate-typescript",
-			execute: async () => {
-				// Simulate TypeScript validation failure
-				throw new Error("TypeScript compilation failed");
-			},
-			rollback: async () => {},
-		});
+		tx.add(createFileOperation(classifierPath, invalidCode));
+		tx.add(
+			createFailingOperation(
+				"validate-typescript",
+				"TypeScript compilation failed",
+			),
+		);
 
 		const result = await tx.execute();
 
@@ -679,9 +564,9 @@ describe("create-classifier - End-to-End Tests", () => {
 	let vault: string;
 
 	beforeEach(() => {
-		vault = createTestVault();
+		const setup = setupClassifierTestVault();
+		vault = setup.vault;
 		trackVault(vault);
-		writeVaultFile(vault, "Templates/.gitkeep", "");
 	});
 
 	test("full workflow: classifier + template → functional", async () => {
@@ -771,6 +656,95 @@ describe("create-classifier - End-to-End Tests", () => {
 });
 
 // Helper types and functions
+
+/**
+ * Setup classifier test vault with standard directory structure
+ */
+function setupClassifierTestVault() {
+	const vault = createTestVault();
+	const classifiersDir = join(
+		vault,
+		".plugin-workspace",
+		"classifiers",
+		"definitions",
+	);
+	const templatesDir = join(vault, "Templates");
+	const registryPath = join(classifiersDir, "index.ts");
+
+	writeVaultFile(
+		vault,
+		".plugin-workspace/classifiers/definitions/.gitkeep",
+		"",
+	);
+	writeVaultFile(vault, "Templates/.gitkeep", "");
+
+	return {
+		vault,
+		classifiersDir,
+		templatesDir,
+		registryPath,
+	};
+}
+
+/**
+ * Create a transaction operation for file creation with rollback
+ */
+function createFileOperation(filePath: string, content: string) {
+	return {
+		name: "create-file",
+		execute: async () => {
+			await atomicWriteFile(filePath, content);
+			return { path: filePath };
+		},
+		rollback: async (result?: unknown) => {
+			const fileResult = result as FileRollbackResult | undefined;
+			if (fileResult?.path) {
+				await unlink(fileResult.path).catch(() => {});
+			}
+		},
+	};
+}
+
+/**
+ * Create a failing transaction operation for testing
+ */
+function createFailingOperation(name: string, errorMessage: string) {
+	return {
+		name,
+		execute: async () => {
+			throw new Error(errorMessage);
+		},
+		rollback: async () => {},
+	};
+}
+
+/**
+ * Create a registry update operation with backup and rollback
+ */
+function createRegistryUpdateOperation(
+	registryPath: string,
+	originalContent: string,
+	updatedContent: string,
+) {
+	return {
+		name: "update-registry",
+		execute: async () => {
+			const backupPath = `${registryPath}.backup`;
+			await atomicWriteFile(registryPath, originalContent);
+			await atomicWriteFile(backupPath, originalContent);
+			await atomicWriteFile(registryPath, updatedContent);
+			return { backup: originalContent, backupPath };
+		},
+		rollback: async (result?: unknown) => {
+			const registryResult = result as RegistryRollbackResult | undefined;
+			if (registryResult?.backup && registryResult?.backupPath) {
+				await atomicWriteFile(registryPath, registryResult.backup).catch(
+					() => {},
+				);
+			}
+		},
+	};
+}
 
 /**
  * Rollback result for file operations

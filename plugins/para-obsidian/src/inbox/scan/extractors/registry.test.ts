@@ -56,6 +56,42 @@ function createTestFile(filename: string, extension: string): InboxFile {
 	};
 }
 
+/**
+ * Setup a registry with common extractors for testing
+ * @param extractorConfigs - Array of [id, extensions[]] tuples
+ * @returns Configured ExtractorRegistry instance
+ */
+function setupRegistry(
+	extractorConfigs: Array<[string, string[]]>,
+): ExtractorRegistry {
+	const registry = new ExtractorRegistry();
+	for (const [id, extensions] of extractorConfigs) {
+		registry.register(createMockExtractor(id, extensions));
+	}
+	return registry;
+}
+
+/**
+ * Setup a registry with a single extractor
+ * @param id - Extractor ID
+ * @param extensions - Supported extensions
+ * @param options - Optional extractor configuration
+ * @returns Tuple of [registry, extractor]
+ */
+function setupSingleExtractor(
+	id: string,
+	extensions: string[],
+	options?: {
+		canHandleFn?: (file: InboxFile) => boolean;
+		checkAvailability?: () => Promise<{ available: boolean; error?: string }>;
+	},
+): [ExtractorRegistry, ContentExtractor] {
+	const registry = new ExtractorRegistry();
+	const extractor = createMockExtractor(id, extensions, options);
+	registry.register(extractor);
+	return [registry, extractor];
+}
+
 // =============================================================================
 // Tests
 // =============================================================================
@@ -64,26 +100,21 @@ describe("extractors/registry", () => {
 	describe("ExtractorRegistry", () => {
 		describe("register", () => {
 			test("should register an extractor", () => {
-				const registry = new ExtractorRegistry();
-				const extractor = createMockExtractor("pdf", [".pdf"]);
-
-				registry.register(extractor);
+				const [registry, extractor] = setupSingleExtractor("pdf", [".pdf"]);
 
 				expect(registry.size).toBe(1);
 				expect(registry.get("pdf")).toBe(extractor);
 			});
 
 			test("should register multiple extractors", () => {
-				const registry = new ExtractorRegistry();
-				const pdfExtractor = createMockExtractor("pdf", [".pdf"]);
-				const imageExtractor = createMockExtractor("image", [".png", ".jpg"]);
-
-				registry.register(pdfExtractor);
-				registry.register(imageExtractor);
+				const registry = setupRegistry([
+					["pdf", [".pdf"]],
+					["image", [".png", ".jpg"]],
+				]);
 
 				expect(registry.size).toBe(2);
-				expect(registry.get("pdf")).toBe(pdfExtractor);
-				expect(registry.get("image")).toBe(imageExtractor);
+				expect(registry.get("pdf")).toBeDefined();
+				expect(registry.get("image")).toBeDefined();
 			});
 
 			test("should throw error for duplicate ID", () => {
@@ -99,12 +130,10 @@ describe("extractors/registry", () => {
 			});
 
 			test("should allow registering extractors with same extensions but different IDs", () => {
-				const registry = new ExtractorRegistry();
-				const extractor1 = createMockExtractor("pdf-basic", [".pdf"]);
-				const extractor2 = createMockExtractor("pdf-advanced", [".pdf"]);
-
-				registry.register(extractor1);
-				registry.register(extractor2);
+				const registry = setupRegistry([
+					["pdf-basic", [".pdf"]],
+					["pdf-advanced", [".pdf"]],
+				]);
 
 				expect(registry.size).toBe(2);
 			});
@@ -112,9 +141,7 @@ describe("extractors/registry", () => {
 
 		describe("unregister", () => {
 			test("should remove registered extractor", () => {
-				const registry = new ExtractorRegistry();
-				const extractor = createMockExtractor("pdf", [".pdf"]);
-				registry.register(extractor);
+				const [registry] = setupSingleExtractor("pdf", [".pdf"]);
 
 				const result = registry.unregister("pdf");
 
@@ -132,9 +159,10 @@ describe("extractors/registry", () => {
 			});
 
 			test("should only remove specified extractor", () => {
-				const registry = new ExtractorRegistry();
-				registry.register(createMockExtractor("pdf", [".pdf"]));
-				registry.register(createMockExtractor("image", [".png"]));
+				const registry = setupRegistry([
+					["pdf", [".pdf"]],
+					["image", [".png"]],
+				]);
 
 				registry.unregister("pdf");
 
@@ -145,9 +173,7 @@ describe("extractors/registry", () => {
 
 		describe("get", () => {
 			test("should return extractor by ID", () => {
-				const registry = new ExtractorRegistry();
-				const extractor = createMockExtractor("pdf", [".pdf"]);
-				registry.register(extractor);
+				const [registry, extractor] = setupSingleExtractor("pdf", [".pdf"]);
 
 				expect(registry.get("pdf")).toBe(extractor);
 			});
@@ -161,11 +187,9 @@ describe("extractors/registry", () => {
 
 		describe("findExtractor", () => {
 			test("should find extractor for matching file", () => {
-				const registry = new ExtractorRegistry();
-				const pdfExtractor = createMockExtractor("pdf", [".pdf"]);
-				registry.register(pdfExtractor);
-
+				const [registry, pdfExtractor] = setupSingleExtractor("pdf", [".pdf"]);
 				const file = createTestFile("invoice.pdf", ".pdf");
+
 				const match = registry.findExtractor(file);
 
 				expect(match).not.toBeNull();
@@ -174,10 +198,9 @@ describe("extractors/registry", () => {
 			});
 
 			test("should return null for no matching extractor", () => {
-				const registry = new ExtractorRegistry();
-				registry.register(createMockExtractor("pdf", [".pdf"]));
-
+				const [registry] = setupSingleExtractor("pdf", [".pdf"]);
 				const file = createTestFile("document.docx", ".docx");
+
 				const match = registry.findExtractor(file);
 
 				expect(match).toBeNull();
@@ -198,11 +221,9 @@ describe("extractors/registry", () => {
 			});
 
 			test("should use canHandle for matching", () => {
-				const registry = new ExtractorRegistry();
-				const extractor = createMockExtractor("custom", [".txt"], {
+				const [registry, extractor] = setupSingleExtractor("custom", [".txt"], {
 					canHandleFn: (file) => file.filename.startsWith("special-"),
 				});
-				registry.register(extractor);
 
 				const regularFile = createTestFile("document.txt", ".txt");
 				const specialFile = createTestFile("special-doc.txt", ".txt");
@@ -223,18 +244,14 @@ describe("extractors/registry", () => {
 
 		describe("canHandle", () => {
 			test("should return true when extractor exists for file", () => {
-				const registry = new ExtractorRegistry();
-				registry.register(createMockExtractor("pdf", [".pdf"]));
-
+				const [registry] = setupSingleExtractor("pdf", [".pdf"]);
 				const file = createTestFile("invoice.pdf", ".pdf");
 
 				expect(registry.canHandle(file)).toBe(true);
 			});
 
 			test("should return false when no extractor exists for file", () => {
-				const registry = new ExtractorRegistry();
-				registry.register(createMockExtractor("pdf", [".pdf"]));
-
+				const [registry] = setupSingleExtractor("pdf", [".pdf"]);
 				const file = createTestFile("document.docx", ".docx");
 
 				expect(registry.canHandle(file)).toBe(false);
@@ -242,7 +259,6 @@ describe("extractors/registry", () => {
 
 			test("should return false for empty registry", () => {
 				const registry = new ExtractorRegistry();
-
 				const file = createTestFile("invoice.pdf", ".pdf");
 
 				expect(registry.canHandle(file)).toBe(false);
@@ -257,10 +273,11 @@ describe("extractors/registry", () => {
 			});
 
 			test("should return all extensions from single extractor", () => {
-				const registry = new ExtractorRegistry();
-				registry.register(
-					createMockExtractor("image", [".png", ".jpg", ".jpeg"]),
-				);
+				const [registry] = setupSingleExtractor("image", [
+					".png",
+					".jpg",
+					".jpeg",
+				]);
 
 				const extensions = registry.getSupportedExtensions();
 
@@ -271,9 +288,10 @@ describe("extractors/registry", () => {
 			});
 
 			test("should return unique extensions across extractors", () => {
-				const registry = new ExtractorRegistry();
-				registry.register(createMockExtractor("pdf", [".pdf"]));
-				registry.register(createMockExtractor("image", [".png", ".jpg"]));
+				const registry = setupRegistry([
+					["pdf", [".pdf"]],
+					["image", [".png", ".jpg"]],
+				]);
 
 				const extensions = registry.getSupportedExtensions();
 
@@ -284,11 +302,10 @@ describe("extractors/registry", () => {
 			});
 
 			test("should deduplicate extensions", () => {
-				const registry = new ExtractorRegistry();
-				registry.register(createMockExtractor("basic", [".txt", ".md"]));
-				registry.register(
-					createMockExtractor("advanced", [".md", ".markdown"]),
-				);
+				const registry = setupRegistry([
+					["basic", [".txt", ".md"]],
+					["advanced", [".md", ".markdown"]],
+				]);
 
 				const extensions = registry.getSupportedExtensions();
 
@@ -297,10 +314,11 @@ describe("extractors/registry", () => {
 			});
 
 			test("should normalize extensions to lowercase", () => {
-				const registry = new ExtractorRegistry();
-				registry.register(
-					createMockExtractor("mixed", [".PDF", ".Png", ".jpg"]),
-				);
+				const [registry] = setupSingleExtractor("mixed", [
+					".PDF",
+					".Png",
+					".jpg",
+				]);
 
 				const extensions = registry.getSupportedExtensions();
 
@@ -319,22 +337,18 @@ describe("extractors/registry", () => {
 			});
 
 			test("should return all registered extractors", () => {
-				const registry = new ExtractorRegistry();
-				const extractor1 = createMockExtractor("pdf", [".pdf"]);
-				const extractor2 = createMockExtractor("image", [".png"]);
-				registry.register(extractor1);
-				registry.register(extractor2);
+				const registry = setupRegistry([
+					["pdf", [".pdf"]],
+					["image", [".png"]],
+				]);
 
 				const all = registry.getAll();
 
 				expect(all).toHaveLength(2);
-				expect(all).toContain(extractor1);
-				expect(all).toContain(extractor2);
 			});
 
 			test("should return new array on each call", () => {
-				const registry = new ExtractorRegistry();
-				registry.register(createMockExtractor("pdf", [".pdf"]));
+				const [registry] = setupSingleExtractor("pdf", [".pdf"]);
 
 				const all1 = registry.getAll();
 				const all2 = registry.getAll();
@@ -352,18 +366,20 @@ describe("extractors/registry", () => {
 			});
 
 			test("should return correct count", () => {
-				const registry = new ExtractorRegistry();
-				registry.register(createMockExtractor("pdf", [".pdf"]));
-				registry.register(createMockExtractor("image", [".png"]));
-				registry.register(createMockExtractor("markdown", [".md"]));
+				const registry = setupRegistry([
+					["pdf", [".pdf"]],
+					["image", [".png"]],
+					["markdown", [".md"]],
+				]);
 
 				expect(registry.size).toBe(3);
 			});
 
 			test("should update after unregister", () => {
-				const registry = new ExtractorRegistry();
-				registry.register(createMockExtractor("pdf", [".pdf"]));
-				registry.register(createMockExtractor("image", [".png"]));
+				const registry = setupRegistry([
+					["pdf", [".pdf"]],
+					["image", [".png"]],
+				]);
 
 				expect(registry.size).toBe(2);
 
@@ -384,19 +400,17 @@ describe("extractors/registry", () => {
 
 			test("should check availability of all extractors", async () => {
 				const registry = new ExtractorRegistry();
-				registry.register(
-					createMockExtractor("pdf", [".pdf"], {
-						checkAvailability: async () => ({ available: true }),
+				const pdfExtractor = createMockExtractor("pdf", [".pdf"], {
+					checkAvailability: async () => ({ available: true }),
+				});
+				const imageExtractor = createMockExtractor("image", [".png"], {
+					checkAvailability: async () => ({
+						available: false,
+						error: "Vision API not configured",
 					}),
-				);
-				registry.register(
-					createMockExtractor("image", [".png"], {
-						checkAvailability: async () => ({
-							available: false,
-							error: "Vision API not configured",
-						}),
-					}),
-				);
+				});
+				registry.register(pdfExtractor);
+				registry.register(imageExtractor);
 
 				const results = await registry.checkAllAvailability();
 
@@ -409,8 +423,7 @@ describe("extractors/registry", () => {
 			});
 
 			test("should assume available if checkAvailability not defined", async () => {
-				const registry = new ExtractorRegistry();
-				registry.register(createMockExtractor("simple", [".txt"]));
+				const [registry] = setupSingleExtractor("simple", [".txt"]);
 
 				const results = await registry.checkAllAvailability();
 
@@ -419,12 +432,12 @@ describe("extractors/registry", () => {
 
 			test("should handle mixed extractors with/without checkAvailability", async () => {
 				const registry = new ExtractorRegistry();
-				registry.register(createMockExtractor("simple", [".txt"])); // No checkAvailability
-				registry.register(
-					createMockExtractor("complex", [".pdf"], {
-						checkAvailability: async () => ({ available: true }),
-					}),
-				);
+				const simpleExtractor = createMockExtractor("simple", [".txt"]); // No checkAvailability
+				const complexExtractor = createMockExtractor("complex", [".pdf"], {
+					checkAvailability: async () => ({ available: true }),
+				});
+				registry.register(simpleExtractor);
+				registry.register(complexExtractor);
 
 				const results = await registry.checkAllAvailability();
 

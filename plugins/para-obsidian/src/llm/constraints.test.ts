@@ -52,6 +52,20 @@ tags: <% tp.system.prompt("Tags") %>
 ## Important Notes`,
 };
 
+/**
+ * Helper to build constraint set from template and rules.
+ * Reduces repetition across tests.
+ */
+function buildConstraintsFromTemplate(
+	template: TemplateInfo,
+	rules?: FrontmatterRules,
+	vaultContext?: VaultContext,
+) {
+	const fields = getTemplateFields(template);
+	const sections = getTemplateSections(template);
+	return buildConstraintSet(fields, sections, rules, vaultContext);
+}
+
 const MOCK_RULES: FrontmatterRules = {
 	required: {
 		"Booking title": { type: "string" },
@@ -91,14 +105,7 @@ const MOCK_VAULT_CONTEXT: VaultContext = {
 
 describe("buildConstraintSet", () => {
 	test("extracts field constraints from template and rules", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 
 		// Verify all expected fields are present
 		expect(constraints.fields.length).toBeGreaterThan(0);
@@ -127,14 +134,7 @@ describe("buildConstraintSet", () => {
 	});
 
 	test("marks required fields correctly", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 
 		const requiredField = constraints.fields.find(
 			(f) => f.key === "Booking title",
@@ -148,14 +148,7 @@ describe("buildConstraintSet", () => {
 	});
 
 	test("extracts enum values from rules", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 
 		const enumField = constraints.fields.find((f) => f.key === "Booking type");
 		expect(enumField?.type).toBe("enum");
@@ -169,14 +162,7 @@ describe("buildConstraintSet", () => {
 	});
 
 	test("extracts array includes constraint", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 
 		const arrayField = constraints.fields.find((f) => f.key === "Tags");
 		expect(arrayField?.type).toBe("array");
@@ -184,28 +170,14 @@ describe("buildConstraintSet", () => {
 	});
 
 	test("excludes auto-date fields", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 
 		const autoDateField = constraints.fields.find((f) => f.key === "created");
 		expect(autoDateField).toBeUndefined();
 	});
 
 	test("handles missing rules gracefully", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			undefined,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE);
 
 		// Still extracts fields from template
 		expect(constraints.fields.length).toBeGreaterThan(0);
@@ -220,11 +192,8 @@ describe("buildConstraintSet", () => {
 	});
 
 	test("includes vault context when provided", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
+		const constraints = buildConstraintsFromTemplate(
+			MOCK_TEMPLATE,
 			MOCK_RULES,
 			MOCK_VAULT_CONTEXT,
 		);
@@ -242,14 +211,7 @@ describe("buildConstraintSet", () => {
 	});
 
 	test("builds output schema with sections", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 
 		expect(constraints.outputSchema.sections).toEqual([
 			"Booking Details",
@@ -260,14 +222,7 @@ describe("buildConstraintSet", () => {
 	});
 
 	test("builds args example with placeholders", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 
 		const argsExample = constraints.outputSchema.argsExample;
 		expect(argsExample["Booking title"]).toBe("<value>");
@@ -284,42 +239,21 @@ describe("buildConstraintSet", () => {
 
 describe("formatFieldConstraints", () => {
 	test("marks required fields", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 		const formatted = formatFieldConstraints(constraints.fields);
 
 		expect(formatted).toContain('"Booking title" (frontmatter) REQUIRED');
 	});
 
 	test("marks optional fields", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 		const formatted = formatFieldConstraints(constraints.fields);
 
 		expect(formatted).toContain('"Booking reference" (frontmatter) OPTIONAL');
 	});
 
 	test("includes enum values inline", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 		const formatted = formatFieldConstraints(constraints.fields);
 
 		expect(formatted).toContain(
@@ -328,14 +262,7 @@ describe("formatFieldConstraints", () => {
 	});
 
 	test("adds wikilink formatting guidance", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 		const formatted = formatFieldConstraints(constraints.fields);
 
 		expect(formatted).toContain(
@@ -344,14 +271,7 @@ describe("formatFieldConstraints", () => {
 	});
 
 	test("includes array includes constraint", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 		const formatted = formatFieldConstraints(constraints.fields);
 
 		expect(formatted).toContain(
@@ -361,14 +281,7 @@ describe("formatFieldConstraints", () => {
 	});
 
 	test("formats date fields", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 		const formatted = formatFieldConstraints(constraints.fields);
 
 		expect(formatted).toContain(
@@ -377,14 +290,7 @@ describe("formatFieldConstraints", () => {
 	});
 
 	test("formats generic string fields", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 		const formatted = formatFieldConstraints(constraints.fields);
 
 		expect(formatted).toContain('"Cost" (frontmatter) REQUIRED - string');
@@ -397,11 +303,8 @@ describe("formatFieldConstraints", () => {
 
 describe("formatVaultContext", () => {
 	test("lists existing areas with guidance", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
+		const constraints = buildConstraintsFromTemplate(
+			MOCK_TEMPLATE,
 			MOCK_RULES,
 			MOCK_VAULT_CONTEXT,
 		);
@@ -422,11 +325,8 @@ describe("formatVaultContext", () => {
 	});
 
 	test("lists existing projects", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
+		const constraints = buildConstraintsFromTemplate(
+			MOCK_TEMPLATE,
 			MOCK_RULES,
 			MOCK_VAULT_CONTEXT,
 		);
@@ -443,11 +343,8 @@ describe("formatVaultContext", () => {
 	});
 
 	test("constrains tags to allowed values", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
+		const constraints = buildConstraintsFromTemplate(
+			MOCK_TEMPLATE,
 			MOCK_RULES,
 			MOCK_VAULT_CONTEXT,
 		);
@@ -464,11 +361,8 @@ describe("formatVaultContext", () => {
 	});
 
 	test("includes critical wikilink rules", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
+		const constraints = buildConstraintsFromTemplate(
+			MOCK_TEMPLATE,
 			MOCK_RULES,
 			MOCK_VAULT_CONTEXT,
 		);
@@ -519,14 +413,7 @@ describe("formatVaultContext", () => {
 
 describe("formatOutputSchema", () => {
 	test("builds args example from constraints", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 		const formatted = formatOutputSchema(constraints.outputSchema);
 
 		expect(formatted).toContain('"Booking title": "<value>"');
@@ -535,14 +422,7 @@ describe("formatOutputSchema", () => {
 	});
 
 	test("builds content example from sections", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 		const formatted = formatOutputSchema(constraints.outputSchema);
 
 		expect(formatted).toContain('"Booking Details"');
@@ -552,14 +432,7 @@ describe("formatOutputSchema", () => {
 	});
 
 	test("includes JSON format specification", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 		const formatted = formatOutputSchema(constraints.outputSchema);
 
 		expect(formatted).toContain("OUTPUT FORMAT:");
@@ -570,14 +443,7 @@ describe("formatOutputSchema", () => {
 	});
 
 	test("includes critical rules for wikilinks", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 		const formatted = formatOutputSchema(constraints.outputSchema);
 
 		expect(formatted).toContain("For wikilink fields: Use literal null");
@@ -586,14 +452,7 @@ describe("formatOutputSchema", () => {
 	});
 
 	test("includes date format rules", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 		const formatted = formatOutputSchema(constraints.outputSchema);
 
 		expect(formatted).toContain("Dates MUST be YYYY-MM-DD format");
@@ -606,11 +465,8 @@ describe("formatOutputSchema", () => {
 
 describe("formatConstraintSet", () => {
 	test("combines all formatting functions", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
+		const constraints = buildConstraintsFromTemplate(
+			MOCK_TEMPLATE,
 			MOCK_RULES,
 			MOCK_VAULT_CONTEXT,
 		);
@@ -622,28 +478,14 @@ describe("formatConstraintSet", () => {
 	});
 
 	test("vault context is undefined when not provided", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 		const formatted = formatConstraintSet(constraints);
 
 		expect(formatted.vaultContext).toBeUndefined();
 	});
 
 	test("fields section includes all constraints", () => {
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			MOCK_RULES,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, MOCK_RULES);
 		const formatted = formatConstraintSet(constraints);
 
 		expect(formatted.fields).toContain("REQUIRED");
@@ -665,14 +507,7 @@ describe("edge cases", () => {
 			content: "---\n---\n\n## Notes",
 		};
 
-		const fields = getTemplateFields(emptyTemplate);
-		const sections = getTemplateSections(emptyTemplate);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			undefined,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(emptyTemplate);
 
 		expect(constraints.fields).toHaveLength(0);
 		expect(constraints.outputSchema.sections).toEqual(["Notes"]);
@@ -690,14 +525,7 @@ title: <% tp.system.prompt("Title") %>
 Body content without sections`,
 		};
 
-		const fields = getTemplateFields(noSectionsTemplate);
-		const sections = getTemplateSections(noSectionsTemplate);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			undefined,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(noSectionsTemplate);
 
 		// Verify single field is extracted
 		expect(constraints.fields).toContainEqual(
@@ -714,14 +542,7 @@ Body content without sections`,
 			required: {},
 		};
 
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
-			emptyRules,
-			undefined,
-		);
+		const constraints = buildConstraintsFromTemplate(MOCK_TEMPLATE, emptyRules);
 
 		// Fields are extracted from template, but all are optional
 		expect(constraints.fields.every((f) => !f.required)).toBe(true);
@@ -735,13 +556,9 @@ Body content without sections`,
 			},
 		};
 
-		const fields = getTemplateFields(MOCK_TEMPLATE);
-		const sections = getTemplateSections(MOCK_TEMPLATE);
-		const constraints = buildConstraintSet(
-			fields,
-			sections,
+		const constraints = buildConstraintsFromTemplate(
+			MOCK_TEMPLATE,
 			partialRules,
-			undefined,
 		);
 
 		const titleField = constraints.fields.find(

@@ -42,9 +42,12 @@ const createTestConverter = (
 });
 
 describe("ClassifierRegistry", () => {
+	// Helper to create a fresh registry for each test
+	const createRegistry = () => new ClassifierRegistry();
+
 	describe("register", () => {
 		test("should register a converter", () => {
-			const registry = new ClassifierRegistry();
+			const registry = createRegistry();
 			const converter = createTestConverter();
 
 			registry.register(converter);
@@ -54,7 +57,7 @@ describe("ClassifierRegistry", () => {
 		});
 
 		test("should throw when registering duplicate ID", () => {
-			const registry = new ClassifierRegistry();
+			const registry = createRegistry();
 			const converter = createTestConverter();
 
 			registry.register(converter);
@@ -65,7 +68,7 @@ describe("ClassifierRegistry", () => {
 		});
 
 		test("should throw when schema version is too new", () => {
-			const registry = new ClassifierRegistry();
+			const registry = createRegistry();
 			const futureConverter = createTestConverter({
 				schemaVersion: CURRENT_SCHEMA_VERSION + 1,
 			});
@@ -76,7 +79,7 @@ describe("ClassifierRegistry", () => {
 		});
 
 		test("should accept converters at current schema version", () => {
-			const registry = new ClassifierRegistry();
+			const registry = createRegistry();
 			const converter = createTestConverter({
 				schemaVersion: CURRENT_SCHEMA_VERSION,
 			});
@@ -89,7 +92,7 @@ describe("ClassifierRegistry", () => {
 
 	describe("registerAll", () => {
 		test("should register multiple converters", () => {
-			const registry = new ClassifierRegistry();
+			const registry = createRegistry();
 			const converters = [
 				createTestConverter({ id: "conv1" }),
 				createTestConverter({ id: "conv2" }),
@@ -107,7 +110,7 @@ describe("ClassifierRegistry", () => {
 
 	describe("unregister", () => {
 		test("should remove a registered converter", () => {
-			const registry = new ClassifierRegistry();
+			const registry = createRegistry();
 			registry.register(createTestConverter());
 
 			const result = registry.unregister("test");
@@ -118,7 +121,7 @@ describe("ClassifierRegistry", () => {
 		});
 
 		test("should return false for non-existent ID", () => {
-			const registry = new ClassifierRegistry();
+			const registry = createRegistry();
 
 			const result = registry.unregister("nonexistent");
 
@@ -128,7 +131,7 @@ describe("ClassifierRegistry", () => {
 
 	describe("get", () => {
 		test("should return registered converter", () => {
-			const registry = new ClassifierRegistry();
+			const registry = createRegistry();
 			const converter = createTestConverter();
 			registry.register(converter);
 
@@ -138,7 +141,7 @@ describe("ClassifierRegistry", () => {
 		});
 
 		test("should return undefined for non-existent ID", () => {
-			const registry = new ClassifierRegistry();
+			const registry = createRegistry();
 
 			const result = registry.get("nonexistent");
 
@@ -148,7 +151,7 @@ describe("ClassifierRegistry", () => {
 
 	describe("getEnabled", () => {
 		test("should return only enabled converters", () => {
-			const registry = new ClassifierRegistry();
+			const registry = createRegistry();
 			registry.registerAll([
 				createTestConverter({ id: "enabled1", enabled: true, priority: 10 }),
 				createTestConverter({ id: "disabled", enabled: false, priority: 50 }),
@@ -162,7 +165,7 @@ describe("ClassifierRegistry", () => {
 		});
 
 		test("should sort by priority (highest first)", () => {
-			const registry = new ClassifierRegistry();
+			const registry = createRegistry();
 			registry.registerAll([
 				createTestConverter({ id: "low", priority: 10 }),
 				createTestConverter({ id: "high", priority: 100 }),
@@ -177,7 +180,7 @@ describe("ClassifierRegistry", () => {
 
 	describe("getAll", () => {
 		test("should return all converters including disabled", () => {
-			const registry = new ClassifierRegistry();
+			const registry = createRegistry();
 			registry.registerAll([
 				createTestConverter({ id: "enabled", enabled: true }),
 				createTestConverter({ id: "disabled", enabled: false }),
@@ -191,7 +194,7 @@ describe("ClassifierRegistry", () => {
 
 	describe("getIds", () => {
 		test("should return all registered IDs", () => {
-			const registry = new ClassifierRegistry();
+			const registry = createRegistry();
 			registry.registerAll([
 				createTestConverter({ id: "alpha" }),
 				createTestConverter({ id: "beta" }),
@@ -206,7 +209,7 @@ describe("ClassifierRegistry", () => {
 
 	describe("findMatch", () => {
 		test("should find matching converter by filename", () => {
-			const registry = new ClassifierRegistry();
+			const registry = createRegistry();
 			registry.register(
 				createTestConverter({
 					id: "invoice",
@@ -225,7 +228,7 @@ describe("ClassifierRegistry", () => {
 		});
 
 		test("should find matching converter by content", () => {
-			const registry = new ClassifierRegistry();
+			const registry = createRegistry();
 			registry.register(
 				createTestConverter({
 					id: "invoice",
@@ -244,7 +247,7 @@ describe("ClassifierRegistry", () => {
 		});
 
 		test("should return null when no match found", () => {
-			const registry = new ClassifierRegistry();
+			const registry = createRegistry();
 			registry.register(
 				createTestConverter({
 					id: "invoice",
@@ -264,7 +267,7 @@ describe("ClassifierRegistry", () => {
 
 	describe("clear", () => {
 		test("should remove all converters", () => {
-			const registry = new ClassifierRegistry();
+			const registry = createRegistry();
 			registry.registerAll([
 				createTestConverter({ id: "a" }),
 				createTestConverter({ id: "b" }),

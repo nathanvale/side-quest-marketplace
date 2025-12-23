@@ -76,11 +76,20 @@ describe("classifiers/suggestion-builder", () => {
 	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 	afterEach(getAfterEachHook());
 
+	/**
+	 * Setup test vault and track for cleanup
+	 * Combines vault creation and tracking into a single call
+	 */
+	function setupTest(): string {
+		const vault = createTestVault();
+		trackVault(vault);
+		return vault;
+	}
+
 	describe("buildSuggestion", () => {
 		describe("Inbox destination (all items go to inbox)", () => {
 			test("should set destination to inbox folder for LLM detection", () => {
-				const vault = createTestVault();
-				trackVault(vault);
+				setupTest();
 
 				const input = createInput({
 					llmResult: createLLMResult({
@@ -97,8 +106,7 @@ describe("classifiers/suggestion-builder", () => {
 			});
 
 			test("should set destination to inbox folder for heuristic detection", () => {
-				const vault = createTestVault();
-				trackVault(vault);
+				setupTest();
 
 				const input = createInput({
 					heuristicResult: createHeuristicResult({
@@ -117,8 +125,7 @@ describe("classifiers/suggestion-builder", () => {
 			});
 
 			test("should set destination to inbox folder for LLM+heuristic detection", () => {
-				const vault = createTestVault();
-				trackVault(vault);
+				setupTest();
 
 				const input = createInput({
 					heuristicResult: createHeuristicResult({
@@ -143,8 +150,7 @@ describe("classifiers/suggestion-builder", () => {
 
 		describe("Edge cases", () => {
 			test("should set destination to inbox folder for frontmatter detection", () => {
-				const vault = createTestVault();
-				trackVault(vault);
+				setupTest();
 
 				const input = createInput({
 					llmResult: createLLMResult({
@@ -162,8 +168,7 @@ describe("classifiers/suggestion-builder", () => {
 			});
 
 			test("should handle 'none' detection source (no LLM suggestions)", () => {
-				const vault = createTestVault();
-				trackVault(vault);
+				setupTest();
 
 				const input = createInput({
 					detectionSource: "none",
@@ -176,8 +181,7 @@ describe("classifiers/suggestion-builder", () => {
 			});
 
 			test("should handle skip action (no create-note fields)", () => {
-				const vault = createTestVault();
-				trackVault(vault);
+				setupTest();
 
 				const input = createInput({
 					llmResult: createLLMResult({
@@ -195,8 +199,7 @@ describe("classifiers/suggestion-builder", () => {
 
 		describe("Field extraction", () => {
 			test("should create notes in inbox folder", () => {
-				const vault = createTestVault();
-				trackVault(vault);
+				setupTest();
 
 				const input = createInput({
 					llmResult: createLLMResult({
@@ -214,8 +217,7 @@ describe("classifiers/suggestion-builder", () => {
 			});
 
 			test("should extract all fields from LLM result", () => {
-				const vault = createTestVault();
-				trackVault(vault);
+				setupTest();
 
 				const input = createInput({
 					llmResult: createLLMResult({
@@ -246,8 +248,7 @@ describe("classifiers/suggestion-builder", () => {
 
 		describe("Attachment naming with hash", () => {
 			test("should generate ideal attachment name without hash (collision check at execute)", () => {
-				const vault = createTestVault();
-				trackVault(vault);
+				setupTest();
 
 				const input = createInput({
 					filename: "receipt.pdf",
@@ -278,8 +279,7 @@ describe("classifiers/suggestion-builder", () => {
 			});
 
 			test("should NOT generate attachment name without hash", () => {
-				const vault = createTestVault();
-				trackVault(vault);
+				setupTest();
 
 				const input = createInput({
 					filename: "receipt.pdf",
