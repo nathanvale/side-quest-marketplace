@@ -35,7 +35,6 @@ import {
 	validatePriority,
 } from "../shared/validation";
 import {
-	cleanupTestVault,
 	createTestVault,
 	readVaultFile,
 	useTestVaultCleanup,

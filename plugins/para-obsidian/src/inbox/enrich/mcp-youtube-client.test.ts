@@ -156,9 +156,7 @@ mock.module("@modelcontextprotocol/sdk/client/index.js", () => ({
 }));
 
 mock.module("@modelcontextprotocol/sdk/client/stdio.js", () => ({
-	StdioClientTransport: class MockTransport {
-		constructor() {}
-	},
+	StdioClientTransport: class MockTransport {},
 }));
 
 describe("fetchTranscriptViaMcp", () => {

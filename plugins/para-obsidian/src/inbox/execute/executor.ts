@@ -113,6 +113,7 @@ export async function executeSuggestion(
 
 	// Debug Type A detection - always log to stderr for debugging
 	console.error(
+		// biome-ignore lint/suspicious/noExplicitAny: Debug logging only - casting is safe for inspection
 		`[executor] isCreateNote=${isCreateNoteSuggestion(suggestion)} sourceOfTruth=${isCreateNoteSuggestion(suggestion) ? (suggestion as any).sourceOfTruth : "n/a"} hasSuggestedContent=${isCreateNoteSuggestion(suggestion) ? !!(suggestion as any).suggestedContent : false} contentLen=${isCreateNoteSuggestion(suggestion) ? ((suggestion as any).suggestedContent?.length ?? 0) : 0} isTypeA=${isTypeA}`,
 	);
 

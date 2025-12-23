@@ -19,7 +19,6 @@ import {
 import { OutputFormat } from "@sidequest/core/terminal";
 import { loadConfig } from "../config/index";
 import {
-	createTestContext as createInboxTestContext,
 	createTestVault,
 	useTestVaultCleanup,
 	vaultFileExists,

@@ -4,21 +4,16 @@
  * Focuses on the resolveParaFolder helper function.
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import {
 	cleanupTestDir,
-	cleanupTestVault,
 	createTempDir,
-	createTestContext,
 	createTestSuggestion,
 	createTestVault,
 	useTestVaultCleanup,
-	writeTestFile,
 	writeVaultFile,
 } from "../../../testing/utils";
 import { createRegistry } from "../../registry/processed-registry";
-import type { InboxSuggestion } from "../../types";
-import { createSuggestionId } from "../../types";
 import { executeSuggestion, resolveParaFolder } from "./execute-suggestion";
 
 describe("resolveParaFolder", () => {

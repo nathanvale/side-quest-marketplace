@@ -13,7 +13,6 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { join } from "node:path";
 import { executeLogger } from "../../shared/logger";
 import {
-	cleanupTestVault,
 	createTestContext,
 	createTestSuggestion,
 	createTestVault,
