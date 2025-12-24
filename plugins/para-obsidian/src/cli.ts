@@ -379,15 +379,18 @@ async function main(): Promise<void> {
 				? error.message
 				: "Unexpected error in para-obsidian CLI",
 		);
-		process.exit(1);
+		// Preserve specific exit codes from commands
+		const exitCode =
+			error && typeof error === "object" && "exitCode" in error
+				? (error.exitCode as number)
+				: 1;
+		process.exit(exitCode);
 	}
 }
 
 // Only run main when executed directly (not when imported)
 if (import.meta.main) {
-	main().then(() => {
-		process.exit(0);
-	});
+	await main();
 }
 
 // Re-export for backward compatibility (previously exported from this file)
