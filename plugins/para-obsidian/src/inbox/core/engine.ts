@@ -136,7 +136,9 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 
 	// In-memory cache of suggestions from last scan
 	// Used by execute() to look up suggestions by ID
+	// Limited to 10,000 entries to prevent memory leaks
 	const suggestionCache = new Map<string, InboxSuggestion>();
+	const MAX_CACHE_SIZE = 10_000;
 
 	if (inboxLogger) {
 		const cid = createCorrelationId();
@@ -192,7 +194,20 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			restrictToAttachments:
 				resolvedConfig.restrictRegistryToAttachments ?? true,
 		});
-		await registry.load();
+		try {
+			await registry.load();
+		} catch (error) {
+			if (inboxLogger) {
+				inboxLogger.error("Failed to load registry, starting fresh", {
+					event: "registry_load_failed",
+					error: error instanceof Error ? error.message : "unknown error",
+					sessionCid,
+					timestamp: new Date().toISOString(),
+				});
+			}
+			// Continue with empty registry but warn user
+			// This prevents processing already-processed files if registry is corrupted
+		}
 		await cleanupOrphanedStaging(resolvedConfig.vaultPath, registry, {
 			sessionCid,
 		});
@@ -452,6 +467,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 							async () =>
 								extractorMatch.extractor.extract(file, cid, parentCid, {
 									sessionCid,
+									vaultPath: resolvedConfig.vaultPath,
 								}),
 							{ parentCid, context: { filename } },
 						);
@@ -718,6 +734,24 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				inboxLogger.info`Suggestion built file=${filename} action=${suggestion.action} confidence=${suggestion.confidence} type=${noteType} source=${source} reason=${suggestion.reason} sessionCid=${sessionCid} cid=${cid}`;
 			}
 
+			// Check cache size limit before adding
+			if (suggestionCache.size >= MAX_CACHE_SIZE) {
+				if (inboxLogger) {
+					inboxLogger.warn(
+						"Suggestion cache size limit reached, clearing cache",
+						{
+							event: "cache_size_limit",
+							size: suggestionCache.size,
+							limit: MAX_CACHE_SIZE,
+							sessionCid,
+							cid,
+							timestamp: new Date().toISOString(),
+						},
+					);
+				}
+				suggestionCache.clear();
+			}
+
 			suggestionCache.set(suggestion.id, suggestion);
 
 			// Log file processing completion with structured event
@@ -840,115 +874,122 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				// Clear stale suggestions from previous scans to prevent memory leaks
 				suggestionCache.clear();
 
-				if (inboxLogger) {
-					inboxLogger.info("Scan started", {
-						event: "scan_started",
-						cid,
-						sessionCid,
-						vaultPath: resolvedConfig.vaultPath,
-						timestamp: new Date().toISOString(),
+				// Ensure cache is cleared on error to prevent memory leaks
+				try {
+					if (inboxLogger) {
+						inboxLogger.info("Scan started", {
+							event: "scan_started",
+							cid,
+							sessionCid,
+							vaultPath: resolvedConfig.vaultPath,
+							timestamp: new Date().toISOString(),
+						});
+
+						// Log resource usage at scan start
+						const startMetrics = captureResourceMetrics();
+						inboxLogger.debug("Scan resources start", {
+							event: "scan_resources_start",
+							cid,
+							sessionCid,
+							parentCid: sessionCid,
+							...startMetrics,
+						});
+					}
+
+					// Silent pre-commit: auto-save any uncommitted PARA files before scan
+					// This never blocks - if git fails, we log and continue
+					// Note: We use default PARA folders here to avoid filesystem config reads
+					// which can conflict with test vault setups
+					const preCommitResult = await ensureCleanState({
+						vault: resolvedConfig.vaultPath,
+						paraFolders: DEFAULT_PARA_FOLDERS,
+						defaultDestinations: DEFAULT_DESTINATIONS,
 					});
+					if (preCommitResult.preCommitted && inboxLogger) {
+						inboxLogger.info`Auto-saved ${preCommitResult.files.length} existing files before scan`;
+					}
 
-					// Log resource usage at scan start
-					const startMetrics = captureResourceMetrics();
-					inboxLogger.debug("Scan resources start", {
-						event: "scan_resources_start",
-						cid,
-						sessionCid,
-						parentCid: sessionCid,
-						...startMetrics,
-					});
-				}
+					// Load registry and clean up staging
+					const registry = await loadAndCleanRegistry(sessionCid);
 
-				// Silent pre-commit: auto-save any uncommitted PARA files before scan
-				// This never blocks - if git fails, we log and continue
-				// Note: We use default PARA folders here to avoid filesystem config reads
-				// which can conflict with test vault setups
-				const preCommitResult = await ensureCleanState({
-					vault: resolvedConfig.vaultPath,
-					paraFolders: DEFAULT_PARA_FOLDERS,
-					defaultDestinations: DEFAULT_DESTINATIONS,
-				});
-				if (preCommitResult.preCommitted && inboxLogger) {
-					inboxLogger.info`Auto-saved ${preCommitResult.files.length} existing files before scan`;
-				}
+					// Find supported files and get extractor registry
+					const findResult = await findSupportedFiles(cid);
+					if (!findResult) {
+						return [];
+					}
+					const { files: supportedFiles, extractorRegistry } = findResult;
 
-				// Load registry and clean up staging
-				const registry = await loadAndCleanRegistry(sessionCid);
+					// Validate dependencies
+					await validateDependencies(cid);
 
-				// Find supported files and get extractor registry
-				const findResult = await findSupportedFiles(cid);
-				if (!findResult) {
-					return [];
-				}
-				const { files: supportedFiles, extractorRegistry } = findResult;
+					// Build vault context
+					const vaultContext = buildVaultContext();
 
-				// Validate dependencies
-				await validateDependencies(cid);
-
-				// Build vault context
-				const vaultContext = buildVaultContext();
-
-				// Create concurrency limiters
-				const extractionLimit = pLimit(
-					resolvedConfig.concurrency?.pdfExtraction ?? 5,
-				);
-				const llmLimit = pLimit(resolvedConfig.concurrency?.llmCalls ?? 3);
-
-				// Process files concurrently
-				const suggestionPromises = supportedFiles.map((file, index) =>
-					processSingleFile({
-						sessionCid,
-						file,
-						index,
-						total: supportedFiles.length,
-						registry,
-						extractorRegistry,
-						vaultContext,
-						extractionLimit,
-						llmLimit,
-						onProgress,
-						parentCid: cid,
-						llmStats,
-					}),
-				);
-
-				const results = await Promise.all(suggestionPromises);
-				const suggestions = results.filter(
-					(s): s is InboxSuggestion => s !== null,
-				);
-				const durationMs = Date.now() - startedAt;
-
-				// Log resource usage at scan end
-				if (inboxLogger) {
-					const endMetrics = captureResourceMetrics();
-					inboxLogger.debug("Scan resources end", {
-						event: "scan_resources_end",
-						cid,
-						sessionCid,
-						parentCid: sessionCid,
-						...endMetrics,
-					});
-				}
-
-				// Record LLM availability SLO if any LLM calls were attempted
-				const totalLLMCalls = llmStats.successes + llmStats.failures;
-				if (totalLLMCalls > 0) {
-					const availabilityRate = (llmStats.successes / totalLLMCalls) * 100;
-					const llmSLOCheck = await checkSLOBreach(
-						"llm_availability",
-						availabilityRate,
+					// Create concurrency limiters
+					const extractionLimit = pLimit(
+						resolvedConfig.concurrency?.pdfExtraction ?? 5,
 					);
-					recordSLOEvent(
-						"llm_availability",
-						llmSLOCheck.breached,
-						availabilityRate,
+					const llmLimit = pLimit(resolvedConfig.concurrency?.llmCalls ?? 3);
+
+					// Process files concurrently
+					const suggestionPromises = supportedFiles.map((file, index) =>
+						processSingleFile({
+							sessionCid,
+							file,
+							index,
+							total: supportedFiles.length,
+							registry,
+							extractorRegistry,
+							vaultContext,
+							extractionLimit,
+							llmLimit,
+							onProgress,
+							parentCid: cid,
+							llmStats,
+						}),
 					);
+
+					const results = await Promise.all(suggestionPromises);
+					const suggestions = results.filter(
+						(s): s is InboxSuggestion => s !== null,
+					);
+					const durationMs = Date.now() - startedAt;
+
+					// Log resource usage at scan end
+					if (inboxLogger) {
+						const endMetrics = captureResourceMetrics();
+						inboxLogger.debug("Scan resources end", {
+							event: "scan_resources_end",
+							cid,
+							sessionCid,
+							parentCid: sessionCid,
+							...endMetrics,
+						});
+					}
+
+					// Record LLM availability SLO if any LLM calls were attempted
+					const totalLLMCalls = llmStats.successes + llmStats.failures;
+					if (totalLLMCalls > 0) {
+						const availabilityRate = (llmStats.successes / totalLLMCalls) * 100;
+						const llmSLOCheck = await checkSLOBreach(
+							"llm_availability",
+							availabilityRate,
+						);
+						recordSLOEvent(
+							"llm_availability",
+							llmSLOCheck.breached,
+							availabilityRate,
+						);
+					}
+
+					logScanStatistics(suggestions, durationMs, cid, sessionCid, llmStats);
+
+					return suggestions;
+				} catch (error) {
+					// Clear cache on error to prevent memory leaks
+					suggestionCache.clear();
+					throw error;
 				}
-
-				logScanStatistics(suggestions, durationMs, cid, sessionCid, llmStats);
-
-				return suggestions;
 			},
 			{ parentCid: sessionCid },
 		);
@@ -968,255 +1009,263 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		await initLoggerWithNotice();
 		const sessionCid = options?.sessionCid ?? createCorrelationId();
 
-		return observe(
-			executeLogger,
-			"inbox:execute",
-			async () => {
-				const startedAt = Date.now();
-				const cid = createCorrelationId();
-				const onProgress = options?.onProgress;
+		// Wrap entire execute in file lock to prevent concurrent registry modifications
+		const registryPath = join(
+			resolvedConfig.vaultPath,
+			".inbox-processed.json",
+		);
 
-				if (inboxLogger) {
-					inboxLogger.info("Execute started", {
-						event: "execute_started",
-						cid,
-						sessionCid,
-						count: ids.length,
-						timestamp: new Date().toISOString(),
-					});
+		return withFileLock(registryPath, async () =>
+			observe(
+				executeLogger,
+				"inbox:execute",
+				async () => {
+					const startedAt = Date.now();
+					const cid = createCorrelationId();
+					const onProgress = options?.onProgress;
 
-					// Log resource usage at execute start
-					const startMetrics = captureResourceMetrics();
-					inboxLogger.debug("Execute resources start", {
-						event: "execute_resources_start",
-						cid,
-						sessionCid,
-						parentCid: sessionCid,
-						...startMetrics,
-					});
-				}
-
-				if (ids.length === 0) {
-					return {
-						successful: [],
-						failed: new Map(),
-						summary: { total: 0, succeeded: 0, failed: 0 },
-					};
-				}
-
-				// Warn if cache is empty - suggests scan() wasn't called
-				// Don't throw - let per-ID error handling return appropriate results
-				if (suggestionCache.size === 0) {
 					if (inboxLogger) {
-						inboxLogger.warn`Execute called with empty cache - did you forget to call scan()? sessionCid=${sessionCid} cid=${cid}`;
-					}
-				}
-
-				// Load para-obsidian config for path maps
-				const paraConfig = loadConfig();
-
-				// Pre-flight validation
-				validateExecutionPreconditions(
-					resolvedConfig.vaultPath,
-					paraConfig.paraFolders ?? {},
-				);
-
-				// Start a session - this silently pre-commits any existing uncommitted files
-				// and tracks changes for batch commit at the end
-				// Note: We use defaults with fallback from config to avoid test interference
-				const session = await startSession({
-					vault: resolvedConfig.vaultPath,
-					paraFolders: paraConfig.paraFolders ?? DEFAULT_PARA_FOLDERS,
-					defaultDestinations:
-						paraConfig.defaultDestinations ?? DEFAULT_DESTINATIONS,
-				});
-				if (inboxLogger) {
-					inboxLogger.debug`Execute session started id=${session.id} sessionCid=${sessionCid} cid=${cid}`;
-				}
-
-				// Build path maps ONCE for entire batch
-				const areaPathMap = getAreaPathMap(
-					resolvedConfig.vaultPath,
-					paraConfig.paraFolders,
-				);
-				const projectPathMap = getProjectPathMap(
-					resolvedConfig.vaultPath,
-					paraConfig.paraFolders,
-				);
-
-				// Load the registry for updating after successful execution
-				const registry = createRegistry(resolvedConfig.vaultPath, {
-					restrictToAttachments:
-						resolvedConfig.restrictRegistryToAttachments ?? true,
-				});
-				await registry.load();
-
-				const successful: ExecutionResult[] = [];
-				const failed = new Map<SuggestionId, Error>();
-				let processed = 0;
-				const total = ids.length;
-
-				for (const id of ids) {
-					// Look up suggestion by ID from engine cache
-					const suggestion = suggestionCache.get(id);
-					if (!suggestion) {
-						const error = new Error(`Suggestion not found: ${id}`);
-						failed.set(id, error);
-						continue;
-					}
-
-					// Skip if action is skip
-					if (suggestion.action === "skip") {
-						successful.push({
-							suggestionId: id,
-							success: true,
-							action: "skip",
-						});
-						continue;
-					}
-
-					// Defense-in-depth: Validate create-note has destination
-					// This should be filtered at CLI layer, but catch any slip-through
-					if (
-						isCreateNoteSuggestion(suggestion) &&
-						!suggestion.suggestedDestination
-					) {
-						const error = new Error(
-							`Cannot execute: missing destination. Tag the file in Obsidian and re-scan.`,
-						);
-						failed.set(id, error);
-						if (executeLogger) {
-							executeLogger.warn`Skipping create-note without destination id=${id} source=${basename(suggestion.source)} ${cid}`;
-						}
-						continue;
-					}
-
-					try {
-						const result = await executeSuggestion(
-							suggestion,
-							resolvedConfig,
-							registry,
+						inboxLogger.info("Execute started", {
+							event: "execute_started",
 							cid,
-							{ areaPathMap, projectPathMap, sessionCid },
-						);
-						successful.push(result);
-						if (result.success) {
-							// Save registry immediately after each successful execution
-							await registry.save();
-							if (executeLogger) {
-								executeLogger.debug`Registry saved after item=${id} ${cid}`;
-							}
-							// Track file changes in session for batch commit
-							// Track source file deletion for git staging
-							if (result.movedFrom) {
-								await trackChange(session, result.movedFrom);
-							}
-							// Track destination files for git staging
-							if (result.createdNote) {
-								await trackChange(session, result.createdNote);
-							}
-							if (result.movedAttachment) {
-								await trackChange(session, result.movedAttachment);
-							}
-						} else {
-							// Track as failed even though executeSuggestion returned a result
-							failed.set(id, new Error(result.error));
-						}
-					} catch (error) {
-						failed.set(id, error as Error);
-						// Log but don't stop - continue processing other suggestions
-						if (executeLogger) {
-							const filename = suggestion
-								? basename(suggestion.source)
-								: "unknown";
-							executeLogger.error`Execute failed id=${id} filename=${filename} error=${error instanceof Error ? error.message : "unknown"} ${cid}`;
-						}
-					}
+							sessionCid,
+							count: ids.length,
+							timestamp: new Date().toISOString(),
+						});
 
-					// Emit progress after each item for CLI feedback
-					processed++;
-					if (onProgress) {
-						const lastResult = successful[successful.length - 1];
-						const wasSuccessful = lastResult?.success ?? false;
-						const failedError = failed.get(id);
-						// Extract error from failed result using discriminated union pattern
-						const progressError = failedError
-							? failedError.message
-							: lastResult && !lastResult.success
-								? lastResult.error
-								: undefined;
-						const percentComplete = Math.round((processed / total) * 100);
-						await onProgress({
-							processed,
-							total,
-							suggestionId: id,
-							action: suggestion?.action ?? "skip",
-							success: wasSuccessful,
-							error: progressError,
-							percentComplete,
+						// Log resource usage at execute start
+						const startMetrics = captureResourceMetrics();
+						inboxLogger.debug("Execute resources start", {
+							event: "execute_resources_start",
+							cid,
+							sessionCid,
+							parentCid: sessionCid,
+							...startMetrics,
 						});
 					}
-				}
 
-				// Final save to ensure any edge cases are captured
-				// (This is now redundant but harmless as a safety net)
-				await registry.save();
-
-				// Finalize session - batch commit all changes from this execute() call
-				const successCount = successful.filter((r) => r.success).length;
-				if (successCount > 0) {
-					const summary = `inbox: processed ${successCount} item${successCount === 1 ? "" : "s"}`;
-					const commitResult = await finalizeSession(
-						session,
-						summary,
-						paraConfig,
-					);
-					if (commitResult.committed && inboxLogger) {
-						inboxLogger.info`Session committed: ${summary}`;
+					if (ids.length === 0) {
+						return {
+							successful: [],
+							failed: new Map(),
+							summary: { total: 0, succeeded: 0, failed: 0 },
+						};
 					}
-				} else {
-					// No successful operations - just mark session as finalized without commit
-					session.finalized = true;
-				}
 
-				const durationMs = Date.now() - startedAt;
+					// Warn if cache is empty - suggests scan() wasn't called
+					// Don't throw - let per-ID error handling return appropriate results
+					if (suggestionCache.size === 0) {
+						if (inboxLogger) {
+							inboxLogger.warn`Execute called with empty cache - did you forget to call scan()? sessionCid=${sessionCid} cid=${cid}`;
+						}
+					}
 
-				// Log resource usage at execute end
-				if (inboxLogger) {
-					const endMetrics = captureResourceMetrics();
-					inboxLogger.debug("Execute resources end", {
-						event: "execute_resources_end",
-						cid,
-						sessionCid,
-						parentCid: sessionCid,
-						...endMetrics,
+					// Load para-obsidian config for path maps
+					const paraConfig = loadConfig();
+
+					// Pre-flight validation
+					validateExecutionPreconditions(
+						resolvedConfig.vaultPath,
+						paraConfig.paraFolders ?? {},
+					);
+
+					// Start a session - this silently pre-commits any existing uncommitted files
+					// and tracks changes for batch commit at the end
+					// Note: We use defaults with fallback from config to avoid test interference
+					const session = await startSession({
+						vault: resolvedConfig.vaultPath,
+						paraFolders: paraConfig.paraFolders ?? DEFAULT_PARA_FOLDERS,
+						defaultDestinations:
+							paraConfig.defaultDestinations ?? DEFAULT_DESTINATIONS,
 					});
-				}
+					if (inboxLogger) {
+						inboxLogger.debug`Execute session started id=${session.id} sessionCid=${sessionCid} cid=${cid}`;
+					}
 
-				if (inboxLogger) {
-					inboxLogger.info("Execute completed", {
-						event: "execute_completed",
-						cid,
-						successCount: successful.length,
-						failureCount: failed.size,
-						total: ids.length,
-						durationMs,
-						timestamp: new Date().toISOString(),
+					// Build path maps ONCE for entire batch
+					const areaPathMap = getAreaPathMap(
+						resolvedConfig.vaultPath,
+						paraConfig.paraFolders,
+					);
+					const projectPathMap = getProjectPathMap(
+						resolvedConfig.vaultPath,
+						paraConfig.paraFolders,
+					);
+
+					// Load the registry for updating after successful execution
+					const registry = createRegistry(resolvedConfig.vaultPath, {
+						restrictToAttachments:
+							resolvedConfig.restrictRegistryToAttachments ?? true,
 					});
-					inboxLogger.debug`Execute summary total=${ids.length} success=${successful.length} failed=${failed.size} durationMs=${durationMs} sessionCid=${sessionCid} cid=${cid}`;
-				}
+					await registry.load();
 
-				return {
-					successful,
-					failed,
-					summary: {
-						total: ids.length,
-						succeeded: successful.length,
-						failed: failed.size,
-					},
-				};
-			},
-			{ parentCid: sessionCid },
+					const successful: ExecutionResult[] = [];
+					const failed = new Map<SuggestionId, Error>();
+					let processed = 0;
+					const total = ids.length;
+
+					for (const id of ids) {
+						// Look up suggestion by ID from engine cache
+						const suggestion = suggestionCache.get(id);
+						if (!suggestion) {
+							const error = new Error(`Suggestion not found: ${id}`);
+							failed.set(id, error);
+							continue;
+						}
+
+						// Skip if action is skip
+						if (suggestion.action === "skip") {
+							successful.push({
+								suggestionId: id,
+								success: true,
+								action: "skip",
+							});
+							continue;
+						}
+
+						// Defense-in-depth: Validate create-note has destination
+						// This should be filtered at CLI layer, but catch any slip-through
+						if (
+							isCreateNoteSuggestion(suggestion) &&
+							!suggestion.suggestedDestination
+						) {
+							const error = new Error(
+								`Cannot execute: missing destination. Tag the file in Obsidian and re-scan.`,
+							);
+							failed.set(id, error);
+							if (executeLogger) {
+								executeLogger.warn`Skipping create-note without destination id=${id} source=${basename(suggestion.source)} ${cid}`;
+							}
+							continue;
+						}
+
+						try {
+							const result = await executeSuggestion(
+								suggestion,
+								resolvedConfig,
+								registry,
+								cid,
+								{ areaPathMap, projectPathMap, sessionCid },
+							);
+							successful.push(result);
+							if (result.success) {
+								// Save registry immediately after each successful execution
+								await registry.save();
+								if (executeLogger) {
+									executeLogger.debug`Registry saved after item=${id} ${cid}`;
+								}
+								// Track file changes in session for batch commit
+								// Track source file deletion for git staging
+								if (result.movedFrom) {
+									await trackChange(session, result.movedFrom);
+								}
+								// Track destination files for git staging
+								if (result.createdNote) {
+									await trackChange(session, result.createdNote);
+								}
+								if (result.movedAttachment) {
+									await trackChange(session, result.movedAttachment);
+								}
+							} else {
+								// Track as failed even though executeSuggestion returned a result
+								failed.set(id, new Error(result.error));
+							}
+						} catch (error) {
+							failed.set(id, error as Error);
+							// Log but don't stop - continue processing other suggestions
+							if (executeLogger) {
+								const filename = suggestion
+									? basename(suggestion.source)
+									: "unknown";
+								executeLogger.error`Execute failed id=${id} filename=${filename} error=${error instanceof Error ? error.message : "unknown"} ${cid}`;
+							}
+						}
+
+						// Emit progress after each item for CLI feedback
+						processed++;
+						if (onProgress) {
+							const lastResult = successful[successful.length - 1];
+							const wasSuccessful = lastResult?.success ?? false;
+							const failedError = failed.get(id);
+							// Extract error from failed result using discriminated union pattern
+							const progressError = failedError
+								? failedError.message
+								: lastResult && !lastResult.success
+									? lastResult.error
+									: undefined;
+							const percentComplete = Math.round((processed / total) * 100);
+							await onProgress({
+								processed,
+								total,
+								suggestionId: id,
+								action: suggestion?.action ?? "skip",
+								success: wasSuccessful,
+								error: progressError,
+								percentComplete,
+							});
+						}
+					}
+
+					// Final save to ensure any edge cases are captured
+					// (This is now redundant but harmless as a safety net)
+					await registry.save();
+
+					// Finalize session - batch commit all changes from this execute() call
+					const successCount = successful.filter((r) => r.success).length;
+					if (successCount > 0) {
+						const summary = `inbox: processed ${successCount} item${successCount === 1 ? "" : "s"}`;
+						const commitResult = await finalizeSession(
+							session,
+							summary,
+							paraConfig,
+						);
+						if (commitResult.committed && inboxLogger) {
+							inboxLogger.info`Session committed: ${summary}`;
+						}
+					} else {
+						// No successful operations - just mark session as finalized without commit
+						session.finalized = true;
+					}
+
+					const durationMs = Date.now() - startedAt;
+
+					// Log resource usage at execute end
+					if (inboxLogger) {
+						const endMetrics = captureResourceMetrics();
+						inboxLogger.debug("Execute resources end", {
+							event: "execute_resources_end",
+							cid,
+							sessionCid,
+							parentCid: sessionCid,
+							...endMetrics,
+						});
+					}
+
+					if (inboxLogger) {
+						inboxLogger.info("Execute completed", {
+							event: "execute_completed",
+							cid,
+							successCount: successful.length,
+							failureCount: failed.size,
+							total: ids.length,
+							durationMs,
+							timestamp: new Date().toISOString(),
+						});
+						inboxLogger.debug`Execute summary total=${ids.length} success=${successful.length} failed=${failed.size} durationMs=${durationMs} sessionCid=${sessionCid} cid=${cid}`;
+					}
+
+					return {
+						successful,
+						failed,
+						summary: {
+							total: ids.length,
+							succeeded: successful.length,
+							failed: failed.size,
+						},
+					};
+				},
+				{ parentCid: sessionCid },
+			),
 		);
 	}
 
@@ -1262,7 +1311,14 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					`No extractor available for file type: ${file.extension}`,
 				);
 			}
-			const extracted = await extractorMatch.extractor.extract(file, cid);
+			const extracted = await extractorMatch.extractor.extract(
+				file,
+				cid,
+				undefined,
+				{
+					vaultPath: resolvedConfig.vaultPath,
+				},
+			);
 			text = extracted.text;
 		} catch (error) {
 			// Return original with error note if extraction fails

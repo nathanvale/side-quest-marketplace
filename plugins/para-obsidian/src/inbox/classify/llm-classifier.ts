@@ -307,7 +307,12 @@ ${vaultContext.projects.map((p) => `- ${p}`).join("\n")}
  * @param content - Full document content
  * @returns Formatted content preview section
  */
-function buildContentPreview(content: string): string {
+function buildContentPreview(content: string | undefined | null): string {
+	// Defensive check: validate input type and non-empty
+	if (!content || typeof content !== "string") {
+		return "- Content: [No content available]";
+	}
+
 	const START_CHARS = 5000;
 	const END_CHARS = 3000;
 	const TOTAL_LIMIT = 8000;
@@ -518,18 +523,63 @@ export function parseDetectionResponse(response: string): DocumentTypeResult {
 		);
 	}
 
+	// Validate extractedFields structure (must be object or null/undefined)
+	let extractedFields: FieldExtractionResult | null | undefined;
+	if (obj.extractedFields === null || obj.extractedFields === undefined) {
+		extractedFields = obj.extractedFields;
+	} else if (
+		typeof obj.extractedFields === "object" &&
+		!Array.isArray(obj.extractedFields)
+	) {
+		// Validate it's a plain object with string/number/boolean values
+		const fields = obj.extractedFields as Record<string, unknown>;
+		const validatedFields: Record<string, unknown> = {};
+
+		for (const [key, value] of Object.entries(fields)) {
+			// Only accept primitive types (prevent injection of functions, objects, etc.)
+			if (
+				typeof value === "string" ||
+				typeof value === "number" ||
+				typeof value === "boolean" ||
+				value === null ||
+				value === undefined
+			) {
+				validatedFields[key] = value;
+			}
+		}
+
+		extractedFields = validatedFields as FieldExtractionResult;
+	} else {
+		// Invalid structure - set to null instead of throwing (graceful degradation)
+		extractedFields = null;
+	}
+
+	// Validate suggestedFilenameDescription (must be string or null/undefined)
+	let suggestedFilenameDescription: string | null | undefined;
+	if (
+		typeof obj.suggestedFilenameDescription === "string" ||
+		obj.suggestedFilenameDescription === null ||
+		obj.suggestedFilenameDescription === undefined
+	) {
+		suggestedFilenameDescription = obj.suggestedFilenameDescription;
+	} else {
+		suggestedFilenameDescription = null;
+	}
+
+	// Validate reasoning (must be string or undefined)
+	let reasoning: string | undefined;
+	if (typeof obj.reasoning === "string" || obj.reasoning === undefined) {
+		reasoning = obj.reasoning;
+	} else {
+		reasoning = undefined;
+	}
+
 	return {
 		documentType,
 		confidence: Math.max(0, Math.min(1, obj.confidence)),
-		extractedFields: obj.extractedFields as
-			| FieldExtractionResult
-			| null
-			| undefined,
-		suggestedFilenameDescription: obj.suggestedFilenameDescription as
-			| string
-			| null
-			| undefined,
-		reasoning: obj.reasoning as string | undefined,
+		extractedFields,
+		suggestedFilenameDescription,
+		reasoning,
 		extractionWarnings,
 	};
 }

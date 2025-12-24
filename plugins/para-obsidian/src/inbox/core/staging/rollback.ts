@@ -82,28 +82,24 @@ export async function rollbackOperation(
 			// Resolve staging path relative to vault, not CWD
 			const stagingAbsolute = join(vaultPath, stagingNotePath);
 
-			if (fs.existsSync(stagingAbsolute)) {
-				const deleted = unlinkWithRetry(fs, stagingAbsolute);
+			// CRITICAL: Removed TOCTOU race - let unlinkWithRetry handle ENOENT
+			const deleted = unlinkWithRetry(fs, stagingAbsolute);
 
-				if (deleted) {
-					// Ensure deletion is durable
-					const dir = dirname(stagingAbsolute);
-					const fd = fs.openSync(dir, "r");
-					fs.fsyncSync(fd);
-					fs.closeSync(fd);
+			if (deleted) {
+				// Ensure deletion is durable
+				const dir = dirname(stagingAbsolute);
+				const fd = fs.openSync(dir, "r");
+				fs.fsyncSync(fd);
+				fs.closeSync(fd);
 
-					if (executeLogger) {
-						executeLogger.info`Rolled back staging note=${stagingNotePath} ${cid}`;
-					}
-				} else {
-					// Orphaned staging note - log for manual cleanup
-					if (executeLogger) {
-						executeLogger.error`ORPHANED STAGING NOTE (manual cleanup required): path=${stagingAbsolute} ${cid}`;
-					}
+				if (executeLogger) {
+					executeLogger.info`Rolled back staging note=${stagingNotePath} ${cid}`;
 				}
-			} else if (executeLogger) {
-				// Layer 2: Log warning if staging file not found (helps debug path issues)
-				executeLogger.warn`Staging note not found during rollback path=${stagingAbsolute} ${cid}`;
+			} else {
+				// Orphaned staging note - log for manual cleanup
+				if (executeLogger) {
+					executeLogger.error`ORPHANED STAGING NOTE (manual cleanup required): path=${stagingAbsolute} ${cid}`;
+				}
 			}
 		} catch (rollbackError) {
 			if (executeLogger) {

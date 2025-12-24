@@ -33,11 +33,14 @@
  */
 
 import {
+	closeSync,
+	constants,
 	existsSync,
 	mkdirSync,
+	openSync,
 	renameSync,
 	unlinkSync,
-	writeFileSync,
+	writeSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
 import pLimit from "p-limit";
@@ -214,8 +217,40 @@ export async function hashFile(filePath: string): Promise<string> {
 // =============================================================================
 
 /**
- * Acquire a file lock by creating a lock file with timestamp.
- * Retries with exponential backoff if lock is held by another process.
+ * Helper function to check if lock is stale and clean it up.
+ *
+ * @param lockPath - Path to lock file
+ * @returns true if lock was stale and removed, false otherwise
+ */
+async function checkAndCleanStaleLock(lockPath: string): Promise<boolean> {
+	try {
+		const lockContent = await Bun.file(lockPath).text();
+		const lockTime = Number.parseInt(lockContent, 10);
+		if (Date.now() - lockTime > LOCK_TIMEOUT) {
+			// Stale lock, remove it
+			log.warn("Removing stale lock file", {
+				path: lockPath,
+				age: Date.now() - lockTime,
+			});
+			unlinkSync(lockPath);
+			return true;
+		}
+	} catch {
+		// Lock file unreadable, try to remove
+		try {
+			unlinkSync(lockPath);
+			return true;
+		} catch {
+			/* ignore */
+		}
+	}
+	return false;
+}
+
+/**
+ * Acquire a file lock using atomic file creation.
+ * Uses O_CREAT | O_EXCL flags to atomically create lock file if it doesn't exist.
+ * Retries with delay if lock is held by another process.
  * Detects and removes stale locks (older than LOCK_TIMEOUT).
  *
  * @param lockPath - Path to lock file
@@ -224,64 +259,64 @@ export async function hashFile(filePath: string): Promise<string> {
 async function acquireLock(lockPath: string): Promise<void> {
 	const startTime = Date.now();
 
-	while (existsSync(lockPath)) {
-		// Check if lock is stale (older than timeout)
-		try {
-			const lockContent = await Bun.file(lockPath).text();
-			const lockTime = Number.parseInt(lockContent, 10);
-			if (Date.now() - lockTime > LOCK_TIMEOUT) {
-				// Stale lock, remove it
-				log.warn("Removing stale lock file", {
-					path: lockPath,
-					age: Date.now() - lockTime,
-				});
-				unlinkSync(lockPath);
-				break;
-			}
-		} catch {
-			// Lock file unreadable, try to remove
-			try {
-				unlinkSync(lockPath);
-			} catch {
-				/* ignore */
-			}
-			break;
-		}
-
-		if (Date.now() - startTime > LOCK_TIMEOUT) {
-			throw new Error(
-				"Failed to acquire registry lock - another process may be running",
-			);
-		}
-
-		await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_DELAY));
-	}
-
 	// Ensure parent directory exists before creating lock file
 	const lockDir = dirname(lockPath);
 	if (!existsSync(lockDir)) {
 		try {
 			mkdirSync(lockDir, { recursive: true });
-		} catch {
+		} catch (error) {
 			// Directory can't be created (read-only fs, tests with fake paths, etc.)
-			// Gracefully skip locking - single process scenario is safe
-			log.warn("Cannot create lock directory, skipping lock", {
+			// This is a critical error - we can't proceed without locking capability
+			log.error("Cannot create lock directory", {
 				path: lockDir,
+				error: String(error),
 			});
-			return;
+			throw new Error(
+				`Failed to create lock directory: ${lockDir} - ${String(error)}`,
+			);
 		}
 	}
 
-	// Create lock file with timestamp
-	try {
-		writeFileSync(lockPath, String(Date.now()), "utf8");
-		log.debug("Lock acquired", { path: lockPath });
-	} catch {
-		// Lock file can't be created - gracefully degrade
-		log.warn("Cannot create lock file, proceeding without lock", {
-			path: lockPath,
-		});
+	while (Date.now() - startTime < LOCK_TIMEOUT) {
+		try {
+			// Use O_CREAT | O_EXCL for atomic create-if-not-exists
+			const fd = openSync(
+				lockPath,
+				constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY,
+			);
+			// Write PID and timestamp for debugging
+			writeSync(fd, `${process.pid}\n${Date.now()}\n`);
+			closeSync(fd);
+			log.debug("Lock acquired", { path: lockPath, pid: process.pid });
+			return; // Lock acquired successfully
+		} catch (error: unknown) {
+			if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+				// Lock exists, check if stale
+				const wasStale = await checkAndCleanStaleLock(lockPath);
+				if (!wasStale) {
+					// Lock is active, wait and retry
+					await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_DELAY));
+				}
+				// If stale lock was cleaned, retry immediately on next loop iteration
+				continue;
+			}
+			// Other error - can't acquire lock
+			log.error("Failed to acquire lock", {
+				path: lockPath,
+				error: String(error),
+			});
+			throw new Error(`Failed to acquire registry lock: ${String(error)}`);
+		}
 	}
+
+	// Timeout exceeded
+	log.error("Lock acquisition timeout", {
+		path: lockPath,
+		timeoutMs: LOCK_TIMEOUT,
+	});
+	throw new Error(
+		`Failed to acquire registry lock after ${LOCK_TIMEOUT}ms - another process may be running`,
+	);
 }
 
 /**
@@ -600,6 +635,7 @@ export function createRegistry(
 	 * @throws If sourcePath is empty
 	 * @throws If processedAt is not a valid ISO8601 timestamp
 	 * @throws If item type doesn't match registry scope (when restrictRegistryToAttachments enabled)
+	 * @throws If hash collision detected (same hash, different path)
 	 */
 	function markProcessed(item: ProcessedItem): void {
 		// Validate sourceHash (SHA256 = 64 hex chars)
@@ -623,6 +659,21 @@ export function createRegistry(
 
 		// Validate item type matches registry scope
 		validateItemType(item, restrictToAttachments);
+
+		// Detect hash collision (same hash, different path)
+		const existing = items.get(item.sourceHash);
+		if (existing && existing.sourcePath !== item.sourcePath) {
+			log.error("Hash collision detected", {
+				hash: item.sourceHash,
+				existingPath: existing.sourcePath,
+				newPath: item.sourcePath,
+				existingProcessedAt: existing.processedAt,
+				newProcessedAt: item.processedAt,
+			});
+			throw new Error(
+				`Hash collision detected: hash ${item.sourceHash.slice(0, 8)}... already exists for "${existing.sourcePath}" but trying to add "${item.sourcePath}" - investigate manually`,
+			);
+		}
 
 		items.set(item.sourceHash, item);
 		log.debug("Item marked processed", {

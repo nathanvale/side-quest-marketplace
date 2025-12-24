@@ -20,8 +20,8 @@
  * ```
  */
 
-import { basename } from "node:path";
-import { stat } from "@sidequest/core/fs";
+import { stat as fsStat } from "node:fs/promises";
+import { basename, resolve } from "node:path";
 import { $ } from "bun";
 import { observe } from "../../../shared/instrumentation";
 import { pdfLogger } from "../../../shared/logger";
@@ -103,6 +103,35 @@ export interface ExtractionMetrics {
 }
 
 // =============================================================================
+// Path Validation (Security)
+// =============================================================================
+
+/**
+ * Validate file path for subprocess execution to prevent command injection.
+ *
+ * @param filePath - Path to validate
+ * @param cid - Correlation ID for logging
+ * @returns Normalized safe path
+ * @throws InboxError if path validation fails
+ */
+function validatePathForSubprocess(filePath: string, cid: string): string {
+	const normalizedPath = resolve(filePath);
+
+	// Check for shell metacharacters in filename
+	const filename = basename(filePath);
+	if (!/^[a-zA-Z0-9_\-. ]+$/.test(filename)) {
+		throw createInboxError("EXT_PDF_CORRUPT", {
+			cid,
+			source: filePath,
+			originalError:
+				"Invalid characters in filename - possible command injection attempt",
+		});
+	}
+
+	return normalizedPath;
+}
+
+// =============================================================================
 // pdftotext Check
 // =============================================================================
 
@@ -174,36 +203,41 @@ export async function extractPdfText(
 				});
 			}
 
-			// Check file size (pre-extraction)
-			let preExtractionStats: { size: number } | undefined;
-			try {
-				preExtractionStats = await stat(filePath);
-				if (preExtractionStats.size > MAX_PDF_SIZE) {
-					throw createInboxError("EXT_PDF_TOO_LARGE", {
+			// Check file size (pre-extraction) and capture inode for TOCTOU detection
+			const preExtractionStats = await (async () => {
+				try {
+					const stats = await fsStat(filePath);
+					if (stats.size > MAX_PDF_SIZE) {
+						throw createInboxError("EXT_PDF_TOO_LARGE", {
+							cid,
+							source: filePath,
+							fileSize: stats.size,
+							maxSize: MAX_PDF_SIZE,
+						});
+					}
+
+					log.debug`PDF file size=${stats.size} bytes ${cid}`;
+					return { size: stats.size, ino: stats.ino };
+				} catch (error) {
+					if (error instanceof InboxError) throw error;
+
+					throw createInboxError("EXT_PDF_CORRUPT", {
 						cid,
 						source: filePath,
-						fileSize: preExtractionStats.size,
-						maxSize: MAX_PDF_SIZE,
+						originalError: String(error),
 					});
 				}
-
-				log.debug`PDF file size=${preExtractionStats.size} bytes ${cid}`;
-			} catch (error) {
-				if (error instanceof InboxError) throw error;
-
-				throw createInboxError("EXT_PDF_CORRUPT", {
-					cid,
-					source: filePath,
-					originalError: String(error),
-				});
-			}
+			})();
 
 			// Extract text with timeout
 			let proc: ReturnType<typeof Bun.spawn> | null = null;
 
 			try {
+				// Validate path for subprocess execution (prevent command injection)
+				const safePath = validatePathForSubprocess(filePath, cid);
+
 				// Spawn pdftotext subprocess
-				proc = Bun.spawn(["pdftotext", "-layout", filePath, "-"], {
+				proc = Bun.spawn(["pdftotext", "-layout", safePath, "-"], {
 					stdout: "pipe",
 					stderr: "pipe",
 				});
@@ -219,12 +253,20 @@ export async function extractPdfText(
 				// Handle timeout
 				if (result.type === "timeout") {
 					log.warn`PDF extraction timeout, killing subprocess ${cid}`;
-					proc.kill();
-					// Give it a moment to die gracefully
-					await Promise.race([
+
+					// Try SIGTERM first
+					proc.kill("SIGTERM");
+					const gracefulExit = await Promise.race([
 						proc.exited,
 						new Promise((resolve) => setTimeout(resolve, 1000)),
 					]);
+
+					// Force SIGKILL if still alive
+					if (!gracefulExit && !proc.killed) {
+						log.error`Force-killing hung PDF extraction process ${cid}`;
+						proc.kill("SIGKILL");
+					}
+
 					throw createInboxError("EXT_PDF_TIMEOUT", {
 						cid,
 						source: filePath,
@@ -324,21 +366,34 @@ export async function extractPdfText(
 
 				// Post-extraction verification: detect TOCTOU attacks
 				try {
-					const postExtractionStats = await stat(filePath);
+					const postExtractionStats = await fsStat(filePath);
+
+					// Check if file was replaced (inode changed)
+					if (postExtractionStats.ino !== preExtractionStats.ino) {
+						throw createInboxError("EXT_PDF_CORRUPT", {
+							cid,
+							source: filePath,
+							originalError:
+								"File was replaced during extraction (inode changed)",
+						});
+					}
+
+					// Check if file size changed
+					if (postExtractionStats.size !== preExtractionStats.size) {
+						throw createInboxError("EXT_PDF_CORRUPT", {
+							cid,
+							source: filePath,
+							originalError: `TOCTOU detected: size changed from ${preExtractionStats.size} to ${postExtractionStats.size} bytes`,
+						});
+					}
+
+					// Additional check: ensure size is still under limit
 					if (postExtractionStats.size > MAX_PDF_SIZE) {
 						throw createInboxError("EXT_PDF_CORRUPT", {
 							cid,
 							source: filePath,
 							originalError: `File size changed during extraction (possible TOCTOU attack): ${preExtractionStats.size} → ${postExtractionStats.size} bytes`,
 						});
-					}
-
-					// Log if size changed significantly (even if still under limit)
-					const sizeDiff = Math.abs(
-						postExtractionStats.size - preExtractionStats.size,
-					);
-					if (sizeDiff > 0) {
-						log.debug`File size changed during extraction: ${preExtractionStats.size} → ${postExtractionStats.size} bytes ${cid}`;
 					}
 				} catch (error) {
 					if (error instanceof InboxError) throw error;

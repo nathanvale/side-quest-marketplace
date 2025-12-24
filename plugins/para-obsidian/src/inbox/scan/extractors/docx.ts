@@ -14,6 +14,7 @@ import TurndownService from "turndown";
 import { observe } from "../../../shared/instrumentation";
 import { docxLogger } from "../../../shared/logger";
 import type { OperationContext } from "../../shared/context";
+import { validateInboxPath } from "../../shared/path-validation";
 import type { ContentExtractor, ExtractedContent, InboxFile } from "./types";
 
 /**
@@ -65,45 +66,60 @@ function createTurndownService(): TurndownService {
  * Extract both text and markdown from a DOCX file.
  *
  * @param filePath - Absolute path to the DOCX file
+ * @param vaultPath - Vault root path for validation (optional, for defense-in-depth)
  * @param cid - Correlation ID for logging
  * @param parentCid - Optional parent correlation ID
  * @returns Extracted text and markdown content
+ * @throws Error if extraction fails with context about the failure
  */
 async function extractDocxContent(
 	filePath: string,
+	vaultPath: string | undefined,
 	cid: string,
 	_parentCid?: string,
 ): Promise<DocxExtractionResult> {
-	const buffer = await readFile(filePath);
+	// Path validation (defense-in-depth security layer)
+	const safePath = vaultPath
+		? validateInboxPath(filePath, vaultPath)
+		: filePath;
 
-	// Extract plain text for classification
-	const textResult = await mammoth.extractRawText({ buffer });
+	try {
+		const buffer = await readFile(safePath);
 
-	if (textResult.messages.length > 0) {
-		// Log warnings but don't fail
-		for (const msg of textResult.messages) {
-			docxLogger.warn`DOCX text extraction warning: ${msg.message} ${cid}`;
+		// Extract plain text for classification
+		const textResult = await mammoth.extractRawText({ buffer });
+
+		if (textResult.messages.length > 0) {
+			// Log warnings but don't fail
+			for (const msg of textResult.messages) {
+				docxLogger.warn`DOCX text extraction warning: ${msg.message} ${cid}`;
+			}
 		}
-	}
 
-	// Extract HTML for markdown conversion
-	const htmlResult = await mammoth.convertToHtml({ buffer });
+		// Extract HTML for markdown conversion
+		const htmlResult = await mammoth.convertToHtml({ buffer });
 
-	if (htmlResult.messages.length > 0) {
-		// Log warnings but don't fail
-		for (const msg of htmlResult.messages) {
-			docxLogger.warn`DOCX HTML extraction warning: ${msg.message} ${cid}`;
+		if (htmlResult.messages.length > 0) {
+			// Log warnings but don't fail
+			for (const msg of htmlResult.messages) {
+				docxLogger.warn`DOCX HTML extraction warning: ${msg.message} ${cid}`;
+			}
 		}
+
+		// Convert HTML to clean markdown
+		const turndown = createTurndownService();
+		const markdown = turndown.turndown(htmlResult.value);
+
+		return {
+			text: textResult.value.trim(),
+			markdown: markdown.trim(),
+		};
+	} catch (error) {
+		// Wrap mammoth errors with context
+		throw new Error(
+			`DOCX extraction failed for ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+		);
 	}
-
-	// Convert HTML to clean markdown
-	const turndown = createTurndownService();
-	const markdown = turndown.turndown(htmlResult.value);
-
-	return {
-		text: textResult.value.trim(),
-		markdown: markdown.trim(),
-	};
 }
 
 /**
@@ -151,7 +167,7 @@ export const docxExtractor: ContentExtractor = {
 		parentCid?: string,
 		options?: OperationContext,
 	): Promise<ExtractedContent> {
-		const { sessionCid } = options ?? {};
+		const { sessionCid, vaultPath } = options ?? {};
 
 		return await observe(
 			docxLogger,
@@ -159,6 +175,7 @@ export const docxExtractor: ContentExtractor = {
 			async () => {
 				const { text, markdown } = await extractDocxContent(
 					file.path,
+					vaultPath,
 					cid,
 					parentCid,
 				);

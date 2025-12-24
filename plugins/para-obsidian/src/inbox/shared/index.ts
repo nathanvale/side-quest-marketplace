@@ -10,6 +10,10 @@ export {
 	isRecoverableError,
 } from "./errors";
 export {
+	validateFilenameForSubprocess,
+	validateInboxPath,
+} from "./path-validation";
+export {
 	checkThreshold,
 	PERFORMANCE_THRESHOLDS,
 	type ThresholdCheckResult,

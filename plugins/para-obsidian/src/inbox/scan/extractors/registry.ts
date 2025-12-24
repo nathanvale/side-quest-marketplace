@@ -208,11 +208,16 @@ export async function createDefaultRegistry(): Promise<ExtractorRegistry> {
 	);
 
 	// Register successful loads, log failures
-	for (const result of results) {
+	for (const [index, result] of results.entries()) {
 		if (result.status === "fulfilled") {
 			registry.register(result.value.extractor);
+		} else {
+			// Log failed extractor loads for debugging
+			console.error(
+				`Failed to load extractor ${extractorLoaders[index]?.name ?? index}:`,
+				result.reason,
+			);
 		}
-		// Failed loads are silently skipped - caller can check registry.size
 	}
 
 	return registry;

@@ -172,6 +172,33 @@ export interface FieldValidationResult {
 }
 
 /**
+ * Checks if a regex pattern is potentially dangerous (ReDoS vulnerability).
+ *
+ * Detects patterns that could cause catastrophic backtracking:
+ * - Nested quantifiers like (a+)+, (a*)*, (a?)?
+ * - Patterns with multiple unbounded quantifiers
+ *
+ * @param pattern - The regex pattern string to validate
+ * @returns true if pattern appears safe, false if potentially dangerous
+ *
+ * @example
+ * ```typescript
+ * isRegexSafe("^[a-z]+$")      // true - simple pattern
+ * isRegexSafe("(a+)+")         // false - nested quantifiers
+ * isRegexSafe("(a*)*b")        // false - catastrophic backtracking
+ * ```
+ */
+function isRegexSafe(pattern: string): boolean {
+	// Check for dangerous patterns: nested quantifiers, excessive backtracking
+	const dangerousPatterns = [
+		/(\+|\*|\?)\s*\1/, // Nested quantifiers like ++, **, ??
+		/\([^)]*(\+|\*)[^)]*\)\s*(\+|\*)/, // (a+)+ pattern
+		/\{[0-9]+,\}\s*\{/, // Nested unbounded quantifiers
+	];
+	return !dangerousPatterns.some((dp) => dp.test(pattern));
+}
+
+/**
  * Validates a field value against its definition constraints
  *
  * @param value - The value to validate
@@ -205,13 +232,28 @@ export function validateFieldValue(
 		}
 	}
 
-	// Validate against pattern
+	// Validate against pattern (with ReDoS protection)
 	if (field.validationPattern) {
-		const pattern = new RegExp(field.validationPattern);
-		if (!pattern.test(trimmedValue)) {
+		// Check for potentially dangerous regex patterns before compilation
+		if (!isRegexSafe(field.validationPattern)) {
 			return {
 				isValid: false,
-				error: `Field '${field.name}' does not match required pattern: ${field.validationPattern}`,
+				error: `Field '${field.name}' has a potentially dangerous validation pattern: ${field.validationPattern}`,
+			};
+		}
+
+		try {
+			const pattern = new RegExp(field.validationPattern);
+			if (!pattern.test(trimmedValue)) {
+				return {
+					isValid: false,
+					error: `Field '${field.name}' does not match required pattern: ${field.validationPattern}`,
+				};
+			}
+		} catch (_error) {
+			return {
+				isValid: false,
+				error: `Field '${field.name}' has an invalid regex pattern: ${field.validationPattern}`,
 			};
 		}
 	}

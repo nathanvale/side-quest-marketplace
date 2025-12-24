@@ -45,6 +45,10 @@ let loadPromise: Promise<void> | null = null;
 /** Promise chain for serializing disk writes */
 let writeChain: Promise<void> = Promise.resolve();
 
+/** Circuit breaker for write failures */
+let writeFailures = 0;
+const MAX_WRITE_FAILURES = 3;
+
 /**
  * SLO metric unit type
  */
@@ -191,7 +195,6 @@ async function loadEventsFromDisk(): Promise<void> {
 			const fileExists = await pathExists(filePath);
 
 			if (!fileExists) {
-				eventsLoaded = true;
 				return;
 			}
 
@@ -215,10 +218,13 @@ async function loadEventsFromDisk(): Promise<void> {
 					const events = sloEvents.get(event.sloName) ?? [];
 					events.push(event);
 					sloEvents.set(event.sloName, events);
-				} catch {}
+				} catch (error) {
+					console.error(
+						`Failed to parse SLO event line: ${line.substring(0, 100)}...`,
+						error,
+					);
+				}
 			}
-
-			eventsLoaded = true;
 
 			// If we pruned >10% of events, trigger rotation to clean up disk
 			if (lines.length > 0 && prunedCount / lines.length > 0.1) {
@@ -229,8 +235,10 @@ async function loadEventsFromDisk(): Promise<void> {
 		} catch (error: unknown) {
 			// If loading fails, just start fresh (don't block execution)
 			console.error("Failed to load SLO events from disk:", error);
-			eventsLoaded = true;
 		} finally {
+			// CRITICAL: Set eventsLoaded BEFORE clearing loadPromise to prevent race condition
+			// Race window: Thread A clears promise, Thread B sees !eventsLoaded && !loadPromise, Thread A sets flag
+			eventsLoaded = true;
 			loadPromise = null;
 		}
 	})();
@@ -347,10 +355,30 @@ export function recordSLOEvent(
 
 	// Serialize disk writes to prevent interleaving
 	writeChain = writeChain
-		.then(() => appendEventToDisk(event))
+		.then(() => {
+			// Circuit breaker: Skip writes if too many failures
+			if (writeFailures >= MAX_WRITE_FAILURES) {
+				console.error(
+					"SLO persistence disabled - too many consecutive failures",
+				);
+				return;
+			}
+			return appendEventToDisk(event);
+		})
+		.then(() => {
+			// Reset failure count on success
+			writeFailures = 0;
+		})
 		.catch((error: unknown) => {
-			// Log error but don't throw - disk persistence is non-critical
-			console.error("Failed to persist SLO event to disk:", error);
+			// Increment failure count and log
+			writeFailures++;
+			console.error(
+				`Failed to persist SLO event (failure ${writeFailures}/${MAX_WRITE_FAILURES}):`,
+				error,
+			);
+			if (writeFailures >= MAX_WRITE_FAILURES) {
+				console.error("SLO persistence disabled - too many failures");
+			}
 		});
 }
 
@@ -422,6 +450,7 @@ export function resetSLOEvents(): void {
 	eventsLoaded = false; // Allow reload from disk
 	loadPromise = null;
 	writeChain = Promise.resolve();
+	writeFailures = 0; // Reset circuit breaker
 }
 
 /**
@@ -433,6 +462,7 @@ export function resetSLOEventsForTests(): void {
 	eventsLoaded = true; // Mark as loaded to prevent disk reload
 	loadPromise = null;
 	writeChain = Promise.resolve();
+	writeFailures = 0; // Reset circuit breaker
 }
 
 /**

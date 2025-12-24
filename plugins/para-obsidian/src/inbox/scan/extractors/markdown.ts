@@ -17,6 +17,7 @@ import { parseFrontmatter } from "../../../frontmatter/parse";
 import { observe } from "../../../shared/instrumentation";
 import { inboxLogger } from "../../../shared/logger";
 import type { OperationContext } from "../../shared/context";
+import { validateInboxPath } from "../../shared/path-validation";
 import type { ContentExtractor, ExtractedContent, InboxFile } from "./types";
 
 /** Supported markdown extensions */
@@ -159,16 +160,20 @@ export const markdownExtractor: ContentExtractor = {
 		parentCid?: string,
 		options?: OperationContext,
 	): Promise<ExtractedContent> {
-		const { sessionCid } = options ?? {};
+		const { sessionCid, vaultPath } = options ?? {};
 
 		return await observe(
 			inboxLogger,
 			"inbox:extractMarkdown",
 			async () => {
-				// Read file content with validation
+				// Validate and read file content
 				let rawContent: string;
 				try {
-					rawContent = await readFile(file.path, "utf-8");
+					// Path validation (defense-in-depth security layer)
+					const safePath = vaultPath
+						? validateInboxPath(file.path, vaultPath)
+						: file.path;
+					rawContent = await readFile(safePath, "utf-8");
 				} catch (error) {
 					throw new Error(
 						`Failed to read markdown file: ${file.path} - ${error instanceof Error ? error.message : "unknown error"}`,

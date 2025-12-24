@@ -6,7 +6,7 @@
  * @module inbox/core/staging/cleanup
  */
 
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import {
 	ensureDirSync,
 	moveFile,
@@ -118,9 +118,37 @@ export async function cleanupOrphanedStaging(
 					let finalDest = "";
 					if (noteType && config.defaultDestinations?.[noteType]) {
 						finalDest = config.defaultDestinations[noteType];
+
+						// CRITICAL: Validate path safety - prevent path traversal
+						if (
+							finalDest.includes("..") ||
+							finalDest.startsWith("/") ||
+							finalDest.includes("~")
+						) {
+							if (inboxLogger) {
+								inboxLogger.error`Path traversal detected in note_type destination: noteType=${noteType} dest=${finalDest}`;
+							}
+							throw new Error(
+								`Path traversal attempt in cleanup: ${noteType} -> ${finalDest}`,
+							);
+						}
 					}
 
 					const finalPath = join(vaultPath, finalDest, file);
+
+					// CRITICAL: Verify final path doesn't escape vault
+					const resolvedFinal = resolve(finalPath);
+					const resolvedVault = resolve(vaultPath);
+
+					if (!resolvedFinal.startsWith(resolvedVault)) {
+						if (inboxLogger) {
+							inboxLogger.error`Final path escapes vault: finalPath=${resolvedFinal} vault=${resolvedVault}`;
+						}
+						throw new Error(
+							`Path traversal attempt: ${finalPath} escapes vault`,
+						);
+					}
+
 					ensureDirSync(dirname(finalPath));
 					await moveFile(stagingPath, finalPath);
 

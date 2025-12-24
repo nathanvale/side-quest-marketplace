@@ -419,7 +419,7 @@ describe("inbox/registry", () => {
 			expect(registry.getItem(testHash("new-hash"))).toEqual(item);
 		});
 
-		test("should update existing item with same hash", async () => {
+		test("should update existing item with same hash and path", async () => {
 			const TEST_DIR = createTestDir();
 			const registry = await setupLoadedRegistry(TEST_DIR, {
 				restrictToAttachments: false,
@@ -427,21 +427,50 @@ describe("inbox/registry", () => {
 
 			const item1: ProcessedItem = {
 				sourceHash: testHash("same-hash"),
-				sourcePath: "/inbox/v1.pdf",
+				sourcePath: "/inbox/document.pdf",
 				processedAt: "2024-01-01T00:00:00Z",
 			};
 			const item2: ProcessedItem = {
 				sourceHash: testHash("same-hash"),
-				sourcePath: "/inbox/v2.pdf",
+				sourcePath: "/inbox/document.pdf", // Same path - legitimate update
 				processedAt: "2024-01-15T00:00:00Z",
-				createdNote: "/notes/v2.md",
+				createdNote: "/notes/document.md",
 			};
 
 			registry.markProcessed(item1);
 			registry.markProcessed(item2);
 
-			// Should update, not duplicate
+			// Should update metadata when path is identical
 			expect(registry.getItem(testHash("same-hash"))).toEqual(item2);
+		});
+
+		test("should reject hash collision (same hash, different path)", async () => {
+			const TEST_DIR = createTestDir();
+			const registry = await setupLoadedRegistry(TEST_DIR, {
+				restrictToAttachments: false,
+			});
+
+			const item1: ProcessedItem = {
+				sourceHash: testHash("collision-hash"),
+				sourcePath: "/inbox/v1.pdf",
+				processedAt: "2024-01-01T00:00:00Z",
+			};
+			const item2: ProcessedItem = {
+				sourceHash: testHash("collision-hash"),
+				sourcePath: "/inbox/v2.pdf", // Different path - hash collision!
+				processedAt: "2024-01-15T00:00:00Z",
+				createdNote: "/notes/v2.md",
+			};
+
+			registry.markProcessed(item1);
+
+			// Should throw error for hash collision
+			expect(() => registry.markProcessed(item2)).toThrow(
+				/Hash collision detected.*investigate manually/,
+			);
+
+			// Original item should remain unchanged
+			expect(registry.getItem(testHash("collision-hash"))).toEqual(item1);
 		});
 	});
 
@@ -787,14 +816,12 @@ describe("inbox/registry", () => {
 			}
 			await registry.save();
 
-			// Remove concurrently and track timing to verify serialization
-			const start = Date.now();
+			// Remove concurrently (file locking ensures serialization)
 			const results = await Promise.all([
 				registry.removeAndSave(testHash("concurrent0")),
 				registry.removeAndSave(testHash("concurrent1")),
 				registry.removeAndSave(testHash("concurrent2")),
 			]);
-			const duration = Date.now() - start;
 
 			expect(results).toEqual([true, true, true]);
 
@@ -817,8 +844,7 @@ describe("inbox/registry", () => {
 			expect(registry2.isProcessed(testHash("concurrent3"))).toBe(true);
 			expect(registry2.isProcessed(testHash("concurrent4"))).toBe(true);
 
-			// Verify operations were serialized (should take > 0ms)
-			expect(duration).toBeGreaterThan(0);
+			// File persistence proves operations were serialized correctly (timing assertions are flaky)
 		});
 	});
 

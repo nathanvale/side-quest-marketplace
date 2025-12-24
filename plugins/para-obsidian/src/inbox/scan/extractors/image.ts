@@ -13,12 +13,12 @@
  * @module extractors/image
  */
 
-import { constants } from "node:fs";
-import { access, readFile, stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { basename, extname } from "node:path";
 import { observe } from "../../../shared/instrumentation";
 import { inboxLogger } from "../../../shared/logger";
 import type { OperationContext } from "../../shared/context";
+import { validateInboxPath } from "../../shared/path-validation";
 import type { ContentExtractor, ExtractedContent, InboxFile } from "./types";
 
 /** Supported image extensions */
@@ -83,47 +83,43 @@ export function isImageExtension(ext: string): ext is ImageExtension {
 }
 
 /**
- * Check if a file exists and is readable.
- *
- * @param filePath - Path to file
- * @returns true if file exists and is readable
- */
-async function fileExists(filePath: string): Promise<boolean> {
-	try {
-		await access(filePath, constants.R_OK);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-/**
  * Read image file as base64 for API calls.
- * Includes file existence and size validation.
+ * Includes file size validation and path traversal protection.
  *
- * @param filePath - Path to image file
+ * TOCTOU mitigation: No existence check - let readFile throw if not found.
+ * This eliminates the race condition between check and read.
+ *
+ * @param filePath - Path to image file (absolute)
+ * @param vaultPath - Vault root path for validation (optional, for defense-in-depth)
  * @returns Base64-encoded image data
  * @throws Error if file doesn't exist, is too large, or can't be read
  */
-export async function readImageAsBase64(filePath: string): Promise<string> {
-	// Check file exists first (TOCTOU mitigation - fail fast)
-	if (!(await fileExists(filePath))) {
-		throw new Error(`Image file not found: ${filePath}`);
-	}
+export async function readImageAsBase64(
+	filePath: string,
+	vaultPath?: string,
+): Promise<string> {
+	// Path validation (defense-in-depth security layer)
+	const safePath = vaultPath
+		? validateInboxPath(filePath, vaultPath)
+		: filePath;
 
-	// Check file size before reading
-	const stats = await stat(filePath);
-	if (stats.size > MAX_IMAGE_SIZE_BYTES) {
-		throw new Error(
-			`Image file too large: ${stats.size} bytes exceeds ${MAX_IMAGE_SIZE_BYTES} byte limit`,
-		);
-	}
-
-	// Read file - may still fail due to TOCTOU, but we've minimized the window
 	try {
-		const buffer = await readFile(filePath);
+		// Read file directly without existence check (eliminates TOCTOU)
+		const buffer = await readFile(safePath);
+
+		// Check size after reading (file is already in memory)
+		if (buffer.length > MAX_IMAGE_SIZE_BYTES) {
+			throw new Error(
+				`Image file too large: ${buffer.length} bytes exceeds ${MAX_IMAGE_SIZE_BYTES} byte limit`,
+			);
+		}
+
 		return buffer.toString("base64");
 	} catch (error) {
+		// Provide context for different error types
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+			throw new Error(`Image file not found: ${filePath}`);
+		}
 		throw new Error(
 			`Failed to read image file: ${filePath} - ${error instanceof Error ? error.message : "unknown error"}`,
 		);
@@ -131,22 +127,31 @@ export async function readImageAsBase64(filePath: string): Promise<string> {
 }
 
 /**
- * Get image file stats with existence validation.
+ * Get image file size with path validation.
  *
- * @param filePath - Path to image file
+ * TOCTOU mitigation: No existence check - let stat throw if not found.
+ *
+ * @param filePath - Path to image file (absolute)
+ * @param vaultPath - Vault root path for validation (optional, for defense-in-depth)
  * @returns File size in bytes
  * @throws Error if file doesn't exist or can't be read
  */
-export async function getImageFileSize(filePath: string): Promise<number> {
-	// Check file exists first
-	if (!(await fileExists(filePath))) {
-		throw new Error(`Image file not found: ${filePath}`);
-	}
+export async function getImageFileSize(
+	filePath: string,
+	vaultPath?: string,
+): Promise<number> {
+	// Path validation (defense-in-depth security layer)
+	const safePath = vaultPath
+		? validateInboxPath(filePath, vaultPath)
+		: filePath;
 
 	try {
-		const stats = await stat(filePath);
+		const stats = await stat(safePath);
 		return stats.size;
 	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+			throw new Error(`Image file not found: ${filePath}`);
+		}
 		throw new Error(
 			`Failed to get file stats: ${filePath} - ${error instanceof Error ? error.message : "unknown error"}`,
 		);
@@ -226,21 +231,16 @@ export const imageExtractor: ContentExtractor = {
 		parentCid?: string,
 		options?: OperationContext,
 	): Promise<ExtractedContent> {
-		const { sessionCid } = options ?? {};
+		const { sessionCid, vaultPath } = options ?? {};
 
 		return await observe(
 			inboxLogger,
 			"inbox:extractImage",
 			async () => {
-				// Validate file exists before processing (TOCTOU mitigation)
-				if (!(await fileExists(file.path))) {
-					throw new Error(`Image file not found: ${file.path}`);
-				}
-
-				// Get file size with validation
+				// Get file size with validation (no existence check - eliminates TOCTOU)
 				let fileSize: number;
 				try {
-					fileSize = await getImageFileSize(file.path);
+					fileSize = await getImageFileSize(file.path, vaultPath);
 				} catch (error) {
 					throw new Error(
 						`Failed to read image file: ${file.path} - ${error instanceof Error ? error.message : "unknown error"}`,
