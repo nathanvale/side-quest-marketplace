@@ -21,6 +21,7 @@ import {
 	startSession,
 	trackChange,
 } from "../../git/session";
+import { withFileLock } from "../../shared/file-lock";
 import { observe } from "../../shared/instrumentation";
 import {
 	createCorrelationId,
@@ -383,89 +384,116 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			// ATTACHMENT PROCESSING: Hash, extract, classify PDF and DOCX files
 			// =================================================================
 
-			// Calculate hash for dedup check and linking note title to attachment
+			// Acquire file lock before hashing to prevent TOCTOU vulnerability.
+			// The lock is held until extraction completes, ensuring the file
+			// content cannot change between hash check and reading.
 			let fileHash: string;
-			try {
-				if (onProgress) {
-					await onProgress({ ...progressBase, stage: "hash" });
-				}
-				fileHash = await hashFile(filePath);
-
-				// Registry check - only for attachments (Phase 2: scope restriction)
-				if (shouldTrackInRegistry(file)) {
-					if (registry.isProcessed(fileHash)) {
-						if (inboxLogger) {
-							inboxLogger.debug`Skipping already processed: ${filename} sessionCid=${sessionCid} cid=${cid}`;
-						}
-						if (onProgress) {
-							await onProgress({ ...progressBase, stage: "skip" });
-						}
-						return null;
-					}
-				} else {
-					// Markdown files use frontmatter-based enrichment tracking
-					// For bookmarks: check enrichedAt field in subsequent phases
-					if (inboxLogger) {
-						inboxLogger.debug`Skipped registry check for markdown: ${filename} cid=${cid}`;
-					}
-				}
-			} catch (_error) {
-				if (inboxLogger) {
-					inboxLogger.warn`Failed to hash file: ${filename} sessionCid=${sessionCid} cid=${cid}`;
-				}
-				if (onProgress) {
-					await onProgress({
-						...progressBase,
-						stage: "error",
-						error: "hash failed",
-					});
-				}
-				return null;
-			}
-
-			// Find the right extractor for this file type
-			const extractorMatch = extractorRegistry.findExtractor(file);
-			if (!extractorMatch) {
-				if (inboxLogger) {
-					inboxLogger.warn`No extractor found for: ${filename} sessionCid=${sessionCid} cid=${cid}`;
-				}
-				if (onProgress) {
-					await onProgress({
-						...progressBase,
-						stage: "error",
-						error: "no extractor available",
-					});
-				}
-				return null;
-			}
-
-			// Extract text using the appropriate extractor
 			let text: string;
 			let extractedMarkdown: string | undefined;
+
 			try {
-				if (onProgress) {
-					await onProgress({ ...progressBase, stage: "extract" });
-				}
-				const extracted = await observe(
-					inboxLogger,
-					"inbox:extractContent",
-					async () =>
-						extractorMatch.extractor.extract(file, cid, parentCid, {
-							sessionCid,
-						}),
-					{ parentCid, context: { filename } },
+				// Wrap hash + extraction in single file lock to prevent TOCTOU
+				type LockResult =
+					| { skip: true; hash: string }
+					| { skip: false; hash: string; text: string; markdown?: string };
+
+				const result = await withFileLock<LockResult>(
+					filePath,
+					async (): Promise<LockResult> => {
+						// Calculate hash for dedup check and linking note title to attachment
+						if (onProgress) {
+							await onProgress({ ...progressBase, stage: "hash" });
+						}
+						const hash = await hashFile(filePath);
+
+						// Registry check - only for attachments (Phase 2: scope restriction)
+						if (shouldTrackInRegistry(file)) {
+							if (registry.isProcessed(hash)) {
+								if (inboxLogger) {
+									inboxLogger.debug`Skipping already processed: ${filename} sessionCid=${sessionCid} cid=${cid}`;
+								}
+								if (onProgress) {
+									await onProgress({ ...progressBase, stage: "skip" });
+								}
+								return { skip: true, hash };
+							}
+						} else {
+							// Markdown files use frontmatter-based enrichment tracking
+							// For bookmarks: check enrichedAt field in subsequent phases
+							if (inboxLogger) {
+								inboxLogger.debug`Skipped registry check for markdown: ${filename} cid=${cid}`;
+							}
+						}
+
+						// Find the right extractor for this file type
+						const extractorMatch = extractorRegistry.findExtractor(file);
+						if (!extractorMatch) {
+							if (inboxLogger) {
+								inboxLogger.warn`No extractor found for: ${filename} sessionCid=${sessionCid} cid=${cid}`;
+							}
+							if (onProgress) {
+								await onProgress({
+									...progressBase,
+									stage: "error",
+									error: "no extractor available",
+								});
+							}
+							return { skip: true, hash };
+						}
+
+						// Extract text using the appropriate extractor
+						// This happens INSIDE the lock to prevent file modification between hash and read
+						if (onProgress) {
+							await onProgress({ ...progressBase, stage: "extract" });
+						}
+						const extracted = await observe(
+							inboxLogger,
+							"inbox:extractContent",
+							async () =>
+								extractorMatch.extractor.extract(file, cid, parentCid, {
+									sessionCid,
+								}),
+							{ parentCid, context: { filename } },
+						);
+
+						return {
+							skip: false,
+							hash,
+							text: extracted.text,
+							markdown: extracted.markdown,
+						};
+					},
 				);
-				text = extracted.text;
-				extractedMarkdown = extracted.markdown;
+
+				// File lock released here - safe to continue with classification
+
+				// Handle skip/error cases
+				if (result.skip) {
+					return null;
+				}
+
+				// Successful extraction - assign to outer scope
+				fileHash = result.hash;
+				text = result.text;
+				extractedMarkdown = result.markdown;
 			} catch (error) {
+				// Log lock acquisition or extraction failure
 				if (inboxLogger) {
-					inboxLogger.warn`Failed to extract content: ${filename} sessionCid=${sessionCid} cid=${cid}`;
+					const errorMsg =
+						error instanceof Error ? error.message : "unknown error";
+					if (errorMsg.includes("Failed to acquire lock")) {
+						// Lock failure - log warning but continue processing
+						inboxLogger.warn`File lock timeout for: ${filename} sessionCid=${sessionCid} cid=${cid}`;
+					} else {
+						// Extraction failure
+						inboxLogger.warn`Failed to process file: ${filename} error=${errorMsg} sessionCid=${sessionCid} cid=${cid}`;
+					}
 				}
 				if (onProgress) {
 					await onProgress({
 						...progressBase,
 						stage: "error",
-						error: error instanceof Error ? error.message : "extraction failed",
+						error: error instanceof Error ? error.message : "processing failed",
 					});
 				}
 				// Return error suggestion
@@ -476,12 +504,11 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					confidence: "low",
 					action: "skip",
 					detectionSource: "none",
-					reason: `Content extraction failed: ${error instanceof Error ? error.message : "unknown error"}`,
+					reason: `Content processing failed: ${error instanceof Error ? error.message : "unknown error"}`,
 				};
 				suggestionCache.set(errorSuggestion.id, errorSuggestion);
 				return errorSuggestion;
 			}
-
 			// Run heuristic detection
 			const heuristicResult = combineHeuristics(filename, text);
 			if (inboxLogger) {
@@ -1172,11 +1199,11 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 						cid,
 						successCount: successful.length,
 						failureCount: failed.size,
-						total,
+						total: ids.length,
 						durationMs,
 						timestamp: new Date().toISOString(),
 					});
-					inboxLogger.debug`Execute summary total=${total} success=${successful.length} failed=${failed.size} durationMs=${durationMs} sessionCid=${sessionCid} cid=${cid}`;
+					inboxLogger.debug`Execute summary total=${ids.length} success=${successful.length} failed=${failed.size} durationMs=${durationMs} sessionCid=${sessionCid} cid=${cid}`;
 				}
 
 				return {

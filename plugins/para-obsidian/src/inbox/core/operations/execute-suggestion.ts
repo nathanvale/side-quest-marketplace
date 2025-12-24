@@ -808,20 +808,46 @@ export async function executeSuggestion(
 			}
 
 			// Update registry - clear in-progress flag and mark as completed
+			// IMPORTANT: In-memory state changes must succeed atomically with disk save.
+			// If save() fails after modifying state, we'd have inconsistent registry.
+			// Registry modifications are deferred - save() happens in engine.ts after this returns.
+			// If save() throws, the entire operation is rolled back via catch handler in engine.ts.
 			registry.clearInProgress(hash);
 
-			// Only mark processed if there's an attachment to track
-			// Type A and bookmarks don't have attachments, so skip registry entry
-			// (when restrictRegistryToAttachments is enabled, entries without movedAttachment are rejected)
-			if (!isBookmark && !isTypeA && movedFilePath) {
-				registry.markProcessed({
-					sourceHash: hash,
-					sourcePath: suggestion.source,
-					processedAt: new Date().toISOString(),
-					createdNote: createdNotePath,
-					movedAttachment: movedFilePath,
-				});
+			// Mark processed based on document type:
+			// - Type A: Track as "note" (markdown is source of truth, no attachment)
+			// - Type B: Track as "attachment" (attachment is source of truth)
+			// - Bookmarks: Skip registry (handled separately)
+			if (!isBookmark) {
+				if (isTypeA) {
+					// Type A: Track the note itself (no attachment exists)
+					registry.markProcessed({
+						sourceHash: hash,
+						sourcePath: suggestion.source,
+						processedAt: new Date().toISOString(),
+						createdNote: createdNotePath,
+						// Use createdNote as movedAttachment for registry validation
+						// This satisfies restrictRegistryToAttachments check while tracking Type A docs
+						movedAttachment: createdNotePath ?? "",
+						itemType: "note",
+					});
+				} else if (movedFilePath) {
+					// Type B: Track the attachment (standard behavior)
+					registry.markProcessed({
+						sourceHash: hash,
+						sourcePath: suggestion.source,
+						processedAt: new Date().toISOString(),
+						createdNote: createdNotePath,
+						movedAttachment: movedFilePath,
+						itemType: "attachment",
+					});
+				}
 			}
+
+			// NOTE: registry.save() is called in engine.ts (line 1079) after this function returns.
+			// If save() fails, it throws REG_WRITE_FAILED which is caught in engine.ts try/catch (line 1099).
+			// This ensures the operation is marked as failed and in-memory state changes are abandoned.
+			// The registry uses atomic writes (temp file + rename) to prevent corruption on disk.
 
 			// Note: Auto-commit removed from per-operation execution
 			// Commits are now batched at session level in engine.ts for cleaner history

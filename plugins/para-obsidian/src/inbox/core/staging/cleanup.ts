@@ -14,12 +14,56 @@ import {
 	readDir,
 	readTextFileSync,
 } from "@sidequest/core/fs";
+import { sleepSync } from "@sidequest/core/utils";
 import { loadConfig } from "../../../config/index";
 import { parseFrontmatter } from "../../../frontmatter/parse";
 import { inboxLogger } from "../../../shared/logger";
 import type { createRegistry } from "../../registry/processed-registry";
 import type { OperationContext } from "../../shared/context";
 import type { ProcessedItem } from "../../types";
+
+/**
+ * Attempt to delete a file with retries.
+ * Uses sync operations with small delays between attempts.
+ *
+ * @param absolutePath - Absolute path to file to delete
+ * @param maxAttempts - Maximum retry attempts (default: 3)
+ * @param delayMs - Delay between retries in ms (default: 50)
+ * @returns true if deleted successfully, false if all retries failed
+ */
+function unlinkWithRetry(
+	absolutePath: string,
+	maxAttempts = 3,
+	delayMs = 50,
+): boolean {
+	let lastError: Error | undefined;
+
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+		try {
+			const fs = require("node:fs");
+			fs.unlinkSync(absolutePath);
+			return true; // Success
+		} catch (error) {
+			lastError = error instanceof Error ? error : new Error(String(error));
+
+			// Don't retry if file doesn't exist (already deleted)
+			if ("code" in lastError && lastError.code === "ENOENT") {
+				return true;
+			}
+
+			// If not the last attempt, wait before retrying
+			if (attempt < maxAttempts) {
+				sleepSync(delayMs);
+			}
+		}
+	}
+
+	// All retries failed
+	if (inboxLogger && lastError) {
+		inboxLogger.warn`File deletion failed after ${maxAttempts} attempts: ${lastError.message}`;
+	}
+	return false;
+}
 
 /**
  * Cleanup orphaned staging files from interrupted operations.
@@ -107,10 +151,15 @@ export async function cleanupOrphanedStaging(
 					const oneDayMs = 24 * 60 * 60 * 1000;
 
 					if (ageMs > oneDayMs) {
-						const fs = await import("node:fs");
-						fs.unlinkSync(stagingPath);
-						if (inboxLogger) {
-							inboxLogger.info`Deleted stale orphaned file (>24h): ${file}${sessionCid ? ` ${sessionCid}` : ""}`;
+						const deleted = unlinkWithRetry(stagingPath);
+						if (deleted) {
+							if (inboxLogger) {
+								inboxLogger.info`Deleted stale orphaned file (>24h): ${file}${sessionCid ? ` ${sessionCid}` : ""}`;
+							}
+						} else {
+							if (inboxLogger) {
+								inboxLogger.error`ORPHANED FILE (manual cleanup required): path=${stagingPath}${sessionCid ? ` ${sessionCid}` : ""}`;
+							}
 						}
 					}
 				} catch (error) {

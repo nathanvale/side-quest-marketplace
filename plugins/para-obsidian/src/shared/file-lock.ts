@@ -8,6 +8,7 @@
  * @module shared/file-lock
  */
 
+import { createHash } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -17,6 +18,19 @@ import { lockLogger } from "./logger.js";
 const LOCK_DIR = join(tmpdir(), "para-obsidian-locks");
 const LOCK_TIMEOUT_MS = 30000; // 30 seconds
 const RETRY_INTERVAL_MS = 100; // 100ms between retries
+
+/**
+ * Convert a resource ID (which may contain path separators) to a safe lock filename.
+ * Uses a hash to ensure uniqueness while avoiding filesystem issues.
+ */
+function toLockFilename(resourceId: string): string {
+	// Use SHA-256 hash truncated to 16 chars for a unique, safe filename
+	const hash = createHash("sha256")
+		.update(resourceId)
+		.digest("hex")
+		.slice(0, 16);
+	return `${hash}.lock`;
+}
 
 /**
  * Execute an operation with exclusive file lock.
@@ -46,7 +60,7 @@ export async function withFileLock<T>(
 		"lock:withFileLock",
 		async () => {
 			await mkdir(LOCK_DIR, { recursive: true });
-			const lockPath = join(LOCK_DIR, `${resourceId}.lock`);
+			const lockPath = join(LOCK_DIR, toLockFilename(resourceId));
 
 			// Acquire lock with timeout
 			const lockAcquireStart = Date.now();
