@@ -98,6 +98,7 @@ export class YouTubeEnrichmentError extends Error {
 		this.code = code;
 		this.videoId = videoId;
 		this.retryable = retryable;
+		Object.setPrototypeOf(this, YouTubeEnrichmentError.prototype);
 	}
 }
 

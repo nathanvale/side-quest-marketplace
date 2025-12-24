@@ -163,7 +163,7 @@ async function handleEnrichYouTube(
 		};
 	}
 
-	// Note: startTime is set after confirmation prompt, not here
+	// Initialize startTime after validation (Bug ENRICH-CLI-001 fix)
 	let startTime = Date.now();
 
 	try {
@@ -216,13 +216,39 @@ async function handleEnrichYouTube(
 							absolutePath,
 						});
 					}
-				} catch {
-					// Skip files that can't be read or parsed
+				} catch (error) {
+					// Bug ENRICH-CLI-003 fix: Log when files fail to read
+					if (enrichLogger) {
+						enrichLogger.warn("Failed to check file for enrichment", {
+							event: "enrich_youtube_file_check_failed",
+							file: absolutePath,
+							error: error instanceof Error ? error.message : "Unknown error",
+							cid,
+							sessionCid,
+						});
+					}
+					// Continue to skip file
 				}
 			}
 		} else {
 			// Validate specific target file (guaranteed to exist due to validation above)
 			const targetPath = target as string;
+
+			// Bug ENRICH-CLI-004 fix: Validate path - prevent traversal
+			if (targetPath.includes("..") || targetPath.includes("~")) {
+				const errorMsg = "Path contains invalid characters (.. or ~)";
+				if (enrichLogger) {
+					enrichLogger.warn("Path traversal attempt blocked", {
+						event: "enrich_youtube_path_blocked",
+						target: targetPath,
+						cid,
+						sessionCid,
+					});
+				}
+				session.end({ error: errorMsg });
+				return { success: false, error: errorMsg, exitCode: 1 };
+			}
+
 			const absolutePath = targetPath.startsWith("/")
 				? targetPath
 				: join(vaultPath, targetPath);
@@ -529,7 +555,7 @@ async function handleEnrichYouTube(
 		console.log("");
 		console.log(
 			emphasize.info(
-				`Done. Enriched ${metrics.success}/${metrics.total} notes in ${(metrics.durationMs / 1000).toFixed(1)}s.`,
+				`Done in ${(metrics.durationMs / 1000).toFixed(1)}s: ${metrics.success} enriched, ${metrics.failed} failed, ${metrics.skipped} skipped (${metrics.total} total)`,
 			),
 		);
 

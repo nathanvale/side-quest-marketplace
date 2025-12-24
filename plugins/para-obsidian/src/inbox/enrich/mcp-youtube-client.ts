@@ -14,6 +14,47 @@ import { enrichLogger } from "../../shared/logger";
 const log = enrichLogger;
 
 /**
+ * Maximum number of pagination pages to fetch before aborting.
+ * Prevents infinite loops if MCP server returns same cursor repeatedly.
+ */
+const MAX_PAGES = 50;
+
+/**
+ * Timeout for MCP client connection in milliseconds.
+ */
+const CONNECT_TIMEOUT_MS = 30_000; // 30 seconds
+
+/**
+ * Timeout for individual MCP tool calls in milliseconds.
+ */
+const TOOL_CALL_TIMEOUT_MS = 60_000; // 60 seconds
+
+/**
+ * Wraps a promise with a timeout.
+ *
+ * @param promise - The promise to wrap
+ * @param timeoutMs - Timeout in milliseconds
+ * @param operation - Description for error message
+ * @returns Promise that rejects on timeout
+ * @throws Error if timeout is exceeded
+ */
+function withTimeout<T>(
+	promise: Promise<T>,
+	timeoutMs: number,
+	operation: string,
+): Promise<T> {
+	return Promise.race([
+		promise,
+		new Promise<T>((_, reject) =>
+			setTimeout(
+				() => reject(new Error(`${operation} timed out after ${timeoutMs}ms`)),
+				timeoutMs,
+			),
+		),
+	]);
+}
+
+/**
  * A single timed transcript segment from YouTube.
  */
 export interface TranscriptSegment {
@@ -67,6 +108,11 @@ function chunkSegments(
 	segments: TranscriptSegment[],
 	chunkDurationSeconds: number,
 ): TranscriptSegment[][] {
+	// Guard against empty input
+	if (segments.length === 0) {
+		return [];
+	}
+
 	const chunks: TranscriptSegment[][] = [];
 	let currentChunk: TranscriptSegment[] = [];
 	let chunkStartTime = 0;
@@ -208,7 +254,12 @@ export async function fetchTranscriptViaMcp(
 	);
 
 	try {
-		await client.connect(transport);
+		// FIX: MCP-YOUTUBE-001 - Add timeout to client.connect()
+		await withTimeout(
+			client.connect(transport),
+			CONNECT_TIMEOUT_MS,
+			"MCP client connect",
+		);
 
 		if (log) {
 			log.debug`MCP YouTube client connected`;
@@ -218,20 +269,50 @@ export async function fetchTranscriptViaMcp(
 		const segments: TranscriptSegment[] = [];
 		let title = "";
 		let nextCursor: string | null = null;
+		let pageCount = 0;
+		// FIX: MCP-YOUTUBE-004 - Track seen cursors to detect infinite loops
+		const seenCursors = new Set<string>();
 
 		do {
+			// FIX: MCP-YOUTUBE-004 - Enforce MAX_PAGES limit
+			pageCount++;
+			if (pageCount > MAX_PAGES) {
+				if (log) {
+					log.warn`MCP YouTube pagination exceeded MAX_PAGES=${MAX_PAGES} videoId=${videoId} pages=${pageCount}`;
+				}
+				break;
+			}
+
+			// FIX: MCP-YOUTUBE-004 - Detect infinite loop (same cursor returned twice)
+			if (nextCursor && seenCursors.has(nextCursor)) {
+				if (log) {
+					log.error`MCP YouTube infinite loop detected videoId=${videoId} cursor=${nextCursor} page=${pageCount}`;
+				}
+				throw new Error(
+					`Infinite pagination loop detected: cursor "${nextCursor}" returned twice`,
+				);
+			}
+			if (nextCursor) {
+				seenCursors.add(nextCursor);
+			}
+
 			const args: Record<string, unknown> = { url, lang };
 			if (nextCursor) {
 				args.next_cursor = nextCursor;
 			}
 
-			const result = await client.callTool({
-				name: "get_timed_transcript",
-				arguments: args,
-			});
+			// FIX: MCP-YOUTUBE-001 - Add timeout to client.callTool()
+			const result = await withTimeout(
+				client.callTool({
+					name: "get_timed_transcript",
+					arguments: args,
+				}),
+				TOOL_CALL_TIMEOUT_MS,
+				`MCP tool call (page ${pageCount})`,
+			);
 
 			if (log) {
-				log.debug`MCP YouTube tool response received`;
+				log.debug`MCP YouTube tool response received page=${pageCount}`;
 			}
 
 			// Parse response

@@ -17,6 +17,7 @@
  */
 
 import { parseFrontmatter, serializeFrontmatter } from "../../frontmatter";
+import { atomicWriteFile } from "../../shared/atomic-fs";
 import { enrichLogger } from "../../shared/logger";
 import type { InboxFile } from "../scan/extractors";
 import { applyBookmarkEnrichment } from "./strategies/bookmark-strategy";
@@ -191,7 +192,7 @@ export function createEnrichmentPipeline(config: EnrichmentPipelineConfig) {
 				updatedFrontmatter,
 				updatedBody,
 			);
-			await Bun.write(file.path, updatedContent);
+			await atomicWriteFile(file.path, updatedContent);
 
 			const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 			if (log) {
@@ -257,10 +258,30 @@ export function createEnrichmentPipeline(config: EnrichmentPipelineConfig) {
 
 				// Write updated frontmatter to file
 				const updatedContent = serializeFrontmatter(updatedFrontmatter, body);
-				await Bun.write(file.path, updatedContent);
+				await atomicWriteFile(file.path, updatedContent);
 
 				if (log) {
 					log.info`Marked transcript as failed file=${file.filename} error_code=${updatedFrontmatter.transcript_error_code} cid=${cid}`;
+				}
+			} else if (strategy.id === "bookmark-content") {
+				// Mark bookmark as failed (not pending)
+				updatedFrontmatter = {
+					...frontmatter,
+					enrichment_status: "failed",
+					enrichment_error: enrichmentError.message,
+					enrichment_error_code:
+						enrichmentError instanceof BookmarkEnrichmentError
+							? enrichmentError.code
+							: "UNKNOWN",
+					enrichment_failed_at: new Date().toISOString(),
+				};
+
+				// Write updated frontmatter to file
+				const updatedContent = serializeFrontmatter(updatedFrontmatter, body);
+				await atomicWriteFile(file.path, updatedContent);
+
+				if (log) {
+					log.info`Marked bookmark as failed file=${file.filename} error_code=${updatedFrontmatter.enrichment_error_code} cid=${cid}`;
 				}
 			}
 
@@ -358,6 +379,6 @@ export function createDefaultEnrichmentPipeline(
  */
 export function isEnrichmentSuccess(
 	result: EnrichmentResult,
-): result is { type: "bookmark"; data: import("./types").BookmarkEnrichment } {
+): result is Exclude<EnrichmentResult, { type: "none" }> {
 	return result.type !== "none";
 }

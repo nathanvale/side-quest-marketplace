@@ -115,6 +115,7 @@ export class BookmarkEnrichmentError extends Error {
 		this.url = url;
 		this.retryable = retryable;
 		this.retryAfterMs = retryAfterMs;
+		Object.setPrototypeOf(this, BookmarkEnrichmentError.prototype);
 	}
 }
 
