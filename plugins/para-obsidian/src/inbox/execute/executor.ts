@@ -224,7 +224,21 @@ export async function executeSuggestion(
 		// Note: Don't check result - link injection is non-fatal
 	}
 
+	if (logger) {
+		logger.info`Executed suggestion id=${suggestion.id} movedTo=${basename(moveResult.movedTo as string)} createdNote=${createdNotePath ?? "none"} ${cid}`;
+	}
+
+	const result: ExecutionResult = {
+		suggestionId: suggestion.id,
+		success: true,
+		action: suggestion.action,
+		createdNote: createdNotePath,
+		movedAttachment: moveResult.movedTo,
+	};
+
 	// Step 4: Cleanup registry for moved attachments
+	// IMPORTANT: Cleanup happens AFTER all operations complete to prevent race conditions
+	// Other processes may still be reading the registry entry while we execute
 	// Remove any existing registry entry to allow reprocessing if user re-adds the file
 	// Registry is only used during scan to skip already-processed items
 	// Use atomic removeAndSave() to prevent race conditions
@@ -237,17 +251,7 @@ export async function executeSuggestion(
 		}
 	}
 
-	if (logger) {
-		logger.info`Executed suggestion id=${suggestion.id} movedTo=${basename(moveResult.movedTo as string)} createdNote=${createdNotePath ?? "none"} ${cid}`;
-	}
-
-	return {
-		suggestionId: suggestion.id,
-		success: true,
-		action: suggestion.action,
-		createdNote: createdNotePath,
-		movedAttachment: moveResult.movedTo,
-	};
+	return result;
 }
 
 /**

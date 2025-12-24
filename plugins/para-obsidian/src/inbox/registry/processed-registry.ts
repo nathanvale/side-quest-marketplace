@@ -35,7 +35,7 @@
 import {
 	existsSync,
 	mkdirSync,
-	renameSync as rename,
+	renameSync,
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
@@ -478,7 +478,7 @@ export function createRegistry(
 			await Bun.write(tempPath, JSON.stringify(registry, null, 2));
 
 			// Atomic rename (POSIX guarantees atomicity)
-			await rename(tempPath, registryPath);
+			renameSync(tempPath, registryPath);
 
 			log.debug("Registry saved", {
 				items: items.size,
@@ -561,10 +561,11 @@ export function createRegistry(
 
 	/**
 	 * Validate that an item's type matches the expected type for the registry scope.
-	 * When restrictRegistryToAttachments is true, only attachment items are allowed.
+	 * When restrictRegistryToAttachments is true, allows both "attachment" and "note" types.
+	 * "note" type is used for Type A documents where markdown is the source of truth.
 	 *
 	 * @param item - Item to validate
-	 * @param restrictToAttachments - If true, only attachment items allowed
+	 * @param restrictToAttachments - If true, only attachment and note items allowed
 	 * @throws If item type doesn't match expected scope
 	 */
 	function validateItemType(
@@ -572,16 +573,20 @@ export function createRegistry(
 		restrictToAttachments: boolean,
 	): void {
 		if (restrictToAttachments) {
-			// In attachment-only mode, item must have movedAttachment and itemType should be "attachment"
+			// In attachment-only mode, item must have movedAttachment
 			if (!item.movedAttachment) {
 				throw new Error(
 					"Registry restricted to attachments: item must have movedAttachment field",
 				);
 			}
-			// If itemType is explicitly set, enforce it
-			if (item.itemType && item.itemType !== "attachment") {
+			// If itemType is explicitly set, enforce it (allow "attachment" or "note")
+			if (
+				item.itemType &&
+				item.itemType !== "attachment" &&
+				item.itemType !== "note"
+			) {
 				throw new Error(
-					`Registry restricted to attachments: itemType must be "attachment", got "${item.itemType}"`,
+					`Registry restricted to attachments: itemType must be "attachment" or "note", got "${item.itemType}"`,
 				);
 			}
 		}
