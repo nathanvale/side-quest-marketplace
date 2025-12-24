@@ -590,5 +590,155 @@ No frontmatter here.
 				expectScanResult(result, 0, 1);
 			});
 		});
+
+		describe("type validation for frontmatter fields", () => {
+			test("skips notes when area is empty array", async () => {
+				vaultPath = setupTest(["02 Areas/Health"]);
+
+				writeVaultFile(
+					vaultPath,
+					"00 Inbox/Note.md",
+					`---
+title: "Empty Array Area"
+area: []
+---
+
+Content.
+`,
+				);
+
+				const result = await scanForRoutableNotes(vaultPath, "00 Inbox");
+
+				expectScanResult(result, 0, 1);
+				expect(result.skipped[0]).toMatchObject({
+					path: "00 Inbox/Note.md",
+					reason: "Missing area or project in frontmatter",
+				});
+			});
+
+			test("skips notes when project is empty array", async () => {
+				vaultPath = setupTest(["01 Projects/Alpha"]);
+
+				writeVaultFile(
+					vaultPath,
+					"00 Inbox/Note.md",
+					`---
+title: "Empty Array Project"
+project: []
+---
+
+Content.
+`,
+				);
+
+				const result = await scanForRoutableNotes(vaultPath, "00 Inbox");
+
+				expectScanResult(result, 0, 1);
+				expect(result.skipped[0]).toMatchObject({
+					path: "00 Inbox/Note.md",
+					reason: "Missing area or project in frontmatter",
+				});
+			});
+
+			test("skips notes when area array has non-string first element", async () => {
+				vaultPath = setupTest(["02 Areas/Health"]);
+
+				writeVaultFile(
+					vaultPath,
+					"00 Inbox/Note.md",
+					`---
+title: "Non-String Array Element"
+area:
+  - 123
+  - "Health"
+---
+
+Content.
+`,
+				);
+
+				const result = await scanForRoutableNotes(vaultPath, "00 Inbox");
+
+				expectScanResult(result, 0, 1);
+				expect(result.skipped[0]).toMatchObject({
+					path: "00 Inbox/Note.md",
+					reason: "Missing area or project in frontmatter",
+				});
+			});
+
+			test("skips notes when area is a number", async () => {
+				vaultPath = setupTest(["02 Areas/Health"]);
+
+				writeVaultFile(
+					vaultPath,
+					"00 Inbox/Note.md",
+					`---
+title: "Number Area"
+area: 123
+---
+
+Content.
+`,
+				);
+
+				const result = await scanForRoutableNotes(vaultPath, "00 Inbox");
+
+				expectScanResult(result, 0, 1);
+				expect(result.skipped[0]).toMatchObject({
+					path: "00 Inbox/Note.md",
+					reason: "Missing area or project in frontmatter",
+				});
+			});
+
+			test("skips notes when project is a boolean", async () => {
+				vaultPath = setupTest(["01 Projects/Alpha"]);
+
+				writeVaultFile(
+					vaultPath,
+					"00 Inbox/Note.md",
+					`---
+title: "Boolean Project"
+project: true
+---
+
+Content.
+`,
+				);
+
+				const result = await scanForRoutableNotes(vaultPath, "00 Inbox");
+
+				expectScanResult(result, 0, 1);
+				expect(result.skipped[0]).toMatchObject({
+					path: "00 Inbox/Note.md",
+					reason: "Missing area or project in frontmatter",
+				});
+			});
+
+			test("skips notes when area is an object", async () => {
+				vaultPath = setupTest(["02 Areas/Health"]);
+
+				writeVaultFile(
+					vaultPath,
+					"00 Inbox/Note.md",
+					`---
+title: "Object Area"
+area:
+  name: "Health"
+  priority: 1
+---
+
+Content.
+`,
+				);
+
+				const result = await scanForRoutableNotes(vaultPath, "00 Inbox");
+
+				expectScanResult(result, 0, 1);
+				expect(result.skipped[0]).toMatchObject({
+					path: "00 Inbox/Note.md",
+					reason: "Missing area or project in frontmatter",
+				});
+			});
+		});
 	});
 });

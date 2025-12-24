@@ -833,14 +833,14 @@ invalid yaml: [
 			// Don't create inbox folder
 			const ctx = createCommandContext({ isJson: true });
 
-			// Should not crash
+			// Should not crash, but should return error
 			const logs = await captureConsoleOutputAsync(async () => {
 				await handleInboxMove(ctx);
 			});
 
 			const jsonOutput = findJsonOutput(logs) as Record<string, unknown>;
-			expect(jsonOutput.success).toBe(true);
-			expect(jsonOutput.moved).toBe(0);
+			expect(jsonOutput.success).toBe(false);
+			expect(jsonOutput.error).toBe("Inbox folder '00 Inbox' not found");
 		});
 	});
 

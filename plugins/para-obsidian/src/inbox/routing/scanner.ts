@@ -7,7 +7,7 @@
  * @module inbox/routing/scanner
  */
 
-import { join } from "node:path";
+import { join, isAbsolute as pathIsAbsolute } from "node:path";
 import { readTextFile } from "@sidequest/core/fs";
 import { parseFrontmatter } from "../../frontmatter/parse";
 import { createCorrelationId, routingLogger } from "../../shared/logger";
@@ -22,6 +22,22 @@ export interface RoutingContext {
 	sessionCid: string;
 	/** Parent operation correlation ID */
 	parentCid?: string;
+}
+
+/**
+ * Safely extract a string value from frontmatter field.
+ * Handles string, string[], or other types gracefully.
+ */
+function extractStringField(value: unknown): string | undefined {
+	if (typeof value === "string") return value;
+	if (
+		Array.isArray(value) &&
+		value.length > 0 &&
+		typeof value[0] === "string"
+	) {
+		return value[0];
+	}
+	return undefined;
 }
 
 /**
@@ -81,7 +97,7 @@ export async function scanForRoutableNotes(
 	for (const file of files) {
 		// globFiles may return absolute or relative paths depending on input
 		// If absolute, extract relative portion by removing inboxPath prefix
-		const isAbsolute = file.startsWith("/");
+		const isAbsolute = pathIsAbsolute(file);
 		const relativeToInbox = isAbsolute
 			? file.slice(inboxPath.length + 1) // +1 for trailing slash
 			: file;
@@ -99,15 +115,9 @@ export async function scanForRoutableNotes(
 			const title = attributes.title as string | undefined;
 			const type = attributes.type as string | undefined;
 
-			// Handle area/project as string or array (take first element if array)
-			const rawArea = attributes.area;
-			const rawProject = attributes.project;
-			const area = Array.isArray(rawArea)
-				? (rawArea[0] as string | undefined)
-				: (rawArea as string | undefined);
-			const project = Array.isArray(rawProject)
-				? (rawProject[0] as string | undefined)
-				: (rawProject as string | undefined);
+			// Handle area/project as string or array using safe extraction
+			const area = extractStringField(attributes.area);
+			const project = extractStringField(attributes.project);
 
 			// Skip if missing title
 			if (!title) {
@@ -197,6 +207,9 @@ export async function scanForRoutableNotes(
 					sessionCid: ctx?.sessionCid,
 					path: relativePath,
 					error: errorMessage,
+					stack: error instanceof Error ? error.stack : undefined,
+					errorType:
+						error instanceof Error ? error.constructor.name : "Unknown",
 				});
 			}
 		}

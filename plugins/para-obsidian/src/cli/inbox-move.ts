@@ -9,6 +9,7 @@
 
 import { join } from "node:path";
 import { confirm } from "@inquirer/prompts";
+import { isDirectorySync } from "@sidequest/core/fs";
 import { emphasize } from "@sidequest/core/terminal";
 import type { RoutingContext } from "../inbox/routing";
 import { moveNote, scanForRoutableNotes } from "../inbox/routing";
@@ -51,6 +52,26 @@ export async function handleInboxMove(
 			isJson,
 			timestamp: new Date().toISOString(),
 		});
+	}
+
+	// Validate inbox folder exists
+	const inboxPath = join(vaultPath, "00 Inbox");
+	if (!isDirectorySync(inboxPath)) {
+		if (isJson) {
+			console.log(
+				JSON.stringify(
+					{ success: false, error: "Inbox folder '00 Inbox' not found" },
+					null,
+					2,
+				),
+			);
+		} else {
+			console.log(
+				emphasize.error("Inbox folder '00 Inbox' not found in vault."),
+			);
+		}
+		session.end({ success: false });
+		return { success: false, exitCode: 1 };
 	}
 
 	if (!isJson) {
