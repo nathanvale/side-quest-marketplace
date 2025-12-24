@@ -32,6 +32,18 @@ import type {
 
 const log = enrichLogger;
 
+/**
+ * Check if frontmatter represents a YouTube note.
+ * Accepts both `type: "youtube"` and `type: "clipping"` with `clipping_type: "youtube"`.
+ */
+function isYouTubeFrontmatter(frontmatter: Record<string, unknown>): boolean {
+	const type = frontmatter.type as string | undefined;
+	const clippingType = frontmatter.clipping_type as string | undefined;
+	return (
+		type === "youtube" || (type === "clipping" && clippingType === "youtube")
+	);
+}
+
 // Default configuration
 const DEFAULT_TIMEOUT = 30000;
 const DEFAULT_MAX_RETRIES = 3;
@@ -326,11 +338,17 @@ export const youtubeEnrichmentStrategy: EnrichmentStrategy = {
 	canEnrich(ctx: EnrichmentContext): EnrichmentEligibility {
 		const { frontmatter, file } = ctx;
 
-		// Must be a YouTube video type
-		if (frontmatter.type !== "youtube") {
+		// Must be a YouTube video type (either type:youtube or type:clipping with clipping_type:youtube)
+		if (!isYouTubeFrontmatter(frontmatter)) {
+			const type = frontmatter.type as string | undefined;
+			const clippingType = frontmatter.clipping_type as string | undefined;
+			const typeInfo =
+				type === "clipping"
+					? `clipping/${clippingType ?? "none"}`
+					: (type ?? "none");
 			return {
 				eligible: false,
-				reason: "Not a YouTube video (type !== youtube)",
+				reason: `Not a YouTube video (type: ${typeInfo})`,
 			};
 		}
 

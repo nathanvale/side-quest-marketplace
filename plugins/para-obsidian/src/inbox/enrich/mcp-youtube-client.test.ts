@@ -211,13 +211,13 @@ describe("fetchTranscriptViaMcp", () => {
 	});
 
 	describe("tool calling", () => {
-		test("calls get_transcript tool with correct arguments", async () => {
+		test("calls get_timed_transcript tool with correct arguments", async () => {
 			const { fetchTranscriptViaMcp } = await import("./mcp-youtube-client");
 
 			await fetchTranscriptViaMcp(TEST_VIDEO_IDS.SIMPLE, "en");
 
 			expect(mockCallTool).toHaveBeenCalledWith({
-				name: "get_transcript",
+				name: "get_timed_transcript",
 				arguments: {
 					url: `https://www.youtube.com/watch?v=${TEST_VIDEO_IDS.SIMPLE}`,
 					lang: "en",
@@ -231,7 +231,7 @@ describe("fetchTranscriptViaMcp", () => {
 			await fetchTranscriptViaMcp(TEST_VIDEO_IDS.SIMPLE);
 
 			expect(mockCallTool).toHaveBeenCalledWith({
-				name: "get_transcript",
+				name: "get_timed_transcript",
 				arguments: {
 					url: `https://www.youtube.com/watch?v=${TEST_VIDEO_IDS.SIMPLE}`,
 					lang: "en",
@@ -274,7 +274,7 @@ describe("fetchTranscriptViaMcp", () => {
 
 			// First call should not have next_cursor
 			expect(mockCallTool).toHaveBeenNthCalledWith(1, {
-				name: "get_transcript",
+				name: "get_timed_transcript",
 				arguments: {
 					url: `https://www.youtube.com/watch?v=${TEST_VIDEO_IDS.PAGINATED}`,
 					lang: "en",
@@ -283,7 +283,7 @@ describe("fetchTranscriptViaMcp", () => {
 
 			// Second call should have next_cursor
 			expect(mockCallTool).toHaveBeenNthCalledWith(2, {
-				name: "get_transcript",
+				name: "get_timed_transcript",
 				arguments: {
 					url: `https://www.youtube.com/watch?v=${TEST_VIDEO_IDS.PAGINATED}`,
 					lang: "en",
