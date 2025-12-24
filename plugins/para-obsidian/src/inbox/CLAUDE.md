@@ -1,6 +1,6 @@
 # Inbox Processing Framework
 
-**5-stage pipeline for automated file processing with LLM-powered classification and interactive approval**
+**7-stage pipeline for automated file processing with LLM-powered classification, enrichment, and interactive approval**
 
 ---
 
@@ -9,25 +9,32 @@
 **Type:** TypeScript module (part of para-obsidian plugin)
 **Runtime:** Bun
 **Test Pattern:** `*.test.ts` alongside source
-**Architecture:** Domain-driven design with clear separation of concerns
+**Architecture:** Domain-driven design with Strategy Pattern for enrichment
 
 ---
 
 ## Pipeline Stages
 
 ```
-┌─────────┐    ┌──────────┐    ┌─────────┐    ┌────────┐    ┌─────────┐
-│  Scan   │───▶│ Classify │───▶│ Suggest │───▶│ Review │───▶│ Execute │
-└─────────┘    └──────────┘    └─────────┘    └────────┘    └─────────┘
-     │              │               │              │              │
- Extract        Classifier      Build          User          Create
- content        Registry       suggestions     approve        notes
-(Git guard)  (Schema version) (LLM fallback) (Warnings)  (Collision safe)
-   │                                                             │
-   └──────────────── SLO Tracking & Performance Thresholds ─────┘
+┌─────────┐   ┌────────┐   ┌──────────┐   ┌─────────┐   ┌────────┐   ┌─────────┐   ┌───────┐
+│  Scan   │──▶│ Enrich │──▶│ Classify │──▶│ Suggest │──▶│ Review │──▶│ Execute │──▶│ Route │
+└─────────┘   └────────┘   └──────────┘   └─────────┘   └────────┘   └─────────┘   └───────┘
+     │             │             │              │             │             │           │
+ Extract      YouTube       Classifier      Build         User        Create       Move to
+ content    transcripts      Registry     suggestions    approve       notes        PARA
+(Git guard) (Firecrawl)   (Schema ver)  (LLM fallback) (Warnings) (Collision safe) (Colocate)
+     │                                                                                  │
+     └───────────────────── SLO Tracking & Performance Thresholds ────────────────────┘
 ```
 
 **Recent Enhancements:**
+- **Type A/B Document Processing** - DOCX files with mammoth/turndown for text & markdown
+- **Enrichment Pipeline with Strategy Pattern** - YouTube transcripts, bookmark content via Firecrawl
+- **Routing Module** - Move processed notes from inbox to PARA destinations based on frontmatter
+- **Colocate Support** - Auto-creates folders for file-only areas/projects
+- **DRY Test Helpers** - Shared `initGitRepo`, `createTestEngine`, `createVaultStructure` in `core/testing/`
+- **New Classifiers** - cv, letter, employment-contract, document (in addition to invoice, booking, bookmark, medical-statement)
+- **Classifier Services** - Pattern builder, scoring calculator, field mapper for modular scoring
 - **SLO tracking with 7 production SLOs** - Automated performance monitoring and alerting
 - **Session-based correlation tracking** - W3C trace context with parent-child relationships
 - **Performance threshold alerting** - Real-time warnings when operations exceed thresholds
@@ -45,13 +52,17 @@
 - Registry management commands (list, remove, clear)
 - Export bookmarks command for browser-compatible output
 
+**Breaking Changes (v2.0):**
+- Removed interactive destination assignment - destinations now derived from frontmatter area/project
+- Removed tags feature in favor of Obsidian properties
+
 ---
 
 ## Directory Structure
 
 ```
 src/inbox/
-├── types.ts                   # Core types (39 symbols)
+├── types.ts                   # Core types (39+ symbols)
 ├── index.ts                   # Public API barrel
 ├── core/                      # Main engine
 │   ├── engine.ts              # InboxEngine factory (with git guard, LLM fallback)
@@ -64,22 +75,33 @@ src/inbox/
 │   │   └── rollback.ts        # Transaction rollback (vault-relative paths)
 │   ├── llm/                   # LLM client wrapper
 │   │   └── client.ts          # callLLM with fallback transparency
-│   └── vault/                 # Vault context
-│       └── context.ts         # Projects/areas loader
+│   ├── vault/                 # Vault context
+│   │   └── context.ts         # Projects/areas loader
+│   └── testing/               # DRY test helpers
+│       ├── helpers.ts         # initGitRepo, createTestEngine, createVaultStructure
+│       └── index.ts           # Barrel exports
 ├── classify/                  # Document classification
 │   ├── llm-classifier.ts      # LLM-based detection (with fallback transparency)
-│   ├── classifiers/           # NEW: Classifier registry system
+│   ├── classifiers/           # Classifier registry system
 │   │   ├── definitions/       # Built-in classifier modules
 │   │   │   ├── _template.ts   # Classifier template
 │   │   │   ├── booking.ts     # Travel/booking classifier
 │   │   │   ├── bookmark.ts    # Web bookmark classifier (Obsidian Web Clipper)
+│   │   │   ├── cv.ts          # CV/resume classifier
+│   │   │   ├── document.ts    # Generic document classifier
+│   │   │   ├── employment-contract.ts  # Employment contract classifier
 │   │   │   ├── invoice.ts     # Invoice/receipt classifier
+│   │   │   ├── letter.ts      # Letter classifier
 │   │   │   ├── medical-statement.ts  # Medical statement classifier
-│   │   │   ├── research.ts    # Research paper classifier
 │   │   │   ├── index.ts       # Barrel exports
 │   │   │   └── README.md      # Classifier creation guide
+│   │   ├── services/          # Modular scoring services
+│   │   │   ├── pattern-builder.ts    # Heuristic pattern compilation
+│   │   │   ├── scoring-calculator.ts # Score computation logic
+│   │   │   └── field-mapper.ts       # Field extraction mapping
 │   │   ├── registry.ts        # Classifier registry with schema versioning
 │   │   ├── loader.ts          # Classifier matching logic
+│   │   ├── validator.ts       # Classifier schema validation
 │   │   ├── suggestion-builder.ts  # Build suggestions from classifiers
 │   │   ├── types.ts           # Classifier schemas (InboxConverter)
 │   │   └── migrations/        # Schema migrations
@@ -87,10 +109,11 @@ src/inbox/
 │   │       ├── migrate.ts     # Migration executor
 │   │       └── README.md      # Migration guide
 │   ├── detection/             # Content processors
-│   │   └── pdf-processor.ts  # PDF extraction + heuristics
+│   │   └── pdf-processor.ts   # PDF extraction + heuristics
 │   └── converters/            # Legacy converter system (being phased out)
 │       ├── defaults.ts        # Built-in converters
 │       ├── loader.ts          # Converter matching
+│       ├── clipping-converter.ts  # Web clipping converter
 │       ├── suggestion-builder.ts  # Suggestion creation
 │       └── types.ts           # Converter schemas
 ├── scan/                      # Content extraction
@@ -98,10 +121,28 @@ src/inbox/
 │       ├── markdown.ts        # .md extraction
 │       ├── image.ts           # Image vision extraction
 │       ├── pdf.ts             # PDF text extraction
+│       ├── docx.ts            # DOCX extraction (mammoth/turndown)
 │       ├── registry.ts        # Extractor registry
 │       └── types.ts           # Extractor schemas
+├── enrich/                    # Enrichment pipeline (Strategy Pattern)
+│   ├── pipeline.ts            # Enrichment orchestration
+│   ├── types.ts               # Enrichment types and errors
+│   ├── bookmark-enricher.ts   # Firecrawl-based bookmark enrichment
+│   ├── mcp-youtube-client.ts  # MCP client for YouTube transcripts
+│   ├── strategies/            # Enrichment strategies
+│   │   ├── youtube-strategy.ts   # YouTube transcript enrichment
+│   │   ├── bookmark-strategy.ts  # Bookmark content enrichment
+│   │   └── index.ts           # Strategy exports
+│   └── index.ts               # Public exports
+├── routing/                   # Move notes to PARA destinations
+│   ├── types.ts               # RoutingCandidate, RoutingResult
+│   ├── scanner.ts             # Find routable notes in inbox
+│   ├── resolver.ts            # Resolve destinations from frontmatter
+│   ├── executor.ts            # Execute moves with colocate support
+│   └── index.ts               # Public exports
 ├── execute/                   # Suggestion execution
 │   ├── executor.ts            # Main execution logic (atomic operations)
+│   ├── types.ts               # Execution types
 │   ├── note-creator.ts        # Note creation (filename collision handling)
 │   ├── attachment-mover.ts    # Attachment handling
 │   └── attachment-linker.ts   # Link insertion
@@ -284,9 +325,22 @@ interface InboxConverter {
 | **booking** | `booking` | 90 | Travel bookings, reservations, confirmations |
 | **bookmark** | `bookmark` | 85 | Web bookmarks from Obsidian Web Clipper |
 | **medical-statement** | `medical-statement` | 85 | Medical statements, health records |
-| **research** | `research` | 80 | Research papers, academic articles |
+| **employment-contract** | `employment-contract` | 80 | Employment contracts, offer letters |
+| **cv** | `cv` | 75 | Resumes, CVs, professional profiles |
+| **letter** | `letter` | 70 | Formal letters, correspondence |
+| **document** | `document` | 50 | Generic documents (fallback classifier) |
 
 **Location:** `src/inbox/classify/classifiers/definitions/`
+
+### Classifier Services
+
+Modular services for scoring and field extraction:
+
+| Service | Purpose |
+|---------|---------|
+| `pattern-builder.ts` | Compile heuristic patterns from classifier definitions |
+| `scoring-calculator.ts` | Compute weighted scores for filename/content matches |
+| `field-mapper.ts` | Map LLM responses to classifier field definitions |
 
 ### Creating a Classifier
 
@@ -359,6 +413,118 @@ const migrated = await migrateClassifierData(classifier, data)
 
 ---
 
+## Enrichment Pipeline (src/inbox/enrich/)
+
+The enrichment module uses the Strategy Pattern to add metadata to files before classification.
+
+### Strategy Pattern
+
+```typescript
+interface EnrichmentStrategy {
+  id: string                    // Unique strategy identifier
+  name: string                  // Human-readable name
+  priority: number              // Higher = checked first (100 = bookmark, 50 = default)
+  canEnrich(ctx): EnrichmentEligibility  // Fast eligibility check
+  enrich(ctx, options): Promise<EnrichmentResult>  // Perform enrichment
+}
+```
+
+### Built-in Strategies
+
+| Strategy | Priority | Description |
+|----------|----------|-------------|
+| `youtube` | 100 | Fetch transcripts via YouTube MCP server |
+| `bookmark` | 90 | Scrape content via Firecrawl API |
+
+### Enrichment Types
+
+```typescript
+// YouTube enrichment result
+interface YouTubeEnrichment {
+  transcript: string       // Full transcript text
+  transcriptLength: number // Character count
+  enrichedAt: string       // ISO timestamp
+}
+
+// Bookmark enrichment result
+interface BookmarkEnrichment {
+  originalTitle: string    // From frontmatter
+  improvedTitle: string    // LLM-improved title
+  formattedTitle: string   // "Bookmark <improvedTitle>"
+  summary: string          // Page summary
+  domain: string           // e.g., "github.com"
+  enrichedAt: string       // ISO timestamp
+  fromCache?: boolean      // Cache hit indicator
+}
+```
+
+### Usage
+
+```typescript
+import { createEnrichmentPipeline, youtubeStrategy, bookmarkStrategy } from "./enrich"
+
+const pipeline = createEnrichmentPipeline({
+  strategies: [youtubeStrategy, bookmarkStrategy],
+  vaultPath: "/path/to/vault",
+})
+
+const result = await pipeline.process(inboxFile, { cid: "abc123" })
+if (result.enriched) {
+  console.log(`Enriched with ${result.strategyId}`)
+}
+```
+
+---
+
+## Routing Module (src/inbox/routing/)
+
+The routing module moves processed notes from inbox to PARA destinations based on frontmatter.
+
+### Key Types
+
+```typescript
+interface RoutingCandidate {
+  path: string           // Relative path in inbox
+  title: string          // From frontmatter
+  type?: string          // Note type (e.g., "bookmark")
+  area?: string          // Area wikilink: "[[Health]]"
+  project?: string       // Project wikilink: "[[Project Alpha]]"
+  destination: string    // Resolved path: "01 Projects/Project Alpha"
+  colocate?: {           // For file-only areas/projects
+    sourceNotePath: string  // Area/project note to move
+    folderPath: string      // Folder to create
+  }
+}
+
+interface RoutingResult {
+  success: boolean
+  movedFrom: string
+  movedTo: string
+  error?: string
+}
+```
+
+### Colocate Support
+
+When an area or project is a standalone `.md` file (not a folder), the routing module:
+1. Creates a folder with that name
+2. Moves the area/project note into the folder
+3. Moves the inbox note alongside it
+
+### Usage
+
+```typescript
+import { scanForRoutableCandidates, executeRouting } from "./routing"
+
+// Find routable notes in inbox
+const { candidates, skipped } = await scanForRoutableCandidates(vaultPath)
+
+// Execute moves
+const results = await executeRouting(vaultPath, candidates)
+```
+
+---
+
 ## Classification (src/inbox/classify/)
 
 ### LLM Classifier (llm-classifier.ts)
@@ -417,9 +583,30 @@ const inboxFile = await createInboxFile(filePath, { vaultPath })
 
 ### Built-in Extractors
 
-**markdown.ts** - Frontmatter + content extraction
-**image.ts** - Vision API (base64 + LLM description)
-**pdf.ts** - pdf-to-text wrapper
+| Extractor | Extensions | Description |
+|-----------|------------|-------------|
+| **markdown** | `.md` | Frontmatter + content extraction |
+| **image** | `.png`, `.jpg`, `.jpeg`, `.webp` | Vision API (base64 + LLM description) |
+| **pdf** | `.pdf` | pdf-to-text wrapper |
+| **docx** | `.docx` | Type A/B extraction with mammoth/turndown |
+
+### DOCX Extractor (Type A/B Documents)
+
+The DOCX extractor supports two output modes:
+
+```typescript
+interface DocxExtractionResult {
+  text: string     // Plain text for classification (Type A)
+  markdown: string // Formatted markdown for note embedding (Type B)
+}
+```
+
+**Type A**: Plain text used for LLM classification and field extraction
+**Type B**: Formatted markdown preserves headings, lists, emphasis for embedding in note body
+
+Uses:
+- `mammoth` - DOCX to text/HTML extraction
+- `turndown` - HTML to clean Markdown conversion
 
 ---
 
@@ -565,7 +752,29 @@ if (isRecoverableError(error)) { /* retry */ }
 ```
 src/inbox/core/
 ├── engine.ts           # Implementation
-└── engine.test.ts      # Tests (26,750 lines - comprehensive)
+└── engine.test.ts      # Tests
+```
+
+### DRY Test Helpers (src/inbox/core/testing/)
+
+Shared utilities extracted across 32 test files:
+
+```typescript
+// From src/inbox/core/testing/helpers.ts
+import { initGitRepo, createTestEngine, createVaultStructure } from "./core/testing"
+
+// Initialize git repo for tests that call execute() (checks git status)
+await initGitRepo(tempDir)
+
+// Create test engine with mocked LLM client
+const engine = createTestEngine({
+  vaultPath: tempDir,
+  inboxFolder: "00 Inbox",
+})
+
+// Create full PARA vault structure
+createVaultStructure(vaultPath)
+// Creates: 00 Inbox, 01 Projects, 02 Areas, 03 Resources, 04 Archives, Templates, Attachments
 ```
 
 ### Test Utilities
@@ -747,6 +956,8 @@ const markdown = engine.generateReport(results)
 - Result types (`ExecutionResult`, `ProcessorResult`)
 - Registry types (`ProcessedRegistry`, `RegistryMetadata`)
 - Error types (`InboxError`, `ErrorCode`, `ErrorCategory`)
+- Enrichment types (`EnrichmentStrategy`, `EnrichmentResult`, `BookmarkEnrichment`, `YouTubeEnrichment`)
+- Routing types (`RoutingCandidate`, `RoutingResult`, `RoutingScanResult`)
 
 ### Functions
 - **Engine:** `createInboxEngine`
@@ -756,6 +967,9 @@ const markdown = engine.generateReport(results)
 - **Registry:** `createRegistry`, `hashFile`
 - **Extractors:** `createInboxFile`, `getDefaultRegistry`
 - **Classification:** `buildSuggestion`, `buildInboxPrompt`, `extractPdfText`
+- **Enrichment:** `createEnrichmentPipeline`, `youtubeStrategy`, `bookmarkStrategy`
+- **Routing:** `scanForRoutableCandidates`, `executeRouting`, `resolveDestination`
+- **Test Helpers:** `initGitRepo`, `createTestEngine`, `createVaultStructure`
 
 ---
 
@@ -795,9 +1009,12 @@ Changed from LLM-first to heuristics-first for performance and cost:
 - `@inquirer/prompts` - Interactive CLI
 - `yaml` - Frontmatter parsing
 - `date-fns` - Date handling
+- `mammoth` - DOCX text/HTML extraction
+- `turndown` - HTML to Markdown conversion
 
 **External Tools:**
 - `pdf-to-text` - PDF extraction (validated at runtime)
+- `youtube-transcript` MCP - YouTube transcript fetching (optional, for enrichment)
 
 ---
 

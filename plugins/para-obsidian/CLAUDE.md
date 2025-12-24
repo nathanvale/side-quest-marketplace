@@ -24,6 +24,9 @@
 
 **Key Features:**
 - Intelligent inbox processing with LLM-assisted classification
+- **Type A/B Document Processing** - DOCX files with mammoth/turndown for text & markdown extraction
+- **Enrichment Pipeline with Strategy Pattern** - YouTube transcript enrichment, bookmark content enrichment
+- **Routing Module** - Move processed notes from inbox to PARA destinations based on frontmatter
 - **SLO Tracking & Performance Monitoring** - 7 SLOs with burn rate analysis and alerting
 - **Session-based Correlation Tracking** - Track operations across async boundaries with W3C trace context
 - Web bookmark management via Obsidian Web Clipper integration
@@ -31,6 +34,10 @@
 - PARA-based organization (Projects/Areas/Resources/Archives)
 - Template versioning and migration system
 - Atomic operations with transaction rollback
+
+**Breaking Changes (v2.0):**
+- Removed interactive destination assignment - destinations now derived from frontmatter area/project
+- Removed tags feature in favor of Obsidian properties
 
 ---
 
@@ -49,19 +56,29 @@ bun run format           # Biome format only
 # Inbox processing (shorter aliases)
 para scan                          # Scan inbox for new files
 para execute                       # Execute approved suggestions
+para move                          # Move notes to PARA destinations based on frontmatter
 para export                        # Export bookmarks to browser format
 para init [--quick]                # Create new classifier (wizard)
 para registry list|remove|clear    # Manage processed items registry
 
 # Full commands (also work)
 para process-inbox [--auto] [--preview] [--dry-run]
+para inbox move                    # Move notes from inbox to PARA folders
 para export-bookmarks [--filter type:bookmark]
 para create-classifier
 para create-note-template
 
+# Enrichment commands
+para enrich youtube --all          # Enrich all YouTube bookmarks with transcripts
+para enrich youtube "<file.md>"    # Enrich specific file
+para enrich-bookmark <file.md>     # Enrich bookmark with Firecrawl
+
 # Performance & Observability
 para slo [slo-name|--breaches]     # Monitor SLO health, burn rates, violations
 para trace <correlation-id>         # Trace operation logs with parent-child relationships
+
+# Migration
+para migrate:remove-tags [--dry-run]  # Remove tags in favor of properties
 ```
 
 ---
@@ -98,15 +115,26 @@ para-obsidian/
 │   │   └── search.ts          # para_search, para_semantic
 │   ├── inbox/                 # Inbox processing framework
 │   │   ├── core/              # Engine, operations, staging
+│   │   │   └── testing/       # DRY test helpers (initGitRepo, createTestEngine, createVaultStructure)
 │   │   ├── classify/          # LLM classification, converters, classifiers
-│   │   │   ├── classifiers/   # NEW: Classifier registry system
-│   │   │   │   ├── definitions/  # Built-in classifiers (invoice, booking, bookmark, medical-statement, research)
+│   │   │   ├── classifiers/   # Classifier registry system
+│   │   │   │   ├── definitions/  # Built-in classifiers (invoice, booking, bookmark, medical-statement, cv, letter, employment-contract, document)
 │   │   │   │   ├── registry.ts   # Schema versioning
 │   │   │   │   ├── loader.ts     # Classifier matching
+│   │   │   │   ├── services/     # Pattern builder, scoring calculator, field mapper
 │   │   │   │   └── migrations/   # Schema migrations
 │   │   │   ├── converters/    # Legacy converter system (being phased out)
 │   │   │   └── detection/     # Content processors (PDF, etc.)
-│   │   ├── scan/              # Content extractors (md, pdf, image)
+│   │   ├── scan/              # Content extractors (md, pdf, image, docx)
+│   │   │   └── extractors/    # File type handlers with DOCX support (mammoth/turndown)
+│   │   ├── enrich/            # Enrichment pipeline (Strategy Pattern)
+│   │   │   ├── strategies/    # YouTube strategy, Bookmark strategy
+│   │   │   ├── pipeline.ts    # Enrichment orchestration
+│   │   │   └── types.ts       # Enrichment types and errors
+│   │   ├── routing/           # Move notes from inbox to PARA destinations
+│   │   │   ├── scanner.ts     # Find routable notes
+│   │   │   ├── resolver.ts    # Resolve destinations from frontmatter
+│   │   │   └── executor.ts    # Execute moves with colocate support
 │   │   ├── execute/           # Suggestion execution (with filename collision handling)
 │   │   ├── registry/          # Processed item tracking
 │   │   ├── ui/                # Interactive CLI adapter (with inline warnings)
@@ -176,7 +204,7 @@ para-obsidian/
 
 | File | Purpose |
 |------|---------|
-| `src/cli.ts` | CLI entry point with 23 commands (including aliases) |
+| `src/cli.ts` | CLI entry point with 30+ commands (including aliases) |
 | `mcp/index.ts` | MCP server entry (20+ tools) |
 | `src/config/defaults.ts` | Default frontmatter rules, templates |
 | `src/inbox/core/engine.ts` | Inbox processing engine |
@@ -189,6 +217,11 @@ para-obsidian/
 | `src/inbox/classify/classifiers/generator.ts` | Classifier code generation |
 | `src/inbox/classify/classifiers/registry-updater.ts` | AST-based registry updates |
 | `src/inbox/classify/classifiers/definitions/bookmark.ts` | Web bookmark classifier |
+| `src/inbox/enrich/pipeline.ts` | Enrichment pipeline with Strategy Pattern |
+| `src/inbox/enrich/strategies/youtube-strategy.ts` | YouTube transcript enrichment |
+| `src/inbox/routing/executor.ts` | Move notes from inbox to PARA destinations |
+| `src/inbox/scan/extractors/docx.ts` | DOCX extraction with mammoth/turndown |
+| `src/inbox/core/testing/helpers.ts` | DRY test utilities (initGitRepo, createTestEngine) |
 | `src/templates/wizard.ts` | Template configuration wizard |
 | `src/templates/generator.ts` | Template file generation |
 | `src/shared/atomic-fs.ts` | Atomic file operations |
@@ -230,14 +263,21 @@ para-obsidian/
 ### Inbox Processing Pipeline
 
 ```
-scan → classify → suggest → review → execute
-  ↓        ↓         ↓         ↓         ↓
-Extract  Classifier Build    User      Create
-content  Registry  suggestions approve  notes
-(Git guard) (Schema versioning) (LLM fallback) (Inline warnings) (Collision safe)
+scan → enrich → classify → suggest → review → execute → route
+  ↓       ↓         ↓          ↓         ↓        ↓        ↓
+Extract  YouTube  Classifier  Build    User    Create   Move to
+content  transcripts Registry  suggestions approve notes  PARA
+(Git guard) (Firecrawl) (Schema ver) (LLM fallback) (Warnings) (Collision safe) (Colocate)
 ```
 
-**New Features:**
+**Recent Features:**
+- **Type A/B Document Processing**: DOCX files with mammoth/turndown for text & markdown
+- **Enrichment Pipeline**: Strategy Pattern for YouTube transcripts, bookmark content
+- **Routing Module**: Move processed notes from inbox to PARA destinations
+- **Colocate Support**: Auto-creates folders for file-only areas/projects
+- **DRY Test Helpers**: Shared `initGitRepo`, `createTestEngine`, `createVaultStructure`
+- **New Classifiers**: cv, letter, employment-contract, document (in addition to existing)
+- **Classifier Services**: Pattern builder, scoring calculator, field mapper
 - **Classifier Registry**: Modular classifier definitions with schema versioning and migrations
 - **Bookmark Classifier**: Web bookmark classification from Obsidian Web Clipper
 - **Export Bookmarks**: Export vault bookmarks to browser-compatible format
@@ -249,8 +289,6 @@ content  Registry  suggestions approve  notes
 - **Enhanced Review Commands**: Approve-all (A), back (b), list (l) navigation
 - **Quick-Start Wizard**: `--quick` flag for fast classifier creation
 - **Registry Management**: List, remove, clear processed items
-- **Classifier Creation Wizard**: Interactive classifier generation with template integration
-- **Template Creation Wizard**: Standalone Templater template generation
 
 ### Reliability Features
 
@@ -404,6 +442,8 @@ bun test --watch             # Watch mode
 - `yaml` - YAML parsing
 - `nanospinner` - CLI spinners
 - `p-limit` - Concurrency control
+- `mammoth` - DOCX text extraction
+- `turndown` - HTML to Markdown conversion
 
 ---
 
