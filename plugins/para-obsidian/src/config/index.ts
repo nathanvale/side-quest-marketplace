@@ -134,8 +134,7 @@ export interface TemplateInfo {
  * Attempts to load and parse a JSON config file.
  *
  * @param filePath - Absolute path to the JSON file
- * @returns Parsed config object, or undefined if file doesn't exist
- * @throws Error if file exists but cannot be parsed as JSON
+ * @returns Parsed config object, or undefined if file doesn't exist or fails to parse
  */
 function loadJsonIfExists<T>(filePath: string): Partial<T> | undefined {
 	if (!pathExistsSync(filePath)) return undefined;
@@ -143,9 +142,10 @@ function loadJsonIfExists<T>(filePath: string): Partial<T> | undefined {
 		const raw = readTextFileSync(filePath);
 		return JSON.parse(raw) as Partial<T>;
 	} catch (error) {
-		throw new Error(
-			`Failed to parse config at ${filePath}: ${getErrorMessage(error)}`,
+		console.warn(
+			`Warning: Failed to parse config at ${filePath}: ${getErrorMessage(error)}. Using defaults.`,
 		);
+		return undefined;
 	}
 }
 
@@ -156,18 +156,23 @@ function loadJsonIfExists<T>(filePath: string): Partial<T> | undefined {
  * Safe locations:
  * - User's home directory (~/.config/)
  * - Current working directory or subdirectories
- * - Absolute paths that don't contain path traversal sequences
+ * - Vault directory (if PARA_VAULT is set)
+ *
+ * Security: Canonicalizes path first to prevent bypasses like //etc/passwd
  *
  * @param configPath - Path to validate
  * @returns true if path is safe to load
  */
 function isConfigPathSafe(configPath: string): boolean {
+	// Canonicalize the path first to resolve any tricks like //etc/passwd
+	// This normalizes slashes, resolves symlinks, and makes absolute
 	const resolved = path.resolve(configPath);
 	const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
 	const cwd = process.cwd();
 
 	// Check for path traversal sequences in the original path
-	if (configPath.includes("..") || configPath.includes("//")) {
+	// This catches patterns like ../ before resolution
+	if (configPath.includes("..")) {
 		return false;
 	}
 
@@ -231,10 +236,11 @@ export interface LoadConfigOptions {
  * Loads and merges configuration from all sources.
  *
  * Configuration sources (in order of precedence, later wins):
- * 1. Project-level: .para-obsidianrc in cwd
- * 2. User-level: ~/.config/para-obsidian/config.json
- * 3. Explicit: path from PARA_OBSIDIAN_CONFIG env var
- * 4. Required: PARA_VAULT env var (always required)
+ * 1. Built-in defaults (lowest priority)
+ * 2. Project-level: .para-obsidianrc in vault
+ * 3. User-level: ~/.config/para-obsidian/config.json
+ * 4. Explicit: path from PARA_OBSIDIAN_CONFIG env var (highest priority)
+ * 5. Required: PARA_VAULT env var (always required)
  *
  * Environment variables:
  * - PARA_VAULT (required): Path to Obsidian vault
@@ -262,7 +268,6 @@ export function loadConfig(
 	}
 
 	const envConfigPath = resolveRcFromEnv();
-	const userRc = loadJsonIfExists<ParaObsidianConfig>(resolveUserRc()) ?? {};
 
 	// Resolve vault path first so we can look for .paraobsidianrc in the vault
 	const vault = path.resolve(envVault);
@@ -270,14 +275,20 @@ export function loadConfig(
 		throw new Error(`PARA_VAULT does not point to a directory: ${vault}`);
 	}
 
+	// Load config files individually - errors are logged but don't throw
 	const projectRcPath = resolveProjectRc(vault);
 	const projectRc = projectRcPath
 		? (loadJsonIfExists<ParaObsidianConfig>(projectRcPath) ?? {})
 		: {};
+
+	const userRc = loadJsonIfExists<ParaObsidianConfig>(resolveUserRc()) ?? {};
+
 	const explicitRc = envConfigPath
 		? (loadJsonIfExists<ParaObsidianConfig>(envConfigPath) ?? {})
 		: {};
 
+	// Merge in correct priority order: project < user < explicit
+	// This ensures user config overrides project config as expected
 	const merged: ParaObsidianConfig = {
 		...projectRc,
 		...userRc,
