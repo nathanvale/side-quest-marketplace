@@ -52,15 +52,25 @@ function createTestEngine(config: Omit<InboxEngineConfig, "llmClient">) {
 describe("engine scan()", () => {
 	describe("basic scan functionality", () => {
 		let testVaultPath: string;
+		let originalVault: string | undefined;
 
 		beforeEach(async () => {
 			testVaultPath = createTempDir("scan-basic-test-");
 			mkdirSync(join(testVaultPath, "00 Inbox"), { recursive: true });
 			await initGitRepo(testVaultPath);
+			// Set PARA_VAULT for loadConfig() calls within engine
+			originalVault = process.env.PARA_VAULT;
+			process.env.PARA_VAULT = testVaultPath;
 		});
 
 		afterEach(() => {
 			cleanupTestDir(testVaultPath);
+			// Restore original PARA_VAULT
+			if (originalVault !== undefined) {
+				process.env.PARA_VAULT = originalVault;
+			} else {
+				delete process.env.PARA_VAULT;
+			}
 		});
 
 		test("should return a promise", async () => {
@@ -85,6 +95,7 @@ describe("engine scan()", () => {
 
 	describe("filesystem operations", () => {
 		let testVaultPath: string;
+		let originalVault: string | undefined;
 
 		beforeEach(async () => {
 			testVaultPath = createTempDir("scan-fs-test-");
@@ -93,10 +104,19 @@ describe("engine scan()", () => {
 			mkdirSync(join(testVaultPath, "02 Areas"), { recursive: true });
 			mkdirSync(join(testVaultPath, "Templates"), { recursive: true });
 			await initGitRepo(testVaultPath);
+			// Set PARA_VAULT for loadConfig() calls within engine
+			originalVault = process.env.PARA_VAULT;
+			process.env.PARA_VAULT = testVaultPath;
 		});
 
 		afterEach(() => {
 			cleanupTestDir(testVaultPath);
+			// Restore original PARA_VAULT
+			if (originalVault !== undefined) {
+				process.env.PARA_VAULT = originalVault;
+			} else {
+				delete process.env.PARA_VAULT;
+			}
 		});
 
 		test("should return empty array for empty inbox folder", async () => {
@@ -216,6 +236,7 @@ describe("engine scan()", () => {
 	describe("Session Correlation ID", () => {
 		test("scan() accepts sessionCid option and logs it", async () => {
 			const vaultPath = createTempDir("session-cid-scan-test-");
+			const originalVault = process.env.PARA_VAULT;
 			await initGitRepo(vaultPath);
 
 			// Create vault structure
@@ -226,6 +247,9 @@ describe("engine scan()", () => {
 			mkdirSync(join(vaultPath, "04 Archives"), { recursive: true });
 			mkdirSync(join(vaultPath, "Templates"), { recursive: true });
 			mkdirSync(join(vaultPath, "Attachments"), { recursive: true });
+
+			// Set PARA_VAULT for loadConfig() calls within engine
+			process.env.PARA_VAULT = vaultPath;
 
 			// Create a test PDF
 			const pdfPath = join(vaultPath, "00 Inbox", "test.pdf");
@@ -239,6 +263,13 @@ describe("engine scan()", () => {
 
 			// Test passes if no error thrown - logger will have sessionCid in logs
 			cleanupTestDir(vaultPath);
+
+			// Restore original PARA_VAULT
+			if (originalVault !== undefined) {
+				process.env.PARA_VAULT = originalVault;
+			} else {
+				delete process.env.PARA_VAULT;
+			}
 		});
 	});
 });

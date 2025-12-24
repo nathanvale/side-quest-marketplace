@@ -65,8 +65,7 @@ import { join as pathJoin } from "node:path";
 /**
  * Mock globFiles that matches real API behavior:
  * - Accepts (pattern, options) where options can be string (cwd) or { cwd: string }
- * - Returns RELATIVE paths despite core/glob docs saying absolute
- *   (enrich.ts code expects relative paths - see line 169)
+ * - Returns ABSOLUTE paths (enrich.ts expects this - see line 198: const absolutePath = file)
  * - Supports recursive **\/*.md pattern matching
  */
 const mockGlobFiles = async (
@@ -80,21 +79,18 @@ const mockGlobFiles = async (
 	const files: string[] = [];
 
 	// Recursive directory scanner
-	function scanDir(dir: string, relativePath = "") {
+	function scanDir(dir: string) {
 		try {
 			const entries = readdirSync(dir, { withFileTypes: true });
 			for (const entry of entries) {
 				const fullPath = pathJoin(dir, entry.name);
-				const relPath = relativePath
-					? `${relativePath}/${entry.name}`
-					: entry.name;
 
 				if (entry.isDirectory()) {
 					// Recurse into subdirectories
-					scanDir(fullPath, relPath);
+					scanDir(fullPath);
 				} else if (entry.isFile() && entry.name.endsWith(".md")) {
-					// Return RELATIVE paths (what enrich.ts expects)
-					files.push(relPath);
+					// Return ABSOLUTE paths (what enrich.ts expects)
+					files.push(fullPath);
 				}
 			}
 		} catch {
@@ -122,6 +118,7 @@ mock.module("@sidequest/core/glob", () => ({
  * Create test CommandContext with defaults
  */
 function createTestContext(overrides: {
+	subcommand?: string;
 	positional?: string[];
 	flags?: Record<string, string | boolean>;
 	isJson?: boolean;
@@ -142,7 +139,7 @@ function createTestContext(overrides: {
 		flags: overrides.flags ?? {},
 		format: overrides.isJson ? OutputFormat.JSON : OutputFormat.MARKDOWN,
 		isJson: overrides.isJson ?? false,
-		subcommand: undefined,
+		subcommand: overrides.subcommand,
 	};
 }
 
@@ -235,7 +232,7 @@ describe("handleEnrich", () => {
 	describe("router", () => {
 		test("shows usage when no action specified (markdown)", async () => {
 			setupVault();
-			const ctx = createTestContext({ positional: [], isJson: false });
+			const ctx = createTestContext({ isJson: false });
 
 			const logs = await captureConsoleOutputAsync(async () => {
 				await handleEnrich(ctx);
@@ -249,7 +246,7 @@ describe("handleEnrich", () => {
 
 		test("shows usage when no action specified (JSON)", async () => {
 			setupVault();
-			const ctx = createTestContext({ positional: [], isJson: true });
+			const ctx = createTestContext({ isJson: true });
 
 			const logs = await captureConsoleOutputAsync(async () => {
 				await handleEnrich(ctx);
@@ -264,7 +261,7 @@ describe("handleEnrich", () => {
 		test("returns error for unknown action", async () => {
 			setupVault();
 			const ctx = createTestContext({
-				positional: ["invalid-action"],
+				subcommand: "invalid-action",
 				isJson: false,
 			});
 
@@ -278,7 +275,7 @@ describe("handleEnrich", () => {
 		test("routes to youtube handler", async () => {
 			setupVault();
 			const ctx = createTestContext({
-				positional: ["youtube"],
+				subcommand: "youtube",
 				flags: { all: true },
 				isJson: true,
 			});
@@ -297,7 +294,7 @@ describe("handleEnrich", () => {
 		test("requires explicit target or --all flag", async () => {
 			setupVault();
 			const ctx = createTestContext({
-				positional: ["youtube"],
+				subcommand: "youtube",
 				flags: {},
 				isJson: false,
 			});
@@ -318,13 +315,15 @@ describe("handleEnrich", () => {
 type: youtube
 video_id: AmdLVWMdjOk
 title: Test Video
+transcript_status: pending
 created: 2024-01-01T00:00:00Z
 ---
 # Test Video`,
 			);
 
 			const ctx = createTestContext({
-				positional: ["youtube", "00 Inbox/test-video.md"],
+				subcommand: "youtube",
+				positional: ["00 Inbox/test-video.md"],
 				isJson: true,
 			});
 
@@ -350,7 +349,8 @@ url: https://example.com
 			);
 
 			const ctx = createTestContext({
-				positional: ["youtube", "00 Inbox/not-youtube.md"],
+				subcommand: "youtube",
+				positional: ["00 Inbox/not-youtube.md"],
 				isJson: false,
 			});
 
@@ -374,20 +374,25 @@ enrichedAt: 2024-01-01T00:00:00Z
 			);
 
 			const ctx = createTestContext({
-				positional: ["youtube", "00 Inbox/enriched.md"],
-				isJson: false,
+				subcommand: "youtube",
+				positional: ["00 Inbox/enriched.md"],
+				isJson: true,
 			});
 
-			const result = await handleEnrich(ctx);
+			const logs = await captureConsoleOutputAsync(async () => {
+				await handleEnrich(ctx);
+			});
 
-			expect(result.success).toBe(false);
-			expect(result.error).toContain("already enriched");
+			const jsonOutput = findJsonOutput(logs) as Record<string, unknown>;
+			expect(jsonOutput.success).toBe(true);
+			expect(jsonOutput.enriched).toBe(false);
+			expect(jsonOutput.message).toContain("Already enriched");
 		});
 
 		test("accepts --all flag", async () => {
 			setupVault();
 			const ctx = createTestContext({
-				positional: ["youtube"],
+				subcommand: "youtube",
 				flags: { all: true },
 				isJson: true,
 			});
@@ -407,6 +412,7 @@ enrichedAt: 2024-01-01T00:00:00Z
 				`---
 type: youtube
 video_id: video1
+transcript_status: pending
 ---`,
 			);
 			writeVaultFile(
@@ -415,6 +421,7 @@ video_id: video1
 				`---
 type: youtube
 video_id: video2
+transcript_status: pending
 ---`,
 			);
 			writeVaultFile(
@@ -426,7 +433,7 @@ type: bookmark
 			);
 
 			const ctx = createTestContext({
-				positional: ["youtube"],
+				subcommand: "youtube",
 				flags: { all: true },
 				isJson: true,
 			});
@@ -449,6 +456,7 @@ type: bookmark
 				`---
 type: youtube
 video_id: new
+transcript_status: pending
 ---`,
 			);
 			writeVaultFile(
@@ -462,7 +470,7 @@ enrichedAt: 2024-01-01T00:00:00Z
 			);
 
 			const ctx = createTestContext({
-				positional: ["youtube"],
+				subcommand: "youtube",
 				flags: { all: true },
 				isJson: true,
 			});
@@ -482,7 +490,7 @@ enrichedAt: 2024-01-01T00:00:00Z
 			writeVaultFile(vault, "00 Inbox/.gitkeep", "");
 
 			const ctx = createTestContext({
-				positional: ["youtube"],
+				subcommand: "youtube",
 				flags: { all: true },
 				isJson: true,
 			});
@@ -502,7 +510,7 @@ enrichedAt: 2024-01-01T00:00:00Z
 		test("creates session with correlation ID", async () => {
 			setupVault();
 			const ctx = createTestContext({
-				positional: ["youtube"],
+				subcommand: "youtube",
 				flags: { all: true },
 				isJson: true,
 			});
@@ -518,7 +526,7 @@ enrichedAt: 2024-01-01T00:00:00Z
 		test("ends session on completion", async () => {
 			setupVault();
 			const ctx = createTestContext({
-				positional: ["youtube"],
+				subcommand: "youtube",
 				flags: { all: true },
 				isJson: true,
 			});
@@ -533,7 +541,7 @@ enrichedAt: 2024-01-01T00:00:00Z
 		test("ends session on error", async () => {
 			setupVault();
 			const ctx = createTestContext({
-				positional: ["youtube"],
+				subcommand: "youtube",
 				flags: {},
 				isJson: false,
 			});
@@ -550,7 +558,7 @@ enrichedAt: 2024-01-01T00:00:00Z
 		test("includes sessionCid in JSON output", async () => {
 			setupVault();
 			const ctx = createTestContext({
-				positional: ["youtube"],
+				subcommand: "youtube",
 				flags: { all: true },
 				isJson: true,
 			});
@@ -573,11 +581,12 @@ enrichedAt: 2024-01-01T00:00:00Z
 				`---
 type: youtube
 video_id: test
+transcript_status: pending
 ---`,
 			);
 
 			const ctx = createTestContext({
-				positional: ["youtube"],
+				subcommand: "youtube",
 				flags: { all: true },
 				isJson: true,
 			});
@@ -600,6 +609,7 @@ video_id: test
 				"00 Inbox/video1.md",
 				`---
 type: youtube
+transcript_status: pending
 ---`,
 			);
 			writeVaultFile(
@@ -607,11 +617,12 @@ type: youtube
 				"00 Inbox/video2.md",
 				`---
 type: youtube
+transcript_status: pending
 ---`,
 			);
 
 			const ctx = createTestContext({
-				positional: ["youtube"],
+				subcommand: "youtube",
 				flags: { all: true },
 				isJson: true,
 			});
@@ -632,7 +643,8 @@ type: youtube
 		test("handles missing target file", async () => {
 			setupVault();
 			const ctx = createTestContext({
-				positional: ["youtube", "00 Inbox/nonexistent.md"],
+				subcommand: "youtube",
+				positional: ["00 Inbox/nonexistent.md"],
 				isJson: false,
 			});
 
@@ -654,7 +666,7 @@ invalid yaml: [
 			);
 
 			const ctx = createTestContext({
-				positional: ["youtube"],
+				subcommand: "youtube",
 				flags: { all: true },
 				isJson: true,
 			});
@@ -680,11 +692,13 @@ invalid yaml: [
 				`---
 type: youtube
 video_id: test
+transcript_status: pending
 ---`,
 			);
 
 			const ctx = createTestContext({
-				positional: ["youtube", absolutePath],
+				subcommand: "youtube",
+				positional: [absolutePath],
 				isJson: true,
 			});
 
@@ -704,11 +718,13 @@ video_id: test
 				`---
 type: youtube
 video_id: test
+transcript_status: pending
 ---`,
 			);
 
 			const ctx = createTestContext({
-				positional: ["youtube", "00 Inbox/video.md"],
+				subcommand: "youtube",
+				positional: ["00 Inbox/video.md"],
 				isJson: true,
 			});
 

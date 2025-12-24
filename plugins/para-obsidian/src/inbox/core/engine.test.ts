@@ -7,7 +7,6 @@
  * Test organization:
  * - engine-factory.test.ts - Factory function and configuration tests
  * - engine-scan.test.ts - Scan functionality and filesystem operations
- * - engine-preclass.test.ts - Pre-classification and frontmatter detection
  * - engine-execute.test.ts - Execute functionality and collision handling
  * - engine-other.test.ts - Utility methods (editWithPrompt, challenge, generateReport)
  */
@@ -15,7 +14,6 @@
 // Import all test suites to run them as part of the main test run
 import "./engine-factory.test";
 import "./engine-scan.test";
-import "./engine-preclass.test";
 import "./engine-execute.test";
 import "./engine-other.test";
 
