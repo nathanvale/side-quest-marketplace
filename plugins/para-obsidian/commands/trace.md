@@ -2,7 +2,7 @@
 description: Trace logs by correlation ID for debugging para-obsidian operations
 argument-hint: [correlation-id]
 allowed-tools: Bash(grep:*), Bash(cat:*), Bash(jq:*), Bash(wc:*), Bash(awk:*), Bash(sort:*)
-model: claude-sonnet-4-5-20250514
+model: haiku
 ---
 
 # Trace Logs for Correlation ID: `$1`
