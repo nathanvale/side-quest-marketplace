@@ -24,9 +24,20 @@ import {
 	enrichLogger,
 	initLoggerWithNotice,
 } from "../shared/logger";
-import { validatePathSafety } from "../shared/validation";
 import { startSession } from "./shared/session";
 import type { CommandContext, CommandResult } from "./types";
+
+/**
+ * Helper to check if frontmatter attributes represent a YouTube note.
+ * Accepts both `type: "youtube"` and `type: "clipping"` with `clipping_type: "youtube"`.
+ */
+function isYouTubeNote(attributes: Record<string, unknown>): boolean {
+	const type = attributes.type as string | undefined;
+	const clippingType = attributes.clipping_type as string | undefined;
+	return (
+		type === "youtube" || (type === "clipping" && clippingType === "youtube")
+	);
+}
 
 /**
  * Enrichment action types supported by the router
@@ -57,7 +68,7 @@ interface EnrichMetrics {
 export async function handleEnrich(
 	ctx: CommandContext,
 ): Promise<CommandResult> {
-	const action = ctx.positional[0] as EnrichAction | undefined;
+	const action = ctx.subcommand as EnrichAction | undefined;
 
 	if (!action) {
 		return showEnrichUsage(ctx);
@@ -119,328 +130,10 @@ function showEnrichUsage(ctx: CommandContext): CommandResult {
 }
 
 /**
- * Validate enrichment target specification.
- *
- * Ensures either a file path or --all flag is provided.
- */
-function validateEnrichTarget(
-	target: string | undefined,
-	isAll: boolean,
-): { valid: true } | { valid: false; error: string } {
-	if (!target && !isAll) {
-		return {
-			valid: false,
-			error: "Specify a file path or use --all flag",
-		};
-	}
-	return { valid: true };
-}
-
-/**
- * Candidate file for enrichment.
- */
-interface EnrichCandidate {
-	path: string;
-	absolutePath: string;
-}
-
-/**
- * Find enrichment candidates based on target specification.
- *
- * Scans for YouTube notes without enrichedAt field.
- * Returns either all eligible notes (--all) or validates a specific file.
- */
-async function findEnrichmentCandidates(
-	vaultPath: string,
-	target: string | undefined,
-	isAll: boolean,
-): Promise<
-	| { success: true; candidates: EnrichCandidate[] }
-	| { success: false; error: string }
-> {
-	const inboxPath = join(vaultPath, "00 Inbox");
-	const candidates: EnrichCandidate[] = [];
-
-	if (isAll) {
-		// Scan all markdown files
-		const files = await globFiles("**/*.md", inboxPath);
-
-		for (const file of files) {
-			const absolutePath = join(inboxPath, file);
-			try {
-				const content = await readTextFile(absolutePath);
-				const { attributes } = parseFrontmatter(content);
-
-				const type = attributes.type as string | undefined;
-				const enrichedAt = attributes.enrichedAt as string | undefined;
-
-				// Only enrich YouTube notes that haven't been enriched
-				if (type === "youtube" && !enrichedAt) {
-					candidates.push({
-						path: join("00 Inbox", file),
-						absolutePath,
-					});
-				}
-			} catch {
-				// Skip files that can't be read or parsed
-			}
-		}
-	} else {
-		// Validate specific target file
-		const targetPath = target as string; // Guaranteed to exist by validateEnrichTarget
-
-		// Security: Validate path to prevent traversal attacks
-		try {
-			validatePathSafety(targetPath, vaultPath);
-		} catch (error) {
-			const errorMsg = error instanceof Error ? error.message : "Invalid path";
-			return {
-				success: false,
-				error: `Path validation failed: ${errorMsg}`,
-			};
-		}
-
-		const absolutePath = targetPath.startsWith("/")
-			? targetPath
-			: join(vaultPath, targetPath);
-
-		try {
-			const content = await readTextFile(absolutePath);
-			const { attributes } = parseFrontmatter(content);
-
-			const type = attributes.type as string | undefined;
-			const enrichedAt = attributes.enrichedAt as string | undefined;
-
-			if (type !== "youtube") {
-				return {
-					success: false,
-					error: `File is not a YouTube note (type: ${type ?? "none"})`,
-				};
-			}
-
-			if (enrichedAt) {
-				return {
-					success: false,
-					error: "File already enriched (enrichedAt exists)",
-				};
-			}
-
-			candidates.push({ path: targetPath, absolutePath });
-		} catch (error) {
-			const errorMsg = error instanceof Error ? error.message : "Unknown error";
-			return {
-				success: false,
-				error: `Failed to read target file: ${errorMsg}`,
-			};
-		}
-	}
-
-	return { success: true, candidates };
-}
-
-/**
- * Display candidates and get user confirmation.
- *
- * In JSON mode, outputs candidate list and returns immediately.
- * In markdown mode, shows preview and prompts for confirmation.
- */
-async function displayCandidatesAndConfirm(
-	candidates: EnrichCandidate[],
-	isJson: boolean,
-	sessionCid: string,
-): Promise<{ proceed: true } | { proceed: false }> {
-	// JSON mode: show preview only
-	if (isJson) {
-		console.log(
-			JSON.stringify(
-				{
-					candidates: candidates.map((c) => ({ path: c.path })),
-					count: candidates.length,
-					sessionCid,
-				},
-				null,
-				2,
-			),
-		);
-		return { proceed: false }; // JSON mode doesn't execute
-	}
-
-	// Markdown mode: show preview and confirm
-	console.log(
-		emphasize.success(`Found ${candidates.length} YouTube note(s) to enrich:`),
-	);
-	console.log("");
-
-	for (const c of candidates) {
-		console.log(`  - ${c.path}`);
-	}
-	console.log("");
-
-	const proceed = await confirm({
-		message: "Enrich these notes?",
-		default: true,
-	});
-
-	if (!proceed) {
-		console.log(emphasize.warn("Cancelled."));
-		return { proceed: false };
-	}
-
-	return { proceed: true };
-}
-
-/**
- * Execute enrichment pipeline on all candidates.
- *
- * Processes each candidate through the enrichment pipeline,
- * tracking successes, failures, and skipped items.
- */
-async function executeEnrichments(
-	candidates: EnrichCandidate[],
-	vaultPath: string,
-): Promise<{
-	success: number;
-	failed: number;
-	skipped: number;
-	errors: string[];
-}> {
-	const pipeline = createEnrichmentPipeline({
-		strategies: DEFAULT_ENRICHMENT_STRATEGIES,
-		vaultPath,
-	});
-
-	const result = {
-		success: 0,
-		failed: 0,
-		skipped: 0,
-		errors: [] as string[],
-	};
-
-	for (let i = 0; i < candidates.length; i++) {
-		const candidate = candidates[i];
-		if (!candidate) continue; // Should never happen but satisfies type checker
-
-		console.log("");
-		console.log(
-			emphasize.info(
-				`Enriching ${i + 1}/${candidates.length}: ${candidate.path}...`,
-			),
-		);
-
-		try {
-			// Create InboxFile for the pipeline
-			const inboxFile = createInboxFile(candidate.absolutePath);
-
-			// Process through pipeline
-			const pipelineResult = await pipeline.processFile(inboxFile);
-
-			if (pipelineResult.enriched) {
-				console.log(emphasize.success("✓ Enriched successfully"));
-				result.success++;
-			} else {
-				// Extract reason from result
-				const reason =
-					pipelineResult.result?.type === "none"
-						? pipelineResult.result.reason
-						: "No matching strategy";
-				console.log(emphasize.warn(`- Skipped: ${reason}`));
-				result.skipped++;
-			}
-		} catch (error) {
-			const msg =
-				error instanceof Error ? error.message : "Unknown error occurred";
-			console.log(emphasize.error(`✗ Error: ${msg}`));
-			result.errors.push(`${candidate.path}: ${msg}`);
-			result.failed++;
-		}
-	}
-
-	return result;
-}
-
-/**
- * Calculate and record SLO metrics.
- *
- * Checks enrichment latency SLO and records the event.
- */
-async function buildEnrichMetrics(
-	totalFiles: number,
-	durationMs: number,
-): Promise<{
-	avgEnrichmentMs: number;
-	sloBreached: boolean;
-	burnRate: number;
-}> {
-	const avgEnrichmentMs = durationMs / totalFiles;
-	const enrichmentSLOCheck = await checkSLOBreach(
-		"enrichment_latency",
-		avgEnrichmentMs,
-	);
-	recordSLOEvent(
-		"enrichment_latency",
-		enrichmentSLOCheck.breached,
-		avgEnrichmentMs,
-	);
-
-	return {
-		avgEnrichmentMs,
-		sloBreached: enrichmentSLOCheck.breached,
-		burnRate: enrichmentSLOCheck.burnRate,
-	};
-}
-
-/**
- * Display enrichment summary and results.
- *
- * Shows completion metrics, SLO warnings, and any errors.
- */
-function displayEnrichSummary(
-	metrics: EnrichMetrics,
-	sloMetrics: {
-		avgEnrichmentMs: number;
-		sloBreached: boolean;
-		burnRate: number;
-	},
-	errors: string[],
-): CommandResult {
-	console.log("");
-	console.log(
-		emphasize.info(
-			`Done. Enriched ${metrics.success}/${metrics.total} notes in ${(metrics.durationMs / 1000).toFixed(1)}s.`,
-		),
-	);
-
-	// Show SLO warning if breached
-	if (sloMetrics.sloBreached) {
-		console.log(
-			emphasize.warn(
-				`⚠ Enrichment latency SLO breached: ${sloMetrics.avgEnrichmentMs.toFixed(0)}ms avg`,
-			),
-		);
-	}
-
-	// Display errors if any
-	if (errors.length > 0) {
-		console.log("");
-		console.log(emphasize.warn("Errors:"));
-		for (const err of errors) {
-			console.log(`  ${err}`);
-		}
-		return { success: false, exitCode: 1 };
-	}
-
-	return { success: true };
-}
-
-/**
  * Handle YouTube enrichment action.
  *
- * Orchestrates the enrichment workflow:
- * 1. Validate target specification
- * 2. Find eligible candidates
- * 3. Display preview and get confirmation
- * 4. Execute enrichments
- * 5. Display results and metrics
+ * Finds YouTube notes with transcript_status: pending, shows preview,
+ * and enriches after confirmation (markdown mode) or auto-executes (JSON mode).
  */
 async function handleEnrichYouTube(
 	ctx: CommandContext,
@@ -455,24 +148,27 @@ async function handleEnrichYouTube(
 	const cid = createCorrelationId();
 
 	// Parse target specification
-	const target = ctx.positional[1]; // file path or undefined
+	const target = ctx.positional[0]; // file path or undefined
 	const isAll = flags.all === true;
 
 	// Validate target specification
-	const validation = validateEnrichTarget(target, isAll);
-	if (!validation.valid) {
-		session.end({ error: validation.error });
+	if (!target && !isAll) {
+		session.end({
+			error: "Specify a file path or use --all flag",
+		});
 		return {
 			success: false,
-			error: validation.error,
+			error: "Specify a file path or use --all flag",
 			exitCode: 1,
 		};
 	}
 
-	const startTime = Date.now();
+	// Note: startTime is set after confirmation prompt, not here
+	let startTime = Date.now();
 
 	try {
 		const vaultPath = config.vault;
+		const inboxPath = join(vaultPath, "00 Inbox");
 
 		if (enrichLogger) {
 			enrichLogger.info("YouTube enrichment started", {
@@ -491,22 +187,170 @@ async function handleEnrichYouTube(
 		}
 
 		// Find candidate files
-		const candidateResult = await findEnrichmentCandidates(
-			vaultPath,
-			target,
-			isAll,
-		);
+		const candidates: Array<{ path: string; absolutePath: string }> = [];
 
-		if (!candidateResult.success) {
-			session.end({ error: candidateResult.error });
-			return {
-				success: false,
-				error: candidateResult.error,
-				exitCode: 1,
-			};
+		if (isAll) {
+			// Scan all markdown files
+			const files = await globFiles("**/*.md", inboxPath);
+
+			for (const file of files) {
+				// globFiles returns absolute paths, use directly
+				const absolutePath = file;
+				// Extract relative path from inbox for display
+				const relativePath = absolutePath.startsWith(inboxPath)
+					? absolutePath.slice(inboxPath.length + 1)
+					: absolutePath;
+
+				try {
+					const content = await readTextFile(absolutePath);
+					const { attributes } = parseFrontmatter(content);
+
+					const transcriptStatus = attributes.transcript_status as
+						| string
+						| undefined;
+
+					// Only enrich YouTube notes with pending transcripts
+					if (isYouTubeNote(attributes) && transcriptStatus === "pending") {
+						candidates.push({
+							path: join("00 Inbox", relativePath),
+							absolutePath,
+						});
+					}
+				} catch {
+					// Skip files that can't be read or parsed
+				}
+			}
+		} else {
+			// Validate specific target file (guaranteed to exist due to validation above)
+			const targetPath = target as string;
+			const absolutePath = targetPath.startsWith("/")
+				? targetPath
+				: join(vaultPath, targetPath);
+
+			try {
+				const content = await readTextFile(absolutePath);
+				const { attributes } = parseFrontmatter(content);
+
+				const type = attributes.type as string | undefined;
+				const clippingType = attributes.clipping_type as string | undefined;
+				const transcriptStatus = attributes.transcript_status as
+					| string
+					| undefined;
+
+				if (!isYouTubeNote(attributes)) {
+					const typeInfo =
+						type === "clipping"
+							? `clipping/${clippingType ?? "none"}`
+							: (type ?? "none");
+					const errorMsg = `File is not a YouTube note (type: ${typeInfo})`;
+
+					if (enrichLogger) {
+						enrichLogger.warn("Invalid file type for YouTube enrichment", {
+							event: "enrich_youtube_invalid_type",
+							cid,
+							sessionCid,
+							target: targetPath,
+							type: type ?? "none",
+							timestamp: new Date().toISOString(),
+						});
+					}
+
+					if (isJson) {
+						console.log(
+							JSON.stringify(
+								{
+									success: false,
+									error: errorMsg,
+									sessionCid,
+									type: type ?? "none",
+									clipping_type: clippingType,
+								},
+								null,
+								2,
+							),
+						);
+					} else {
+						console.log(emphasize.error(errorMsg));
+					}
+
+					session.end({ error: errorMsg });
+					return { success: false, error: errorMsg, exitCode: 1 };
+				}
+
+				if (transcriptStatus !== "pending") {
+					const msg = `Already enriched (transcript_status: ${transcriptStatus ?? "none"})`;
+
+					if (enrichLogger) {
+						enrichLogger.info("Transcript already processed", {
+							event: "enrich_youtube_already_processed",
+							cid,
+							sessionCid,
+							target: targetPath,
+							transcriptStatus,
+							timestamp: new Date().toISOString(),
+						});
+					}
+
+					if (isJson) {
+						console.log(
+							JSON.stringify(
+								{
+									success: true,
+									enriched: false,
+									message: msg,
+									sessionCid,
+									transcriptStatus,
+								},
+								null,
+								2,
+							),
+						);
+					} else {
+						console.log(emphasize.info(msg));
+					}
+
+					session.end({ success: true });
+					return { success: true };
+				}
+
+				candidates.push({ path: targetPath, absolutePath });
+			} catch (error) {
+				const errorMsg =
+					error instanceof Error ? error.message : "Unknown error";
+				const fullErrorMsg = `Failed to read target file: ${errorMsg}`;
+
+				if (enrichLogger) {
+					enrichLogger.error("Failed to read target file", {
+						event: "enrich_youtube_read_failed",
+						cid,
+						sessionCid,
+						target: targetPath,
+						error: errorMsg,
+						timestamp: new Date().toISOString(),
+					});
+				}
+
+				if (isJson) {
+					console.log(
+						JSON.stringify(
+							{
+								success: false,
+								error: fullErrorMsg,
+								sessionCid,
+								target: targetPath,
+							},
+							null,
+							2,
+						),
+					);
+				} else {
+					console.log(emphasize.error(fullErrorMsg));
+				}
+
+				session.end({ error: fullErrorMsg });
+				return { success: false, error: fullErrorMsg, exitCode: 1 };
+			}
 		}
-
-		const { candidates } = candidateResult;
 
 		// Check for empty candidates
 		if (candidates.length === 0) {
@@ -533,7 +377,7 @@ async function handleEnrichYouTube(
 							success: true,
 							enriched: 0,
 							message: "No YouTube notes ready to enrich",
-							hint: "Notes need type: youtube in frontmatter (and not already enriched)",
+							hint: "Notes need type: youtube and transcript_status: pending",
 							sessionCid,
 							durationMs,
 						},
@@ -543,42 +387,125 @@ async function handleEnrichYouTube(
 				);
 			} else {
 				console.log(emphasize.warn("No YouTube notes ready to enrich."));
-				console.log(
-					"Notes need type: youtube in frontmatter (and not already enriched).",
-				);
+				console.log("Notes need type: youtube and transcript_status: pending.");
 			}
 
 			session.end({ success: true });
 			return { success: true };
 		}
 
-		// Display candidates and get confirmation
-		const confirmation = await displayCandidatesAndConfirm(
-			candidates,
-			isJson,
-			sessionCid,
-		);
-
-		if (!confirmation.proceed) {
+		// Show preview in JSON mode
+		if (isJson) {
+			console.log(
+				JSON.stringify(
+					{
+						candidates: candidates.map((c) => ({ path: c.path })),
+						count: candidates.length,
+						sessionCid,
+					},
+					null,
+					2,
+				),
+			);
 			session.end({ success: true });
 			return { success: true };
 		}
 
-		// Execute enrichments
-		const executionResult = await executeEnrichments(candidates, vaultPath);
+		// Markdown output: show preview and confirm
+		console.log(
+			emphasize.success(
+				`Found ${candidates.length} YouTube note(s) to enrich:`,
+			),
+		);
+		console.log("");
 
+		for (const c of candidates) {
+			console.log(`  - ${c.path}`);
+		}
+		console.log("");
+
+		const proceed = await confirm({
+			message: "Enrich these notes?",
+			default: true,
+		});
+
+		if (!proceed) {
+			console.log(emphasize.warn("Cancelled."));
+			session.end({ success: true });
+			return { success: true };
+		}
+
+		// Start timing AFTER confirmation (don't count user think time)
+		startTime = Date.now();
+
+		// Create enrichment pipeline
+		const pipeline = createEnrichmentPipeline({
+			strategies: DEFAULT_ENRICHMENT_STRATEGIES,
+			vaultPath,
+		});
+
+		// Execute enrichments with progress feedback
 		const metrics: EnrichMetrics = {
 			total: candidates.length,
-			success: executionResult.success,
-			failed: executionResult.failed,
-			skipped: executionResult.skipped,
-			durationMs: Date.now() - startTime,
+			success: 0,
+			failed: 0,
+			skipped: 0,
+			durationMs: 0,
 		};
 
-		// Calculate SLO metrics
-		const sloMetrics = await buildEnrichMetrics(
-			metrics.total,
-			metrics.durationMs,
+		const errors: string[] = [];
+
+		for (let i = 0; i < candidates.length; i++) {
+			const candidate = candidates[i];
+			if (!candidate) continue; // Should never happen but satisfies type checker
+
+			console.log("");
+			console.log(
+				emphasize.info(
+					`Enriching ${i + 1}/${candidates.length}: ${candidate.path}...`,
+				),
+			);
+
+			try {
+				// Create InboxFile for the pipeline
+				const inboxFile = createInboxFile(candidate.absolutePath);
+
+				// Process through pipeline
+				const result = await pipeline.processFile(inboxFile);
+
+				if (result.enriched) {
+					console.log(emphasize.success("✓ Enriched successfully"));
+					metrics.success++;
+				} else {
+					// Extract reason from result
+					const reason =
+						result.result?.type === "none"
+							? result.result.reason
+							: "No matching strategy";
+					console.log(emphasize.warn(`- Skipped: ${reason}`));
+					metrics.skipped++;
+				}
+			} catch (error) {
+				const msg =
+					error instanceof Error ? error.message : "Unknown error occurred";
+				console.log(emphasize.error(`✗ Error: ${msg}`));
+				errors.push(`${candidate.path}: ${msg}`);
+				metrics.failed++;
+			}
+		}
+
+		metrics.durationMs = Date.now() - startTime;
+
+		// Check SLO for enrichment latency (per-file average)
+		const avgEnrichmentMs = metrics.durationMs / metrics.total;
+		const enrichmentSLOCheck = await checkSLOBreach(
+			"enrichment_latency",
+			avgEnrichmentMs,
+		);
+		recordSLOEvent(
+			"enrichment_latency",
+			enrichmentSLOCheck.breached,
+			avgEnrichmentMs,
 		);
 
 		if (enrichLogger) {
@@ -591,22 +518,43 @@ async function handleEnrichYouTube(
 				success: metrics.success,
 				failed: metrics.failed,
 				skipped: metrics.skipped,
-				avgEnrichmentMs: sloMetrics.avgEnrichmentMs,
-				sloBreached: sloMetrics.sloBreached,
-				burnRate: sloMetrics.burnRate,
+				avgEnrichmentMs,
+				sloBreached: enrichmentSLOCheck.breached,
+				burnRate: enrichmentSLOCheck.burnRate,
 				timestamp: new Date().toISOString(),
 			});
 		}
 
 		// Display summary
-		const result = displayEnrichSummary(
-			metrics,
-			sloMetrics,
-			executionResult.errors,
+		console.log("");
+		console.log(
+			emphasize.info(
+				`Done. Enriched ${metrics.success}/${metrics.total} notes in ${(metrics.durationMs / 1000).toFixed(1)}s.`,
+			),
 		);
 
-		session.end(result.success ? { success: true } : { error: "Failed" });
-		return result;
+		// Show SLO warning if breached
+		if (enrichmentSLOCheck.breached) {
+			console.log(
+				emphasize.warn(
+					`⚠ Enrichment latency SLO breached: ${avgEnrichmentMs.toFixed(0)}ms avg (threshold: ${enrichmentSLOCheck.slo.threshold}ms)`,
+				),
+			);
+		}
+
+		// Display errors if any
+		if (errors.length > 0) {
+			console.log("");
+			console.log(emphasize.warn("Errors:"));
+			for (const err of errors) {
+				console.log(`  ${err}`);
+			}
+			session.end({ error: `${errors.length} enrichment(s) failed` });
+			return { success: false, exitCode: 1 };
+		}
+
+		session.end({ success: true });
+		return { success: true };
 	} catch (error) {
 		const errorMsg = error instanceof Error ? error.message : String(error);
 		const durationMs = Date.now() - startTime;
@@ -622,7 +570,24 @@ async function handleEnrichYouTube(
 			});
 		}
 
+		if (isJson) {
+			console.log(
+				JSON.stringify(
+					{
+						success: false,
+						error: errorMsg,
+						sessionCid,
+						durationMs,
+					},
+					null,
+					2,
+				),
+			);
+		} else {
+			console.log(emphasize.error(`Error: ${errorMsg}`));
+		}
+
 		session.end({ error: errorMsg });
-		throw error;
+		return { success: false, error: errorMsg, exitCode: 1 };
 	}
 }
