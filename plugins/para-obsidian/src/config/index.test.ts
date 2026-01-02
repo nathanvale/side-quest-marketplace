@@ -276,13 +276,20 @@ describe("loadConfig", () => {
 
 			// Use actual process.cwd() since that's what isConfigPathSafe checks
 			const cwdConfigPath = path.join(process.cwd(), "myconfig.json");
-			writeJson(cwdConfigPath, {
-				autoCommit: false,
-			});
-			process.env.PARA_OBSIDIAN_CONFIG = cwdConfigPath;
+			try {
+				writeJson(cwdConfigPath, {
+					autoCommit: false,
+				});
+				process.env.PARA_OBSIDIAN_CONFIG = cwdConfigPath;
 
-			const cfg = loadConfig();
-			expect(cfg.autoCommit).toBe(false);
+				const cfg = loadConfig();
+				expect(cfg.autoCommit).toBe(false);
+			} finally {
+				// Clean up the config file created in cwd
+				if (fs.existsSync(cwdConfigPath)) {
+					fs.unlinkSync(cwdConfigPath);
+				}
+			}
 		});
 
 		it("allows config within home/.config directory", () => {
