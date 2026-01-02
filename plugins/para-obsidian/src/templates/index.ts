@@ -577,8 +577,13 @@ export function convertTemplaterFormat(templaterFormat: string): string {
 	result = result.replace(/YY/g, "yy");
 
 	// Week tokens (must come after special week handling above)
+	// Uppercase WW/W for ISO week number (Moment.js uses both cases)
+	// Avoid matching W inside 'W' (from [W] conversion above)
+	result = result.replace(/WW/g, "II"); // ISO week (2-digit)
+	result = result.replace(/(?<!'|I)W(?!W)/g, "I"); // ISO week (1-digit), avoid 'W' and II
+	// Lowercase ww/w
 	result = result.replace(/ww/g, "II"); // ISO week
-	result = result.replace(/w/g, "I"); // ISO week
+	result = result.replace(/(?<!'|I)w(?!w)/g, "I"); // ISO week, avoid 'w' and II
 
 	// Day of week tokens (lowercase d) - must come before day of month
 	// Process longest first
@@ -643,11 +648,13 @@ export function applyDateSubstitutions(
 	content: string,
 	baseDate: Date = new Date(),
 ): string {
+	let result = content;
+
 	// Match: <% tp.date.now("format") %> or <% tp.date.now("format", offset) %>
 	// The format is in quotes, offset is an optional integer (positive or negative)
 	const dateRegex = /<%\s*tp\.date\.now\("([^"]+)"(?:,\s*(-?\d+))?\)\s*%>/g;
 
-	return content.replace(dateRegex, (_, templaterFormat: string, offsetStr) => {
+	result = result.replace(dateRegex, (_, templaterFormat: string, offsetStr) => {
 		const offset = offsetStr ? Number.parseInt(offsetStr, 10) : 0;
 		const date = offset === 0 ? baseDate : addDays(baseDate, offset);
 		const dateFnsFormat = convertTemplaterFormat(templaterFormat);
@@ -659,4 +666,9 @@ export function applyDateSubstitutions(
 			return `[Invalid date format: ${templaterFormat}]`;
 		}
 	});
+
+	// Remove tp.file.cursor() - it's just a cursor position marker in Obsidian
+	result = result.replace(/<%\s*tp\.file\.cursor\(\)\s*%>/g, "");
+
+	return result;
 }
