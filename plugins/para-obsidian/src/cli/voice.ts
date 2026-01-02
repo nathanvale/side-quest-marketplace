@@ -12,6 +12,7 @@ import { dirname, join } from "node:path";
 import {
 	ensureDirSync,
 	pathExistsSync,
+	readTextFileSync,
 	writeTextFileSync,
 } from "@sidequest/core/fs";
 import { emphasize } from "@sidequest/core/terminal";
@@ -136,6 +137,30 @@ function ensureDailyNote(
 
 	// Write the note
 	writeTextFileSync(dailyNotePath, content);
+
+	return true;
+}
+
+/**
+ * Ensure the Log section exists in a daily note.
+ *
+ * If the note doesn't have a ## Log heading, appends one to the bottom.
+ * This handles older daily notes created from templates without a Log section.
+ *
+ * @param dailyNotePath - Absolute path to the daily note
+ * @returns true if Log section was added, false if it already existed
+ */
+function ensureLogSection(dailyNotePath: string): boolean {
+	const content = readTextFileSync(dailyNotePath);
+
+	// Check if Log heading already exists (## Log)
+	if (/^## Log\s*$/m.test(content)) {
+		return false;
+	}
+
+	// Append Log section to the end of the file
+	const logSection = `\n---\n\n## Log\n\n<!-- Voice memo entries go here -->\n`;
+	writeTextFileSync(dailyNotePath, content.trimEnd() + logSection);
 
 	return true;
 }
@@ -421,6 +446,12 @@ export async function handleVoice(ctx: CommandContext): Promise<CommandResult> {
 				spinner?.update({
 					text: `Created daily note for ${dailyNoteRelative}...`,
 				});
+			}
+
+			// Ensure Log section exists (for older daily notes without it)
+			const logSectionAdded = ensureLogSection(dailyNotePath);
+			if (logSectionAdded) {
+				voiceLogger.info`voice:addLogSection cid=${memoCid} sessionCid=${sessionCid} dailyNote=${dailyNoteRelative}`;
 			}
 
 			// Insert into note
