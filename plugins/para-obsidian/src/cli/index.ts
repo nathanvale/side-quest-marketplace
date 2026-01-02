@@ -91,3 +91,5 @@ export {
 	parseUnset,
 	withAutoDiscoveredAttachments,
 } from "./utils";
+// Voice commands
+export { handleVoice } from "./voice";

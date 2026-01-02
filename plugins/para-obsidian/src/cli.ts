@@ -43,6 +43,7 @@ import {
 	handleSemantic,
 	handleTemplateFields,
 	handleTemplates,
+	handleVoice,
 	normalizeFlags,
 } from "./cli/index";
 import type { CommandContext } from "./cli/types";
@@ -86,6 +87,9 @@ function printUsage(): void {
 		"",
 		"Migration:",
 		"  para migrate:remove-tags [--dry-run] [--verbose] [--format md|json]",
+		"",
+		"Voice Memos:",
+		"  para voice [--dry-run] [--all] [--since YYYY-MM-DD]",
 		"",
 		"Shorter aliases:",
 		"  para scan        (alias for process-inbox)",
@@ -362,6 +366,12 @@ async function main(): Promise<void> {
 
 			case "migrate:remove-tags": {
 				const result = await handleMigrateRemoveTags(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
+				break;
+			}
+
+			case "voice": {
+				const result = await handleVoice(ctx, args);
 				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}

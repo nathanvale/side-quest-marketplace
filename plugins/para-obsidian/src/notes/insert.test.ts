@@ -81,4 +81,48 @@ describe("insertIntoNote", () => {
 			).toThrow("Heading not found");
 		});
 	});
+
+	it("accepts heading with # prefix", async () => {
+		await withTempVault(async (vault, config) => {
+			const file = "note.md";
+			writeVaultFile(
+				vault,
+				file,
+				`# Title\n\n## Tasks\n- existing\n\n## Notes\ntext\n`,
+			);
+
+			insertIntoNote(config, {
+				file,
+				heading: "## Tasks",
+				content: "- added via prefix",
+				mode: "append",
+			});
+
+			const result = readVaultFile(vault, file);
+			expect(result).toBe(
+				`# Title\n\n## Tasks\n- existing\n- added via prefix\n\n## Notes\ntext\n`,
+			);
+		});
+	});
+
+	it("accepts heading with ### prefix", async () => {
+		await withTempVault(async (vault, config) => {
+			const file = "note.md";
+			writeVaultFile(
+				vault,
+				file,
+				`# Title\n\n## Section\n\n### Gratitude\n\n1.\n2.\n3.\n`,
+			);
+
+			insertIntoNote(config, {
+				file,
+				heading: "### Gratitude",
+				content: "- grateful item",
+				mode: "append",
+			});
+
+			const result = readVaultFile(vault, file);
+			expect(result).toContain("- grateful item");
+		});
+	});
 });

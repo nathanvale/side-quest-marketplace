@@ -57,6 +57,7 @@ export const SUBSYSTEMS = [
 	"cli",
 	"classify",
 	"routing",
+	"voice",
 ] as const;
 
 export type PluginSubsystem = (typeof SUBSYSTEMS)[number];
@@ -265,6 +266,11 @@ export const classifyLogger = subsystemLoggers.classify!;
  */
 export const routingLogger = subsystemLoggers.routing!;
 
+/**
+ * Logger for voice memo transcription operations.
+ */
+export const voiceLogger = subsystemLoggers.voice!;
+
 // =============================================================================
 // Re-exports for convenience
 // =============================================================================
@@ -300,4 +306,5 @@ export const loggers = {
 	tx: txLogger,
 	cli: cliLogger,
 	routing: routingLogger,
+	voice: voiceLogger,
 } as const;

@@ -16,6 +16,7 @@ import {
 
 import type { ParaObsidianConfig } from "../config/index";
 import { resolveVaultPath } from "../shared/fs";
+import { fsLogger } from "../shared/logger";
 
 /**
  * Insertion mode relative to a heading's content.
@@ -59,16 +60,26 @@ function normalizeLines(text: string): string[] {
 }
 
 /**
+ * Normalizes a heading parameter by stripping any leading # symbols.
+ * Accepts both "## Tasks" and "Tasks" formats.
+ */
+function normalizeHeadingParam(heading: string): string {
+	return heading.replace(/^#+\s*/, "").trim();
+}
+
+/**
  * Finds a heading by its title text.
  *
  * @param lines - Array of document lines
- * @param heading - Heading title to find (without # prefix)
+ * @param heading - Heading title to find (with or without # prefix)
  * @returns Heading match with index and level, or undefined if not found
  */
 function findHeading(
 	lines: ReadonlyArray<string>,
 	heading: string,
 ): HeadingMatch | undefined {
+	const normalizedHeading = normalizeHeadingParam(heading);
+
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
 		if (line === undefined) continue;
@@ -78,7 +89,7 @@ function findHeading(
 		const hashes = match[1];
 		const title = match[2];
 		if (!hashes || !title) continue;
-		if (title.trim() === heading.trim()) {
+		if (title.trim() === normalizedHeading) {
 			return { index: i, level: hashes.length };
 		}
 	}
@@ -160,15 +171,40 @@ export function insertIntoNote(
 	options: InsertOptions,
 ): { relative: string; mode: InsertMode } {
 	const target = resolveVaultPath(config.vault, options.file);
+	if (fsLogger) {
+		fsLogger.debug`insertIntoNote: vault=${config.vault} file=${options.file} heading=${options.heading} absolutePath=${target.absolute}`;
+	}
+
 	if (!pathExistsSync(target.absolute)) {
+		if (fsLogger) {
+			fsLogger.error`insertIntoNote: File not found at ${target.absolute}`;
+		}
 		throw new Error(`File not found: ${options.file}`);
 	}
 
 	const raw = readTextFileSync(target.absolute);
 	const lines = normalizeLines(raw);
+	if (fsLogger) {
+		fsLogger.debug`insertIntoNote: Read ${lines.length} lines from file`;
+	}
+
 	const heading = findHeading(lines, options.heading);
 	if (!heading) {
+		// Log available headings for debugging
+		const availableHeadings: string[] = [];
+		for (const line of lines) {
+			const match = /^(#+)\s+(.*)$/.exec(line?.trim() ?? "");
+			if (match?.[2]) {
+				availableHeadings.push(`${match[1]} ${match[2]}`);
+			}
+		}
+		if (fsLogger) {
+			fsLogger.error`insertIntoNote: Heading not found. Looking for=${options.heading} Available headings=${availableHeadings.join(", ")}`;
+		}
 		throw new Error(`Heading not found: ${options.heading}`);
+	}
+	if (fsLogger) {
+		fsLogger.debug`insertIntoNote: Found heading at line ${heading.index} level=${heading.level}`;
 	}
 
 	const insertLines = normalizeLines(options.content);
