@@ -8,10 +8,15 @@
  */
 
 import { homedir } from "node:os";
-import { join } from "node:path";
-import { pathExistsSync } from "@sidequest/core/fs";
+import { dirname, join } from "node:path";
+import {
+	ensureDirSync,
+	pathExistsSync,
+	writeTextFileSync,
+} from "@sidequest/core/fs";
 import { emphasize } from "@sidequest/core/terminal";
 import { createSpinner } from "nanospinner";
+import type { ParaObsidianConfig } from "../config/index";
 import { insertIntoNote } from "../notes/insert";
 import {
 	createCorrelationId,
@@ -19,6 +24,7 @@ import {
 	initLogger,
 	voiceLogger,
 } from "../shared/logger";
+import { applyDateSubstitutions, getTemplate } from "../templates/index";
 import {
 	checkFfmpeg,
 	checkWhisperCli,
@@ -32,49 +38,6 @@ import {
 } from "../voice";
 import { startSession } from "./shared/session";
 import type { CommandContext, CommandResult } from "./types";
-
-/**
- * Voice command flags.
- */
-interface VoiceFlags {
-	/** Preview without actually transcribing or inserting */
-	readonly dryRun: boolean;
-	/** Re-process all memos (ignore state) */
-	readonly all: boolean;
-	/** Only process memos since this date */
-	readonly since?: Date;
-}
-
-/**
- * Parse voice command flags from args.
- */
-function parseVoiceFlags(args: string[]): VoiceFlags {
-	const flags: VoiceFlags = {
-		dryRun: false,
-		all: false,
-	};
-
-	for (let i = 0; i < args.length; i++) {
-		const arg = args[i];
-
-		if (arg === "--dry-run") {
-			(flags as { dryRun: boolean }).dryRun = true;
-		} else if (arg === "--all") {
-			(flags as { all: boolean }).all = true;
-		} else if (arg === "--since") {
-			const dateStr = args[i + 1];
-			if (dateStr) {
-				const date = new Date(dateStr);
-				if (!Number.isNaN(date.getTime())) {
-					(flags as { since?: Date }).since = date;
-				}
-				i++; // Skip next arg (the date value)
-			}
-		}
-	}
-
-	return flags;
-}
 
 /**
  * Get daily note path for a given date.
@@ -91,17 +54,113 @@ function getDailyNotePath(vaultPath: string, date: Date): string {
 }
 
 /**
+ * Create a minimal daily note with just frontmatter and Log section.
+ *
+ * Used as fallback when daily template doesn't exist.
+ */
+function createMinimalDailyNote(date: Date): string {
+	const year = date.getFullYear();
+	const month = (date.getMonth() + 1).toString().padStart(2, "0");
+	const day = date.getDate().toString().padStart(2, "0");
+	const isoDate = `${year}-${month}-${day}`;
+
+	// Get ISO week number
+	const d = new Date(date);
+	d.setHours(0, 0, 0, 0);
+	d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+	const week1 = new Date(d.getFullYear(), 0, 4);
+	const weekNum = Math.ceil(
+		((d.getTime() - week1.getTime()) / 86400000 + week1.getDay() + 1) / 7,
+	);
+	const weekStr = `${d.getFullYear()}-W${weekNum.toString().padStart(2, "0")}`;
+
+	// Format day name
+	const dayName = date.toLocaleDateString("en-US", { weekday: "long" });
+	const monthName = date.toLocaleDateString("en-US", { month: "long" });
+	const dayNum = date.getDate();
+	const titleDate = `${dayName}, ${monthName} ${dayNum}, ${year}`;
+
+	return `---
+title: "${titleDate}"
+created: ${isoDate}
+type: daily
+week: ${weekStr}
+template_version: 4
+---
+
+# ${titleDate}
+
+---
+
+## Log
+
+<!-- Voice memo entries go here -->
+`;
+}
+
+/**
+ * Create a daily note for a specific date.
+ *
+ * Tries to use the daily template if available, otherwise falls back
+ * to a minimal daily note with just frontmatter and Log section.
+ *
+ * @param config - Para-obsidian configuration
+ * @param date - Date to create the daily note for
+ * @param dailyNotePath - Absolute path where the daily note should be created
+ * @returns true if note was created, false if it already exists
+ */
+function ensureDailyNote(
+	config: ParaObsidianConfig,
+	date: Date,
+	dailyNotePath: string,
+): boolean {
+	// Already exists, nothing to do
+	if (pathExistsSync(dailyNotePath)) {
+		return false;
+	}
+
+	// Ensure directory exists
+	ensureDirSync(dirname(dailyNotePath));
+
+	// Try to get daily template
+	const template = getTemplate(config, "daily");
+
+	let content: string;
+	if (template) {
+		// Use template with date substitutions for the specific date
+		content = applyDateSubstitutions(template.content, date);
+	} else {
+		// Fall back to minimal daily note
+		content = createMinimalDailyNote(date);
+	}
+
+	// Write the note
+	writeTextFileSync(dailyNotePath, content);
+
+	return true;
+}
+
+/**
  * Handle the 'voice' command.
  *
  * Scans Apple Voice Memos, transcribes new ones using whisper.cpp,
  * and appends formatted entries to daily notes.
  */
-export async function handleVoice(
-	ctx: CommandContext,
-	args: string[],
-): Promise<CommandResult> {
-	const { config, isJson } = ctx;
-	const flags = parseVoiceFlags(args);
+export async function handleVoice(ctx: CommandContext): Promise<CommandResult> {
+	const { config, isJson, flags } = ctx;
+
+	// Parse flags from ctx.flags
+	const dryRun = flags["dry-run"] === true;
+	const all = flags.all === true;
+
+	// Parse since date if provided
+	let since: Date | undefined;
+	if (typeof flags.since === "string") {
+		const parsedDate = new Date(flags.since);
+		if (!Number.isNaN(parsedDate.getTime())) {
+			since = parsedDate;
+		}
+	}
 
 	// Initialize logger
 	await initLogger();
@@ -110,7 +169,7 @@ export async function handleVoice(
 	const session = startSession("para voice", { silent: isJson });
 	const sessionCid = session.sessionCid;
 
-	voiceLogger.info`voice:start sessionCid=${sessionCid} dryRun=${flags.dryRun} all=${flags.all} since=${flags.since?.toISOString() ?? "none"}`;
+	voiceLogger.info`voice:start sessionCid=${sessionCid} dryRun=${dryRun} all=${all} since=${since?.toISOString() ?? "none"}`;
 
 	// Show log file location
 	if (!isJson) {
@@ -231,7 +290,7 @@ export async function handleVoice(
 	}
 
 	const memos = scanVoiceMemos(recordingsDir, {
-		since: flags.since,
+		since,
 	});
 
 	voiceLogger.info`voice:scan:result cid=${scanCid} sessionCid=${sessionCid} memosFound=${memos.length}`;
@@ -262,11 +321,11 @@ export async function handleVoice(
 	const state = loadVoiceState(stateFilePath);
 
 	// Filter to unprocessed memos (unless --all flag)
-	const memosToProcess = flags.all
+	const memosToProcess = all
 		? memos
 		: memos.filter((m) => !isProcessed(state, m.filename));
 
-	voiceLogger.debug`voice:filter sessionCid=${sessionCid} totalMemos=${memos.length} toProcess=${memosToProcess.length} all=${flags.all}`;
+	voiceLogger.debug`voice:filter sessionCid=${sessionCid} totalMemos=${memos.length} toProcess=${memosToProcess.length} all=${all}`;
 
 	if (memosToProcess.length === 0) {
 		voiceLogger.info`voice:complete sessionCid=${sessionCid} processed=${0} total=${memos.length} message=${"All memos already processed"}`;
@@ -300,7 +359,7 @@ export async function handleVoice(
 		console.log("");
 	}
 
-	if (flags.dryRun) {
+	if (dryRun) {
 		voiceLogger.info`voice:dryRun sessionCid=${sessionCid} memoCount=${memosToProcess.length}`;
 		if (isJson) {
 			console.log(
@@ -355,14 +414,13 @@ export async function handleVoice(
 			const dailyNotePath = getDailyNotePath(config.vault, memo.timestamp);
 			const dailyNoteRelative = `000 Timestamps/Daily Notes/${memo.timestamp.toISOString().split("T")[0]}.md`;
 
-			// Check daily note exists
-			if (!pathExistsSync(dailyNotePath)) {
-				voiceLogger.warn`voice:skip cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename} reason=${"daily note not found"} dailyNote=${dailyNoteRelative}`;
-				spinner?.error({
-					text: `Daily note not found: ${dailyNoteRelative}`,
+			// Auto-create daily note if it doesn't exist
+			const wasCreated = ensureDailyNote(config, memo.timestamp, dailyNotePath);
+			if (wasCreated) {
+				voiceLogger.info`voice:createDailyNote cid=${memoCid} sessionCid=${sessionCid} dailyNote=${dailyNoteRelative}`;
+				spinner?.update({
+					text: `Created daily note for ${dailyNoteRelative}...`,
 				});
-				skipped++;
-				continue;
 			}
 
 			// Insert into note

@@ -617,6 +617,7 @@ export function convertTemplaterFormat(templaterFormat: string): string {
  * which are converted to date-fns format internally.
  *
  * @param content - Template content containing Templater date patterns
+ * @param baseDate - Optional base date to use instead of current date (default: new Date())
  * @returns Content with all date patterns replaced with actual dates
  *
  * @example
@@ -632,16 +633,23 @@ export function convertTemplaterFormat(templaterFormat: string): string {
  * // Complex format
  * applyDateSubstitutions('<% tp.date.now("dddd, MMMM D, YYYY") %>');
  * // Returns: "Friday, December 6, 2025"
+ *
+ * // With custom base date
+ * applyDateSubstitutions('<% tp.date.now("YYYY-MM-DD") %>', new Date('2012-02-23'));
+ * // Returns: "2012-02-23"
  * ```
  */
-export function applyDateSubstitutions(content: string): string {
+export function applyDateSubstitutions(
+	content: string,
+	baseDate: Date = new Date(),
+): string {
 	// Match: <% tp.date.now("format") %> or <% tp.date.now("format", offset) %>
 	// The format is in quotes, offset is an optional integer (positive or negative)
 	const dateRegex = /<%\s*tp\.date\.now\("([^"]+)"(?:,\s*(-?\d+))?\)\s*%>/g;
 
 	return content.replace(dateRegex, (_, templaterFormat: string, offsetStr) => {
 		const offset = offsetStr ? Number.parseInt(offsetStr, 10) : 0;
-		const date = offset === 0 ? new Date() : addDays(new Date(), offset);
+		const date = offset === 0 ? baseDate : addDays(baseDate, offset);
 		const dateFnsFormat = convertTemplaterFormat(templaterFormat);
 
 		try {
