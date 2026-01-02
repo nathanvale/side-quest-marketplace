@@ -428,12 +428,16 @@ export const DEFAULT_PARA_SEARCH_FOLDERS = [
  * - Clarity about note purpose
  *
  * Convention:
+ * - Projects get 🎯 prefix (has a target/goal)
+ * - Areas get 🌱 prefix (cultivated over time)
  * - Specific types (research, booking, trip) get prefixes
- * - PARA core (project, area, resource) follow Forte's style (emoji/capitalized/lowercase)
+ * - Resources follow Forte's style (no prefix)
  * - Tasks don't need prefixes (action-oriented by nature)
  * - Captures are temporary inbox items (no prefix)
  */
 export const DEFAULT_TITLE_PREFIXES: Partial<Record<string, string>> = {
+	project: "🎯 ",
+	area: "🌱 ",
 	research: "📊 ",
 	booking: "🎫 ",
 	trip: "✈️ ",

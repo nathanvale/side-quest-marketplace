@@ -119,9 +119,9 @@ Area: <% tp.system.prompt("Area") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("00 Inbox/Build Dashboard.md");
+		expect(result.filePath).toBe("00 Inbox/🎯 Build Dashboard.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written).toContain("title: Build Dashboard");
+		expect(written).toContain("title: 🎯 Build Dashboard");
 		expect(written).toContain("target_completion: 2025-12-31");
 		// Wikilink gets parsed as array by YAML, check for Work
 		expect(written).toContain("Work");
@@ -154,9 +154,9 @@ Description: <% tp.system.prompt("Description") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("00 Inbox/Engineering.md");
+		expect(result.filePath).toBe("00 Inbox/🌱 Engineering.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written).toContain("title: Engineering");
+		expect(written).toContain("title: 🌱 Engineering");
 		expect(written).toContain(
 			"Description: Technical skills and software development",
 		);
@@ -317,16 +317,32 @@ Source: <% tp.system.prompt("Source type") %>`,
 	});
 
 	describe.each([
-		{ template: "project", title: "My Project", type: "project" },
-		{ template: "area", title: "Health", type: "area" },
-		{ template: "resource", title: "Atomic Habits", type: "resource" },
-		{ template: "task", title: "Review PR", type: "task" },
-		{ template: "daily", title: "2025-12-06", type: "daily" },
-		{ template: "capture", title: "Quick Thought", type: "capture" },
+		{
+			template: "project",
+			title: "My Project",
+			type: "project",
+			prefix: "🎯 ",
+		},
+		{ template: "area", title: "Health", type: "area", prefix: "🌱 " },
+		{
+			template: "resource",
+			title: "Atomic Habits",
+			type: "resource",
+			prefix: "",
+		},
+		{ template: "task", title: "Review PR", type: "task", prefix: "" },
+		{ template: "daily", title: "2025-12-06", type: "daily", prefix: "" },
+		{
+			template: "capture",
+			title: "Quick Thought",
+			type: "capture",
+			prefix: "",
+		},
 	])("creates $type in 00 Inbox by default (PARA method)", ({
 		template,
 		title,
 		type,
+		prefix,
 	}) => {
 		it(`creates ${template}`, () => {
 			const vault = setupTest();
@@ -346,10 +362,10 @@ Body`,
 				title,
 			});
 
-			expect(result.filePath).toBe(`00 Inbox/${title}.md`);
-			expect(fs.existsSync(path.join(vault, "00 Inbox", `${title}.md`))).toBe(
-				true,
-			);
+			expect(result.filePath).toBe(`00 Inbox/${prefix}${title}.md`);
+			expect(
+				fs.existsSync(path.join(vault, "00 Inbox", `${prefix}${title}.md`)),
+			).toBe(true);
 		});
 	});
 
@@ -372,10 +388,10 @@ Body`,
 			dest: "Custom/Subfolder",
 		});
 
-		expect(result.filePath).toBe("Custom/Subfolder/Custom Location.md");
+		expect(result.filePath).toBe("Custom/Subfolder/🎯 Custom Location.md");
 		expect(
 			fs.existsSync(
-				path.join(vault, "Custom", "Subfolder", "Custom Location.md"),
+				path.join(vault, "Custom", "Subfolder", "🎯 Custom Location.md"),
 			),
 		).toBe(true);
 	});
@@ -447,8 +463,8 @@ tags:
 		});
 
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written).toContain("title: Launch Dark Mode");
-		expect(written).toContain("# Launch Dark Mode");
+		expect(written).toContain("title: 🎯 Launch Dark Mode");
+		expect(written).toContain("# 🎯 Launch Dark Mode");
 		expect(written).not.toContain('tp.system.prompt("Project title")');
 	});
 
@@ -474,8 +490,8 @@ tags:
 		});
 
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written).toContain("title: Health & Fitness");
-		expect(written).toContain("# Health & Fitness");
+		expect(written).toContain("title: 🌱 Health & Fitness");
+		expect(written).toContain("# 🌱 Health & Fitness");
 		expect(written).not.toContain('tp.system.prompt("Area title")');
 	});
 
@@ -625,7 +641,7 @@ area: "[[<% tp.system.prompt("Area") %>]]"
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		// Unsubstituted prompts should be replaced with empty strings
 		// preventing YAML parse errors from nested quotes
-		expect(written).toContain("title: No Args Test");
+		expect(written).toContain("title: 🎯 No Args Test");
 		expect(written).toContain("target_completion: null"); // empty becomes null in YAML
 		expect(written).toContain('area: "[[]]"'); // empty wikilink
 		// Should NOT contain raw Templater patterns

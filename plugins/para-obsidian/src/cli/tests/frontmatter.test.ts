@@ -17,9 +17,9 @@ describe("frontmatter file validation", () => {
 
 		writeVaultFile(
 			vault,
-			"01_Projects/Test.md",
+			"01_Projects/🎯 Test.md",
 			`---
-title: Test
+title: 🎯 Test
 created: 2025-01-01
 type: project
 status: active
@@ -33,7 +33,7 @@ Body`,
 		);
 
 		const cfg = loadConfig({ cwd: vault });
-		const result = validateFrontmatterFile(cfg, "01_Projects/Test.md");
+		const result = validateFrontmatterFile(cfg, "01_Projects/🎯 Test.md");
 		expect(result.valid).toBe(true);
 		expect(result.issues).toHaveLength(0);
 	});

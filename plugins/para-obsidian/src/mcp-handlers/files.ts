@@ -351,7 +351,11 @@ Modes:
 Requires git repository with clean working tree.`,
 		inputSchema: {
 			file: z.string().describe('File path (e.g., "Projects/My Note.md")'),
-			heading: z.string().describe('Heading to insert near (e.g., "## Tasks")'),
+			heading: z
+				.string()
+				.describe(
+					'Heading to insert near. Accepts with or without # prefix (e.g., "Tasks" or "## Tasks")',
+				),
 			content: z.string().describe("Text content to insert"),
 			mode: z
 				.enum(["append", "prepend", "before", "after"])

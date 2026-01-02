@@ -426,9 +426,9 @@ describe("applyTitlePrefix", () => {
 		expect(result).toBe("✈️ Tasmania Trip");
 	});
 
-	test("does not add prefix to project (no default)", () => {
+	test("adds prefix to project", () => {
 		const result = applyTitlePrefix("My Project", "project", mockConfig);
-		expect(result).toBe("My Project");
+		expect(result).toBe("🎯 My Project");
 	});
 
 	test("handles empty string title", () => {

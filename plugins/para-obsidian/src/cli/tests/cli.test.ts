@@ -127,14 +127,14 @@ type: project
 
 		expect(exitCode).toBe(0);
 		const result = JSON.parse(stdout);
-		expect(result.filePath).toBe("00 Inbox/Test Project.md");
+		expect(result.filePath).toBe("00 Inbox/🎯 Test Project.md");
 		expect(result.sectionsInjected).toBe(2);
 		expect(result.injectedHeadings).toContain("Why This Matters");
 		expect(result.injectedHeadings).toContain("Success Criteria");
 
 		// Verify file content
 		const written = fs.readFileSync(
-			path.join(vault, "00 Inbox", "Test Project.md"),
+			path.join(vault, "00 Inbox", "🎯 Test Project.md"),
 			"utf8",
 		);
 		expect(written).toContain("This project addresses a critical need.");
@@ -223,7 +223,7 @@ type: project
 
 		// Verify only existing section was injected
 		const written = fs.readFileSync(
-			path.join(vault, "00 Inbox", "Partial Test.md"),
+			path.join(vault, "00 Inbox", "🎯 Partial Test.md"),
 			"utf8",
 		);
 		expect(written).toContain("This will be injected");
@@ -304,7 +304,7 @@ type: project
 
 		expect(exitCode).toBe(0);
 		const result = JSON.parse(stdout);
-		expect(result.filePath).toBe("00 Inbox/No Content Test.md");
+		expect(result.filePath).toBe("00 Inbox/🎯 No Content Test.md");
 		// No content injection fields when --content not provided
 		expect(result.sectionsInjected).toBeUndefined();
 	});

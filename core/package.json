@@ -22,6 +22,7 @@
 		"./terminal": "./src/terminal/index.ts",
 		"./testing": "./src/testing/index.ts",
 		"./utils": "./src/utils/index.ts",
+		"./youtube-transcript": "./src/youtube-transcript/index.ts",
 		"./validate/types": "./src/validate/types.ts",
 		"./validate/runner": "./src/validate/runner.ts",
 		"./validate/reporter": "./src/validate/reporter.ts",
@@ -35,6 +36,7 @@
 		"@logtape/file": "^0.12.0",
 		"@logtape/logtape": "^0.12.0",
 		"@modelcontextprotocol/sdk": "^1.20.0",
+		"youtube-captions-api": "^1.0.1",
 		"zod": "^3.23.8"
 	},
 	"devDependencies": {
