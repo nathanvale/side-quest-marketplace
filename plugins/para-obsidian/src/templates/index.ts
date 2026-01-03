@@ -654,18 +654,21 @@ export function applyDateSubstitutions(
 	// The format is in quotes, offset is an optional integer (positive or negative)
 	const dateRegex = /<%\s*tp\.date\.now\("([^"]+)"(?:,\s*(-?\d+))?\)\s*%>/g;
 
-	result = result.replace(dateRegex, (_, templaterFormat: string, offsetStr) => {
-		const offset = offsetStr ? Number.parseInt(offsetStr, 10) : 0;
-		const date = offset === 0 ? baseDate : addDays(baseDate, offset);
-		const dateFnsFormat = convertTemplaterFormat(templaterFormat);
+	result = result.replace(
+		dateRegex,
+		(_, templaterFormat: string, offsetStr) => {
+			const offset = offsetStr ? Number.parseInt(offsetStr, 10) : 0;
+			const date = offset === 0 ? baseDate : addDays(baseDate, offset);
+			const dateFnsFormat = convertTemplaterFormat(templaterFormat);
 
-		try {
-			return format(date, dateFnsFormat);
-		} catch {
-			// If format fails, return the original pattern so it's visible
-			return `[Invalid date format: ${templaterFormat}]`;
-		}
-	});
+			try {
+				return format(date, dateFnsFormat);
+			} catch {
+				// If format fails, return the original pattern so it's visible
+				return `[Invalid date format: ${templaterFormat}]`;
+			}
+		},
+	);
 
 	// Remove tp.file.cursor() - it's just a cursor position marker in Obsidian
 	result = result.replace(/<%\s*tp\.file\.cursor\(\)\s*%>/g, "");

@@ -371,7 +371,7 @@ async function main(): Promise<void> {
 			}
 
 			case "voice": {
-				const result = await handleVoice(ctx, args);
+				const result = await handleVoice(ctx);
 				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}
