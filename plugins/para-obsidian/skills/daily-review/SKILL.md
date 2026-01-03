@@ -80,4 +80,41 @@ After exploring the logs together, help compose a journal entry that:
 2. Explore 2-3 significant entries deeply
 3. Draw out gratitude from what emerged
 4. Co-write the journal entry
-5. Offer to insert it into the daily note using `para_insert`
+5. Insert content using TWO separate `para_insert` calls (see below)
+
+## Using para_insert - TWO SEPARATE CALLS
+
+The daily note template has an existing `### Gratitude` section with placeholder text. You must use TWO separate insert calls:
+
+### Call 1: Insert the Journal section
+
+```
+para_insert({
+  file: "000 Timestamps/Daily Notes/YYYY-MM-DD.md",
+  heading: "End of Day",           // Just the text, NO # symbols
+  mode: "after",                   // Insert after the heading
+  content: "### Journal\n\n[journal prose here...]",
+  response_format: "json"
+})
+```
+
+### Call 2: Fill in the existing Gratitude section
+
+```
+para_insert({
+  file: "000 Timestamps/Daily Notes/YYYY-MM-DD.md",
+  heading: "Gratitude",            // Just the text, NO # symbols
+  mode: "after",                   // Insert right after the heading
+  content: "\n1. [First gratitude]\n2. [Second gratitude]\n3. [Third gratitude]",
+  response_format: "json"
+})
+```
+
+**CRITICAL:**
+- The `heading` parameter takes just the heading text WITHOUT any `#` symbols
+- Use `"End of Day"` not `"## End of Day"`, use `"Gratitude"` not `"### Gratitude"`
+- The tool normalizes headings internally
+- **DO NOT create a new Gratitude section** - the template already has one
+- Use `mode: "after"` for Gratitude - inserts right after the heading line (before the comment/placeholder)
+- The Journal section goes BEFORE the existing Gratitude section (inserted after "End of Day" heading)
+- The template placeholder (`1. 2. 3.`) will remain below the inserted gratitudes - user can delete if desired
