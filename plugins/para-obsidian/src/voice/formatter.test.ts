@@ -1,7 +1,48 @@
 import { describe, expect, test } from "bun:test";
-import { formatLogEntry, formatTimestamp } from "./formatter";
+import {
+	dedupeConsecutiveLines,
+	formatLogEntry,
+	formatTimestamp,
+} from "./formatter";
 
 describe("voice/formatter", () => {
+	describe("dedupeConsecutiveLines", () => {
+		test("removes consecutive duplicate lines", () => {
+			const input = "Line A\nLine A\nLine A\nLine B";
+			expect(dedupeConsecutiveLines(input)).toBe("Line A\nLine B");
+		});
+
+		test("preserves non-consecutive duplicates", () => {
+			const input = "Line A\nLine B\nLine A";
+			expect(dedupeConsecutiveLines(input)).toBe("Line A\nLine B\nLine A");
+		});
+
+		test("handles empty lines between content", () => {
+			const input = "Line A\n\n\nLine B";
+			expect(dedupeConsecutiveLines(input)).toBe("Line A\nLine B");
+		});
+
+		test("handles whitespace variations", () => {
+			const input = "  Line A  \nLine A\n  Line A";
+			expect(dedupeConsecutiveLines(input)).toBe("Line A");
+		});
+
+		test("handles empty input", () => {
+			expect(dedupeConsecutiveLines("")).toBe("");
+		});
+
+		test("handles single line", () => {
+			expect(dedupeConsecutiveLines("Single line")).toBe("Single line");
+		});
+
+		test("handles many repeated lines (whisper hallucination)", () => {
+			const repeated = Array(50).fill("We don't need to do this.").join("\n");
+			expect(dedupeConsecutiveLines(repeated)).toBe(
+				"We don't need to do this.",
+			);
+		});
+	});
+
 	describe("formatTimestamp", () => {
 		test("formats morning time (12-hour, lowercase am)", () => {
 			// Create date with explicit hours/minutes in local time
@@ -72,13 +113,25 @@ describe("voice/formatter", () => {
 			expect(entry).toBe("- 2:45 pm - 🎤 Test transcription");
 		});
 
-		test("handles multi-line transcriptions", () => {
+		test("collapses multi-line transcriptions to single line", () => {
 			const date = new Date(2025, 11, 28, 9, 30, 0); // 9:30 AM
 			const transcription = "Line one\nLine two\nLine three";
 
 			const entry = formatLogEntry(date, transcription);
 
-			expect(entry).toBe("- 9:30 am - 🎤 Line one\nLine two\nLine three");
+			expect(entry).toBe("- 9:30 am - 🎤 Line one Line two Line three");
+		});
+
+		test("removes consecutive duplicate lines (whisper hallucination)", () => {
+			const date = new Date(2025, 11, 28, 9, 30, 0); // 9:30 AM
+			const transcription =
+				"Real content here.\nWe don't need to do this.\nWe don't need to do this.\nWe don't need to do this.\nMore content.";
+
+			const entry = formatLogEntry(date, transcription);
+
+			expect(entry).toBe(
+				"- 9:30 am - 🎤 Real content here. We don't need to do this. More content.",
+			);
 		});
 
 		test("trims whitespace from transcription", () => {

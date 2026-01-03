@@ -2,15 +2,20 @@
  * Voice memo transcription module.
  *
  * Provides functionality to scan Apple Voice Memos, transcribe them using
- * whisper.cpp, and insert formatted entries into daily notes.
+ * parakeet-mlx, and insert formatted entries into daily notes.
  *
  * @module voice
  */
 
 // Formatting
-export { formatLogEntry, formatTimestamp } from "./formatter";
+export {
+	dedupeConsecutiveLines,
+	formatLogEntry,
+	formatTimestamp,
+} from "./formatter";
 // Scanner
 export {
+	isSafeFilename,
 	parseVoiceMemoTimestamp,
 	type ScanOptions,
 	scanVoiceMemos,
@@ -28,8 +33,11 @@ export {
 } from "./state";
 // Transcription
 export {
-	checkFfmpeg,
-	checkWhisperCli,
+	checkFfmpeg, // @deprecated - use isFfmpegAvailable
+	checkParakeetMlx, // @deprecated - use isParakeetMlxAvailable
+	checkWhisperCli, // @deprecated - use isParakeetMlxAvailable
+	isFfmpegAvailable,
+	isParakeetMlxAvailable,
 	type TranscriptionResult,
 	transcribeVoiceMemo,
 } from "./transcriber";

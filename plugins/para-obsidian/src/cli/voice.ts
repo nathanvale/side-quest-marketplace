@@ -1,7 +1,7 @@
 /**
  * CLI command: para voice
  *
- * Transcribes Apple Voice Memos using whisper.cpp and appends them
+ * Transcribes Apple Voice Memos using parakeet-mlx and appends them
  * as log entries to daily notes.
  *
  * @module cli/voice
@@ -27,9 +27,10 @@ import {
 } from "../shared/logger";
 import { applyDateSubstitutions, getTemplate } from "../templates/index";
 import {
-	checkFfmpeg,
-	checkWhisperCli,
 	formatLogEntry,
+	formatTimestamp,
+	isFfmpegAvailable,
+	isParakeetMlxAvailable,
 	isProcessed,
 	loadVoiceState,
 	markAsProcessed,
@@ -41,16 +42,25 @@ import { startSession } from "./shared/session";
 import type { CommandContext, CommandResult } from "./types";
 
 /**
+ * Format a date as YYYY-MM-DD using local time (not UTC).
+ *
+ * @param date - Date to format
+ * @returns Date string in YYYY-MM-DD format
+ */
+function formatLocalDate(date: Date): string {
+	const year = date.getFullYear();
+	const month = (date.getMonth() + 1).toString().padStart(2, "0");
+	const day = date.getDate().toString().padStart(2, "0");
+	return `${year}-${month}-${day}`;
+}
+
+/**
  * Get daily note path for a given date.
  *
  * Daily notes are stored at: 000 Timestamps/Daily Notes/YYYY-MM-DD.md
  */
 function getDailyNotePath(vaultPath: string, date: Date): string {
-	const year = date.getFullYear();
-	const month = (date.getMonth() + 1).toString().padStart(2, "0");
-	const day = date.getDate().toString().padStart(2, "0");
-	const filename = `${year}-${month}-${day}.md`;
-
+	const filename = `${formatLocalDate(date)}.md`;
 	return join(vaultPath, "000 Timestamps", "Daily Notes", filename);
 }
 
@@ -166,9 +176,34 @@ function ensureLogSection(dailyNotePath: string): boolean {
 }
 
 /**
+ * Check if a log entry already exists in a daily note.
+ *
+ * Uses the timestamp prefix to detect duplicates (e.g., "- 9:02 am - 🎤").
+ * This prevents duplicate entries when re-processing with --all flag.
+ *
+ * Uses anchored regex to match only at line start to avoid false positives
+ * when the time string appears elsewhere in the file.
+ *
+ * @param dailyNotePath - Absolute path to the daily note
+ * @param timePrefix - Time prefix to search for (e.g., "- 9:02 am - 🎤")
+ * @returns true if entry already exists
+ */
+function hasExistingEntry(dailyNotePath: string, timePrefix: string): boolean {
+	if (!pathExistsSync(dailyNotePath)) {
+		return false;
+	}
+	const content = readTextFileSync(dailyNotePath);
+	// Escape regex special characters in timePrefix
+	const escapedPrefix = timePrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	// Match only at start of line (multiline mode)
+	const pattern = new RegExp(`^${escapedPrefix}`, "m");
+	return pattern.test(content);
+}
+
+/**
  * Handle the 'voice' command.
  *
- * Scans Apple Voice Memos, transcribes new ones using whisper.cpp,
+ * Scans Apple Voice Memos, transcribes new ones using parakeet-mlx,
  * and appends formatted entries to daily notes.
  */
 export async function handleVoice(ctx: CommandContext): Promise<CommandResult> {
@@ -209,20 +244,20 @@ export async function handleVoice(ctx: CommandContext): Promise<CommandResult> {
 		console.log(emphasize.info("Checking dependencies..."));
 	}
 
-	const hasWhisper = await checkWhisperCli();
-	const hasFfmpeg = await checkFfmpeg();
+	const hasParakeet = await isParakeetMlxAvailable();
+	const hasFfmpeg = await isFfmpegAvailable();
 
-	voiceLogger.debug`voice:checkDeps:result cid=${depCid} hasWhisper=${hasWhisper} hasFfmpeg=${hasFfmpeg}`;
+	voiceLogger.debug`voice:checkDeps:result cid=${depCid} hasParakeet=${hasParakeet} hasFfmpeg=${hasFfmpeg}`;
 
-	if (!hasWhisper) {
-		voiceLogger.error`voice:error cid=${depCid} sessionCid=${sessionCid} error=${"whisper-cli not found"}`;
+	if (!hasParakeet) {
+		voiceLogger.error`voice:error cid=${depCid} sessionCid=${sessionCid} error=${"parakeet-mlx not found"}`;
 		if (isJson) {
 			console.log(
 				JSON.stringify(
 					{
 						success: false,
-						error: "whisper-cli not found",
-						hint: "Install with: brew install whisper-cpp",
+						error: "parakeet-mlx not found",
+						hint: "Install with: uv tool install parakeet-mlx",
 						sessionCid,
 					},
 					null,
@@ -230,10 +265,10 @@ export async function handleVoice(ctx: CommandContext): Promise<CommandResult> {
 				),
 			);
 		} else {
-			console.log(emphasize.error("whisper-cli not found."));
-			console.log("Install with: brew install whisper-cpp");
+			console.log(emphasize.error("parakeet-mlx not found."));
+			console.log("Install with: uv tool install parakeet-mlx");
 		}
-		session.end({ error: "whisper-cli not found" });
+		session.end({ error: "parakeet-mlx not found" });
 		return { success: false, exitCode: 1 };
 	}
 
@@ -274,37 +309,6 @@ export async function handleVoice(ctx: CommandContext): Promise<CommandResult> {
 		"para-obsidian",
 		"voice-state.json",
 	);
-	const modelPath = join(
-		homedir(),
-		".config",
-		"para-obsidian",
-		"models",
-		"ggml-large-v3-turbo.bin",
-	);
-
-	// Check model exists
-	if (!pathExistsSync(modelPath)) {
-		voiceLogger.error`voice:error sessionCid=${sessionCid} error=${"Whisper model not found"} modelPath=${modelPath}`;
-		if (isJson) {
-			console.log(
-				JSON.stringify(
-					{
-						success: false,
-						error: "Whisper model not found",
-						hint: `Download model to: ${modelPath}`,
-						sessionCid,
-					},
-					null,
-					2,
-				),
-			);
-		} else {
-			console.log(emphasize.error("Whisper model not found."));
-			console.log(`Download ggml-large-v3-turbo.bin to: ${modelPath}`);
-		}
-		session.end({ error: "Whisper model not found" });
-		return { success: false, exitCode: 1 };
-	}
 
 	// Scan voice memos
 	const scanCid = createCorrelationId();
@@ -425,19 +429,30 @@ export async function handleVoice(ctx: CommandContext): Promise<CommandResult> {
 			: createSpinner(`Processing ${memo.filename}...`).start();
 
 		try {
+			// Check for duplicate entry BEFORE transcribing (to avoid wasted work)
+			const timePrefix = `- ${formatTimestamp(memo.timestamp)} - 🎤`;
+			const dailyNotePath = getDailyNotePath(config.vault, memo.timestamp);
+			const localDateStr = formatLocalDate(memo.timestamp);
+			const dailyNoteRelative = `000 Timestamps/Daily Notes/${localDateStr}.md`;
+
+			if (hasExistingEntry(dailyNotePath, timePrefix)) {
+				voiceLogger.warn`voice:skip:duplicate cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename} dailyNote=${dailyNoteRelative}`;
+				spinner?.warn({
+					text: `Skipped ${memo.filename} (already exists in ${localDateStr})`,
+				});
+				skipped++;
+				continue;
+			}
+
 			// Transcribe
 			const transcribeStart = Date.now();
-			const result = await transcribeVoiceMemo(memo.path, modelPath);
+			const result = await transcribeVoiceMemo(memo.path);
 			const transcribeDurationMs = Date.now() - transcribeStart;
 
 			voiceLogger.info`voice:transcribe:success cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename} textLength=${result.text.length} durationMs=${transcribeDurationMs}`;
 
 			// Format log entry
 			const logEntry = formatLogEntry(memo.timestamp, result.text);
-
-			// Get daily note path
-			const dailyNotePath = getDailyNotePath(config.vault, memo.timestamp);
-			const dailyNoteRelative = `000 Timestamps/Daily Notes/${memo.timestamp.toISOString().split("T")[0]}.md`;
 
 			// Auto-create daily note if it doesn't exist
 			const wasCreated = ensureDailyNote(config, memo.timestamp, dailyNotePath);
@@ -464,12 +479,23 @@ export async function handleVoice(ctx: CommandContext): Promise<CommandResult> {
 
 			voiceLogger.debug`voice:insert cid=${memoCid} sessionCid=${sessionCid} dailyNote=${dailyNoteRelative}`;
 
-			// Mark as processed
-			newState = markAsProcessed(state, memo.filename, {
+			// Mark as processed (accumulate into newState)
+			newState = markAsProcessed(newState, memo.filename, {
 				processedAt: new Date().toISOString(),
 				transcription: result.text.slice(0, 100),
-				dailyNote: memo.timestamp.toISOString().split("T")[0] || "",
+				dailyNote: localDateStr,
 			});
+
+			// Save state incrementally after each successful processing
+			// Wrapped in try/catch - if save fails, state is still in memory for duplicate detection
+			try {
+				saveVoiceState(stateFilePath, newState);
+				voiceLogger.debug`voice:saveState:incremental cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename}`;
+			} catch (saveError) {
+				const saveErr = saveError as Error;
+				voiceLogger.error`voice:saveState:failed cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename} error=${saveErr.message}`;
+				// Continue processing - in-memory state still prevents duplicates within this session
+			}
 
 			spinner?.success({
 				text: `Processed ${memo.filename}`,
@@ -485,12 +511,6 @@ export async function handleVoice(ctx: CommandContext): Promise<CommandResult> {
 			});
 			skipped++;
 		}
-	}
-
-	// Save state
-	if (processed > 0) {
-		saveVoiceState(stateFilePath, newState);
-		voiceLogger.debug`voice:saveState sessionCid=${sessionCid} processedCount=${processed}`;
 	}
 
 	// Summary

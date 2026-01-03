@@ -1,11 +1,10 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { join } from "node:path";
 import { writeTextFileSync } from "@sidequest/core/fs";
 import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
 import {
-	checkFfmpeg,
-	checkWhisperCli,
-	type TranscriptionResult,
+	isFfmpegAvailable,
+	isParakeetMlxAvailable,
 	transcribeVoiceMemo,
 } from "./transcriber";
 
@@ -18,86 +17,222 @@ describe("voice/transcriber", () => {
 
 	afterEach(() => {
 		cleanupTestDir(tempDir);
+		mock.restore();
 	});
 
-	describe("checkWhisperCli", () => {
-		test("detects whisper-cli availability", async () => {
+	describe("isParakeetMlxAvailable", () => {
+		test("returns true when parakeet-mlx is available", async () => {
+			// Mock successful spawn (exit code 0)
+			const mockSpawn = mock(() => ({
+				exited: Promise.resolve(0),
+				stdout: { text: () => Promise.resolve("/usr/local/bin/parakeet-mlx") },
+				stderr: { text: () => Promise.resolve("") },
+			}));
+			Bun.spawn = mockSpawn as unknown as typeof Bun.spawn;
+
+			const result = await isParakeetMlxAvailable();
+
+			expect(result).toBe(true);
+			expect(mockSpawn).toHaveBeenCalledWith(
+				["which", "parakeet-mlx"],
+				expect.objectContaining({
+					stdout: "pipe",
+					stderr: "pipe",
+				}),
+			);
+		});
+
+		test("returns false when parakeet-mlx is not available", async () => {
+			// Mock failed spawn (exit code 1)
+			const mockSpawn = mock(() => ({
+				exited: Promise.resolve(1),
+				stdout: { text: () => Promise.resolve("") },
+				stderr: { text: () => Promise.resolve("") },
+			}));
+			Bun.spawn = mockSpawn as unknown as typeof Bun.spawn;
+
+			const result = await isParakeetMlxAvailable();
+
+			expect(result).toBe(false);
+		});
+
+		test("returns false when spawn throws error", async () => {
+			// Mock spawn throwing (command not found)
+			const mockSpawn = mock(() => {
+				throw new Error("Command not found");
+			});
+			Bun.spawn = mockSpawn as unknown as typeof Bun.spawn;
+
+			const result = await isParakeetMlxAvailable();
+
+			expect(result).toBe(false);
+		});
+
+		test("detects parakeet-mlx availability (integration)", async () => {
 			// This test will pass/fail based on actual system state
 			// It's more of an integration test
-			const available = await checkWhisperCli();
+			const available = await isParakeetMlxAvailable();
 			expect(typeof available).toBe("boolean");
 		});
 	});
 
-	describe("checkFfmpeg", () => {
-		test("detects ffmpeg availability", async () => {
-			const available = await checkFfmpeg();
+	describe("isFfmpegAvailable", () => {
+		test("returns true when ffmpeg is available", async () => {
+			// Mock successful spawn (exit code 0)
+			const mockSpawn = mock(() => ({
+				exited: Promise.resolve(0),
+				stdout: { text: () => Promise.resolve("/usr/local/bin/ffmpeg") },
+				stderr: { text: () => Promise.resolve("") },
+			}));
+			Bun.spawn = mockSpawn as unknown as typeof Bun.spawn;
+
+			const result = await isFfmpegAvailable();
+
+			expect(result).toBe(true);
+			expect(mockSpawn).toHaveBeenCalledWith(
+				["which", "ffmpeg"],
+				expect.objectContaining({
+					stdout: "pipe",
+					stderr: "pipe",
+				}),
+			);
+		});
+
+		test("returns false when ffmpeg is not available", async () => {
+			// Mock failed spawn (exit code 1)
+			const mockSpawn = mock(() => ({
+				exited: Promise.resolve(1),
+				stdout: { text: () => Promise.resolve("") },
+				stderr: { text: () => Promise.resolve("") },
+			}));
+			Bun.spawn = mockSpawn as unknown as typeof Bun.spawn;
+
+			const result = await isFfmpegAvailable();
+
+			expect(result).toBe(false);
+		});
+
+		test("returns false when spawn throws error", async () => {
+			// Mock spawn throwing (command not found)
+			const mockSpawn = mock(() => {
+				throw new Error("Command not found");
+			});
+			Bun.spawn = mockSpawn as unknown as typeof Bun.spawn;
+
+			const result = await isFfmpegAvailable();
+
+			expect(result).toBe(false);
+		});
+
+		test("detects ffmpeg availability (integration)", async () => {
+			const available = await isFfmpegAvailable();
 			expect(typeof available).toBe("boolean");
 		});
 	});
 
 	describe("transcribeVoiceMemo", () => {
-		test("throws error if whisper-cli not available", async () => {
+		test("throws specific error when parakeet-mlx unavailable", async () => {
 			const mockPath = join(tempDir, "test.m4a");
 			writeTextFileSync(mockPath, "mock audio");
 
-			// This will naturally fail if whisper-cli is not installed
-			// We're testing the error message
-			try {
-				await transcribeVoiceMemo(mockPath, "/fake/model.bin");
-				// If it doesn't throw, whisper-cli must be installed
-				// In that case, it will fail at model file check
-			} catch (error) {
-				const err = error as Error;
-				// Either whisper-cli or ffmpeg not found
-				expect(
-					err.message.includes("whisper-cli not found") ||
-						err.message.includes("ffmpeg not found"),
-				).toBe(true);
-			}
+			// Mock isParakeetMlxAvailable to return false
+			const mockSpawn = mock(() => ({
+				exited: Promise.resolve(1), // which returns 1 when not found
+				stdout: { text: () => Promise.resolve("") },
+				stderr: { text: () => Promise.resolve("") },
+			}));
+			Bun.spawn = mockSpawn as unknown as typeof Bun.spawn;
+
+			await expect(transcribeVoiceMemo(mockPath)).rejects.toThrow(
+				"parakeet-mlx not found. Install with: uv tool install parakeet-mlx",
+			);
 		});
 
-		test("throws error if input file doesn't exist", async () => {
+		test("throws specific error when ffmpeg unavailable", async () => {
+			const mockPath = join(tempDir, "test.m4a");
+			writeTextFileSync(mockPath, "mock audio");
+
+			// Mock isParakeetMlxAvailable to succeed, but isFfmpegAvailable to fail
+			let callCount = 0;
+			const mockSpawn = mock(() => {
+				callCount++;
+				// First call: isParakeetMlxAvailable (success)
+				if (callCount === 1) {
+					return {
+						exited: Promise.resolve(0),
+						stdout: {
+							text: () => Promise.resolve("/usr/local/bin/parakeet-mlx"),
+						},
+						stderr: { text: () => Promise.resolve("") },
+					};
+				}
+				// Second call: isFfmpegAvailable (failure)
+				return {
+					exited: Promise.resolve(1),
+					stdout: { text: () => Promise.resolve("") },
+					stderr: { text: () => Promise.resolve("") },
+				};
+			});
+			Bun.spawn = mockSpawn as unknown as typeof Bun.spawn;
+
+			await expect(transcribeVoiceMemo(mockPath)).rejects.toThrow(
+				"ffmpeg not found. Install with: brew install ffmpeg",
+			);
+		});
+
+		test("throws when input file does not exist", async () => {
 			const nonExistentPath = join(tempDir, "does-not-exist.m4a");
 
-			try {
-				await transcribeVoiceMemo(nonExistentPath, "/fake/model.bin");
-			} catch (error) {
-				const err = error as Error;
-				// Will fail at dependency check or input file check
-				expect(err.message).toBeDefined();
-			}
+			// Mock both checks to succeed
+			const mockSpawn = mock(() => ({
+				exited: Promise.resolve(0),
+				stdout: { text: () => Promise.resolve("/usr/local/bin/parakeet-mlx") },
+				stderr: { text: () => Promise.resolve("") },
+			}));
+			Bun.spawn = mockSpawn as unknown as typeof Bun.spawn;
+
+			await expect(transcribeVoiceMemo(nonExistentPath)).rejects.toThrow(
+				`Input file does not exist: ${nonExistentPath}`,
+			);
 		});
 
-		test("throws error if model file doesn't exist", async () => {
+		test("throws error if dependencies unavailable (integration)", async () => {
 			const mockPath = join(tempDir, "test.m4a");
 			writeTextFileSync(mockPath, "mock audio");
 
+			// This test validates that transcription fails gracefully
+			// The error depends on system state:
+			// - No parakeet-mlx → "parakeet-mlx not found"
+			// - No ffmpeg → "ffmpeg not found"
+			// - No input file → "Input file does not exist"
+			// NOTE: This test may pass if tools are installed, fail otherwise
 			try {
-				await transcribeVoiceMemo(mockPath, "/fake/model.bin");
+				await transcribeVoiceMemo(mockPath);
+				// If it doesn't throw, tools are installed but mock audio fails transcription
+				// This is acceptable for integration test
 			} catch (error) {
 				const err = error as Error;
-				// Will fail at dependency check or model file check
-				expect(err.message).toBeDefined();
+				// Valid error messages depending on system state
+				// Accept any error since this is system-dependent
+				expect(err).toBeDefined();
+				expect(err.message.length).toBeGreaterThan(0);
 			}
 		});
 
-		// Note: Full integration test with actual whisper-cli would require:
-		// 1. whisper-cli installed
-		// 2. Model file downloaded (~1.5GB)
+		// Note: Full integration test with actual parakeet-mlx would require:
+		// 1. parakeet-mlx installed (uv tool install parakeet-mlx)
+		// 2. ffmpeg installed
 		// 3. Real audio file
 		// This is better suited for manual testing or CI with setup
-		test("validates input parameters", async () => {
+		test("validates input parameters (integration)", async () => {
 			const mockAudioPath = join(tempDir, "test.m4a");
-			const mockModelPath = join(tempDir, "model.bin");
 
-			// Create mock files
+			// Create mock audio file
 			writeTextFileSync(mockAudioPath, "mock audio");
-			writeTextFileSync(mockModelPath, "mock model");
 
-			// This will fail at ffmpeg/whisper stage, but validates our checks
+			// This will fail at parakeet-mlx/ffmpeg stage, but validates our checks
 			try {
-				await transcribeVoiceMemo(mockAudioPath, mockModelPath);
+				await transcribeVoiceMemo(mockAudioPath);
 			} catch (error) {
 				// Expected to fail - we're just checking it doesn't throw on validation
 				expect(error).toBeDefined();
@@ -105,17 +240,8 @@ describe("voice/transcriber", () => {
 		});
 	});
 
-	describe("TranscriptionResult", () => {
-		test("result includes text and metadata", () => {
-			const result: TranscriptionResult = {
-				text: "Test transcription",
-				duration: 5.2,
-				modelUsed: "ggml-large-v3-turbo.bin",
-			};
-
-			expect(result.text).toBe("Test transcription");
-			expect(result.duration).toBe(5.2);
-			expect(result.modelUsed).toBe("ggml-large-v3-turbo.bin");
-		});
-	});
+	// Note: Removed type-only test for TranscriptionResult
+	// TypeScript already validates type construction at compile time
+	// Testing that { text, modelUsed } equals { text, modelUsed }
+	// provides no runtime value
 });

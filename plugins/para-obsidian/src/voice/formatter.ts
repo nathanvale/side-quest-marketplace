@@ -41,6 +41,30 @@ export function formatTimestamp(date: Date): string {
 }
 
 /**
+ * Remove consecutive duplicate lines from text.
+ *
+ * Handles whisper.cpp hallucination where the model gets stuck
+ * repeating the same phrase when audio becomes quiet or noisy.
+ *
+ * @param text - Text that may contain repeated lines
+ * @returns Text with consecutive duplicates removed
+ */
+export function dedupeConsecutiveLines(text: string): string {
+	const lines = text.split("\n");
+	const deduped: string[] = [];
+
+	for (const line of lines) {
+		const trimmed = line.trim();
+		// Skip empty lines and consecutive duplicates
+		if (trimmed && deduped[deduped.length - 1] !== trimmed) {
+			deduped.push(trimmed);
+		}
+	}
+
+	return deduped.join("\n");
+}
+
+/**
  * Format voice memo transcription as log entry.
  *
  * Format: "- {time} - 🎤 {transcription}"
@@ -48,7 +72,9 @@ export function formatTimestamp(date: Date): string {
  * Example:
  * "- 2:45 pm - 🎤 Transcribed voice memo content here..."
  *
- * Multi-line transcriptions preserve line breaks.
+ * Processing:
+ * 1. Removes consecutive duplicate lines (whisper hallucination fix)
+ * 2. Collapses all newlines to single spaces (single bullet point)
  *
  * @param timestamp - Voice memo timestamp
  * @param transcription - Transcribed text content
@@ -56,7 +82,12 @@ export function formatTimestamp(date: Date): string {
  */
 export function formatLogEntry(timestamp: Date, transcription: string): string {
 	const time = formatTimestamp(timestamp);
-	const text = transcription.trim();
 
-	return `- ${time} - 🎤 ${text}`;
+	// Step 1: Remove consecutive duplicate lines (whisper hallucination)
+	const deduped = dedupeConsecutiveLines(transcription);
+
+	// Step 2: Collapse newlines to spaces for single bullet point
+	const collapsed = deduped.replace(/\n+/g, " ").trim();
+
+	return `- ${time} - 🎤 ${collapsed}`;
 }

@@ -1,18 +1,18 @@
 /**
  * Voice memo transcription module.
  *
- * Wraps whisper.cpp CLI for audio transcription. Handles:
- * - Dependency checking (whisper-cli, ffmpeg)
- * - Audio format conversion (m4a → wav)
- * - Whisper.cpp invocation
+ * Wraps parakeet-mlx CLI for audio transcription. Handles:
+ * - Dependency checking (parakeet-mlx, ffmpeg)
+ * - Parakeet invocation with text output
  * - Temporary file cleanup
+ *
+ * Uses NVIDIA Parakeet model via MLX for fast Apple Silicon transcription.
  *
  * @module voice/transcriber
  */
 
-import { unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { pathExistsSync } from "@sidequest/core/fs";
 
 /**
@@ -21,20 +21,18 @@ import { pathExistsSync } from "@sidequest/core/fs";
 export interface TranscriptionResult {
 	/** Transcribed text content */
 	readonly text: string;
-	/** Audio duration in seconds */
-	readonly duration: number;
-	/** Model filename used for transcription */
+	/** Model used for transcription */
 	readonly modelUsed: string;
 }
 
 /**
- * Check if whisper-cli is installed and available.
+ * Check if parakeet-mlx is installed and available.
  *
- * @returns True if whisper-cli found in PATH
+ * @returns True if parakeet-mlx found in PATH
  */
-export async function checkWhisperCli(): Promise<boolean> {
+export async function isParakeetMlxAvailable(): Promise<boolean> {
 	try {
-		const proc = Bun.spawn(["which", "whisper-cli"], {
+		const proc = Bun.spawn(["which", "parakeet-mlx"], {
 			stdout: "pipe",
 			stderr: "pipe",
 		});
@@ -51,7 +49,7 @@ export async function checkWhisperCli(): Promise<boolean> {
  *
  * @returns True if ffmpeg found in PATH
  */
-export async function checkFfmpeg(): Promise<boolean> {
+export async function isFfmpegAvailable(): Promise<boolean> {
 	try {
 		const proc = Bun.spawn(["which", "ffmpeg"], {
 			stdout: "pipe",
@@ -66,70 +64,35 @@ export async function checkFfmpeg(): Promise<boolean> {
 }
 
 /**
- * Convert m4a audio to wav format using ffmpeg.
- *
- * Whisper.cpp requires wav input. This converts the Apple Voice Memo
- * m4a format to wav using ffmpeg.
- *
- * @param m4aPath - Path to input .m4a file
- * @param wavPath - Path for output .wav file
- * @throws Error if conversion fails
+ * Default Parakeet model to use.
+ * This is the latest v3 model optimized for accuracy.
  */
-async function convertM4aToWav(
-	m4aPath: string,
-	wavPath: string,
-): Promise<void> {
-	const proc = Bun.spawn(
-		[
-			"ffmpeg",
-			"-i",
-			m4aPath,
-			"-ar",
-			"16000", // 16kHz sample rate (whisper.cpp requirement)
-			"-ac",
-			"1", // Mono
-			"-c:a",
-			"pcm_s16le", // 16-bit PCM
-			wavPath,
-			"-y", // Overwrite output file
-		],
-		{
-			stdout: "pipe",
-			stderr: "pipe",
-		},
-	);
-
-	const exitCode = await proc.exited;
-
-	if (exitCode !== 0) {
-		const stderr = await new Response(proc.stderr).text();
-		throw new Error(`ffmpeg conversion failed: ${stderr}`);
-	}
-}
+const DEFAULT_MODEL = "mlx-community/parakeet-tdt-0.6b-v3";
 
 /**
- * Run whisper-cli transcription.
+ * Run parakeet-mlx transcription.
  *
- * @param wavPath - Path to input .wav file
- * @param modelPath - Path to whisper.cpp model (.bin file)
- * @param outputPath - Path for output .txt file (without extension)
+ * @param audioPath - Path to input audio file
+ * @param outputDir - Directory for output .txt file
+ * @param model - Hugging Face model to use (default: parakeet-tdt-0.6b-v3)
+ * @returns Path to the output .txt file
  * @throws Error if transcription fails
  */
-async function runWhisperCli(
-	wavPath: string,
-	modelPath: string,
-	outputPath: string,
-): Promise<void> {
+async function runParakeetMlx(
+	audioPath: string,
+	outputDir: string,
+	model: string = DEFAULT_MODEL,
+): Promise<string> {
 	const proc = Bun.spawn(
 		[
-			"whisper-cli",
-			"-m",
-			modelPath,
-			"-f",
-			wavPath,
-			"-otxt", // Output as text file
-			"-of",
-			outputPath, // Output file path (without .txt extension)
+			"parakeet-mlx",
+			audioPath,
+			"--output-format",
+			"txt",
+			"--output-dir",
+			outputDir,
+			"--model",
+			model,
 		],
 		{
 			stdout: "pipe",
@@ -141,86 +104,100 @@ async function runWhisperCli(
 
 	if (exitCode !== 0) {
 		const stderr = await new Response(proc.stderr).text();
-		throw new Error(`whisper-cli failed: ${stderr}`);
+		throw new Error(`parakeet-mlx failed: ${stderr}`);
 	}
+
+	// parakeet-mlx outputs {filename}.txt in the output directory
+	const inputFilename = basename(audioPath);
+	const outputFilename = inputFilename.replace(/\.[^.]+$/, ".txt");
+	return join(outputDir, outputFilename);
 }
 
 /**
- * Transcribe a voice memo using whisper.cpp.
+ * Transcribe a voice memo using parakeet-mlx.
  *
  * Process:
- * 1. Check dependencies (whisper-cli, ffmpeg)
- * 2. Convert m4a → wav
- * 3. Run whisper-cli transcription
- * 4. Read transcription text
- * 5. Clean up temp files
+ * 1. Check dependencies (parakeet-mlx, ffmpeg)
+ * 2. Run parakeet-mlx transcription
+ * 3. Read transcription text
+ * 4. Clean up temp files
  *
- * @param audioPath - Path to .m4a voice memo file
- * @param modelPath - Path to whisper.cpp model (.bin file)
+ * @param audioPath - Path to audio file (m4a, mp3, wav, etc.)
  * @returns Transcription result with text and metadata
  * @throws Error if dependencies missing or transcription fails
  */
 export async function transcribeVoiceMemo(
 	audioPath: string,
-	modelPath: string,
 ): Promise<TranscriptionResult> {
 	// Validate dependencies
-	if (!(await checkWhisperCli())) {
+	if (!(await isParakeetMlxAvailable())) {
 		throw new Error(
-			"whisper-cli not found. Install with: brew install whisper-cpp",
+			"parakeet-mlx not found. Install with: uv tool install parakeet-mlx",
 		);
 	}
 
-	if (!(await checkFfmpeg())) {
+	if (!(await isFfmpegAvailable())) {
 		throw new Error("ffmpeg not found. Install with: brew install ffmpeg");
 	}
 
-	// Validate input files
+	// Validate input file
 	if (!pathExistsSync(audioPath)) {
 		throw new Error(`Input file does not exist: ${audioPath}`);
 	}
 
-	if (!pathExistsSync(modelPath)) {
-		throw new Error(`Model file does not exist: ${modelPath}`);
-	}
+	// Create temp directory for output
+	const tempId = `parakeet-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+	const outputDir = join(tmpdir(), tempId);
 
-	// Create temp file paths
-	const tempId = `whisper-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-	const tempDir = tmpdir();
-	const wavPath = join(tempDir, `${tempId}.wav`);
-	const txtOutputBase = join(tempDir, tempId); // whisper-cli adds .txt
-	const txtPath = `${txtOutputBase}.txt`;
+	// Create output directory
+	await Bun.spawn(["mkdir", "-p", outputDir], {
+		stdout: "pipe",
+		stderr: "pipe",
+	}).exited;
+
+	let txtPath: string | null = null;
 
 	try {
-		// Step 1: Convert m4a → wav
-		await convertM4aToWav(audioPath, wavPath);
+		// Run parakeet-mlx transcription
+		txtPath = await runParakeetMlx(audioPath, outputDir);
 
-		// Step 2: Run whisper-cli
-		await runWhisperCli(wavPath, modelPath, txtOutputBase);
-
-		// Step 3: Read transcription
+		// Read transcription
 		const transcriptionFile = Bun.file(txtPath);
 		const text = await transcriptionFile.text();
 
-		// Extract model filename from path
-		const modelUsed = modelPath.split("/").pop() || "unknown";
-
 		return {
 			text: text.trim(),
-			duration: 0, // TODO: Could extract from ffmpeg output
-			modelUsed,
+			modelUsed: DEFAULT_MODEL,
 		};
 	} finally {
-		// Cleanup temp files
+		// Cleanup temp directory
 		try {
-			if (pathExistsSync(wavPath)) {
-				unlinkSync(wavPath);
-			}
-			if (pathExistsSync(txtPath)) {
-				unlinkSync(txtPath);
+			if (pathExistsSync(outputDir)) {
+				await Bun.spawn(["rm", "-rf", outputDir], {
+					stdout: "pipe",
+					stderr: "pipe",
+				}).exited;
 			}
 		} catch {
 			// Ignore cleanup errors
 		}
 	}
 }
+
+// Legacy exports for backwards compatibility during transition
+// These will be removed in a future version
+
+/**
+ * @deprecated Use isParakeetMlxAvailable instead. Will be removed in next major version.
+ */
+export { isParakeetMlxAvailable as checkWhisperCli };
+
+/**
+ * @deprecated Use isParakeetMlxAvailable instead.
+ */
+export { isParakeetMlxAvailable as checkParakeetMlx };
+
+/**
+ * @deprecated Use isFfmpegAvailable instead.
+ */
+export { isFfmpegAvailable as checkFfmpeg };

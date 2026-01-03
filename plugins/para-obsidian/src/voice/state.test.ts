@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathExistsSync } from "@sidequest/core/fs";
 import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
@@ -53,12 +54,90 @@ describe("voice/state", () => {
 
 		test("handles corrupted JSON gracefully", () => {
 			// Write invalid JSON
-			const fs = require("node:fs");
-			fs.writeFileSync(stateFilePath, "{ invalid json");
+			writeFileSync(stateFilePath, "{ invalid json");
 
 			const state = loadVoiceState(stateFilePath);
 
 			// Should return empty state instead of crashing
+			expect(state.processedMemos).toEqual({});
+			expect(state.lastScan).toBeNull();
+		});
+
+		test("returns empty state when processedMemos is an array", () => {
+			// Invalid: processedMemos should be object, not array
+			const invalidState = {
+				processedMemos: ["item1", "item2"],
+				lastScan: "2025-12-28T14:35:00Z",
+			};
+
+			writeFileSync(stateFilePath, JSON.stringify(invalidState));
+			const state = loadVoiceState(stateFilePath);
+
+			// Should return empty state (graceful degradation)
+			expect(state.processedMemos).toEqual({});
+			expect(state.lastScan).toBeNull();
+		});
+
+		test("returns empty state when processedMemos entry missing required fields", () => {
+			// Invalid: missing 'transcription' field
+			const invalidState = {
+				processedMemos: {
+					"20251228 143045-abc123.m4a": {
+						processedAt: "2025-12-28T14:35:00Z",
+						dailyNote: "2025-12-28",
+						// missing: transcription
+					},
+				},
+				lastScan: "2025-12-28T14:35:00Z",
+			};
+
+			writeFileSync(stateFilePath, JSON.stringify(invalidState));
+			const state = loadVoiceState(stateFilePath);
+
+			// Should return empty state (graceful degradation)
+			expect(state.processedMemos).toEqual({});
+			expect(state.lastScan).toBeNull();
+		});
+
+		test("returns empty state when processedMemos entry is not an object", () => {
+			// Invalid: entry is a primitive, not an object
+			const invalidState = {
+				processedMemos: {
+					"20251228 143045-abc123.m4a": "not an object",
+				},
+				lastScan: "2025-12-28T14:35:00Z",
+			};
+
+			writeFileSync(stateFilePath, JSON.stringify(invalidState));
+			const state = loadVoiceState(stateFilePath);
+
+			// Should return empty state (graceful degradation)
+			expect(state.processedMemos).toEqual({});
+			expect(state.lastScan).toBeNull();
+		});
+
+		test("returns empty state when processedMemos is missing", () => {
+			// Invalid: no processedMemos field
+			const invalidState = {
+				lastScan: "2025-12-28T14:35:00Z",
+			};
+
+			writeFileSync(stateFilePath, JSON.stringify(invalidState));
+			const state = loadVoiceState(stateFilePath);
+
+			// Should return empty state (graceful degradation)
+			expect(state.processedMemos).toEqual({});
+			expect(state.lastScan).toBeNull();
+		});
+
+		test("returns empty state when root is not an object", () => {
+			// Invalid: root is an array
+			const invalidState = ["not", "an", "object"];
+
+			writeFileSync(stateFilePath, JSON.stringify(invalidState));
+			const state = loadVoiceState(stateFilePath);
+
+			// Should return empty state (graceful degradation)
 			expect(state.processedMemos).toEqual({});
 			expect(state.lastScan).toBeNull();
 		});

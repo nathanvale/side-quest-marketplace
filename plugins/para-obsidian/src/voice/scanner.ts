@@ -7,7 +7,7 @@
  * @module voice/scanner
  */
 
-import { readdirSync, statSync } from "node:fs";
+import { lstatSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { pathExistsSync } from "@sidequest/core/fs";
 
@@ -53,12 +53,30 @@ const VOICE_MEMO_PATTERN =
 	/^(\d{4})(\d{2})(\d{2}) (\d{2})(\d{2})(\d{2})-[a-zA-Z0-9]+\.m4a$/;
 
 /**
+ * Safe filename pattern for security validation.
+ * Allows: alphanumeric, spaces, hyphens, underscores, dots
+ * Prevents: command injection via shell metacharacters
+ */
+const SAFE_FILENAME_PATTERN = /^[\w\d\s._-]+\.m4a$/i;
+
+/**
+ * Validate filename contains only safe characters.
+ * Prevents command injection via malicious filenames.
+ *
+ * @param filename - Voice memo filename to validate
+ * @returns True if filename is safe for processing
+ */
+export function isSafeFilename(filename: string): boolean {
+	return SAFE_FILENAME_PATTERN.test(filename);
+}
+
+/**
  * Parse timestamp from voice memo filename.
  *
  * Apple Voice Memos use filename format: YYYYMMDD HHMMSS-<UUID>.m4a
  *
  * @param filename - Voice memo filename (not full path)
- * @returns Parsed timestamp components, or null if invalid format
+ * @returns Parsed timestamp components, or null if invalid format or invalid values
  */
 export function parseVoiceMemoTimestamp(
 	filename: string,
@@ -68,13 +86,28 @@ export function parseVoiceMemoTimestamp(
 		return null;
 	}
 
+	const year = Number.parseInt(match[1] as string, 10);
+	const month = Number.parseInt(match[2] as string, 10);
+	const day = Number.parseInt(match[3] as string, 10);
+	const hour = Number.parseInt(match[4] as string, 10);
+	const minute = Number.parseInt(match[5] as string, 10);
+	const second = Number.parseInt(match[6] as string, 10);
+
+	// Validate timestamp values are within sane ranges
+	if (year < 2000 || year > 2100) return null;
+	if (month < 1 || month > 12) return null;
+	if (day < 1 || day > 31) return null;
+	if (hour < 0 || hour > 23) return null;
+	if (minute < 0 || minute > 59) return null;
+	if (second < 0 || second > 59) return null;
+
 	return {
-		year: Number.parseInt(match[1] as string, 10),
-		month: Number.parseInt(match[2] as string, 10),
-		day: Number.parseInt(match[3] as string, 10),
-		hour: Number.parseInt(match[4] as string, 10),
-		minute: Number.parseInt(match[5] as string, 10),
-		second: Number.parseInt(match[6] as string, 10),
+		year,
+		month,
+		day,
+		hour,
+		minute,
+		second,
 	};
 }
 
@@ -130,8 +163,20 @@ export function scanVoiceMemos(
 			continue; // Skip non-voice-memo files
 		}
 
+		// Security: Validate filename has only safe characters
+		if (!isSafeFilename(filename)) {
+			continue; // Skip files with potentially dangerous characters
+		}
+
 		// Get full path and check file size
 		const fullPath = join(recordingsDir, filename);
+
+		// Security: Skip symlinks to prevent path traversal
+		const lstats = lstatSync(fullPath);
+		if (lstats.isSymbolicLink()) {
+			continue;
+		}
+
 		const stats = statSync(fullPath);
 
 		// Skip empty files (iCloud not synced)
