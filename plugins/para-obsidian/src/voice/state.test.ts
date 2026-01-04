@@ -7,7 +7,9 @@ import {
 	isProcessed,
 	loadVoiceState,
 	markAsProcessed,
+	markAsSkipped,
 	type ProcessedMemoMetadata,
+	type SkippedMemoMetadata,
 	saveVoiceState,
 	type VoiceState,
 } from "./state";
@@ -141,6 +143,51 @@ describe("voice/state", () => {
 			expect(state.processedMemos).toEqual({});
 			expect(state.lastScan).toBeNull();
 		});
+
+		test("loads state with skipped memos", () => {
+			const existingState: VoiceState = {
+				processedMemos: {
+					"20251228 143045-abc123.m4a": {
+						processedAt: "2025-12-28T14:35:00Z",
+						transcription: "Test transcription...",
+						dailyNote: "2025-12-28",
+					},
+					"20251228 150000-xyz789.m4a": {
+						skippedAt: "2025-12-28T15:00:00Z",
+						reason: "empty transcription",
+						status: "skipped",
+					},
+				},
+				lastScan: "2025-12-28T15:00:00Z",
+			};
+
+			saveVoiceState(stateFilePath, existingState);
+			const loaded = loadVoiceState(stateFilePath);
+
+			expect(loaded.processedMemos).toEqual(existingState.processedMemos);
+			expect(loaded.lastScan).toBe(existingState.lastScan);
+		});
+
+		test("returns empty state when skipped memo missing required fields", () => {
+			// Invalid: skipped memo missing 'reason' field
+			const invalidState = {
+				processedMemos: {
+					"20251228 143045-abc123.m4a": {
+						skippedAt: "2025-12-28T14:35:00Z",
+						status: "skipped",
+						// missing: reason
+					},
+				},
+				lastScan: "2025-12-28T14:35:00Z",
+			};
+
+			writeFileSync(stateFilePath, JSON.stringify(invalidState));
+			const state = loadVoiceState(stateFilePath);
+
+			// Should return empty state (graceful degradation)
+			expect(state.processedMemos).toEqual({});
+			expect(state.lastScan).toBeNull();
+		});
 	});
 
 	describe("saveVoiceState", () => {
@@ -226,6 +273,21 @@ describe("voice/state", () => {
 						processedAt: "2025-12-28T14:35:00Z",
 						transcription: "Test",
 						dailyNote: "2025-12-28",
+					},
+				},
+				lastScan: null,
+			};
+
+			expect(isProcessed(state, "20251228 143045-abc123.m4a")).toBe(true);
+		});
+
+		test("returns true for skipped memo", () => {
+			const state: VoiceState = {
+				processedMemos: {
+					"20251228 143045-abc123.m4a": {
+						skippedAt: "2025-12-28T14:35:00Z",
+						reason: "empty transcription",
+						status: "skipped",
 					},
 				},
 				lastScan: null,
@@ -334,6 +396,79 @@ describe("voice/state", () => {
 
 			// Updated should have the new memo
 			expect(updated.processedMemos["test.m4a"]).toBeDefined();
+		});
+	});
+
+	describe("markAsSkipped", () => {
+		test("adds skipped memo to state", () => {
+			const state: VoiceState = {
+				processedMemos: {},
+				lastScan: null,
+			};
+
+			const updated = markAsSkipped(
+				state,
+				"20251228 143045-abc123.m4a",
+				"empty transcription",
+			);
+
+			const skippedMemo = updated.processedMemos[
+				"20251228 143045-abc123.m4a"
+			] as SkippedMemoMetadata;
+			expect(skippedMemo.status).toBe("skipped");
+			expect(skippedMemo.reason).toBe("empty transcription");
+			expect(skippedMemo.skippedAt).toBeDefined();
+			expect(updated.lastScan).toBe(skippedMemo.skippedAt);
+		});
+
+		test("preserves other memos when adding skipped memo", () => {
+			const state: VoiceState = {
+				processedMemos: {
+					"existing.m4a": {
+						processedAt: "2025-12-27T00:00:00Z",
+						transcription: "Existing",
+						dailyNote: "2025-12-27",
+					},
+				},
+				lastScan: "2025-12-27T00:00:00Z",
+			};
+
+			const updated = markAsSkipped(
+				state,
+				"skipped.m4a",
+				"empty transcription",
+			);
+
+			expect(updated.processedMemos["existing.m4a"]).toBeDefined();
+			expect(updated.processedMemos["skipped.m4a"]).toBeDefined();
+		});
+
+		test("doesn't mutate original state", () => {
+			const state: VoiceState = {
+				processedMemos: {},
+				lastScan: null,
+			};
+
+			const updated = markAsSkipped(state, "test.m4a", "empty transcription");
+
+			// Original should be unchanged
+			expect(state.processedMemos).toEqual({});
+			expect(state.lastScan).toBeNull();
+
+			// Updated should have the skipped memo
+			expect(updated.processedMemos["test.m4a"]).toBeDefined();
+		});
+
+		test("skipped memos are detected by isProcessed", () => {
+			const state: VoiceState = {
+				processedMemos: {},
+				lastScan: null,
+			};
+
+			const updated = markAsSkipped(state, "test.m4a", "empty transcription");
+
+			// Should be detected as processed (won't be retried)
+			expect(isProcessed(updated, "test.m4a")).toBe(true);
 		});
 	});
 });

@@ -19,6 +19,7 @@ import { emphasize } from "@sidequest/core/terminal";
 import { createSpinner } from "nanospinner";
 import type { ParaObsidianConfig } from "../config/index";
 import { insertIntoNote } from "../notes/insert";
+import { withFileLock } from "../shared/file-lock";
 import {
 	createCorrelationId,
 	getLogFile,
@@ -33,6 +34,7 @@ import {
 	isProcessed,
 	loadVoiceState,
 	markAsProcessed,
+	markAsSkipped,
 	saveVoiceState,
 	scanVoiceMemos,
 	transcribeVoiceMemo,
@@ -210,6 +212,56 @@ export async function handleVoice(ctx: CommandContext): Promise<CommandResult> {
 		console.log(emphasize.info(`Logs: ${getLogFile()}`));
 	}
 
+	// Validate vault configuration
+	const vaultCid = createCorrelationId();
+	if (!config.vault || config.vault.trim() === "") {
+		voiceLogger.error`voice:validateVault:missing cid=${vaultCid} sessionCid=${sessionCid}`;
+		if (isJson) {
+			console.log(
+				JSON.stringify(
+					{
+						success: false,
+						error: "Vault path not configured",
+						hint: "Set PARA_VAULT environment variable",
+						sessionCid,
+					},
+					null,
+					2,
+				),
+			);
+		} else {
+			console.log(emphasize.error("Vault path not configured."));
+			console.log("Set PARA_VAULT environment variable.");
+		}
+		session.end({ error: "Vault path not configured" });
+		return { success: false, exitCode: 1 };
+	}
+
+	if (!pathExistsSync(config.vault)) {
+		voiceLogger.error`voice:validateVault:notFound cid=${vaultCid} sessionCid=${sessionCid} vault=${config.vault}`;
+		if (isJson) {
+			console.log(
+				JSON.stringify(
+					{
+						success: false,
+						error: "Vault path does not exist",
+						path: config.vault,
+						sessionCid,
+					},
+					null,
+					2,
+				),
+			);
+		} else {
+			console.log(emphasize.error("Vault path does not exist."));
+			console.log(`Path: ${config.vault}`);
+		}
+		session.end({ error: "Vault path does not exist" });
+		return { success: false, exitCode: 1 };
+	}
+
+	voiceLogger.debug`voice:validateVault:success cid=${vaultCid} sessionCid=${sessionCid} vault=${config.vault}`;
+
 	// Check dependencies first
 	const depCid = createCorrelationId();
 	voiceLogger.debug`voice:checkDeps cid=${depCid} sessionCid=${sessionCid}`;
@@ -320,161 +372,195 @@ export async function handleVoice(ctx: CommandContext): Promise<CommandResult> {
 		return { success: true };
 	}
 
-	// Load state
-	const state = loadVoiceState(stateFilePath);
+	// Wrap critical section in file lock to prevent concurrent state modifications
+	const { processed, skipped, memosToProcess } = await withFileLock(
+		stateFilePath,
+		async () => {
+			// Load state (inside lock)
+			const state = loadVoiceState(stateFilePath);
 
-	// Filter to unprocessed memos (unless --all flag)
-	const memosToProcess = all
-		? memos
-		: memos.filter((m) => !isProcessed(state, m.filename));
+			// Filter to unprocessed memos (unless --all flag)
+			const memosToProcess = all
+				? memos
+				: memos.filter((m) => !isProcessed(state, m.filename));
 
-	voiceLogger.debug`voice:filter sessionCid=${sessionCid} totalMemos=${memos.length} toProcess=${memosToProcess.length} all=${all}`;
+			voiceLogger.debug`voice:filter sessionCid=${sessionCid} totalMemos=${memos.length} toProcess=${memosToProcess.length} all=${all}`;
 
-	if (memosToProcess.length === 0) {
-		voiceLogger.info`voice:complete sessionCid=${sessionCid} processed=${0} total=${memos.length} message=${"All memos already processed"}`;
-		if (isJson) {
-			console.log(
-				JSON.stringify(
-					{
-						success: true,
-						processed: 0,
-						total: memos.length,
-						message: "All memos already processed",
-						hint: "Use --all to re-process",
-						sessionCid,
-					},
-					null,
-					2,
-				),
-			);
-		} else {
-			console.log(emphasize.info("All memos already processed."));
-			console.log(`Total: ${memos.length} memos`);
-			console.log("Use --all to re-process all memos.");
-		}
-		session.end({ success: true });
-		return { success: true };
-	}
+			if (memosToProcess.length === 0) {
+				voiceLogger.info`voice:complete sessionCid=${sessionCid} processed=${0} total=${memos.length} message=${"All memos already processed"}`;
+				if (isJson) {
+					console.log(
+						JSON.stringify(
+							{
+								success: true,
+								processed: 0,
+								total: memos.length,
+								message: "All memos already processed",
+								hint: "Use --all to re-process",
+								sessionCid,
+							},
+							null,
+							2,
+						),
+					);
+				} else {
+					console.log(emphasize.info("All memos already processed."));
+					console.log(`Total: ${memos.length} memos`);
+					console.log("Use --all to re-process all memos.");
+				}
+				return { processed: 0, skipped: 0, memosToProcess };
+			}
 
-	// Show summary
-	if (!isJson) {
-		console.log(`Found ${memosToProcess.length} memo(s) to process`);
-		console.log("");
-	}
+			// Show summary
+			if (!isJson) {
+				console.log(`Found ${memosToProcess.length} memo(s) to process`);
+				console.log("");
+			}
 
-	if (dryRun) {
-		voiceLogger.info`voice:dryRun sessionCid=${sessionCid} memoCount=${memosToProcess.length}`;
-		if (isJson) {
-			console.log(
-				JSON.stringify(
-					{
-						dryRun: true,
-						memos: memosToProcess.map((m) => ({
-							filename: m.filename,
-							timestamp: m.timestamp.toISOString(),
-						})),
-						sessionCid,
-					},
-					null,
-					2,
-				),
-			);
-		} else {
-			console.log(emphasize.info("Dry run - would process:"));
+			if (dryRun) {
+				voiceLogger.info`voice:dryRun sessionCid=${sessionCid} memoCount=${memosToProcess.length}`;
+				if (isJson) {
+					console.log(
+						JSON.stringify(
+							{
+								dryRun: true,
+								memos: memosToProcess.map((m) => ({
+									filename: m.filename,
+									timestamp: m.timestamp.toISOString(),
+								})),
+								sessionCid,
+							},
+							null,
+							2,
+						),
+					);
+				} else {
+					console.log(emphasize.info("Dry run - would process:"));
+					for (const memo of memosToProcess) {
+						console.log(`  - ${memo.filename}`);
+					}
+				}
+				return { processed: 0, skipped: 0, memosToProcess };
+			}
+
+			// Process each memo
+			let processed = 0;
+			let skipped = 0;
+			let newState = state;
+
 			for (const memo of memosToProcess) {
-				console.log(`  - ${memo.filename}`);
+				const memoCid = createCorrelationId();
+				voiceLogger.debug`voice:process cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename}`;
+
+				const spinner = isJson
+					? null
+					: createSpinner(`Processing ${memo.filename}...`).start();
+
+				try {
+					const dailyNotePath = getDailyNotePath(config.vault, memo.timestamp);
+					const localDateStr = formatLocalDate(memo.timestamp);
+					const dailyNoteRelative = `000 Timestamps/Daily Notes/${localDateStr}.md`;
+
+					// Transcribe
+					const transcribeStart = Date.now();
+					const result = await transcribeVoiceMemo(memo.path);
+					const transcribeDurationMs = Date.now() - transcribeStart;
+
+					voiceLogger.info`voice:transcribe:success cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename} textLength=${result.text.length} durationMs=${transcribeDurationMs}`;
+
+					// Check for empty transcription (parakeet-mlx returns empty for unrecognizable audio)
+					if (result.text.trim().length === 0) {
+						const skipReason = "empty transcription";
+						voiceLogger.warn`voice:transcribe:empty cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename} reason=${skipReason}`;
+
+						// Mark as skipped so we don't retry on next run
+						newState = markAsSkipped(newState, memo.filename, skipReason);
+
+						// Save state incrementally
+						try {
+							saveVoiceState(stateFilePath, newState);
+							voiceLogger.debug`voice:saveState:skipped cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename}`;
+						} catch (saveError) {
+							const saveErr = saveError as Error;
+							voiceLogger.error`voice:saveState:failed cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename} error=${saveErr.message}`;
+						}
+
+						spinner?.warn({
+							text: `Skipped ${memo.filename}: empty transcription`,
+						});
+						skipped++;
+						continue;
+					}
+
+					// Format log entry
+					const logEntry = formatLogEntry(memo.timestamp, result.text);
+
+					// Auto-create daily note if it doesn't exist
+					const wasCreated = ensureDailyNote(
+						config,
+						memo.timestamp,
+						dailyNotePath,
+					);
+					if (wasCreated) {
+						voiceLogger.info`voice:createDailyNote cid=${memoCid} sessionCid=${sessionCid} dailyNote=${dailyNoteRelative}`;
+						spinner?.update({
+							text: `Created daily note for ${dailyNoteRelative}...`,
+						});
+					}
+
+					// Ensure Log section exists (for older daily notes without it)
+					const logSectionAdded = ensureLogSection(dailyNotePath);
+					if (logSectionAdded) {
+						voiceLogger.info`voice:addLogSection cid=${memoCid} sessionCid=${sessionCid} dailyNote=${dailyNoteRelative}`;
+					}
+
+					// Insert into note
+					insertIntoNote(config, {
+						file: dailyNotePath,
+						heading: "Log",
+						content: logEntry,
+						mode: "append",
+					});
+
+					voiceLogger.debug`voice:insert cid=${memoCid} sessionCid=${sessionCid} dailyNote=${dailyNoteRelative}`;
+
+					// Mark as processed (accumulate into newState)
+					newState = markAsProcessed(newState, memo.filename, {
+						processedAt: new Date().toISOString(),
+						transcription: result.text.slice(0, 100),
+						dailyNote: localDateStr,
+					});
+
+					// Save state incrementally after each successful processing
+					// Wrapped in try/catch - if save fails, state is still in memory for duplicate detection
+					try {
+						saveVoiceState(stateFilePath, newState);
+						voiceLogger.debug`voice:saveState:incremental cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename}`;
+					} catch (saveError) {
+						const saveErr = saveError as Error;
+						voiceLogger.error`voice:saveState:failed cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename} error=${saveErr.message}`;
+						// Continue processing - in-memory state still prevents duplicates within this session
+					}
+
+					spinner?.success({
+						text: `Processed ${memo.filename}`,
+					});
+					processed++;
+
+					voiceLogger.info`voice:process:success cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename}`;
+				} catch (error) {
+					const err = error as Error;
+					voiceLogger.error`voice:process:error cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename} error=${err.message}`;
+					spinner?.error({
+						text: `Failed to process ${memo.filename}: ${err.message}`,
+					});
+					skipped++;
+				}
 			}
-		}
-		session.end({ success: true });
-		return { success: true };
-	}
 
-	// Process each memo
-	let processed = 0;
-	let skipped = 0;
-	let newState = state;
-
-	for (const memo of memosToProcess) {
-		const memoCid = createCorrelationId();
-		voiceLogger.debug`voice:process cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename}`;
-
-		const spinner = isJson
-			? null
-			: createSpinner(`Processing ${memo.filename}...`).start();
-
-		try {
-			const dailyNotePath = getDailyNotePath(config.vault, memo.timestamp);
-			const localDateStr = formatLocalDate(memo.timestamp);
-			const dailyNoteRelative = `000 Timestamps/Daily Notes/${localDateStr}.md`;
-
-			// Transcribe
-			const transcribeStart = Date.now();
-			const result = await transcribeVoiceMemo(memo.path);
-			const transcribeDurationMs = Date.now() - transcribeStart;
-
-			voiceLogger.info`voice:transcribe:success cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename} textLength=${result.text.length} durationMs=${transcribeDurationMs}`;
-
-			// Format log entry
-			const logEntry = formatLogEntry(memo.timestamp, result.text);
-
-			// Auto-create daily note if it doesn't exist
-			const wasCreated = ensureDailyNote(config, memo.timestamp, dailyNotePath);
-			if (wasCreated) {
-				voiceLogger.info`voice:createDailyNote cid=${memoCid} sessionCid=${sessionCid} dailyNote=${dailyNoteRelative}`;
-				spinner?.update({
-					text: `Created daily note for ${dailyNoteRelative}...`,
-				});
-			}
-
-			// Ensure Log section exists (for older daily notes without it)
-			const logSectionAdded = ensureLogSection(dailyNotePath);
-			if (logSectionAdded) {
-				voiceLogger.info`voice:addLogSection cid=${memoCid} sessionCid=${sessionCid} dailyNote=${dailyNoteRelative}`;
-			}
-
-			// Insert into note
-			insertIntoNote(config, {
-				file: dailyNotePath,
-				heading: "Log",
-				content: logEntry,
-				mode: "append",
-			});
-
-			voiceLogger.debug`voice:insert cid=${memoCid} sessionCid=${sessionCid} dailyNote=${dailyNoteRelative}`;
-
-			// Mark as processed (accumulate into newState)
-			newState = markAsProcessed(newState, memo.filename, {
-				processedAt: new Date().toISOString(),
-				transcription: result.text.slice(0, 100),
-				dailyNote: localDateStr,
-			});
-
-			// Save state incrementally after each successful processing
-			// Wrapped in try/catch - if save fails, state is still in memory for duplicate detection
-			try {
-				saveVoiceState(stateFilePath, newState);
-				voiceLogger.debug`voice:saveState:incremental cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename}`;
-			} catch (saveError) {
-				const saveErr = saveError as Error;
-				voiceLogger.error`voice:saveState:failed cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename} error=${saveErr.message}`;
-				// Continue processing - in-memory state still prevents duplicates within this session
-			}
-
-			spinner?.success({
-				text: `Processed ${memo.filename}`,
-			});
-			processed++;
-
-			voiceLogger.info`voice:process:success cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename}`;
-		} catch (error) {
-			const err = error as Error;
-			voiceLogger.error`voice:process:error cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename} error=${err.message}`;
-			spinner?.error({
-				text: `Failed to process ${memo.filename}: ${err.message}`,
-			});
-			skipped++;
-		}
-	}
+			return { processed, skipped, memosToProcess };
+		},
+	);
 
 	// Summary
 	voiceLogger.info`voice:complete sessionCid=${sessionCid} processed=${processed} skipped=${skipped} total=${memosToProcess.length}`;

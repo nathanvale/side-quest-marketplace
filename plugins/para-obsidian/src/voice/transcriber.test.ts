@@ -10,13 +10,18 @@ import {
 
 describe("voice/transcriber", () => {
 	let tempDir: string;
+	let originalSpawn: typeof Bun.spawn;
 
 	beforeEach(() => {
 		tempDir = createTempDir("voice-transcriber-");
+		// Store original Bun.spawn for restoration
+		originalSpawn = Bun.spawn;
 	});
 
 	afterEach(() => {
 		cleanupTestDir(tempDir);
+		// Restore original Bun.spawn to prevent test pollution
+		Bun.spawn = originalSpawn;
 		mock.restore();
 	});
 
@@ -131,6 +136,69 @@ describe("voice/transcriber", () => {
 	});
 
 	describe("transcribeVoiceMemo", () => {
+		test("throws when path is not absolute (security)", async () => {
+			const relativePath = "test.m4a";
+
+			await expect(transcribeVoiceMemo(relativePath)).rejects.toThrow(
+				"Audio path must be absolute for security",
+			);
+		});
+
+		test("throws when path contains shell metacharacters (security)", async () => {
+			const dangerousPaths = [
+				"/tmp/test; rm -rf /",
+				"/tmp/test && echo pwned",
+				"/tmp/test | cat /etc/passwd",
+				"/tmp/test`whoami`.m4a",
+				"/tmp/test$(whoami).m4a",
+				'/tmp/test"quoted".m4a',
+				"/tmp/test'quoted'.m4a",
+				"/tmp/test\\escaped.m4a",
+				"/tmp/test<redirect.m4a",
+				"/tmp/test>redirect.m4a",
+				"/tmp/test(parens).m4a",
+			];
+
+			for (const path of dangerousPaths) {
+				await expect(transcribeVoiceMemo(path)).rejects.toThrow(
+					"Audio path contains unsafe shell metacharacters",
+				);
+			}
+		});
+
+		test("allows safe absolute paths with allowed characters", async () => {
+			const mockPath = join(tempDir, "test-file_name.m4a");
+			writeTextFileSync(mockPath, "mock audio");
+
+			// Mock both checks to succeed
+			const mockSpawn = mock(() => ({
+				exited: Promise.resolve(0),
+				stdout: { text: () => Promise.resolve("/usr/local/bin/parakeet-mlx") },
+				stderr: { text: () => Promise.resolve("") },
+			}));
+			Bun.spawn = mockSpawn as unknown as typeof Bun.spawn;
+
+			// Expect to pass security validation and fail at dependency check or later
+			// (We're just testing that security validation passes for valid paths)
+			try {
+				await transcribeVoiceMemo(mockPath);
+			} catch (error) {
+				// Expected to fail at transcription stage with mock audio
+				// Security validation should pass
+				const err = error as Error;
+				expect(err.message).not.toContain("absolute");
+				expect(err.message).not.toContain("metacharacters");
+			}
+		});
+
+		test("throws when path does not exist (after security validation)", async () => {
+			const nonExistentPath = join(tempDir, "does-not-exist.m4a");
+
+			await expect(transcribeVoiceMemo(nonExistentPath)).rejects.toThrow(
+				"Audio file does not exist",
+			);
+		});
+
 		test("throws specific error when parakeet-mlx unavailable", async () => {
 			const mockPath = join(tempDir, "test.m4a");
 			writeTextFileSync(mockPath, "mock audio");
@@ -177,22 +245,6 @@ describe("voice/transcriber", () => {
 
 			await expect(transcribeVoiceMemo(mockPath)).rejects.toThrow(
 				"ffmpeg not found. Install with: brew install ffmpeg",
-			);
-		});
-
-		test("throws when input file does not exist", async () => {
-			const nonExistentPath = join(tempDir, "does-not-exist.m4a");
-
-			// Mock both checks to succeed
-			const mockSpawn = mock(() => ({
-				exited: Promise.resolve(0),
-				stdout: { text: () => Promise.resolve("/usr/local/bin/parakeet-mlx") },
-				stderr: { text: () => Promise.resolve("") },
-			}));
-			Bun.spawn = mockSpawn as unknown as typeof Bun.spawn;
-
-			await expect(transcribeVoiceMemo(nonExistentPath)).rejects.toThrow(
-				`Input file does not exist: ${nonExistentPath}`,
 			);
 		});
 

@@ -29,11 +29,28 @@ export interface ProcessedMemoMetadata {
 }
 
 /**
+ * Metadata about a skipped voice memo (e.g., empty transcription).
+ */
+export interface SkippedMemoMetadata {
+	/** ISO 8601 timestamp when memo was skipped */
+	readonly skippedAt: string;
+	/** Reason why the memo was skipped */
+	readonly reason: string;
+	/** Marker to distinguish from processed memos */
+	readonly status: "skipped";
+}
+
+/**
+ * Union type for memo metadata (processed or skipped).
+ */
+export type MemoMetadata = ProcessedMemoMetadata | SkippedMemoMetadata;
+
+/**
  * Voice memo processing state.
  */
 export interface VoiceState {
-	/** Map of filename -> metadata for processed memos */
-	readonly processedMemos: Record<string, ProcessedMemoMetadata>;
+	/** Map of filename -> metadata for processed or skipped memos */
+	readonly processedMemos: Record<string, MemoMetadata>;
 	/** ISO 8601 timestamp of last scan */
 	readonly lastScan: string | null;
 }
@@ -74,11 +91,21 @@ function isValidVoiceState(data: unknown): data is VoiceState {
 		return false;
 	}
 
-	// Validate each entry has required fields
+	// Validate each entry has required fields (processed or skipped)
 	for (const [_key, value] of Object.entries(state.processedMemos)) {
 		if (typeof value !== "object" || value === null) {
 			return false;
 		}
+
+		// Check if it's a skipped memo
+		if ("status" in value && value.status === "skipped") {
+			if (!("skippedAt" in value) || !("reason" in value)) {
+				return false;
+			}
+			continue;
+		}
+
+		// Otherwise it must be a processed memo
 		if (
 			!("processedAt" in value) ||
 			!("dailyNote" in value) ||
@@ -186,5 +213,35 @@ export function markAsProcessed(
 			[filename]: metadata,
 		},
 		lastScan: metadata.processedAt,
+	};
+}
+
+/**
+ * Mark a voice memo as skipped (e.g., empty transcription).
+ *
+ * Returns new state object (immutable update).
+ * Updates lastScan to skippedAt timestamp.
+ *
+ * @param state - Current voice memo state
+ * @param filename - Voice memo filename (not full path)
+ * @param reason - Reason why the memo was skipped
+ * @returns Updated state
+ */
+export function markAsSkipped(
+	state: VoiceState,
+	filename: string,
+	reason: string,
+): VoiceState {
+	const skippedAt = new Date().toISOString();
+	return {
+		processedMemos: {
+			...state.processedMemos,
+			[filename]: {
+				skippedAt,
+				reason,
+				status: "skipped",
+			},
+		},
+		lastScan: skippedAt,
 	};
 }

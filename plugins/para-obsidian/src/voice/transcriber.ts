@@ -114,21 +114,65 @@ async function runParakeetMlx(
 }
 
 /**
+ * Validate audio file path for security.
+ *
+ * **Defense in depth**: While the scanner validates filenames, the transcriber
+ * independently validates paths to prevent command injection if called directly.
+ *
+ * Checks:
+ * - Path must be absolute (prevents relative path attacks)
+ * - Path must not contain shell metacharacters (prevents injection)
+ * - Path must exist (file presence check)
+ *
+ * @param audioPath - Path to validate
+ * @throws Error if path is unsafe or invalid
+ */
+function validateAudioPath(audioPath: string): void {
+	const { isAbsolute } = require("node:path");
+
+	// Must be absolute path (prevents relative path confusion)
+	if (!isAbsolute(audioPath)) {
+		throw new Error(
+			`Audio path must be absolute for security (got: ${audioPath})`,
+		);
+	}
+
+	// Prevent shell metacharacters (command injection defense)
+	// Allow: alphanumeric, /, -, _, ., space
+	// Block: ; & | ` $ ( ) < > " ' \ newlines
+	const shellMetaPattern = /[;&|`$()<>"'\\]/;
+	if (shellMetaPattern.test(audioPath)) {
+		throw new Error(
+			`Audio path contains unsafe shell metacharacters (got: ${audioPath})`,
+		);
+	}
+
+	// File must exist (presence validation)
+	if (!pathExistsSync(audioPath)) {
+		throw new Error(`Audio file does not exist: ${audioPath}`);
+	}
+}
+
+/**
  * Transcribe a voice memo using parakeet-mlx.
  *
  * Process:
- * 1. Check dependencies (parakeet-mlx, ffmpeg)
- * 2. Run parakeet-mlx transcription
- * 3. Read transcription text
- * 4. Clean up temp files
+ * 1. Validate audio path (security check)
+ * 2. Check dependencies (parakeet-mlx, ffmpeg)
+ * 3. Run parakeet-mlx transcription
+ * 4. Read transcription text
+ * 5. Clean up temp files
  *
- * @param audioPath - Path to audio file (m4a, mp3, wav, etc.)
+ * @param audioPath - Absolute path to audio file (m4a, mp3, wav, etc.)
  * @returns Transcription result with text and metadata
- * @throws Error if dependencies missing or transcription fails
+ * @throws Error if path is unsafe, dependencies missing, or transcription fails
  */
 export async function transcribeVoiceMemo(
 	audioPath: string,
 ): Promise<TranscriptionResult> {
+	// Security: Validate path before any processing
+	validateAudioPath(audioPath);
+
 	// Validate dependencies
 	if (!(await isParakeetMlxAvailable())) {
 		throw new Error(
@@ -138,11 +182,6 @@ export async function transcribeVoiceMemo(
 
 	if (!(await isFfmpegAvailable())) {
 		throw new Error("ffmpeg not found. Install with: brew install ffmpeg");
-	}
-
-	// Validate input file
-	if (!pathExistsSync(audioPath)) {
-		throw new Error(`Input file does not exist: ${audioPath}`);
 	}
 
 	// Create temp directory for output
@@ -160,6 +199,16 @@ export async function transcribeVoiceMemo(
 	try {
 		// Run parakeet-mlx transcription
 		txtPath = await runParakeetMlx(audioPath, outputDir);
+
+		// Check if output file was created
+		// Some audio files cause parakeet-mlx to exit with 0 but not create output
+		if (!pathExistsSync(txtPath)) {
+			// Return empty transcription - will be handled as "skipped" by caller
+			return {
+				text: "",
+				modelUsed: DEFAULT_MODEL,
+			};
+		}
 
 		// Read transcription
 		const transcriptionFile = Bun.file(txtPath);

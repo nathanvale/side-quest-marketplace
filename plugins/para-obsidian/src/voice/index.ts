@@ -26,8 +26,11 @@ export {
 export {
 	isProcessed,
 	loadVoiceState,
+	type MemoMetadata,
 	markAsProcessed,
+	markAsSkipped,
 	type ProcessedMemoMetadata,
+	type SkippedMemoMetadata,
 	saveVoiceState,
 	type VoiceState,
 } from "./state";

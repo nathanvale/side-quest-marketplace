@@ -92,6 +92,46 @@ describe("cli/voice", () => {
 	}
 
 	describe("handleVoice", () => {
+		test("returns error when vault path is not configured", async () => {
+			const ctx = createTestContext({
+				config: {
+					vault: "",
+					templatesDir: "",
+					autoCommit: true,
+					templateVersions: {},
+					frontmatterRules: {},
+				},
+			});
+
+			const result = await handleVoice(ctx);
+
+			expect(result.success).toBe(false);
+			expect(result.exitCode).toBe(1);
+			expect(mockSession.end).toHaveBeenCalledWith({
+				error: "Vault path not configured",
+			});
+		});
+
+		test("returns error when vault path does not exist", async () => {
+			const ctx = createTestContext({
+				config: {
+					vault: "/nonexistent/vault/path",
+					templatesDir: "",
+					autoCommit: true,
+					templateVersions: {},
+					frontmatterRules: {},
+				},
+			});
+
+			const result = await handleVoice(ctx);
+
+			expect(result.success).toBe(false);
+			expect(result.exitCode).toBe(1);
+			expect(mockSession.end).toHaveBeenCalledWith({
+				error: "Vault path does not exist",
+			});
+		});
+
 		test("returns error when parakeet-mlx not found", async () => {
 			const ctx = createTestContext();
 
@@ -490,6 +530,146 @@ describe("cli/voice", () => {
 			expect(result.success).toBe(true);
 			expect(transcribeSpy).toHaveBeenCalledTimes(2);
 			expect(insertSpy).toHaveBeenCalledTimes(2);
+		});
+
+		test("marks memo as skipped when transcription returns empty text", async () => {
+			const ctx = createTestContext();
+
+			// Setup mocks
+			mockVoiceDependencies();
+
+			// Mock scanVoiceMemos to return a single memo
+			spyOn(voiceModule, "scanVoiceMemos").mockReturnValue([
+				{
+					filename: "20240101-120000.m4a",
+					path: "/path/to/empty-memo.m4a",
+					timestamp: new Date("2024-01-01T12:00:00Z"),
+				},
+			]);
+
+			// Mock state (empty)
+			spyOn(voiceModule, "loadVoiceState").mockReturnValue({
+				processedMemos: {},
+				lastScan: null,
+			});
+
+			// Mock isProcessed to return false (not yet processed)
+			spyOn(voiceModule, "isProcessed").mockReturnValue(false);
+
+			// Mock transcription to return empty text
+			const transcribeSpy = spyOn(
+				voiceModule,
+				"transcribeVoiceMemo",
+			).mockResolvedValue({
+				text: "",
+				modelUsed: "test",
+			});
+
+			// Spy on markAsSkipped
+			const markAsSkippedSpy = spyOn(
+				voiceModule,
+				"markAsSkipped",
+			).mockImplementation((state) => state);
+
+			// Spy on insert - should NOT be called
+			const insertSpy = spyOn(
+				insertModule,
+				"insertIntoNote",
+			).mockImplementation(() => ({
+				relative: "000 Timestamps/Daily Notes/2024-01-01.md",
+				mode: "append" as const,
+			}));
+
+			const result = await handleVoice(ctx);
+
+			// Verify success
+			expect(result.success).toBe(true);
+
+			// Verify transcription was called
+			expect(transcribeSpy).toHaveBeenCalled();
+
+			// Verify markAsSkipped was called with correct filename and reason
+			expect(markAsSkippedSpy).toHaveBeenCalledWith(
+				expect.any(Object),
+				"20240101-120000.m4a",
+				"empty transcription",
+			);
+
+			// Verify insert was NOT called (memo not inserted into daily note)
+			expect(insertSpy).not.toHaveBeenCalled();
+
+			// Verify session ended successfully
+			expect(mockSession.end).toHaveBeenCalledWith({ success: true });
+		});
+
+		test("serializes concurrent access to voice state via file locking", async () => {
+			const ctx = createTestContext();
+
+			// Setup mocks
+			mockVoiceDependencies();
+
+			// Mock scanVoiceMemos to return a memo
+			spyOn(voiceModule, "scanVoiceMemos").mockReturnValue([
+				{
+					filename: "20240101-120000.m4a",
+					path: "/path/to/memo.m4a",
+					timestamp: new Date("2024-01-01T12:00:00Z"),
+				},
+			]);
+
+			// Mock state (empty)
+			let stateLoadCount = 0;
+			spyOn(voiceModule, "loadVoiceState").mockImplementation(() => {
+				stateLoadCount++;
+				return {
+					processedMemos: {},
+					lastScan: null,
+				};
+			});
+
+			// Mock isProcessed to return false
+			spyOn(voiceModule, "isProcessed").mockReturnValue(false);
+
+			// Create daily note
+			const dailyNotesDir = join(
+				ctx.config.vault,
+				"000 Timestamps",
+				"Daily Notes",
+			);
+			writeTestFile(dailyNotesDir, "2024-01-01.md", "# Log\n");
+
+			// Mock transcription with delay to simulate slow processing
+			spyOn(voiceModule, "transcribeVoiceMemo").mockImplementation(async () => {
+				await new Promise((resolve) => setTimeout(resolve, 50));
+				return {
+					text: "Test transcription",
+					modelUsed: "test",
+				};
+			});
+
+			// Mock insert
+			spyOn(insertModule, "insertIntoNote").mockImplementation(() => ({
+				relative: "000 Timestamps/Daily Notes/2024-01-01.md",
+				mode: "append" as const,
+			}));
+
+			// Mock state management
+			spyOn(voiceModule, "markAsProcessed").mockImplementation(
+				(state) => state,
+			);
+
+			// Launch two concurrent handleVoice calls
+			const [result1, result2] = await Promise.all([
+				handleVoice(ctx),
+				handleVoice(ctx),
+			]);
+
+			// Both should succeed
+			expect(result1.success).toBe(true);
+			expect(result2.success).toBe(true);
+
+			// State should be loaded exactly twice (once per process, serialized by lock)
+			expect(stateLoadCount).toBe(2);
 		});
 	});
 });
