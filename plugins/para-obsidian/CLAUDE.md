@@ -323,6 +323,34 @@ content  transcripts Registry  suggestions approve notes  PARA
 - **Maturity level: 4/5 (Adaptive)** - Full trace correlation with parent-child relationships
 - See `@./OBSERVABILITY_IMPROVEMENTS.md` for implementation details and trace examples
 
+**Log Message Pattern (REQUIRED):**
+
+All log messages MUST follow the `{domain}:{verb}:{status}` pattern using tagged template literals:
+
+```typescript
+// Pattern: domain:verb:status key=${value}
+logger.info`inbox:scan:start cid=${cid} sessionCid=${sessionCid}`;
+logger.info`inbox:scan:complete filesFound=${count} durationMs=${ms}`;
+logger.error`inbox:process:error cid=${cid} file=${path} error=${err.message}`;
+```
+
+| Domain | Example Messages |
+|--------|------------------|
+| `voice` | `voice:transcribe:success`, `voice:process:error` |
+| `inbox` | `inbox:scan:start`, `inbox:process:success`, `inbox:llm:fallback` |
+| `routing` | `routing:scan:start`, `routing:move:success`, `routing:skip:noDestination` |
+| `enrich` | `enrich:youtube:start`, `enrich:youtube:complete` |
+| `classify` | `classify:match:filename`, `classify:match:notFound` |
+| `cli` | `cli:clipper:start`, `cli:review:command` |
+| `fs` | `fs:insert:start`, `fs:insert:success`, `fs:insert:headingNotFound` |
+
+**Rules:**
+1. Use tagged template literals: `logger.info\`domain:verb:status\``
+2. Dynamic values in template expressions: `${variable}` (not string interpolation)
+3. Status words: `start`, `success`, `error`, `skip`, `complete`, `found`, `notFound`
+4. Low cardinality - no unique IDs in message text, put in attributes
+5. Preserve correlation IDs: `cid`, `sessionCid`, `parentCid`
+
 **Example Trace Hierarchy:**
 ```
 acdfe223 (Session: para scan, 3.2s)
