@@ -28,7 +28,6 @@ import {
 import { applyDateSubstitutions, getTemplate } from "../templates/index";
 import {
 	formatLogEntry,
-	formatTimestamp,
 	isFfmpegAvailable,
 	isParakeetMlxAvailable,
 	isProcessed,
@@ -173,31 +172,6 @@ function ensureLogSection(dailyNotePath: string): boolean {
 	writeTextFileSync(dailyNotePath, content.trimEnd() + logSection);
 
 	return true;
-}
-
-/**
- * Check if a log entry already exists in a daily note.
- *
- * Uses the timestamp prefix to detect duplicates (e.g., "- 9:02 am - 🎤").
- * This prevents duplicate entries when re-processing with --all flag.
- *
- * Uses anchored regex to match only at line start to avoid false positives
- * when the time string appears elsewhere in the file.
- *
- * @param dailyNotePath - Absolute path to the daily note
- * @param timePrefix - Time prefix to search for (e.g., "- 9:02 am - 🎤")
- * @returns true if entry already exists
- */
-function hasExistingEntry(dailyNotePath: string, timePrefix: string): boolean {
-	if (!pathExistsSync(dailyNotePath)) {
-		return false;
-	}
-	const content = readTextFileSync(dailyNotePath);
-	// Escape regex special characters in timePrefix
-	const escapedPrefix = timePrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	// Match only at start of line (multiline mode)
-	const pattern = new RegExp(`^${escapedPrefix}`, "m");
-	return pattern.test(content);
 }
 
 /**
@@ -429,20 +403,9 @@ export async function handleVoice(ctx: CommandContext): Promise<CommandResult> {
 			: createSpinner(`Processing ${memo.filename}...`).start();
 
 		try {
-			// Check for duplicate entry BEFORE transcribing (to avoid wasted work)
-			const timePrefix = `- ${formatTimestamp(memo.timestamp)} - 🎤`;
 			const dailyNotePath = getDailyNotePath(config.vault, memo.timestamp);
 			const localDateStr = formatLocalDate(memo.timestamp);
 			const dailyNoteRelative = `000 Timestamps/Daily Notes/${localDateStr}.md`;
-
-			if (hasExistingEntry(dailyNotePath, timePrefix)) {
-				voiceLogger.warn`voice:skip:duplicate cid=${memoCid} sessionCid=${sessionCid} filename=${memo.filename} dailyNote=${dailyNoteRelative}`;
-				spinner?.warn({
-					text: `Skipped ${memo.filename} (already exists in ${localDateStr})`,
-				});
-				skipped++;
-				continue;
-			}
 
 			// Transcribe
 			const transcribeStart = Date.now();
