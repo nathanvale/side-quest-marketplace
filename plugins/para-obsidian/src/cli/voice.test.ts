@@ -491,6 +491,5 @@ describe("cli/voice", () => {
 			expect(transcribeSpy).toHaveBeenCalledTimes(2);
 			expect(insertSpy).toHaveBeenCalledTimes(2);
 		});
-
 	});
 });
