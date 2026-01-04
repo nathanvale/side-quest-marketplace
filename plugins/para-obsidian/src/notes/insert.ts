@@ -172,12 +172,12 @@ export function insertIntoNote(
 ): { relative: string; mode: InsertMode } {
 	const target = resolveVaultPath(config.vault, options.file);
 	if (fsLogger) {
-		fsLogger.debug`insertIntoNote: vault=${config.vault} file=${options.file} heading=${options.heading} absolutePath=${target.absolute}`;
+		fsLogger.debug`fs:insert:start vault=${config.vault} file=${options.file} heading=${options.heading} absolutePath=${target.absolute}`;
 	}
 
 	if (!pathExistsSync(target.absolute)) {
 		if (fsLogger) {
-			fsLogger.error`insertIntoNote: File not found at ${target.absolute}`;
+			fsLogger.error`fs:insert:fileNotFound file=${target.absolute}`;
 		}
 		throw new Error(`File not found: ${options.file}`);
 	}
@@ -185,7 +185,7 @@ export function insertIntoNote(
 	const raw = readTextFileSync(target.absolute);
 	const lines = normalizeLines(raw);
 	if (fsLogger) {
-		fsLogger.debug`insertIntoNote: Read ${lines.length} lines from file`;
+		fsLogger.debug`fs:insert:read lines=${lines.length}`;
 	}
 
 	const heading = findHeading(lines, options.heading);
@@ -199,12 +199,12 @@ export function insertIntoNote(
 			}
 		}
 		if (fsLogger) {
-			fsLogger.error`insertIntoNote: Heading not found. Looking for=${options.heading} Available headings=${availableHeadings.join(", ")}`;
+			fsLogger.error`fs:insert:headingNotFound heading=${options.heading} available=${availableHeadings.join(", ")}`;
 		}
 		throw new Error(`Heading not found: ${options.heading}`);
 	}
 	if (fsLogger) {
-		fsLogger.debug`insertIntoNote: Found heading at line ${heading.index} level=${heading.level}`;
+		fsLogger.debug`fs:insert:headingFound line=${heading.index} level=${heading.level}`;
 	}
 
 	const insertLines = normalizeLines(options.content);
@@ -239,6 +239,10 @@ export function insertIntoNote(
 
 	const updatedLines = insertAtIndex(lines, insertIndex, insertLines);
 	writeTextFileSync(target.absolute, updatedLines.join("\n"));
+
+	if (fsLogger) {
+		fsLogger.info`fs:insert:success file=${target.relative} mode=${options.mode}`;
+	}
 
 	return { relative: target.relative, mode: options.mode };
 }

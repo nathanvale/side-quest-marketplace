@@ -710,10 +710,7 @@ export async function runInteractiveLoop(
 
 	// Log session start
 	if (cliLogger && sessionCid) {
-		cliLogger.info("Review session started", {
-			suggestions: suggestions.length,
-			cid: sessionCid,
-		});
+		cliLogger.info`cli:review:start sessionCid=${sessionCid} suggestions=${suggestions.length}`;
 	}
 
 	// Create stable ID-to-suggestion map and original index mapping
@@ -774,23 +771,14 @@ export async function runInteractiveLoop(
 			command.type !== "list-all" &&
 			command.type !== "view"
 		) {
-			cliLogger.debug("User command", {
-				type: command.type,
-				approved: approved.size,
-				skipped: skipped.size,
-				cid: sessionCid,
-			});
+			cliLogger.debug`cli:review:command type=${command.type} approved=${approved.size} skipped=${skipped.size} sessionCid=${sessionCid}`;
 		}
 
 		switch (command.type) {
 			case "execute":
 				// Explicit execution command (Enter key when items approved)
 				if (cliLogger && sessionCid) {
-					cliLogger.info("Review complete - executing", {
-						approved: approved.size,
-						skipped: skipped.size,
-						cid: sessionCid,
-					});
+					cliLogger.info`cli:review:execute sessionCid=${sessionCid} approved=${approved.size} skipped=${skipped.size}`;
 				}
 				return {
 					approvedIds: Array.from(approved),
@@ -798,11 +786,7 @@ export async function runInteractiveLoop(
 
 			case "quit":
 				if (cliLogger && sessionCid) {
-					cliLogger.info("Review quit without executing", {
-						approved: approved.size,
-						skipped: skipped.size,
-						cid: sessionCid,
-					});
+					cliLogger.info`cli:review:quit sessionCid=${sessionCid} approved=${approved.size} skipped=${skipped.size}`;
 				}
 				console.log(emphasize.warn("\nQuitting without executing."));
 				return {

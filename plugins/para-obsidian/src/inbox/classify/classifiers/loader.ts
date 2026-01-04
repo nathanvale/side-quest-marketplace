@@ -144,14 +144,7 @@ export function findBestConverter(
 		// This prevents content-heavy classifiers from overriding explicit filename signals
 		if (filenameScore === 1.0) {
 			if (classifyLogger) {
-				classifyLogger.info("Classifier matched by filename", {
-					filename,
-					classifierId: converter.id,
-					filenameScore,
-					contentScore,
-					reason: "authoritative_filename",
-					cid,
-				});
+				classifyLogger.info`classify:match:filename classifier=${converter.id} filename=${filename} filenameScore=${filenameScore} contentScore=${contentScore} reason=authoritative_filename cid=${cid}`;
 			}
 			return { converter, score: 1.0 };
 		}
@@ -166,27 +159,11 @@ export function findBestConverter(
 	// Log the decision
 	if (classifyLogger) {
 		if (bestMatch) {
-			classifyLogger.info("Classifier matched by heuristics", {
-				filename,
-				classifierId: bestMatch.converter.id,
-				score: bestMatch.score,
-				candidatesEvaluated: candidateScores.length,
-				cid,
-			});
+			classifyLogger.info`classify:match:content classifier=${bestMatch.converter.id} filename=${filename} score=${bestMatch.score} candidatesEvaluated=${candidateScores.length} cid=${cid}`;
 			// Log all candidate scores at debug level for detailed analysis
-			classifyLogger.debug("Classifier candidate scores", {
-				filename,
-				candidates: candidateScores,
-				selectedId: bestMatch.converter.id,
-				cid,
-			});
+			classifyLogger.debug`classify:candidates:evaluated filename=${filename} selectedId=${bestMatch.converter.id} candidates=${JSON.stringify(candidateScores)} cid=${cid}`;
 		} else {
-			classifyLogger.debug("No classifier matched", {
-				filename,
-				candidatesEvaluated: candidateScores.length,
-				candidates: candidateScores,
-				cid,
-			});
+			classifyLogger.debug`classify:match:notFound filename=${filename} candidatesEvaluated=${candidateScores.length} candidates=${JSON.stringify(candidateScores)} cid=${cid}`;
 		}
 	}
 

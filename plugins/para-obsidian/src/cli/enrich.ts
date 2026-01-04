@@ -171,14 +171,7 @@ async function handleEnrichYouTube(
 		const inboxPath = join(vaultPath, "00 Inbox");
 
 		if (enrichLogger) {
-			enrichLogger.info("YouTube enrichment started", {
-				event: "enrich_youtube_started",
-				cid,
-				sessionCid,
-				target: target ?? "all",
-				isAll,
-				timestamp: new Date().toISOString(),
-			});
+			enrichLogger.info`enrich:youtube:start cid=${cid} sessionCid=${sessionCid} target=${target ?? "all"} isAll=${isAll}`;
 		}
 
 		if (!isJson) {
@@ -219,13 +212,7 @@ async function handleEnrichYouTube(
 				} catch (error) {
 					// Bug ENRICH-CLI-003 fix: Log when files fail to read
 					if (enrichLogger) {
-						enrichLogger.warn("Failed to check file for enrichment", {
-							event: "enrich_youtube_file_check_failed",
-							file: absolutePath,
-							error: error instanceof Error ? error.message : "Unknown error",
-							cid,
-							sessionCid,
-						});
+						enrichLogger.warn`enrich:youtube:checkFailed cid=${cid} sessionCid=${sessionCid} file=${absolutePath} error=${error instanceof Error ? error.message : "Unknown error"}`;
 					}
 					// Continue to skip file
 				}
@@ -238,12 +225,7 @@ async function handleEnrichYouTube(
 			if (targetPath.includes("..") || targetPath.includes("~")) {
 				const errorMsg = "Path contains invalid characters (.. or ~)";
 				if (enrichLogger) {
-					enrichLogger.warn("Path traversal attempt blocked", {
-						event: "enrich_youtube_path_blocked",
-						target: targetPath,
-						cid,
-						sessionCid,
-					});
+					enrichLogger.warn`enrich:youtube:pathBlocked cid=${cid} sessionCid=${sessionCid} target=${targetPath}`;
 				}
 				session.end({ error: errorMsg });
 				return { success: false, error: errorMsg, exitCode: 1 };
@@ -271,14 +253,7 @@ async function handleEnrichYouTube(
 					const errorMsg = `File is not a YouTube note (type: ${typeInfo})`;
 
 					if (enrichLogger) {
-						enrichLogger.warn("Invalid file type for YouTube enrichment", {
-							event: "enrich_youtube_invalid_type",
-							cid,
-							sessionCid,
-							target: targetPath,
-							type: type ?? "none",
-							timestamp: new Date().toISOString(),
-						});
+						enrichLogger.warn`enrich:youtube:invalidType cid=${cid} sessionCid=${sessionCid} target=${targetPath} type=${type ?? "none"}`;
 					}
 
 					if (isJson) {
@@ -307,14 +282,7 @@ async function handleEnrichYouTube(
 					const msg = `Already enriched (transcript_status: ${transcriptStatus ?? "none"})`;
 
 					if (enrichLogger) {
-						enrichLogger.info("Transcript already processed", {
-							event: "enrich_youtube_already_processed",
-							cid,
-							sessionCid,
-							target: targetPath,
-							transcriptStatus,
-							timestamp: new Date().toISOString(),
-						});
+						enrichLogger.info`enrich:youtube:alreadyProcessed cid=${cid} sessionCid=${sessionCid} target=${targetPath} status=${transcriptStatus}`;
 					}
 
 					if (isJson) {
@@ -346,14 +314,7 @@ async function handleEnrichYouTube(
 				const fullErrorMsg = `Failed to read target file: ${errorMsg}`;
 
 				if (enrichLogger) {
-					enrichLogger.error("Failed to read target file", {
-						event: "enrich_youtube_read_failed",
-						cid,
-						sessionCid,
-						target: targetPath,
-						error: errorMsg,
-						timestamp: new Date().toISOString(),
-					});
+					enrichLogger.error`enrich:youtube:readFailed cid=${cid} sessionCid=${sessionCid} target=${targetPath} error=${errorMsg}`;
 				}
 
 				if (isJson) {
@@ -383,17 +344,7 @@ async function handleEnrichYouTube(
 			const durationMs = Date.now() - startTime;
 
 			if (enrichLogger) {
-				enrichLogger.info("No candidates found", {
-					event: "enrich_youtube_completed",
-					cid,
-					sessionCid,
-					durationMs,
-					total: 0,
-					success: 0,
-					failed: 0,
-					skipped: 0,
-					timestamp: new Date().toISOString(),
-				});
+				enrichLogger.info`enrich:youtube:noCandidates cid=${cid} sessionCid=${sessionCid} durationMs=${durationMs}`;
 			}
 
 			if (isJson) {
@@ -535,20 +486,7 @@ async function handleEnrichYouTube(
 		);
 
 		if (enrichLogger) {
-			enrichLogger.info("YouTube enrichment completed", {
-				event: "enrich_youtube_completed",
-				cid,
-				sessionCid,
-				durationMs: metrics.durationMs,
-				total: metrics.total,
-				success: metrics.success,
-				failed: metrics.failed,
-				skipped: metrics.skipped,
-				avgEnrichmentMs,
-				sloBreached: enrichmentSLOCheck.breached,
-				burnRate: enrichmentSLOCheck.burnRate,
-				timestamp: new Date().toISOString(),
-			});
+			enrichLogger.info`enrich:youtube:complete cid=${cid} sessionCid=${sessionCid} durationMs=${metrics.durationMs} total=${metrics.total} success=${metrics.success} failed=${metrics.failed} skipped=${metrics.skipped} avgMs=${avgEnrichmentMs} sloBreached=${enrichmentSLOCheck.breached}`;
 		}
 
 		// Display summary
@@ -586,14 +524,7 @@ async function handleEnrichYouTube(
 		const durationMs = Date.now() - startTime;
 
 		if (enrichLogger) {
-			enrichLogger.error("YouTube enrichment failed", {
-				event: "enrich_youtube_failed",
-				cid,
-				sessionCid,
-				durationMs,
-				error: errorMsg,
-				timestamp: new Date().toISOString(),
-			});
+			enrichLogger.error`enrich:youtube:error cid=${cid} sessionCid=${sessionCid} durationMs=${durationMs} error=${errorMsg}`;
 		}
 
 		if (isJson) {

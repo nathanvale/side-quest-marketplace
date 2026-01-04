@@ -44,14 +44,7 @@ export async function handleInboxMove(
 
 	// Log command start
 	if (routingLogger) {
-		routingLogger.info("Para move command started", {
-			cid: createCorrelationId(),
-			sessionCid: session.sessionCid,
-			tool: "cli:move",
-			vaultPath,
-			isJson,
-			timestamp: new Date().toISOString(),
-		});
+		routingLogger.info`routing:cli:start cid=${createCorrelationId()} sessionCid=${session.sessionCid} vaultPath=${vaultPath} isJson=${isJson}`;
 	}
 
 	// Validate inbox folder exists
@@ -89,13 +82,7 @@ export async function handleInboxMove(
 	// Early exit if no candidates
 	if (candidates.length === 0) {
 		if (routingLogger) {
-			routingLogger.info("No routable notes found", {
-				cid: createCorrelationId(),
-				sessionCid: session.sessionCid,
-				tool: "cli:move",
-				skippedCount: skipped.length,
-				timestamp: new Date().toISOString(),
-			});
+			routingLogger.info`routing:cli:noCandidates cid=${createCorrelationId()} sessionCid=${session.sessionCid} skippedCount=${skipped.length}`;
 		}
 
 		if (isJson) {
@@ -124,13 +111,7 @@ export async function handleInboxMove(
 	// Use markdown mode (default) for interactive confirmation and execution.
 	if (isJson) {
 		if (routingLogger) {
-			routingLogger.info("Preview mode (JSON)", {
-				cid: createCorrelationId(),
-				sessionCid: session.sessionCid,
-				tool: "cli:move",
-				candidateCount: candidates.length,
-				timestamp: new Date().toISOString(),
-			});
+			routingLogger.info`routing:cli:preview cid=${createCorrelationId()} sessionCid=${session.sessionCid} candidateCount=${candidates.length}`;
 		}
 
 		console.log(
@@ -183,13 +164,7 @@ export async function handleInboxMove(
 
 	if (!proceed) {
 		if (routingLogger) {
-			routingLogger.info("Move cancelled by user", {
-				cid: createCorrelationId(),
-				sessionCid: session.sessionCid,
-				tool: "cli:move",
-				candidateCount: candidates.length,
-				timestamp: new Date().toISOString(),
-			});
+			routingLogger.info`routing:cli:cancelled cid=${createCorrelationId()} sessionCid=${session.sessionCid} candidateCount=${candidates.length}`;
 		}
 		console.log(emphasize.warn("Cancelled."));
 		session.end({ success: true });
@@ -202,13 +177,7 @@ export async function handleInboxMove(
 	const errors: string[] = [];
 
 	if (routingLogger) {
-		routingLogger.info("Starting move execution", {
-			cid: createCorrelationId(),
-			sessionCid: session.sessionCid,
-			tool: "cli:move",
-			candidateCount: candidates.length,
-			timestamp: new Date().toISOString(),
-		});
+		routingLogger.info`routing:cli:executeStart cid=${createCorrelationId()} sessionCid=${session.sessionCid} candidateCount=${candidates.length}`;
 	}
 
 	for (const candidate of candidates) {
@@ -232,18 +201,7 @@ export async function handleInboxMove(
 
 	if (errors.length > 0) {
 		if (routingLogger) {
-			routingLogger.error("Move execution completed with errors", {
-				cid: createCorrelationId(),
-				sessionCid: session.sessionCid,
-				tool: "cli:move",
-				durationMs: executeDurationMs,
-				success: false,
-				total: candidates.length,
-				succeeded: successCount,
-				failed: errors.length,
-				errors,
-				timestamp: new Date().toISOString(),
-			});
+			routingLogger.error`routing:cli:executeError cid=${createCorrelationId()} sessionCid=${session.sessionCid} durationMs=${executeDurationMs} total=${candidates.length} succeeded=${successCount} failed=${errors.length}`;
 		}
 
 		console.log("");
@@ -256,17 +214,7 @@ export async function handleInboxMove(
 	}
 
 	if (routingLogger) {
-		routingLogger.info("Move execution completed successfully", {
-			cid: createCorrelationId(),
-			sessionCid: session.sessionCid,
-			tool: "cli:move",
-			durationMs: executeDurationMs,
-			success: true,
-			total: candidates.length,
-			succeeded: successCount,
-			failed: 0,
-			timestamp: new Date().toISOString(),
-		});
+		routingLogger.info`routing:cli:executeSuccess cid=${createCorrelationId()} sessionCid=${session.sessionCid} durationMs=${executeDurationMs} total=${candidates.length} succeeded=${successCount}`;
 	}
 
 	session.end({ success: true });

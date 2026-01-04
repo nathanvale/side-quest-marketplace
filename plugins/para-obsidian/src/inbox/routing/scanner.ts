@@ -71,15 +71,7 @@ export async function scanForRoutableNotes(
 	const inboxPath = join(vaultPath, inboxFolder);
 
 	if (routingLogger) {
-		routingLogger.info("Routing scan started", {
-			cid,
-			sessionCid: ctx?.sessionCid,
-			parentCid: ctx?.parentCid ?? ctx?.sessionCid,
-			tool: "routing:scan",
-			vaultPath,
-			inboxFolder,
-			timestamp: new Date().toISOString(),
-		});
+		routingLogger.info`routing:scan:start cid=${cid} sessionCid=${ctx?.sessionCid} parentCid=${ctx?.parentCid ?? ctx?.sessionCid} vaultPath=${vaultPath} inboxFolder=${inboxFolder}`;
 	}
 
 	// Find all markdown files in inbox
@@ -87,11 +79,7 @@ export async function scanForRoutableNotes(
 	const files = await globFiles("**/*.md", inboxPath);
 
 	if (routingLogger) {
-		routingLogger.debug("Found markdown files in inbox", {
-			cid,
-			sessionCid: ctx?.sessionCid,
-			fileCount: files.length,
-		});
+		routingLogger.debug`routing:scan:filesFound cid=${cid} sessionCid=${ctx?.sessionCid} count=${files.length}`;
 	}
 
 	for (const file of files) {
@@ -126,11 +114,7 @@ export async function scanForRoutableNotes(
 					reason: "Missing title in frontmatter",
 				});
 				if (routingLogger) {
-					routingLogger.debug("Skipped file: missing title", {
-						cid,
-						sessionCid: ctx?.sessionCid,
-						path: relativePath,
-					});
+					routingLogger.debug`routing:skip:missingTitle cid=${cid} sessionCid=${ctx?.sessionCid} file=${relativePath}`;
 				}
 				continue;
 			}
@@ -142,11 +126,7 @@ export async function scanForRoutableNotes(
 					reason: "Missing area or project in frontmatter",
 				});
 				if (routingLogger) {
-					routingLogger.debug("Skipped file: no routing fields", {
-						cid,
-						sessionCid: ctx?.sessionCid,
-						path: relativePath,
-					});
+					routingLogger.debug`routing:skip:noFields cid=${cid} sessionCid=${ctx?.sessionCid} file=${relativePath}`;
 				}
 				continue;
 			}
@@ -160,13 +140,7 @@ export async function scanForRoutableNotes(
 					reason: "Destination folder does not exist",
 				});
 				if (routingLogger) {
-					routingLogger.warn("Skipped file: destination not found", {
-						cid,
-						sessionCid: ctx?.sessionCid,
-						path: relativePath,
-						area,
-						project,
-					});
+					routingLogger.warn`routing:skip:noDestination cid=${cid} sessionCid=${ctx?.sessionCid} file=${relativePath} area=${area} project=${project}`;
 				}
 				continue;
 			}
@@ -183,16 +157,7 @@ export async function scanForRoutableNotes(
 			});
 
 			if (routingLogger) {
-				routingLogger.debug("Found routable note", {
-					cid,
-					sessionCid: ctx?.sessionCid,
-					path: relativePath,
-					title,
-					area,
-					project,
-					destination: resolved.destination,
-					colocate: resolved.colocate ? "yes" : "no",
-				});
+				routingLogger.debug`routing:found cid=${cid} sessionCid=${ctx?.sessionCid} file=${relativePath} title=${title} area=${area} project=${project} destination=${resolved.destination} colocate=${resolved.colocate ? "yes" : "no"}`;
 			}
 		} catch (error) {
 			const errorMessage =
@@ -202,15 +167,7 @@ export async function scanForRoutableNotes(
 				reason: `Parse error: ${errorMessage}`,
 			});
 			if (routingLogger) {
-				routingLogger.error("Error parsing file", {
-					cid,
-					sessionCid: ctx?.sessionCid,
-					path: relativePath,
-					error: errorMessage,
-					stack: error instanceof Error ? error.stack : undefined,
-					errorType:
-						error instanceof Error ? error.constructor.name : "Unknown",
-				});
+				routingLogger.error`routing:parse:error cid=${cid} sessionCid=${ctx?.sessionCid} file=${relativePath} error=${errorMessage}`;
 			}
 		}
 	}
@@ -218,27 +175,7 @@ export async function scanForRoutableNotes(
 	const durationMs = Date.now() - startTime;
 
 	if (routingLogger) {
-		routingLogger.info("Routing scan completed", {
-			cid,
-			sessionCid: ctx?.sessionCid,
-			parentCid: ctx?.parentCid ?? ctx?.sessionCid,
-			tool: "routing:scan",
-			durationMs,
-			latencyBucket:
-				durationMs < 10
-					? "0-10ms"
-					: durationMs < 50
-						? "10-50ms"
-						: durationMs < 200
-							? "50-200ms"
-							: durationMs < 1000
-								? "200-1000ms"
-								: ">1000ms",
-			success: true,
-			candidateCount: candidates.length,
-			skippedCount: skipped.length,
-			timestamp: new Date().toISOString(),
-		});
+		routingLogger.info`routing:scan:complete cid=${cid} sessionCid=${ctx?.sessionCid} parentCid=${ctx?.parentCid ?? ctx?.sessionCid} durationMs=${durationMs} candidateCount=${candidates.length} skippedCount=${skipped.length}`;
 	}
 
 	return { candidates, skipped };

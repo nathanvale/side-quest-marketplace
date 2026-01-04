@@ -84,16 +84,7 @@ export async function moveNote(
 	const { path: sourcePath, destination } = candidate;
 
 	if (routingLogger) {
-		routingLogger.info("Move operation started", {
-			cid,
-			sessionCid: ctx?.sessionCid,
-			parentCid: ctx?.parentCid ?? ctx?.sessionCid,
-			tool: "routing:move",
-			sourcePath,
-			destination,
-			title: candidate.title,
-			timestamp: new Date().toISOString(),
-		});
+		routingLogger.info`routing:move:start cid=${cid} sessionCid=${ctx?.sessionCid} parentCid=${ctx?.parentCid ?? ctx?.sessionCid} file=${sourcePath} destination=${destination} title=${candidate.title}`;
 	}
 
 	try {
@@ -108,12 +99,7 @@ export async function moveNote(
 		const vaultResolved = resolve(vaultPath);
 
 		if (routingLogger) {
-			routingLogger.debug("Resolved paths", {
-				cid,
-				sessionCid: ctx?.sessionCid,
-				sourceAbsolute,
-				destAbsolute,
-			});
+			routingLogger.debug`routing:move:paths cid=${cid} sessionCid=${ctx?.sessionCid} source=${sourceAbsolute} dest=${destAbsolute}`;
 		}
 
 		// Security: Canonicalize paths to prevent symlink-based path traversal
@@ -185,12 +171,7 @@ export async function moveNote(
 			}
 
 			if (routingLogger) {
-				routingLogger.info("Creating folder for colocate", {
-					cid,
-					sessionCid: ctx?.sessionCid,
-					folderPath,
-					areaNotePath: sourceNotePath,
-				});
+				routingLogger.info`routing:colocate:createFolder cid=${cid} sessionCid=${ctx?.sessionCid} folderPath=${folderPath} areaNote=${sourceNotePath}`;
 			}
 
 			// 1. Create the folder
@@ -205,12 +186,7 @@ export async function moveNote(
 				await moveFile(areaSourceAbsolute, areaDestAbsolute);
 
 				if (routingLogger) {
-					routingLogger.info("Moved area note into folder", {
-						cid,
-						sessionCid: ctx?.sessionCid,
-						from: sourceNotePath,
-						to: join(folderPath, areaFilename),
-					});
+					routingLogger.info`routing:colocate:moveNote cid=${cid} sessionCid=${ctx?.sessionCid} from=${sourceNotePath} to=${join(folderPath, areaFilename)}`;
 				}
 			}
 		}
@@ -225,25 +201,7 @@ export async function moveNote(
 		const durationMs = Date.now() - startTime;
 
 		if (routingLogger) {
-			routingLogger.info("Move operation completed", {
-				cid,
-				sessionCid: ctx?.sessionCid,
-				parentCid: ctx?.parentCid ?? ctx?.sessionCid,
-				tool: "routing:move",
-				durationMs,
-				latencyBucket:
-					durationMs < 10
-						? "0-10ms"
-						: durationMs < 50
-							? "10-50ms"
-							: durationMs < 200
-								? "50-200ms"
-								: ">200ms",
-				success: true,
-				movedFrom: sourcePath,
-				movedTo,
-				timestamp: new Date().toISOString(),
-			});
+			routingLogger.info`routing:move:success cid=${cid} sessionCid=${ctx?.sessionCid} parentCid=${ctx?.parentCid ?? ctx?.sessionCid} durationMs=${durationMs} from=${sourcePath} to=${movedTo}`;
 		}
 
 		return {
@@ -257,18 +215,7 @@ export async function moveNote(
 			error instanceof Error ? error.message : "Unknown error";
 
 		if (routingLogger) {
-			routingLogger.error("Move operation failed", {
-				cid,
-				sessionCid: ctx?.sessionCid,
-				parentCid: ctx?.parentCid ?? ctx?.sessionCid,
-				tool: "routing:move",
-				durationMs,
-				success: false,
-				sourcePath,
-				destination,
-				error: errorMessage,
-				timestamp: new Date().toISOString(),
-			});
+			routingLogger.error`routing:move:error cid=${cid} sessionCid=${ctx?.sessionCid} parentCid=${ctx?.parentCid ?? ctx?.sessionCid} durationMs=${durationMs} file=${sourcePath} destination=${destination} error=${errorMessage}`;
 		}
 
 		return {

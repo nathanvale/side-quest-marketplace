@@ -142,12 +142,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 
 	if (inboxLogger) {
 		const cid = createCorrelationId();
-		inboxLogger.debug("Engine initialized", {
-			event: "engine_created",
-			cid,
-			vaultPath: resolvedConfig.vaultPath,
-			timestamp: new Date().toISOString(),
-		});
+		inboxLogger.debug`inbox:init:success cid=${cid} vaultPath=${resolvedConfig.vaultPath}`;
 	}
 
 	return {
@@ -198,12 +193,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			await registry.load();
 		} catch (error) {
 			if (inboxLogger) {
-				inboxLogger.error("Failed to load registry, starting fresh", {
-					event: "registry_load_failed",
-					error: error instanceof Error ? error.message : "unknown error",
-					sessionCid,
-					timestamp: new Date().toISOString(),
-				});
+				inboxLogger.error`inbox:registry:loadFailed sessionCid=${sessionCid} error=${error instanceof Error ? error.message : "unknown error"}`;
 			}
 			// Continue with empty registry but warn user
 			// This prevents processing already-processed files if registry is corrupted
@@ -234,12 +224,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			files = readDir(inboxPath);
 		} catch (_error) {
 			if (inboxLogger) {
-				inboxLogger.warn("Inbox folder not found", {
-					event: "inbox_folder_not_found",
-					cid,
-					path: inboxPath,
-					timestamp: new Date().toISOString(),
-				});
+				inboxLogger.warn`inbox:scan:folderNotFound cid=${cid} path=${inboxPath}`;
 			}
 			return null;
 		}
@@ -274,13 +259,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		const pdfCheck = await checkPdfToText();
 		if (!pdfCheck.available) {
 			if (inboxLogger) {
-				inboxLogger.error("Required dependency missing", {
-					event: "dependency_missing",
-					cid,
-					dependency: "pdftotext",
-					error: pdfCheck.error,
-					timestamp: new Date().toISOString(),
-				});
+				inboxLogger.error`inbox:dependency:missing cid=${cid} dependency=${"pdftotext"} error=${pdfCheck.error}`;
 			}
 			throw createInboxError("DEP_PDFTOTEXT_MISSING", {
 				cid,
@@ -425,7 +404,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 						if (shouldTrackInRegistry(file)) {
 							if (registry.isProcessed(hash)) {
 								if (inboxLogger) {
-									inboxLogger.debug`Skipping already processed: ${filename} sessionCid=${sessionCid} cid=${cid}`;
+									inboxLogger.debug`inbox:process:skip filename=${filename} sessionCid=${sessionCid} cid=${cid} reason=${"already processed"}`;
 								}
 								if (onProgress) {
 									await onProgress({ ...progressBase, stage: "skip" });
@@ -436,7 +415,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 							// Markdown files use frontmatter-based enrichment tracking
 							// For bookmarks: check enrichedAt field in subsequent phases
 							if (inboxLogger) {
-								inboxLogger.debug`Skipped registry check for markdown: ${filename} cid=${cid}`;
+								inboxLogger.debug`inbox:process:skipRegistryCheck filename=${filename} cid=${cid} reason=${"markdown file"}`;
 							}
 						}
 
@@ -444,7 +423,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 						const extractorMatch = extractorRegistry.findExtractor(file);
 						if (!extractorMatch) {
 							if (inboxLogger) {
-								inboxLogger.warn`No extractor found for: ${filename} sessionCid=${sessionCid} cid=${cid}`;
+								inboxLogger.warn`inbox:extract:noExtractor filename=${filename} sessionCid=${sessionCid} cid=${cid}`;
 							}
 							if (onProgress) {
 								await onProgress({
@@ -499,10 +478,10 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 						error instanceof Error ? error.message : "unknown error";
 					if (errorMsg.includes("Failed to acquire lock")) {
 						// Lock failure - log warning but continue processing
-						inboxLogger.warn`File lock timeout for: ${filename} sessionCid=${sessionCid} cid=${cid}`;
+						inboxLogger.warn`inbox:lock:timeout filename=${filename} sessionCid=${sessionCid} cid=${cid}`;
 					} else {
 						// Extraction failure
-						inboxLogger.warn`Failed to process file: ${filename} error=${errorMsg} sessionCid=${sessionCid} cid=${cid}`;
+						inboxLogger.warn`inbox:extract:error filename=${filename} error=${errorMsg} sessionCid=${sessionCid} cid=${cid}`;
 					}
 				}
 				if (onProgress) {
@@ -528,7 +507,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			// Run heuristic detection
 			const heuristicResult = combineHeuristics(filename, text);
 			if (inboxLogger) {
-				inboxLogger.debug`Heuristic result file=${filename} detected=${heuristicResult.detected} type=${heuristicResult.suggestedType ?? "none"} confidence=${heuristicResult.confidence.toFixed(2)} sessionCid=${sessionCid} cid=${cid}`;
+				inboxLogger.debug`inbox:heuristic:complete filename=${filename} detected=${heuristicResult.detected} type=${heuristicResult.suggestedType ?? "none"} confidence=${heuristicResult.confidence.toFixed(2)} sessionCid=${sessionCid} cid=${cid}`;
 			}
 
 			// Run LLM detection (with its own rate limit)
@@ -547,7 +526,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					});
 				}
 				if (inboxLogger) {
-					inboxLogger.debug`LLM starting file=${filename} model=${llmModel} sessionCid=${sessionCid} cid=${cid}`;
+					inboxLogger.debug`inbox:llm:start filename=${filename} model=${llmModel} sessionCid=${sessionCid} cid=${cid}`;
 				}
 				llmResult = await observe(
 					inboxLogger,
@@ -578,18 +557,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 								// Emit fallback progress update if fallback occurred
 								if (llmFallbackUsed) {
 									if (inboxLogger) {
-										inboxLogger.info("LLM fallback triggered", {
-											event: "llm_fallback",
-											cid,
-											sessionCid,
-											parentCid,
-											filename,
-											primaryModel:
-												resolvedConfig.llmModel ?? resolvedConfig.llmProvider,
-											fallbackModel: llmCallResult.modelUsed,
-											reason: llmCallResult.fallbackReason,
-											timestamp: new Date().toISOString(),
-										});
+										inboxLogger.info`inbox:llm:fallback cid=${cid} sessionCid=${sessionCid} parentCid=${parentCid} filename=${filename} primaryModel=${resolvedConfig.llmModel ?? resolvedConfig.llmProvider} fallbackModel=${llmCallResult.modelUsed} reason=${llmCallResult.fallbackReason}`;
 									}
 									if (onProgress) {
 										await onProgress({
@@ -603,11 +571,11 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 								}
 
 								if (inboxLogger) {
-									inboxLogger.debug`LLM raw response file=${filename} length=${llmCallResult.response.length} preview=${llmCallResult.response.slice(0, 200).replace(/\n/g, " ")} sessionCid=${sessionCid} cid=${cid}`;
+									inboxLogger.debug`inbox:llm:response filename=${filename} length=${llmCallResult.response.length} preview=${llmCallResult.response.slice(0, 200).replace(/\n/g, " ")} sessionCid=${sessionCid} cid=${cid}`;
 								}
 								const result = parseDetectionResponse(llmCallResult.response);
 								if (inboxLogger) {
-									inboxLogger.info`LLM success file=${filename} type=${result.documentType} confidence=${result.confidence.toFixed(2)} fallback=${llmFallbackUsed} sessionCid=${sessionCid} cid=${cid}`;
+									inboxLogger.info`inbox:llm:success filename=${filename} type=${result.documentType} confidence=${result.confidence.toFixed(2)} fallback=${llmFallbackUsed} sessionCid=${sessionCid} cid=${cid}`;
 								}
 								return result;
 							}
@@ -619,11 +587,11 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 								resolvedConfig.llmModel,
 							);
 							if (inboxLogger) {
-								inboxLogger.debug`LLM raw response file=${filename} length=${response.length} preview=${response.slice(0, 200).replace(/\n/g, " ")} sessionCid=${sessionCid} cid=${cid}`;
+								inboxLogger.debug`inbox:llm:response filename=${filename} length=${response.length} preview=${response.slice(0, 200).replace(/\n/g, " ")} sessionCid=${sessionCid} cid=${cid}`;
 							}
 							const result = parseDetectionResponse(response);
 							if (inboxLogger) {
-								inboxLogger.info`LLM success file=${filename} type=${result.documentType} confidence=${result.confidence.toFixed(2)} sessionCid=${sessionCid} cid=${cid}`;
+								inboxLogger.info`inbox:llm:success filename=${filename} type=${result.documentType} confidence=${result.confidence.toFixed(2)} sessionCid=${sessionCid} cid=${cid}`;
 							}
 							return result;
 						}),
@@ -639,7 +607,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				const errorMsg =
 					error instanceof Error ? error.message : "unknown error";
 				if (inboxLogger) {
-					inboxLogger.warn`LLM detection failed: ${filename} - ${errorMsg} sessionCid=${sessionCid} cid=${cid}`;
+					inboxLogger.warn`inbox:llm:error filename=${filename} error=${errorMsg} sessionCid=${sessionCid} cid=${cid}`;
 				}
 				llmStats.failures += 1;
 				llmStats.errors.push({
@@ -711,7 +679,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				});
 
 				if (inboxLogger) {
-					inboxLogger.debug`Type A document: type=${finalType} sourceOfTruth=${classifier.sourceOfTruth} markdownLength=${extractedMarkdown.length} sessionCid=${sessionCid} cid=${cid}`;
+					inboxLogger.debug`inbox:classify:typeA type=${finalType} sourceOfTruth=${classifier.sourceOfTruth} markdownLength=${extractedMarkdown.length} sessionCid=${sessionCid} cid=${cid}`;
 				}
 			}
 
@@ -731,23 +699,13 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				const noteType = isCreateNoteSuggestion(suggestion)
 					? suggestion.suggestedNoteType
 					: "n/a";
-				inboxLogger.info`Suggestion built file=${filename} action=${suggestion.action} confidence=${suggestion.confidence} type=${noteType} source=${source} reason=${suggestion.reason} sessionCid=${sessionCid} cid=${cid}`;
+				inboxLogger.info`inbox:suggest:built filename=${filename} action=${suggestion.action} confidence=${suggestion.confidence} type=${noteType} source=${source} reason=${suggestion.reason} sessionCid=${sessionCid} cid=${cid}`;
 			}
 
 			// Check cache size limit before adding
 			if (suggestionCache.size >= MAX_CACHE_SIZE) {
 				if (inboxLogger) {
-					inboxLogger.warn(
-						"Suggestion cache size limit reached, clearing cache",
-						{
-							event: "cache_size_limit",
-							size: suggestionCache.size,
-							limit: MAX_CACHE_SIZE,
-							sessionCid,
-							cid,
-							timestamp: new Date().toISOString(),
-						},
-					);
+					inboxLogger.warn`inbox:cache:limitReached sessionCid=${sessionCid} cid=${cid} size=${suggestionCache.size} limit=${MAX_CACHE_SIZE}`;
 				}
 				suggestionCache.clear();
 			}
@@ -756,19 +714,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 
 			// Log file processing completion with structured event
 			if (inboxLogger) {
-				inboxLogger.info("File processed", {
-					event: "file_processed",
-					cid,
-					sessionCid,
-					parentCid,
-					filename,
-					action: suggestion.action,
-					confidence: suggestion.confidence,
-					llmUsed: llmResult !== null && !llmErrorMessage,
-					llmFallbackUsed,
-					success: true,
-					timestamp: new Date().toISOString(),
-				});
+				inboxLogger.info`inbox:process:success cid=${cid} sessionCid=${sessionCid} parentCid=${parentCid} filename=${filename} action=${suggestion.action} confidence=${suggestion.confidence} llmUsed=${llmResult !== null && !llmErrorMessage} llmFallbackUsed=${llmFallbackUsed}`;
 			}
 
 			if (onProgress) {
@@ -820,22 +766,12 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		);
 
 		if (inboxLogger) {
-			inboxLogger.info("Scan completed", {
-				event: "scan_completed",
-				cid,
-				sessionCid,
-				suggestionCount: suggestions.length,
-				durationMs,
-				llmSuccesses: llmStats.successes,
-				llmFailures: llmStats.failures,
-				llmFallbacks: llmStats.fallbacks,
-				timestamp: new Date().toISOString(),
-			});
-			inboxLogger.debug`Scan breakdown confidence=${JSON.stringify(confidenceCounts)} actions=${JSON.stringify(actionCounts)} durationMs=${durationMs} sessionCid=${sessionCid} cid=${cid}`;
+			inboxLogger.info`inbox:scan:complete cid=${cid} sessionCid=${sessionCid} suggestionCount=${suggestions.length} durationMs=${durationMs} llmSuccesses=${llmStats.successes} llmFailures=${llmStats.failures} llmFallbacks=${llmStats.fallbacks}`;
+			inboxLogger.debug`inbox:scan:breakdown confidence=${JSON.stringify(confidenceCounts)} actions=${JSON.stringify(actionCounts)} durationMs=${durationMs} sessionCid=${sessionCid} cid=${cid}`;
 
 			// Error if LLM appears unavailable
 			if (llmStats.failures > 0 && llmStats.successes === 0) {
-				inboxLogger.error`LLM service unavailable: all ${llmStats.failures} calls failed. Suggestions are heuristic-only. sessionCid=${sessionCid} cid=${cid}`;
+				inboxLogger.error`inbox:llm:unavailable sessionCid=${sessionCid} cid=${cid} failures=${llmStats.failures}`;
 			}
 		}
 	}
@@ -877,23 +813,11 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 				// Ensure cache is cleared on error to prevent memory leaks
 				try {
 					if (inboxLogger) {
-						inboxLogger.info("Scan started", {
-							event: "scan_started",
-							cid,
-							sessionCid,
-							vaultPath: resolvedConfig.vaultPath,
-							timestamp: new Date().toISOString(),
-						});
+						inboxLogger.info`inbox:scan:start cid=${cid} sessionCid=${sessionCid} vaultPath=${resolvedConfig.vaultPath}`;
 
 						// Log resource usage at scan start
 						const startMetrics = captureResourceMetrics();
-						inboxLogger.debug("Scan resources start", {
-							event: "scan_resources_start",
-							cid,
-							sessionCid,
-							parentCid: sessionCid,
-							...startMetrics,
-						});
+						inboxLogger.debug`inbox:scan:resourcesStart cid=${cid} sessionCid=${sessionCid} parentCid=${sessionCid} heapUsedMB=${startMetrics.heapUsedMB} heapTotalMB=${startMetrics.heapTotalMB}`;
 					}
 
 					// Silent pre-commit: auto-save any uncommitted PARA files before scan
@@ -958,13 +882,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					// Log resource usage at scan end
 					if (inboxLogger) {
 						const endMetrics = captureResourceMetrics();
-						inboxLogger.debug("Scan resources end", {
-							event: "scan_resources_end",
-							cid,
-							sessionCid,
-							parentCid: sessionCid,
-							...endMetrics,
-						});
+						inboxLogger.debug`inbox:scan:resourcesEnd cid=${cid} sessionCid=${sessionCid} parentCid=${sessionCid} heapUsedMB=${endMetrics.heapUsedMB} heapTotalMB=${endMetrics.heapTotalMB}`;
 					}
 
 					// Record LLM availability SLO if any LLM calls were attempted
@@ -1025,23 +943,11 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					const onProgress = options?.onProgress;
 
 					if (inboxLogger) {
-						inboxLogger.info("Execute started", {
-							event: "execute_started",
-							cid,
-							sessionCid,
-							count: ids.length,
-							timestamp: new Date().toISOString(),
-						});
+						inboxLogger.info`inbox:execute:start cid=${cid} sessionCid=${sessionCid} count=${ids.length}`;
 
 						// Log resource usage at execute start
 						const startMetrics = captureResourceMetrics();
-						inboxLogger.debug("Execute resources start", {
-							event: "execute_resources_start",
-							cid,
-							sessionCid,
-							parentCid: sessionCid,
-							...startMetrics,
-						});
+						inboxLogger.debug`inbox:execute:resourcesStart cid=${cid} sessionCid=${sessionCid} parentCid=${sessionCid} heapUsedMB=${startMetrics.heapUsedMB} heapTotalMB=${startMetrics.heapTotalMB}`;
 					}
 
 					if (ids.length === 0) {
@@ -1056,7 +962,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					// Don't throw - let per-ID error handling return appropriate results
 					if (suggestionCache.size === 0) {
 						if (inboxLogger) {
-							inboxLogger.warn`Execute called with empty cache - did you forget to call scan()? sessionCid=${sessionCid} cid=${cid}`;
+							inboxLogger.warn`inbox:execute:emptyCache sessionCid=${sessionCid} cid=${cid}`;
 						}
 					}
 
@@ -1079,7 +985,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 							paraConfig.defaultDestinations ?? DEFAULT_DESTINATIONS,
 					});
 					if (inboxLogger) {
-						inboxLogger.debug`Execute session started id=${session.id} sessionCid=${sessionCid} cid=${cid}`;
+						inboxLogger.debug`inbox:execute:sessionStart id=${session.id} sessionCid=${sessionCid} cid=${cid}`;
 					}
 
 					// Build path maps ONCE for entire batch
@@ -1152,7 +1058,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 								// Save registry immediately after each successful execution
 								await registry.save();
 								if (executeLogger) {
-									executeLogger.debug`Registry saved after item=${id} ${cid}`;
+									executeLogger.debug`inbox:registry:saved cid=${cid} item=${id}`;
 								}
 								// Track file changes in session for batch commit
 								// Track source file deletion for git staging
@@ -1177,7 +1083,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 								const filename = suggestion
 									? basename(suggestion.source)
 									: "unknown";
-								executeLogger.error`Execute failed id=${id} filename=${filename} error=${error instanceof Error ? error.message : "unknown"} ${cid}`;
+								executeLogger.error`inbox:execute:error cid=${cid} id=${id} filename=${filename} error=${error instanceof Error ? error.message : "unknown"}`;
 							}
 						}
 
@@ -1232,26 +1138,12 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 					// Log resource usage at execute end
 					if (inboxLogger) {
 						const endMetrics = captureResourceMetrics();
-						inboxLogger.debug("Execute resources end", {
-							event: "execute_resources_end",
-							cid,
-							sessionCid,
-							parentCid: sessionCid,
-							...endMetrics,
-						});
+						inboxLogger.debug`inbox:execute:resourcesEnd cid=${cid} sessionCid=${sessionCid} parentCid=${sessionCid} heapUsedMB=${endMetrics.heapUsedMB} heapTotalMB=${endMetrics.heapTotalMB}`;
 					}
 
 					if (inboxLogger) {
-						inboxLogger.info("Execute completed", {
-							event: "execute_completed",
-							cid,
-							successCount: successful.length,
-							failureCount: failed.size,
-							total: ids.length,
-							durationMs,
-							timestamp: new Date().toISOString(),
-						});
-						inboxLogger.debug`Execute summary total=${ids.length} success=${successful.length} failed=${failed.size} durationMs=${durationMs} sessionCid=${sessionCid} cid=${cid}`;
+						inboxLogger.info`inbox:execute:complete cid=${cid} sessionCid=${sessionCid} successCount=${successful.length} failureCount=${failed.size} total=${ids.length} durationMs=${durationMs}`;
+						inboxLogger.debug`inbox:execute:summary total=${ids.length} success=${successful.length} failed=${failed.size} durationMs=${durationMs} sessionCid=${sessionCid} cid=${cid}`;
 					}
 
 					return {
@@ -1285,7 +1177,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 
 		if (inboxLogger) {
 			// SECURITY: Never log raw user prompts - only log metadata
-			inboxLogger.info`Edit started id=${id} promptLength=${prompt.length} hasPrompt=${prompt.length > 0} cid=${cid}`;
+			inboxLogger.info`inbox:edit:start id=${id} promptLength=${prompt.length} hasPrompt=${prompt.length > 0} cid=${cid}`;
 		}
 
 		// Look up original suggestion
@@ -1364,7 +1256,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			llmResult = parseDetectionResponse(response);
 		} catch (error) {
 			if (inboxLogger) {
-				inboxLogger.warn`LLM re-detection failed: ${error instanceof Error ? error.message : "unknown"} cid=${cid}`;
+				inboxLogger.warn`inbox:edit:llmError cid=${cid} error=${error instanceof Error ? error.message : "unknown"}`;
 			}
 		}
 
@@ -1391,7 +1283,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		suggestionCache.set(id, finalSuggestion);
 
 		if (inboxLogger) {
-			inboxLogger.info`Edit complete id=${id} newConfidence=${finalSuggestion.confidence} cid=${cid}`;
+			inboxLogger.info`inbox:edit:complete id=${id} newConfidence=${finalSuggestion.confidence} cid=${cid}`;
 		}
 
 		return finalSuggestion;
@@ -1426,11 +1318,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		}
 
 		if (inboxLogger) {
-			inboxLogger.info("Challenge started", {
-				id,
-				hint: trimmedHint,
-				cid,
-			});
+			inboxLogger.info`inbox:challenge:start id=${id} hintLength=${trimmedHint.length} cid=${cid}`;
 		}
 
 		// Look up original suggestion
@@ -1460,11 +1348,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 		} catch (error) {
 			// Log failure without exposing full error details
 			if (inboxLogger) {
-				inboxLogger.warn("Challenge re-classification failed", {
-					id,
-					error: error instanceof Error ? error.message : "unknown",
-					cid,
-				});
+				inboxLogger.warn`inbox:challenge:error id=${id} cid=${cid} error=${error instanceof Error ? error.message : "unknown"}`;
 			}
 			throw error;
 		}
@@ -1489,14 +1373,7 @@ export function createInboxEngine(config: InboxEngineConfig): InboxEngine {
 			const newType = isCreateNoteSuggestion(updated)
 				? updated.suggestedNoteType
 				: undefined;
-			inboxLogger.info("Challenge complete", {
-				id,
-				oldType: previousClassification.documentType,
-				newType,
-				oldConfidence: previousClassification.confidence,
-				newConfidence: updated.confidence,
-				cid,
-			});
+			inboxLogger.info`inbox:challenge:complete id=${id} oldType=${previousClassification.documentType} newType=${newType} oldConfidence=${previousClassification.confidence} newConfidence=${updated.confidence} cid=${cid}`;
 		}
 
 		return challengedSuggestion;
