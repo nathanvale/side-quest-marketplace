@@ -191,9 +191,9 @@ Topic: <% tp.system.prompt("Main topic") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("00 Inbox/Refactoring UI.md");
+		expect(result.filePath).toBe("00 Inbox/📚 Refactoring UI.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written).toContain("title: Refactoring UI");
+		expect(written).toContain("title: 📚 Refactoring UI");
 		expect(written).toContain("source: book");
 		expect(written).toContain("Topic: User interface design");
 	});
@@ -267,9 +267,9 @@ Author: <% tp.system.prompt("Author (optional)", "") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("00 Inbox/Building A Second Brain.md");
+		expect(result.filePath).toBe("00 Inbox/📚 Building A Second Brain.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written).toContain("title: Building a Second Brain");
+		expect(written).toContain("title: 📚 Building a Second Brain");
 		expect(written).toContain("source: book");
 		expect(written).toContain("source_url: https://example.com");
 		expect(written).toContain("author: Tiago Forte");
@@ -307,9 +307,9 @@ Source: <% tp.system.prompt("Source type") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("00 Inbox/Quick Note.md");
+		expect(result.filePath).toBe("00 Inbox/📚 Quick Note.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written).toContain("title: Quick Note");
+		expect(written).toContain("title: 📚 Quick Note");
 		expect(written).toContain("source: article");
 		// Empty strings may or may not have quotes after YAML parsing
 		expect(written).toMatch(/source_url:\s*(""|''|$)/);
@@ -328,7 +328,7 @@ Source: <% tp.system.prompt("Source type") %>`,
 			template: "resource",
 			title: "Atomic Habits",
 			type: "resource",
-			prefix: "",
+			prefix: "📚 ",
 		},
 		{ template: "task", title: "Review PR", type: "task", prefix: "" },
 		{ template: "daily", title: "2025-12-06", type: "daily", prefix: "" },
@@ -429,8 +429,8 @@ Source: <% tp.system.prompt("Source type (book/article/video/course/podcast/etc.
 
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		// Title should be substituted in both frontmatter and body
-		expect(written).toContain("title: Melbourne Coffee Guide");
-		expect(written).toContain("# Melbourne Coffee Guide");
+		expect(written).toContain("title: 📚 Melbourne Coffee Guide");
+		expect(written).toContain("# 📚 Melbourne Coffee Guide");
 		// No unsubstituted prompts should remain for title
 		expect(written).not.toContain('tp.system.prompt("Resource title")');
 	});
