@@ -1,0 +1,72 @@
+{
+	"schemaVersion": "0.1.0",
+	"name": "Recipe",
+	"behavior": "create",
+	"noteNameFormat": "👨‍🍳 {{schema:@Recipe:name|default:title|safe_name|slice:0,80}}",
+	"path": "00 Inbox",
+	"context": "{{schema:@Recipe}}",
+	"noteContentFormat": "# {{schema:@Recipe:name|default:title}}\n\n![Recipe]({{schema:@Recipe:image|default:meta:og:image}})\n\n## Quick Info\n\n| | |\n|---|---|\n| **Prep Time** | `= this.prep_time` |\n| **Cook Time** | `= this.cook_time` |\n| **Total Time** | {{schema:@Recipe:totalTime|default:\"—\"}} |\n| **Servings** | `= this.servings` |\n| **Cuisine** | `= this.cuisine` |\n| **Calories** | {{schema:@Recipe:nutrition.calories|default:\"—\"}} |\n\n## Ingredients\n\n{{schema:@Recipe:recipeIngredient|list|default:\"See source\"}}\n\n## Instructions\n\n{{schema:@Recipe:recipeInstructions|default:\"See source\"}}\n\n## Notes\n\n{{highlights|default:\"\"}}\n\n---\n\n**Source:** [`= this.source`](`= this.source`)",
+	"properties": [
+		{
+			"name": "type",
+			"value": "clipping",
+			"type": "text"
+		},
+		{
+			"name": "clipping_type",
+			"value": "recipe",
+			"type": "text"
+		},
+		{
+			"name": "source",
+			"value": "{{url}}",
+			"type": "text"
+		},
+		{
+			"name": "clipped",
+			"value": "{{time|date:\"YYYY-MM-DD\"}}",
+			"type": "date"
+		},
+		{
+			"name": "prep_time",
+			"value": "{{schema:@Recipe:prepTime|default:\"\"}}",
+			"type": "text"
+		},
+		{
+			"name": "cook_time",
+			"value": "{{schema:@Recipe:cookTime|default:\"\"}}",
+			"type": "text"
+		},
+		{
+			"name": "servings",
+			"value": "{{schema:@Recipe:recipeYield|default:\"\"}}",
+			"type": "text"
+		},
+		{
+			"name": "cuisine",
+			"value": "{{schema:@Recipe:recipeCuisine|default:\"\"}}",
+			"type": "text"
+		},
+		{
+			"name": "distill_status",
+			"value": "raw",
+			"type": "text"
+		},
+		{
+			"name": "related",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "project",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "area",
+			"value": "",
+			"type": "multitext"
+		}
+	],
+	"triggers": ["schema:@Recipe"]
+}

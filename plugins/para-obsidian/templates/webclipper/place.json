@@ -1,0 +1,57 @@
+{
+	"schemaVersion": "0.1.0",
+	"name": "Place",
+	"behavior": "create",
+	"noteNameFormat": "📍 {{title|safe_name|slice:0,80}}",
+	"path": "00 Inbox",
+	"context": "{{selectorHtml:body|markdown}}",
+	"noteContentFormat": "# {{title}}\n\n## Location Details\n\n{{description|default:\"\"}}\n\n## Why I Saved This\n\n\n\n## Notes\n\n{{highlights|default:\"\"}}\n\n---\n\n📍 [View on Map](`= this.source`)",
+	"properties": [
+		{
+			"name": "type",
+			"value": "clipping",
+			"type": "text"
+		},
+		{
+			"name": "clipping_type",
+			"value": "place",
+			"type": "text"
+		},
+		{
+			"name": "source",
+			"value": "{{url}}",
+			"type": "text"
+		},
+		{
+			"name": "clipped",
+			"value": "{{time|date:\"YYYY-MM-DD\"}}",
+			"type": "date"
+		},
+		{
+			"name": "distill_status",
+			"value": "raw",
+			"type": "text"
+		},
+		{
+			"name": "related",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "project",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "area",
+			"value": "",
+			"type": "multitext"
+		}
+	],
+	"triggers": [
+		"https://google.com/maps",
+		"https://www.google.com/maps",
+		"https://maps.google.com",
+		"https://goo.gl/maps"
+	]
+}

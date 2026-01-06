@@ -1,0 +1,76 @@
+{
+	"schemaVersion": "0.1.0",
+	"name": "Movie",
+	"behavior": "create",
+	"noteNameFormat": "🎬 {{schema:@Movie:name|default:title|safe_name|slice:0,80}}",
+	"path": "00 Inbox",
+	"context": "{{schema:@Movie}}",
+	"noteContentFormat": "# {{schema:@Movie:name|default:title}}\n\n![Poster]({{schema:@Movie:image|default:meta:og:image}})\n\n## Movie Info\n\n| | |\n|---|---|\n| **Year** | `= this.year` |\n| **Director** | `= this.director` |\n| **Rating** | `= this.rating`/10 |\n| **Runtime** | {{schema:@Movie:duration|default:\"—\"}} |\n| **Genre** | {{schema:@Movie:genre|default:\"—\"}} |\n\n## Why I Want to Watch This\n\n\n\n## Description\n\n{{description|default:\"\"}}\n\n## Notes\n\n{{highlights|default:\"\"}}",
+	"properties": [
+		{
+			"name": "type",
+			"value": "clipping",
+			"type": "text"
+		},
+		{
+			"name": "clipping_type",
+			"value": "movie",
+			"type": "text"
+		},
+		{
+			"name": "source",
+			"value": "{{url}}",
+			"type": "text"
+		},
+		{
+			"name": "clipped",
+			"value": "{{time|date:\"YYYY-MM-DD\"}}",
+			"type": "date"
+		},
+		{
+			"name": "year",
+			"value": "{{schema:@Movie:datePublished|default:\"\"}}",
+			"type": "text"
+		},
+		{
+			"name": "director",
+			"value": "{{schema:@Movie:director.name|default:\"\"}}",
+			"type": "text"
+		},
+		{
+			"name": "rating",
+			"value": "{{schema:@Movie:aggregateRating.ratingValue|default:\"\"}}",
+			"type": "text"
+		},
+		{
+			"name": "consumption_status",
+			"value": "to-watch",
+			"type": "text"
+		},
+		{
+			"name": "distill_status",
+			"value": "raw",
+			"type": "text"
+		},
+		{
+			"name": "related",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "project",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "area",
+			"value": "",
+			"type": "multitext"
+		}
+	],
+	"triggers": [
+		"schema:@Movie",
+		"https://imdb.com/title",
+		"https://www.imdb.com/title"
+	]
+}

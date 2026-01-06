@@ -1,0 +1,76 @@
+{
+	"schemaVersion": "0.1.0",
+	"name": "Book",
+	"behavior": "create",
+	"noteNameFormat": "📚 {{schema:@Book:name|default:title|safe_name|slice:0,80}}",
+	"path": "00 Inbox",
+	"context": "{{schema:@Book}}",
+	"noteContentFormat": "# {{schema:@Book:name|default:title}}\n\n## AI Summary\n\n{{\"Summarize this content in 3 concise bullet points, focusing on the key insights and actionable takeaways\"|blockquote}}\n\n---\n\n![Cover]({{schema:@Book:image|default:meta:og:image}})\n\n## Book Info\n\n| | |\n|---|---|\n| **Author** | `= this.author` |\n| **Pages** | `= this.pages` |\n| **Rating** | `= this.rating`/5 |\n| **Genre** | {{schema:@Book:genre|default:\"—\"}} |\n| **ISBN** | {{schema:@Book:isbn|default:\"—\"}} |\n\n## Why I Want to Read This\n\n\n\n## Description\n\n{{description|default:\"\"}}\n\n## Notes\n\n{{highlights|default:\"\"}}",
+	"properties": [
+		{
+			"name": "type",
+			"value": "clipping",
+			"type": "text"
+		},
+		{
+			"name": "clipping_type",
+			"value": "book",
+			"type": "text"
+		},
+		{
+			"name": "source",
+			"value": "{{url}}",
+			"type": "text"
+		},
+		{
+			"name": "clipped",
+			"value": "{{time|date:\"YYYY-MM-DD\"}}",
+			"type": "date"
+		},
+		{
+			"name": "author",
+			"value": "{{schema:@Book:author.name|default:\"\"}}",
+			"type": "text"
+		},
+		{
+			"name": "rating",
+			"value": "{{schema:@Book:aggregateRating.ratingValue|default:\"\"}}",
+			"type": "text"
+		},
+		{
+			"name": "pages",
+			"value": "{{schema:@Book:numberOfPages|default:\"\"}}",
+			"type": "text"
+		},
+		{
+			"name": "consumption_status",
+			"value": "to-read",
+			"type": "text"
+		},
+		{
+			"name": "distill_status",
+			"value": "raw",
+			"type": "text"
+		},
+		{
+			"name": "related",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "project",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "area",
+			"value": "",
+			"type": "multitext"
+		}
+	],
+	"triggers": [
+		"schema:@Book",
+		"https://goodreads.com/book",
+		"https://www.goodreads.com/book"
+	]
+}

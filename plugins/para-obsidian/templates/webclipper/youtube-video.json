@@ -1,0 +1,86 @@
+{
+	"schemaVersion": "0.1.0",
+	"name": "YouTube Video",
+	"behavior": "create",
+	"noteNameFormat": "🎬 {{schema:@VideoObject:name|default:title|safe_name|slice:0,80}}",
+	"path": "00 Inbox",
+	"context": "{{schema:@VideoObject:description}}",
+	"noteContentFormat": "# {{schema:@VideoObject:name|default:title}}\n\n## AI Summary\n\n{{\"Summarize this content in 3 concise bullet points, focusing on the key insights and actionable takeaways\"|blockquote}}\n\n---\n\n![]({{schema:@VideoObject:thumbnailUrl|first}})\n\n**Channel:** `= this.channel`\n**Duration:** `= this.duration`\n**Published:** `= this.published`\n\n## Description\n\n{{schema:@VideoObject:description|default:\"—\"}}\n\n## Notes\n\n\n\n## Transcript\n\n<!-- transcript:pending -->\n",
+	"properties": [
+		{
+			"name": "type",
+			"value": "clipping",
+			"type": "text"
+		},
+		{
+			"name": "clipping_type",
+			"value": "youtube",
+			"type": "text"
+		},
+		{
+			"name": "source",
+			"value": "{{url}}",
+			"type": "text"
+		},
+		{
+			"name": "video_id",
+			"value": "{{url|replace:\"/^.*[?&]v=([a-zA-Z0-9_-]{11}).*$/\":\"$1\"|replace:\"/^.*youtu\\.be\\/([a-zA-Z0-9_-]{11}).*$/\":\"$1\"}}",
+			"type": "text"
+		},
+		{
+			"name": "channel",
+			"value": "{{schema:@VideoObject:author}}",
+			"type": "text"
+		},
+		{
+			"name": "duration",
+			"value": "{{schema:@VideoObject:duration}}",
+			"type": "text"
+		},
+		{
+			"name": "published",
+			"value": "{{schema:@VideoObject:uploadDate|date:\"YYYY-MM-DD\"}}",
+			"type": "date"
+		},
+		{
+			"name": "clipped",
+			"value": "{{time|date:\"YYYY-MM-DD\"}}",
+			"type": "date"
+		},
+		{
+			"name": "consumption_status",
+			"value": "to-watch",
+			"type": "text"
+		},
+		{
+			"name": "transcript_status",
+			"value": "pending",
+			"type": "text"
+		},
+		{
+			"name": "distill_status",
+			"value": "raw",
+			"type": "text"
+		},
+		{
+			"name": "related",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "project",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "area",
+			"value": "",
+			"type": "multitext"
+		}
+	],
+	"triggers": [
+		"https://www.youtube.com/watch",
+		"https://m.youtube.com/watch",
+		"https://youtu.be/"
+	]
+}

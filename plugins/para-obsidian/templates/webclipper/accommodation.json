@@ -1,0 +1,59 @@
+{
+	"schemaVersion": "0.1.0",
+	"name": "Accommodation",
+	"behavior": "create",
+	"noteNameFormat": "🏨 {{title|safe_name|slice:0,70}}",
+	"path": "00 Inbox",
+	"context": "{{selectorHtml:body|markdown}}",
+	"noteContentFormat": "# {{title}}\n\n![Property]({{meta:og:image}})\n\n## Property Details\n\n{{description|default:\"\"}}\n\n## Why I'm Interested\n\n\n\n## Highlights\n\n{{highlights|default:\"\"}}\n\n---\n\n🏠 [View Listing](`= this.source`)",
+	"properties": [
+		{
+			"name": "type",
+			"value": "clipping",
+			"type": "text"
+		},
+		{
+			"name": "clipping_type",
+			"value": "accommodation",
+			"type": "text"
+		},
+		{
+			"name": "source",
+			"value": "{{url}}",
+			"type": "text"
+		},
+		{
+			"name": "clipped",
+			"value": "{{time|date:\"YYYY-MM-DD\"}}",
+			"type": "date"
+		},
+		{
+			"name": "distill_status",
+			"value": "raw",
+			"type": "text"
+		},
+		{
+			"name": "related",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "project",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "area",
+			"value": "",
+			"type": "multitext"
+		}
+	],
+	"triggers": [
+		"https://airbnb.com/rooms",
+		"https://www.airbnb.com/rooms",
+		"https://airbnb.com.au/rooms",
+		"https://www.airbnb.com.au/rooms",
+		"https://booking.com/hotel",
+		"https://www.booking.com/hotel"
+	]
+}

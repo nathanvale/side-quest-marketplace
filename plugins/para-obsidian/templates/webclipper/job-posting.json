@@ -1,0 +1,75 @@
+{
+	"schemaVersion": "0.1.0",
+	"name": "Job Posting",
+	"behavior": "create",
+	"noteNameFormat": "💼 {{schema:@JobPosting:title|default:title|safe_name|slice:0,70}}",
+	"path": "00 Inbox",
+	"context": "{{schema:@JobPosting}}",
+	"noteContentFormat": "# {{schema:@JobPosting:title|default:title}}\n\n## Job Details\n\n| | |\n|---|---|\n| **Company** | `= this.company` |\n| **Location** | `= this.location` |\n| **Type** | {{schema:@JobPosting:employmentType|default:\"—\"}} |\n| **Salary** | {{schema:@JobPosting:baseSalary.value|default:\"Not listed\"}} |\n| **Posted** | {{schema:@JobPosting:datePosted|default:\"—\"}} |\n\n## Why I'm Interested\n\n\n\n## Description\n\n{{description|default:\"\"}}\n\n---\n\n💼 [Apply](`= this.source`)",
+	"properties": [
+		{
+			"name": "type",
+			"value": "clipping",
+			"type": "text"
+		},
+		{
+			"name": "clipping_type",
+			"value": "job",
+			"type": "text"
+		},
+		{
+			"name": "source",
+			"value": "{{url}}",
+			"type": "text"
+		},
+		{
+			"name": "clipped",
+			"value": "{{time|date:\"YYYY-MM-DD\"}}",
+			"type": "date"
+		},
+		{
+			"name": "company",
+			"value": "{{schema:@JobPosting:hiringOrganization.name|default:\"\"}}",
+			"type": "text"
+		},
+		{
+			"name": "title",
+			"value": "{{schema:@JobPosting:title|default:\"\"}}",
+			"type": "text"
+		},
+		{
+			"name": "location",
+			"value": "{{schema:@JobPosting:jobLocation.address.addressLocality|default:\"\"}}",
+			"type": "text"
+		},
+		{
+			"name": "distill_status",
+			"value": "raw",
+			"type": "text"
+		},
+		{
+			"name": "related",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "project",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "area",
+			"value": "",
+			"type": "multitext"
+		}
+	],
+	"triggers": [
+		"schema:@JobPosting",
+		"https://linkedin.com/jobs",
+		"https://www.linkedin.com/jobs",
+		"https://indeed.com/viewjob",
+		"https://www.indeed.com/viewjob",
+		"https://seek.com.au/job",
+		"https://www.seek.com.au/job"
+	]
+}

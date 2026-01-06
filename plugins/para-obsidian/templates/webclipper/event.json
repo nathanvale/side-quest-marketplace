@@ -1,0 +1,75 @@
+{
+	"schemaVersion": "0.1.0",
+	"name": "Event",
+	"behavior": "create",
+	"noteNameFormat": "🎫 {{schema:@Event:name|default:title|safe_name|slice:0,80}}",
+	"path": "00 Inbox",
+	"context": "{{schema:@Event}}",
+	"noteContentFormat": "# {{schema:@Event:name|default:title}}\n\n![Event Image]({{schema:@Event:image|default:meta:og:image}})\n\n## Event Details\n\n| | |\n|---|---|\n| **Date** | `= this.event_date` |\n| **End** | {{schema:@Event:endDate|default:\"—\"}} |\n| **Location** | `= this.location` |\n| **Address** | {{schema:@Event:location.address|default:\"—\"}} |\n| **Price** | `= this.price` |\n| **Organizer** | {{schema:@Event:organizer.name|default:\"—\"}} |\n\n## Why I'm Interested\n\n\n\n## Description\n\n{{description|default:\"\"}}\n\n---\n\n🎫 [Get Tickets](`= this.source`)",
+	"properties": [
+		{
+			"name": "type",
+			"value": "clipping",
+			"type": "text"
+		},
+		{
+			"name": "clipping_type",
+			"value": "event",
+			"type": "text"
+		},
+		{
+			"name": "source",
+			"value": "{{url}}",
+			"type": "text"
+		},
+		{
+			"name": "clipped",
+			"value": "{{time|date:\"YYYY-MM-DD\"}}",
+			"type": "date"
+		},
+		{
+			"name": "event_date",
+			"value": "{{schema:@Event:startDate|default:\"\"}}",
+			"type": "date"
+		},
+		{
+			"name": "location",
+			"value": "{{schema:@Event:location.name|default:\"\"}}",
+			"type": "text"
+		},
+		{
+			"name": "price",
+			"value": "{{schema:@Event:offers.price|default:\"\"}}",
+			"type": "text"
+		},
+		{
+			"name": "distill_status",
+			"value": "raw",
+			"type": "text"
+		},
+		{
+			"name": "related",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "project",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "area",
+			"value": "",
+			"type": "multitext"
+		}
+	],
+	"triggers": [
+		"schema:@Event",
+		"https://eventbrite.com",
+		"https://www.eventbrite.com",
+		"https://eventbrite.com.au",
+		"https://www.eventbrite.com.au",
+		"https://meetup.com/events",
+		"https://www.meetup.com/events"
+	]
+}
