@@ -48,5 +48,8 @@
 			"type": "multitext"
 		}
 	],
-	"triggers": ["https://twitter.com", "https://x.com"]
+	"triggers": [
+		"https://twitter.com",
+		"https://x.com"
+	]
 }
