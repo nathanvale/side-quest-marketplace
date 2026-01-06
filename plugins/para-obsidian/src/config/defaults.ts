@@ -288,6 +288,31 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			},
 		},
 	},
+	meeting: {
+		required: {
+			created: { type: "date" },
+			type: { type: "enum", enum: ["meeting"] },
+			meeting_type: {
+				type: "enum",
+				enum: [
+					"1-on-1",
+					"standup",
+					"planning",
+					"retro",
+					"review",
+					"interview",
+					"stakeholder",
+					"general",
+				],
+			},
+			meeting_date: { type: "date" },
+			area: { type: "wikilink", optional: true },
+			project: { type: "wikilink", optional: true },
+			company: { type: "string", optional: true },
+			summary: { type: "string", optional: true },
+		},
+		oneOfRequired: ["area", "project"],
+	},
 	"medical-statement": {
 		required: {
 			title: { type: "string" },
@@ -323,23 +348,28 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 };
 
 export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
-	project: 4,
-	trip: 3,
-	area: 3,
-	resource: 3,
-	task: 4,
-	daily: 3,
-	"weekly-review": 3,
-	capture: 3,
-	checklist: 3,
-	booking: 3,
-	itinerary: 3,
-	"itinerary-day": 3,
-	research: 3,
+	project: 1,
+	trip: 1,
+	area: 1,
+	resource: 1,
+	task: 1,
+	daily: 1,
+	"weekly-review": 1,
+	capture: 1,
+	checklist: 1,
+	booking: 1,
+	itinerary: 1,
+	"itinerary-day": 1,
+	research: 1,
 	session: 1,
 	invoice: 1,
 	bookmark: 1,
 	"medical-statement": 1,
+	cv: 1,
+	letter: 1,
+	"employment-contract": 1,
+	document: 1,
+	meeting: 1,
 };
 
 /**
@@ -366,6 +396,7 @@ export const DEFAULT_DESTINATIONS: Record<string, string> = {
 	invoice: "00 Inbox",
 	bookmark: "00 Inbox",
 	"medical-statement": "00 Inbox",
+	meeting: "00 Inbox",
 	// Attachments folder (for git operations, not template destination)
 	attachments: "Attachments",
 };
@@ -438,6 +469,7 @@ export const DEFAULT_PARA_SEARCH_FOLDERS = [
 export const DEFAULT_TITLE_PREFIXES: Partial<Record<string, string>> = {
 	project: "🎯 ",
 	area: "🌱 ",
+	resource: "📚 ",
 	research: "📊 ",
 	booking: "🎫 ",
 	trip: "✈️ ",
@@ -451,4 +483,5 @@ export const DEFAULT_TITLE_PREFIXES: Partial<Record<string, string>> = {
 	document: "📄 ",
 	letter: "📄 ",
 	cv: "📄 ",
+	meeting: "🗣️ ",
 };
