@@ -135,6 +135,29 @@ describe("webClipperToTemplater", () => {
 		expect(result.content).toContain("template_version: 1");
 		expect(result.content).toContain("status: to-read");
 	});
+
+	test("H12: sanitizes template name for YAML safety in type field", () => {
+		const template: WebClipperTemplate = {
+			schemaVersion: "0.1.0",
+			name: 'Test "With" Special:Characters/Colons',
+			behavior: "create",
+			noteNameFormat: "{{title}}",
+			path: "00 Inbox",
+			noteContentFormat: "# Content",
+			properties: [],
+		};
+
+		const result = webClipperToTemplater(template);
+
+		expect(result.success).toBe(true);
+		// Type should be sanitized (no quotes, colons, or slashes)
+		// The sanitizeYamlValue function replaces slashes with hyphens
+		expect(result.content).toContain(
+			"type: test-with-specialcharacters-colons",
+		);
+		// Should not contain dangerous YAML characters
+		expect(result.content).not.toMatch(/type:.*[:"'/\\]/);
+	});
 });
 
 describe("extractTemplateMetadata", () => {
@@ -245,6 +268,201 @@ describe("webClipperToTemplater - security", () => {
 		// Should not throw - exactly at limit
 		const result = webClipperToTemplater(template);
 		expect(result.success).toBe(true);
+	});
+
+	test("P0-1: escapes backslash in date format to prevent quote escaping", () => {
+		// Attack: Trailing backslash could escape the closing quote
+		// Input: {{time|date:"YYYY\"}} extracts "YYYY\"
+		// Without escaping: <% tp.date.now("YYYY\") %> — backslash escapes the quote!
+		// With escaping: <% tp.date.now("YYYY\\") %> — safe
+		const template: WebClipperTemplate = {
+			schemaVersion: "0.1.0",
+			name: "Test",
+			behavior: "create",
+			noteNameFormat: "{{title}}",
+			path: "00 Inbox",
+			noteContentFormat: "# {{title}}",
+			properties: [
+				{
+					name: "created",
+					value: '{{time|date:"YYYY\\"}}',
+					type: "date",
+				},
+			],
+		};
+
+		const result = webClipperToTemplater(template);
+
+		expect(result.success).toBe(true);
+		expect(result.content).toContain("tp.date.now");
+		// The backslash must be escaped to prevent it from escaping the closing quote
+		expect(result.content).toContain("\\\\");
+	});
+
+	test("P0-1: escapes templater delimiters in schema date format", () => {
+		const template: WebClipperTemplate = {
+			schemaVersion: "0.1.0",
+			name: "Test",
+			behavior: "create",
+			noteNameFormat: "{{title}}",
+			path: "00 Inbox",
+			noteContentFormat: "# {{title}}",
+			properties: [
+				{
+					name: "published",
+					// Attack: Templater delimiters in date format
+					value: '{{schema:@Article:datePublished|date:"YYYY <% evil %> MM"}}',
+					type: "date",
+				},
+			],
+		};
+
+		const result = webClipperToTemplater(template);
+
+		expect(result.success).toBe(true);
+		expect(result.content).toContain("tp.date.now");
+		// Templater delimiters must be escaped
+		expect(result.content).toContain("\\<%");
+		expect(result.content).toContain("%\\>");
+	});
+
+	test("P0-2: escapes backslash in default value", () => {
+		const template: WebClipperTemplate = {
+			schemaVersion: "0.1.0",
+			name: "Test",
+			behavior: "create",
+			noteNameFormat: "{{title}}",
+			path: "00 Inbox",
+			// Attack: Backslash in default value
+			// Regex requires quotes: /\{\{(\w+)(?:\|default:"([^"]*)")?\}\}/
+			noteContentFormat: '# {{author|default:"foo\\bar"}}',
+			properties: [],
+		};
+
+		const result = webClipperToTemplater(template);
+
+		expect(result.success).toBe(true);
+		expect(result.content).toContain("tp.system.prompt");
+		// Backslash must be escaped to prevent it from escaping the closing quote
+		expect(result.content).toContain("\\\\");
+	});
+
+	test("P0-2: escapes templater delimiters in default value", () => {
+		const template: WebClipperTemplate = {
+			schemaVersion: "0.1.0",
+			name: "Test",
+			behavior: "create",
+			noteNameFormat: "{{title}}",
+			path: "00 Inbox",
+			noteContentFormat: '# {{url|default:"<% tp.file.exists() %>"}}',
+			properties: [],
+		};
+
+		const result = webClipperToTemplater(template);
+
+		expect(result.success).toBe(true);
+		// Templater delimiters should be escaped
+		expect(result.content).toContain("\\<%");
+		expect(result.content).toContain("%\\>");
+		// Should NOT create nested Templater code
+		expect(result.content).not.toMatch(
+			/<% tp\.system\.prompt\("[^"]*", "<% tp\.file\.exists/,
+		);
+	});
+
+	test("P0-2: escapes variable label injection", () => {
+		// If a variable name is not in MAPPABLE_VARIABLES, it's used as-is for the label
+		// Variable names are \w+ so they can't contain quotes/delimiters
+		// BUT we test that the LABEL (from MAPPABLE_VARIABLES or the variable name) is escaped
+		// Let's use a property to test label escaping since property values can be complex
+		const template: WebClipperTemplate = {
+			schemaVersion: "0.1.0",
+			name: "Test",
+			behavior: "create",
+			noteNameFormat: "{{title}}",
+			path: "00 Inbox",
+			noteContentFormat: "# {{title}}",
+			properties: [
+				{
+					name: "test",
+					// This will extract variable "customVar" with no default, creating a prompt with label "customVar"
+					value: "{{customVar}}",
+					type: "text",
+				},
+			],
+		};
+
+		const result = webClipperToTemplater(template);
+
+		expect(result.success).toBe(true);
+		// Variable name becomes the label and should be safe (it's \w+ from regex)
+		expect(result.content).toContain("tp.system.prompt");
+		expect(result.content).toContain("customVar");
+	});
+
+	test("escapes backslashes in date format", () => {
+		const template: WebClipperTemplate = {
+			schemaVersion: "0.1.0",
+			name: "Test",
+			behavior: "create",
+			noteNameFormat: "{{title}}",
+			path: "00 Inbox",
+			noteContentFormat: "# {{title}}",
+			properties: [
+				{
+					name: "created",
+					value: '{{time|date:"YYYY\\\\MM\\\\DD"}}',
+					type: "date",
+				},
+			],
+		};
+
+		const result = webClipperToTemplater(template);
+
+		expect(result.success).toBe(true);
+		// Backslashes should be double-escaped
+		expect(result.content).toContain("\\\\\\\\");
+	});
+
+	test("escapes closing delimiter in default value", () => {
+		const template: WebClipperTemplate = {
+			schemaVersion: "0.1.0",
+			name: "Test",
+			behavior: "create",
+			noteNameFormat: "{{title}}",
+			path: "00 Inbox",
+			noteContentFormat: '# {{title|default:"end %> start"}}',
+			properties: [],
+		};
+
+		const result = webClipperToTemplater(template);
+
+		expect(result.success).toBe(true);
+		// Closing delimiter should be escaped
+		expect(result.content).toContain("%\\>");
+		// Should not prematurely close Templater code
+		expect(result.content).not.toMatch(
+			/<% tp\.system\.prompt\("[^"]*", "[^"]*" %> [^>]*"\) %>/,
+		);
+	});
+
+	test("handles benign special characters without over-escaping", () => {
+		const template: WebClipperTemplate = {
+			schemaVersion: "0.1.0",
+			name: "Test",
+			behavior: "create",
+			noteNameFormat: "{{title}}",
+			path: "00 Inbox",
+			noteContentFormat: '# {{title|default:"Hello, World!"}}',
+			properties: [],
+		};
+
+		const result = webClipperToTemplater(template);
+
+		expect(result.success).toBe(true);
+		// Benign characters should pass through unescaped
+		expect(result.content).toContain("Hello, World!");
+		expect(result.content).not.toContain("Hello\\,");
 	});
 });
 

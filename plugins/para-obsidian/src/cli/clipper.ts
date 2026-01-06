@@ -27,6 +27,23 @@ import { startSession } from "./shared/session";
 import type { CommandContext, CommandResult } from "./types";
 
 /**
+ * Validate output path to prevent directory traversal attacks.
+ * Rejects paths containing ".." segments.
+ */
+function validateOutputPath(outputPath: string): {
+	valid: boolean;
+	error?: string;
+} {
+	if (outputPath.includes("..")) {
+		return {
+			valid: false,
+			error: "Invalid output path: path traversal detected (contains '..')",
+		};
+	}
+	return { valid: true };
+}
+
+/**
  * Handle clipper subcommand.
  *
  * Usage:
@@ -94,7 +111,7 @@ export async function handleClipper(
 		const errorMsg = error instanceof Error ? error.message : String(error);
 		cliLogger.error`cli:clipper:error cid=${cid} sessionCid=${sessionCid} error=${errorMsg} durationMs=${Date.now() - startTime}`;
 		session.end({ error: errorMsg });
-		return { success: false, error: errorMsg };
+		return { success: false, error: errorMsg, exitCode: 1 };
 	}
 
 	cliLogger.info`cli:clipper:complete cid=${cid} sessionCid=${sessionCid} success=${result.success} durationMs=${Date.now() - startTime}`;
@@ -116,7 +133,7 @@ function handleClipperList(
 	const { templates, error } = listTemplates();
 
 	if (error) {
-		return { success: false, error };
+		return { success: false, error, exitCode: 1 };
 	}
 
 	if (isJson) {
@@ -159,12 +176,18 @@ async function handleClipperExport(
 			? flags.out
 			: "obsidian-web-clipper-settings.json";
 
+	// Validate output path to prevent directory traversal
+	const validation = validateOutputPath(outputPath);
+	if (!validation.valid) {
+		return { success: false, error: validation.error, exitCode: 1 };
+	}
+
 	cliLogger.info`cli:clipper:export:start cid=${cid} sessionCid=${sessionCid} outputPath=${outputPath}`;
 
 	const result = await exportToWebClipperSettings(outputPath);
 
 	if (!result.success) {
-		return { success: false, error: result.error };
+		return { success: false, error: result.error, exitCode: 1 };
 	}
 
 	if (isJson) {
@@ -219,6 +242,16 @@ async function handleClipperSync(
 			success: false,
 			error:
 				"Missing settings file path. Usage: para clipper sync <settings.json>",
+			exitCode: 1,
+		};
+	}
+
+	// H8: Validate null bytes in positional argument
+	if (settingsPath.includes("\0")) {
+		return {
+			success: false,
+			error: "Invalid settings path: contains null bytes",
+			exitCode: 1,
 		};
 	}
 
@@ -227,7 +260,7 @@ async function handleClipperSync(
 	const result = await syncFromWebClipperSettings(settingsPath);
 
 	if (!result.success) {
-		return { success: false, error: result.error };
+		return { success: false, error: result.error, exitCode: 1 };
 	}
 
 	if (isJson) {
@@ -302,17 +335,39 @@ async function handleClipperConvert(
 			success: false,
 			error:
 				"Missing template name. Usage: para clipper convert <template-name> [--out path]",
+			exitCode: 1,
+		};
+	}
+
+	// H8: Validate null bytes in positional argument
+	if (templateName.includes("\0")) {
+		return {
+			success: false,
+			error: "Invalid template name: contains null bytes",
+			exitCode: 1,
 		};
 	}
 
 	const outputPath = typeof flags.out === "string" ? flags.out : undefined;
+
+	// Validate output path to prevent directory traversal
+	if (outputPath) {
+		const validation = validateOutputPath(outputPath);
+		if (!validation.valid) {
+			return { success: false, error: validation.error, exitCode: 1 };
+		}
+	}
 
 	cliLogger.info`cli:clipper:convert:start cid=${cid} sessionCid=${sessionCid} templateName=${templateName} outputPath=${outputPath || ""}`;
 
 	// Get template metadata first
 	const { template, error: templateError } = getTemplate(templateName);
 	if (templateError || !template) {
-		return { success: false, error: templateError || "Template not found" };
+		return {
+			success: false,
+			error: templateError || "Template not found",
+			exitCode: 1,
+		};
 	}
 
 	const metadata = extractTemplateMetadata(template);
@@ -321,7 +376,7 @@ async function handleClipperConvert(
 	const result = await exportToTemplater(templateName, outputPath, config);
 
 	if (!result.success) {
-		return { success: false, error: result.error };
+		return { success: false, error: result.error, exitCode: 1 };
 	}
 
 	if (isJson) {
@@ -394,6 +449,14 @@ async function handleClipperConvertAll(
 ): Promise<CommandResult> {
 	const outputDir = typeof flags.out === "string" ? flags.out : undefined;
 
+	// Validate output path to prevent directory traversal
+	if (outputDir) {
+		const validation = validateOutputPath(outputDir);
+		if (!validation.valid) {
+			return { success: false, error: validation.error, exitCode: 1 };
+		}
+	}
+
 	cliLogger.info`cli:clipper:convert-all:start cid=${cid} sessionCid=${sessionCid} outputDir=${outputDir || ""}`;
 
 	const result = await exportAllToTemplater(
@@ -402,7 +465,7 @@ async function handleClipperConvertAll(
 	);
 
 	if (!result.success) {
-		return { success: false, error: result.error };
+		return { success: false, error: result.error, exitCode: 1 };
 	}
 
 	if (isJson) {

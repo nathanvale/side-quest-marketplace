@@ -10,12 +10,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createCorrelationId, getSubsystemLogger } from "../shared/logger";
 import type {
 	ParseResult,
 	WebClipperProperty,
 	WebClipperSettings,
 	WebClipperTemplate,
 } from "./types";
+
+const logger = getSubsystemLogger("cli");
 
 /** Valid property types in WebClipper schema */
 const VALID_PROPERTY_TYPES = [
@@ -139,19 +142,26 @@ function validateTemplate(template: unknown): {
  * Parse a WebClipper template from JSON string.
  */
 export function parseTemplate(json: string): ParseResult<WebClipperTemplate> {
+	const cid = createCorrelationId();
+	logger.info`clipper:parse:start cid=${cid}`;
+
 	try {
 		const parsed = JSON.parse(json);
 		const validation = validateTemplate(parsed);
 
 		if (!validation.valid) {
+			const error = validation.errors.join("; ");
+			logger.error`clipper:parse:error cid=${cid} error=${error}`;
 			return {
 				success: false,
-				error: validation.errors.join("; "),
+				error,
 				warnings: validation.warnings,
 			};
 		}
 
-		// Cast to template type with defaults
+		// H4: Cast to template type with defaults
+		// NOTE: Extra fields on property objects will pass through without validation.
+		// This is acceptable for forward compatibility with future schema versions.
 		const template: WebClipperTemplate = {
 			schemaVersion: parsed.schemaVersion || CURRENT_SCHEMA_VERSION,
 			name: parsed.name,
@@ -164,6 +174,7 @@ export function parseTemplate(json: string): ParseResult<WebClipperTemplate> {
 			triggers: parsed.triggers,
 		};
 
+		logger.info`clipper:parse:success cid=${cid} name=${template.name}`;
 		return {
 			success: true,
 			data: template,
@@ -171,9 +182,11 @@ export function parseTemplate(json: string): ParseResult<WebClipperTemplate> {
 				validation.warnings.length > 0 ? validation.warnings : undefined,
 		};
 	} catch (error) {
+		const errorMsg = error instanceof Error ? error.message : String(error);
+		logger.error`clipper:parse:error cid=${cid} error=${errorMsg}`;
 		return {
 			success: false,
-			error: `JSON parse error: ${error instanceof Error ? error.message : String(error)}`,
+			error: `JSON parse error: ${errorMsg}`,
 		};
 	}
 }
@@ -290,9 +303,14 @@ export function parseSettingsFile(
 export function loadTemplatesFromDirectory(
 	dirPath: string,
 ): ParseResult<WebClipperTemplate[]> {
+	const cid = createCorrelationId();
+	logger.info`clipper:load:start cid=${cid} dirPath=${dirPath}`;
+
 	try {
 		if (!fs.existsSync(dirPath)) {
-			return { success: false, error: `Directory not found: ${dirPath}` };
+			const error = `Directory not found: ${dirPath}`;
+			logger.error`clipper:load:error cid=${cid} error=${error}`;
+			return { success: false, error };
 		}
 
 		const files = fs.readdirSync(dirPath).filter((f) => f.endsWith(".json"));
@@ -314,15 +332,18 @@ export function loadTemplatesFromDirectory(
 			}
 		}
 
+		logger.info`clipper:load:success cid=${cid} templateCount=${templates.length}`;
 		return {
 			success: true,
 			data: templates,
 			warnings: warnings.length > 0 ? warnings : undefined,
 		};
 	} catch (error) {
+		const errorMsg = error instanceof Error ? error.message : String(error);
+		logger.error`clipper:load:error cid=${cid} error=${errorMsg}`;
 		return {
 			success: false,
-			error: `Failed to read directory: ${error instanceof Error ? error.message : String(error)}`,
+			error: `Failed to read directory: ${errorMsg}`,
 		};
 	}
 }

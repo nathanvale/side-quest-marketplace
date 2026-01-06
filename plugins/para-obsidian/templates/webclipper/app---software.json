@@ -1,0 +1,66 @@
+{
+	"schemaVersion": "0.1.0",
+	"name": "App / Software",
+	"behavior": "create",
+	"noteNameFormat": "📱 {{schema:@SoftwareApplication:name|default:title|safe_name|slice:0,70}}",
+	"path": "00 Inbox",
+	"context": "{{schema:@SoftwareApplication}}",
+	"noteContentFormat": "# {{schema:@SoftwareApplication:name|default:title}}\n\n![App Icon]({{schema:@SoftwareApplication:image|default:meta:og:image}})\n\n## App Info\n\n| | |\n|---|---|\n| **Price** | `= this.price` |\n| **Rating** | `= this.rating`/5 |\n| **Category** | {{schema:@SoftwareApplication:applicationCategory|default:\"—\"}} |\n| **Platform** | {{schema:@SoftwareApplication:operatingSystem|default:\"—\"}} |\n\n## Why I'm Interested\n\n\n\n## Description\n\n{{description|default:\"\"}}\n\n---\n\n📱 [Download](`= this.source`)",
+	"properties": [
+		{
+			"name": "type",
+			"value": "clipping",
+			"type": "text"
+		},
+		{
+			"name": "clipping_type",
+			"value": "app",
+			"type": "text"
+		},
+		{
+			"name": "source",
+			"value": "{{url}}",
+			"type": "text"
+		},
+		{
+			"name": "clipped",
+			"value": "{{time|date:\"YYYY-MM-DD\"}}",
+			"type": "date"
+		},
+		{
+			"name": "price",
+			"value": "{{schema:@SoftwareApplication:offers.price|default:\"\"}}",
+			"type": "text"
+		},
+		{
+			"name": "rating",
+			"value": "{{schema:@SoftwareApplication:aggregateRating.ratingValue|default:\"\"}}",
+			"type": "text"
+		},
+		{
+			"name": "distill_status",
+			"value": "raw",
+			"type": "text"
+		},
+		{
+			"name": "related",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "project",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "area",
+			"value": "",
+			"type": "multitext"
+		}
+	],
+	"triggers": [
+		"schema:@SoftwareApplication",
+		"https://apps.apple.com",
+		"https://play.google.com/store/apps"
+	]
+}

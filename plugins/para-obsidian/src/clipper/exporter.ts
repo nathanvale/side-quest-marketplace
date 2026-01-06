@@ -13,6 +13,9 @@ import fs from "node:fs";
 import path from "node:path";
 import type { ParaObsidianConfig } from "../config/index";
 import { atomicWriteFile } from "../shared/atomic-fs";
+import { withFileLock } from "../shared/file-lock";
+import { createCorrelationId, getSubsystemLogger } from "../shared/logger";
+import { Transaction } from "../shared/transaction";
 import { compareTemplates, webClipperToTemplater } from "./converter";
 import {
 	getTemplatesDirectory,
@@ -20,6 +23,8 @@ import {
 	parseSettingsFile,
 } from "./parser";
 import type { WebClipperSettings, WebClipperTemplate } from "./types";
+
+const logger = getSubsystemLogger("cli");
 
 /**
  * Maximum allowed template name length to prevent abuse.
@@ -29,6 +34,9 @@ const MAX_TEMPLATE_NAME_LENGTH = 200;
 /**
  * Sanitize a template name to prevent path traversal attacks.
  * Removes dangerous characters and patterns.
+ *
+ * Strips common file extensions before sanitization to prevent
+ * template names like "article.html" becoming "article-html.md".
  */
 function sanitizeTemplateName(name: string): string {
 	// Reject overly long names
@@ -38,8 +46,11 @@ function sanitizeTemplateName(name: string): string {
 		);
 	}
 
+	// H5: Strip common file extensions before sanitization
+	const cleaned = name.replace(/\.(json|md|html|txt)$/i, "");
+
 	// Remove null bytes, path separators, and parent directory references
-	const sanitized = name
+	const sanitized = cleaned
 		.replace(/\0/g, "") // Null bytes
 		.replace(/[/\\]/g, "-") // Path separators
 		.replace(/\.\./g, "") // Parent directory traversal
@@ -124,14 +135,21 @@ export function listTemplates(): {
  * This can be imported into the WebClipper browser extension.
  *
  * Uses atomic writes to prevent corruption.
+ *
+ * NOTE: Path validation intentionally omitted - allows exporting to arbitrary
+ * locations (user's Downloads, Documents, etc.). Atomic writes ensure crash safety.
  */
 export async function exportToWebClipperSettings(
 	outputPath: string,
 ): Promise<ExportResult> {
+	const cid = createCorrelationId();
+	logger.info`clipper:export:start cid=${cid} outputPath=${outputPath}`;
+
 	const templatesDir = getTemplatesDirectory();
 	const result = loadTemplatesFromDirectory(templatesDir);
 
 	if (!result.success || !result.data) {
+		logger.error`clipper:export:error cid=${cid} error=${result.error || "Unknown error"}`;
 		return { success: false, error: result.error };
 	}
 
@@ -145,6 +163,7 @@ export async function exportToWebClipperSettings(
 		// Use atomic write for crash safety
 		await atomicWriteFile(outputPath, JSON.stringify(settings, null, "\t"));
 
+		logger.info`clipper:export:success cid=${cid} outputPath=${outputPath} templateCount=${result.data.length}`;
 		return {
 			success: true,
 			outputPath,
@@ -152,9 +171,11 @@ export async function exportToWebClipperSettings(
 			warnings: result.warnings,
 		};
 	} catch (error) {
+		const errorMsg = error instanceof Error ? error.message : String(error);
+		logger.error`clipper:export:error cid=${cid} error=${errorMsg}`;
 		return {
 			success: false,
-			error: `Failed to write ${outputPath}: ${error instanceof Error ? error.message : String(error)}`,
+			error: `Failed to write ${outputPath}: ${errorMsg}`,
 		};
 	}
 }
@@ -261,6 +282,8 @@ export async function exportToTemplater(
  *
  * Security: Sanitizes template names to prevent path traversal.
  * Uses atomic writes to prevent corruption.
+ *
+ * Failure threshold: Returns success=false if >50% of templates fail.
  */
 export async function exportAllToTemplater(
 	outputDir: string,
@@ -273,8 +296,17 @@ export async function exportAllToTemplater(
 		return { success: false, error: result.error };
 	}
 
+	// H7: Explicit error when no templates exist
+	if (result.data.length === 0) {
+		return {
+			success: false,
+			error: "No templates found to export. Check templates directory.",
+		};
+	}
+
 	const warnings: string[] = [];
 	let successCount = 0;
+	let failedCount = 0;
 
 	// Use vault templates dir or provided outputDir
 	const targetDir =
@@ -287,9 +319,14 @@ export async function exportAllToTemplater(
 		return { success: false, error: "No output directory specified" };
 	}
 
-	// Ensure target directory exists
-	if (!fs.existsSync(targetDir)) {
+	// Ensure target directory exists (handle race condition)
+	try {
 		fs.mkdirSync(targetDir, { recursive: true });
+	} catch (error) {
+		// Ignore EEXIST - another process may have created it
+		if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+			throw error;
+		}
 	}
 
 	for (const template of result.data) {
@@ -297,6 +334,7 @@ export async function exportAllToTemplater(
 
 		if (!conversionResult.success || !conversionResult.content) {
 			warnings.push(`${template.name}: ${conversionResult.error}`);
+			failedCount++;
 			continue;
 		}
 
@@ -322,7 +360,23 @@ export async function exportAllToTemplater(
 			warnings.push(
 				`${template.name}: Failed to write - ${error instanceof Error ? error.message : String(error)}`,
 			);
+			failedCount++;
 		}
+	}
+
+	// Calculate failure rate
+	const totalTemplates = result.data.length;
+	const failureRate = totalTemplates > 0 ? failedCount / totalTemplates : 0;
+
+	// Fail if more than 50% of templates failed
+	if (failureRate > 0.5) {
+		return {
+			success: false,
+			outputPath: targetDir,
+			templateCount: successCount,
+			error: `Excessive failure rate: ${failedCount}/${totalTemplates} templates failed (${Math.round(failureRate * 100)}%)`,
+			warnings: warnings.length > 0 ? warnings : undefined,
+		};
 	}
 
 	return {
@@ -339,14 +393,22 @@ export async function exportAllToTemplater(
  *
  * Security: Validates template names and paths to prevent traversal attacks.
  * Uses atomic writes to prevent corruption.
+ * Concurrency: File lock prevents race conditions between concurrent syncs.
+ * Transactional: All-or-nothing semantics with automatic rollback on failure.
+ *
+ * Conflict detection: Warns when overwriting locally modified templates.
  */
 export async function syncFromWebClipperSettings(
 	settingsPath: string,
 ): Promise<SyncResult> {
+	const cid = createCorrelationId();
+	logger.info`clipper:sync:start cid=${cid} settingsPath=${settingsPath}`;
+
 	// Parse the settings file
 	const settingsResult = parseSettingsFile(settingsPath);
 
 	if (!settingsResult.success || !settingsResult.data) {
+		logger.error`clipper:sync:error cid=${cid} error=${settingsResult.error || "Unknown error"}`;
 		return {
 			success: false,
 			added: [],
@@ -361,6 +423,7 @@ export async function syncFromWebClipperSettings(
 	const existingResult = loadTemplatesFromDirectory(templatesDir);
 
 	if (!existingResult.success) {
+		logger.error`clipper:sync:error cid=${cid} error=${existingResult.error || "Unknown error"}`;
 		return {
 			success: false,
 			added: [],
@@ -374,58 +437,139 @@ export async function syncFromWebClipperSettings(
 		(existingResult.data || []).map((t) => [t.name.toLowerCase(), t]),
 	);
 
-	const added: string[] = [];
-	const updated: string[] = [];
-	const unchanged: string[] = [];
-	const warnings: string[] = [];
+	// Extract settings data for type narrowing in closure
+	const settingsData = settingsResult.data;
 
-	// Process templates from settings
-	for (const template of settingsResult.data.templates) {
-		try {
-			// Sanitize template name to prevent path traversal
-			const sanitizedName = sanitizeTemplateName(template.name);
-			const normalizedName = sanitizedName.toLowerCase();
-			const existing = existingTemplates.get(normalizedName);
+	// Use file lock to prevent concurrent modifications to templates directory
+	return withFileLock(`templates-sync-${templatesDir}`, async () => {
+		const added: string[] = [];
+		const updated: string[] = [];
+		const unchanged: string[] = [];
+		const warnings: string[] = [];
 
-			// Build safe file path
-			const fileName = `${normalizedName.replace(/\s+/g, "-")}.json`;
-			const filePath = path.join(templatesDir, fileName);
+		// Wrap template processing in a transaction for rollback support
+		const tx = new Transaction();
 
-			// Validate the path is within templates directory
-			validatePathWithinDir(filePath, templatesDir);
+		// Process templates from settings
+		for (const template of settingsData.templates) {
+			try {
+				// Sanitize template name to prevent path traversal
+				const sanitizedName = sanitizeTemplateName(template.name);
+				const normalizedName = sanitizedName.toLowerCase();
+				const existing = existingTemplates.get(normalizedName);
 
-			if (!existing) {
-				// New template - use atomic write
-				await atomicWriteFile(filePath, JSON.stringify(template, null, "\t"));
-				added.push(template.name);
-			} else {
-				// Compare and update if changed
-				const comparison = compareTemplates(existing, template);
+				// Build safe file path
+				const fileName = `${normalizedName.replace(/\s+/g, "-")}.json`;
+				const filePath = path.join(templatesDir, fileName);
 
-				if (!comparison.identical) {
-					// Use atomic write for updates
-					await atomicWriteFile(filePath, JSON.stringify(template, null, "\t"));
-					updated.push(
-						`${template.name} (${comparison.differences.join(", ")})`,
-					);
+				// Validate the path is within templates directory
+				validatePathWithinDir(filePath, templatesDir);
+
+				if (!existing) {
+					// New template - add to transaction
+					tx.add({
+						name: `create-template-${template.name}`,
+						execute: async () => {
+							await atomicWriteFile(
+								filePath,
+								JSON.stringify(template, null, "\t"),
+							);
+							added.push(template.name);
+							return { filePath, isNew: true };
+						},
+						rollback: async (result) => {
+							const state = result as { filePath: string; isNew: boolean };
+							if (state?.isNew) {
+								// Remove newly created file
+								await fs.promises.unlink(state.filePath).catch(() => {
+									// Ignore - file may not exist
+								});
+							}
+						},
+					});
 				} else {
-					unchanged.push(template.name);
-				}
-			}
-		} catch (error) {
-			warnings.push(
-				`Failed to process ${template.name}: ${error instanceof Error ? error.message : String(error)}`,
-			);
-		}
-	}
+					// Compare and update if changed
+					const comparison = compareTemplates(existing, template);
 
-	return {
-		success: true,
-		added,
-		updated,
-		unchanged,
-		warnings: warnings.length > 0 ? warnings : undefined,
-	};
+					if (!comparison.identical) {
+						// H11: Check if local file was modified (compare disk vs memory)
+						let fileModified = false;
+						try {
+							const diskContent = fs.readFileSync(filePath, "utf-8");
+							const diskTemplate = JSON.parse(
+								diskContent,
+							) as WebClipperTemplate;
+							const diskComparison = compareTemplates(diskTemplate, existing);
+							fileModified = !diskComparison.identical;
+						} catch {
+							// If we can't read/parse disk file, assume not modified
+							fileModified = false;
+						}
+
+						if (fileModified) {
+							warnings.push(
+								`${template.name}: Overwriting locally modified template (${comparison.differences.join(", ")})`,
+							);
+						}
+
+						// Update - add to transaction with backup
+						const backupContent = JSON.stringify(existing, null, "\t");
+
+						tx.add({
+							name: `update-template-${template.name}`,
+							execute: async () => {
+								await atomicWriteFile(
+									filePath,
+									JSON.stringify(template, null, "\t"),
+								);
+								updated.push(
+									`${template.name} (${comparison.differences.join(", ")})`,
+								);
+								return { filePath, backupContent };
+							},
+							rollback: async (result) => {
+								const state = result as {
+									filePath: string;
+									backupContent: string;
+								};
+								// Restore original content
+								await atomicWriteFile(state.filePath, state.backupContent);
+							},
+						});
+					} else {
+						unchanged.push(template.name);
+					}
+				}
+			} catch (error) {
+				warnings.push(
+					`Failed to process ${template.name}: ${error instanceof Error ? error.message : String(error)}`,
+				);
+			}
+		}
+
+		// Execute transaction - rolls back all operations on failure
+		const txResult = await tx.execute();
+
+		if (!txResult.success) {
+			logger.error`clipper:sync:error cid=${cid} failedAt=${txResult.failedAt} error=${txResult.error.message}`;
+			return {
+				success: false,
+				added: [],
+				updated: [],
+				unchanged: [],
+				error: `Transaction failed at ${txResult.failedAt}: ${txResult.error.message}`,
+			};
+		}
+
+		logger.info`clipper:sync:complete cid=${cid} added=${added.length} updated=${updated.length} unchanged=${unchanged.length}`;
+		return {
+			success: true,
+			added,
+			updated,
+			unchanged,
+			warnings: warnings.length > 0 ? warnings : undefined,
+		};
+	});
 }
 
 /**

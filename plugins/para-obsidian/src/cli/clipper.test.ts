@@ -111,6 +111,19 @@ describe("handleClipper", () => {
 			expect(result.error).toContain("Missing settings file path");
 		});
 
+		test("H8: rejects settings path with null bytes", async () => {
+			const ctx = createContext({
+				subcommand: "sync",
+				positional: ["/path/with\0null/settings.json"],
+			});
+
+			const result = await handleClipper(ctx);
+
+			expect(result.success).toBe(false);
+			expect(result.exitCode).toBe(1);
+			expect(result.error).toContain("null bytes");
+		});
+
 		test("returns error for non-existent settings file", async () => {
 			const ctx = createContext({
 				subcommand: "sync",
@@ -155,6 +168,19 @@ describe("handleClipper", () => {
 
 			expect(result.success).toBe(false);
 			expect(result.error).toContain("Missing template name");
+		});
+
+		test("H8: rejects template name with null bytes", async () => {
+			const ctx = createContext({
+				subcommand: "convert",
+				positional: ["template\0name"],
+			});
+
+			const result = await handleClipper(ctx);
+
+			expect(result.success).toBe(false);
+			expect(result.exitCode).toBe(1);
+			expect(result.error).toContain("null bytes");
 		});
 
 		test("returns error for non-existent template", async () => {
@@ -236,6 +262,56 @@ describe("handleClipper", () => {
 			// Unknown subcommands default to list
 			const result = await handleClipper(ctx);
 			expect(result.success).toBe(true);
+		});
+
+		test("sets exitCode to 1 on sync error (missing path)", async () => {
+			const ctx = createContext({
+				subcommand: "sync",
+				positional: [],
+			});
+
+			const result = await handleClipper(ctx);
+
+			expect(result.success).toBe(false);
+			expect(result.exitCode).toBe(1);
+			expect(result.error).toContain("Missing settings file path");
+		});
+
+		test("sets exitCode to 1 on sync error (non-existent file)", async () => {
+			const ctx = createContext({
+				subcommand: "sync",
+				positional: ["/non/existent/settings.json"],
+			});
+
+			const result = await handleClipper(ctx);
+
+			expect(result.success).toBe(false);
+			expect(result.exitCode).toBe(1);
+		});
+
+		test("sets exitCode to 1 on convert error (missing template name)", async () => {
+			const ctx = createContext({
+				subcommand: "convert",
+				positional: [],
+			});
+
+			const result = await handleClipper(ctx);
+
+			expect(result.success).toBe(false);
+			expect(result.exitCode).toBe(1);
+			expect(result.error).toContain("Missing template name");
+		});
+
+		test("sets exitCode to 1 on convert error (non-existent template)", async () => {
+			const ctx = createContext({
+				subcommand: "convert",
+				positional: ["non-existent-template-xyz"],
+			});
+
+			const result = await handleClipper(ctx);
+
+			expect(result.success).toBe(false);
+			expect(result.exitCode).toBe(1);
 		});
 	});
 });

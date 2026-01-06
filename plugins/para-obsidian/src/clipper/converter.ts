@@ -7,6 +7,7 @@
  * @module clipper/converter
  */
 
+import { createCorrelationId, getSubsystemLogger } from "../shared/logger";
 import type {
 	ConversionResult,
 	TemplateMetadata,
@@ -14,6 +15,8 @@ import type {
 	WebClipperProperty,
 	WebClipperTemplate,
 } from "./types";
+
+const logger = getSubsystemLogger("cli");
 
 /**
  * Maximum allowed content length to prevent DoS via regex processing.
@@ -66,27 +69,50 @@ const WEBCLIPPER_ONLY_PATTERNS = [
 ];
 
 /**
+ * Escape a string for safe embedding in Templater code.
+ *
+ * Prevents template injection by escaping:
+ * - Double quotes: " → \"
+ * - Backslashes: \ → \\
+ * - Templater delimiters: <% → \<%, %> → %\>
+ *
+ * Security: Protects against code injection via date formats,
+ * variable labels, and default values.
+ */
+function escapeTemplaterString(str: string): string {
+	return str
+		.replace(/\\/g, "\\\\") // Escape backslashes first
+		.replace(/"/g, '\\"') // Escape double quotes
+		.replace(/<%/g, "\\<%") // Escape opening delimiter
+		.replace(/%>/g, "%\\>"); // Escape closing delimiter
+}
+
+/**
  * Convert a WebClipper date format to Templater date format.
  * WebClipper: {{time|date:"YYYY-MM-DD"}}
  * Templater: <% tp.date.now("YYYY-MM-DD") %>
+ *
+ * Security: Escapes date format string to prevent template injection.
  */
 function convertDateFormat(value: string): {
 	converted: string;
 	isDate: boolean;
 } {
 	const dateMatch = value.match(/\{\{time\|date:"([^"]+)"\}\}/);
-	if (dateMatch) {
+	if (dateMatch?.[1]) {
+		const escapedFormat = escapeTemplaterString(dateMatch[1]);
 		return {
-			converted: `<% tp.date.now("${dateMatch[1]}") %>`,
+			converted: `<% tp.date.now("${escapedFormat}") %>`,
 			isDate: true,
 		};
 	}
 
 	// Also handle schema date formats
 	const schemaDateMatch = value.match(/\{\{schema:[^|]+\|date:"([^"]+)"\}\}/);
-	if (schemaDateMatch) {
+	if (schemaDateMatch?.[1]) {
+		const escapedFormat = escapeTemplaterString(schemaDateMatch[1]);
 		return {
-			converted: `<% tp.date.now("${schemaDateMatch[1]}") %>`,
+			converted: `<% tp.date.now("${escapedFormat}") %>`,
 			isDate: true,
 		};
 	}
@@ -98,13 +124,17 @@ function convertDateFormat(value: string): {
  * Convert a WebClipper variable to Templater prompt.
  * WebClipper: {{variable}} or {{variable|default:""}}
  * Templater: <% tp.system.prompt("Variable", "") %>
+ *
+ * Security: Escapes label and defaultValue to prevent template injection.
  */
 function convertVariable(variable: string, defaultValue?: string): string {
 	const label = MAPPABLE_VARIABLES[variable] || variable;
+	const escapedLabel = escapeTemplaterString(label);
 	if (defaultValue !== undefined) {
-		return `<% tp.system.prompt("${label}", "${defaultValue}") %>`;
+		const escapedDefault = escapeTemplaterString(defaultValue);
+		return `<% tp.system.prompt("${escapedLabel}", "${escapedDefault}") %>`;
 	}
-	return `<% tp.system.prompt("${label}") %>`;
+	return `<% tp.system.prompt("${escapedLabel}") %>`;
 }
 
 /**
@@ -184,6 +214,9 @@ function containsWebClipperOnlyFeatures(content: string): string[] {
  * Strip WebClipper-only features from content.
  */
 function stripWebClipperOnlyFeatures(content: string): string {
+	// Defense-in-depth: validate content length before regex processing
+	validateContentLength(content, "Template content");
+
 	let result = content;
 
 	for (const pattern of WEBCLIPPER_ONLY_PATTERNS) {
@@ -238,6 +271,24 @@ function convertPropertyValue(prop: WebClipperProperty): string {
 const CURRENT_TEMPLATE_VERSION = 1;
 
 /**
+ * Sanitize a string for safe use in YAML frontmatter.
+ * Removes or escapes characters that could break YAML parsing.
+ *
+ * H12: Use this instead of simple `.replace(/\s+/g, "-")` for YAML safety.
+ */
+function sanitizeYamlValue(value: string): string {
+	// Remove or replace characters that could break YAML
+	return value
+		.replace(/[:"'`]/g, "") // Remove quotes and colons
+		.replace(/[/\\]/g, "-") // Replace path separators
+		.replace(/\.\./g, "") // Remove parent directory traversal
+		.replace(/\s+/g, "-") // Replace whitespace with hyphens
+		.replace(/[^\w-]/g, "") // Remove non-word characters except hyphens
+		.toLowerCase()
+		.trim();
+}
+
+/**
  * Generate Templater frontmatter from WebClipper properties.
  *
  * Adds template_version and type fields for PARA system compatibility.
@@ -251,8 +302,8 @@ function generateFrontmatter(
 	// Add PARA template versioning
 	lines.push(`template_version: ${CURRENT_TEMPLATE_VERSION}`);
 
-	// Derive type from template name (kebab-case to identifier)
-	const clippingType = templateName.toLowerCase().replace(/\s+/g, "-");
+	// H12: Derive type from template name using proper YAML sanitization
+	const clippingType = sanitizeYamlValue(templateName);
 	lines.push(`type: ${clippingType}`);
 
 	for (const prop of properties) {
@@ -314,6 +365,24 @@ function convertNoteContent(content: string): {
 		converted = converted.replace(v.fullMatch, replacement);
 	}
 
+	// H2: Check for unmatched {{...}} patterns (e.g., {{meta:og:title}})
+	// These patterns contain characters not matched by \w+ (like : or -)
+	const unmatchedPattern = /\{\{([^}]+)\}\}/g;
+	const allMatches = [...converted.matchAll(unmatchedPattern)];
+	const convertedMatches = new Set(variables.map((v) => v.fullMatch));
+	const unmatched = allMatches.filter((m) => !convertedMatches.has(m[0]));
+	if (unmatched.length > 0) {
+		const patterns = unmatched
+			.map((m) => m[0])
+			.slice(0, 3)
+			.join(", ");
+		const suffix =
+			unmatched.length > 3 ? ` (and ${unmatched.length - 3} more)` : "";
+		warnings.push(
+			`Unmatched variable patterns found: ${patterns}${suffix}. These may require manual conversion.`,
+		);
+	}
+
 	// Convert Dataview inline fields that reference frontmatter
 	// `= this.field` -> <% tp.frontmatter.field %>
 	converted = converted.replace(/`= this\.(\w+)`/g, "<% tp.frontmatter.$1 %>");
@@ -327,6 +396,9 @@ function convertNoteContent(content: string): {
 export function webClipperToTemplater(
 	template: WebClipperTemplate,
 ): ConversionResult {
+	const cid = createCorrelationId();
+	logger.info`clipper:convert:start cid=${cid} name=${template.name}`;
+
 	const warnings: string[] = [];
 	const unsupportedFeatures: string[] = [];
 
@@ -338,6 +410,7 @@ export function webClipperToTemplater(
 
 	if (contentFeatures.length > 0 || nameFeatures.length > 0) {
 		unsupportedFeatures.push(...contentFeatures, ...nameFeatures);
+		logger.warn`clipper:convert:warning cid=${cid} unsupportedFeatures=${unsupportedFeatures.length}`;
 	}
 
 	// Triggers are WebClipper-only
@@ -363,6 +436,8 @@ export function webClipperToTemplater(
 
 	// Combine into final template
 	const content = `${frontmatter}\n\n${body}`;
+
+	logger.info`clipper:convert:success cid=${cid} name=${template.name} contentLength=${content.length}`;
 
 	return {
 		success: true,
