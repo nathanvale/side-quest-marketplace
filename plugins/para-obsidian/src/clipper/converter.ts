@@ -234,13 +234,33 @@ function convertPropertyValue(prop: WebClipperProperty): string {
 	return converted;
 }
 
+/** Current template version for converted Templater templates */
+const CURRENT_TEMPLATE_VERSION = 1;
+
 /**
  * Generate Templater frontmatter from WebClipper properties.
+ *
+ * Adds template_version and type fields for PARA system compatibility.
  */
-function generateFrontmatter(properties: WebClipperProperty[]): string {
+function generateFrontmatter(
+	properties: WebClipperProperty[],
+	templateName: string,
+): string {
 	const lines: string[] = ["---"];
 
+	// Add PARA template versioning
+	lines.push(`template_version: ${CURRENT_TEMPLATE_VERSION}`);
+
+	// Derive type from template name (kebab-case to identifier)
+	const clippingType = templateName.toLowerCase().replace(/\s+/g, "-");
+	lines.push(`type: ${clippingType}`);
+
 	for (const prop of properties) {
+		// Skip if property is already 'type' (we set it above)
+		if (prop.name === "type") {
+			continue;
+		}
+
 		const value = convertPropertyValue(prop);
 
 		// Handle multitext as array
@@ -332,8 +352,8 @@ export function webClipperToTemplater(
 		unsupportedFeatures.push("Context selector");
 	}
 
-	// Generate frontmatter
-	const frontmatter = generateFrontmatter(template.properties);
+	// Generate frontmatter with template versioning
+	const frontmatter = generateFrontmatter(template.properties, template.name);
 
 	// Convert note content
 	const { converted: body, warnings: contentWarnings } = convertNoteContent(

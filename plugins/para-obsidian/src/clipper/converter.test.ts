@@ -113,16 +113,16 @@ describe("webClipperToTemplater", () => {
 		expect(result.content).toContain("tags:");
 	});
 
-	test("preserves static property values", () => {
+	test("preserves static property values and adds versioning", () => {
 		const template: WebClipperTemplate = {
 			schemaVersion: "0.1.0",
-			name: "Test",
+			name: "Article",
 			behavior: "create",
 			noteNameFormat: "{{title}}",
 			path: "00 Inbox",
 			noteContentFormat: "# Content",
 			properties: [
-				{ name: "type", value: "article", type: "text" },
+				{ name: "type", value: "clipping", type: "text" }, // Will be overridden by template name
 				{ name: "status", value: "to-read", type: "text" },
 			],
 		};
@@ -130,7 +130,9 @@ describe("webClipperToTemplater", () => {
 		const result = webClipperToTemplater(template);
 
 		expect(result.success).toBe(true);
+		// Type is derived from template name, not properties
 		expect(result.content).toContain("type: article");
+		expect(result.content).toContain("template_version: 1");
 		expect(result.content).toContain("status: to-read");
 	});
 });

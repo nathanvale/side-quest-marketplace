@@ -30,6 +30,8 @@ export { handleCreateNoteTemplate } from "./create-note-template";
 // Enrich commands
 export { handleEnrich } from "./enrich";
 export { handleEnrichBookmark } from "./enrich-bookmark";
+// Clipper commands
+export { handleClipper } from "./clipper";
 // Export commands
 export { handleExportBookmarks } from "./export-bookmarks";
 export { handleExportWebClipperTemplate } from "./export-webclipper-template";
