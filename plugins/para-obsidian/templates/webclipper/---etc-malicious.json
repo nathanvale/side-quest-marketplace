@@ -1,9 +1,0 @@
-{
-	"schemaVersion": "0.1.0",
-	"name": "../../../etc/malicious",
-	"behavior": "create",
-	"noteNameFormat": "{{title}}",
-	"path": "00 Inbox",
-	"noteContentFormat": "# Malicious content",
-	"properties": []
-}
