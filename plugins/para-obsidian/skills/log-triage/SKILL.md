@@ -187,7 +187,32 @@ template_version: 1
 - **Decisions Made** - Any conclusions or agreements
 - **Action Items** - Tasks as checkboxes (these show up in Dataview!)
 
-**Always preserve raw transcription** at the bottom.
+### Raw Transcription Section (CRITICAL)
+
+**The meeting template does NOT have a Raw Transcription section.** You MUST add it after creating the note.
+
+Use `para_insert` with `mode: "after"` on the `## Follow-up` heading to append:
+
+```markdown
+---
+
+## Raw Transcription
+
+> [Full cleaned transcription in blockquote format, broken into paragraphs]
+```
+
+### Transcription Cleanup Rules
+
+Before inserting, apply basic cleanup to the raw transcription:
+- **Remove filler words:** "um", "uh", "like" (when filler), "you know", "sort of"
+- **Fix grammar:** Correct obvious errors, add missing words
+- **Add punctuation:** Proper periods, commas, question marks
+- **Break into paragraphs:** At natural topic changes or speaker switches
+- **Preserve tone:** Keep conversational style and ALL content
+
+**DO NOT summarize or truncate.** The entire transcription must be preserved.
+
+**Reference example:** `02 Areas/🤝🏻 Contract - Bunnings/🗣️ IT Onboarding - Bunnings.md`
 
 ## URL → Clipping Note
 
