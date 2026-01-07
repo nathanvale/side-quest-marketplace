@@ -2,7 +2,7 @@
 	"schemaVersion": "0.1.0",
 	"name": "Wikipedia",
 	"behavior": "create",
-	"noteNameFormat": "📚 {{title|replace:\" - Wikipedia\":\"\"|safe_name|slice:0,70}}",
+	"noteNameFormat": "✂️📖 {{title|replace:\" - Wikipedia\":\"\"|safe_name|slice:0,70}}",
 	"path": "00 Inbox",
 	"context": "{{selectorHtml:#mw-content-text .mw-parser-output|markdown}}",
 	"noteContentFormat": "# {{title|replace:\" - Wikipedia\":\"\"}}\n\n## AI Summary\n\n{{\"Summarize this content in 3 concise bullet points, focusing on the key insights and actionable takeaways\"|blockquote}}\n\n---\n\n## Summary\n\n{{selector:#mw-content-text .mw-parser-output > p|first|markdown|slice:0,2000}}\n\n## Why I Saved This\n\n\n\n## Key Points\n\n{{highlights|default:\"\"}}\n\n---\n\n📚 [Full Article](`= this.source`)",

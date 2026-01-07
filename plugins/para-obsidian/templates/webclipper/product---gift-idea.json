@@ -2,7 +2,7 @@
 	"schemaVersion": "0.1.0",
 	"name": "Product / Gift Idea",
 	"behavior": "create",
-	"noteNameFormat": "🎁 {{title|safe_name|slice:0,80}}",
+	"noteNameFormat": "✂️🎁 {{title|safe_name|slice:0,80}}",
 	"path": "00 Inbox",
 	"context": "{{schema:@Product}}",
 	"noteContentFormat": "# {{title}}\n\n![Product Image]({{schema:@Product:image|default:meta:og:image}})\n\n## Details\n\n**Price:** `= this.price` `= this.currency`\n\n**Brand:** `= this.brand`\n\n**Rating:** `= this.rating`/5\n\n**Gift For:** `= this.gift_for`\n\n## Why I Clipped This\n\n\n\n## Notes\n\n{{highlights|default:\"\"}}",

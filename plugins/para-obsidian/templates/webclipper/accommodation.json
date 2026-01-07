@@ -2,7 +2,7 @@
 	"schemaVersion": "0.1.0",
 	"name": "Accommodation",
 	"behavior": "create",
-	"noteNameFormat": "🏨 {{title|safe_name|slice:0,70}}",
+	"noteNameFormat": "✂️🏨 {{title|safe_name|slice:0,70}}",
 	"path": "00 Inbox",
 	"context": "{{selectorHtml:body|markdown}}",
 	"noteContentFormat": "# {{title}}\n\n![Property]({{meta:og:image}})\n\n## Property Details\n\n{{description|default:\"\"}}\n\n## Why I'm Interested\n\n\n\n## Highlights\n\n{{highlights|default:\"\"}}\n\n---\n\n🏠 [View Listing](`= this.source`)",

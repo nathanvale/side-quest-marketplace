@@ -291,7 +291,8 @@ function sanitizeYamlValue(value: string): string {
 /**
  * Generate Templater frontmatter from WebClipper properties.
  *
- * Adds template_version and type fields for PARA system compatibility.
+ * Adds template_version, type: clipping, and clipping_type fields for PARA system compatibility.
+ * All WebClipper templates are type: clipping with clipping_type derived from the template name.
  */
 function generateFrontmatter(
 	properties: WebClipperProperty[],
@@ -302,13 +303,16 @@ function generateFrontmatter(
 	// Add PARA template versioning
 	lines.push(`template_version: ${CURRENT_TEMPLATE_VERSION}`);
 
-	// H12: Derive type from template name using proper YAML sanitization
+	// All WebClipper templates are type: clipping
+	lines.push("type: clipping");
+
+	// Derive clipping_type from template name using proper YAML sanitization
 	const clippingType = sanitizeYamlValue(templateName);
-	lines.push(`type: ${clippingType}`);
+	lines.push(`clipping_type: ${clippingType}`);
 
 	for (const prop of properties) {
-		// Skip if property is already 'type' (we set it above)
-		if (prop.name === "type") {
+		// Skip if property is already 'type' or 'clipping_type' (we set them above)
+		if (prop.name === "type" || prop.name === "clipping_type") {
 			continue;
 		}
 
@@ -331,6 +335,43 @@ function generateFrontmatter(
 
 	lines.push("---");
 	return lines.join("\n");
+}
+
+/**
+ * Extract emoji prefix from WebClipper noteNameFormat.
+ * Returns the emoji characters at the start of the format string.
+ *
+ * Example: "✂️🎬 {{title}}" -> "✂️🎬"
+ */
+function extractEmojiPrefix(noteNameFormat: string): string | null {
+	// Match emoji characters at the start (including variation selectors and ZWJ sequences)
+	// This regex matches common emoji patterns including:
+	// - Basic emoji (e.g., ✂️)
+	// - Emoji with variation selectors (e.g., ✂︎)
+	// - ZWJ sequences (e.g., 👨‍👩‍👧)
+	const emojiRegex =
+		/^((?:[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{FE00}-\u{FE0F}]|[\u{200D}])+\s*)+/u;
+	const match = noteNameFormat.match(emojiRegex);
+	if (match?.[0]) {
+		return match[0].trim();
+	}
+	return null;
+}
+
+/**
+ * Generate Templater script to rename file with emoji prefix.
+ * This ensures files created from the template get the correct emoji prefix.
+ */
+function generateRenameScript(emojiPrefix: string): string {
+	// Escape the emoji for safe embedding in JavaScript string
+	const escapedEmoji = emojiPrefix.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+	return `<%*
+// Auto-rename to add emoji prefix if not present
+const title = tp.file.title;
+if (!title.startsWith("${escapedEmoji}")) {
+  await tp.file.rename("${escapedEmoji} " + title);
+}
+-%>`;
 }
 
 /**
@@ -387,6 +428,11 @@ function convertNoteContent(content: string): {
 	// `= this.field` -> <% tp.frontmatter.field %>
 	converted = converted.replace(/`= this\.(\w+)`/g, "<% tp.frontmatter.$1 %>");
 
+	// Replace H1 title with tp.file.title reference
+	// This ensures the note title matches the filename (which includes emoji prefix)
+	// Matches any H1 at start of line and replaces with file title reference
+	converted = converted.replace(/^# .+$/m, "# <% tp.file.title %>");
+
 	return { converted, warnings };
 }
 
@@ -434,8 +480,12 @@ export function webClipperToTemplater(
 	);
 	warnings.push(...contentWarnings);
 
-	// Combine into final template
-	const content = `${frontmatter}\n\n${body}`;
+	// Extract emoji prefix from noteNameFormat and generate rename script
+	const emojiPrefix = extractEmojiPrefix(template.noteNameFormat);
+	const renameScript = emojiPrefix ? generateRenameScript(emojiPrefix) : "";
+
+	// Combine into final template (with rename script at end if present)
+	const content = `${frontmatter}\n\n${body}${renameScript ? `\n\n${renameScript}` : ""}`;
 
 	logger.info`clipper:convert:success cid=${cid} name=${template.name} contentLength=${content.length}`;
 

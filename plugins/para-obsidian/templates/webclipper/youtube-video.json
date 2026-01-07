@@ -2,10 +2,10 @@
 	"schemaVersion": "0.1.0",
 	"name": "YouTube Video",
 	"behavior": "create",
-	"noteNameFormat": "🎬 {{schema:@VideoObject:name|default:title|safe_name|slice:0,80}}",
+	"noteNameFormat": "✂️🎬 {{schema:@VideoObject:name|default:title|safe_name|slice:0,80}}",
 	"path": "00 Inbox",
 	"context": "{{schema:@VideoObject:description}}",
-	"noteContentFormat": "# {{schema:@VideoObject:name|default:title}}\n\n## AI Summary\n\n{{\"Summarize this content in 3 concise bullet points, focusing on the key insights and actionable takeaways\"|blockquote}}\n\n---\n\n![]({{schema:@VideoObject:thumbnailUrl|first}})\n\n**Channel:** `= this.channel`\n**Duration:** `= this.duration`\n**Published:** `= this.published`\n\n## Description\n\n{{schema:@VideoObject:description|default:\"—\"}}\n\n## Notes\n\n\n\n## Transcript\n\n<!-- transcript:pending -->\n",
+	"noteContentFormat": "# {{title}}\n\n## AI Summary\n\n{{\"Summarize this content in 3 concise bullet points, focusing on the key insights and actionable takeaways\"|blockquote}}\n\n---\n\n![]({{schema:@VideoObject:thumbnailUrl|first}})\n\n**Channel:** `= this.channel`\n**Duration:** `= this.duration`\n**Published:** `= this.published`\n\n## Description\n\n{{schema:@VideoObject:description|default:\"—\"}}\n\n## Notes\n\n\n\n## Transcript\n\n<!-- transcript:pending -->\n",
 	"properties": [
 		{
 			"name": "type",

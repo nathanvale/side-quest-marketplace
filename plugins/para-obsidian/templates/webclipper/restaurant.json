@@ -2,10 +2,10 @@
 	"schemaVersion": "0.1.0",
 	"name": "Restaurant",
 	"behavior": "create",
-	"noteNameFormat": "🍽️ {{schema:@Restaurant:name|default:title|safe_name|slice:0,80}}",
+	"noteNameFormat": "✂️🍽️ {{schema:@Restaurant:name|default:title|safe_name|slice:0,80}}",
 	"path": "00 Inbox",
 	"context": "{{schema:@Restaurant}}",
-	"noteContentFormat": "# {{schema:@Restaurant:name|default:title}}\n\n## At a Glance\n\n| | |\n|---|---|\n| **Cuisine** | `= this.cuisine` |\n| **Price Range** | `= this.price_range` |\n| **Rating** | `= this.rating`/5 |\n| **Suburb** | `= this.suburb` |\n| **Address** | {{schema:@Restaurant:address.streetAddress|default:\"—\"}} |\n| **Phone** | {{schema:@Restaurant:telephone|default:\"—\"}} |\n\n## Hours\n\n{{schema:@Restaurant:openingHours|default:\"Check website\"}}\n\n## Why I Want to Try This\n\n\n\n## Notes\n\n{{highlights|default:\"\"}}",
+	"noteContentFormat": "# {{title}}\n\n## At a Glance\n\n| | |\n|---|---|\n| **Cuisine** | `= this.cuisine` |\n| **Price Range** | `= this.price_range` |\n| **Rating** | `= this.rating`/5 |\n| **Suburb** | `= this.suburb` |\n| **Address** | {{schema:@Restaurant:address.streetAddress|default:\"—\"}} |\n| **Phone** | {{schema:@Restaurant:telephone|default:\"—\"}} |\n\n## Hours\n\n{{schema:@Restaurant:openingHours|default:\"Check website\"}}\n\n## Why I Want to Try This\n\n\n\n## Notes\n\n{{highlights|default:\"\"}}",
 	"properties": [
 		{
 			"name": "type",

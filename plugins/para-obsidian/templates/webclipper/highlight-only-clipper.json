@@ -50,6 +50,6 @@
 			"type": "multitext"
 		}
 	],
-	"noteNameFormat": "✨ {{title|safe_name|slice:0,60}}",
+	"noteNameFormat": "✂️✨ {{title|safe_name|slice:0,60}}",
 	"path": "00 Inbox"
 }

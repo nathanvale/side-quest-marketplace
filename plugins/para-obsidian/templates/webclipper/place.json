@@ -2,7 +2,7 @@
 	"schemaVersion": "0.1.0",
 	"name": "Place",
 	"behavior": "create",
-	"noteNameFormat": "📍 {{title|safe_name|slice:0,80}}",
+	"noteNameFormat": "✂️📍 {{title|safe_name|slice:0,80}}",
 	"path": "00 Inbox",
 	"context": "{{selectorHtml:body|markdown}}",
 	"noteContentFormat": "# {{title}}\n\n## Location Details\n\n{{description|default:\"\"}}\n\n## Why I Saved This\n\n\n\n## Notes\n\n{{highlights|default:\"\"}}\n\n---\n\n📍 [View on Map](`= this.source`)",

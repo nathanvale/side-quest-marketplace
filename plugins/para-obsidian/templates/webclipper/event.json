@@ -2,10 +2,10 @@
 	"schemaVersion": "0.1.0",
 	"name": "Event",
 	"behavior": "create",
-	"noteNameFormat": "🎫 {{schema:@Event:name|default:title|safe_name|slice:0,80}}",
+	"noteNameFormat": "✂️📅 {{schema:@Event:name|default:title|safe_name|slice:0,80}}",
 	"path": "00 Inbox",
 	"context": "{{schema:@Event}}",
-	"noteContentFormat": "# {{schema:@Event:name|default:title}}\n\n![Event Image]({{schema:@Event:image|default:meta:og:image}})\n\n## Event Details\n\n| | |\n|---|---|\n| **Date** | `= this.event_date` |\n| **End** | {{schema:@Event:endDate|default:\"—\"}} |\n| **Location** | `= this.location` |\n| **Address** | {{schema:@Event:location.address|default:\"—\"}} |\n| **Price** | `= this.price` |\n| **Organizer** | {{schema:@Event:organizer.name|default:\"—\"}} |\n\n## Why I'm Interested\n\n\n\n## Description\n\n{{description|default:\"\"}}\n\n---\n\n🎫 [Get Tickets](`= this.source`)",
+	"noteContentFormat": "# {{title}}\n\n![Event Image]({{schema:@Event:image|default:meta:og:image}})\n\n## Event Details\n\n| | |\n|---|---|\n| **Date** | `= this.event_date` |\n| **End** | {{schema:@Event:endDate|default:\"—\"}} |\n| **Location** | `= this.location` |\n| **Address** | {{schema:@Event:location.address|default:\"—\"}} |\n| **Price** | `= this.price` |\n| **Organizer** | {{schema:@Event:organizer.name|default:\"—\"}} |\n\n## Why I'm Interested\n\n\n\n## Description\n\n{{description|default:\"\"}}\n\n---\n\n🎫 [Get Tickets](`= this.source`)",
 	"properties": [
 		{
 			"name": "type",

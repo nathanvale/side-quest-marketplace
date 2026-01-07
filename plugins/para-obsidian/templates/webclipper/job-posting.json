@@ -2,10 +2,10 @@
 	"schemaVersion": "0.1.0",
 	"name": "Job Posting",
 	"behavior": "create",
-	"noteNameFormat": "💼 {{schema:@JobPosting:title|default:title|safe_name|slice:0,70}}",
+	"noteNameFormat": "✂️💼 {{schema:@JobPosting:title|default:title|safe_name|slice:0,70}}",
 	"path": "00 Inbox",
 	"context": "{{schema:@JobPosting}}",
-	"noteContentFormat": "# {{schema:@JobPosting:title|default:title}}\n\n## Job Details\n\n| | |\n|---|---|\n| **Company** | `= this.company` |\n| **Location** | `= this.location` |\n| **Type** | {{schema:@JobPosting:employmentType|default:\"—\"}} |\n| **Salary** | {{schema:@JobPosting:baseSalary.value|default:\"Not listed\"}} |\n| **Posted** | {{schema:@JobPosting:datePosted|default:\"—\"}} |\n\n## Why I'm Interested\n\n\n\n## Description\n\n{{description|default:\"\"}}\n\n---\n\n💼 [Apply](`= this.source`)",
+	"noteContentFormat": "# {{title}}\n\n## Job Details\n\n| | |\n|---|---|\n| **Company** | `= this.company` |\n| **Location** | `= this.location` |\n| **Type** | {{schema:@JobPosting:employmentType|default:\"—\"}} |\n| **Salary** | {{schema:@JobPosting:baseSalary.value|default:\"Not listed\"}} |\n| **Posted** | {{schema:@JobPosting:datePosted|default:\"—\"}} |\n\n## Why I'm Interested\n\n\n\n## Description\n\n{{description|default:\"\"}}\n\n---\n\n💼 [Apply](`= this.source`)",
 	"properties": [
 		{
 			"name": "type",
