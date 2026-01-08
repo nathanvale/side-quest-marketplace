@@ -1,55 +1,19 @@
 ---
 name: log-triage
-description: Process voice memos and links from daily notes into structured inbox notes. Extract 🎤 voice memos into meeting notes with full transcriptions preserved, URLs into clipping notes by type, and reminder text into capture notes. Always preserve raw transcription. Use when triaging daily logs, converting voice memos into meetings, or processing saved URLs and reminders.
+description: Processes voice memos and links from daily notes into structured inbox notes. Extracts 🎤 voice memos into meeting notes with full transcriptions preserved, URLs into clipping notes by type, and reminder text into capture notes. Use when triaging daily logs, converting voice memos, or processing saved URLs and reminders.
 allowed-tools: Read, mcp__para-obsidian_para-obsidian__para_read, mcp__para-obsidian_para-obsidian__para_list, mcp__para-obsidian_para-obsidian__para_create, mcp__para-obsidian_para-obsidian__para_insert, mcp__para-obsidian_para-obsidian__para_list_areas, mcp__para-obsidian_para-obsidian__para_list_projects, mcp__firecrawl__firecrawl_scrape, mcp__youtube-transcript__get_transcript, WebFetch, Edit, Write, Bash
 ---
 
 # Log Triage - Daily Note Processing
 
-Process daily note log entries into structured notes with full fidelity. Extract voice memos into meeting notes, URLs into clipping notes, and reminders into capture tasks.
+Process daily note log entries into structured notes. Extract voice memos into meeting notes, URLs into clipping notes, and reminders into capture tasks.
 
-## Templates Reference
+## Templates
 
-**Main Templates:** `/Users/nathanvale/code/my-second-brain/Templates/`
+Use `para_config` to get the vault and templates path. Use `para_template_fields` to inspect required fields for any template.
 
-| Template | Type | Use For |
-|----------|------|---------|
-| `meeting.md` | meeting | Voice memos of meetings, calls, conversations |
-| `capture.md` | capture | Ideas, thoughts, random notes |
-| `project.md` | project | Multi-step goals with end dates |
-| `area.md` | area | Ongoing responsibilities |
-| `resource.md` | resource | Reference material |
-| `research.md` | research | Research topics |
-| `booking.md` | booking | Reservations, appointments |
-| `trip.md` | trip | Travel planning |
-| `itinerary.md` | itinerary | Travel schedules |
-
-**Clipping Templates:** `/Users/nathanvale/code/my-second-brain/Templates/Clippings/`
-
-| Template | Type | Domain Pattern |
-|----------|------|----------------|
-| `article.md` | article | News sites, blogs |
-| `documentation.md` | documentation | Docs, API refs, Confluence |
-| `youtube-video.md` | youtube-video | youtube.com |
-| `github-repo.md` | github-repo | github.com |
-| `product---gift-idea.md` | product | Shopping sites |
-| `recipe.md` | recipe | Recipe sites |
-| `podcast-episode.md` | podcast-episode | Podcast links |
-| `book.md` | book | Goodreads, book sites |
-| `movie.md` | movie | IMDB, movie sites |
-| `job-posting.md` | job-posting | Job boards |
-| `restaurant.md` | restaurant | Restaurant sites |
-| `event.md` | event | Event pages |
-| `course---tutorial.md` | course | Course platforms |
-| `accommodation.md` | accommodation | Hotels, Airbnb |
-| `place.md` | place | Google Maps, locations |
-| `tweet---x-post.md` | tweet | twitter.com, x.com |
-| `reddit-post.md` | reddit | reddit.com |
-| `stack-overflow.md` | stack-overflow | stackoverflow.com |
-| `wikipedia.md` | wikipedia | wikipedia.org |
-| `chatgpt-conversation.md` | chatgpt | chatgpt.com |
-| `claude-conversation.md` | claude | claude.ai |
-| `app---software.md` | app | App stores |
+**Primary templates:** `meeting`, `capture`
+**Clipping templates:** In `Templates/Clippings/` - matched by URL domain (see URL mapping below)
 
 ## The Flow
 
@@ -173,12 +137,6 @@ template_version: 1
 - [ ] Test VPN from home tonight
 - [ ] Look at Miro board for resellers
 
----
-
-## Raw Transcription
-
-> Hi Jackie. Sorry, I'm just not very familiar with PC...
-> [full transcription preserved]
 ```
 
 **Key sections to extract:**
@@ -313,9 +271,6 @@ Confluence documentation page (POS space). Content requires authentication.
 ## Why I Saved This
 
 
-
-## Key Snippets
-
 ```
 
 ## Text Entry / Short Voice Memo → Capture Note
@@ -406,29 +361,42 @@ After creating the note, **delete the log entry** from the daily note using Edit
 
 The raw transcription is preserved in the meeting note, so nothing is lost.
 
-## Using para_create
+## Creating Notes Efficiently
 
-For meeting notes:
+**Step 1: Create note with content injection (single call)**
 ```
 para_create({
   template: "meeting",
   title: "GMS Project Kickoff - Jackie",
   dest: "00 Inbox",
-  args: {
-    "Type (1-on-1/standup/planning/retro/review/interview/stakeholder/general)": "general",
-    "Meeting date (YYYY-MM-DD)": "2026-01-06",
-    "Area (e.g., Career & Contracting)": "Career & Contracting",
-    "Company/client": "Bunnings"
+  args: { ... },
+  content: {
+    "Attendees": "- Jackie (Team Lead)\n- Nathan",
+    "Notes": "### Key Points\n- Point 1\n- Point 2",
+    "Action Items": "- [ ] Task 1\n- [ ] Task 2"
   },
   response_format: "json"
 })
 ```
 
-Then use `para_insert` to add the extracted content to the note sections.
+**Step 2: Set frontmatter (args may not populate correctly)**
+```
+para_frontmatter_set({
+  file: "00 Inbox/🗣️ Note Title.md",
+  set: { meeting_type: "general", meeting_date: "2026-01-06", ... }
+})
+```
 
-## Your Voice
+**Step 3: Append Raw Transcription after Follow-up section**
 
-- Show what you extracted before creating
-- Always ask for confirmation
-- Be clear about what will be created vs skipped
-- Preserve ALL raw content in the note
+The Follow-up section has a `-` placeholder. Insert AFTER it:
+```
+para_insert({
+  file: "...",
+  heading: "Follow-up",
+  content: "\n---\n\n## Raw Transcription\n\n> [transcription]",
+  mode: "after"
+})
+```
+
+**Step 4: Update daily note** - Use Edit tool directly (don't re-read via MCP).
