@@ -52,6 +52,7 @@ Shared audit criteria for all levels (user, project, module).
 - [ ] Architecture overview (brief, not exhaustive)
 - [ ] Module @imports for feature-specific context
 - [ ] Custom tools/MCP servers documented
+- [ ] Consider `.claude/rules/` for large projects
 
 **File Tree Check:**
 
@@ -70,6 +71,65 @@ project-name/
 - 🔴 Missing file tree entirely
 - 🟡 File tree present but no annotations
 - 🟢 File tree with descriptions
+
+---
+
+### PROJECT RULES Level (.claude/rules/*.md)
+
+**Budget:** 30-100 lines per rule file
+
+**When to Use:**
+- Project has >300 lines of instructions
+- Different rules apply to different file types
+- Team wants modular, topic-focused rules
+
+**Check For:**
+- [ ] Each file focused on one topic
+- [ ] Descriptive filenames (`testing.md`, `api-design.md`)
+- [ ] Path-specific rules use YAML frontmatter correctly
+- [ ] Subdirectories for related rules (e.g., `frontend/`, `backend/`)
+- [ ] No duplication between rule files
+
+**Path-Specific Rules Check:**
+
+**Required format:**
+```yaml
+---
+paths: src/api/**/*.ts
+---
+# API Rules
+- Validation required on all endpoints
+```
+
+**Glob patterns:**
+- `**/*.ts` — All TypeScript files
+- `src/**/*` — All files under src/
+- `{src,lib}/**/*.ts, tests/**/*.test.ts` — Multiple patterns
+
+**Flags:**
+- 🔴 Invalid YAML frontmatter
+- 🔴 Invalid glob pattern
+- 🟡 Path-specific rule with overly broad pattern
+- 🟢 Well-scoped, focused rule files
+
+---
+
+### LOCAL MEMORY (./CLAUDE.local.md)
+
+**Budget:** 20-50 lines
+
+**Purpose:** Personal project preferences (auto-gitignored)
+
+**Appropriate Content:**
+- [ ] Personal sandbox URLs
+- [ ] Preferred test data
+- [ ] Individual workflow shortcuts
+- [ ] Local environment specifics
+
+**Should NOT Contain:**
+- ❌ Team conventions (belongs in CLAUDE.md)
+- ❌ Build commands (belongs in CLAUDE.md)
+- ❌ Global preferences (belongs in ~/.claude/CLAUDE.md)
 
 ---
 
@@ -238,3 +298,27 @@ Examples:
 - Personal communication style in project file → Remove, keep in user file
 - Project-wide git workflow in module file → Remove, reference parent
 - Directory structure in user file → Remove, keep in project file
+
+---
+
+## @imports Syntax Check
+
+**Valid @import patterns:**
+```markdown
+See @README for project overview
+Full guide: @docs/git-instructions.md
+Personal prefs: @~/.claude/my-project.md
+```
+
+**Check For:**
+- [ ] Relative paths resolve correctly
+- [ ] Absolute paths use `~` for home directory
+- [ ] @imports not inside code blocks (ignored there)
+- [ ] Max depth of 5 hops for recursive imports
+- [ ] No circular import chains
+
+**Flags:**
+- 🔴 @import to non-existent file
+- 🔴 Circular import chain
+- 🟡 Deep nesting (>3 levels)
+- 🟢 Clean, shallow import structure

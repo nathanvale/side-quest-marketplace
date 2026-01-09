@@ -8,15 +8,21 @@ CLAUDE.md files become part of Claude's prompt, consuming tokens every session.
 2. **Tune like a prompt** — Use emphasis markers for adherence
 3. **Be specific** — "Use 2-space indentation" beats "Format code properly"
 4. **Use @imports** — Split large content into modular files
-5. **Front-load critical rules** — NEVER/MUST at the top
+5. **Use `.claude/rules/`** — Modular, path-scoped rules for larger projects
+6. **Front-load critical rules** — NEVER/MUST at the top
 
 ## Memory Loading Hierarchy
 
-```
-Enterprise → ~/.claude/CLAUDE.md (user) → Project root → Nested subtrees
-```
+| Memory Type | Location | Shared With |
+|-------------|----------|-------------|
+| Enterprise policy | `/Library/Application Support/ClaudeCode/CLAUDE.md` (macOS) | All org users |
+| User memory | `~/.claude/CLAUDE.md` | Just you (all projects) |
+| User rules | `~/.claude/rules/*.md` | Just you (all projects) |
+| Project memory | `./CLAUDE.md` or `./.claude/CLAUDE.md` | Team (via git) |
+| Project rules | `./.claude/rules/*.md` | Team (via git) |
+| Local memory | `./CLAUDE.local.md` | Just you (auto-gitignored) |
 
-Claude loads these files in order, with later files adding context on top of earlier ones.
+Claude loads files recursively from cwd up to root, and discovers nested CLAUDE.md in subtrees (loaded on-demand when reading files in those subtrees).
 
 ## Token Budgets by Level
 
@@ -67,6 +73,35 @@ Use these markers to ensure Claude follows important directives:
 - Individual communication style
 - Global tool configs that apply everywhere
 
+### Project Rules (.claude/rules/*.md)
+
+For larger projects, organize instructions into focused rule files:
+
+```
+.claude/rules/
+├── code-style.md      # Coding standards
+├── testing.md         # Test conventions
+├── security.md        # Security requirements
+└── frontend/
+    ├── react.md       # React patterns
+    └── styles.md      # CSS conventions
+```
+
+**Path-specific rules** use YAML frontmatter:
+```yaml
+---
+paths: src/api/**/*.ts
+---
+# API Development Rules
+- All endpoints must include input validation
+- Use standard error response format
+```
+
+Rules without `paths` apply to all files. Glob patterns supported:
+- `**/*.ts` — All TypeScript files
+- `src/**/*` — All files under src/
+- `{src,lib}/**/*.ts` — Multiple directories
+
 ### Module Level (feature/CLAUDE.md)
 - Feature-specific conventions
 - Key files in this module
@@ -77,6 +112,13 @@ Use these markers to ensure Claude follows important directives:
 - Project-wide standards (inherit from root)
 - Personal preferences
 - Full architecture docs
+
+### Local Memory (./CLAUDE.local.md)
+
+Personal project preferences, auto-gitignored:
+- Your sandbox URLs
+- Preferred test data
+- Personal shortcuts for this project
 
 ## Effectiveness Patterns
 
