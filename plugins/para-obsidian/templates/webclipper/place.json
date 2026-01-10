@@ -5,7 +5,7 @@
 	"noteNameFormat": "✂️📍 {{title|safe_name|slice:0,80}}",
 	"path": "00 Inbox",
 	"context": "{{selectorHtml:body|markdown}}",
-	"noteContentFormat": "# {{title}}\n\n## Location Details\n\n{{description|default:\"\"}}\n\n## Why I Saved This\n\n\n\n## Notes\n\n{{highlights|default:\"\"}}\n\n---\n\n📍 [View on Map](`= this.source`)",
+	"noteContentFormat": "# `= this.file.name`\n\n## Location Details\n\n{{description}}\n\n## Why I Saved This\n\n\n\n## Notes\n\n{{highlights}}\n\n---\n\n📍 [View on Map](`= this.source`)",
 	"properties": [
 		{
 			"name": "type",

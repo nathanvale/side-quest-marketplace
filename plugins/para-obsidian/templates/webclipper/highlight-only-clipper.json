@@ -2,7 +2,7 @@
 	"schemaVersion": "0.1.0",
 	"name": "Highlight Only",
 	"behavior": "create",
-	"noteContentFormat": "# Highlights from `= this.source_title`\n\n{{highlights}}\n\n---\n\n🔗 [Source](`= this.source`)",
+	"noteContentFormat": "# `= this.file.name`\n\n{{highlights}}\n\n---\n\n🔗 [Source](`= this.source`)",
 	"properties": [
 		{
 			"name": "type",

@@ -236,10 +236,14 @@ describe("exportAllToTemplater", () => {
 describe("syncFromWebClipperSettings - security", () => {
 	let tempDir: string;
 	let settingsPath: string;
+	let templatesDir: string;
 
 	beforeEach(() => {
 		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "sync-test-"));
 		settingsPath = path.join(tempDir, "settings.json");
+		// Use a temp directory for templates so tests don't pollute real templates
+		templatesDir = path.join(tempDir, "templates");
+		fs.mkdirSync(templatesDir, { recursive: true });
 	});
 
 	afterEach(() => {
@@ -266,7 +270,9 @@ describe("syncFromWebClipperSettings - security", () => {
 
 		fs.writeFileSync(settingsPath, JSON.stringify(maliciousSettings));
 
-		const result = await syncFromWebClipperSettings(settingsPath);
+		const result = await syncFromWebClipperSettings(settingsPath, {
+			templatesDir,
+		});
 
 		// The malicious name is sanitized (../ removed, / replaced with -)
 		// so it succeeds as a new template with a safe name
@@ -294,7 +300,9 @@ describe("syncFromWebClipperSettings - security", () => {
 
 		fs.writeFileSync(settingsPath, JSON.stringify(maliciousSettings));
 
-		const result = await syncFromWebClipperSettings(settingsPath);
+		const result = await syncFromWebClipperSettings(settingsPath, {
+			templatesDir,
+		});
 
 		// Null bytes are stripped and path traversal is neutralized
 		expect(result.success).toBe(true);
@@ -320,7 +328,9 @@ describe("syncFromWebClipperSettings - security", () => {
 
 		fs.writeFileSync(settingsPath, JSON.stringify(maliciousSettings));
 
-		const result = await syncFromWebClipperSettings(settingsPath);
+		const result = await syncFromWebClipperSettings(settingsPath, {
+			templatesDir,
+		});
 
 		// Backslashes are replaced with hyphens and .. is removed
 		expect(result.success).toBe(true);
@@ -347,7 +357,9 @@ describe("syncFromWebClipperSettings - security", () => {
 
 		fs.writeFileSync(settingsPath, JSON.stringify(maliciousSettings));
 
-		const result = await syncFromWebClipperSettings(settingsPath);
+		const result = await syncFromWebClipperSettings(settingsPath, {
+			templatesDir,
+		});
 
 		// Should report warning for the oversized template name
 		expect(result.warnings).toBeDefined();
@@ -355,7 +367,9 @@ describe("syncFromWebClipperSettings - security", () => {
 	});
 
 	test("returns error for non-existent settings file", async () => {
-		const result = await syncFromWebClipperSettings("/non/existent/path.json");
+		const result = await syncFromWebClipperSettings("/non/existent/path.json", {
+			templatesDir,
+		});
 		expect(result.success).toBe(false);
 		expect(result.error).toBeDefined();
 	});
@@ -363,50 +377,64 @@ describe("syncFromWebClipperSettings - security", () => {
 	test("returns error for invalid JSON in settings file", async () => {
 		fs.writeFileSync(settingsPath, "not valid json");
 
-		const result = await syncFromWebClipperSettings(settingsPath);
+		const result = await syncFromWebClipperSettings(settingsPath, {
+			templatesDir,
+		});
 		expect(result.success).toBe(false);
 		expect(result.error).toContain("JSON");
 	});
 
 	test("H11: warns when overwriting locally modified templates", async () => {
-		// First export a template
-		const outputPath = path.join(tempDir, "settings.json");
-		await exportToWebClipperSettings(outputPath);
+		// Create a template in our temp templates dir first
+		const testTemplate = {
+			schemaVersion: "0.1.0",
+			name: "Test Template",
+			behavior: "create",
+			noteNameFormat: "{{title}}",
+			path: "00 Inbox",
+			noteContentFormat: "# Original content",
+			properties: [],
+		};
+		fs.writeFileSync(
+			path.join(templatesDir, "test-template.json"),
+			JSON.stringify(testTemplate, null, "\t"),
+		);
 
-		// Read the exported settings
-		const settings = JSON.parse(
-			fs.readFileSync(outputPath, "utf-8"),
-		) as WebClipperSettings;
+		// Create settings with modified version
+		const modifiedTemplate: WebClipperSettings["templates"][number] = {
+			...testTemplate,
+			behavior: "create" as const,
+			noteContentFormat: "# Modified content",
+		};
+		const settings: WebClipperSettings = {
+			templates: [modifiedTemplate],
+			vaults: [],
+			propertyTypes: [],
+		};
+		fs.writeFileSync(settingsPath, JSON.stringify(settings, null, "\t"));
 
-		if (settings.templates.length > 0) {
-			// Modify the template in memory
-			const template = settings.templates[0];
-			if (template) {
-				template.noteContentFormat = "# Modified content";
+		// Sync should detect the change
+		const result = await syncFromWebClipperSettings(settingsPath, {
+			templatesDir,
+		});
 
-				// Write modified settings back
-				fs.writeFileSync(outputPath, JSON.stringify(settings, null, "\t"));
-
-				// Sync should warn about overwriting the modification
-				const result = await syncFromWebClipperSettings(outputPath);
-
-				// Note: The warning detection logic compares disk vs memory,
-				// so this test verifies the structure exists
-				expect(result.success).toBe(true);
-				// If there was a local modification, we'd see a warning
-				// For this test, we just verify the sync completes
-			}
-		}
+		expect(result.success).toBe(true);
+		// Should report it was updated
+		expect(result.updated.length).toBe(1);
 	});
 });
 
 describe("syncFromWebClipperSettings - functionality", () => {
 	let tempDir: string;
 	let settingsPath: string;
+	let templatesDir: string;
 
 	beforeEach(() => {
 		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "sync-test-"));
 		settingsPath = path.join(tempDir, "settings.json");
+		// Use a temp directory for templates so tests don't pollute real templates
+		templatesDir = path.join(tempDir, "templates");
+		fs.mkdirSync(templatesDir, { recursive: true });
 	});
 
 	afterEach(() => {
@@ -414,30 +442,46 @@ describe("syncFromWebClipperSettings - functionality", () => {
 	});
 
 	test("reports added, updated, and unchanged templates", async () => {
-		// First, get existing templates
-		const existingTemplates = listTemplates();
+		// Create an existing template in the temp templates dir
+		const existingTemplate: WebClipperSettings["templates"][number] = {
+			schemaVersion: "0.1.0",
+			name: "Existing Template",
+			behavior: "create",
+			noteNameFormat: "{{title}}",
+			path: "00 Inbox",
+			noteContentFormat: "# Existing content",
+			properties: [],
+		};
+		fs.writeFileSync(
+			path.join(templatesDir, "existing-template.json"),
+			JSON.stringify(existingTemplate, null, "\t"),
+		);
 
-		const firstExisting = existingTemplates.templates[0];
-		if (firstExisting) {
-			// Create settings with existing template (should be unchanged)
-			// and a new template (should be added)
-			const templateResult = getTemplate(firstExisting.name);
+		// Create settings with same template (unchanged) and a new one (added)
+		const newTemplate: WebClipperSettings["templates"][number] = {
+			schemaVersion: "0.1.0",
+			name: "New Template",
+			behavior: "create",
+			noteNameFormat: "{{title}}",
+			path: "00 Inbox",
+			noteContentFormat: "# New content",
+			properties: [],
+		};
+		const settings: WebClipperSettings = {
+			templates: [existingTemplate, newTemplate],
+			vaults: [],
+			propertyTypes: [],
+		};
 
-			if (templateResult.template) {
-				const settings: WebClipperSettings = {
-					templates: [templateResult.template],
-					vaults: [],
-					propertyTypes: [],
-				};
+		fs.writeFileSync(settingsPath, JSON.stringify(settings));
 
-				fs.writeFileSync(settingsPath, JSON.stringify(settings));
+		const result = await syncFromWebClipperSettings(settingsPath, {
+			templatesDir,
+		});
 
-				const result = await syncFromWebClipperSettings(settingsPath);
-
-				expect(result.success).toBe(true);
-				// The template should be unchanged (identical to existing)
-				expect(result.unchanged.length).toBeGreaterThanOrEqual(0);
-			}
-		}
+		expect(result.success).toBe(true);
+		// One unchanged (existing), one added (new)
+		expect(result.unchanged.length).toBe(1);
+		expect(result.added.length).toBe(1);
 	});
 });

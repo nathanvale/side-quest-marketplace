@@ -125,4 +125,47 @@ describe("insertIntoNote", () => {
 			expect(result).toContain("- grateful item");
 		});
 	});
+
+	it("treats horizontal rule as section boundary", async () => {
+		await withTempVault(async (vault, config) => {
+			const file = "note.md";
+			// This is the WebClipper template pattern - AI Summary followed by ---
+			writeVaultFile(
+				vault,
+				file,
+				`# Title
+
+## AI Summary
+
+
+
+---
+
+**Channel:** foo
+**Duration:** bar
+
+## Description
+
+Some text
+`,
+			);
+
+			insertIntoNote(config, {
+				file,
+				heading: "AI Summary",
+				content: "> - Point 1\n> - Point 2",
+				mode: "append",
+			});
+
+			const result = readVaultFile(vault, file);
+			// Content should be inserted BEFORE the ---, not after it
+			expect(result).toContain("> - Point 1\n> - Point 2");
+			// Critical: content must be BEFORE ---, not after
+			const summaryIndex = result.indexOf("## AI Summary");
+			const contentIndex = result.indexOf("> - Point 1");
+			const hrIndex = result.indexOf("---");
+			expect(contentIndex).toBeGreaterThan(summaryIndex);
+			expect(contentIndex).toBeLessThan(hrIndex);
+		});
+	});
 });

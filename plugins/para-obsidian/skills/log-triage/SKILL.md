@@ -1,7 +1,7 @@
 ---
 name: log-triage
 description: Processes voice memos and links from daily notes into structured inbox notes. Extracts 🎤 voice memos into meeting notes with full transcriptions preserved, URLs into clipping notes by type, and reminder text into capture notes. Use when triaging daily logs, converting voice memos, or processing saved URLs and reminders.
-allowed-tools: Read, mcp__para-obsidian_para-obsidian__para_read, mcp__para-obsidian_para-obsidian__para_list, mcp__para-obsidian_para-obsidian__para_create, mcp__para-obsidian_para-obsidian__para_insert, mcp__para-obsidian_para-obsidian__para_list_areas, mcp__para-obsidian_para-obsidian__para_list_projects, mcp__firecrawl__firecrawl_scrape, mcp__youtube-transcript__get_transcript, WebFetch, Edit, Write, Bash
+allowed-tools: Read, mcp__para-obsidian_para-obsidian__para_read, mcp__para-obsidian_para-obsidian__para_list, mcp__para-obsidian_para-obsidian__para_create, mcp__para-obsidian_para-obsidian__para_insert, mcp__para-obsidian_para-obsidian__para_frontmatter_set, mcp__para-obsidian_para-obsidian__para_list_areas, mcp__para-obsidian_para-obsidian__para_list_projects, mcp__firecrawl__firecrawl_scrape, mcp__youtube-transcript__get_video_info, mcp__youtube-transcript__get_transcript, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__take_snapshot, WebFetch, Edit, Write, Bash
 ---
 
 # Log Triage - Daily Note Processing
@@ -180,6 +180,7 @@ For URLs, fetch content and create appropriate clipping:
 2. **Detect clipping type** from domain/content:
    - `youtube.com` → `youtube-video`
    - `github.com` → `github-repo`
+   - `twitter.com`, `x.com` → `tweet` (see X/Twitter section below)
    - `*.atlassian.net` → `documentation` (may need auth)
    - News/blog sites → `article`
    - etc.
@@ -187,6 +188,200 @@ For URLs, fetch content and create appropriate clipping:
    - Title, author, published date, domain
    - Summary (first paragraph or meta description)
 4. **Create clipping note** using template structure
+
+### X/Twitter Posts (Special Handling)
+
+For `twitter.com` or `x.com` URLs, create notes matching the WebClipper output.
+
+**⚠️ X requires JavaScript** - Firecrawl and WebFetch cannot scrape X. Use one of:
+1. **Chrome DevTools MCP** (`mcp__chrome-devtools__*`) - Navigate and extract via DOM
+2. **Manual entry** - Ask user for author/content if Chrome DevTools unavailable
+3. **URL parsing** - Extract username and tweet ID from URL as fallback
+
+**Chrome DevTools approach:**
+```
+1. mcp__chrome-devtools__navigate_page({ url: "https://x.com/..." })
+2. mcp__chrome-devtools__take_snapshot() - Get page content
+3. mcp__chrome-devtools__evaluate_script() - Extract specific fields
+```
+
+**Extract from page:**
+- **Author**: Display name (e.g., "Matt Pocock")
+- **Handle**: @username (e.g., "@mattpocockuk")
+- **Posted**: Date from the post
+- **Content**: Full post text (tweets or X Articles)
+
+**AI generation** (use context from scraped content):
+- **ai_summary**: "In 10 words or less, what is the key point of this post?"
+- **topics**: "List 2-3 topic tags as comma-separated list (e.g. tech, AI, programming)"
+- **sentiment**: "Is this post positive, negative, neutral, or controversial? One word."
+
+**Template output:**
+```markdown
+---
+type: clipping
+clipping_type: tweet
+source: "https://x.com/mattpocockuk/status/123456789"
+clipped: 2026-01-09
+author: Matt Pocock
+handle: "@mattpocockuk"
+posted: 2026-01-09
+ai_summary: AI coding agent loops using Ralph and Claude
+topics: AI, programming, automation
+sentiment: positive
+distill_status: raw
+related: []
+project: []
+area: []
+---
+
+# ✂️🐦 Matt Pocock - AI Coding Agents With Ralph
+
+## AI Summary
+
+> This post introduces Ralph, a technique for running AI coding agents iteratively...
+
+---
+
+**Author:** Matt Pocock (@mattpocockuk)
+**Posted:** 2026-01-09
+**Clipped:** 2026-01-09
+**Link:** [View on X](https://x.com/mattpocockuk/status/123456789)
+
+## Content
+
+[Full post content from Firecrawl scrape]
+
+## My Notes
+
+
+```
+
+**Note naming:** `✂️🐦 {Author} - {AI-generated 3-6 word topic summary}`
+
+Generate a unique title based on the tweet's content (e.g., "AI Coding Agents With Ralph", "TypeScript Inference Tips"). This prevents filename collisions when the same author posts multiple tweets.
+
+### YouTube Videos (Special Handling)
+
+For `youtube.com` or `youtu.be` URLs, use the YouTube MCP tools to fetch video info and transcript.
+
+**Step 1: Fetch video info and transcript**
+```
+mcp__youtube-transcript__get_video_info({ url: "https://www.youtube.com/watch?v=..." })
+mcp__youtube-transcript__get_transcript({ url: "https://www.youtube.com/watch?v=..." })
+```
+
+**Extracted fields from video info:**
+- **title**: Video title
+- **uploader**: Channel name
+- **description**: Video description
+- **upload_date**: Published date (format: YYYY-MM-DDTHH:MM:SS)
+- **duration**: Video length (e.g., "4 minutes")
+
+**Step 2: Create note using `youtube-video` template**
+```
+para_create({
+  template: "youtube-video",
+  title: "✂️🎬 {Video Title}",
+  dest: "00 Inbox",
+  args: {},
+  content: {
+    "Description": "[Video description from API]"
+  },
+  response_format: "json"
+})
+```
+
+**Step 3: Set frontmatter with extracted values**
+```
+para_frontmatter_set({
+  file: "00 Inbox/✂️🎬 {Video Title}.md",
+  set: {
+    source: "https://www.youtube.com/watch?v=...",
+    video_id: "dQw4w9WgXcQ",
+    channel: "Rick Astley",
+    duration: "4 minutes",
+    published: "2009-10-25",
+    transcript_status: "complete"
+  }
+})
+```
+
+**Step 4: Insert transcript after the placeholder**
+
+The template has `<!-- transcript:pending -->`. Replace it with the full transcript:
+```
+para_insert({
+  file: "00 Inbox/✂️🎬 {Video Title}.md",
+  heading: "Transcript",
+  content: "[Full transcript from API]",
+  mode: "append"
+})
+```
+
+**Step 5: Generate AI Summary**
+
+Based on the description and transcript, generate a 3-bullet summary:
+```
+para_insert({
+  file: "00 Inbox/✂️🎬 {Video Title}.md",
+  heading: "AI Summary",
+  content: "> - Key insight 1\n> - Key insight 2\n> - Key insight 3",
+  mode: "append"
+})
+```
+
+**Template output:**
+```markdown
+---
+type: clipping
+clipping_type: youtube-video
+source: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+video_id: dQw4w9WgXcQ
+channel: Rick Astley
+duration: 4 minutes
+published: 2009-10-25
+clipped: 2026-01-09
+consumption_status: to-watch
+transcript_status: complete
+distill_status: raw
+related: []
+project: []
+area: []
+---
+
+# ✂️🎬 Rick Astley - Never Gonna Give You Up (Official Video)
+
+## AI Summary
+
+> - Classic 1987 hit that topped charts in 25 countries
+> - Directed by Simon West (later directed Con Air, Tomb Raider)
+> - Passed 1 billion YouTube views in July 2021
+
+---
+
+![](https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg)
+
+**Channel:** Rick Astley
+**Duration:** 4 minutes
+**Published:** 2009-10-25
+
+## Description
+
+The official video for "Never Gonna Give You Up" by Rick Astley...
+
+## Notes
+
+
+
+## Transcript
+
+♪ We're no strangers to love ♪
+♪ You know the rules and so do I ♪
+...
+```
+
+**Note naming:** `✂️🎬 {Channel} - {Video Title}` (truncate to 80 chars)
 
 ```markdown
 ---

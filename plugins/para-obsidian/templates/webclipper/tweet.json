@@ -2,10 +2,10 @@
 	"schemaVersion": "0.1.0",
 	"name": "Tweet / X Post",
 	"behavior": "create",
-	"noteNameFormat": "✂️🐦 {{selector:[data-testid=\"User-Name\"] span|first|default:\"someone\"|safe_name}} - {{time|date:\"YYYY-MM-DD\"}}",
+	"noteNameFormat": "✂️🐦 {{selector:[data-testid=\"User-Name\"] span|first}} - {{\"Create a unique 3-6 word title summarizing this tweet's main topic. No quotes or punctuation.\"|safe_name|slice:0,60}}",
 	"path": "00 Inbox",
-	"context": "{{selectorHtml:body|markdown}}",
-	"noteContentFormat": "# Tweet by {{selector:[data-testid=\"User-Name\"]|first|default:\"Unknown\"}}\n\n{{selector:[data-testid=\"tweetText\"]|first|default:content}}\n\n---\n\n**Posted:** `= this.clipped`\n**Link:** [View on X](`= this.source`)\n\n## Why I Saved This\n\n",
+	"context": "{{fullHtml|markdown}}",
+	"noteContentFormat": "# `= this.file.name`\n\n## AI Summary\n\n{{\"Summarize this post in 2-3 sentences. Focus on the key insight, controversy, or value.\"|blockquote}}\n\n---\n\n**Author:** `= this.author` (`= this.handle`)\n**Posted:** `= this.posted`\n**Clipped:** `= this.clipped`\n**Link:** [View on X](`= this.source`)\n\n## Content\n\n{{content}}\n\n## My Notes\n\n",
 	"properties": [
 		{
 			"name": "type",
@@ -26,6 +26,36 @@
 			"name": "clipped",
 			"value": "{{time|date:\"YYYY-MM-DD\"}}",
 			"type": "date"
+		},
+		{
+			"name": "author",
+			"value": "{{selector:[data-testid=\"User-Name\"] span|first}}",
+			"type": "text"
+		},
+		{
+			"name": "handle",
+			"value": "{{selector:[data-testid=\"User-Name\"] a|slice:-1|first}}",
+			"type": "text"
+		},
+		{
+			"name": "posted",
+			"value": "{{selector:time?datetime|first|date:\"YYYY-MM-DD\"}}",
+			"type": "date"
+		},
+		{
+			"name": "ai_summary",
+			"value": "{{\"In 10 words or less, what is the key point of this post?\"}}",
+			"type": "text"
+		},
+		{
+			"name": "topics",
+			"value": "{{\"List 2-3 topic tags as a comma-separated list (e.g. tech, AI, programming). No hashtags.\"}}",
+			"type": "text"
+		},
+		{
+			"name": "sentiment",
+			"value": "{{\"Is this post positive, negative, neutral, or controversial? One word.\"}}",
+			"type": "text"
 		},
 		{
 			"name": "distill_status",

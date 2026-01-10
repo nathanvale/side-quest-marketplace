@@ -99,8 +99,10 @@ function findHeading(
 /**
  * Finds the end of a heading's section.
  *
- * A section ends when we encounter a heading of equal or higher level,
- * or at the end of the document.
+ * A section ends when we encounter:
+ * - A heading of equal or higher level
+ * - A horizontal rule (---, ***, ___) - common in templates as visual separator
+ * - The end of the document
  *
  * @param lines - Array of document lines
  * @param startIndex - Line index of the heading
@@ -115,7 +117,17 @@ function findSectionEnd(
 	for (let i = startIndex + 1; i < lines.length; i++) {
 		const line = lines[i];
 		if (line === undefined) continue;
-		const match = /^(#+)\s+(.*)$/.exec(line.trim());
+
+		const trimmedLine = line.trim();
+
+		// Check for horizontal rule (---, ***, ___)
+		// These act as section boundaries in templates (e.g., WebClipper)
+		if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmedLine)) {
+			return i;
+		}
+
+		// Check for heading
+		const match = /^(#+)\s+(.*)$/.exec(trimmedLine);
 		if (!match) continue;
 		const hashes = match[1];
 		if (!hashes) continue;

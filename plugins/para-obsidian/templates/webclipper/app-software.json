@@ -2,10 +2,9 @@
 	"schemaVersion": "0.1.0",
 	"name": "App / Software",
 	"behavior": "create",
-	"noteNameFormat": "✂️📱 {{schema:@SoftwareApplication:name|default:title|safe_name|slice:0,70}}",
+	"noteNameFormat": "✂️📱 {{title|safe_name|slice:0,70}}",
 	"path": "00 Inbox",
-	"context": "{{schema:@SoftwareApplication}}",
-	"noteContentFormat": "# {{title}}\n\n![App Icon]({{schema:@SoftwareApplication:image|default:meta:og:image}})\n\n## App Info\n\n| | |\n|---|---|\n| **Price** | `= this.price` |\n| **Rating** | `= this.rating`/5 |\n| **Category** | {{schema:@SoftwareApplication:applicationCategory|default:\"—\"}} |\n| **Platform** | {{schema:@SoftwareApplication:operatingSystem|default:\"—\"}} |\n\n## Why I'm Interested\n\n\n\n## Description\n\n{{description|default:\"\"}}\n\n---\n\n📱 [Download](`= this.source`)",
+	"noteContentFormat": "# `= this.file.name`\n\n![App Icon]({{image}})\n\n## App Info\n\n| | |\n|---|---|\n| **Price** | `= this.price` |\n| **Rating** | `= this.rating`/5 |\n| **Category** | `= this.category` |\n| **Platform** | `= this.platform` |\n\n## Why I'm Interested\n\n\n\n## Description\n\n{{description}}\n\n---\n\n[Download](`= this.source`)",
 	"properties": [
 		{
 			"name": "type",
@@ -29,12 +28,22 @@
 		},
 		{
 			"name": "price",
-			"value": "{{schema:@SoftwareApplication:offers.price|default:\"\"}}",
+			"value": "{{schema:@SoftwareApplication:offers.price}}",
 			"type": "text"
 		},
 		{
 			"name": "rating",
-			"value": "{{schema:@SoftwareApplication:aggregateRating.ratingValue|default:\"\"}}",
+			"value": "{{schema:@SoftwareApplication:aggregateRating.ratingValue}}",
+			"type": "text"
+		},
+		{
+			"name": "category",
+			"value": "{{schema:@SoftwareApplication:applicationCategory}}",
+			"type": "text"
+		},
+		{
+			"name": "platform",
+			"value": "{{schema:@SoftwareApplication:operatingSystem}}",
 			"type": "text"
 		},
 		{

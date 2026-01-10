@@ -371,11 +371,16 @@ async function handleEnrichYouTube(
 			return { success: true };
 		}
 
-		// Show preview in JSON mode
-		if (isJson) {
+		// In JSON mode, auto-execute (no confirmation prompt)
+		// For preview-only, user should use --dry-run flag
+		const isDryRun = flags.dryRun === true || flags["dry-run"] === true;
+
+		if (isDryRun) {
+			// Dry run: just show candidates
 			console.log(
 				JSON.stringify(
 					{
+						dryRun: true,
 						candidates: candidates.map((c) => ({ path: c.path })),
 						count: candidates.length,
 						sessionCid,
@@ -388,31 +393,34 @@ async function handleEnrichYouTube(
 			return { success: true };
 		}
 
-		// Markdown output: show preview and confirm
-		console.log(
-			emphasize.success(
-				`Found ${candidates.length} YouTube note(s) to enrich:`,
-			),
-		);
-		console.log("");
+		// In JSON mode, skip confirmation and execute directly
+		// In markdown mode, show preview and confirm
+		if (!isJson) {
+			console.log(
+				emphasize.success(
+					`Found ${candidates.length} YouTube note(s) to enrich:`,
+				),
+			);
+			console.log("");
 
-		for (const c of candidates) {
-			console.log(`  - ${c.path}`);
+			for (const c of candidates) {
+				console.log(`  - ${c.path}`);
+			}
+			console.log("");
+
+			const proceed = await confirm({
+				message: "Enrich these notes?",
+				default: true,
+			});
+
+			if (!proceed) {
+				console.log(emphasize.warn("Cancelled."));
+				session.end({ success: true });
+				return { success: true };
+			}
 		}
-		console.log("");
 
-		const proceed = await confirm({
-			message: "Enrich these notes?",
-			default: true,
-		});
-
-		if (!proceed) {
-			console.log(emphasize.warn("Cancelled."));
-			session.end({ success: true });
-			return { success: true };
-		}
-
-		// Start timing AFTER confirmation (don't count user think time)
+		// Start timing (after confirmation in markdown mode)
 		startTime = Date.now();
 
 		// Create enrichment pipeline
@@ -436,12 +444,14 @@ async function handleEnrichYouTube(
 			const candidate = candidates[i];
 			if (!candidate) continue; // Should never happen but satisfies type checker
 
-			console.log("");
-			console.log(
-				emphasize.info(
-					`Enriching ${i + 1}/${candidates.length}: ${candidate.path}...`,
-				),
-			);
+			if (!isJson) {
+				console.log("");
+				console.log(
+					emphasize.info(
+						`Enriching ${i + 1}/${candidates.length}: ${candidate.path}...`,
+					),
+				);
+			}
 
 			try {
 				// Create InboxFile for the pipeline
@@ -451,7 +461,9 @@ async function handleEnrichYouTube(
 				const result = await pipeline.processFile(inboxFile);
 
 				if (result.enriched) {
-					console.log(emphasize.success("✓ Enriched successfully"));
+					if (!isJson) {
+						console.log(emphasize.success("✓ Enriched successfully"));
+					}
 					metrics.success++;
 				} else {
 					// Extract reason from result
@@ -459,13 +471,17 @@ async function handleEnrichYouTube(
 						result.result?.type === "none"
 							? result.result.reason
 							: "No matching strategy";
-					console.log(emphasize.warn(`- Skipped: ${reason}`));
+					if (!isJson) {
+						console.log(emphasize.warn(`- Skipped: ${reason}`));
+					}
 					metrics.skipped++;
 				}
 			} catch (error) {
 				const msg =
 					error instanceof Error ? error.message : "Unknown error occurred";
-				console.log(emphasize.error(`✗ Error: ${msg}`));
+				if (!isJson) {
+					console.log(emphasize.error(`✗ Error: ${msg}`));
+				}
 				errors.push(`${candidate.path}: ${msg}`);
 				metrics.failed++;
 			}
@@ -490,29 +506,55 @@ async function handleEnrichYouTube(
 		}
 
 		// Display summary
-		console.log("");
-		console.log(
-			emphasize.info(
-				`Done in ${(metrics.durationMs / 1000).toFixed(1)}s: ${metrics.success} enriched, ${metrics.failed} failed, ${metrics.skipped} skipped (${metrics.total} total)`,
-			),
-		);
-
-		// Show SLO warning if breached
-		if (enrichmentSLOCheck.breached) {
+		if (isJson) {
+			// JSON output with structured metrics
 			console.log(
-				emphasize.warn(
-					`⚠ Enrichment latency SLO breached: ${avgEnrichmentMs.toFixed(0)}ms avg (threshold: ${enrichmentSLOCheck.slo.threshold}ms)`,
+				JSON.stringify(
+					{
+						success: errors.length === 0,
+						metrics: {
+							total: metrics.total,
+							success: metrics.success,
+							failed: metrics.failed,
+							skipped: metrics.skipped,
+							durationMs: metrics.durationMs,
+						},
+						errors: errors.length > 0 ? errors : undefined,
+						sloBreached: enrichmentSLOCheck.breached,
+						sessionCid,
+					},
+					null,
+					2,
 				),
 			);
+		} else {
+			console.log("");
+			console.log(
+				emphasize.info(
+					`Done in ${(metrics.durationMs / 1000).toFixed(1)}s: ${metrics.success} enriched, ${metrics.failed} failed, ${metrics.skipped} skipped (${metrics.total} total)`,
+				),
+			);
+
+			// Show SLO warning if breached
+			if (enrichmentSLOCheck.breached) {
+				console.log(
+					emphasize.warn(
+						`⚠ Enrichment latency SLO breached: ${avgEnrichmentMs.toFixed(0)}ms avg (threshold: ${enrichmentSLOCheck.slo.threshold}ms)`,
+					),
+				);
+			}
+
+			// Display errors if any
+			if (errors.length > 0) {
+				console.log("");
+				console.log(emphasize.warn("Errors:"));
+				for (const err of errors) {
+					console.log(`  ${err}`);
+				}
+			}
 		}
 
-		// Display errors if any
 		if (errors.length > 0) {
-			console.log("");
-			console.log(emphasize.warn("Errors:"));
-			for (const err of errors) {
-				console.log(`  ${err}`);
-			}
 			session.end({ error: `${errors.length} enrichment(s) failed` });
 			return { success: false, exitCode: 1 };
 		}

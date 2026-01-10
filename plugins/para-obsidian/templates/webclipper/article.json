@@ -4,8 +4,7 @@
 	"behavior": "create",
 	"noteNameFormat": "✂️📰 {{title|safe_name|slice:0,80}}",
 	"path": "00 Inbox",
-	"context": "{{selectorHtml:article|markdown}}",
-	"noteContentFormat": "# {{title}}\n\n## AI Summary\n\n{{\"Summarize this content in 3 concise bullet points, focusing on the key insights and actionable takeaways\"|blockquote}}\n\n---\n\n**Author:** `= this.author`\n**Published:** `= this.published`\n**Source:** [`= this.domain`](`= this.source`)\n\n---\n\n## Summary\n\n{{description|default:\"\"}}\n\n## Highlights\n\n{{highlights|default:\"\"}}\n\n## Full Content\n\n{{content|slice:0,15000}}",
+	"noteContentFormat": "# `= this.file.name`\n\n**Author:** `= this.author`\n**Published:** `= this.published`\n**Source:** [`= this.domain`](`= this.source`)\n\n---\n\n## Summary\n\n{{description}}\n\n## Highlights\n\n{{highlights}}\n\n## Full Content\n\n{{content|slice:0,15000}}",
 	"properties": [
 		{
 			"name": "type",
@@ -29,12 +28,12 @@
 		},
 		{
 			"name": "author",
-			"value": "{{author|default:\"\"}}",
+			"value": "{{author}}",
 			"type": "text"
 		},
 		{
 			"name": "published",
-			"value": "{{published|default:\"\"}}",
+			"value": "{{published}}",
 			"type": "date"
 		},
 		{
@@ -63,10 +62,5 @@
 			"type": "multitext"
 		}
 	],
-	"triggers": [
-		"schema:@Article",
-		"schema:@BlogPosting",
-		"schema:@NewsArticle",
-		"schema:@WebPage"
-	]
+	"triggers": ["schema:@Article", "schema:@BlogPosting", "schema:@NewsArticle"]
 }

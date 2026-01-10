@@ -2,10 +2,9 @@
 	"schemaVersion": "0.1.0",
 	"name": "Event",
 	"behavior": "create",
-	"noteNameFormat": "✂️📅 {{schema:@Event:name|default:title|safe_name|slice:0,80}}",
+	"noteNameFormat": "✂️📅 {{title|safe_name|slice:0,80}}",
 	"path": "00 Inbox",
-	"context": "{{schema:@Event}}",
-	"noteContentFormat": "# {{title}}\n\n![Event Image]({{schema:@Event:image|default:meta:og:image}})\n\n## Event Details\n\n| | |\n|---|---|\n| **Date** | `= this.event_date` |\n| **End** | {{schema:@Event:endDate|default:\"—\"}} |\n| **Location** | `= this.location` |\n| **Address** | {{schema:@Event:location.address|default:\"—\"}} |\n| **Price** | `= this.price` |\n| **Organizer** | {{schema:@Event:organizer.name|default:\"—\"}} |\n\n## Why I'm Interested\n\n\n\n## Description\n\n{{description|default:\"\"}}\n\n---\n\n🎫 [Get Tickets](`= this.source`)",
+	"noteContentFormat": "# `= this.file.name`\n\n![Event Image]({{image}})\n\n## Event Details\n\n| | |\n|---|---|\n| **Date** | `= this.event_date` |\n| **End** | `= this.event_end` |\n| **Location** | `= this.location` |\n| **Address** | `= this.address` |\n| **Price** | `= this.price` |\n| **Organizer** | `= this.organizer` |\n\n## Why I'm Interested\n\n\n\n## Description\n\n{{description}}\n\n---\n\n🎫 [Get Tickets](`= this.source`)",
 	"properties": [
 		{
 			"name": "type",
@@ -29,17 +28,32 @@
 		},
 		{
 			"name": "event_date",
-			"value": "{{schema:@Event:startDate|default:\"\"}}",
+			"value": "{{schema:@Event:startDate}}",
 			"type": "date"
 		},
 		{
+			"name": "event_end",
+			"value": "{{schema:@Event:endDate}}",
+			"type": "text"
+		},
+		{
 			"name": "location",
-			"value": "{{schema:@Event:location.name|default:\"\"}}",
+			"value": "{{schema:@Event:location.name}}",
+			"type": "text"
+		},
+		{
+			"name": "address",
+			"value": "{{schema:@Event:location.address}}",
 			"type": "text"
 		},
 		{
 			"name": "price",
-			"value": "{{schema:@Event:offers.price|default:\"\"}}",
+			"value": "{{schema:@Event:offers.price}}",
+			"type": "text"
+		},
+		{
+			"name": "organizer",
+			"value": "{{schema:@Event:organizer.name}}",
 			"type": "text"
 		},
 		{

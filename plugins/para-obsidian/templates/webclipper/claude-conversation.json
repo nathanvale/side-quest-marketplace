@@ -5,7 +5,7 @@
 	"noteNameFormat": "✂️🤖 {{title|safe_name|slice:0,60}}",
 	"path": "00 Inbox",
 	"context": "{{selectorHtml:body|markdown}}",
-	"noteContentFormat": "# {{title}}\n\n**Saved:** `= this.clipped`\n**Model:** `= this.ai_model`\n\n## Why I Saved This\n\n\n\n## Conversation\n\n{{content|slice:0,20000}}\n\n---\n\n**Source:** [`= this.ai_model`](`= this.source`)",
+	"noteContentFormat": "# `= this.file.name`\n\n**Saved:** `= this.clipped`\n**Model:** `= this.ai_model`\n\n## Why I Saved This\n\n\n\n## Conversation\n\n{{content|slice:0,20000}}\n\n---\n\n**Source:** [`= this.ai_model`](`= this.source`)",
 	"properties": [
 		{
 			"name": "type",

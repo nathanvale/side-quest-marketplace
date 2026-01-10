@@ -2,10 +2,9 @@
 	"schemaVersion": "0.1.0",
 	"name": "Restaurant",
 	"behavior": "create",
-	"noteNameFormat": "✂️🍽️ {{schema:@Restaurant:name|default:title|safe_name|slice:0,80}}",
+	"noteNameFormat": "✂️🍽️ {{title|safe_name|slice:0,80}}",
 	"path": "00 Inbox",
-	"context": "{{schema:@Restaurant}}",
-	"noteContentFormat": "# {{title}}\n\n## At a Glance\n\n| | |\n|---|---|\n| **Cuisine** | `= this.cuisine` |\n| **Price Range** | `= this.price_range` |\n| **Rating** | `= this.rating`/5 |\n| **Suburb** | `= this.suburb` |\n| **Address** | {{schema:@Restaurant:address.streetAddress|default:\"—\"}} |\n| **Phone** | {{schema:@Restaurant:telephone|default:\"—\"}} |\n\n## Hours\n\n{{schema:@Restaurant:openingHours|default:\"Check website\"}}\n\n## Why I Want to Try This\n\n\n\n## Notes\n\n{{highlights|default:\"\"}}",
+	"noteContentFormat": "# `= this.file.name`\n\n## At a Glance\n\n| | |\n|---|---|\n| **Cuisine** | `= this.cuisine` |\n| **Price Range** | `= this.price_range` |\n| **Rating** | `= this.rating`/5 |\n| **Suburb** | `= this.suburb` |\n| **Address** | `= this.address` |\n| **Phone** | `= this.phone` |\n\n## Hours\n\n`= this.hours`\n\n## Why I Want to Try This\n\n\n\n## Notes\n\n{{highlights}}",
 	"properties": [
 		{
 			"name": "type",
@@ -29,22 +28,37 @@
 		},
 		{
 			"name": "cuisine",
-			"value": "{{schema:@Restaurant:servesCuisine|default:\"\"}}",
+			"value": "{{schema:@Restaurant:servesCuisine}}",
 			"type": "text"
 		},
 		{
 			"name": "price_range",
-			"value": "{{schema:@Restaurant:priceRange|default:\"\"}}",
+			"value": "{{schema:@Restaurant:priceRange}}",
 			"type": "text"
 		},
 		{
 			"name": "rating",
-			"value": "{{schema:@Restaurant:aggregateRating.ratingValue|default:\"\"}}",
+			"value": "{{schema:@Restaurant:aggregateRating.ratingValue}}",
 			"type": "text"
 		},
 		{
 			"name": "suburb",
-			"value": "{{schema:@Restaurant:address.addressLocality|default:\"\"}}",
+			"value": "{{schema:@Restaurant:address.addressLocality}}",
+			"type": "text"
+		},
+		{
+			"name": "address",
+			"value": "{{schema:@Restaurant:address.streetAddress}}",
+			"type": "text"
+		},
+		{
+			"name": "phone",
+			"value": "{{schema:@Restaurant:telephone}}",
+			"type": "text"
+		},
+		{
+			"name": "hours",
+			"value": "{{schema:@Restaurant:openingHours}}",
 			"type": "text"
 		},
 		{

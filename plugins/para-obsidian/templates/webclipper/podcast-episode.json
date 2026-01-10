@@ -5,7 +5,7 @@
 	"noteNameFormat": "✂️🎙️ {{title|safe_name|slice:0,80}}",
 	"path": "00 Inbox",
 	"context": "{{schema:@PodcastEpisode}}",
-	"noteContentFormat": "# {{title}}\n\n## AI Summary\n\n{{\"Summarize this content in 3 concise bullet points, focusing on the key insights and actionable takeaways\"|blockquote}}\n\n---\n\n![Podcast Art]({{meta:og:image}})\n\n## Episode Info\n\n| | |\n|---|---|\n| **Show** | `= this.show` |\n| **Duration** | {{schema:@PodcastEpisode:duration|default:\"—\"}} |\n| **Published** | {{schema:@PodcastEpisode:datePublished|default:\"—\"}} |\n\n## Why I Want to Listen\n\n\n\n## Description\n\n{{description|default:\"\"}}\n\n---\n\n🎧 [Listen](`= this.source`)",
+	"noteContentFormat": "# `= this.file.name`\n\n## AI Summary\n\n{{\"Summarize this content in 3 concise bullet points, focusing on the key insights and actionable takeaways\"|blockquote}}\n\n---\n\n![Podcast Art]({{image}})\n\n## Episode Info\n\n| | |\n|---|---|\n| **Show** | `= this.show` |\n| **Duration** | `= this.duration` |\n| **Published** | `= this.published` |\n\n## Why I Want to Listen\n\n\n\n## Description\n\n{{description}}\n\n---\n\n🎧 [Listen](`= this.source`)",
 	"properties": [
 		{
 			"name": "type",
@@ -29,8 +29,18 @@
 		},
 		{
 			"name": "show",
-			"value": "{{schema:@PodcastEpisode:partOfSeries.name|default:\"\"}}",
+			"value": "{{schema:@PodcastEpisode:partOfSeries.name}}",
 			"type": "text"
+		},
+		{
+			"name": "duration",
+			"value": "{{schema:@PodcastEpisode:duration}}",
+			"type": "text"
+		},
+		{
+			"name": "published",
+			"value": "{{schema:@PodcastEpisode:datePublished}}",
+			"type": "date"
 		},
 		{
 			"name": "consumption_status",

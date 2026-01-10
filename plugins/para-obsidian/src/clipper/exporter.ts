@@ -131,8 +131,10 @@ export function listTemplates(): {
 }
 
 /**
- * Export all templates to WebClipper settings.json format.
- * This can be imported into the WebClipper browser extension.
+ * Export all templates to a directory as individual JSON files.
+ * This is the format expected by the WebClipper browser extension import.
+ *
+ * Each template becomes a separate .json file that can be imported individually.
  *
  * Uses atomic writes to prevent corruption.
  *
@@ -153,6 +155,56 @@ export async function exportToWebClipperSettings(
 		return { success: false, error: result.error };
 	}
 
+	// Determine if outputPath is a directory or file
+	const isDirectory = outputPath.endsWith("/") || !outputPath.endsWith(".json");
+
+	if (isDirectory) {
+		// Export individual template files to directory
+		const outputDir = outputPath.replace(/\/$/, "");
+
+		// Ensure output directory exists
+		try {
+			fs.mkdirSync(outputDir, { recursive: true });
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+				const errorMsg = error instanceof Error ? error.message : String(error);
+				logger.error`clipper:export:error cid=${cid} error=${errorMsg}`;
+				return {
+					success: false,
+					error: `Failed to create directory ${outputDir}: ${errorMsg}`,
+				};
+			}
+		}
+
+		const warnings: string[] = result.warnings || [];
+		let successCount = 0;
+
+		for (const template of result.data) {
+			try {
+				const sanitizedName = sanitizeTemplateName(template.name);
+				const fileName = `${sanitizedName.toLowerCase().replace(/\s+/g, "-")}.json`;
+				const filePath = path.join(outputDir, fileName);
+
+				// Export single template (not wrapped in settings object)
+				await atomicWriteFile(filePath, JSON.stringify(template, null, "\t"));
+				successCount++;
+			} catch (error) {
+				warnings.push(
+					`${template.name}: ${error instanceof Error ? error.message : String(error)}`,
+				);
+			}
+		}
+
+		logger.info`clipper:export:success cid=${cid} outputPath=${outputDir} templateCount=${successCount}`;
+		return {
+			success: successCount > 0,
+			outputPath: outputDir,
+			templateCount: successCount,
+			warnings: warnings.length > 0 ? warnings : undefined,
+		};
+	}
+
+	// Single file export - export as WebClipper settings bundle
 	const settings: WebClipperSettings = {
 		templates: result.data,
 		vaults: [],
@@ -400,6 +452,7 @@ export async function exportAllToTemplater(
  */
 export async function syncFromWebClipperSettings(
 	settingsPath: string,
+	options?: { templatesDir?: string },
 ): Promise<SyncResult> {
 	const cid = createCorrelationId();
 	logger.info`clipper:sync:start cid=${cid} settingsPath=${settingsPath}`;
@@ -418,8 +471,8 @@ export async function syncFromWebClipperSettings(
 		};
 	}
 
-	// Load existing templates
-	const templatesDir = getTemplatesDirectory();
+	// Load existing templates (use provided dir or default)
+	const templatesDir = options?.templatesDir ?? getTemplatesDirectory();
 	const existingResult = loadTemplatesFromDirectory(templatesDir);
 
 	if (!existingResult.success) {

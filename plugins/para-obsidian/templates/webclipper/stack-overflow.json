@@ -5,7 +5,7 @@
 	"noteNameFormat": "✂️💬 {{title|safe_name|slice:0,70}}",
 	"path": "00 Inbox",
 	"context": "{{selectorHtml:#question|markdown}}",
-	"noteContentFormat": "# {{title}}\n\n## AI Summary\n\n{{\"Summarize this content in 3 concise bullet points, focusing on the key insights and actionable takeaways\"|blockquote}}\n\n---\n\n## Problem\n\n{{selector:.s-prose.js-post-body|first|markdown|slice:0,3000}}\n\n## Top Answer\n\n{{selector:.answer.accepted-answer .s-prose|first|markdown|default:\"No accepted answer - check link\"|slice:0,5000}}\n\n---\n\n**Source:** [Stack Overflow](`= this.source`)\n**Tags:** `= this.tags`",
+	"noteContentFormat": "# `= this.file.name`\n\n## AI Summary\n\n{{\"Summarize this content in 3 concise bullet points, focusing on the key insights and actionable takeaways\"|blockquote}}\n\n---\n\n## Problem\n\n{{selector:.s-prose.js-post-body|first|markdown|slice:0,3000}}\n\n## Top Answer\n\n{{selector:.answer.accepted-answer .s-prose|first|markdown|slice:0,5000}}\n\n---\n\n**Source:** [Stack Overflow](`= this.source`)\n**Tags:** `= this.tags`",
 	"properties": [
 		{
 			"name": "type",
@@ -29,7 +29,7 @@
 		},
 		{
 			"name": "tags",
-			"value": "{{selector:.post-tag|join:\", \"|default:\"\"}}",
+			"value": "{{selector:.post-tag|join:\", \"}}",
 			"type": "text"
 		},
 		{

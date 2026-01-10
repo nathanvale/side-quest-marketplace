@@ -5,7 +5,7 @@
 	"noteNameFormat": "✂️🎁 {{title|safe_name|slice:0,80}}",
 	"path": "00 Inbox",
 	"context": "{{schema:@Product}}",
-	"noteContentFormat": "# {{title}}\n\n![Product Image]({{schema:@Product:image|default:meta:og:image}})\n\n## Details\n\n**Price:** `= this.price` `= this.currency`\n\n**Brand:** `= this.brand`\n\n**Rating:** `= this.rating`/5\n\n**Gift For:** `= this.gift_for`\n\n## Why I Clipped This\n\n\n\n## Notes\n\n{{highlights|default:\"\"}}",
+	"noteContentFormat": "# `= this.file.name`\n\n![Product Image]({{image}})\n\n## Details\n\n**Price:** `= this.price` `= this.currency`\n\n**Brand:** `= this.brand`\n\n**Rating:** `= this.rating`/5\n\n**Gift For:** `= this.gift_for`\n\n## Why I Clipped This\n\n\n\n## Notes\n\n{{highlights}}",
 	"properties": [
 		{
 			"name": "type",
@@ -29,22 +29,22 @@
 		},
 		{
 			"name": "price",
-			"value": "{{schema:@Product:offers.price|default:\"\"}}",
+			"value": "{{schema:@Product:offers.price}}",
 			"type": "text"
 		},
 		{
 			"name": "currency",
-			"value": "{{schema:@Product:offers.priceCurrency|default:\"AUD\"}}",
+			"value": "{{schema:@Product:offers.priceCurrency}}",
 			"type": "text"
 		},
 		{
 			"name": "brand",
-			"value": "{{schema:@Product:brand.name|default:\"\"}}",
+			"value": "{{schema:@Product:brand.name}}",
 			"type": "text"
 		},
 		{
 			"name": "rating",
-			"value": "{{schema:@Product:aggregateRating.ratingValue|default:\"\"}}",
+			"value": "{{schema:@Product:aggregateRating.ratingValue}}",
 			"type": "text"
 		},
 		{

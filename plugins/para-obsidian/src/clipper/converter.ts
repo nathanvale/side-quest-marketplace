@@ -59,13 +59,16 @@ const MAPPABLE_VARIABLES: Record<string, string> = {
 /**
  * WebClipper-only features that have no Templater equivalent.
  * These will be stripped with a warning.
+ *
+ * Order matters: AI prompt blocks must be stripped BEFORE schema patterns
+ * because AI prompts can contain nested patterns.
  */
 const WEBCLIPPER_ONLY_PATTERNS = [
+	/\{\{"[^"]*"\|blockquote\}\}/g, // AI prompt blocks (must come first - full pattern)
 	/\{\{schema:[^}]+\}\}/g, // Schema.org data extraction
 	/\{\{selector:[^}]+\}\}/g, // CSS selector extraction
 	/\{\{selectorHtml:[^}]+\}\}/g, // HTML selector extraction
 	/\{\{meta:[^}]+\}\}/g, // Meta tag extraction
-	/\|blockquote\}\}/g, // AI prompt blocks
 ];
 
 /**
@@ -191,6 +194,10 @@ function containsWebClipperOnlyFeatures(content: string): string[] {
 
 	const features: string[] = [];
 
+	// Check for AI prompt blocks first (full pattern)
+	if (/\{\{"[^"]*"\|blockquote\}\}/.test(content)) {
+		features.push('AI prompt blocks ({{"..."|blockquote}})');
+	}
 	if (/\{\{schema:[^}]+\}\}/.test(content)) {
 		features.push("Schema.org data extraction ({{schema:...}})");
 	}
@@ -202,9 +209,6 @@ function containsWebClipperOnlyFeatures(content: string): string[] {
 	}
 	if (/\{\{meta:[^}]+\}\}/.test(content)) {
 		features.push("Meta tag extraction ({{meta:...}})");
-	}
-	if (/\|blockquote\}\}/.test(content)) {
-		features.push("AI prompt blocks (|blockquote)");
 	}
 
 	return features;
@@ -222,9 +226,6 @@ function stripWebClipperOnlyFeatures(content: string): string {
 	for (const pattern of WEBCLIPPER_ONLY_PATTERNS) {
 		result = result.replace(pattern, "");
 	}
-
-	// Clean up AI prompt blocks entirely (they're multiline)
-	result = result.replace(/\{\{"[^"]+"\|blockquote\}\}/g, "");
 
 	return result;
 }

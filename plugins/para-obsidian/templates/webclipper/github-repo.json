@@ -5,7 +5,7 @@
 	"noteNameFormat": "✂️💻 {{title|split:\":\"|first|safe_name}}",
 	"path": "00 Inbox",
 	"context": "{{selectorHtml:article.markdown-body|markdown}}",
-	"noteContentFormat": "# {{title}}\n\n## AI Summary\n\n{{\"Summarize this content in 3 concise bullet points, focusing on the key insights and actionable takeaways\"|blockquote}}\n\n---\n\n{{description}}\n\n## Quick Info\n\n| | |\n|---|---|\n| **URL** | [`= this.source`](`= this.source`) |\n| **Language** | `= this.language` |\n| **License** | {{selector:.octicon-law + span|default:\"—\"}} |\n\n## Why I'm Interested\n\n\n\n## README\n\n{{selectorHtml:article.markdown-body|markdown|slice:0,50000|default:\"See repo for details\"}}",
+	"noteContentFormat": "# `= this.file.name`\n\n## AI Summary\n\n{{\"Summarize this content in 3 concise bullet points, focusing on the key insights and actionable takeaways\"|blockquote}}\n\n---\n\n{{description}}\n\n## Quick Info\n\n| | |\n|---|---|\n| **URL** | [`= this.source`](`= this.source`) |\n| **Language** | `= this.language` |\n| **License** | `= this.license` |\n\n## Why I'm Interested\n\n\n\n## README\n\n{{selectorHtml:article.markdown-body|markdown|slice:0,50000}}",
 	"properties": [
 		{
 			"name": "type",
@@ -29,7 +29,12 @@
 		},
 		{
 			"name": "language",
-			"value": "{{selector:[itemprop=\"programmingLanguage\"]|default:\"\"}}",
+			"value": "{{selector:[itemprop=\"programmingLanguage\"]}}",
+			"type": "text"
+		},
+		{
+			"name": "license",
+			"value": "{{selector:.octicon-law + span}}",
 			"type": "text"
 		},
 		{

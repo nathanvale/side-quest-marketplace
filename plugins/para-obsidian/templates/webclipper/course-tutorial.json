@@ -2,10 +2,10 @@
 	"schemaVersion": "0.1.0",
 	"name": "Course / Tutorial",
 	"behavior": "create",
-	"noteNameFormat": "✂️🎓 {{schema:@Course:name|default:title|safe_name|slice:0,70}}",
+	"noteNameFormat": "✂️🎓 {{title|safe_name|slice:0,70}}",
 	"path": "00 Inbox",
-	"context": "{{schema:@Course}}",
-	"noteContentFormat": "# {{title}}\n\n## AI Summary\n\n{{\"Summarize this content in 3 concise bullet points, focusing on the key insights and actionable takeaways\"|blockquote}}\n\n---\n\n![Course Image]({{schema:@Course:image|default:meta:og:image}})\n\n## Course Info\n\n| | |\n|---|---|\n| **Instructor** | `= this.instructor` |\n| **Price** | `= this.price` |\n| **Rating** | {{schema:@Course:aggregateRating.ratingValue|default:\"—\"}}/5 |\n| **Duration** | {{schema:@Course:timeRequired|default:\"—\"}} |\n\n## Why I Want to Take This\n\n\n\n## Description\n\n{{description|default:\"\"}}\n\n---\n\n🎓 [Enroll](`= this.source`)",
+	"context": "{{fullHtml|markdown}}",
+	"noteContentFormat": "# `= this.file.name`\n\n## AI Summary\n\n{{\"Summarize this course in 2-3 sentences. Focus on: what you'll learn, who it's for, and the teaching approach (hands-on, video lectures, etc).\"|blockquote}}\n\n---\n\n![Course Image]({{image}})\n\n## Course Info\n\n| | |\n|---|---|\n| **Instructor** | `= this.instructor` |\n| **Price** | `= this.price` |\n| **Rating** | `= this.rating` |\n| **Duration** | `= this.duration` |\n\n## Why I Want to Take This\n\n\n\n## Description\n\n{{description}}\n\n## Key Topics\n\n{{\"List the 5-8 main topics or modules covered in this course as a bulleted list. Be specific about what skills or concepts are taught.\"}}\n\n---\n\n🎓 [Enroll](`= this.source`)",
 	"properties": [
 		{
 			"name": "type",
@@ -29,12 +29,42 @@
 		},
 		{
 			"name": "instructor",
-			"value": "{{schema:@Course:provider.name|default:\"\"}}",
+			"value": "{{\"Who is the instructor or creator of this course? Return just their name(s), nothing else.\"}}",
 			"type": "text"
 		},
 		{
 			"name": "price",
-			"value": "{{schema:@Course:offers.price|default:\"\"}}",
+			"value": "{{\"What is the price of this course? Return just the price with currency symbol (e.g. '$99', 'Free', '$29/month'). If multiple tiers, show range like '$99-$149'.\"}}",
+			"type": "text"
+		},
+		{
+			"name": "rating",
+			"value": "{{\"What is the rating of this course? Return in format like '4.7/5' or '4.7 stars'. If no rating shown, return empty.\"}}",
+			"type": "text"
+		},
+		{
+			"name": "duration",
+			"value": "{{\"What is the duration or length of this course? Return concisely like '12 hours', '8 weeks', '50 lessons', or '218-page book + videos'.\"}}",
+			"type": "text"
+		},
+		{
+			"name": "platform",
+			"value": "{{\"What platform is this course on? Return just the platform name like 'Udemy', 'Coursera', 'Self-hosted', etc.\"}}",
+			"type": "text"
+		},
+		{
+			"name": "skill_level",
+			"value": "{{\"What skill level is this course for? Return one of: Beginner, Intermediate, Advanced, All Levels. If not specified, return 'Not specified'.\"}}",
+			"type": "text"
+		},
+		{
+			"name": "ai_summary",
+			"value": "{{\"In 15 words or less, what will you learn from this course?\"}}",
+			"type": "text"
+		},
+		{
+			"name": "topics",
+			"value": "{{\"List 2-4 topic tags for this course as comma-separated values (e.g. design, UI, CSS, developer-tools). No hashtags.\"}}",
 			"type": "text"
 		},
 		{
@@ -71,6 +101,13 @@
 		"https://www.coursera.org/learn",
 		"https://skillshare.com/classes",
 		"https://www.skillshare.com/classes",
-		"https://masterclass.com/classes"
+		"https://masterclass.com/classes",
+		"https://www.refactoringui.com",
+		"https://egghead.io",
+		"https://frontendmasters.com",
+		"https://www.pluralsight.com",
+		"https://laracasts.com",
+		"https://levelup.video",
+		"https://testingjavascript.com"
 	]
 }

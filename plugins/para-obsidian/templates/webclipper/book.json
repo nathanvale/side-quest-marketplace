@@ -2,10 +2,9 @@
 	"schemaVersion": "0.1.0",
 	"name": "Book",
 	"behavior": "create",
-	"noteNameFormat": "✂️📚 {{schema:@Book:name|default:title|safe_name|slice:0,80}}",
+	"noteNameFormat": "✂️📚 {{title|safe_name|slice:0,80}}",
 	"path": "00 Inbox",
-	"context": "{{schema:@Book}}",
-	"noteContentFormat": "# {{title}}\n\n## AI Summary\n\n{{\"Summarize this content in 3 concise bullet points, focusing on the key insights and actionable takeaways\"|blockquote}}\n\n---\n\n![Cover]({{schema:@Book:image|default:meta:og:image}})\n\n## Book Info\n\n| | |\n|---|---|\n| **Author** | `= this.author` |\n| **Pages** | `= this.pages` |\n| **Rating** | `= this.rating`/5 |\n| **Genre** | {{schema:@Book:genre|default:\"—\"}} |\n| **ISBN** | {{schema:@Book:isbn|default:\"—\"}} |\n\n## Why I Want to Read This\n\n\n\n## Description\n\n{{description|default:\"\"}}\n\n## Notes\n\n{{highlights|default:\"\"}}",
+	"noteContentFormat": "# `= this.file.name`\n\n![Cover]({{image}})\n\n## Book Info\n\n| | |\n|---|---|\n| **Author** | `= this.author` |\n| **Pages** | `= this.pages` |\n| **Rating** | `= this.rating`/5 |\n| **Genre** | `= this.genre` |\n| **ISBN** | `= this.isbn` |\n\n## Why I Want to Read This\n\n\n\n## Description\n\n{{description}}\n\n## Notes\n\n{{highlights}}",
 	"properties": [
 		{
 			"name": "type",
@@ -29,17 +28,27 @@
 		},
 		{
 			"name": "author",
-			"value": "{{schema:@Book:author.name|default:\"\"}}",
+			"value": "{{schema:@Book:author.name}}",
 			"type": "text"
 		},
 		{
 			"name": "rating",
-			"value": "{{schema:@Book:aggregateRating.ratingValue|default:\"\"}}",
+			"value": "{{schema:@Book:aggregateRating.ratingValue}}",
 			"type": "text"
 		},
 		{
 			"name": "pages",
-			"value": "{{schema:@Book:numberOfPages|default:\"\"}}",
+			"value": "{{schema:@Book:numberOfPages}}",
+			"type": "text"
+		},
+		{
+			"name": "genre",
+			"value": "{{schema:@Book:genre}}",
+			"type": "text"
+		},
+		{
+			"name": "isbn",
+			"value": "{{schema:@Book:isbn}}",
 			"type": "text"
 		},
 		{

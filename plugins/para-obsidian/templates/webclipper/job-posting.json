@@ -2,10 +2,9 @@
 	"schemaVersion": "0.1.0",
 	"name": "Job Posting",
 	"behavior": "create",
-	"noteNameFormat": "✂️💼 {{schema:@JobPosting:title|default:title|safe_name|slice:0,70}}",
+	"noteNameFormat": "✂️💼 {{title|safe_name|slice:0,70}}",
 	"path": "00 Inbox",
-	"context": "{{schema:@JobPosting}}",
-	"noteContentFormat": "# {{title}}\n\n## Job Details\n\n| | |\n|---|---|\n| **Company** | `= this.company` |\n| **Location** | `= this.location` |\n| **Type** | {{schema:@JobPosting:employmentType|default:\"—\"}} |\n| **Salary** | {{schema:@JobPosting:baseSalary.value|default:\"Not listed\"}} |\n| **Posted** | {{schema:@JobPosting:datePosted|default:\"—\"}} |\n\n## Why I'm Interested\n\n\n\n## Description\n\n{{description|default:\"\"}}\n\n---\n\n💼 [Apply](`= this.source`)",
+	"noteContentFormat": "# `= this.file.name`\n\n## Job Details\n\n| | |\n|---|---|\n| **Company** | `= this.company` |\n| **Location** | `= this.location` |\n| **Type** | `= this.employment_type` |\n| **Salary** | `= this.salary` |\n| **Posted** | `= this.posted` |\n\n## Why I'm Interested\n\n\n\n## Description\n\n{{description}}\n\n---\n\n💼 [Apply](`= this.source`)",
 	"properties": [
 		{
 			"name": "type",
@@ -29,18 +28,33 @@
 		},
 		{
 			"name": "company",
-			"value": "{{schema:@JobPosting:hiringOrganization.name|default:\"\"}}",
+			"value": "{{schema:@JobPosting:hiringOrganization.name}}",
 			"type": "text"
 		},
 		{
-			"name": "title",
-			"value": "{{schema:@JobPosting:title|default:\"\"}}",
+			"name": "job_title",
+			"value": "{{schema:@JobPosting:title}}",
 			"type": "text"
 		},
 		{
 			"name": "location",
-			"value": "{{schema:@JobPosting:jobLocation.address.addressLocality|default:\"\"}}",
+			"value": "{{schema:@JobPosting:jobLocation.address.addressLocality}}",
 			"type": "text"
+		},
+		{
+			"name": "employment_type",
+			"value": "{{schema:@JobPosting:employmentType}}",
+			"type": "text"
+		},
+		{
+			"name": "salary",
+			"value": "{{schema:@JobPosting:baseSalary.value}}",
+			"type": "text"
+		},
+		{
+			"name": "posted",
+			"value": "{{schema:@JobPosting:datePosted}}",
+			"type": "date"
 		},
 		{
 			"name": "distill_status",

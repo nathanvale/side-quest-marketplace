@@ -2,10 +2,9 @@
 	"schemaVersion": "0.1.0",
 	"name": "Movie",
 	"behavior": "create",
-	"noteNameFormat": "✂️🎬 {{schema:@Movie:name|default:title|safe_name|slice:0,80}}",
+	"noteNameFormat": "✂️🎬 {{title|safe_name|slice:0,80}}",
 	"path": "00 Inbox",
-	"context": "{{schema:@Movie}}",
-	"noteContentFormat": "# {{title}}\n\n![Poster]({{schema:@Movie:image|default:meta:og:image}})\n\n## Movie Info\n\n| | |\n|---|---|\n| **Year** | `= this.year` |\n| **Director** | `= this.director` |\n| **Rating** | `= this.rating`/10 |\n| **Runtime** | {{schema:@Movie:duration|default:\"—\"}} |\n| **Genre** | {{schema:@Movie:genre|default:\"—\"}} |\n\n## Why I Want to Watch This\n\n\n\n## Description\n\n{{description|default:\"\"}}\n\n## Notes\n\n{{highlights|default:\"\"}}",
+	"noteContentFormat": "# `= this.file.name`\n\n![Poster]({{image}})\n\n## Movie Info\n\n| | |\n|---|---|\n| **Year** | `= this.year` |\n| **Director** | `= this.director` |\n| **Rating** | `= this.rating`/10 |\n| **Runtime** | `= this.runtime` |\n| **Genre** | `= this.genre` |\n\n## Why I Want to Watch This\n\n\n\n## Description\n\n{{description}}\n\n## Notes\n\n{{highlights}}",
 	"properties": [
 		{
 			"name": "type",
@@ -29,17 +28,27 @@
 		},
 		{
 			"name": "year",
-			"value": "{{schema:@Movie:datePublished|default:\"\"}}",
+			"value": "{{schema:@Movie:datePublished}}",
 			"type": "text"
 		},
 		{
 			"name": "director",
-			"value": "{{schema:@Movie:director.name|default:\"\"}}",
+			"value": "{{schema:@Movie:director.name}}",
 			"type": "text"
 		},
 		{
 			"name": "rating",
-			"value": "{{schema:@Movie:aggregateRating.ratingValue|default:\"\"}}",
+			"value": "{{schema:@Movie:aggregateRating.ratingValue}}",
+			"type": "text"
+		},
+		{
+			"name": "runtime",
+			"value": "{{schema:@Movie:duration}}",
+			"type": "text"
+		},
+		{
+			"name": "genre",
+			"value": "{{schema:@Movie:genre}}",
 			"type": "text"
 		},
 		{

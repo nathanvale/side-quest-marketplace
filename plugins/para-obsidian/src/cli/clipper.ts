@@ -79,7 +79,14 @@ export async function handleClipper(
 				result = handleClipperList(isJson, sessionCid, cid);
 				break;
 			case "export":
-				result = await handleClipperExport(flags, isJson, sessionCid, cid);
+				result = await handleClipperExport(
+					flags,
+					positional,
+					config,
+					isJson,
+					sessionCid,
+					cid,
+				);
 				break;
 			case "sync":
 				result = await handleClipperSync(positional, isJson, sessionCid, cid);
@@ -163,18 +170,26 @@ function handleClipperList(
 }
 
 /**
- * Export templates to WebClipper settings.json.
+ * Export templates to WebClipper settings.json or individual JSON files.
+ *
+ * If outputPath ends with "/" or doesn't end with ".json", exports individual files.
+ * Otherwise exports a single WebClipper settings bundle.
+ *
+ * With --templater flag, also exports Templater .md files to the vault Templates folder.
  */
 async function handleClipperExport(
 	flags: CommandContext["flags"],
+	positional: ReadonlyArray<string>,
+	config: CommandContext["config"],
 	isJson: boolean,
 	sessionCid: string,
 	cid: string,
 ): Promise<CommandResult> {
+	// Accept output path from positional arg or --out flag
 	const outputPath =
-		typeof flags.out === "string"
-			? flags.out
-			: "obsidian-web-clipper-settings.json";
+		positional[0] ||
+		(typeof flags.out === "string" ? flags.out : null) ||
+		"obsidian-web-clipper-settings.json";
 
 	// Validate output path to prevent directory traversal
 	const validation = validateOutputPath(outputPath);
@@ -182,12 +197,28 @@ async function handleClipperExport(
 		return { success: false, error: validation.error, exitCode: 1 };
 	}
 
-	cliLogger.info`cli:clipper:export:start cid=${cid} sessionCid=${sessionCid} outputPath=${outputPath}`;
+	const includeTemplater = flags.templater === true;
+
+	cliLogger.info`cli:clipper:export:start cid=${cid} sessionCid=${sessionCid} outputPath=${outputPath} includeTemplater=${includeTemplater}`;
 
 	const result = await exportToWebClipperSettings(outputPath);
 
 	if (!result.success) {
 		return { success: false, error: result.error, exitCode: 1 };
+	}
+
+	// Also export Templater .md files if --templater flag is set
+	let templaterResult: {
+		success: boolean;
+		outputPath?: string;
+		templateCount?: number;
+		error?: string;
+		warnings?: string[];
+	} | null = null;
+	if (includeTemplater) {
+		const templaterDir =
+			config.templatesDir || `${config.vault}/Templates/Clippings`;
+		templaterResult = await exportAllToTemplater(templaterDir, config);
 	}
 
 	if (isJson) {
@@ -198,6 +229,13 @@ async function handleClipperExport(
 					outputPath: result.outputPath,
 					templateCount: result.templateCount,
 					warnings: result.warnings,
+					templater: templaterResult
+						? {
+								outputPath: templaterResult.outputPath,
+								templateCount: templaterResult.templateCount,
+								warnings: templaterResult.warnings,
+							}
+						: undefined,
 				},
 				null,
 				2,
@@ -214,6 +252,24 @@ async function handleClipperExport(
 				console.log(emphasize.warn(`  ⚠ ${w}`));
 			}
 		}
+
+		if (templaterResult?.success) {
+			console.log(
+				emphasize.success(
+					`Exported ${templaterResult.templateCount} Templater templates to ${templaterResult.outputPath}`,
+				),
+			);
+			if (templaterResult.warnings && templaterResult.warnings.length > 0) {
+				for (const w of templaterResult.warnings) {
+					console.log(emphasize.warn(`  ⚠ ${w}`));
+				}
+			}
+		} else if (templaterResult && !templaterResult.success) {
+			console.log(
+				emphasize.warn(`\nTemplater export failed: ${templaterResult.error}`),
+			);
+		}
+
 		console.log(
 			emphasize.dim(
 				"\nImport this file in Obsidian Web Clipper settings to sync templates.\n",
@@ -221,7 +277,7 @@ async function handleClipperExport(
 		);
 	}
 
-	cliLogger.info`cli:clipper:export:complete cid=${cid} sessionCid=${sessionCid} outputPath=${result.outputPath} templateCount=${result.templateCount}`;
+	cliLogger.info`cli:clipper:export:complete cid=${cid} sessionCid=${sessionCid} outputPath=${result.outputPath} templateCount=${result.templateCount} templaterExported=${templaterResult?.success ?? false}`;
 
 	return { success: true };
 }

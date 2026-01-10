@@ -4,8 +4,7 @@
 	"behavior": "create",
 	"noteNameFormat": "✂️🏨 {{title|safe_name|slice:0,70}}",
 	"path": "00 Inbox",
-	"context": "{{selectorHtml:body|markdown}}",
-	"noteContentFormat": "# {{title}}\n\n![Property]({{meta:og:image}})\n\n## Property Details\n\n{{description|default:\"\"}}\n\n## Why I'm Interested\n\n\n\n## Highlights\n\n{{highlights|default:\"\"}}\n\n---\n\n🏠 [View Listing](`= this.source`)",
+	"noteContentFormat": "# `= this.file.name`\n\n![Property]({{image}})\n\n## Property Details\n\n{{description}}\n\n## Why I'm Interested\n\n\n\n## Highlights\n\n{{highlights}}\n\n---\n\n[View Listing](`= this.source`)",
 	"properties": [
 		{
 			"name": "type",

@@ -299,6 +299,9 @@ export function parseSettingsFile(
 
 /**
  * Load all templates from a directory.
+ *
+ * Deduplicates templates by name (case-insensitive).
+ * When duplicates are found, keeps the first file alphabetically and warns.
  */
 export function loadTemplatesFromDirectory(
 	dirPath: string,
@@ -313,15 +316,35 @@ export function loadTemplatesFromDirectory(
 			return { success: false, error };
 		}
 
-		const files = fs.readdirSync(dirPath).filter((f) => f.endsWith(".json"));
+		// Sort files alphabetically so deduplication is deterministic
+		const files = fs
+			.readdirSync(dirPath)
+			.filter((f) => f.endsWith(".json"))
+			.sort();
+
 		const templates: WebClipperTemplate[] = [];
 		const warnings: string[] = [];
+
+		// Track seen template names (lowercase) to detect duplicates
+		const seenNames = new Map<string, string>(); // name -> first filename
 
 		for (const file of files) {
 			const filePath = path.join(dirPath, file);
 			const result = parseTemplateFile(filePath);
 
 			if (result.success && result.data) {
+				const normalizedName = result.data.name.toLowerCase();
+
+				// Check for duplicate template name
+				const existingFile = seenNames.get(normalizedName);
+				if (existingFile) {
+					warnings.push(
+						`Duplicate template "${result.data.name}" in ${file} (already loaded from ${existingFile})`,
+					);
+					continue; // Skip duplicate
+				}
+
+				seenNames.set(normalizedName, file);
 				templates.push(result.data);
 			} else if (result.error) {
 				warnings.push(result.error);
