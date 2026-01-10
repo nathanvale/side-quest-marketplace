@@ -1,5 +1,5 @@
 {
-	"description": "Git intelligence hooks for session context and summaries",
+	"description": "Git intelligence hooks for session context, summaries, and auto-commit",
 	"hooks": {
 		"SessionStart": [
 			{
@@ -19,6 +19,17 @@
 					{
 						"type": "command",
 						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/session-summary.ts",
+						"timeout": 5
+					}
+				]
+			}
+		],
+		"Stop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/auto-commit-check.ts",
 						"timeout": 5
 					}
 				]

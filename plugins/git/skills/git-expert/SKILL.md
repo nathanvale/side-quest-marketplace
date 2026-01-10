@@ -1,11 +1,11 @@
 ---
 name: git-expert
-description: Git operations, history exploration, and intelligent commit management. Use when users ask about git history ("what did we change", "when did we add"), want to understand past changes, need help with commits ("commit this", "save my work", "checkpoint"), ask about branches, or mention recent work.
+description: Git history exploration and repository analysis. Use when users ask about git history ("what changed", "when did we add"), want to understand past changes, need to search commits, ask about branches, or want to explore the codebase evolution.
 ---
 
 # Git Expert Skill
 
-Git operations, history exploration, and intelligent commit management.
+Git history exploration and repository analysis.
 
 ## Capabilities
 
@@ -15,16 +15,14 @@ Git operations, history exploration, and intelligent commit management.
 - Find when specific code was introduced or removed
 - Identify who made changes and why
 
-### Smart Commits
-- Create well-formatted Conventional Commits
-- Split large changes into atomic commits
-- Handle pre-commit hooks gracefully
-- Never commit secrets or sensitive data
+### Repository Exploration
+- Branch information and comparisons
+- Diff analysis between commits/branches
+- Blame to find who changed specific lines
 
 ### Session Awareness
 - Track what was done during the current session
-- Show uncommitted work
-- Create checkpoints before risky operations
+- Show uncommitted work status
 
 ## Tools Available
 
@@ -33,51 +31,33 @@ Use the git-intelligence MCP server tools:
 - `search_commits` - Search by message or code
 - `get_status` - Current repository state
 - `get_diff_summary` - Summary of changes
+- `get_file_history` - History of a specific file
+- `get_branch_info` - Branch information
 
-For file history and branch info, use Bash:
+For additional queries, use Bash:
 - `git log --oneline -10 -- <filepath>` - File-specific history
-- `git branch -a` - Branch information
-
-## Commit Format
-
-Always use Conventional Commits format:
-```
-<type>(<scope>): <subject>
-```
-
-Type mappings:
-| Type | Use for |
-|------|---------|
-| feat | New feature |
-| fix | Bug fix |
-| docs | Documentation |
-| style | Formatting |
-| refactor | Refactoring |
-| perf | Performance |
-| test | Tests |
-| build | Build system |
-| ci | CI/CD |
-| chore | Maintenance |
-| revert | Revert |
-
-## Best Practices
-
-1. **Before editing**: Check recent commits to understand context
-2. **Before committing**: Review all changes, never blind commit
-3. **Large changes**: Suggest splitting into atomic commits
-4. **Unclear intent**: Ask user for commit scope/description
-5. **Secrets detected**: Warn and refuse to commit
+- `git branch -a` - All branches
+- `git blame <filepath>` - Line-by-line attribution
+- `git show <commit>` - Commit details
+- `git diff <ref1>..<ref2>` - Compare refs
 
 ## Example Interactions
 
 **User**: "What changed in the auth module recently?"
-- Use `search_commits` with query "auth" or Bash `git log --oneline -10 -- src/auth/`
+- Use `search_commits` with query "auth" or `git log --oneline -10 -- src/auth/`
 
-**User**: "Commit my changes"
-- Run `get_status`, review diffs, create appropriate conventional commit
+**User**: "When did we add the login feature?"
+- Use `search_commits` with query "login" and `search_code: false`
+
+**User**: "Who changed this file?"
+- Use `git blame <filepath>` or `get_file_history`
+
+**User**: "What branches exist?"
+- Use `get_branch_info` or `git branch -a`
 
 **User**: "What did we do this session?"
-- Check recent commits and current diff, summarize activity
+- Use `get_recent_commits` and `get_status` to summarize activity
 
-**User**: "Save my work before I try this"
-- Create a checkpoint commit with current context
+## For Committing Changes
+
+Use the **smart-commit** skill for creating commits. This skill focuses on history exploration only.
