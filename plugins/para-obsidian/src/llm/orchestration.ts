@@ -24,11 +24,7 @@ import {
 	validateFrontmatterFile,
 } from "../frontmatter/index";
 import { autoCommitChanges } from "../git/index";
-import {
-	createFromTemplate,
-	replaceH1Title,
-	replaceSections,
-} from "../notes/create";
+import { createFromTemplate, replaceSections } from "../notes/create";
 import { listAreas, listProjects } from "../search/indexer";
 import { readFile } from "../shared/fs";
 import {
@@ -448,17 +444,15 @@ function injectContentSections(
 	config: ParaObsidianConfig,
 	filePath: string,
 	extracted: ExtractionResult,
-	options: ConvertNoteOptions,
+	_options: ConvertNoteOptions,
 ): {
 	sectionsInjected: string[];
 	sectionsSkipped: Array<{ heading: string; reason: string }>;
 } {
-	// Replace H1 title placeholder with actual title
-	const noteTitle =
-		typeof extracted.args.title === "string"
-			? extracted.args.title
-			: (options.titleOverride ?? extracted.title);
-	replaceH1Title(config, filePath, noteTitle);
+	// NOTE: We do NOT replace the H1 title here.
+	// Templates use # <% tp.file.title %> which is a dynamic Dataview reference
+	// that automatically updates when the note is renamed. Replacing it with a
+	// static title would break this functionality.
 
 	// Replace content sections (not append)
 	let sectionsInjected: string[] = [];

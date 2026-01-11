@@ -437,7 +437,11 @@ export function injectSections(
 
 	for (const [heading, content] of Object.entries(sections)) {
 		// Skip null/undefined or non-string content
-		if (content === null || content === undefined || typeof content !== "string") {
+		if (
+			content === null ||
+			content === undefined ||
+			typeof content !== "string"
+		) {
 			skipped.push({ heading, reason: "Invalid content type" });
 			continue;
 		}
@@ -497,7 +501,11 @@ export function replaceSections(
 
 	for (const [heading, content] of Object.entries(sections)) {
 		// Skip null/undefined or non-string content
-		if (content === null || content === undefined || typeof content !== "string") {
+		if (
+			content === null ||
+			content === undefined ||
+			typeof content !== "string"
+		) {
 			skipped.push({ heading, reason: "Invalid content type" });
 			continue;
 		}
