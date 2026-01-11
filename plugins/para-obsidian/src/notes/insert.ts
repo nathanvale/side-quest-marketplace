@@ -70,6 +70,9 @@ function normalizeHeadingParam(heading: string): string {
 /**
  * Finds a heading by its title text.
  *
+ * Skips Templater syntax headings (e.g., `# <% tp.file.title %>`)
+ * to preserve dynamic template placeholders.
+ *
  * @param lines - Array of document lines
  * @param heading - Heading title to find (with or without # prefix)
  * @returns Heading match with index and level, or undefined if not found
@@ -89,6 +92,11 @@ function findHeading(
 		const hashes = match[1];
 		const title = match[2];
 		if (!hashes || !title) continue;
+
+		// Skip Templater syntax headings (e.g., "# <% tp.file.title %>")
+		// These should be left for Obsidian's Templater plugin to process
+		if (title.trim().startsWith("<%")) continue;
+
 		if (title.trim() === normalizedHeading) {
 			return { index: i, level: hashes.length };
 		}

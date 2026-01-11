@@ -177,6 +177,38 @@ export async function callOllama(
 }
 
 /**
+ * Coerce a value to a string for content sections.
+ *
+ * Handles various LLM response formats:
+ * - Strings: Return as-is
+ * - Arrays: Join with newlines
+ * - Objects: Stringify as JSON
+ * - null/undefined: Return empty string
+ * - Numbers/booleans: Convert to string
+ *
+ * @param value - Value to coerce
+ * @returns String representation
+ */
+function coerceToString(value: unknown): string {
+	if (typeof value === "string") {
+		return value;
+	}
+	if (value === null || value === undefined) {
+		return "";
+	}
+	if (Array.isArray(value)) {
+		// Join array items with newlines
+		return value.map((item) => String(item)).join("\n");
+	}
+	if (typeof value === "object") {
+		// Stringify objects as JSON
+		return JSON.stringify(value);
+	}
+	// Handle primitives (numbers, booleans)
+	return String(value);
+}
+
+/**
  * Parse LLM response, handling potential markdown code fences.
  *
  * @param response - Raw response from LLM
@@ -199,10 +231,16 @@ export function parseOllamaResponse(response: string): ExtractionResult {
 	try {
 		const parsed = JSON.parse(json) as ExtractionResult;
 
+		// Coerce all content values to strings to prevent .trim() errors
+		const content: Record<string, string> = {};
+		for (const [key, value] of Object.entries(parsed.content ?? {})) {
+			content[key] = coerceToString(value);
+		}
+
 		// Ensure required fields exist with defaults
 		return {
 			args: parsed.args ?? {},
-			content: parsed.content ?? {},
+			content,
 			title: parsed.title ?? "Untitled",
 		};
 	} catch (_error) {

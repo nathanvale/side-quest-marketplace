@@ -22,7 +22,6 @@ import { generateUniqueNotePath } from "../inbox/core/engine-utils";
 import { resolveVaultPath } from "../shared/fs";
 import {
 	applyDateSubstitutions,
-	applyFileSubstitutions,
 	detectTitlePromptKey,
 	getTemplate,
 } from "../templates/index";
@@ -350,12 +349,11 @@ export function createFromTemplate(
 
 	// Apply template substitutions:
 	// 1. First, replace all date patterns (tp.date.now) with actual dates
-	// 2. Then, replace file-related patterns (tp.file.title, script blocks)
-	// 3. Finally, replace all prompt patterns (tp.system.prompt) with provided args
+	// 2. Then, replace all prompt patterns (tp.system.prompt) with provided args
 	//    - Auto-detect the title prompt key (e.g., "Title", "Project title", "Resource title")
 	//    - Inject displayTitle using the detected key for automatic substitution
+	// NOTE: We preserve tp.file.title and <%* script blocks for Obsidian/Templater
 	let filled = applyDateSubstitutions(tpl.content);
-	filled = applyFileSubstitutions(filled, displayTitle);
 	const titleKey = detectTitlePromptKey(tpl);
 	const argsWithTitle = { [titleKey]: displayTitle, ...options.args };
 	filled = applyArgsToTemplate(filled, argsWithTitle);
@@ -438,6 +436,11 @@ export function injectSections(
 	const skipped: Array<{ heading: string; reason: string }> = [];
 
 	for (const [heading, content] of Object.entries(sections)) {
+		// Skip null/undefined or non-string content
+		if (content === null || content === undefined || typeof content !== "string") {
+			skipped.push({ heading, reason: "Invalid content type" });
+			continue;
+		}
 		// Skip empty content
 		if (!content.trim()) {
 			skipped.push({ heading, reason: "Empty content" });
@@ -493,8 +496,13 @@ export function replaceSections(
 	const skipped: Array<{ heading: string; reason: string }> = [];
 
 	for (const [heading, content] of Object.entries(sections)) {
-		// Skip null/empty content
-		if (content === null || !content.trim()) {
+		// Skip null/undefined or non-string content
+		if (content === null || content === undefined || typeof content !== "string") {
+			skipped.push({ heading, reason: "Invalid content type" });
+			continue;
+		}
+		// Skip empty content
+		if (!content.trim()) {
 			skipped.push({ heading, reason: "Empty content" });
 			continue;
 		}

@@ -1012,4 +1012,113 @@ title: Test Note
 		expect(result.injected).toEqual([]);
 		expect(result.skipped).toEqual([]);
 	});
+
+	it("preserves Templater syntax in H1 heading when using replaceSections", () => {
+		const vault = setupTest();
+		const templateContent = `---
+title: "<% tp.system.prompt(\\"Title\\") %>"
+type: capture
+---
+# <% tp.file.title %>
+
+## Notes
+
+Empty section.
+
+## Other Section
+
+More content.
+`;
+		writeTemplate(vault, "Test Template", templateContent);
+		process.env.PARA_VAULT = vault;
+
+		const config = loadConfig({ cwd: vault });
+
+		// replaceSections should NOT match the H1 Templater syntax
+		const { replaceSections } = require("./create");
+		replaceSections(config, "Test Template.md", {
+			Notes: "Some notes content",
+		});
+
+		// Read back the file
+		const written = fs.readFileSync(
+			path.join(vault, "Test Template.md"),
+			"utf8",
+		);
+
+		// Templater syntax should be preserved in H1
+		expect(written).toContain("# <% tp.file.title %>");
+		// Our injection should work
+		expect(written).toContain("## Notes");
+		expect(written).toContain("Some notes content");
+		// Other sections should be preserved
+		expect(written).toContain("## Other Section");
+		expect(written).toContain("More content");
+	});
+
+	it("preserves Templater syntax in H1 when using injectSections", () => {
+		const vault = setupTest();
+		const templateContent = `---
+title: "<% tp.system.prompt(\\"Title\\") %>"
+type: capture
+---
+# <% tp.file.title %>
+
+## Notes
+
+Empty section.
+`;
+		writeTemplate(vault, "Test Template", templateContent);
+		process.env.PARA_VAULT = vault;
+
+		const config = loadConfig({ cwd: vault });
+
+		// injectSections should NOT match the H1 Templater syntax
+		const result = injectSections(config, "Test Template.md", {
+			Notes: "Appended content",
+		});
+
+		// Read back the file
+		const written = fs.readFileSync(
+			path.join(vault, "Test Template.md"),
+			"utf8",
+		);
+
+		// Templater syntax should be preserved in H1
+		expect(written).toContain("# <% tp.file.title %>");
+		// Our injection should work
+		expect(result.injected).toContain("Notes");
+		expect(written).toContain("Appended content");
+	});
+
+	it("still replaces H1 with '# null' pattern", () => {
+		const vault = setupTest();
+		writeTemplate(
+			path.join(vault, "Templates"),
+			"test",
+			`---
+title: "<% tp.system.prompt(\\"Title\\") %>"
+type: test
+---
+# null
+
+## Body
+
+Content here.
+`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		const result = createFromTemplate(loadConfig({ cwd: vault }), {
+			template: "test",
+			title: "My Test",
+			args: { Title: "My Test" },
+		});
+
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+
+		// '# null' should be replaced with actual title
+		expect(written).toContain("# My Test");
+		expect(written).not.toContain("# null");
+	});
 });
