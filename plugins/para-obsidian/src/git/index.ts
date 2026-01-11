@@ -368,7 +368,7 @@ export async function ensureGitGuard(
 			if (uncommitted.length > 0) {
 				const fileList = `\nUncommitted files:\n${uncommitted.map((f: string) => `  - ${f}`).join("\n")}`;
 				throw new Error(
-					`Vault has uncommitted changes in PARA folders. Commit or stash before processing inbox.${fileList}\n\nTo fix, run one of these commands:\n  para git commit                # Commit all uncommitted notes\n  git add . && git commit -m "chore: stage changes"  # Manual commit`,
+					`Vault has uncommitted changes in PARA folders. Commit or stash before processing inbox.${fileList}\n\nTo fix:\n  - For agents: Use para_commit MCP tool (no vault path needed)\n  - For interactive: Run /para-obsidian:commit or para git commit\n  - Manual: git add . && git commit -m "chore: stage changes"`,
 				);
 			}
 		},

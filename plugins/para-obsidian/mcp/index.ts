@@ -38,6 +38,7 @@ import "../src/mcp-handlers/indexer";
 import "../src/mcp-handlers/frontmatter";
 import "../src/mcp-handlers/links";
 import "../src/mcp-handlers/export";
+import "../src/mcp-handlers/git";
 
 // Initialize logger
 initMcpLogger().catch(console.error);
