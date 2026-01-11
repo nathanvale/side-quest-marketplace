@@ -278,24 +278,34 @@ mcp__youtube-transcript__get_transcript({ url: "https://www.youtube.com/watch?v=
 - **upload_date**: Published date (format: YYYY-MM-DDTHH:MM:SS)
 - **duration**: Video length (e.g., "4 minutes")
 
-**Step 2: Create note using `youtube-video` template**
+**Step 2: Create note with description AND transcript in one call**
+
+The `youtube-video` template has these headings for content injection:
+- `## Description` - Video description from API
+- `## Transcript` - Full transcript from API
+- `## AI Summary` - Generated summary (3 bullet points)
+
 ```
 para_create({
   template: "youtube-video",
-  title: "✂️🎬 {Video Title}",
+  title: "{Channel} - {Video Title}",
   dest: "00 Inbox",
   args: {},
   content: {
-    "Description": "[Video description from API]"
+    "Description": "[Video description from API]",
+    "Transcript": "[Full transcript from get_transcript]",
+    "AI Summary": "> - Key insight 1\n> - Key insight 2\n> - Key insight 3"
   },
   response_format: "json"
 })
 ```
 
+**CRITICAL:** Use the exact heading names from the template: `"Description"`, `"Transcript"`, `"AI Summary"`.
+
 **Step 3: Set frontmatter with extracted values**
 ```
 para_frontmatter_set({
-  file: "00 Inbox/✂️🎬 {Video Title}.md",
+  file: "00 Inbox/✂️🎬 {Channel} - {Video Title}.md",
   set: {
     source: "https://www.youtube.com/watch?v=...",
     video_id: "dQw4w9WgXcQ",
@@ -304,30 +314,6 @@ para_frontmatter_set({
     published: "2009-10-25",
     transcript_status: "complete"
   }
-})
-```
-
-**Step 4: Insert transcript after the placeholder**
-
-The template has `<!-- transcript:pending -->`. Replace it with the full transcript:
-```
-para_insert({
-  file: "00 Inbox/✂️🎬 {Video Title}.md",
-  heading: "Transcript",
-  content: "[Full transcript from API]",
-  mode: "append"
-})
-```
-
-**Step 5: Generate AI Summary**
-
-Based on the description and transcript, generate a 3-bullet summary:
-```
-para_insert({
-  file: "00 Inbox/✂️🎬 {Video Title}.md",
-  heading: "AI Summary",
-  content: "> - Key insight 1\n> - Key insight 2\n> - Key insight 3",
-  mode: "append"
 })
 ```
 
