@@ -89,8 +89,8 @@
 		{
 			"name": "para-obsidian",
 			"source": "./plugins/para-obsidian",
-			"description": "PARA-compliant Obsidian vault management CLI. Creates notes with proper frontmatter, templates, and file organization following the PARA method.",
-			"version": "0.1.0",
+			"description": "PARA-style Obsidian vault management with frontmatter validation, template versioning, and git auto-commit. Provides 20+ MCP tools, 11 slash commands, and 4 skills for complete vault operations including AI-assisted content injection.",
+			"version": "0.2.5",
 			"author": {
 				"name": "Nathan Vale"
 			},
@@ -101,7 +101,10 @@
 				"cli",
 				"vault",
 				"templates",
-				"frontmatter"
+				"frontmatter",
+				"mcp",
+				"ai-content",
+				"inbox-processing"
 			]
 		},
 		{
