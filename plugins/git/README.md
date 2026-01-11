@@ -27,6 +27,12 @@ Seven tools for efficient git queries:
 - Current uncommitted changes
 - Helps maintain continuity across context windows
 
+**Stop** - Auto-commit check before session ends:
+- Detects staged changes that should be committed
+- Blocks session end and prompts Claude to use `/git:commit`
+- Includes loop prevention via `stop_hook_active` flag
+- Only triggers on staged changes (respects user intent)
+
 ### Slash Commands
 
 - `/git:commit` - Smart commits with Conventional Commits format
