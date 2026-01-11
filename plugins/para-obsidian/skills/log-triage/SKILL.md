@@ -265,15 +265,23 @@ Generate a unique title based on the tweet's content (e.g., "AI Coding Agents Wi
 
 For `youtube.com` or `youtu.be` URLs, use the YouTube MCP tools to fetch video info and transcript.
 
-**Step 1: Fetch video info and transcript**
+**Step 1: Fetch video info and transcript using YouTube MCP tools**
+
+Use these MCP tools (from `youtube-transcript` server):
+
 ```
 mcp__youtube-transcript__get_video_info({ url: "https://www.youtube.com/watch?v=..." })
+```
+Returns: `title`, `uploader` (channel), `description`, `upload_date`, `duration`
+
+```
 mcp__youtube-transcript__get_transcript({ url: "https://www.youtube.com/watch?v=..." })
 ```
+Returns: Full transcript text (may be paginated - check for `next_cursor`)
 
 **Extracted fields from video info:**
 - **title**: Video title
-- **uploader**: Channel name
+- **uploader**: Channel name (use as `channel` in frontmatter)
 - **description**: Video description
 - **upload_date**: Published date (format: YYYY-MM-DDTHH:MM:SS)
 - **duration**: Video length (e.g., "4 minutes")
