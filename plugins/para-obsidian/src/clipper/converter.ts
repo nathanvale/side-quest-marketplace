@@ -72,6 +72,50 @@ const WEBCLIPPER_ONLY_PATTERNS = [
 ];
 
 /**
+ * Extract emoji prefix from WebClipper noteNameFormat.
+ *
+ * WebClipper format: "✂️📰 {{title|safe_name|slice:0,80}}"
+ * Returns: "✂️📰" or undefined if no emoji prefix found
+ *
+ * Emoji detection uses Unicode properties to match emoji sequences,
+ * including multi-codepoint emoji (e.g., skin tones, ZWJ sequences).
+ */
+function extractEmojiPrefix(noteNameFormat: string): string | undefined {
+	// Match leading emoji characters (emoji, variation selectors, ZWJ sequences)
+	// followed by optional whitespace before the first {{
+	// Note: Using alternation instead of character class to avoid combining character issues
+	// with \p{Emoji_Component} (Biome lint/suspicious/noMisleadingCharacterClass)
+	const emojiRegex = /^((?:\p{Emoji}|\p{Emoji_Component}|\uFE0F|\u200D)+)\s*/u;
+	const match = noteNameFormat.match(emojiRegex);
+
+	if (match?.[1]) {
+		return match[1].trim();
+	}
+
+	return undefined;
+}
+
+/**
+ * Generate Templater rename script for emoji prefix.
+ *
+ * Creates a Templater execution block that renames the file
+ * to add the emoji prefix if not already present.
+ */
+function generateEmojiRenameScript(emojiPrefix: string): string {
+	// Escape the emoji for safe embedding in JavaScript string
+	const escapedEmoji = emojiPrefix.replace(/"/g, '\\"');
+
+	return `
+<%*
+// Auto-rename to add emoji prefix if not present
+const title = tp.file.title;
+if (!title.startsWith("${escapedEmoji}")) {
+  await tp.file.rename("${escapedEmoji} " + title);
+}
+-%>`;
+}
+
+/**
  * Escape a string for safe embedding in Templater code.
  *
  * Prevents template injection by escaping:
@@ -231,7 +275,24 @@ function stripWebClipperOnlyFeatures(content: string): string {
 }
 
 /**
+ * Check if a value contains WebClipper-only patterns (schema, selector, etc.)
+ * that cannot be converted to Templater equivalents.
+ */
+function containsWebClipperOnlyPatterns(value: string): boolean {
+	return WEBCLIPPER_ONLY_PATTERNS.some((pattern) => {
+		// Reset lastIndex for global regexes
+		pattern.lastIndex = 0;
+		return pattern.test(value);
+	});
+}
+
+/**
  * Convert WebClipper property to Templater frontmatter value.
+ *
+ * Handles conversion of:
+ * - Date variables: {{time|date:"..."}} → <% tp.date.now("...") %>
+ * - Simple variables: {{url}} → <% tp.system.prompt("URL") %>
+ * - WebClipper-only patterns: {{schema:...}} → "" (empty, with Templater prompt as fallback)
  */
 function convertPropertyValue(prop: WebClipperProperty): string {
 	const { value, type } = prop;
@@ -242,6 +303,14 @@ function convertPropertyValue(prop: WebClipperProperty): string {
 		if (dateResult.isDate) {
 			return dateResult.converted;
 		}
+	}
+
+	// Handle WebClipper-only patterns (schema, selector, meta, etc.)
+	// These have no Templater equivalent - convert to empty string or prompt
+	if (containsWebClipperOnlyPatterns(value)) {
+		// If the value is ONLY a WebClipper pattern, convert to empty string
+		// The user will fill this in manually when using the template
+		return "";
 	}
 
 	// Handle simple variable references
@@ -326,9 +395,15 @@ function generateFrontmatter(
 			} else {
 				lines.push(`${prop.name}: ${value}`);
 			}
-		} else if (value.includes("\n") || value.includes('"')) {
-			// Quote complex values
+		} else if (value.includes("\n")) {
+			// Multiline values need double quotes with escaped inner quotes
 			lines.push(`${prop.name}: "${value.replace(/"/g, '\\"')}"`);
+		} else if (value.includes('"')) {
+			// Values with double quotes use single quote wrapper (for Templater syntax)
+			lines.push(`${prop.name}: '${value}'`);
+		} else if (value === "" || value.includes(":") || value.includes("#")) {
+			// Empty values or values with YAML special chars need quoting
+			lines.push(`${prop.name}: "${value}"`);
 		} else {
 			lines.push(`${prop.name}: ${value}`);
 		}
@@ -445,12 +520,14 @@ export function webClipperToTemplater(
 	);
 	warnings.push(...contentWarnings);
 
-	// Note: We no longer generate Templater rename scripts.
-	// The H1 now uses Dataview `= this.file.name` which dynamically renders the filename.
-	// Emoji prefixes are handled by para-obsidian's createFromTemplate function.
+	// Extract emoji prefix from noteNameFormat and generate Templater rename script
+	const emojiPrefix = extractEmojiPrefix(template.noteNameFormat);
+	const emojiScript = emojiPrefix ? generateEmojiRenameScript(emojiPrefix) : "";
 
 	// Combine into final template
-	const content = `${frontmatter}\n\n${body}`;
+	// Note: emoji script is appended at the end to auto-rename files with emoji prefix
+	// Ensure trailing newline for POSIX compliance
+	const content = `${frontmatter}\n\n${body}${emojiScript}\n`;
 
 	logger.info`clipper:convert:success cid=${cid} name=${template.name} contentLength=${content.length}`;
 

@@ -383,8 +383,9 @@ export function createFromTemplate(
 		body = body.replace(/\{\{content\}\}/g, "");
 	}
 
-	// Inject title if not provided by args/template substitution
-	if (!attributes.title || attributes.title === "null") {
+	// Only inject title if template explicitly has a title field with null/placeholder
+	// Don't auto-add title - filename IS the title (avoids redundancy)
+	if (attributes.title === "null" || attributes.title === null) {
 		attributes.title = displayTitle;
 	}
 

@@ -222,8 +222,10 @@ async function handleEnrichYouTube(
 			const targetPath = target as string;
 
 			// Bug ENRICH-CLI-004 fix: Validate path - prevent traversal
-			if (targetPath.includes("..") || targetPath.includes("~")) {
-				const errorMsg = "Path contains invalid characters (.. or ~)";
+			// Note: Check for "../" specifically, not ".." which would block filenames with ellipsis
+			if (targetPath.includes("../") || targetPath.startsWith("~")) {
+				const errorMsg =
+					"Path contains traversal pattern (../) or starts with ~";
 				if (enrichLogger) {
 					enrichLogger.warn`enrich:youtube:pathBlocked cid=${cid} sessionCid=${sessionCid} target=${targetPath}`;
 				}

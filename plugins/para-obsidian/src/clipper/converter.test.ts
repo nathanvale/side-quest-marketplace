@@ -32,7 +32,7 @@ describe("webClipperToTemplater", () => {
 		expect(result.success).toBe(true);
 		expect(result.content).toContain("---");
 		expect(result.content).toContain("type: test");
-		expect(result.content).toContain('source: "<% tp.system.prompt');
+		expect(result.content).toContain("source: '<% tp.system.prompt");
 	});
 
 	test("converts date variables", () => {
@@ -490,9 +490,10 @@ describe("webClipperToTemplater - H1 uses Dataview syntax", () => {
 		expect(result.success).toBe(true);
 		// H1 should use Dataview syntax for dynamic title
 		expect(result.content).toContain("# `= this.file.name`");
-		// Should NOT contain Templater rename scripts (emoji prefixes handled by para-obsidian)
-		expect(result.content).not.toContain("<%*");
-		expect(result.content).not.toContain("tp.file.rename");
+		// Should contain Templater rename script with emoji prefix extracted from noteNameFormat
+		expect(result.content).toContain("<%*");
+		expect(result.content).toContain('if (!title.startsWith("✂️🎬"))');
+		expect(result.content).toContain('await tp.file.rename("✂️🎬 " + title)');
 	});
 
 	test("no rename script when no emoji prefix", () => {
@@ -514,6 +515,61 @@ describe("webClipperToTemplater - H1 uses Dataview syntax", () => {
 		// Should NOT contain rename script
 		expect(result.content).not.toContain("tp.file.rename");
 		expect(result.content).not.toContain("<%*");
+	});
+
+	test("converts schema.org properties to empty strings in frontmatter", () => {
+		const template: WebClipperTemplate = {
+			schemaVersion: "0.1.0",
+			name: "Restaurant",
+			behavior: "create",
+			noteNameFormat: "✂️🍽️ {{title}}",
+			path: "00 Inbox",
+			noteContentFormat: "# {{title}}",
+			properties: [
+				{
+					name: "cuisine",
+					value: "{{schema:@Restaurant:servesCuisine}}",
+					type: "text",
+				},
+				{
+					name: "price_range",
+					value: "{{schema:@Restaurant:priceRange}}",
+					type: "text",
+				},
+				{ name: "source", value: "{{url}}", type: "text" },
+			],
+		};
+
+		const result = webClipperToTemplater(template);
+
+		expect(result.success).toBe(true);
+		// Schema.org variables should be converted to empty strings (no Templater equivalent)
+		expect(result.content).toContain("cuisine: ");
+		expect(result.content).toContain("price_range: ");
+		expect(result.content).not.toContain("{{schema:");
+		// Regular variables should be converted to Templater prompts
+		expect(result.content).toContain(
+			"source: '<% tp.system.prompt(\"URL\") %>'",
+		);
+	});
+
+	test("extracts multi-character emoji prefixes", () => {
+		const template: WebClipperTemplate = {
+			schemaVersion: "0.1.0",
+			name: "Podcast",
+			behavior: "create",
+			noteNameFormat: "✂️🎙️ {{title}}",
+			path: "00 Inbox",
+			noteContentFormat: "# {{title}}",
+			properties: [],
+		};
+
+		const result = webClipperToTemplater(template);
+
+		expect(result.success).toBe(true);
+		// Multi-emoji prefix (✂️🎙️) should be extracted correctly
+		expect(result.content).toContain('if (!title.startsWith("✂️🎙️"))');
+		expect(result.content).toContain('await tp.file.rename("✂️🎙️ " + title)');
 	});
 });
 
