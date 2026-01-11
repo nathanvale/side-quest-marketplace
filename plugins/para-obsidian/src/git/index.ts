@@ -368,7 +368,7 @@ export async function ensureGitGuard(
 			if (uncommitted.length > 0) {
 				const fileList = `\nUncommitted files:\n${uncommitted.map((f: string) => `  - ${f}`).join("\n")}`;
 				throw new Error(
-					`Vault has uncommitted changes in PARA folders. Commit or stash before processing inbox.${fileList}\n\nTo fix:\n  - For agents: Use para_commit MCP tool (no vault path needed)\n  - For interactive: Run /para-obsidian:commit or para git commit\n  - Manual: git add . && git commit -m "chore: stage changes"`,
+					`Vault has uncommitted changes in PARA folders. Commit or stash before processing inbox.${fileList}\n\nTo fix:\n  - For agents: Use para_commit MCP tool (no vault path needed)\n  - For interactive: Run /para-obsidian:commit or para git commit`,
 				);
 			}
 		},
@@ -384,7 +384,7 @@ export async function ensureGitGuard(
 }
 
 /**
- * Stages files for commit.
+ * Stages files for commit (new and modified files).
  *
  * @param dir - Git repository directory
  * @param paths - Paths to stage (relative to git root)
@@ -393,7 +393,7 @@ export async function ensureGitGuard(
 export async function gitAdd(dir: string, paths: string[]): Promise<void> {
 	return observe(gitLogger, "git:stageFiles", async () => {
 		const { exitCode, stderr } = await spawnAndCollect(
-			["git", "add", ...paths],
+			["git", "add", "--", ...paths],
 			{
 				cwd: dir,
 			},
@@ -405,34 +405,54 @@ export async function gitAdd(dir: string, paths: string[]): Promise<void> {
 }
 
 /**
- * Lists files that are already staged for deletion.
+ * Checks if a file is tracked by git (exists in the index).
  *
- * Uses `git diff --cached --name-only -z --diff-filter=D` to capture paths
- * relative to the repo root without quoting, preserving spaces and unicode.
- *
- * @param dir - Git repository root
- * @returns Set of staged deletion paths (relative to git root)
+ * @param dir - Git repository directory
+ * @param filePath - Path to check (relative to git root)
+ * @returns true if the file is tracked
  */
-async function getStagedDeletions(dir: string): Promise<Set<string>> {
-	const { stdout, stderr, exitCode } = await spawnAndCollect(
+async function isTrackedByGit(dir: string, filePath: string): Promise<boolean> {
+	const { exitCode } = await spawnAndCollect(
+		["git", "ls-files", "--error-unmatch", "--", filePath],
+		{ cwd: dir },
+	);
+	return exitCode === 0;
+}
+
+/**
+ * Checks if a file is staged for deletion.
+ *
+ * @param dir - Git repository directory
+ * @param filePath - Path to check (relative to git root)
+ * @returns true if the file is staged for deletion
+ */
+async function isStagedForDeletion(
+	dir: string,
+	filePath: string,
+): Promise<boolean> {
+	const { stdout } = await spawnAndCollect(
 		["git", "diff", "--cached", "--name-only", "-z", "--diff-filter=D"],
 		{ cwd: dir },
 	);
+	const stagedDeletions = stdout.split("\0").filter((p) => p.length > 0);
+	return stagedDeletions.includes(filePath);
+}
+
+/**
+ * Stages a file deletion using git rm.
+ *
+ * @param dir - Git repository directory
+ * @param filePath - Path to remove (relative to git root)
+ * @throws Error if git rm fails
+ */
+async function gitRm(dir: string, filePath: string): Promise<void> {
+	const { exitCode, stderr } = await spawnAndCollect(
+		["git", "rm", "--", filePath],
+		{ cwd: dir },
+	);
 	if (exitCode !== 0) {
-		throw new Error(`git diff failed: ${stderr}`);
+		throw new Error(`git rm failed: ${stderr}`);
 	}
-
-	const entries = stdout
-		.split("\0")
-		.filter((entry) => entry.length > 0)
-		.map((entry) => {
-			if (entry.startsWith('"') && entry.endsWith('"')) {
-				return unescapeGitPath(entry.slice(1, -1));
-			}
-			return entry;
-		});
-
-	return new Set(entries);
 }
 
 /**
@@ -686,21 +706,42 @@ export async function commitNote(
 				}
 			}
 
-			// Stage files
-			const stagedDeletions = await getStagedDeletions(gitRoot);
-			const filesToAdd = filesToCommit.filter((relativePath) => {
+			// Stage files - handle existing vs deleted separately
+			const existingFiles: string[] = [];
+			const filesToDelete: string[] = [];
+
+			for (const relativePath of filesToCommit) {
 				const absolute = path.join(realGitRoot, relativePath);
-				if (fs.existsSync(absolute)) return true;
+				if (fs.existsSync(absolute)) {
+					existingFiles.push(relativePath);
+				} else {
+					// File doesn't exist - check if it's already staged for deletion
+					const alreadyStaged = await isStagedForDeletion(gitRoot, relativePath);
+					if (alreadyStaged) {
+						// Already staged, nothing to do
+						continue;
+					}
 
-				if (stagedDeletions.has(relativePath)) return false;
+					// Check if it's tracked (needs git rm) or never existed (error)
+					const isTracked = await isTrackedByGit(gitRoot, relativePath);
+					if (isTracked) {
+						filesToDelete.push(relativePath);
+					} else {
+						throw new Error(
+							`Cannot commit: note does not exist and is not tracked by git.`,
+						);
+					}
+				}
+			}
 
-				throw new Error(
-					`Cannot stage ${relativePath}: file is missing and not staged for deletion.`,
-				);
-			});
+			// Stage existing files (new + modified)
+			if (existingFiles.length > 0) {
+				await gitAdd(gitRoot, existingFiles);
+			}
 
-			if (filesToAdd.length > 0) {
-				await gitAdd(gitRoot, filesToAdd);
+			// Stage deletions
+			for (const filePath of filesToDelete) {
+				await gitRm(gitRoot, filePath);
 			}
 
 			// Build commit message from note title (filename without .md)
