@@ -869,7 +869,7 @@ describe("ensureGitGuard", () => {
 		fs.writeFileSync(path.join(vault, "00 Inbox", "Note.md"), "# Note");
 
 		await expect(ensureGitGuard(makeConfig(vault))).rejects.toThrow(
-			/uncommitted changes in PARA folders/,
+			/uncommitted changes/,
 		);
 	});
 
@@ -942,7 +942,7 @@ describe("ensureGitGuard", () => {
 		// Should throw when checkAllFileTypes=true
 		await expect(
 			ensureGitGuard(makeConfig(vault), { checkAllFileTypes: true }),
-		).rejects.toThrow(/uncommitted changes in PARA folders/);
+		).rejects.toThrow(/uncommitted changes/);
 	});
 
 	it("throws when checkAllFileTypes=true and PARA folders have uncommitted JSON", async () => {
@@ -960,7 +960,7 @@ describe("ensureGitGuard", () => {
 		// Should throw when checkAllFileTypes=true
 		await expect(
 			ensureGitGuard(makeConfig(vault), { checkAllFileTypes: true }),
-		).rejects.toThrow(/uncommitted changes in PARA folders/);
+		).rejects.toThrow(/uncommitted changes/);
 	});
 
 	it("checkAllFileTypes=true lists all uncommitted file types in error", async () => {

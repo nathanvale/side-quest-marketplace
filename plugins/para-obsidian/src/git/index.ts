@@ -368,7 +368,7 @@ export async function ensureGitGuard(
 			if (uncommitted.length > 0) {
 				const fileList = `\nUncommitted files:\n${uncommitted.map((f: string) => `  - ${f}`).join("\n")}`;
 				throw new Error(
-					`Vault has uncommitted changes in PARA folders. Commit or stash before processing inbox.${fileList}\n\nTo fix:\n  - For agents: Use para_commit MCP tool (no vault path needed)\n  - For interactive: Run /para-obsidian:commit or para git commit`,
+					`Vault has uncommitted changes. Commit before proceeding.${fileList}\n\nTo fix: Use para_commit MCP tool\n\nDO NOT use raw git commands or inspect the vault directly.`,
 				);
 			}
 		},
@@ -716,7 +716,10 @@ export async function commitNote(
 					existingFiles.push(relativePath);
 				} else {
 					// File doesn't exist - check if it's already staged for deletion
-					const alreadyStaged = await isStagedForDeletion(gitRoot, relativePath);
+					const alreadyStaged = await isStagedForDeletion(
+						gitRoot,
+						relativePath,
+					);
 					if (alreadyStaged) {
 						// Already staged, nothing to do
 						continue;
@@ -728,7 +731,7 @@ export async function commitNote(
 						filesToDelete.push(relativePath);
 					} else {
 						throw new Error(
-							`Cannot commit: note does not exist and is not tracked by git.`,
+							`Cannot commit: note does not exist. Ask the user to check their vault. DO NOT debug with git commands.`,
 						);
 					}
 				}
