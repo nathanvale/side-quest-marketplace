@@ -27,13 +27,15 @@
 		"./commands/slo.md",
 		"./commands/trace.md",
 		"./commands/validate.md",
-		"./commands/triage.md"
+		"./commands/triage.md",
+		"./commands/webclipper.md"
 	],
 	"mcpServers": ["./.mcp.json"],
 	"skills": [
 		"./skills/daily-review",
 		"./skills/log-triage",
 		"./skills/field-suggestions",
-		"./skills/template-assistant"
+		"./skills/template-assistant",
+		"./skills/webclipper-templates"
 	]
 }
