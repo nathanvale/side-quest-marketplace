@@ -352,7 +352,7 @@ export function createFromTemplate(
 	// 2. Then, replace all prompt patterns (tp.system.prompt) with provided args
 	//    - Auto-detect the title prompt key (e.g., "Title", "Project title", "Resource title")
 	//    - Inject displayTitle using the detected key for automatic substitution
-	// NOTE: We preserve tp.file.title and <%* script blocks for Obsidian/Templater
+	// NOTE: We preserve Dataview inline syntax (`= this.file.name`) for dynamic H1 titles
 	let filled = applyDateSubstitutions(tpl.content);
 	const titleKey = detectTitlePromptKey(tpl);
 	const argsWithTitle = { [titleKey]: displayTitle, ...options.args };

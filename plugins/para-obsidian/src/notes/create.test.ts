@@ -1013,13 +1013,13 @@ title: Test Note
 		expect(result.skipped).toEqual([]);
 	});
 
-	it("preserves Templater syntax in H1 heading when using replaceSections", () => {
+	it("preserves Dataview syntax in H1 heading when using replaceSections", () => {
 		const vault = setupTest();
 		const templateContent = `---
 title: "<% tp.system.prompt(\\"Title\\") %>"
 type: capture
 ---
-# <% tp.file.title %>
+# \`= this.file.name\`
 
 ## Notes
 
@@ -1034,7 +1034,7 @@ More content.
 
 		const config = loadConfig({ cwd: vault });
 
-		// replaceSections should NOT match the H1 Templater syntax
+		// replaceSections should NOT match the H1 Dataview syntax
 		const { replaceSections } = require("./create");
 		replaceSections(config, "Test Template.md", {
 			Notes: "Some notes content",
@@ -1046,8 +1046,8 @@ More content.
 			"utf8",
 		);
 
-		// Templater syntax should be preserved in H1
-		expect(written).toContain("# <% tp.file.title %>");
+		// Dataview syntax should be preserved in H1
+		expect(written).toContain("# `= this.file.name`");
 		// Our injection should work
 		expect(written).toContain("## Notes");
 		expect(written).toContain("Some notes content");
@@ -1056,13 +1056,13 @@ More content.
 		expect(written).toContain("More content");
 	});
 
-	it("preserves Templater syntax in H1 when using injectSections", () => {
+	it("preserves Dataview syntax in H1 when using injectSections", () => {
 		const vault = setupTest();
 		const templateContent = `---
 title: "<% tp.system.prompt(\\"Title\\") %>"
 type: capture
 ---
-# <% tp.file.title %>
+# \`= this.file.name\`
 
 ## Notes
 
@@ -1073,7 +1073,7 @@ Empty section.
 
 		const config = loadConfig({ cwd: vault });
 
-		// injectSections should NOT match the H1 Templater syntax
+		// injectSections should NOT match the H1 Dataview syntax
 		const result = injectSections(config, "Test Template.md", {
 			Notes: "Appended content",
 		});
@@ -1084,8 +1084,8 @@ Empty section.
 			"utf8",
 		);
 
-		// Templater syntax should be preserved in H1
-		expect(written).toContain("# <% tp.file.title %>");
+		// Dataview syntax should be preserved in H1
+		expect(written).toContain("# `= this.file.name`");
 		// Our injection should work
 		expect(result.injected).toContain("Notes");
 		expect(written).toContain("Appended content");

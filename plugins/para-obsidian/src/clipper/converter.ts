@@ -339,43 +339,6 @@ function generateFrontmatter(
 }
 
 /**
- * Extract emoji prefix from WebClipper noteNameFormat.
- * Returns the emoji characters at the start of the format string.
- *
- * Example: "✂️🎬 {{title}}" -> "✂️🎬"
- */
-function extractEmojiPrefix(noteNameFormat: string): string | null {
-	// Match emoji characters at the start (including variation selectors and ZWJ sequences)
-	// This regex matches common emoji patterns including:
-	// - Basic emoji (e.g., ✂️)
-	// - Emoji with variation selectors (e.g., ✂︎)
-	// - ZWJ sequences (e.g., 👨‍👩‍👧)
-	const emojiRegex =
-		/^((?:[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{FE00}-\u{FE0F}]|[\u{200D}])+\s*)+/u;
-	const match = noteNameFormat.match(emojiRegex);
-	if (match?.[0]) {
-		return match[0].trim();
-	}
-	return null;
-}
-
-/**
- * Generate Templater script to rename file with emoji prefix.
- * This ensures files created from the template get the correct emoji prefix.
- */
-function generateRenameScript(emojiPrefix: string): string {
-	// Escape the emoji for safe embedding in JavaScript string
-	const escapedEmoji = emojiPrefix.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-	return `<%*
-// Auto-rename to add emoji prefix if not present
-const title = tp.file.title;
-if (!title.startsWith("${escapedEmoji}")) {
-  await tp.file.rename("${escapedEmoji} " + title);
-}
--%>`;
-}
-
-/**
  * Convert WebClipper note content format to Templater body.
  */
 function convertNoteContent(content: string): {
@@ -429,10 +392,11 @@ function convertNoteContent(content: string): {
 	// `= this.field` -> <% tp.frontmatter.field %>
 	converted = converted.replace(/`= this\.(\w+)`/g, "<% tp.frontmatter.$1 %>");
 
-	// Replace H1 title with tp.file.title reference
-	// This ensures the note title matches the filename (which includes emoji prefix)
-	// Matches any H1 at start of line and replaces with file title reference
-	converted = converted.replace(/^# .+$/m, "# <% tp.file.title %>");
+	// Replace H1 title with Dataview inline reference to filename
+	// This ensures the note title dynamically matches the filename (which includes emoji prefix)
+	// Using Dataview instead of Templater prevents file modification on open
+	// Matches any H1 at start of line and replaces with dynamic file name reference
+	converted = converted.replace(/^# .+$/m, "# `= this.file.name`");
 
 	return { converted, warnings };
 }
@@ -481,12 +445,12 @@ export function webClipperToTemplater(
 	);
 	warnings.push(...contentWarnings);
 
-	// Extract emoji prefix from noteNameFormat and generate rename script
-	const emojiPrefix = extractEmojiPrefix(template.noteNameFormat);
-	const renameScript = emojiPrefix ? generateRenameScript(emojiPrefix) : "";
+	// Note: We no longer generate Templater rename scripts.
+	// The H1 now uses Dataview `= this.file.name` which dynamically renders the filename.
+	// Emoji prefixes are handled by para-obsidian's createFromTemplate function.
 
-	// Combine into final template (with rename script at end if present)
-	const content = `${frontmatter}\n\n${body}${renameScript ? `\n\n${renameScript}` : ""}`;
+	// Combine into final template
+	const content = `${frontmatter}\n\n${body}`;
 
 	logger.info`clipper:convert:success cid=${cid} name=${template.name} contentLength=${content.length}`;
 

@@ -450,9 +450,9 @@ function injectContentSections(
 	sectionsSkipped: Array<{ heading: string; reason: string }>;
 } {
 	// NOTE: We do NOT replace the H1 title here.
-	// Templates use # <% tp.file.title %> which is a dynamic Dataview reference
-	// that automatically updates when the note is renamed. Replacing it with a
-	// static title would break this functionality.
+	// Templates use `# \`= this.file.name\`` which is a Dataview inline query
+	// that dynamically renders the filename. Replacing it with a static title
+	// would break this functionality.
 
 	// Replace content sections (not append)
 	let sectionsInjected: string[] = [];

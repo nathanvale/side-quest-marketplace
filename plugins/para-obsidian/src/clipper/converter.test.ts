@@ -334,7 +334,7 @@ describe("webClipperToTemplater - security", () => {
 			noteNameFormat: "{{title}}",
 			path: "00 Inbox",
 			// Attack: Backslash in default value
-			// Use ## Summary so it's not replaced by tp.file.title
+			// Use ## Summary so it's not replaced by Dataview file.name
 			noteContentFormat:
 				'# {{title}}\n\n## Summary\n\n{{author|default:"foo\\bar"}}',
 			properties: [],
@@ -355,7 +355,7 @@ describe("webClipperToTemplater - security", () => {
 			behavior: "create",
 			noteNameFormat: "{{title}}",
 			path: "00 Inbox",
-			// Use ## Summary so content isn't replaced by tp.file.title
+			// Use ## Summary so content isn't replaced by Dataview file.name
 			noteContentFormat:
 				'# {{title}}\n\n## Summary\n\n{{url|default:"<% tp.file.exists() %>"}}',
 			properties: [],
@@ -434,7 +434,7 @@ describe("webClipperToTemplater - security", () => {
 			behavior: "create",
 			noteNameFormat: "{{title}}",
 			path: "00 Inbox",
-			// Use ## Summary so content isn't replaced by tp.file.title
+			// Use ## Summary so content isn't replaced by Dataview file.name
 			noteContentFormat:
 				'# {{title}}\n\n## Summary\n\n{{author|default:"end %> start"}}',
 			properties: [],
@@ -458,7 +458,7 @@ describe("webClipperToTemplater - security", () => {
 			behavior: "create",
 			noteNameFormat: "{{title}}",
 			path: "00 Inbox",
-			// Use ## Summary so content isn't replaced by tp.file.title
+			// Use ## Summary so content isn't replaced by Dataview file.name
 			noteContentFormat:
 				'# {{title}}\n\n## Summary\n\n{{author|default:"Hello, World!"}}',
 			properties: [],
@@ -473,8 +473,8 @@ describe("webClipperToTemplater - security", () => {
 	});
 });
 
-describe("webClipperToTemplater - emoji rename script", () => {
-	test("injects rename script for dual emoji prefix", () => {
+describe("webClipperToTemplater - H1 uses Dataview syntax", () => {
+	test("replaces H1 with Dataview file.name reference", () => {
 		const template: WebClipperTemplate = {
 			schemaVersion: "0.1.0",
 			name: "YouTube Video",
@@ -488,33 +488,14 @@ describe("webClipperToTemplater - emoji rename script", () => {
 		const result = webClipperToTemplater(template);
 
 		expect(result.success).toBe(true);
-		// Should contain the rename script
-		expect(result.content).toContain("<%*");
-		expect(result.content).toContain("tp.file.rename");
-		expect(result.content).toContain("✂️🎬");
-		// Script should check if title starts with emoji
-		expect(result.content).toContain('startsWith("✂️🎬")');
+		// H1 should use Dataview syntax for dynamic title
+		expect(result.content).toContain("# `= this.file.name`");
+		// Should NOT contain Templater rename scripts (emoji prefixes handled by para-obsidian)
+		expect(result.content).not.toContain("<%*");
+		expect(result.content).not.toContain("tp.file.rename");
 	});
 
-	test("injects rename script for single emoji prefix", () => {
-		const template: WebClipperTemplate = {
-			schemaVersion: "0.1.0",
-			name: "Article",
-			behavior: "create",
-			noteNameFormat: "✂️📰 {{title}}",
-			path: "00 Inbox",
-			noteContentFormat: "# {{title}}\n\nArticle content",
-			properties: [],
-		};
-
-		const result = webClipperToTemplater(template);
-
-		expect(result.success).toBe(true);
-		expect(result.content).toContain("tp.file.rename");
-		expect(result.content).toContain("✂️📰");
-	});
-
-	test("does not inject rename script when no emoji prefix", () => {
+	test("no rename script when no emoji prefix", () => {
 		const template: WebClipperTemplate = {
 			schemaVersion: "0.1.0",
 			name: "Test",
@@ -528,48 +509,11 @@ describe("webClipperToTemplater - emoji rename script", () => {
 		const result = webClipperToTemplater(template);
 
 		expect(result.success).toBe(true);
+		// H1 should still use Dataview syntax
+		expect(result.content).toContain("# `= this.file.name`");
 		// Should NOT contain rename script
 		expect(result.content).not.toContain("tp.file.rename");
 		expect(result.content).not.toContain("<%*");
-	});
-
-	test("handles emojis with variation selectors", () => {
-		const template: WebClipperTemplate = {
-			schemaVersion: "0.1.0",
-			name: "Test",
-			behavior: "create",
-			noteNameFormat: "✂️ {{title}}", // scissors with variation selector
-			path: "00 Inbox",
-			noteContentFormat: "# {{title}}",
-			properties: [],
-		};
-
-		const result = webClipperToTemplater(template);
-
-		expect(result.success).toBe(true);
-		expect(result.content).toContain("tp.file.rename");
-	});
-
-	test("rename script is placed at the end of template", () => {
-		const template: WebClipperTemplate = {
-			schemaVersion: "0.1.0",
-			name: "Test",
-			behavior: "create",
-			noteNameFormat: "✂️🎬 {{title}}",
-			path: "00 Inbox",
-			noteContentFormat: "# {{title}}\n\nContent here",
-			properties: [{ name: "source", value: "{{url}}", type: "text" }],
-		};
-
-		const result = webClipperToTemplater(template);
-
-		expect(result.success).toBe(true);
-		// Rename script should be at the end
-		const renameScriptStart = result.content?.indexOf("<%*");
-		const frontmatterEnd = result.content?.lastIndexOf("---");
-		expect(renameScriptStart).toBeGreaterThan(frontmatterEnd ?? -1);
-		// Content should end with the rename script closing tag
-		expect(result.content?.trimEnd()).toMatch(/-%>$/);
 	});
 });
 
