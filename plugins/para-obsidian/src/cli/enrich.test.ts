@@ -324,6 +324,7 @@ created: 2024-01-01T00:00:00Z
 			const ctx = createTestContext({
 				subcommand: "youtube",
 				positional: ["00 Inbox/test-video.md"],
+				flags: { dryRun: true },
 				isJson: true,
 			});
 
@@ -434,7 +435,7 @@ type: bookmark
 
 			const ctx = createTestContext({
 				subcommand: "youtube",
-				flags: { all: true },
+				flags: { all: true, dryRun: true },
 				isJson: true,
 			});
 
@@ -471,7 +472,7 @@ enrichedAt: 2024-01-01T00:00:00Z
 
 			const ctx = createTestContext({
 				subcommand: "youtube",
-				flags: { all: true },
+				flags: { all: true, dryRun: true },
 				isJson: true,
 			});
 
@@ -587,7 +588,7 @@ transcript_status: pending
 
 			const ctx = createTestContext({
 				subcommand: "youtube",
-				flags: { all: true },
+				flags: { all: true, dryRun: true },
 				isJson: true,
 			});
 
@@ -623,7 +624,7 @@ transcript_status: pending
 
 			const ctx = createTestContext({
 				subcommand: "youtube",
-				flags: { all: true },
+				flags: { all: true, dryRun: true },
 				isJson: true,
 			});
 
@@ -699,6 +700,7 @@ transcript_status: pending
 			const ctx = createTestContext({
 				subcommand: "youtube",
 				positional: [absolutePath],
+				flags: { dryRun: true },
 				isJson: true,
 			});
 
@@ -725,6 +727,7 @@ transcript_status: pending
 			const ctx = createTestContext({
 				subcommand: "youtube",
 				positional: ["00 Inbox/video.md"],
+				flags: { dryRun: true },
 				isJson: true,
 			});
 
