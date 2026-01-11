@@ -1,0 +1,60 @@
+{
+	"schemaVersion": "0.1.0",
+	"name": "Stack Overflow",
+	"behavior": "create",
+	"noteNameFormat": "✂️💬 {{title|safe_name|slice:0,70}}",
+	"path": "00 Inbox",
+	"context": "{{selectorHtml:#question|markdown}}",
+	"noteContentFormat": "# {{title}}\n\n## AI Summary\n\n{{\"Summarize this content in 3 concise bullet points, focusing on the key insights and actionable takeaways\"|blockquote}}\n\n---\n\n## Problem\n\n{{selector:.s-prose.js-post-body|first|markdown|slice:0,3000}}\n\n## Top Answer\n\n{{selector:.answer.accepted-answer .s-prose|first|markdown|default:\"No accepted answer - check link\"|slice:0,5000}}\n\n---\n\n**Source:** [Stack Overflow](`= this.source`)\n**Tags:** `= this.tags`",
+	"properties": [
+		{
+			"name": "type",
+			"value": "clipping",
+			"type": "text"
+		},
+		{
+			"name": "clipping_type",
+			"value": "code-reference",
+			"type": "text"
+		},
+		{
+			"name": "source",
+			"value": "{{url}}",
+			"type": "text"
+		},
+		{
+			"name": "clipped",
+			"value": "{{time|date:\"YYYY-MM-DD\"}}",
+			"type": "date"
+		},
+		{
+			"name": "tags",
+			"value": "{{selector:.post-tag|join:\", \"|default:\"\"}}",
+			"type": "text"
+		},
+		{
+			"name": "distill_status",
+			"value": "raw",
+			"type": "text"
+		},
+		{
+			"name": "related",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "project",
+			"value": "",
+			"type": "multitext"
+		},
+		{
+			"name": "area",
+			"value": "",
+			"type": "multitext"
+		}
+	],
+	"triggers": [
+		"https://stackoverflow.com/questions",
+		"https://www.stackoverflow.com/questions"
+	]
+}

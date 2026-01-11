@@ -472,6 +472,22 @@ Confluence documentation page (POS space). Content requires authentication.
 
 For text entries or short voice memos (reminders, thoughts, ideas):
 
+**Creating capture notes with content injection:**
+```
+para_create({
+  template: "capture",
+  title: "Voice Memo - 2026-01-06 9:26 AM",
+  dest: "00 Inbox",
+  args: {},
+  content: {
+    "Capture": "🎤 The raw transcription text goes here..."
+  },
+  response_format: "json"
+})
+```
+
+**CRITICAL:** The capture template uses `## Capture` heading (not "Raw Content"). Always use `"Capture"` as the key in the content object.
+
 **Reminder example** ("remind me to...", "don't forget..."):
 ```markdown
 ---
