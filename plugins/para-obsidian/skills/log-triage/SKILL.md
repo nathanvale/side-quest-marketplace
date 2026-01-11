@@ -95,8 +95,8 @@ Log entry → LLM extraction → Suggest note type → User confirms → Create 
    - Show extraction preview
    - **Ask user to confirm**
    - Create note in `00 Inbox`
-   - Delete entry from daily note
-5. **Summary** - What was created, what was skipped
+   - Replace entry with `✅ Processed → [[Note Title]]`
+5. **Summary** - What was created, what was marked as processed
 
 ## Voice Memo → Meeting Note
 
@@ -563,14 +563,22 @@ Found 3 log entries in 2026-01-06:
 
 ---
 Created: 2 meeting notes, 1 clipping
-Deleted: 3 log entries
+Marked as processed: 3 log entries
 ```
 
-## Deleting Log Entries
+## Marking Entries as Processed
 
-After creating the note, **delete the log entry** from the daily note using Edit tool.
+After creating the note, **replace the log entry** with a processed marker linking to the new note:
 
-The raw transcription is preserved in the meeting note, so nothing is lost.
+```
+Before: - 6:21 pm - https://youtube.com/watch?v=abc123
+After:  - 6:21 pm - ✅ Processed → [[📝 🎬 Video Title]]
+
+Before: - 9:26 am - 🎤 Long transcription text here...
+After:  - 9:26 am - ✅ Processed → [[🗣️ Meeting Title]]
+```
+
+This preserves a record of what was processed while keeping the log clean. The full content is in the linked note.
 
 ## Creating Notes Efficiently
 
