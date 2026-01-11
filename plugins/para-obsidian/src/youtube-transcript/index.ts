@@ -15,7 +15,7 @@
  *
  * @example
  * ```typescript
- * import { fetchYouTubeTranscript, extractVideoId } from "@sidequest/core/youtube-transcript";
+ * import { fetchYouTubeTranscript, extractVideoId } from "./youtube-transcript";
  *
  * // Fetch transcript by video ID
  * const result = await fetchYouTubeTranscript("dQw4w9WgXcQ");

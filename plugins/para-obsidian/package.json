@@ -19,7 +19,8 @@
 		"nanospinner": "^1.2.2",
 		"p-limit": "^7.2.0",
 		"turndown": "^7.2.2",
-		"yaml": "^2.6.0"
+		"yaml": "^2.6.0",
+		"youtube-captions-api": "^1.0.1"
 	},
 	"scripts": {
 		"test": "bun test --recursive",

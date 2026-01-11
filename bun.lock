@@ -22,7 +22,6 @@
         "@logtape/file": "^0.12.0",
         "@logtape/logtape": "^0.12.0",
         "@modelcontextprotocol/sdk": "^1.20.0",
-        "youtube-captions-api": "^1.0.1",
         "zod": "^3.23.8",
       },
       "devDependencies": {
@@ -170,6 +169,7 @@
         "p-limit": "^7.2.0",
         "turndown": "^7.2.2",
         "yaml": "^2.6.0",
+        "youtube-captions-api": "^1.0.1",
       },
       "devDependencies": {
         "@logtape/logtape": "^0.12.0",

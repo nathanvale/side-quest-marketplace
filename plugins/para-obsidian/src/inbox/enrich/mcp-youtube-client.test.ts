@@ -1,8 +1,8 @@
 /**
  * Tests for YouTube Transcript Client Wrapper
  *
- * Tests the wrapper module that re-exports from @sidequest/core/youtube-transcript.
- * The actual transcript fetching logic is tested in core/src/youtube-transcript/index.test.ts.
+ * Tests the wrapper module that re-exports from src/youtube-transcript.
+ * The actual transcript fetching logic is tested in src/youtube-transcript/index.test.ts.
  * This file tests the wrapper-specific behavior (logging, type re-exports).
  */
 
@@ -91,16 +91,16 @@ describe("mcp-youtube-client module", () => {
 	});
 });
 
-describe("integration with @sidequest/core", () => {
-	test("core exports are accessible through wrapper", async () => {
-		// Verify that the wrapper re-exports types from core correctly
+describe("integration with youtube-transcript module", () => {
+	test("youtube-transcript exports are accessible through wrapper", async () => {
+		// Verify that the wrapper re-exports types from youtube-transcript correctly
 		const wrapperModule = await import("./mcp-youtube-client");
-		const coreModule = await import("@sidequest/core/youtube-transcript");
+		const youtubeModule = await import("../../youtube-transcript");
 
 		// Both should export fetchYouTubeTranscript (wrapper calls it internally)
-		expect(typeof coreModule.fetchYouTubeTranscript).toBe("function");
+		expect(typeof youtubeModule.fetchYouTubeTranscript).toBe("function");
 
-		// Wrapper should have its own function that calls core
+		// Wrapper should have its own function that calls the youtube-transcript module
 		expect(typeof wrapperModule.fetchTranscriptViaMcp).toBe("function");
 	});
 });

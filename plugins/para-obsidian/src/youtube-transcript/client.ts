@@ -7,13 +7,13 @@
  * @module youtube-transcript/client
  */
 
+import { unescapeHtml } from "@sidequest/core/html";
+import { getErrorMessage, retry, safeJsonParse } from "@sidequest/core/utils";
 import {
 	NoTranscriptFound,
 	TranscriptsDisabled,
 	YouTubeTranscriptApi,
 } from "youtube-captions-api";
-import { unescapeHtml } from "../html/index";
-import { getErrorMessage, retry, safeJsonParse } from "../utils/index";
 import { YouTubeTranscriptError } from "./errors";
 import {
 	formatTranscriptAsPlainText,
@@ -73,7 +73,7 @@ async function fetchVideoTitle(videoId: string): Promise<string> {
  *
  * @example
  * ```typescript
- * import { fetchYouTubeTranscript } from "@sidequest/core/youtube-transcript";
+ * import { fetchYouTubeTranscript } from "./youtube-transcript";
  *
  * const result = await fetchYouTubeTranscript("dQw4w9WgXcQ");
  * console.log(result.title);      // "Rick Astley - Never Gonna Give You Up"

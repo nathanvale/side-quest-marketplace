@@ -9,13 +9,13 @@
  * @module inbox/enrich/mcp-youtube-client
  */
 
+import { enrichLogger } from "../../shared/logger";
 import {
 	fetchYouTubeTranscript,
 	type TranscriptFormatOptions,
 	type TranscriptSegment,
 	type YouTubeTranscriptResult,
-} from "@sidequest/core/youtube-transcript";
-import { enrichLogger } from "../../shared/logger";
+} from "../../youtube-transcript";
 
 // Re-export types for backward compatibility
 export type {
