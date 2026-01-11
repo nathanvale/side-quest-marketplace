@@ -22,6 +22,7 @@ import { generateUniqueNotePath } from "../inbox/core/engine-utils";
 import { resolveVaultPath } from "../shared/fs";
 import {
 	applyDateSubstitutions,
+	applyFileSubstitutions,
 	detectTitlePromptKey,
 	getTemplate,
 } from "../templates/index";
@@ -349,10 +350,12 @@ export function createFromTemplate(
 
 	// Apply template substitutions:
 	// 1. First, replace all date patterns (tp.date.now) with actual dates
-	// 2. Then, replace all prompt patterns (tp.system.prompt) with provided args
+	// 2. Then, replace file-related patterns (tp.file.title, script blocks)
+	// 3. Finally, replace all prompt patterns (tp.system.prompt) with provided args
 	//    - Auto-detect the title prompt key (e.g., "Title", "Project title", "Resource title")
 	//    - Inject displayTitle using the detected key for automatic substitution
 	let filled = applyDateSubstitutions(tpl.content);
+	filled = applyFileSubstitutions(filled, displayTitle);
 	const titleKey = detectTitlePromptKey(tpl);
 	const argsWithTitle = { [titleKey]: displayTitle, ...options.args };
 	filled = applyArgsToTemplate(filled, argsWithTitle);

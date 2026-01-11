@@ -4,6 +4,7 @@ import { addDays, format } from "date-fns";
 import { createTestTemplate } from "../testing/utils";
 import {
 	applyDateSubstitutions,
+	applyFileSubstitutions,
 	convertTemplaterFormat,
 	detectTitlePromptKey,
 	extractSourceHeadings,
@@ -640,5 +641,76 @@ describe("suggestSectionMapping", () => {
 		expect(["Next Steps", "Action Items", "To-Do List"]).toContain(
 			tasksMatch ?? "",
 		);
+	});
+});
+
+describe("applyFileSubstitutions", () => {
+	test("replaces tp.file.title with actual title", () => {
+		const input = "# <% tp.file.title %>";
+		const result = applyFileSubstitutions(input, "My Project");
+		expect(result).toBe("# My Project");
+	});
+
+	test("handles tp.file.title with extra whitespace", () => {
+		const input = "#  <%  tp.file.title  %>";
+		const result = applyFileSubstitutions(input, "Test Title");
+		expect(result).toBe("#  Test Title");
+	});
+
+	test("replaces multiple tp.file.title occurrences", () => {
+		const input = "# <% tp.file.title %>\n\nSee also: <% tp.file.title %>";
+		const result = applyFileSubstitutions(input, "My Note");
+		expect(result).toBe("# My Note\n\nSee also: My Note");
+	});
+
+	test("strips Templater script blocks with -%> ending", () => {
+		const input = `Content here
+
+<%*
+const title = tp.file.title;
+if (!title.startsWith("🎯")) {
+  await tp.file.rename("🎯 " + title);
+}
+-%>`;
+		const result = applyFileSubstitutions(input, "Title");
+		expect(result).toBe("Content here\n\n");
+	});
+
+	test("strips Templater script blocks with %> ending", () => {
+		const input = `# Title
+
+<%*
+await tp.file.rename("New Name");
+%>
+
+More content`;
+		const result = applyFileSubstitutions(input, "Title");
+		expect(result).toBe("# Title\n\n\n\nMore content");
+	});
+
+	test("handles multiple script blocks", () => {
+		const input = `<%* const x = 1; -%>
+# <% tp.file.title %>
+<%* const y = 2; %>`;
+		const result = applyFileSubstitutions(input, "My Title");
+		expect(result).toBe("\n# My Title\n");
+	});
+
+	test("preserves content without Templater patterns", () => {
+		const input = "# Regular Title\n\nSome content";
+		const result = applyFileSubstitutions(input, "Unused Title");
+		expect(result).toBe("# Regular Title\n\nSome content");
+	});
+
+	test("handles empty title", () => {
+		const input = "# <% tp.file.title %>";
+		const result = applyFileSubstitutions(input, "");
+		expect(result).toBe("# ");
+	});
+
+	test("handles title with special characters", () => {
+		const input = "# <% tp.file.title %>";
+		const result = applyFileSubstitutions(input, "🎯 Project: Test & Demo");
+		expect(result).toBe("# 🎯 Project: Test & Demo");
 	});
 });
