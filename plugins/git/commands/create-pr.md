@@ -88,9 +88,7 @@ gh pr create --title "<type>(<scope>): <subject>" --body "$(cat <<'EOF'
 - [ ] <Testing checklist item>
 - [ ] <Another testing item>
 
----
 
-Generated with [Claude Code](https://claude.ai/code)
 EOF
 )"
 ```
