@@ -57,6 +57,36 @@ export interface YouTubeEnrichment {
 }
 
 /**
+ * Clipping type values for web clips.
+ */
+export type ClippingType =
+	| "article"
+	| "youtube"
+	| "recipe"
+	| "product"
+	| "github"
+	| "documentation"
+	| "social"
+	| "podcast"
+	| "book"
+	| "generic";
+
+/**
+ * Result of classifying a raw web clipping.
+ * Sets the clipping_type field for downstream enrichment.
+ */
+export interface ClippingClassificationEnrichment {
+	/** Classified clipping type */
+	readonly clippingType: ClippingType;
+
+	/** ISO timestamp of when classification was performed */
+	readonly classifiedAt: string;
+
+	/** YouTube video ID (if clipping_type is "youtube") */
+	readonly videoId?: string;
+}
+
+/**
  * Options for bookmark enrichment.
  */
 export interface EnrichmentOptions {
@@ -234,6 +264,10 @@ export interface EnrichmentEligibility {
 export type EnrichmentResult =
 	| { readonly type: "bookmark"; readonly data: BookmarkEnrichment }
 	| { readonly type: "youtube"; readonly data: YouTubeEnrichment }
+	| {
+			readonly type: "clipping-classification";
+			readonly data: ClippingClassificationEnrichment;
+	  }
 	| { readonly type: "none"; readonly reason: string };
 
 /**

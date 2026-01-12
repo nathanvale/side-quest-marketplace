@@ -173,6 +173,9 @@ export interface CreateNoteSuggestion extends BaseSuggestion {
 
 	/** Source of truth strategy from classifier */
 	readonly sourceOfTruth?: "markdown" | "binary";
+
+	/** User-provided capture reason (why they saved this clipping) */
+	readonly captureReason?: string;
 }
 
 /**

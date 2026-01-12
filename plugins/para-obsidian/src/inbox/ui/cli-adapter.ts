@@ -13,6 +13,7 @@ import type {
 	BatchResult,
 	CLICommand,
 	Confidence,
+	CreateNoteSuggestion,
 	DetectionSource,
 	InboxEngine,
 	InboxSuggestion,
@@ -1053,6 +1054,44 @@ export async function runInteractiveLoop(
 						}
 
 						if (!approved.has(targetSuggestion.id)) {
+							// Check if this is a raw clipping - prompt for capture reason
+							if (
+								isCreateNoteSuggestion(targetSuggestion) &&
+								targetSuggestion.suggestedNoteType === "clipping"
+							) {
+								const extractedFields = targetSuggestion.extractedFields ?? {};
+								const distillStatus = extractedFields.distill_status as
+									| string
+									| undefined;
+
+								// Prompt if distill_status is "raw" or missing (backward compat)
+								if (distillStatus === "raw" || distillStatus === undefined) {
+									const captureReasonInput = await input({
+										message: "Why did you save this? (Enter to skip):",
+									});
+
+									const captureReason = captureReasonInput.trim();
+									if (captureReason) {
+										// Create updated suggestion with captureReason
+										const updatedSuggestion: CreateNoteSuggestion = {
+											...targetSuggestion,
+											captureReason,
+										};
+
+										// Update in our list
+										const originalIndex = currentSuggestions.findIndex(
+											(s) => s.id === targetSuggestion.id,
+										);
+										if (originalIndex >= 0) {
+											currentSuggestions[originalIndex] = updatedSuggestion;
+										}
+
+										// Update suggestionById map
+										suggestionById.set(updatedSuggestion.id, updatedSuggestion);
+									}
+								}
+							}
+
 							approved.add(targetSuggestion.id);
 							approvalHistory.push(targetSuggestion.id);
 							newlyApproved.push(targetSuggestion.id);

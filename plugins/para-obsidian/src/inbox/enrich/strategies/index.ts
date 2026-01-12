@@ -12,6 +12,20 @@ export {
 } from "./bookmark-strategy";
 
 export {
+	applyClippingClassification,
+	clippingClassificationStrategy,
+} from "./clipping-strategy";
+
+export {
+	CLIPPING_TYPE_EMOJI,
+	type ClippingType,
+	CONTENT_MARKERS,
+	classifyClipping,
+	extractYouTubeVideoId,
+	URL_PATTERNS,
+} from "./clipping-types";
+
+export {
 	applyYouTubeEnrichment,
 	YouTubeEnrichmentError,
 	type YouTubeErrorCode,

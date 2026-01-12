@@ -155,6 +155,11 @@ export async function createNoteFromSuggestion(
 		// Area and project fields are left empty - user fills them in manually in Obsidian
 		// No longer auto-suggesting or auto-routing based on LLM classification
 
+		// Add capture reason if provided (Phase 3 feature for raw clippings)
+		if (suggestion.captureReason) {
+			args.capture_reason = suggestion.captureReason;
+		}
+
 		// Create the note
 		// For Type A documents (sourceOfTruth: "markdown"), suggestedContent contains
 		// the extracted markdown to embed in the note body via {{content}} placeholder

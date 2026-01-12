@@ -1,20 +1,144 @@
 ---
 name: webclipper-templates
-description: Export and manage Obsidian Web Clipper JSON templates. Use when creating, editing, debugging, or exporting Web Clipper templates. Covers filter syntax, special character escaping, replace filters with URLs, and the export workflow from source JSON to individual template files.
+description: Web Clipper template management for ADHD-friendly capture workflow. Single universal template with zero-decision capture, automatic classification, and deferred organization. Use for template installation, understanding the capture pipeline, or troubleshooting Web Clipper issues.
 ---
 
-# Obsidian Web Clipper Templates
+# Web Clipper Templates
 
-## CRITICAL RULES
+**ADHD-friendly web clipping: Capture now, organize later.**
 
-1. **JSON templates use `{{variable}}` syntax** - NOT Dataview (`` `= this.field` ``)
-2. **Special characters in `replace` filter search terms must be escaped**: `: | { } ( ) ' "`
-3. **URLs in replace filters require regex syntax** - plain string replacement breaks on `://`
-4. **Always add `|trim` after `|safe_name`** in noteNameFormat to prevent trailing whitespace
+---
 
-## Quick Reference
+## Philosophy
 
-### Filter Syntax
+Traditional web clippers require decisions at capture time:
+- Which template to use?
+- Is this a recipe or an article?
+- Should I tag it now?
+
+This cognitive load fights against ADHD brains. Our approach: **capture everything with zero decisions, classify automatically during review.**
+
+---
+
+## The Single Template Approach
+
+One template (`capture.json`) captures everything to `00 Inbox/` with minimal metadata:
+
+```yaml
+type: clipping
+source: <url>
+clipped: <date>
+domain: <domain>
+distill_status: raw
+```
+
+No decisions required. No analysis paralysis. Just capture.
+
+---
+
+## Classification Pipeline
+
+```
+Capture          →    para scan     →   para enrich   →   para execute
+(Web Clipper)         (classify)        (transcripts)     (templates)
+```
+
+### 1. Capture (Web Clipper)
+- Use single Capture template
+- Zero decisions required
+- All clips go to `00 Inbox/`
+
+### 2. Classify (para scan)
+Automatic detection from URL patterns and content:
+
+| Type | Detected From |
+|------|---------------|
+| 🎬 youtube | youtube.com, youtu.be |
+| 🐙 github | github.com |
+| 💬 social | twitter.com, reddit.com |
+| 📚 documentation | docs.*, developer.* |
+| 🍳 recipe | Recipe sites, ingredients |
+| 🛍️ product | amazon, ebay, prices |
+| 🎧 podcast | spotify episodes, apple podcasts |
+| 📖 book | goodreads |
+| 📰 article | Default for articles |
+| ✂️ generic | Fallback |
+
+### 3. Review Prompt
+During interactive review, you're asked:
+> "Why did you save this? (Enter to skip)"
+
+Optional - stored in frontmatter as `capture_reason`.
+
+### 4. Enrich (para enrich)
+- YouTube clips get transcripts (via Firecrawl)
+- Bookmark clips get full page content
+- Other enrichments as needed
+
+### 5. Execute (para execute)
+- Apply vault templates
+- Add emoji prefixes
+- Move to final location
+
+---
+
+## Installing the Template
+
+1. Open Obsidian Web Clipper settings
+2. Go to Templates section
+3. Import `capture.json`
+4. Set as default template
+
+---
+
+## Template Location
+
+```
+plugins/para-obsidian/templates/webclipper/capture.json
+```
+
+---
+
+## Archived Templates
+
+Previous 15 specialized templates are in `archived/` for reference.
+They were replaced to reduce decision fatigue at capture time.
+
+---
+
+## Troubleshooting
+
+| Issue | Fix |
+|-------|-----|
+| Template won't import | Check JSON syntax with `jq` |
+| Clippings not in inbox | Verify path is set to `00 Inbox` |
+| Missing metadata | Re-import template (Web Clipper caches) |
+
+---
+
+## Technical Notes
+
+### JSON Template Structure
+
+```json
+{
+  "schemaVersion": "0.1.0",
+  "name": "Capture",
+  "behavior": "create",
+  "noteNameFormat": "{{domain|safe_name|trim}} {{date:YYYY-MM-DD-HHmmss}}",
+  "path": "00 Inbox",
+  "noteContentFormat": "# {{title}}\n\nContent here...",
+  "properties": [
+    {
+      "name": "type",
+      "value": "clipping",
+      "type": "text"
+    }
+  ]
+}
+```
+
+### Filter Syntax Quick Reference
 
 ```
 {{variable|filter}}
@@ -24,107 +148,23 @@ description: Export and manage Obsidian Web Clipper JSON templates. Use when cre
 {{variable|replace:"/regex/":"replace"}}  # Regex replacement
 ```
 
-### Escaping Special Characters
+### Common Filters
 
-In the **search term** of `replace` filters, escape these with backslash:
-- `:` → `\:`
-- `|` → `\|`
-- `{` `}` → `\{` `\}`
-- `(` `)` → `\(` `\)`
-- `'` `"` → `\'` `\"`
+- `safe_name` - Convert to safe filename
+- `trim` - Remove leading/trailing whitespace
+- `date:"YYYY-MM-DD"` - Format date
+- `replace:"search":"replace"` - Replace text
 
-### URLs in Replace Filters - USE REGEX
-
-**WRONG** (causes import failure):
-```
-{{field|replace:"https://schema.org/":""}}
-```
-
-**CORRECT** (use regex to avoid colon parsing issues):
-```
-{{field|replace:"/https:\/\/schema\.org\//":""}}
-```
-
-In JSON, this becomes (double backslash for JSON escaping):
-```json
-"{{field|replace:\"/https:\\/\\/schema\\.org\\//:\"\"}}\"
-```
-
----
-
-## Export Workflow
-
-### Source File
-`~/code/my-second-brain/Templates/Clippings/web-clipper-all-templates.json`
-
-### Export Script Location
-`${CLAUDE_PLUGIN_ROOT}/skills/webclipper-templates/references/export-script.cjs`
-
-### Export Command
-```bash
-rm -rf ~/Downloads/webclipper-templates && \
-mkdir ~/Downloads/webclipper-templates && \
-node ${CLAUDE_PLUGIN_ROOT}/skills/webclipper-templates/references/export-script.cjs
-```
-
-### Import Templates
-1. Open Obsidian Web Clipper settings
-2. Go to Templates section
-3. Click Import
-4. Select files from `~/Downloads/webclipper-templates/`
-
----
-
-## Common Issues & Fixes
-
-| Issue | Cause | Fix |
-|-------|-------|-----|
-| "Error importing template" | Special chars in replace filter | Use regex syntax for URLs |
-| Trailing spaces in filename | Missing `\|trim` | Add `\|safe_name\|trim}}` |
-| Markdown tables broken | Overly aggressive regex cleanup | Don't strip spaces around `\|` in table syntax |
-| `#` appearing in output | Literal `#` before `{{variable}}` | Remove `#` or escape it |
-| Dataview syntax in JSON | Wrong syntax for Web Clipper | Replace `` `= this.field` `` with `{{property_value}}` |
-
----
-
-## Template JSON Schema
-
-```json
-{
-  "schemaVersion": "0.1.0",
-  "name": "Template Name",
-  "behavior": "create",
-  "noteNameFormat": "{{title|safe_name|trim}}",
-  "path": "00 Inbox",
-  "noteContentFormat": "# {{title}}\n\nContent here...",
-  "properties": [
-    {
-      "name": "field_name",
-      "value": "{{variable|filter}}",
-      "type": "text"
-    }
-  ],
-  "triggers": [
-    "schema:@Article",
-    "https://example.com"
-  ]
-}
-```
-
-### Property Types
-- `text` - Plain text
-- `number` - Numeric value
-- `date` - Date value (use `|date:"YYYY-MM-DD"` filter)
-- `multitext` - Array of values
+**CRITICAL:** Always add `|trim` after `|safe_name` in noteNameFormat to prevent trailing whitespace.
 
 ---
 
 ## References
 
-Load these for detailed information:
+For advanced usage and troubleshooting:
 
-- **Filter syntax**: `./references/filter-syntax.md` - Complete filter reference with examples
-- **Export script**: `./references/export-script.cjs` - The v8 export script with URL regex fix
+- **Filter syntax**: `./references/filter-syntax.md` - Complete filter reference
+- **Export script**: `./references/export-script.cjs` - Template export utility
 - **Troubleshooting**: `./references/troubleshooting.md` - Detailed debugging guide
 
 ---
