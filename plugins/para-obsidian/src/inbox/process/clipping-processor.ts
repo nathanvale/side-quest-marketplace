@@ -144,41 +144,44 @@ function addEmojiPrefix(filename: string, type: ClippingType): string {
 }
 
 /**
- * Parse clipping content to extract highlights and content sections.
+ * Parse clipping content to extract content section and highlight count.
  *
- * Note: Highlights clip detection is now done via frontmatter `highlight_count` property,
- * not by parsing sections. This function is retained for extracting section content.
+ * The highlight count is embedded as an HTML comment at the end of the content:
+ * `<!-- highlights:4 -->` for 4 highlights, `<!-- highlights:0 -->` for full page clip.
  *
  * @param content - Raw markdown content (body without frontmatter)
- * @returns Parsed sections (highlights and content)
+ * @returns Parsed content section and highlight count
  *
  * @example
  * ```typescript
  * const parsed = parseClippingSections(content);
- * console.log(parsed.contentSection);
+ * if (parsed.highlightCount > 0) {
+ *   // This is a highlights clip - preserve user's curated content
+ * }
  * ```
  */
 export function parseClippingSections(content: string): {
-	highlights: string;
 	contentSection: string;
+	highlightCount: number;
 } {
-	// Find ## Highlights section
-	// Use [ \t]* instead of \s* to avoid consuming newlines before content
-	const highlightsMatch = content.match(
-		/## Highlights[ \t]*\n([\s\S]*?)(?=\n+---\n|\n## |\n# |$)/,
-	);
-	const highlights = highlightsMatch?.[1]?.trim() || "";
+	// Extract highlight count from HTML comment marker
+	// Format: <!-- highlights:N --> where N is the count
+	const highlightMatch = content.match(/<!--\s*highlights:(\d+)\s*-->/);
+	const highlightCount =
+		highlightMatch?.[1] !== undefined
+			? Number.parseInt(highlightMatch[1], 10)
+			: 0;
 
 	// Find ## Content section
 	// Use [ \t]* instead of \s* to avoid consuming newlines before content
 	const contentMatch = content.match(
-		/## Content[ \t]*\n([\s\S]*?)(?=\n## |\n# |$)/,
+		/## Content[ \t]*\n([\s\S]*?)(?=\n<!-- highlights:|\n## |\n# |$)/,
 	);
 	const contentSection = contentMatch?.[1]?.trim() || "";
 
 	return {
-		highlights,
 		contentSection,
+		highlightCount,
 	};
 }
 
@@ -720,19 +723,14 @@ export async function processClipping(
 					log.info`inbox:processClipping:start cid=${cid} file=${filePath} title=${title}`;
 				}
 
-				// 2. Detect if this is a highlights clip using frontmatter
-				// Web Clipper sets highlight_count > 0 when user highlighted content
+				// 2. Detect if this is a highlights clip using the HTML comment marker
+				// Format: <!-- highlights:N --> where N > 0 means highlights clip
 				// The {{content}} variable already contains either highlights or full page content
-				const highlightCount =
-					typeof frontmatter.highlight_count === "number"
-						? frontmatter.highlight_count
-						: typeof frontmatter.highlight_count === "string"
-							? Number.parseInt(frontmatter.highlight_count, 10) || 0
-							: 0;
-				const isHighlightsClip = highlightCount > 0;
+				const parsed = parseClippingSections(content);
+				const isHighlightsClip = parsed.highlightCount > 0;
 
 				if (options.verbose && log) {
-					log.info`inbox:processClipping:parsed cid=${cid} file=${filePath} isHighlightsClip=${isHighlightsClip} highlightCount=${highlightCount}`;
+					log.info`inbox:processClipping:parsed cid=${cid} file=${filePath} isHighlightsClip=${isHighlightsClip} highlightCount=${parsed.highlightCount}`;
 				}
 
 				// 3. Detect type - use explicit clipping_type if set, otherwise classify
