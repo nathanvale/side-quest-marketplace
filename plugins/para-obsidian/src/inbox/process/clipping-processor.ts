@@ -145,23 +145,22 @@ function addEmojiPrefix(filename: string, type: ClippingType): string {
 
 /**
  * Parse clipping content to extract highlights and content sections.
- * Detects whether the clipping is a highlights-only clip based on section content.
+ *
+ * Note: Highlights clip detection is now done via frontmatter `highlight_count` property,
+ * not by parsing sections. This function is retained for extracting section content.
  *
  * @param content - Raw markdown content (body without frontmatter)
- * @returns Parsed sections with isHighlightsClip flag
+ * @returns Parsed sections (highlights and content)
  *
  * @example
  * ```typescript
  * const parsed = parseClippingSections(content);
- * if (parsed.isHighlightsClip) {
- *   // User curated highlights - preserve them
- * }
+ * console.log(parsed.contentSection);
  * ```
  */
 export function parseClippingSections(content: string): {
 	highlights: string;
 	contentSection: string;
-	isHighlightsClip: boolean;
 } {
 	// Find ## Highlights section
 	// Use [ \t]* instead of \s* to avoid consuming newlines before content
@@ -177,36 +176,9 @@ export function parseClippingSections(content: string): {
 	);
 	const contentSection = contentMatch?.[1]?.trim() || "";
 
-	// Normalize content for comparison by stripping bullet prefixes and extra whitespace
-	// This handles Web Clipper quirks like double-dashes (- - item) or formatting differences
-	const normalizeForComparison = (text: string): string =>
-		text
-			.split("\n")
-			.map((line) => line.replace(/^[\s\-*•]+/, "").trim())
-			.filter((line) => line.length > 0)
-			.join("\n");
-
-	const normalizedHighlights = normalizeForComparison(highlights);
-	const normalizedContent = normalizeForComparison(contentSection);
-
-	// It's a highlights clip if:
-	// 1. Highlights section has actual content (not just whitespace)
-	// 2. Content is either empty OR matches the highlights (Web Clipper sets content to highlights when highlighting)
-	const hasHighlights = highlights.length > 0;
-	const contentIsEmpty = contentSection.length === 0;
-	const contentMatchesHighlights =
-		normalizedContent === normalizedHighlights ||
-		// Web Clipper sometimes wraps highlights in the content section too
-		normalizedContent.includes(normalizedHighlights) ||
-		normalizedHighlights.includes(normalizedContent);
-
-	const isHighlightsClip =
-		hasHighlights && (contentIsEmpty || contentMatchesHighlights);
-
 	return {
 		highlights,
 		contentSection,
-		isHighlightsClip,
 	};
 }
 
@@ -748,13 +720,19 @@ export async function processClipping(
 					log.info`inbox:processClipping:start cid=${cid} file=${filePath} title=${title}`;
 				}
 
-				// 2. Parse content to detect highlights vs full page clip
-				// This determines whether we use Firecrawl or preserve user's curated content
-				const parsedSections = parseClippingSections(content);
-				const isHighlightsClip = parsedSections.isHighlightsClip;
+				// 2. Detect if this is a highlights clip using frontmatter
+				// Web Clipper sets highlight_count > 0 when user highlighted content
+				// The {{content}} variable already contains either highlights or full page content
+				const highlightCount =
+					typeof frontmatter.highlight_count === "number"
+						? frontmatter.highlight_count
+						: typeof frontmatter.highlight_count === "string"
+							? Number.parseInt(frontmatter.highlight_count, 10) || 0
+							: 0;
+				const isHighlightsClip = highlightCount > 0;
 
 				if (options.verbose && log) {
-					log.info`inbox:processClipping:parsed cid=${cid} file=${filePath} isHighlightsClip=${isHighlightsClip} highlightsLen=${parsedSections.highlights.length} contentLen=${parsedSections.contentSection.length}`;
+					log.info`inbox:processClipping:parsed cid=${cid} file=${filePath} isHighlightsClip=${isHighlightsClip} highlightCount=${highlightCount}`;
 				}
 
 				// 3. Detect type - use explicit clipping_type if set, otherwise classify
@@ -829,10 +807,10 @@ export async function processClipping(
 				}
 
 				// 5. Generate summary (LLM-powered)
-				// For highlights clips: use the highlights as source of truth
+				// For highlights clips: content already contains the highlights (Web Clipper behavior)
 				// For full page clips: use enriched content if available
 				const contentForSummary = isHighlightsClip
-					? parsedSections.highlights
+					? content
 					: enrichment.scrapedContent || enrichment.transcript || content;
 
 				if (options.verbose && log && isHighlightsClip) {
