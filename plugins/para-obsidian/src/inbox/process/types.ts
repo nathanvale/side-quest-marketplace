@@ -62,6 +62,12 @@ export interface ClippingFrontmatter {
 	capture_reason?: string;
 	/** Number of highlights in the clipping (0 = full page, >0 = highlights only). Can be string or number depending on YAML parsing. */
 	highlight_count?: number | string;
+	/**
+	 * Optional explicit clipping type set by Web Clipper.
+	 * When set, skips auto-classification and uses this type directly.
+	 * Valid values: youtube, recipe, restaurant, accommodation, article, etc.
+	 */
+	clipping_type?: string;
 }
 
 /**

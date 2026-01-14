@@ -681,11 +681,24 @@ export async function processClipping(
 					log.info`inbox:processClipping:start cid=${cid} file=${filePath} title=${title}`;
 				}
 
-				// 2. Detect type (initial classification from URL + content)
-				let type = classifyClipping(frontmatter.source, content);
+				// 2. Detect type - use explicit clipping_type if set, otherwise classify
+				let type: ClippingType;
+				const explicitType = frontmatter.clipping_type as
+					| ClippingType
+					| undefined;
 
-				if (options.verbose && log) {
-					log.info`inbox:processClipping:classified cid=${cid} file=${filePath} type=${type}`;
+				if (explicitType) {
+					// User specified type in Web Clipper - use it directly
+					type = explicitType;
+					if (options.verbose && log) {
+						log.info`inbox:processClipping:explicitType cid=${cid} file=${filePath} type=${type}`;
+					}
+				} else {
+					// No explicit type - classify from URL + content
+					type = classifyClipping(frontmatter.source, content);
+					if (options.verbose && log) {
+						log.info`inbox:processClipping:classified cid=${cid} file=${filePath} type=${type}`;
+					}
 				}
 
 				// 3. Enrich (unless skipped)
