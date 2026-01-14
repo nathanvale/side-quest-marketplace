@@ -144,6 +144,60 @@ function addEmojiPrefix(filename: string, type: ClippingType): string {
 }
 
 /**
+ * Parse clipping content to extract highlights and content sections.
+ * Detects whether the clipping is a highlights-only clip based on section content.
+ *
+ * @param content - Raw markdown content (body without frontmatter)
+ * @returns Parsed sections with isHighlightsClip flag
+ *
+ * @example
+ * ```typescript
+ * const parsed = parseClippingSections(content);
+ * if (parsed.isHighlightsClip) {
+ *   // User curated highlights - preserve them
+ * }
+ * ```
+ */
+export function parseClippingSections(content: string): {
+	highlights: string;
+	contentSection: string;
+	isHighlightsClip: boolean;
+} {
+	// Find ## Highlights section
+	// Use [ \t]* instead of \s* to avoid consuming newlines before content
+	const highlightsMatch = content.match(
+		/## Highlights[ \t]*\n([\s\S]*?)(?=\n+---\n|\n## |\n# |$)/,
+	);
+	const highlights = highlightsMatch?.[1]?.trim() || "";
+
+	// Find ## Content section
+	// Use [ \t]* instead of \s* to avoid consuming newlines before content
+	const contentMatch = content.match(
+		/## Content[ \t]*\n([\s\S]*?)(?=\n## |\n# |$)/,
+	);
+	const contentSection = contentMatch?.[1]?.trim() || "";
+
+	// It's a highlights clip if:
+	// 1. Highlights section has actual content (not just whitespace)
+	// 2. Content is either empty OR matches the highlights (Web Clipper sets content to highlights when highlighting)
+	const hasHighlights = highlights.length > 0;
+	const contentIsEmpty = contentSection.length === 0;
+	const contentMatchesHighlights =
+		contentSection === highlights ||
+		// Web Clipper sometimes wraps highlights in the content section too
+		contentSection.includes(highlights);
+
+	const isHighlightsClip =
+		hasHighlights && (contentIsEmpty || contentMatchesHighlights);
+
+	return {
+		highlights,
+		contentSection,
+		isHighlightsClip,
+	};
+}
+
+/**
  * Find all clipping notes in the inbox.
  * Looks for notes with type:clipping in frontmatter.
  *
@@ -681,7 +735,16 @@ export async function processClipping(
 					log.info`inbox:processClipping:start cid=${cid} file=${filePath} title=${title}`;
 				}
 
-				// 2. Detect type - use explicit clipping_type if set, otherwise classify
+				// 2. Parse content to detect highlights vs full page clip
+				// This determines whether we use Firecrawl or preserve user's curated content
+				const parsedSections = parseClippingSections(content);
+				const isHighlightsClip = parsedSections.isHighlightsClip;
+
+				if (options.verbose && log) {
+					log.info`inbox:processClipping:parsed cid=${cid} file=${filePath} isHighlightsClip=${isHighlightsClip} highlightsLen=${parsedSections.highlights.length} contentLen=${parsedSections.contentSection.length}`;
+				}
+
+				// 3. Detect type - use explicit clipping_type if set, otherwise classify
 				let type: ClippingType;
 				const explicitType = frontmatter.clipping_type as
 					| ClippingType
@@ -701,20 +764,26 @@ export async function processClipping(
 					}
 				}
 
-				// 3. Enrich (unless skipped)
+				// 4. Enrich (unless skipped OR this is a highlights clip)
+				// For highlights clips, user's curated content is the source of truth - skip Firecrawl
 				let enrichment: ClippingEnrichment = {
 					enrichmentSource: "none",
 					enrichmentStatus: "skipped",
 				};
 
-				if (!options.skipEnrichment) {
+				if (isHighlightsClip) {
+					// Highlights clip - skip external enrichment, preserve user content
+					if (options.verbose && log) {
+						log.info`inbox:processClipping:skipEnrichment cid=${cid} file=${filePath} reason=highlightsClip`;
+					}
+				} else if (!options.skipEnrichment) {
 					enrichment = await enrichClipping(frontmatter, content, type, cid);
 
 					if (options.verbose && log) {
 						log.info`inbox:processClipping:enriched cid=${cid} file=${filePath} status=${enrichment.enrichmentStatus} source=${enrichment.enrichmentSource}`;
 					}
 
-					// 3a. Re-classify from metadata if initially generic
+					// 4a. Re-classify from metadata if initially generic
 					// Firecrawl scrape returns OG/meta tags that may indicate restaurant, etc.
 					if (
 						type === "generic" &&
@@ -746,31 +815,15 @@ export async function processClipping(
 					}
 				}
 
-				// 4. Generate summary (LLM-powered)
-				// Use enriched content if available (Firecrawl scraped content or YouTube transcript)
-				// This provides better context for summary generation than just the original clipping
-				const contentForSummary =
-					enrichment.scrapedContent || enrichment.transcript || content;
+				// 5. Generate summary (LLM-powered)
+				// For highlights clips: use the highlights as source of truth
+				// For full page clips: use enriched content if available
+				const contentForSummary = isHighlightsClip
+					? parsedSections.highlights
+					: enrichment.scrapedContent || enrichment.transcript || content;
 
-				// Determine if this is a highlights-only clipping
-				// When highlight_count > 0, user curated specific text - treat differently
-				const rawHighlightCount = (
-					frontmatter as unknown as Record<string, unknown>
-				).highlight_count as number | string | undefined;
-				// Parse highlight_count - can be number or string from YAML
-				const highlightCount =
-					typeof rawHighlightCount === "number"
-						? rawHighlightCount
-						: typeof rawHighlightCount === "string"
-							? Number.parseInt(rawHighlightCount, 10)
-							: undefined;
-				const isHighlightsOnly =
-					typeof highlightCount === "number" &&
-					!Number.isNaN(highlightCount) &&
-					highlightCount > 0;
-
-				if (options.verbose && log && isHighlightsOnly) {
-					log.info`inbox:processClipping:highlightsMode cid=${cid} file=${filePath} highlightCount=${highlightCount}`;
+				if (options.verbose && log && isHighlightsClip) {
+					log.info`inbox:processClipping:highlightsMode cid=${cid} file=${filePath} usingHighlightsForSummary=true`;
 				}
 
 				const summaryResult = await generateSummary(
@@ -780,7 +833,7 @@ export async function processClipping(
 						content: contentForSummary,
 						transcript: enrichment.transcript,
 						videoDescription: enrichment.videoDescription,
-						isHighlightsOnly,
+						isHighlightsOnly: isHighlightsClip,
 					},
 					cid,
 				);
