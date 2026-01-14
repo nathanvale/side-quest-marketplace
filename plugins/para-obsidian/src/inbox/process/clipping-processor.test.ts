@@ -143,4 +143,37 @@ Just content, no highlights section at all.`;
 		expect(result.highlights).toBe("");
 		expect(result.contentSection).toContain("Good for kids");
 	});
+
+	test("detects highlights clip when Web Clipper adds double-dash formatting", () => {
+		// Real-world case: Web Clipper sometimes adds extra dashes to list items
+		const content = `# \`= this.file.name\`
+
+**Source:** [google.com](https://example.com)
+**Clipped:** 2026-01-14 18:59
+
+---
+
+## Highlights
+
+- - Good for kids
+- Good for kids birthday
+- Kid-friendly hikes
+- Playground
+
+---
+
+## Content
+
+- Good for kids
+- Good for kids birthday
+- Kid-friendly hikes
+- Playground`;
+
+		const result = parseClippingSections(content);
+
+		// Despite formatting differences (double-dash in highlights), should detect as highlights clip
+		// because the actual text content is the same
+		expect(result.isHighlightsClip).toBe(true);
+		expect(result.highlights).toContain("Good for kids");
+	});
 });

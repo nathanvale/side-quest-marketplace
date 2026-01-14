@@ -177,15 +177,28 @@ export function parseClippingSections(content: string): {
 	);
 	const contentSection = contentMatch?.[1]?.trim() || "";
 
+	// Normalize content for comparison by stripping bullet prefixes and extra whitespace
+	// This handles Web Clipper quirks like double-dashes (- - item) or formatting differences
+	const normalizeForComparison = (text: string): string =>
+		text
+			.split("\n")
+			.map((line) => line.replace(/^[\s\-*•]+/, "").trim())
+			.filter((line) => line.length > 0)
+			.join("\n");
+
+	const normalizedHighlights = normalizeForComparison(highlights);
+	const normalizedContent = normalizeForComparison(contentSection);
+
 	// It's a highlights clip if:
 	// 1. Highlights section has actual content (not just whitespace)
 	// 2. Content is either empty OR matches the highlights (Web Clipper sets content to highlights when highlighting)
 	const hasHighlights = highlights.length > 0;
 	const contentIsEmpty = contentSection.length === 0;
 	const contentMatchesHighlights =
-		contentSection === highlights ||
+		normalizedContent === normalizedHighlights ||
 		// Web Clipper sometimes wraps highlights in the content section too
-		contentSection.includes(highlights);
+		normalizedContent.includes(normalizedHighlights) ||
+		normalizedHighlights.includes(normalizedContent);
 
 	const isHighlightsClip =
 		hasHighlights && (contentIsEmpty || contentMatchesHighlights);
