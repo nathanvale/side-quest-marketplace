@@ -201,11 +201,11 @@ describe("handleClipper", () => {
 			const listResult = await handleClipper(listCtx);
 			expect(listResult.success).toBe(true);
 
-			// Use "article" template which should exist in the templates directory
-			const outputPath = path.join(tempDir, "article-converted.md");
+			// Use "capture" template which should exist in the templates directory
+			const outputPath = path.join(tempDir, "capture-converted.md");
 			const ctx = createContext({
 				subcommand: "convert",
-				positional: ["article"],
+				positional: ["capture"],
 				flags: { out: outputPath },
 			});
 
@@ -223,7 +223,7 @@ describe("handleClipper", () => {
 		test("outputs to stdout when no --out flag", async () => {
 			const ctx = createContext({
 				subcommand: "convert",
-				positional: ["article"],
+				positional: ["capture"],
 			});
 
 			const result = await handleClipper(ctx);

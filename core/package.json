@@ -5,6 +5,7 @@
 	"type": "module",
 	"exports": {
 		"./cli": "./src/cli/index.ts",
+		"./geo": "./src/geo/index.ts",
 		"./compression": "./src/compression/index.ts",
 		"./formatters": "./src/formatters/index.ts",
 		"./fs": "./src/fs/index.ts",

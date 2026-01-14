@@ -65,6 +65,8 @@ export {
 export { handleMigrateRemoveTags } from "./migrate-remove-tags";
 // Notes commands
 export { handleDelete, handleList, handleRead } from "./notes";
+// Process commands
+export { handleProcess } from "./process";
 // Process inbox commands
 export { handleProcessInbox } from "./process-inbox";
 // Registry commands

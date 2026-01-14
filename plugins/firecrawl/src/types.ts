@@ -374,7 +374,7 @@ export interface ExtractResponse {
  */
 export interface ExtractStatusResponse {
 	success: boolean;
-	status?: "pending" | "completed" | "failed";
+	status?: "pending" | "processing" | "completed" | "failed";
 	data?: Record<string, unknown>;
 	sources?: string[];
 	error?: string;

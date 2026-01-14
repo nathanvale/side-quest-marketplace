@@ -1,7 +1,7 @@
 /**
- * Web Clipper Template Export Script (v9 - Single Capture Template)
+ * Web Clipper Template Export Script (v10 - Single Capture Template)
  *
- * Exports the single capture.json template to the user's vault.
+ * Exports the single capture.json template for Web Clipper import.
  *
  * This script replaces the previous multi-template system with a single
  * ADHD-friendly capture template. All specialized templates have been
@@ -11,28 +11,18 @@
  *   node export-script.cjs
  *
  * Output:
- *   - Copies capture.json to $PARA_VAULT/Templates/Clippings/
- *   - Creates directory if it doesn't exist
+ *   - Exports to ~/Downloads/
  */
 
-const fs = require("fs");
-const path = require("path");
+const fs = require("node:fs");
+const path = require("node:path");
+const os = require("node:os");
 
 // Configuration
 const PLUGIN_ROOT = path.join(__dirname, "../../..");
 const SOURCE_FILE = path.join(PLUGIN_ROOT, "templates/webclipper/capture.json");
-const VAULT_PATH = process.env.PARA_VAULT;
-const OUTPUT_DIR = VAULT_PATH
-	? path.join(VAULT_PATH, "Templates/Clippings")
-	: null;
-
-// Validate environment
-if (!VAULT_PATH) {
-	console.error("ERROR: PARA_VAULT environment variable is not set.");
-	console.error("Please set it to your Obsidian vault path:");
-	console.error('  export PARA_VAULT="/path/to/your/vault"');
-	process.exit(1);
-}
+const DOWNLOADS_DIR = path.join(os.homedir(), "Downloads");
+const OUTPUT_DIR = DOWNLOADS_DIR;
 
 // Validate source file exists
 if (!fs.existsSync(SOURCE_FILE)) {

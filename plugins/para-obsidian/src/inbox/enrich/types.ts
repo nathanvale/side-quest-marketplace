@@ -69,6 +69,9 @@ export type ClippingType =
 	| "social"
 	| "podcast"
 	| "book"
+	| "accommodation"
+	| "place"
+	| "restaurant"
 	| "generic";
 
 /**
