@@ -11,7 +11,8 @@
 			"!!plugins/bookmarks/data/*.html",
 			"!!plugins/the-cinema-bandit/classic-cinemas-email-template.html",
 			"!!plugins/the-cinema-bandit/examples/*.html",
-			"!!plugins/para-obsidian/templates/webclipper/*malicious*"
+			"!!plugins/para-obsidian/templates/webclipper/*malicious*",
+			"!!plugins/para-obsidian/templates/webclipper/capture.json"
 		],
 		"ignoreUnknown": true
 	},

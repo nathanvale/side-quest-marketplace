@@ -40,7 +40,7 @@ if (!fs.existsSync(OUTPUT_DIR)) {
 
 // Copy capture.json to vault
 const outputFile = path.join(OUTPUT_DIR, "capture.json");
-fs.writeFileSync(outputFile, JSON.stringify(captureTemplate, null, "\t"));
+fs.writeFileSync(outputFile, JSON.stringify(captureTemplate, null, 4));
 
 console.log("✓ Exported capture.json to:", outputFile);
 console.log("\nNext steps:");
