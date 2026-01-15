@@ -310,6 +310,7 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			project: { type: "wikilink", optional: true },
 			company: { type: "string", optional: true },
 			summary: { type: "string", optional: true },
+			transcription: { type: "wikilink", optional: true },
 		},
 		oneOfRequired: ["area", "project"],
 	},

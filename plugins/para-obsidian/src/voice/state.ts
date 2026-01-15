@@ -26,6 +26,8 @@ export interface ProcessedMemoMetadata {
 	readonly transcription: string;
 	/** Date of daily note where memo was inserted (YYYY-MM-DD) */
 	readonly dailyNote: string;
+	/** Path to the voice memo note in the inbox (optional) */
+	readonly notePath?: string;
 }
 
 /**

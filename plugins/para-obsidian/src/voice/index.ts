@@ -10,9 +10,21 @@
 // Formatting
 export {
 	dedupeConsecutiveLines,
+	formatFilenameTime,
 	formatLogEntry,
 	formatTimestamp,
+	formatWikilinkLogEntry,
 } from "./formatter";
+// Note creation
+export {
+	basicCleanup,
+	type CreateVoiceMemoNoteOptions,
+	createVoiceMemoNote,
+	generateNoteTitle,
+	processWithLLM,
+	type VoiceMemoLLMResult,
+	type VoiceMemoNoteResult,
+} from "./note-creator";
 // Scanner
 export {
 	isSafeFilename,
@@ -44,3 +56,11 @@ export {
 	type TranscriptionResult,
 	transcribeVoiceMemo,
 } from "./transcriber";
+// VTT parser
+export {
+	extractTextFromVtt,
+	isVttFile,
+	parseVtt,
+	type VttCue,
+	type VttParseResult,
+} from "./vtt-parser";

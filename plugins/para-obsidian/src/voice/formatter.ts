@@ -91,3 +91,48 @@ export function formatLogEntry(timestamp: Date, transcription: string): string {
 
 	return `- ${time} - 🎤 ${collapsed}`;
 }
+
+/**
+ * Format time for use in filenames (no colons).
+ *
+ * Format: "h-mmam/pm" (no space between time and period)
+ *
+ * Examples:
+ * - 2-45pm
+ * - 10-30am
+ * - 12-00am (midnight)
+ * - 12-00pm (noon)
+ *
+ * @param date - Date object to format
+ * @returns Filename-safe time string
+ */
+export function formatFilenameTime(date: Date): string {
+	const hours24 = date.getHours();
+	let hours12 = hours24 % 12;
+	if (hours12 === 0) {
+		hours12 = 12;
+	}
+	const minutes = date.getMinutes().toString().padStart(2, "0");
+	const period = hours24 < 12 ? "am" : "pm";
+	return `${hours12}-${minutes}${period}`;
+}
+
+/**
+ * Format wikilink log entry for daily note.
+ *
+ * Format: "- {time} - 🎤 [[{noteTitle}]]"
+ *
+ * Used when creating voice memo notes instead of inline transcriptions.
+ * The wikilink points to the separate voice memo note in the inbox.
+ *
+ * @param timestamp - Voice memo timestamp
+ * @param noteTitle - Title of the voice memo note (for wikilink)
+ * @returns Formatted log entry with wikilink
+ */
+export function formatWikilinkLogEntry(
+	timestamp: Date,
+	noteTitle: string,
+): string {
+	const time = formatTimestamp(timestamp);
+	return `- ${time} - 🎤 [[${noteTitle}]]`;
+}

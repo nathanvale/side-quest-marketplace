@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
 	dedupeConsecutiveLines,
+	formatFilenameTime,
 	formatLogEntry,
 	formatTimestamp,
+	formatWikilinkLogEntry,
 } from "./formatter";
 
 describe("voice/formatter", () => {
@@ -187,6 +189,53 @@ describe("voice/formatter", () => {
 
 			expect(entry).toStartWith("- 2:45 pm - 🎤 A");
 			expect(entry.length).toBe(500 + "- 2:45 pm - 🎤 ".length);
+		});
+	});
+
+	describe("formatFilenameTime", () => {
+		test("formats afternoon time", () => {
+			const date = new Date(2026, 0, 15, 14, 45);
+			expect(formatFilenameTime(date)).toBe("2-45pm");
+		});
+
+		test("formats morning time", () => {
+			const date = new Date(2026, 0, 15, 10, 30);
+			expect(formatFilenameTime(date)).toBe("10-30am");
+		});
+
+		test("formats midnight as 12am", () => {
+			const date = new Date(2026, 0, 15, 0, 0);
+			expect(formatFilenameTime(date)).toBe("12-00am");
+		});
+
+		test("formats noon as 12pm", () => {
+			const date = new Date(2026, 0, 15, 12, 0);
+			expect(formatFilenameTime(date)).toBe("12-00pm");
+		});
+
+		test("formats single digit hour without padding", () => {
+			const date = new Date(2026, 0, 15, 9, 5);
+			expect(formatFilenameTime(date)).toBe("9-05am");
+		});
+	});
+
+	describe("formatWikilinkLogEntry", () => {
+		test("formats wikilink entry correctly", () => {
+			const date = new Date(2026, 0, 15, 14, 45);
+			const result = formatWikilinkLogEntry(
+				date,
+				"Voice Memo 2026-01-15 2-45pm",
+			);
+			expect(result).toBe("- 2:45 pm - 🎤 [[Voice Memo 2026-01-15 2-45pm]]");
+		});
+
+		test("handles morning time", () => {
+			const date = new Date(2026, 0, 15, 9, 30);
+			const result = formatWikilinkLogEntry(
+				date,
+				"Voice Memo 2026-01-15 9-30am",
+			);
+			expect(result).toBe("- 9:30 am - 🎤 [[Voice Memo 2026-01-15 9-30am]]");
 		});
 	});
 });

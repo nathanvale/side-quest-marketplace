@@ -28,10 +28,13 @@ import {
 } from "../shared/logger";
 import { applyDateSubstitutions, getTemplate } from "../templates/index";
 import {
-	formatLogEntry,
+	createVoiceMemoNote,
+	extractTextFromVtt,
+	formatWikilinkLogEntry,
 	isFfmpegAvailable,
 	isParakeetMlxAvailable,
 	isProcessed,
+	isVttFile,
 	loadVoiceState,
 	markAsProcessed,
 	markAsSkipped,
@@ -183,6 +186,23 @@ function ensureLogSection(dailyNotePath: string): boolean {
  * and appends formatted entries to daily notes.
  */
 export async function handleVoice(ctx: CommandContext): Promise<CommandResult> {
+	const { subcommand } = ctx;
+
+	// Route to subcommand
+	if (subcommand === "convert") {
+		return await handleVoiceConvert(ctx);
+	}
+
+	// Default: existing voice transcription
+	return await handleVoiceTranscribe(ctx);
+}
+
+/**
+ * Handle the main 'voice' command (transcription).
+ */
+async function handleVoiceTranscribe(
+	ctx: CommandContext,
+): Promise<CommandResult> {
 	const { config, isJson, flags } = ctx;
 
 	// Parse flags from ctx.flags
@@ -492,8 +512,19 @@ export async function handleVoice(ctx: CommandContext): Promise<CommandResult> {
 						continue;
 					}
 
-					// Format log entry
-					const logEntry = formatLogEntry(memo.timestamp, result.text);
+					// Create voice memo note in inbox
+					const noteResult = await createVoiceMemoNote({
+						timestamp: memo.timestamp,
+						transcription: result.text,
+						vaultPath: config.vault,
+						sessionCid,
+					});
+
+					// Add wikilink to daily log (instead of full text)
+					const logEntry = formatWikilinkLogEntry(
+						memo.timestamp,
+						noteResult.noteTitle,
+					);
 
 					// Auto-create daily note if it doesn't exist
 					const wasCreated = ensureDailyNote(
@@ -529,6 +560,7 @@ export async function handleVoice(ctx: CommandContext): Promise<CommandResult> {
 						processedAt: new Date().toISOString(),
 						transcription: result.text.slice(0, 100),
 						dailyNote: localDateStr,
+						notePath: noteResult.notePath,
 					});
 
 					// Save state incrementally after each successful processing
@@ -589,4 +621,274 @@ export async function handleVoice(ctx: CommandContext): Promise<CommandResult> {
 
 	session.end({ success: true });
 	return { success: true };
+}
+
+/**
+ * Handle the 'voice convert' subcommand.
+ *
+ * Converts a transcript into a voice memo note with LLM cleanup and summary.
+ * Accepts either a file path or inline text via --text flag.
+ *
+ * Usage:
+ *   para voice convert <path>           # Read from file
+ *   para voice convert --text "..."     # Use inline text
+ */
+async function handleVoiceConvert(ctx: CommandContext): Promise<CommandResult> {
+	const { config, positional, flags, isJson } = ctx;
+
+	// Initialize logger
+	await initLogger();
+
+	// Start session with correlation tracking
+	const session = startSession("para voice convert", { silent: isJson });
+	const sessionCid = session.sessionCid;
+
+	voiceLogger.info`voice:convert:start sessionCid=${sessionCid}`;
+
+	// Show log file location
+	if (!isJson) {
+		console.log(emphasize.info(`Logs: ${getLogFile()}`));
+	}
+
+	// Validate vault configuration
+	if (!config.vault || config.vault.trim() === "") {
+		voiceLogger.error`voice:convert:error sessionCid=${sessionCid} error=${"Vault path not configured"}`;
+		if (isJson) {
+			console.log(
+				JSON.stringify(
+					{
+						success: false,
+						error: "Vault path not configured",
+						hint: "Set PARA_VAULT environment variable",
+						sessionCid,
+					},
+					null,
+					2,
+				),
+			);
+		} else {
+			console.log(emphasize.error("Vault path not configured."));
+			console.log("Set PARA_VAULT environment variable.");
+		}
+		session.end({ error: "Vault path not configured" });
+		return { success: false, exitCode: 1 };
+	}
+
+	if (!pathExistsSync(config.vault)) {
+		voiceLogger.error`voice:convert:error sessionCid=${sessionCid} error=${"Vault path does not exist"}`;
+		if (isJson) {
+			console.log(
+				JSON.stringify(
+					{
+						success: false,
+						error: "Vault path does not exist",
+						path: config.vault,
+						sessionCid,
+					},
+					null,
+					2,
+				),
+			);
+		} else {
+			console.log(emphasize.error("Vault path does not exist."));
+			console.log(`Path: ${config.vault}`);
+		}
+		session.end({ error: "Vault path does not exist" });
+		return { success: false, exitCode: 1 };
+	}
+
+	// Get transcript from --text flag or file path
+	const inlineText = flags.text as string | undefined;
+	const filePath = positional[0];
+
+	// Must have one or the other
+	if (!inlineText && !filePath) {
+		voiceLogger.error`voice:convert:error sessionCid=${sessionCid} error=${"Missing input"}`;
+		if (isJson) {
+			console.log(
+				JSON.stringify(
+					{
+						success: false,
+						error: "Missing input",
+						usage:
+							"para voice convert <path> or para voice convert --text '...'",
+						sessionCid,
+					},
+					null,
+					2,
+				),
+			);
+		} else {
+			console.log(emphasize.error("Missing input."));
+			console.log("Usage: para voice convert <path>");
+			console.log("   or: para voice convert --text '...'");
+		}
+		session.end({ error: "Missing input" });
+		return { success: false, exitCode: 1 };
+	}
+
+	// Cannot have both
+	if (inlineText && filePath) {
+		voiceLogger.error`voice:convert:error sessionCid=${sessionCid} error=${"Cannot use both file path and --text"}`;
+		if (isJson) {
+			console.log(
+				JSON.stringify(
+					{
+						success: false,
+						error: "Cannot use both file path and --text flag",
+						sessionCid,
+					},
+					null,
+					2,
+				),
+			);
+		} else {
+			console.log(
+				emphasize.error("Cannot use both file path and --text flag."),
+			);
+		}
+		session.end({ error: "Cannot use both file path and --text" });
+		return { success: false, exitCode: 1 };
+	}
+
+	// Determine source type for frontmatter
+	const isVtt = filePath ? isVttFile(filePath) : false;
+	const source = inlineText
+		? "inline-text"
+		: isVtt
+			? "vtt-file"
+			: "transcript-file";
+
+	try {
+		let transcription: string;
+		let fileTimestamp: Date = new Date(); // Default to current time for inline text
+
+		if (inlineText) {
+			// Use inline text directly
+			transcription = inlineText;
+			voiceLogger.debug`voice:convert:source sessionCid=${sessionCid} source=${"inline-text"} length=${transcription.length}`;
+		} else {
+			// Read from file (filePath is guaranteed to be defined here due to earlier check)
+			const inputFile = filePath as string;
+			if (!pathExistsSync(inputFile)) {
+				voiceLogger.error`voice:convert:error sessionCid=${sessionCid} error=${"File not found"} path=${inputFile}`;
+				if (isJson) {
+					console.log(
+						JSON.stringify(
+							{
+								success: false,
+								error: "File not found",
+								path: inputFile,
+								sessionCid,
+							},
+							null,
+							2,
+						),
+					);
+				} else {
+					console.log(emphasize.error(`File not found: ${inputFile}`));
+				}
+				session.end({ error: "File not found" });
+				return { success: false, exitCode: 1 };
+			}
+
+			const bunFile = Bun.file(inputFile);
+			const fileContent = await bunFile.text();
+
+			// Get file modification time for the recorded timestamp
+			const fileStat = await Bun.file(inputFile).stat();
+			fileTimestamp = fileStat?.mtime ? new Date(fileStat.mtime) : new Date();
+
+			// Parse VTT files to extract just the text
+			if (isVtt) {
+				transcription = extractTextFromVtt(fileContent);
+				voiceLogger.debug`voice:convert:source sessionCid=${sessionCid} source=${"vtt-file"} path=${inputFile} rawLength=${fileContent.length} extractedLength=${transcription.length}`;
+			} else {
+				transcription = fileContent;
+				voiceLogger.debug`voice:convert:source sessionCid=${sessionCid} source=${"file"} path=${inputFile} length=${transcription.length}`;
+			}
+		}
+
+		if (transcription.trim().length === 0) {
+			voiceLogger.warn`voice:convert:error sessionCid=${sessionCid} error=${"File is empty"}`;
+			if (isJson) {
+				console.log(
+					JSON.stringify(
+						{
+							success: false,
+							error: "File is empty",
+							path: filePath,
+							sessionCid,
+						},
+						null,
+						2,
+					),
+				);
+			} else {
+				console.log(emphasize.error("File is empty."));
+			}
+			session.end({ error: "File is empty" });
+			return { success: false, exitCode: 1 };
+		}
+
+		voiceLogger.info`voice:convert:process sessionCid=${sessionCid} inputLength=${transcription.length}`;
+
+		// Create voice memo note (no daily log entry)
+		// Use file modification time for recorded timestamp (for files), current time for inline text
+		const noteResult = await createVoiceMemoNote({
+			timestamp: fileTimestamp,
+			transcription,
+			vaultPath: config.vault,
+			source,
+			sessionCid,
+			isVttSource: isVtt,
+		});
+
+		voiceLogger.info`voice:convert:success sessionCid=${sessionCid} notePath=${noteResult.notePath}`;
+
+		// Output result
+		if (isJson) {
+			console.log(
+				JSON.stringify(
+					{
+						success: true,
+						notePath: noteResult.notePath,
+						noteTitle: noteResult.noteTitle,
+						summary: noteResult.summary,
+						sessionCid,
+					},
+					null,
+					2,
+				),
+			);
+		} else {
+			console.log(emphasize.success(`Created: ${noteResult.notePath}`));
+			if (noteResult.summary) {
+				console.log(`Summary: ${noteResult.summary}`);
+			}
+		}
+
+		session.end({ success: true });
+		return { success: true };
+	} catch (error) {
+		const err = error as Error;
+		voiceLogger.error`voice:convert:error sessionCid=${sessionCid} error=${err.message}`;
+		if (isJson) {
+			console.log(
+				JSON.stringify(
+					{
+						success: false,
+						error: err.message,
+						sessionCid,
+					},
+					null,
+					2,
+				),
+			);
+		} else {
+			console.log(emphasize.error(`Error: ${err.message}`));
+		}
+		session.end({ error: err.message });
+		return { success: false, exitCode: 1 };
+	}
 }
