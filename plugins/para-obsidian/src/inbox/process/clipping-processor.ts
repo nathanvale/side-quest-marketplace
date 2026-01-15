@@ -648,12 +648,23 @@ function buildTemplateVariables(
 
 	// Accommodation-specific fields
 	if (type === "accommodation") {
+		// Only generate map URLs if we have a real location (not just title)
+		// Highlights often lack location data, so skip maps in those cases
+		const hasLocation =
+			enrichment.location && enrichment.location.trim() !== "";
+		const mapQuery = hasLocation
+			? [title, enrichment.location].filter(Boolean).join(", ")
+			: undefined;
+
 		return {
 			...base,
 			check_in: enrichment.checkIn,
 			check_out: enrichment.checkOut,
 			location: enrichment.location,
 			price: enrichment.price,
+			// Map URLs for navigation (only when we have location data)
+			google_maps: mapQuery ? generateGoogleMapsSearchUrl(mapQuery) : undefined,
+			apple_maps: mapQuery ? generateAppleMapsSearchUrl(mapQuery) : undefined,
 		};
 	}
 
