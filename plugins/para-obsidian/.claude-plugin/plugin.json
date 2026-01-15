@@ -23,6 +23,7 @@
 		"./commands/create-note-template.md",
 		"./commands/daily-review.md",
 		"./commands/enrich.md",
+		"./commands/meeting.md",
 		"./commands/search.md",
 		"./commands/slo.md",
 		"./commands/trace.md",
@@ -36,6 +37,7 @@
 		"./skills/log-triage",
 		"./skills/field-suggestions",
 		"./skills/template-assistant",
-		"./skills/webclipper-templates"
+		"./skills/webclipper-templates",
+		"./skills/meeting-from-transcription"
 	]
 }
