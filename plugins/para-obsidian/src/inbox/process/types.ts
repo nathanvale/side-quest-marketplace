@@ -204,6 +204,39 @@ export interface ClippingEnrichment {
 	/** Ambiance/vibe description */
 	ambiance?: string;
 
+	// GitHub-specific fields (from URL/content extraction)
+	/** GitHub username (for profile pages) */
+	githubUsername?: string;
+	/** GitHub display name */
+	githubDisplayName?: string;
+	/** GitHub bio/tagline */
+	githubBio?: string;
+	/** GitHub location */
+	githubLocation?: string;
+	/** Repository name (for repo pages) */
+	repoName?: string;
+	/** Repository owner */
+	repoOwner?: string;
+	/** Repository description */
+	repoDescription?: string;
+	/** Primary programming language */
+	repoLanguage?: string;
+	/** Star count */
+	repoStars?: number;
+	/** Fork count */
+	repoForks?: number;
+	/** GitHub page type: profile, repo, issue, pr, gist, org */
+	githubPageType?: "profile" | "repo" | "issue" | "pr" | "gist" | "org";
+	/** Pinned repositories (for profiles) */
+	pinnedRepos?: Array<{
+		name: string;
+		description?: string;
+		language?: string;
+		stars?: number;
+	}>;
+	/** Current projects/highlights (for profiles) */
+	currentProjects?: string[];
+
 	// Firecrawl metadata (for re-classification)
 	/** Page metadata from Firecrawl scrape (Open Graph, meta tags) */
 	firecrawlMetadata?: {
@@ -333,6 +366,36 @@ export interface TemplateVariables {
 	specialties?: string;
 	/** Ambiance/vibe description */
 	ambiance?: string;
+
+	// GitHub-specific fields
+	/** GitHub username (for profile pages) */
+	github_username?: string;
+	/** GitHub display name */
+	github_display_name?: string;
+	/** GitHub bio/tagline */
+	github_bio?: string;
+	/** GitHub location */
+	github_location?: string;
+	/** Repository name (for repo pages) */
+	repo_name?: string;
+	/** Repository owner */
+	repo_owner?: string;
+	/** Repository description */
+	repo_description?: string;
+	/** Primary programming language */
+	repo_language?: string;
+	/** Star count */
+	repo_stars?: string;
+	/** Fork count */
+	repo_forks?: string;
+	/** GitHub page type: profile, repo, issue, pr, gist, org */
+	github_page_type?: string;
+	/** Formatted pinned repositories (markdown) */
+	pinned_repos?: string;
+	/** Formatted current projects (markdown) */
+	current_projects?: string;
+	/** GitHub profile URL */
+	github_url?: string;
 }
 
 /**

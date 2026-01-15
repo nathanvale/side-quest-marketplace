@@ -42,6 +42,12 @@ import {
 } from "../enrich/strategies/clipping-types.js";
 import { fetchVideoInfo } from "../enrich/youtube-info.js";
 import {
+	extractGitHubDetails,
+	extractUsernameFromUrl,
+	getGitHubPageType,
+	isGitHubUrl,
+} from "./github-extractor.js";
+import {
 	extractGoogleMapsPlace,
 	isGoogleMapsUrl,
 } from "./google-maps-extractor.js";
@@ -433,6 +439,37 @@ async function enrichClipping(
 				}
 			}
 
+			// GitHub extraction (deterministic, no LLM/API needed)
+			if (type === "github" && isGitHubUrl(url)) {
+				const githubDetails = extractGitHubDetails(url, content);
+				if (githubDetails) {
+					if (log) {
+						log.info`inbox:enrichClipping:github cid=${cid} pageType=${githubDetails.pageType} username=${githubDetails.username ?? "n/a"} repo=${githubDetails.repoName ?? "n/a"}`;
+					}
+					return {
+						githubUsername: githubDetails.username,
+						githubDisplayName: githubDetails.displayName,
+						githubBio: githubDetails.bio,
+						githubLocation: githubDetails.location,
+						repoName: githubDetails.repoName,
+						repoOwner: githubDetails.repoOwner,
+						repoDescription: githubDetails.repoDescription,
+						repoLanguage: githubDetails.repoLanguage,
+						repoStars: githubDetails.repoStars,
+						repoForks: githubDetails.repoForks,
+						githubPageType: githubDetails.pageType,
+						pinnedRepos: githubDetails.pinnedRepos,
+						currentProjects: githubDetails.currentProjects,
+						enrichmentSource: "none",
+						enrichmentStatus: "success",
+					};
+				}
+				// Fall through to Firecrawl if extraction failed
+				if (log) {
+					log.warn`inbox:enrichClipping:githubFailed cid=${cid} url=${url}`;
+				}
+			}
+
 			// YouTube enrichment
 			if (type === "youtube") {
 				const videoId = extractYouTubeVideoId(url);
@@ -710,6 +747,42 @@ function buildTemplateVariables(
 		};
 	}
 
+	// GitHub-specific fields
+	if (type === "github" && enrichment.githubPageType) {
+		// Format pinned repos as markdown list
+		const pinnedReposMarkdown = enrichment.pinnedRepos
+			?.map((repo) => {
+				const stars = repo.stars ? ` ⭐ ${repo.stars}` : "";
+				const lang = repo.language ? ` (${repo.language})` : "";
+				const desc = repo.description ? ` - ${repo.description}` : "";
+				return `- **${repo.name}**${lang}${stars}${desc}`;
+			})
+			.join("\n");
+
+		// Format current projects as markdown list
+		const currentProjectsMarkdown = enrichment.currentProjects
+			?.map((project) => `- ${project}`)
+			.join("\n");
+
+		return {
+			...base,
+			github_username: enrichment.githubUsername,
+			github_display_name: enrichment.githubDisplayName,
+			github_bio: enrichment.githubBio,
+			github_location: enrichment.githubLocation,
+			repo_name: enrichment.repoName,
+			repo_owner: enrichment.repoOwner,
+			repo_description: enrichment.repoDescription,
+			repo_language: enrichment.repoLanguage,
+			repo_stars: enrichment.repoStars?.toString(),
+			repo_forks: enrichment.repoForks?.toString(),
+			github_page_type: enrichment.githubPageType,
+			pinned_repos: pinnedReposMarkdown,
+			current_projects: currentProjectsMarkdown,
+			github_url: frontmatter.source,
+		};
+	}
+
 	// Article/general fields
 	if (enrichment.scrapedContent) {
 		return {
@@ -801,6 +874,18 @@ export async function processClipping(
 					// Highlights clip - skip external enrichment, preserve user content
 					if (options.verbose && log) {
 						log.info`inbox:processClipping:skipEnrichment cid=${cid} file=${filePath} reason=highlightsClip`;
+					}
+					// But still extract URL-based info for GitHub (username from URL)
+					if (type === "github" && isGitHubUrl(frontmatter.source)) {
+						const username = extractUsernameFromUrl(frontmatter.source);
+						const pageType = getGitHubPageType(frontmatter.source);
+						if (username || pageType) {
+							enrichment = {
+								...enrichment,
+								githubUsername: username ?? undefined,
+								githubPageType: pageType ?? undefined,
+							};
+						}
 					}
 				} else if (!options.skipEnrichment) {
 					enrichment = await enrichClipping(frontmatter, content, type, cid);

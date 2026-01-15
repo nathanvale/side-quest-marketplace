@@ -99,7 +99,7 @@ const TITLE_GUIDANCE: Record<ClippingType, string> = {
 		"Dish name with key descriptor (e.g., 'Thai Green Curry with Chicken')",
 	product: "Brand - Product name (e.g., 'Sony WH-1000XM5 Headphones')",
 	github:
-		"Owner/Repo - Brief description (e.g., 'facebook/react - UI Component Library')",
+		"For profiles: 'Username - Developer focus' (e.g., 'steipete - iOS & macOS developer'). For repos: 'owner/repo - Brief description' (e.g., 'facebook/react - UI Component Library')",
 	documentation: "Tool/API - Topic (e.g., 'TypeScript - Generics Guide')",
 	social: "Author - Topic (e.g., 'Dan Abramov - React Hydration Explained')",
 	podcast: "Show - Episode topic (e.g., 'Syntax FM - CSS Container Queries')",
@@ -121,7 +121,8 @@ const SUMMARY_GUIDANCE: Record<ClippingType, string> = {
 	article: "main argument and key takeaway",
 	recipe: "dish type and cuisine/technique",
 	product: "what it is and main use case",
-	github: "what project does and technology used",
+	github:
+		"For profiles: developer's focus areas and notable projects. For repos: what project does and main technology",
 	documentation: "topic covered and why useful",
 	social: "main point and why worth saving",
 	podcast: "main theme and key guests/insights",
