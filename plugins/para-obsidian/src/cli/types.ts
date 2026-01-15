@@ -11,7 +11,14 @@ import type { OutputFormat } from "@sidequest/core/terminal";
 import type { ParaObsidianConfig } from "../config/index";
 
 /**
- * Parsed CLI flags with normalized values.
+ * Raw CLI flags as parsed - preserves arrays for multi-value flags like --arg.
+ * Single values are strings/booleans, repeated flags become arrays.
+ */
+export type RawFlags = Record<string, string | boolean | (string | boolean)[]>;
+
+/**
+ * Parsed CLI flags with normalized values (arrays converted to first element).
+ * @deprecated Use RawFlags and handle arrays explicitly where needed.
  */
 export type NormalizedFlags = Record<string, string | boolean>;
 
@@ -23,8 +30,8 @@ export interface CommandContext {
 	readonly config: ParaObsidianConfig;
 	/** Positional arguments after command/subcommand */
 	readonly positional: ReadonlyArray<string>;
-	/** Normalized flag values */
-	readonly flags: NormalizedFlags;
+	/** Raw flag values - preserves arrays for multi-value flags like --arg */
+	readonly flags: RawFlags;
 	/** Output format (json or markdown) */
 	readonly format: OutputFormat;
 	/** Whether output is JSON format */

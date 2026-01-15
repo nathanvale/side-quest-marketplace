@@ -9,7 +9,7 @@
 
 import { discoverAttachments } from "../attachments/index";
 import type { ParaObsidianConfig } from "../config/index";
-import type { NormalizedFlags } from "./types";
+import type { NormalizedFlags, RawFlags } from "./types";
 
 /**
  * Normalize a flag value to single value (string or boolean).
@@ -43,11 +43,14 @@ export function normalizeFlags(
 
 /**
  * Parse --attachments flag into array of paths.
+ * Accepts both RawFlags (may have arrays) and NormalizedFlags.
  */
-export function parseAttachments(flags: NormalizedFlags): string[] {
+export function parseAttachments(flags: RawFlags | NormalizedFlags): string[] {
 	const raw = flags.attachments;
-	if (typeof raw !== "string") return [];
-	return raw
+	// Handle array case (take first element)
+	const value = Array.isArray(raw) ? raw[0] : raw;
+	if (typeof value !== "string") return [];
+	return value
 		.split(",")
 		.map((s) => s.trim())
 		.filter(Boolean);

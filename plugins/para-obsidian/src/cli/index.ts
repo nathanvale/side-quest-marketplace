@@ -80,6 +80,7 @@ export type {
 	CommandHandler,
 	CommandResult,
 	NormalizedFlags,
+	RawFlags,
 } from "./types";
 // Utilities
 export {

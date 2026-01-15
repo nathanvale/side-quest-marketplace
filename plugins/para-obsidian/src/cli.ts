@@ -46,7 +46,6 @@ import {
 	handleTemplateFields,
 	handleTemplates,
 	handleVoice,
-	normalizeFlags,
 } from "./cli/index";
 import type { CommandContext } from "./cli/types";
 import { loadConfig } from "./config/index";
@@ -146,10 +145,11 @@ async function main(): Promise<void> {
 		const config = loadConfig();
 
 		// Build context for command handlers
+		// Note: flags are passed raw (not normalized) to preserve arrays for multi-value flags like --arg
 		const ctx: CommandContext = {
 			config,
 			positional,
-			flags: normalizeFlags(flags),
+			flags,
 			format,
 			isJson,
 			subcommand,
