@@ -138,15 +138,42 @@ const SUMMARY_GUIDANCE: Record<ClippingType, string> = {
  * into readable paragraphs without summarizing the whole page.
  */
 function buildHighlightsPrompt(options: SummaryOptions): string {
-	return `You are processing user-curated highlights from a web page.
+	const titleGuidance = TITLE_GUIDANCE[options.clippingType];
+
+	// Type-specific field extraction for highlights
+	let typeSpecificInstructions = "";
+	let typeSpecificJsonFields = "";
+
+	if (options.clippingType === "place") {
+		typeSpecificInstructions = `
+EXTRACT THESE FIELDS (from the title and highlights):
+- name: Place name (e.g., "Paddington Reservoir Gardens")
+- address: Full street address if mentioned
+- suburb: Suburb or neighborhood (e.g., "Paddington", "Vaucluse")
+- category: Type of place (e.g., "park", "beach", "restaurant", "museum", "cafe")`;
+		typeSpecificJsonFields =
+			', "name": "...", "address": "...", "suburb": "...", "category": "..."';
+	} else if (options.clippingType === "accommodation") {
+		typeSpecificInstructions = `
+EXTRACT THESE FIELDS (from the title and highlights):
+- check_in: Check-in date in YYYY-MM-DD format if mentioned
+- check_out: Check-out date in YYYY-MM-DD format if mentioned
+- location: City or area (e.g., "Sydney", "Melbourne CBD")
+- price: Total price with currency if mentioned (e.g., "548.64 AUD")`;
+		typeSpecificJsonFields =
+			', "check_in": "...", "check_out": "...", "location": "...", "price": "..."';
+	}
+
+	return `You are processing user-curated highlights from a web page (type: ${options.clippingType}).
 
 The user has specifically selected these passages as important. Your job is to:
 1. Generate a descriptive title
 2. Write a brief summary of what these highlights are about
 3. Clean up the highlights into well-formatted, readable content
+4. Extract any relevant metadata fields
 
 TITLE RULES:
-- Create a descriptive title based on what the highlights are about
+- Format: ${titleGuidance}
 - Max 60 characters
 - No emoji, no quotes
 
@@ -156,13 +183,16 @@ SUMMARY RULES:
 - Plain text only (no markdown)
 
 CLEANED CONTENT RULES:
-- Format the highlights into clean, readable paragraphs
+- Format the highlights into clean, readable content
 - Fix any broken sentences or formatting issues
-- Remove: trailing ellipses, broken HTML, navigation artifacts
+- Remove: trailing ellipses, broken HTML, navigation artifacts, ## headings
 - Keep: all the substance of what the user highlighted
 - Preserve the meaning and order of the highlights
-- Use clean markdown formatting
-- If highlights are bullet points or quotes, format them nicely
+- Use clean markdown formatting (bullet points, bold, etc.)
+- If highlights are bullet points, keep them as bullet points
+- Do NOT add any ## headings - use ### if you need sub-sections
+- The output will be placed under a ## Notes heading, so no ## allowed
+${typeSpecificInstructions}
 
 Original title: {{title}}
 
@@ -170,7 +200,7 @@ User's highlights:
 {{content}}
 
 Respond with ONLY valid JSON (no markdown code blocks):
-{"title": "descriptive title", "summary": "what these highlights are about", "cleaned_content": "formatted highlights"}`
+{"title": "descriptive title", "summary": "what these highlights are about", "cleaned_content": "formatted highlights"${typeSpecificJsonFields}}`
 		.replace("{{title}}", options.title)
 		.replace("{{content}}", options.content);
 }
@@ -223,7 +253,8 @@ CLEANED CONTENT RULES:
 - Extract key insights, techniques, or takeaways
 - Remove: filler words, repetition, off-topic tangents
 - Keep: main arguments, practical advice, quotable insights
-- Format as clean markdown with headers for major sections
+- Format as clean markdown - use ### for sub-sections (content goes under ## Notes)
+- Do NOT use ## headings
 - Max 1000 words
 
 Original title: {{title}}
@@ -258,7 +289,8 @@ CLEANED CONTENT RULES:
 - Remove: tracking URLs, "Saving...", UI elements, navigation links, login prompts
 - Remove: facilities lists (keep only noteworthy amenities), generic policies
 - Keep: property name, room type, dates, price, address, cancellation deadline, confirmation number
-- Format as clean markdown with headers
+- Format as clean markdown - use ### for sub-sections (content goes under ## Notes)
+- Do NOT use ## headings
 - Max 500 words
 
 EXTRACT THESE FIELDS:
@@ -285,38 +317,34 @@ Respond with ONLY valid JSON (no markdown code blocks):
 	if (options.clippingType === "place") {
 		return `You are processing a place/location for a personal knowledge base.
 
-Extract place details, generate a title and summary, and clean up the content.
+CRITICAL: This is a Google Maps page. Extract the place details and respond with JSON.
 
-TITLE RULES:
-- Format: ${titleGuidance}
-- Max 60 characters
-- No emoji, no quotes
+HOW TO FIND THE PLACE NAME:
+1. Look for a ## heading that contains the place name (NOT "## Content" or "## Tours")
+2. The place name heading comes AFTER any logo images and BEFORE review counts
+3. Example: "## Paddington Reservoir Gardens" means the place is "Paddington Reservoir Gardens"
 
-SUMMARY RULES:
-- 1-2 sentences, 50-150 characters
-- Capture: ${summaryGuidance}
-- Plain text only (no markdown)
+YOUR TASK:
+1. Find the place name from the ## heading
+2. Generate a title in format: "${titleGuidance}"
+3. Write a 1-2 sentence summary of what the place is
+4. Write a brief description (2-4 sentences)
+5. Extract suburb from the place name or URL
 
 CLEANED CONTENT RULES:
-- Write a brief, useful description of the place (2-4 sentences)
-- Include: what type of place it is, what it's known for, location context
-- Remove: Google Maps UI elements, navigation cruft, reviews, ratings
-- Format as clean prose, not bullet points
-- Max 200 words
-
-EXTRACT THESE FIELDS:
-- name: Place name (e.g., "Paddington Reservoir Gardens")
-- address: Full street address if available
-- suburb: Suburb or neighborhood (e.g., "Paddington")
-- category: Type of place (e.g., "park", "restaurant", "museum", "cafe", "attraction")
+- Write 2-4 sentences describing the place
+- Include: what type of place it is, hours if shown, what it's good for
+- IGNORE: SponsoredBy sections, tour ads, "People also search for", account info, review breakdowns
+- Do NOT report errors or ask for clarification - just extract what you can see
+- Do NOT use ## headings in your response
 
 Original title: {{title}}
 
-Place content:
+Content:
 {{content}}
 
-Respond with ONLY valid JSON (no markdown code blocks):
-{"title": "...", "summary": "...", "cleaned_content": "...", "name": "...", "address": "...", "suburb": "...", "category": "..."}`
+Respond with ONLY this JSON format (no markdown, no explanation):
+{"title": "Place Name - Suburb", "summary": "Brief description", "cleaned_content": "2-4 sentence description", "name": "Place Name", "address": "", "suburb": "Suburb", "category": "park/garden/beach/etc"}`
 			.replace("{{title}}", options.title)
 			.replace(
 				"{{content}}",
@@ -347,7 +375,8 @@ CLEANED CONTENT RULES:
 - Remove: tracking parameters from URLs, login/signup prompts
 - Keep: main article text, author byline, publication date, key quotes
 - For social posts: keep the main thread, remove "Show replies", UI cruft
-- Format as clean markdown
+- Format as clean markdown - use ### for sub-sections (content goes under ## Notes)
+- Do NOT use ## headings
 - If content is a thread/conversation, preserve the flow
 - Max 1000 words
 

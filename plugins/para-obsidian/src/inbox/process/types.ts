@@ -141,6 +141,7 @@ export interface ClippingEnrichment {
 		| "youtube-mcp"
 		| "firecrawl-scrape"
 		| "firecrawl-extract"
+		| "google-maps-url"
 		| "none";
 	/** Whether enrichment succeeded, failed, or was skipped */
 	enrichmentStatus: "success" | "failed" | "skipped";

@@ -41,6 +41,10 @@ import {
 	extractYouTubeVideoId,
 } from "../enrich/strategies/clipping-types.js";
 import { fetchVideoInfo } from "../enrich/youtube-info.js";
+import {
+	extractGoogleMapsPlace,
+	isGoogleMapsUrl,
+} from "./google-maps-extractor.js";
 import { generateSummary } from "./summary-generator.js";
 import { applyTemplate } from "./template-applier.js";
 import type {
@@ -397,7 +401,7 @@ async function getYouTubeTranscript(
  */
 async function enrichClipping(
 	frontmatter: ClippingFrontmatter,
-	_content: string,
+	content: string,
 	type: ClippingType,
 	cid: string,
 ): Promise<ClippingEnrichment> {
@@ -406,6 +410,28 @@ async function enrichClipping(
 		"inbox:enrichClipping",
 		async () => {
 			const url = frontmatter.source;
+
+			// Google Maps place extraction (deterministic, no LLM/API needed)
+			if (type === "place" && isGoogleMapsUrl(url)) {
+				const placeDetails = extractGoogleMapsPlace(url, content);
+				if (placeDetails) {
+					if (log) {
+						log.info`inbox:enrichClipping:googleMaps cid=${cid} name=${placeDetails.name} suburb=${placeDetails.suburb ?? "unknown"} category=${placeDetails.category ?? "unknown"}`;
+					}
+					return {
+						placeName: placeDetails.name,
+						suburb: placeDetails.suburb,
+						category: placeDetails.category,
+						address: undefined, // Not reliably extractable from Google Maps
+						enrichmentSource: "google-maps-url",
+						enrichmentStatus: "success",
+					};
+				}
+				// Fall through to Firecrawl if extraction failed
+				if (log) {
+					log.warn`inbox:enrichClipping:googleMapsFailed cid=${cid} url=${url}`;
+				}
+			}
 
 			// YouTube enrichment
 			if (type === "youtube") {
