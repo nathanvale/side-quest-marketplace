@@ -238,11 +238,11 @@ export interface GetUncommittedFilesOptions {
  * ```typescript
  * // Get only markdown files (default)
  * const mdFiles = await getUncommittedFiles(config.vault);
- * // Returns: ['Projects/My Project.md', '00_Inbox/New Note.md']
+ * // Returns: ['Projects/My Project.md', '00 Inbox/New Note.md']
  *
  * // Get all file types
  * const allFiles = await getUncommittedFiles(config.vault, { allFileTypes: true });
- * // Returns: ['Projects/My Project.md', '00_Inbox/doc.pdf', '00_Inbox/data.json']
+ * // Returns: ['Projects/My Project.md', '00 Inbox/doc.pdf', '00 Inbox/data.json']
  * ```
  */
 export async function getUncommittedFiles(

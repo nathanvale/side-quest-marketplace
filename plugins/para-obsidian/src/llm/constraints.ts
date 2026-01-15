@@ -27,9 +27,9 @@ import type { TemplateField } from "../templates/index";
  * Vault context for guiding LLM extraction.
  */
 export interface VaultContext {
-	/** Existing area names from 02_Areas/ */
+	/** Existing area names from 02 Areas/ */
 	readonly areas: ReadonlyArray<string>;
-	/** Existing project names from 01_Projects/ */
+	/** Existing project names from 01 Projects/ */
 	readonly projects: ReadonlyArray<string>;
 	/** Allowed tag values from config */
 	readonly suggestedTags: ReadonlyArray<string>;

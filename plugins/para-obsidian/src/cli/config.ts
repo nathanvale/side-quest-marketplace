@@ -6,7 +6,7 @@
  * Commands:
  * - config: Display current configuration
  * - templates: List available templates with versions
- * - list-areas: List all areas in 02_Areas/
+ * - list-areas: List all areas in 02 Areas/
  * - template-fields: Show fields for a specific template
  *
  * @module cli/config
@@ -87,7 +87,7 @@ export const handleListAreas: CommandHandler = async (
 		console.log(JSON.stringify({ areas, count: areas.length }, null, 2));
 	} else {
 		if (areas.length === 0) {
-			console.log(emphasize.warn("No areas found in 02_Areas/"));
+			console.log(emphasize.warn("No areas found in 02 Areas/"));
 		} else {
 			console.log(emphasize.info(`Found ${areas.length} areas:`));
 			for (const area of areas) {

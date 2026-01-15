@@ -243,7 +243,7 @@ Requires index to exist (run para_index_prime first).`,
 tool(
 	"para_list_areas",
 	{
-		description: `List existing area names from 02_Areas/ directory. Returns area titles (without .md extension) sorted alphabetically. Use before creating projects to suggest existing areas or allow user to create new.`,
+		description: `List existing area names from 02 Areas/ directory. Returns area titles (without .md extension) sorted alphabetically. Use before creating projects to suggest existing areas or allow user to create new.`,
 		inputSchema: {
 			response_format: z
 				.enum(["markdown", "json"])
@@ -289,7 +289,7 @@ tool(
 				format,
 				areas.length > 0
 					? `# Existing Areas (${areas.length})\n\n${areas.map((a) => `- ${a}`).join("\n")}`
-					: "No areas found in 02_Areas/",
+					: "No areas found in 02 Areas/",
 			);
 		} catch (error) {
 			log({
@@ -314,7 +314,7 @@ tool(
 tool(
 	"para_list_projects",
 	{
-		description: `List existing project names from 01_Projects/ directory. Returns project titles (without .md extension) sorted alphabetically. Use for linking tasks to projects.`,
+		description: `List existing project names from 01 Projects/ directory. Returns project titles (without .md extension) sorted alphabetically. Use for linking tasks to projects.`,
 		inputSchema: {
 			response_format: z
 				.enum(["markdown", "json"])
@@ -360,7 +360,7 @@ tool(
 				format,
 				projects.length > 0
 					? `# Existing Projects (${projects.length})\n\n${projects.map((p) => `- ${p}`).join("\n")}`
-					: "No projects found in 01_Projects/",
+					: "No projects found in 01 Projects/",
 			);
 		} catch (error) {
 			log({

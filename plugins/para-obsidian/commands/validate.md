@@ -23,12 +23,12 @@ bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts frontmatter validate-all $ARGUMENTS --forma
 /para-obsidian:validate
 
 # Validate specific directories
-/para-obsidian:validate --dir 01_Projects
-/para-obsidian:validate --dir 01_Projects,02_Areas
+/para-obsidian:validate --dir "01 Projects"
+/para-obsidian:validate --dir "01 Projects,02 Areas"
 
 # Validate only notes of a specific type
 /para-obsidian:validate --type project
-/para-obsidian:validate --type area --dir 02_Areas
+/para-obsidian:validate --type area --dir "02 Areas"
 
 # Get markdown output instead of JSON
 /para-obsidian:validate --format md
@@ -60,7 +60,7 @@ For each note, the validation checks:
   },
   "issues": [
     {
-      "file": "01_Projects/My Project.md",
+      "file": "01 Projects/My Project.md",
       "type": "project",
       "valid": false,
       "errors": [
@@ -82,7 +82,7 @@ By type:
 
 Files with issues:
 
-01_Projects/My Project.md:
+01 Projects/My Project.md:
   - status: missing required field
   - template_version: outdated (found 1, expected 2)
 ```

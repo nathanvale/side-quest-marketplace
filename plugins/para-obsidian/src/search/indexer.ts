@@ -198,7 +198,7 @@ export function loadIndex(config: ParaObsidianConfig): VaultIndex | undefined {
 /**
  * Lists all areas from the vault.
  *
- * Scans the 02_Areas directory for area notes and returns their titles.
+ * Scans the 02 Areas directory for area notes and returns their titles.
  * Falls back to scanning frontmatter if directory doesn't exist.
  *
  * @param config - Para-obsidian configuration
@@ -241,7 +241,7 @@ export function listAreas(config: ParaObsidianConfig): string[] {
 /**
  * Lists all projects from the vault.
  *
- * Scans the 01_Projects directory for project notes and returns their titles.
+ * Scans the 01 Projects directory for project notes and returns their titles.
  *
  * @param config - Para-obsidian configuration
  * @returns Array of project titles

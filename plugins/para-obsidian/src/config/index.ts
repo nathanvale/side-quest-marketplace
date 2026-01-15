@@ -93,7 +93,7 @@ export interface ParaObsidianConfig {
 	readonly frontmatterRules?: Record<string, FrontmatterRules>;
 	/** Expected template_version for each note type. Used for migration tracking. */
 	readonly templateVersions?: Record<string, number>;
-	/** Default destination directories for each template type (e.g., project → 01_Projects). */
+	/** Default destination directories for each template type (e.g., project → 01 Projects). */
 	readonly defaultDestinations?: Record<string, string>;
 	/** Available LLM models for AI-powered features. */
 	readonly availableModels?: ReadonlyArray<string>;

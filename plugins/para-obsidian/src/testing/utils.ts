@@ -12,11 +12,11 @@
  * const vault = createTestVault();
  *
  * // Write files to the vault
- * writeVaultFile(vault, "01_Projects/Note.md", "---\ntitle: Test\n---\n");
+ * writeVaultFile(vault, "01 Projects/Note.md", "---\ntitle: Test\n---\n");
  *
  * // Or setup a complete vault in one call
  * const vault = setupTestVault({
- *   "01_Projects/Note.md": "---\ntitle: Test\n---\n",
+ *   "01 Projects/Note.md": "---\ntitle: Test\n---\n",
  *   "Templates/project.md": "---\ntype: project\n---\n"
  * });
  * ```
@@ -79,12 +79,12 @@ export function createTestVault(options: { gitInit?: boolean } = {}): string {
  * Write a file to the test vault
  *
  * @param vault - Vault directory path
- * @param relativePath - Path relative to vault (e.g., "01_Projects/Note.md")
+ * @param relativePath - Path relative to vault (e.g., "01 Projects/Note.md")
  * @param content - File content
  *
  * @example
  * ```ts
- * writeVaultFile(vault, "01_Projects/Test.md", `---
+ * writeVaultFile(vault, "01 Projects/Test.md", `---
  * title: Test Project
  * type: project
  * status: active
@@ -136,7 +136,7 @@ export function vaultFileExists(vault: string, relativePath: string): boolean {
  * @example
  * ```ts
  * const vault = setupTestVault({
- *   "01_Projects/Test.md": `---
+ *   "01 Projects/Test.md": `---
  * title: Test
  * type: project
  * status: active

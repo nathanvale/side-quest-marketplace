@@ -9,7 +9,7 @@ Future ideas and enhancements for the plugin.
 ### Convert Command Enhancements
 
 - [ ] `--replace` flag - Delete original file after successful conversion + validation
-- [ ] Batch convert - Process multiple files at once (`convert --dir 00_Inbox --template booking`)
+- [ ] Batch convert - Process multiple files at once (`convert --dir "00 Inbox" --template booking`)
 - [ ] Model selection in config - Set default model in `.para-obsidianrc`
 - [ ] Retry with fallback - If local LLM fails, optionally retry with cloud model
 
@@ -30,7 +30,7 @@ Future ideas and enhancements for the plugin.
 
 ### Scheduled Inbox Processing
 
-- [ ] Automated inbox cleanup script - Process `00_Inbox` on schedule
+- [ ] Automated inbox cleanup script - Process `00 Inbox` on schedule
 - [ ] launchd plist generator - Create macOS-native scheduled tasks
 - [ ] Batch convert inbox notes - Auto-detect template type and convert
 - [ ] Stale note detection - Flag notes sitting in inbox too long

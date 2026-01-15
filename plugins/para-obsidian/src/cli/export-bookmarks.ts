@@ -123,7 +123,7 @@ export function resolveOutputPath(outputPath: string): string {
 /**
  * Converts frontmatter para value to category name.
  *
- * @param paraValue - Value from frontmatter (e.g., "projects", "01_Projects")
+ * @param paraValue - Value from frontmatter (e.g., "projects", "01 Projects")
  * @returns Standardized category name
  */
 function normalizeParaCategory(paraValue: unknown): string {
