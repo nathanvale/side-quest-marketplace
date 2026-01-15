@@ -28,7 +28,12 @@ describe("isPluginFile", () => {
 });
 
 describe("findPluginRoot", () => {
-	const MARKETPLACE_ROOT = "/Users/nathanvale/code/side-quest-marketplace";
+	// Use path relative to test file location to avoid hardcoded paths
+	const TEST_DIR = import.meta.dir;
+	const MARKETPLACE_ROOT = TEST_DIR.replace(
+		/\/plugins\/validate-plugin\/hooks$/,
+		"",
+	);
 	const GIT_PLUGIN_ROOT = `${MARKETPLACE_ROOT}/plugins/git`;
 
 	test("finds root for file in .claude-plugin/", () => {
