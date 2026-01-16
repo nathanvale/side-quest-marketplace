@@ -13,7 +13,9 @@
 		"history",
 		"conventional-commits",
 		"mcp",
-		"session"
+		"session",
+		"worktree",
+		"tmux"
 	],
 	"license": "MIT",
 	"skills": ["./skills/git-expert"],
@@ -22,7 +24,9 @@
 		"./commands/commit.md",
 		"./commands/create-pr.md",
 		"./commands/history.md",
-		"./commands/session-log.md"
+		"./commands/session-log.md",
+		"./commands/worktree.md",
+		"./commands/worktree-delete.md"
 	],
 	"mcpServers": ["./.mcp.json"]
 }
