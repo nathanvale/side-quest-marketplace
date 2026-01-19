@@ -10,6 +10,17 @@
 	},
 	"plugins": [
 		{
+			"name": "nvcc",
+			"source": "./plugins/nvcc",
+			"description": "Core productivity commands, specialized agents, and custom skills for dotfiles management, shell workflows, HyperFlow keyboard orchestration, and SuperWhisper voice dictation.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "productivity",
+			"keywords": ["productivity", "dotfiles", "workflows", "voice"]
+		},
+		{
 			"name": "atuin",
 			"source": "./plugins/atuin",
 			"description": "Atuin shell history integration - search, capture, and manage bash command history with AI. Never lose a command again.",
@@ -188,6 +199,23 @@
 				"code-symbols",
 				"cased-kit",
 				"code-search"
+			]
+		},
+		{
+			"name": "melanie",
+			"source": "./plugins/melanie",
+			"description": "Communication and relationship assistant for Nathan & Melanie - message drafting in authentic voice, meme creation, date research, and relationship pattern analysis. Self-contained with comprehensive style guides and personality profiles.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "personal",
+			"keywords": [
+				"communication",
+				"relationship",
+				"meme",
+				"personal",
+				"voice-matching"
 			]
 		},
 		{
