@@ -58,6 +58,11 @@ export function parseFrontmatter(content: string): FrontmatterParseResult {
  * Creates a properly formatted Markdown document with YAML frontmatter
  * delimited by `---` markers.
  *
+ * **Null value handling:** Following Obsidian best practices, null values
+ * are omitted from the frontmatter entirely rather than being written as
+ * `field: null`. This prevents issues with Dataview queries and keeps
+ * frontmatter clean.
+ *
  * @param attributes - Key-value pairs to serialize as YAML
  * @param body - Markdown body content
  * @returns Complete Markdown document with frontmatter
@@ -66,12 +71,21 @@ export function parseFrontmatter(content: string): FrontmatterParseResult {
  * ```typescript
  * const md = serializeFrontmatter({ title: 'Note', tags: ['work'] }, '# Content');
  * // '---\ntitle: Note\ntags:\n  - work\n---\n# Content'
+ *
+ * // Null values are omitted:
+ * const md2 = serializeFrontmatter({ title: 'Note', area: null }, '# Content');
+ * // '---\ntitle: Note\n---\n# Content' (area field omitted)
  * ```
  */
 export function serializeFrontmatter(
 	attributes: Record<string, unknown>,
 	body: string,
 ): string {
-	const yaml = stringify(attributes).trimEnd();
+	// Filter out null values - Obsidian best practice is to omit fields
+	// rather than write `field: null` (prevents Dataview issues)
+	const filteredAttributes = Object.fromEntries(
+		Object.entries(attributes).filter(([, value]) => value !== null),
+	);
+	const yaml = stringify(filteredAttributes).trimEnd();
 	return `---\n${yaml}\n---\n${body.replace(/^\n/, "")}`;
 }

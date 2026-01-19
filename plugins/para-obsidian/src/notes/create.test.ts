@@ -642,7 +642,9 @@ area: "[[<% tp.system.prompt("Area") %>]]"
 		// Unsubstituted prompts should be replaced with empty strings
 		// preventing YAML parse errors from nested quotes
 		expect(written).toContain("title: 🎯 No Args Test");
-		expect(written).toContain("target_completion: null"); // empty becomes null in YAML
+		// Null values are now omitted following Obsidian best practices
+		// (prevents Dataview issues and keeps frontmatter clean)
+		expect(written).not.toContain("target_completion");
 		expect(written).toContain('area: "[[]]"'); // empty wikilink
 		// Should NOT contain raw Templater patterns
 		expect(written).not.toContain("tp.system.prompt");
@@ -806,6 +808,100 @@ Body`,
 		// status and priority should NOT be replaced since they weren't null
 		expect(written).toContain("status: planning");
 		expect(written).toContain("priority: high");
+	});
+
+	it("creates note from template with native placeholders", () => {
+		const vault = setupTest();
+		writeTemplate(
+			path.join(vault, "Templates"),
+			"native-test",
+			`---
+title: null
+type: project
+status: "{{status:planning}}"
+template_version: 1
+---
+# {{title}}
+
+Created on {{date:YYYY-MM-DD}}.`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		const result = createFromTemplate(loadConfig({ cwd: vault }), {
+			template: "native-test",
+			title: "My Native Project",
+			args: { status: "active" },
+		});
+
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+		expect(written).toContain("title: My Native Project");
+		// Status should be replaced (YAML may or may not keep quotes)
+		expect(written).toMatch(/status:\s*"?active"?/);
+		expect(written).toContain("# My Native Project");
+		// Date should be replaced with actual date (not {{date:...}})
+		expect(written).not.toContain("{{date:");
+		expect(written).toMatch(/Created on \d{4}-\d{2}-\d{2}/);
+	});
+
+	it("applies emoji_prefix from template frontmatter", () => {
+		const vault = setupTest();
+		writeTemplate(
+			path.join(vault, "Templates"),
+			"emoji-test",
+			`---
+emoji_prefix: "🎯 "
+title: null
+type: project
+template_version: 1
+---
+# {{title}}`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		const result = createFromTemplate(loadConfig({ cwd: vault }), {
+			template: "emoji-test",
+			title: "My Goal",
+		});
+
+		// Filename should include emoji prefix
+		expect(result.filePath).toContain("🎯 My Goal.md");
+
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+		// Title in frontmatter should have emoji
+		expect(written).toContain("title: 🎯 My Goal");
+		// H1 should have emoji
+		expect(written).toContain("# 🎯 My Goal");
+		// emoji_prefix should be removed from output frontmatter
+		expect(written).not.toContain("emoji_prefix:");
+	});
+
+	it("does not double-prefix when title already has emoji", () => {
+		const vault = setupTest();
+		writeTemplate(
+			path.join(vault, "Templates"),
+			"emoji-test",
+			`---
+emoji_prefix: "🎯 "
+title: null
+type: project
+template_version: 1
+---
+# {{title}}`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		const result = createFromTemplate(loadConfig({ cwd: vault }), {
+			template: "emoji-test",
+			title: "🎯 Already Prefixed",
+		});
+
+		// Should not double-prefix
+		expect(result.filePath).toContain("🎯 Already Prefixed.md");
+		expect(result.filePath).not.toContain("🎯 🎯");
+
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+		expect(written).toContain("# 🎯 Already Prefixed");
+		expect(written).not.toContain("🎯 🎯");
 	});
 });
 
@@ -1120,5 +1216,122 @@ Content here.
 		// '# null' should be replaced with actual title
 		expect(written).toContain("# My Test");
 		expect(written).not.toContain("# null");
+	});
+});
+
+describe("applyTemplateSubstitutions", () => {
+	const {
+		applyTemplateSubstitutions,
+	}: {
+		applyTemplateSubstitutions: typeof import("./create").applyTemplateSubstitutions;
+	} = require("./create");
+
+	it("handles native placeholder syntax", () => {
+		const template = `---
+created: {{date:YYYY-MM-DD}}
+status: "{{status:planning}}"
+---
+# {{title}}`;
+
+		const result = applyTemplateSubstitutions(
+			template,
+			{ status: "active" },
+			{ title: "My Note", baseDate: new Date("2025-01-16") },
+		);
+
+		expect(result).toContain("created: 2025-01-16");
+		expect(result).toContain('status: "active"');
+		expect(result).toContain("# My Note");
+	});
+
+	it("handles Templater syntax with deprecation (backward compat)", () => {
+		const template = `---
+created: <% tp.date.now("YYYY-MM-DD") %>
+status: "<% tp.system.prompt("Status", "planning") %>"
+---
+Body`;
+
+		const result = applyTemplateSubstitutions(
+			template,
+			{ Status: "active" },
+			{ baseDate: new Date("2025-01-16") },
+		);
+
+		expect(result).toContain("created: 2025-01-16");
+		expect(result).toContain('status: "active"');
+	});
+
+	it("uses default values for unspecified native fields", () => {
+		const template = "Status: {{status:planning}}";
+		const result = applyTemplateSubstitutions(template, {});
+		expect(result).toBe("Status: planning");
+	});
+
+	it("returns content unchanged when no placeholders present", () => {
+		const template = "Just plain text";
+		const result = applyTemplateSubstitutions(template, {});
+		expect(result).toBe("Just plain text");
+	});
+});
+
+describe("extractEmojiPrefix", () => {
+	const {
+		extractEmojiPrefix,
+	}: { extractEmojiPrefix: typeof import("./create").extractEmojiPrefix } =
+		require("./create");
+
+	it("extracts emoji prefix from frontmatter", () => {
+		const content = `---
+emoji_prefix: "🎯 "
+type: project
+---
+# Title`;
+
+		const result = extractEmojiPrefix(content);
+		expect(result).toBe("🎯 ");
+	});
+
+	it("returns undefined when no emoji_prefix present", () => {
+		const content = `---
+type: project
+---
+# Title`;
+
+		const result = extractEmojiPrefix(content);
+		expect(result).toBeUndefined();
+	});
+
+	it("returns undefined for invalid frontmatter (Templater syntax)", () => {
+		const content = `---
+title: "<% tp.system.prompt("Title") %>"
+type: project
+---
+# Title`;
+
+		// Should not throw, just return undefined
+		const result = extractEmojiPrefix(content);
+		expect(result).toBeUndefined();
+	});
+
+	it("returns undefined for empty emoji_prefix", () => {
+		const content = `---
+emoji_prefix: ""
+type: project
+---
+# Title`;
+
+		const result = extractEmojiPrefix(content);
+		expect(result).toBeUndefined();
+	});
+
+	it("returns undefined for whitespace-only emoji_prefix", () => {
+		const content = `---
+emoji_prefix: "   "
+type: project
+---
+# Title`;
+
+		const result = extractEmojiPrefix(content);
+		expect(result).toBeUndefined();
 	});
 });

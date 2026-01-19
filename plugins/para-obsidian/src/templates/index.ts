@@ -151,32 +151,34 @@ export function detectTitlePromptKey(template: TemplateInfo): string {
  * Field information extracted from a template.
  */
 export interface TemplateField {
-	/** The exact key to use in args (matches Templater prompt text). */
+	/** The exact key to use in args (matches prompt text or placeholder name). */
 	readonly key: string;
 	/** Whether this field appears in frontmatter (vs body only). */
 	readonly inFrontmatter: boolean;
 	/** Whether this is a date field that auto-fills. */
 	readonly isAutoDate: boolean;
+	/** Default value for optional fields (from {{field:default}} or tp.system.prompt("field", "default")). */
+	readonly defaultValue?: string;
 }
 
 /**
- * Extracts all Templater prompt fields from a template.
+ * Extracts all prompt fields from a template.
  *
- * Scans template content for `<% tp.system.prompt("...") %>` patterns
- * and `<% tp.date.now(...) %>` patterns to identify required fields.
+ * Supports both Templater syntax (`<% tp.system.prompt("...") %>`) and
+ * native placeholder syntax (`{{field}}`, `{{field:default}}`).
  *
  * @param template - Template info with content to analyze
  * @returns Array of field information with exact keys to use in args
  *
  * @example
  * ```typescript
- * const template = getTemplate(config, 'project');
+ * // Templater syntax
  * const fields = getTemplateFields(template);
- * // [
- * //   { key: "Project title", inFrontmatter: true, isAutoDate: false },
- * //   { key: "Target completion date (YYYY-MM-DD)", inFrontmatter: true, isAutoDate: false },
- * //   { key: "Area", inFrontmatter: true, isAutoDate: false }
- * // ]
+ * // [{ key: "Project title", inFrontmatter: true, isAutoDate: false }]
+ *
+ * // Native syntax
+ * const fields = getTemplateFields(template);
+ * // [{ key: "status", inFrontmatter: true, isAutoDate: false, defaultValue: "planning" }]
  * ```
  */
 export function getTemplateFields(template: TemplateInfo): TemplateField[] {
@@ -194,42 +196,106 @@ export function getTemplateFields(template: TemplateInfo): TemplateField[] {
 				? template.content.slice(frontmatterMatch[0].length)
 				: template.content;
 
-			// Find all tp.system.prompt("...") fields (both single and two-arg forms)
-			// Single: <% tp.system.prompt("key") %>
-			// Double: <% tp.system.prompt("key", "default") %>
-			const promptRegex =
-				/<%\s*tp\.system\.prompt\("([^"]+)"(?:\s*,\s*"[^"]*")?\)\s*%>/g;
+			// Reserved native placeholder names (not user fields)
+			const reservedNames = new Set(["date", "title", "content"]);
 
-			// Scan frontmatter
-			for (const match of frontmatter.matchAll(promptRegex)) {
-				const key = match[1];
-				if (key && !seen.has(key)) {
-					fields.push({ key, inFrontmatter: true, isAutoDate: false });
-					seen.add(key);
-				}
-			}
+			// ===== NATIVE PLACEHOLDER SYNTAX (preferred) =====
+			// {{field}} or {{field:default}}
+			const nativeFieldRegex = /\{\{([^}:]+)(?::([^}]*))?\}\}/g;
 
-			// Scan body for any additional prompts
-			for (const match of body.matchAll(promptRegex)) {
-				const key = match[1];
-				if (key && !seen.has(key)) {
-					fields.push({ key, inFrontmatter: false, isAutoDate: false });
-					seen.add(key);
-				}
-			}
-
-			// Find auto-date fields (tp.date.now)
-			const dateRegex = /<%\s*tp\.date\.now\([^)]+\)\s*%>/g;
-			const dateMatches = frontmatter.match(dateRegex);
-			if (dateMatches && dateMatches.length > 0) {
-				// Add a note about auto-filled dates
-				if (!seen.has("created")) {
+			// Scan frontmatter for native placeholders
+			for (const match of frontmatter.matchAll(nativeFieldRegex)) {
+				const key = match[1]?.trim();
+				const defaultValue = match[2];
+				if (key && !seen.has(key) && !reservedNames.has(key)) {
 					fields.push({
-						key: "created",
+						key,
 						inFrontmatter: true,
-						isAutoDate: true,
+						isAutoDate: false,
+						defaultValue,
 					});
-					seen.add("created");
+					seen.add(key);
+				}
+			}
+
+			// Scan body for native placeholders
+			for (const match of body.matchAll(nativeFieldRegex)) {
+				const key = match[1]?.trim();
+				const defaultValue = match[2];
+				if (key && !seen.has(key) && !reservedNames.has(key)) {
+					fields.push({
+						key,
+						inFrontmatter: false,
+						isAutoDate: false,
+						defaultValue,
+					});
+					seen.add(key);
+				}
+			}
+
+			// Check for native date placeholders
+			const nativeDateRegex = /\{\{date(?::[^}]+)?\}\}/;
+			if (nativeDateRegex.test(frontmatter) && !seen.has("created")) {
+				fields.push({
+					key: "created",
+					inFrontmatter: true,
+					isAutoDate: true,
+				});
+				seen.add("created");
+			}
+
+			// ===== TEMPLATER SYNTAX (legacy, for backward compatibility) =====
+			// Only process if template uses Templater syntax
+			if (template.content.includes("<%") && template.content.includes("%>")) {
+				// Find all tp.system.prompt("...") fields (both single and two-arg forms)
+				// Single: <% tp.system.prompt("key") %>
+				// Double: <% tp.system.prompt("key", "default") %>
+				const promptRegex =
+					/<%\s*tp\.system\.prompt\("([^"]+)"(?:\s*,\s*"([^"]*)")?\)\s*%>/g;
+
+				// Scan frontmatter
+				for (const match of frontmatter.matchAll(promptRegex)) {
+					const key = match[1];
+					const defaultValue = match[2];
+					if (key && !seen.has(key)) {
+						fields.push({
+							key,
+							inFrontmatter: true,
+							isAutoDate: false,
+							defaultValue,
+						});
+						seen.add(key);
+					}
+				}
+
+				// Scan body for any additional prompts
+				for (const match of body.matchAll(promptRegex)) {
+					const key = match[1];
+					const defaultValue = match[2];
+					if (key && !seen.has(key)) {
+						fields.push({
+							key,
+							inFrontmatter: false,
+							isAutoDate: false,
+							defaultValue,
+						});
+						seen.add(key);
+					}
+				}
+
+				// Find auto-date fields (tp.date.now)
+				const dateRegex = /<%\s*tp\.date\.now\([^)]+\)\s*%>/g;
+				const dateMatches = frontmatter.match(dateRegex);
+				if (dateMatches && dateMatches.length > 0) {
+					// Add a note about auto-filled dates
+					if (!seen.has("created")) {
+						fields.push({
+							key: "created",
+							inFrontmatter: true,
+							isAutoDate: true,
+						});
+						seen.add("created");
+					}
 				}
 			}
 
@@ -250,6 +316,8 @@ export function getTemplateFields(template: TemplateInfo): TemplateField[] {
  * Scans the body section (after frontmatter) for level-2 headings (## ...)
  * and returns their text content. Used to tell the LLM what sections
  * exist in the target template during note conversion.
+ *
+ * Handles both Templater syntax and native placeholders in headings.
  *
  * @param template - Template info with content to analyze
  * @returns Array of section heading names (without ## prefix)
@@ -277,7 +345,12 @@ export function getTemplateSections(template: TemplateInfo): string[] {
 		if (heading) {
 			// Strip any Templater prompts from heading text
 			// e.g., "## <% tp.system.prompt("Title") %>" → skip or extract
-			const cleanHeading = heading.replace(/<%\s*tp\.[^%]+%>/g, "").trim();
+			let cleanHeading = heading.replace(/<%\s*tp\.[^%]+%>/g, "").trim();
+
+			// Also strip native placeholders
+			// e.g., "## {{title}}" → skip or extract
+			cleanHeading = cleanHeading.replace(/\{\{[^}]+\}\}/g, "").trim();
+
 			if (cleanHeading) {
 				sections.push(cleanHeading);
 			}
@@ -310,25 +383,41 @@ function getSectionContent(body: string, heading: string): string {
 }
 
 /**
- * Check if section content contains a dataview block.
+ * Check if section content contains a dataview block or inline dataview expressions.
  *
  * Dataview blocks are code blocks with language identifier "dataview":
  * ```dataview
  * TABLE ...
  * ```
  *
+ * Inline dataview expressions use backtick syntax:
+ * - `= this.field` (inline field reference)
+ * - `= this.file.name` (file property reference)
+ *
  * @param content - Section content to check
- * @returns true if content contains a dataview block
+ * @returns true if content contains dataview (block or inline)
  */
 function hasDataviewBlock(content: string): boolean {
-	return /```dataview[\s\S]*?```/.test(content);
+	// Check for fenced dataview code blocks
+	if (/```dataview[\s\S]*?```/.test(content)) {
+		return true;
+	}
+	// Check for inline dataview expressions: `= this.field` or `= this.file.name`
+	if (/`=\s*this\.[^`]+`/.test(content)) {
+		return true;
+	}
+	return false;
 }
 
 /**
- * Get template sections that are editable (don't contain dataview blocks).
+ * Get template sections that are editable (don't contain dataview).
  *
- * Filters out sections that have dataview queries, since those should
+ * Filters out sections that have dataview content, since those should
  * be preserved and not overwritten by LLM-generated content.
+ *
+ * Detects both:
+ * - Fenced dataview code blocks (```dataview ... ```)
+ * - Inline dataview expressions (`= this.field`)
  *
  * @param template - Template info with content to analyze
  * @returns Array of section heading names that can be edited
@@ -339,6 +428,10 @@ function hasDataviewBlock(content: string): boolean {
  * const editableSections = getEditableSections(template);
  * // ["Description", "Standards to Maintain", "Key Metrics", "Routines & Habits", "Review Questions", "Notes"]
  * // (excludes "Current Projects", "Related Tasks", "Related Resources" which have dataview)
+ *
+ * const projectTemplate = getTemplate(config, 'project');
+ * const editableSections = getEditableSections(projectTemplate);
+ * // (excludes "Project Overview" which has inline dataview `= this.status`)
  * ```
  */
 export function getEditableSections(template: TemplateInfo): string[] {
@@ -557,6 +650,7 @@ export function suggestSectionMapping(
  * convertTemplaterFormat("YYYY-MM-DD"); // "yyyy-MM-dd"
  * convertTemplaterFormat("dddd, MMMM D, YYYY"); // "EEEE, MMMM d, yyyy"
  * convertTemplaterFormat("YYYY-[W]ww"); // "yyyy-'W'II" (ISO week number)
+ * convertTemplaterFormat("YYYY-MM-DDTHH:mm:ss"); // "yyyy-MM-dd'T'HH:mm:ss" (ISO 8601)
  * ```
  */
 export function convertTemplaterFormat(templaterFormat: string): string {
@@ -596,6 +690,10 @@ export function convertTemplaterFormat(templaterFormat: string): string {
 	result = result.replace(/D/g, "d"); // 1-31
 
 	// Month tokens are the same in both: MMMM, MMM, MM, M
+
+	// ISO 8601 T separator - in date-fns, T outputs milliseconds timestamp
+	// Escape it to treat as literal when followed by hour tokens (e.g., YYYY-MM-DDTHH:mm:ss)
+	result = result.replace(/T(?=[Hh])/g, "'T'");
 
 	// Hour tokens are the same: HH, H, hh, h
 

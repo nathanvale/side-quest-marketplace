@@ -1,14 +1,18 @@
 /**
  * Note creation from templates.
  *
- * This module handles creating new notes from Templater-style templates.
- * It supports:
+ * This module handles creating new notes from templates, supporting both:
+ * - **Native placeholders** (preferred): `{{field}}`, `{{date:format}}`
+ * - **Templater syntax** (deprecated): `<% tp.system.prompt() %>`
+ *
+ * Features:
  * - Title Case filename generation
  * - Template argument substitution
  * - Automatic template_version injection
  * - Title field injection
  * - Content injection into template sections
  * - Unique filename generation on collision (Obsidian-style: "Title 1.md")
+ * - Emoji prefix support via frontmatter
  *
  * @module create
  */
@@ -20,11 +24,17 @@ import type { ParaObsidianConfig } from "../config/index";
 import { parseFrontmatter, serializeFrontmatter } from "../frontmatter/index";
 import { generateUniqueNotePath } from "../inbox/core/engine-utils";
 import { resolveVaultPath } from "../shared/fs";
+import { templatesLogger as logger } from "../shared/logger";
 import {
 	applyDateSubstitutions,
 	detectTitlePromptKey,
 	getTemplate,
 } from "../templates/index";
+import {
+	applyNativePlaceholders,
+	hasNativePlaceholders,
+	hasTemplaterSyntax,
+} from "../templates/placeholder";
 import { applyTitlePrefix } from "../utils/title";
 import { stripWikilinksOrValue } from "../utils/wikilinks";
 import { insertIntoNote, replaceSectionContent } from "./insert";
@@ -288,14 +298,131 @@ export function applyArgsToTemplate(
 }
 
 /**
+ * Applies template substitutions using the appropriate syntax.
+ *
+ * Automatically detects whether the template uses native placeholders
+ * or Templater syntax and applies the correct substitution method.
+ *
+ * **Native placeholders** (preferred):
+ * - `{{field}}` - Required field
+ * - `{{field:default}}` - Optional with default
+ * - `{{date}}`, `{{date:format}}`, `{{date:format:offset}}`
+ * - `{{title}}` - Note title
+ *
+ * **Templater syntax** (deprecated, shows warning):
+ * - `<% tp.system.prompt("field") %>`
+ * - `<% tp.date.now("format") %>`
+ *
+ * @param content - Template content
+ * @param args - Arguments for substitution (field values)
+ * @param options - Substitution options
+ * @returns Content with placeholders replaced
+ */
+export function applyTemplateSubstitutions(
+	content: string,
+	args: Record<string, string>,
+	options: {
+		/** Note title to inject */
+		title?: string;
+		/** Base date for date placeholders (default: now) */
+		baseDate?: Date;
+		/** Remove unmatched placeholders (default: false) */
+		removeUnmatched?: boolean;
+		/** Template name for deprecation logging */
+		templateName?: string;
+	} = {},
+): string {
+	const {
+		title,
+		baseDate = new Date(),
+		removeUnmatched = false,
+		templateName,
+	} = options;
+
+	// Determine which syntax the template uses
+	const hasNative = hasNativePlaceholders(content);
+	const hasTemplater = hasTemplaterSyntax(content);
+
+	// Both syntaxes - warn about mixed usage
+	if (hasNative && hasTemplater) {
+		logger.warn`templates:syntax:mixed template=${templateName ?? "unknown"} message=${"Template mixes native and Templater syntax. Please migrate fully to native {{field}} syntax."}`;
+	}
+
+	// If template uses native placeholders (preferred path)
+	if (hasNative && !hasTemplater) {
+		const argsWithTitle = title ? { title, ...args } : args;
+		return applyNativePlaceholders(content, argsWithTitle, {
+			baseDate,
+			removeUnmatched,
+			stripWikilinks: true,
+		});
+	}
+
+	// If template uses Templater syntax (deprecated path)
+	if (hasTemplater) {
+		logger.warn`templates:syntax:deprecated template=${templateName ?? "unknown"} message=${"Templater syntax is deprecated. Run 'para migrate:templates' to convert to native {{field}} syntax."}`;
+
+		// Apply Templater-style date substitutions first
+		let result = applyDateSubstitutions(content, baseDate);
+
+		// Apply Templater-style prompt substitutions
+		const argsWithTitle = title ? { Title: title, ...args } : args;
+		result = applyArgsToTemplate(result, argsWithTitle);
+
+		return result;
+	}
+
+	// No placeholders detected - return as-is
+	return content;
+}
+
+/**
+ * Extracts emoji_prefix from template frontmatter.
+ *
+ * Templates can specify an `emoji_prefix` in frontmatter to automatically
+ * prefix note titles. This replaces Templater's JS rename blocks.
+ *
+ * Handles templates with Templater syntax gracefully - if frontmatter
+ * can't be parsed (due to Templater patterns), returns undefined.
+ *
+ * @param content - Template content with frontmatter
+ * @returns Emoji prefix if found, undefined otherwise
+ *
+ * @example
+ * ```yaml
+ * ---
+ * emoji_prefix: "🎯 "
+ * ---
+ * ```
+ * Returns: "🎯 "
+ */
+export function extractEmojiPrefix(content: string): string | undefined {
+	try {
+		const { attributes } = parseFrontmatter(content);
+		const prefix = attributes.emoji_prefix;
+
+		if (typeof prefix === "string" && prefix.trim()) {
+			return prefix;
+		}
+
+		return undefined;
+	} catch {
+		// Templater syntax in frontmatter can break YAML parsing
+		// Return undefined and let the template be processed normally
+		return undefined;
+	}
+}
+
+/**
  * Creates a new note from a template.
  *
  * This function:
  * 1. Loads the specified template
- * 2. Replaces all `<% tp.date.now(...) %>` patterns with actual dates
- * 3. Replaces all `<% tp.system.prompt(...) %>` patterns with provided args
- * 4. Injects template_version and title into frontmatter
- * 5. Creates the file with Title Case filename
+ * 2. Detects syntax (native placeholders or Templater)
+ * 3. Applies appropriate substitutions for dates and fields
+ * 4. Handles emoji_prefix from template frontmatter
+ * 5. Injects template_version and title into frontmatter
+ * 6. Creates the file with Title Case filename
  *
  * @param config - Para-obsidian configuration
  * @param options - Creation options (template, title, dest, args)
@@ -324,12 +451,23 @@ export function createFromTemplate(
 	const tpl = getTemplate(config, options.template);
 	if (!tpl) throw new Error(`Template not found: ${options.template}`);
 
-	// Apply template-specific title prefix (e.g., "🎫 Booking -" for booking template)
-	const displayTitle = applyTitlePrefix(
-		options.title,
-		options.template,
-		config,
-	);
+	// Check for emoji_prefix in template frontmatter (new native approach)
+	// This replaces Templater's JS rename blocks like: if (!title.startsWith("🎯")) { await tp.file.rename("🎯 " + title); }
+	const templateEmojiPrefix = extractEmojiPrefix(tpl.content);
+
+	// Apply template-specific title prefix from multiple sources (priority order):
+	// 1. Template frontmatter emoji_prefix (native, preferred)
+	// 2. Config titlePrefixes (existing approach)
+	let displayTitle = options.title;
+	if (
+		templateEmojiPrefix &&
+		!displayTitle.startsWith(templateEmojiPrefix.trim())
+	) {
+		displayTitle = `${templateEmojiPrefix}${displayTitle}`;
+	} else {
+		// Fall back to config-based prefix (existing behavior)
+		displayTitle = applyTitlePrefix(options.title, options.template, config);
+	}
 
 	// Resolve destination: explicit > config default > vault root
 	const destDir =
@@ -347,16 +485,16 @@ export function createFromTemplate(
 		relative: path.relative(config.vault, uniqueAbsolutePath),
 	};
 
-	// Apply template substitutions:
-	// 1. First, replace all date patterns (tp.date.now) with actual dates
-	// 2. Then, replace all prompt patterns (tp.system.prompt) with provided args
-	//    - Auto-detect the title prompt key (e.g., "Title", "Project title", "Resource title")
-	//    - Inject displayTitle using the detected key for automatic substitution
-	// NOTE: We preserve Dataview inline syntax (`= this.file.name`) for dynamic H1 titles
-	let filled = applyDateSubstitutions(tpl.content);
+	// Apply template substitutions using unified function that handles both:
+	// - Native placeholders: {{field}}, {{date:format}}
+	// - Templater syntax (deprecated): <% tp.system.prompt() %>, <% tp.date.now() %>
+	// For Templater, also detect the title prompt key for automatic injection
 	const titleKey = detectTitlePromptKey(tpl);
-	const argsWithTitle = { [titleKey]: displayTitle, ...options.args };
-	filled = applyArgsToTemplate(filled, argsWithTitle);
+	const argsWithTitleKey = { [titleKey]: displayTitle, ...options.args };
+	const filled = applyTemplateSubstitutions(tpl.content, argsWithTitleKey, {
+		title: displayTitle,
+		templateName: options.template,
+	});
 
 	const { attributes: rawAttributes, body: rawBody } = parseFrontmatter(filled);
 
@@ -367,6 +505,9 @@ export function createFromTemplate(
 		rawAttributes,
 		argsForFrontmatter,
 	) as Record<string, unknown>;
+
+	// Remove emoji_prefix from output - it's a template config, not a note field
+	delete attributes.emoji_prefix;
 
 	// Also replace null in the H1 title if present (# null → # My Title)
 	let body = rawBody;
