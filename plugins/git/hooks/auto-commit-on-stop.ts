@@ -129,7 +129,9 @@ function truncateForSubject(text: string, maxLen: number): string {
 function generateCommitMessage(prompt: string | null): string {
 	const subjectMaxLen = 50; // Max chars for subject after "chore(wip): " prefix
 	const effectivePrompt =
-		prompt && prompt.trim() !== "" ? prompt : "session checkpoint";
+		typeof prompt === "string" && prompt.trim() !== ""
+			? prompt
+			: "session checkpoint";
 	const truncatedPrompt = truncateForSubject(effectivePrompt, subjectMaxLen);
 
 	return `chore(wip): ${truncatedPrompt}
