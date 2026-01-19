@@ -9,6 +9,10 @@
  */
 import path from "node:path";
 import {
+	type FileVisitor as CoreFileVisitor,
+	type WalkDirectoryOptions as CoreWalkDirectoryOptions,
+	// Re-export walkDirectory from core
+	walkDirectory as coreWalkDirectory,
 	isDirectorySync,
 	isFileSync,
 	pathExistsSync,
@@ -118,19 +122,18 @@ export function readFile(vault: string, inputPath: string): string {
 
 /**
  * Options for directory walking.
+ * Re-exported from core with vault-specific documentation.
  */
-export interface WalkDirectoryOptions {
-	/** Directory names to skip (e.g., ["node_modules", ".git"]) */
-	readonly skipDirs?: ReadonlyArray<string>;
-	/** Whether to skip hidden files/directories (starting with "."). Defaults to true. */
-	readonly skipHidden?: boolean;
-}
+export type WalkDirectoryOptions = CoreWalkDirectoryOptions;
 
 /**
  * Callback function for file visitor.
  * @param fullPath - Absolute path to the file
  * @param relativePath - Path relative to the root directory
  * @param entry - Filename (basename)
+ *
+ * Note: Para-obsidian's FileVisitor has a 3rd `entry` parameter for backwards compatibility.
+ * Core's FileVisitor only has 2 parameters (fullPath, relativePath).
  */
 export type FileVisitor = (
 	fullPath: string,
@@ -141,11 +144,8 @@ export type FileVisitor = (
 /**
  * Recursively walks a directory tree and calls a visitor function for each file.
  *
- * This is a generic utility to avoid duplicating recursive directory walking
- * logic across multiple modules. It handles:
- * - Skipping hidden files/directories (configurable)
- * - Skipping specified directories
- * - Error handling for unreadable directories
+ * This is a wrapper around core's walkDirectory that provides backwards compatibility
+ * with para-obsidian's 3-argument FileVisitor signature.
  *
  * @param rootDir - Absolute path to the root directory to walk
  * @param onFile - Callback function called for each file found
@@ -166,30 +166,11 @@ export function walkDirectory(
 	onFile: FileVisitor,
 	options: WalkDirectoryOptions = {},
 ): void {
-	const { skipDirs = [], skipHidden = true } = options;
-	const skipDirSet = new Set(skipDirs);
+	// Wrap to add the 3rd `entry` parameter that para-obsidian expects
+	const coreVisitor: CoreFileVisitor = (fullPath, relativePath) => {
+		const entry = path.basename(fullPath);
+		onFile(fullPath, relativePath, entry);
+	};
 
-	function walk(currentDir: string): void {
-		try {
-			for (const entry of readDir(currentDir)) {
-				// Skip hidden files/folders if configured
-				if (skipHidden && entry.startsWith(".")) continue;
-
-				// Skip specified directories
-				if (skipDirSet.has(entry)) continue;
-
-				const fullPath = path.join(currentDir, entry);
-				if (isDirectorySync(fullPath)) {
-					walk(fullPath);
-				} else if (isFileSync(fullPath)) {
-					const relativePath = path.relative(rootDir, fullPath);
-					onFile(fullPath, relativePath, entry);
-				}
-			}
-		} catch {
-			// Skip directories we can't read (permission issues, etc.)
-		}
-	}
-
-	walk(rootDir);
+	coreWalkDirectory(rootDir, coreVisitor, options);
 }

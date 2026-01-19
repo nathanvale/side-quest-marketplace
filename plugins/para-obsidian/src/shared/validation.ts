@@ -8,6 +8,10 @@
  */
 
 import { basename, normalize } from "node:path";
+import {
+	sanitizePattern as coreSanitizePattern,
+	validateFilePath as coreValidateFilePath,
+} from "@sidequest/core/fs";
 
 /**
  * Validate classifier ID (kebab-case, no path traversal)
@@ -121,6 +125,7 @@ export function validateTemplateName(name: string): string {
  * Sanitize pattern string (prevent ReDoS)
  *
  * Removes dangerous regex patterns that could cause exponential backtracking.
+ * Delegates to core implementation.
  *
  * @param pattern - Regex pattern to sanitize
  * @returns Sanitized pattern
@@ -132,22 +137,14 @@ export function validateTemplateName(name: string): string {
  * ```
  */
 export function sanitizePattern(pattern: string): string {
-	// Remove potentially dangerous patterns
-	let clean = pattern;
-
-	// Remove nested quantifiers (e.g., (a+)+, (a*)*) - ReDoS risk
-	clean = clean.replace(/\([^)]*[+*][^)]*\)[+*]/g, "");
-
-	// Limit pattern length to prevent resource exhaustion
-	if (clean.length > 500) {
-		clean = clean.substring(0, 500);
-	}
-
-	return clean;
+	return coreSanitizePattern(pattern);
 }
 
 /**
  * Validate file path (no path traversal, within bounds)
+ *
+ * Delegates to core implementation. Prevents absolute paths, path traversal,
+ * and hidden files.
  *
  * @param inputPath - Path to validate
  * @returns Sanitized path
@@ -160,27 +157,7 @@ export function sanitizePattern(pattern: string): string {
  * ```
  */
 export function validateFilePath(inputPath: string): string {
-	const normalized = normalize(inputPath);
-
-	// Prevent absolute paths
-	if (normalized.startsWith("/")) {
-		throw new Error(`Path must be relative (got: ${inputPath})`);
-	}
-
-	// Prevent path traversal
-	if (normalized.includes("..")) {
-		throw new Error(`Path traversal not allowed (got: ${inputPath})`);
-	}
-
-	// Prevent hidden files (common security risk)
-	const parts = normalized.split("/");
-	for (const part of parts) {
-		if (part.startsWith(".")) {
-			throw new Error(`Hidden files not allowed (got: ${inputPath})`);
-		}
-	}
-
-	return normalized;
+	return coreValidateFilePath(inputPath);
 }
 
 /**

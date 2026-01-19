@@ -766,3 +766,26 @@ export {
 	fsUnlink as nodeUnlink,
 	fsStat as nodeStat,
 };
+
+// ============================================
+// RE-EXPORTS - New utility modules
+// ============================================
+
+// Backup and restore utilities
+export {
+	createBackup,
+	restoreFromBackup,
+	safeReadJSON,
+} from "./backup.js";
+// Path safety and validation utilities
+export {
+	sanitizePattern,
+	validateFilePath,
+	validatePathSafety,
+} from "./safety.js";
+// Directory walking utilities
+export {
+	type FileVisitor,
+	type WalkDirectoryOptions,
+	walkDirectory,
+} from "./walk.js";
