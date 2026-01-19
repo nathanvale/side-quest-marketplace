@@ -187,6 +187,13 @@
       "name": "@sidequest/scraper-toolkit",
       "version": "1.0.0",
     },
+    "plugins/teams-scrape": {
+      "name": "@sidequest/teams-scrape",
+      "version": "1.0.0",
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+    },
     "plugins/terminal": {
       "name": "@sidequest/terminal",
       "version": "1.0.0",
@@ -398,6 +405,8 @@
     "@sidequest/plugin-template": ["@sidequest/plugin-template@workspace:plugins/plugin-template"],
 
     "@sidequest/scraper-toolkit": ["@sidequest/scraper-toolkit@workspace:plugins/scraper-toolkit"],
+
+    "@sidequest/teams-scrape": ["@sidequest/teams-scrape@workspace:plugins/teams-scrape"],
 
     "@sidequest/terminal": ["@sidequest/terminal@workspace:plugins/terminal"],
 
@@ -953,6 +962,8 @@
 
     "@sidequest/para-obsidian/@types/bun": ["@types/bun@1.3.5", "", { "dependencies": { "bun-types": "1.3.5" } }, "sha512-RnygCqNrd3srIPEWBd5LFeUYG7plCoH2Yw9WaZGyNmdTEei+gWaHqydbaIRkIkcbXwhBT94q78QljxN0Sk838w=="],
 
+    "@sidequest/teams-scrape/@types/bun": ["@types/bun@1.3.6", "", { "dependencies": { "bun-types": "1.3.6" } }, "sha512-uWCv6FO/8LcpREhenN1d1b6fcspAB+cefwD7uti8C8VffIv0Um08TKMn98FynpTiU38+y2dUO55T11NgDt8VAA=="],
+
     "body-parser/iconv-lite": ["iconv-lite@0.7.0", "", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3.0.0" } }, "sha512-cf6L2Ds3h57VVmkZe+Pn+5APsT7FpqJtEhhieDCvrE2MK5Qk9MyffgQyuxQTm6BChfeZNtcOLHp9IcWRVcIcBQ=="],
 
     "ecdsa-sig-formatter/safe-buffer": ["safe-buffer@5.2.1", "", {}, "sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ=="],
@@ -986,6 +997,8 @@
     "@sidequest/firecrawl/@types/bun/bun-types": ["bun-types@1.3.5", "", { "dependencies": { "@types/node": "*" } }, "sha512-inmAYe2PFLs0SUbFOWSVD24sg1jFlMPxOjOSSCYqUgn4Hsc3rDc7dFvfVYjFPNHtov6kgUeulV4SxbuIV/stPw=="],
 
     "@sidequest/para-obsidian/@types/bun/bun-types": ["bun-types@1.3.5", "", { "dependencies": { "@types/node": "*" } }, "sha512-inmAYe2PFLs0SUbFOWSVD24sg1jFlMPxOjOSSCYqUgn4Hsc3rDc7dFvfVYjFPNHtov6kgUeulV4SxbuIV/stPw=="],
+
+    "@sidequest/teams-scrape/@types/bun/bun-types": ["bun-types@1.3.6", "", { "dependencies": { "@types/node": "*" } }, "sha512-OlFwHcnNV99r//9v5IIOgQ9Uk37gZqrNMCcqEaExdkVq3Avwqok1bJFmvGMCkCE0FqzdY8VMOZpfpR3lwI+CsQ=="],
 
     "form-data/mime-types/mime-db": ["mime-db@1.52.0", "", {}, "sha512-sPU4uV7dYlvtWJxwwxHD0PuihVNiE7TyAbQ5SWxDCB9mUYvOgroQOwYQQOKPJ8CIbE+1ETVlOoK1UC2nU3gYvg=="],
 

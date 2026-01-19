@@ -1,0 +1,23 @@
+{
+	"name": "@sidequest/teams-scrape",
+	"version": "1.0.0",
+	"description": "Microsoft Teams web scraping utilities for extracting meeting data and content",
+	"type": "module",
+	"main": "./src/index.ts",
+	"scripts": {
+		"test": "bun test --recursive",
+		"typecheck": "tsc --noEmit",
+		"format": "biome format --write .",
+		"lint": "biome lint .",
+		"check": "biome check --write ."
+	},
+	"keywords": ["teams", "scraping", "microsoft", "playwright", "web-scraping"],
+	"author": {
+		"name": "Nathan Vale",
+		"email": "hi@nathanvale.com"
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	},
+	"dependencies": {}
+}

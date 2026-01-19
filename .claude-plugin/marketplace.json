@@ -308,6 +308,17 @@
 			},
 			"category": "productivity",
 			"keywords": ["bookmarks"]
+		},
+		{
+			"name": "teams-scrape",
+			"source": "./plugins/teams-scrape",
+			"description": "Extract Microsoft Teams chat messages using macOS automation. Pure skill plugin - uses macos-automator MCP to navigate, capture, and parse Teams content into structured JSON.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "productivity",
+			"keywords": ["teams", "chat", "microsoft", "macos-automation", "scraping"]
 		}
 	]
 }
