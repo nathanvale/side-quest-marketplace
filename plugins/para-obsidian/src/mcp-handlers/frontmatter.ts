@@ -28,6 +28,7 @@ import {
 	type VersionPlanStatus,
 	validateFrontmatterFile,
 } from "../frontmatter/index";
+import { ensureGitGuard } from "../git/index";
 import { MIGRATIONS } from "../templates/migrations";
 
 // ============================================================================
@@ -277,6 +278,11 @@ Requires git repository with clean working tree (unless dry-run).`,
 				for (const [k, v] of Object.entries(set)) {
 					typedSet[k] = coerceValue(v);
 				}
+			}
+
+			// Ensure git is clean before writing (unless dry-run)
+			if (!dryRun) {
+				await ensureGitGuard(config);
 			}
 
 			const result = updateFrontmatterFile(config, file, {

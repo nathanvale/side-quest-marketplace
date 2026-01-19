@@ -129,7 +129,11 @@ function validateField(
 			return undefined;
 		}
 		case "wikilink": {
-			if (typeof value !== "string" || !value.startsWith("[[")) {
+			if (
+				typeof value !== "string" ||
+				!value.startsWith("[[") ||
+				!value.endsWith("]]")
+			) {
 				return {
 					field,
 					message: `expected wikilink [[...]], got ${formatValueForError(value)}${optionalHint}`,

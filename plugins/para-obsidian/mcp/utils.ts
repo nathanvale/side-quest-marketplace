@@ -7,6 +7,7 @@
  * @module mcp/utils
  */
 
+import { coerceValue as coreCoerceValue } from "@sidequest/core/cli";
 import type { ParaObsidianConfig } from "../src/config";
 import {
 	createCorrelationId,
@@ -243,22 +244,17 @@ export function parseKeyValuePairs(pairs: string[]): Record<string, string> {
 
 /**
  * Coerce string value to appropriate JavaScript type.
+ *
+ * Wraps core coerceValue with frontmatter-specific handling:
+ * - "null" → null (for clearing optional fields)
+ *
+ * Core handles: booleans, numbers (including negative), JSON arrays/objects,
+ * comma-separated arrays, quoted strings.
  */
 export function coerceValue(value: string): unknown {
-	// Try parsing as JSON first
-	if (value === "true") return true;
-	if (value === "false") return false;
+	// Handle null specially for frontmatter field clearing
 	if (value === "null") return null;
-	if (/^\d+$/.test(value)) return Number.parseInt(value, 10);
-	if (/^\d+\.\d+$/.test(value)) return Number.parseFloat(value);
-	if (value.startsWith("[") && value.endsWith("]")) {
-		try {
-			return JSON.parse(value);
-		} catch {
-			// Fall through to string
-		}
-	}
-	return value;
+	return coreCoerceValue(value);
 }
 
 // ============================================================================

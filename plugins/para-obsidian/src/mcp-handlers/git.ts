@@ -98,6 +98,13 @@ Returns structured results with commit count, messages, and files.`,
 				}
 
 				// Markdown format
+				if (!result.committed) {
+					return respondText(
+						format,
+						`## Nothing to Commit\n\n**File:** ${file}\n\nThe note is already committed or has no changes.`,
+					);
+				}
+
 				const lines = [
 					"## Note Committed",
 					"",

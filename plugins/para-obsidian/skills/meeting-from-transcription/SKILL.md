@@ -67,6 +67,19 @@ If `--type` override provided, use it. Otherwise infer from transcript content.
 
 See [meeting-types.md](references/meeting-types.md) for enum values and inference signals.
 
+### Step 3b: Determine Area or Project
+
+**REQUIRED:** Meeting notes must have either `area` or `project` in frontmatter.
+
+1. Check transcription frontmatter for existing `area` or `project` field
+2. If present → Use that value (already a wikilink)
+3. If not present → Use `AskUserQuestion` to ask user:
+   - "Which area or project does this meeting belong to?"
+   - Provide options based on context from the transcript content
+   - Include "Other" option for custom input
+
+The value must be a wikilink format: `[[Area Name]]` or `[[Project Name]]`
+
 ### Step 4: Commit Uncommitted Changes
 
 ```
@@ -82,7 +95,13 @@ cd ${CLAUDE_PLUGIN_ROOT} && bun src/cli.ts create \
   --arg "meeting_date=<DATE>" \
   --arg "meeting_type=<TYPE>" \
   --arg "transcription=[[<NOTE_NAME>]]" \
-  --arg "summary=<SUMMARY>"
+  --arg "summary=<SUMMARY>" \
+  --arg "area=[[<AREA_NAME>]]"
+```
+
+Or if project instead of area:
+```bash
+  --arg "project=[[<PROJECT_NAME>]]"
 ```
 
 **Arguments:**
@@ -90,6 +109,7 @@ cd ${CLAUDE_PLUGIN_ROOT} && bun src/cli.ts create \
 - `meeting_type` — One of: `1-on-1`, `standup`, `planning`, `retro`, `review`, `interview`, `stakeholder`, `general`
 - `transcription` — Note name WITHOUT path or `.md` extension, wrapped in `[[...]]`
 - `summary` — Concise 1-line description (max 100 chars)
+- `area` OR `project` — **REQUIRED** (one of these must be provided) — Wikilink to parent area or project
 
 ### Step 6: Link Transcription to Meeting
 
