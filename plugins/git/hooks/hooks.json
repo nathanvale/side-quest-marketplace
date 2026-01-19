@@ -29,7 +29,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/auto-commit-check.ts",
+						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/auto-commit-on-stop.ts",
 						"timeout": 5
 					}
 				]

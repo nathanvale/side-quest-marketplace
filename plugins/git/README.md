@@ -32,6 +32,7 @@ Seven tools for efficient git queries:
 - Blocks session end and prompts Claude to use `/git:commit`
 - Includes loop prevention via `stop_hook_active` flag
 - Only triggers on staged changes (respects user intent)
+- Auto-commits uncommitted changes as WIP when session stops (prevents lost work)
 
 ### Slash Commands
 
