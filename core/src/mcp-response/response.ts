@@ -134,7 +134,10 @@ export type McpErrorResponse = McpResponse & {
  * });
  * ```
  */
-export function respondText(format: ResponseFormat, text: string): McpResponse {
+export function respondText(
+	_format: ResponseFormat,
+	text: string,
+): McpResponse {
 	return {
 		content: [{ type: "text" as const, text }],
 	};

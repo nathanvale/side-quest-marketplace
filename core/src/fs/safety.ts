@@ -8,7 +8,7 @@
  */
 
 import { realpathSync } from "node:fs";
-import { basename, dirname, normalize, resolve } from "node:path";
+import { dirname, normalize, resolve } from "node:path";
 import { pathExistsSync } from "./index.js";
 
 /**

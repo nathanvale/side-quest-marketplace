@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { createBackup, restoreFromBackup, safeReadJSON } from "./backup.js";
 import { pathExists, readTextFile, writeTextFile } from "./index.js";

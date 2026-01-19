@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import {
 	formatError,
 	type McpErrorResponse,
-	type McpResponse,
 	parseResponseFormat,
 	ResponseFormat,
 	respondError,
