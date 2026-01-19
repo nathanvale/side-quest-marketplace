@@ -11,7 +11,13 @@
 		"lint": "biome lint .",
 		"check": "biome check --write ."
 	},
-	"keywords": ["teams", "scraping", "microsoft", "playwright", "web-scraping"],
+	"keywords": [
+		"teams",
+		"scraping",
+		"microsoft",
+		"playwright",
+		"web-scraping"
+	],
 	"author": {
 		"name": "Nathan Vale",
 		"email": "hi@nathanvale.com"
