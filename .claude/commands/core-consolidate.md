@@ -9,8 +9,12 @@ Scan `plugins/$ARGUMENTS` for code patterns that should be extracted into `@side
 
 ## Instructions
 
-1. Validate the plugin exists at `plugins/$ARGUMENTS`
-2. Launch 4 parallel `core-consolidator` agents, each scanning one domain:
+1. If no plugin specified or plugin doesn't exist:
+   - List available plugins from `plugins/` directory
+   - Ask user to choose one
+   - Exit until they provide a valid plugin name
+2. Validate the plugin exists at `plugins/$ARGUMENTS`
+3. Launch 4 parallel `core-consolidator` agents, each scanning one domain:
    - **FS**: File I/O, path handling, directory walking
    - **Concurrency**: Locks, transactions, atomic operations
    - **MCP**: Response building, error formatting

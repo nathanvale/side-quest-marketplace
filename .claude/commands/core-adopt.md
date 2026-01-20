@@ -9,9 +9,13 @@ Scan `plugins/$ARGUMENTS` for places to replace custom code with `@sidequest/cor
 
 ## Instructions
 
-1. Validate the plugin exists at `plugins/$ARGUMENTS`
-2. Check current `@sidequest/core` imports in the plugin
-3. Launch 4 parallel `core-adopter` agents, each scanning one domain:
+1. If no plugin specified or plugin doesn't exist:
+   - List available plugins from `plugins/` directory
+   - Ask user to choose one
+   - Exit until they provide a valid plugin name
+2. Validate the plugin exists at `plugins/$ARGUMENTS`
+3. Check current `@sidequest/core` imports in the plugin
+4. Launch 4 parallel `core-adopter` agents, each scanning one domain:
    - **FS**: `@sidequest/core/fs` adoption
    - **Concurrency**: `@sidequest/core/concurrency` adoption
    - **Instrumentation**: `@sidequest/core/instrumentation` adoption
