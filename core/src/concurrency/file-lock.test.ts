@@ -85,13 +85,24 @@ describe("file-lock", () => {
 
 		test("prevents concurrent access", async () => {
 			const executions: number[] = [];
+
+			// Use a promise to signal when operation1 has acquired the lock
+			let signalLockAcquired: () => void;
+			const lockAcquired = new Promise<void>((resolve) => {
+				signalLockAcquired = resolve;
+			});
+
 			const operation1 = withFileLock("test-resource", async () => {
+				signalLockAcquired(); // Signal that we have the lock
 				executions.push(1);
 				await new Promise((resolve) => setTimeout(resolve, SHORT_OPERATION_MS));
 				executions.push(2);
 			});
 
-			// Start second operation immediately
+			// Wait for operation1 to acquire the lock before starting operation2
+			await lockAcquired;
+
+			// Now start second operation - it must wait for first to complete
 			const operation2 = withFileLock("test-resource", async () => {
 				executions.push(3);
 			});
