@@ -33,35 +33,41 @@
  * @module shared/instrumentation
  */
 
-import { AsyncLocalStorage } from "node:async_hooks";
 import type { Logger } from "@logtape/logtape";
 import {
+	getCurrentContext as coreGetCurrentContext,
+	createTraceContext,
 	getLatencyBucket,
 	incrementCounter,
 	observeHistogram,
+	runWithContext,
+	type TraceContext,
 } from "@sidequest/core/instrumentation";
 import { createCorrelationId, type SUBSYSTEMS } from "./logger.js";
-
-/**
- * AsyncLocalStorage for automatic correlation ID propagation across async boundaries.
- * This enables automatic parent-child relationship tracking without manual propagation.
- */
-const asyncLocalStorage = new AsyncLocalStorage<{
-	cid: string;
-	parentCid?: string;
-}>();
 
 /**
  * Get the current correlation context from AsyncLocalStorage.
  * Returns undefined if not running within an observe/observeSync context.
  *
  * This is useful for manual correlation tracking in code that doesn't use observe/observeSync.
+ *
+ * Now delegates to core's context utilities for cross-plugin trace propagation.
  */
 export function getCurrentContext():
 	| { cid: string; parentCid?: string }
 	| undefined {
-	return asyncLocalStorage.getStore();
+	const ctx = coreGetCurrentContext();
+	if (!ctx) return undefined;
+	return { cid: ctx.cid, parentCid: ctx.parentCid };
 }
+
+// Re-export core context utilities for plugins that want full TraceContext
+export {
+	createTraceContext,
+	coreGetCurrentContext as getCoreContext,
+	runWithContext,
+	type TraceContext,
+};
 
 /** Message format required for MetricsCollector compatibility */
 const MCP_TOOL_RESPONSE = "MCP tool response" as const;
@@ -248,8 +254,11 @@ export async function observe<T>(
 	const parentCid = options?.parentCid ?? currentContext?.cid;
 	const startTime = Date.now();
 
-	// Run operation within AsyncLocalStorage context for automatic propagation
-	return asyncLocalStorage.run({ cid, parentCid }, async () => {
+	// Create trace context for automatic propagation via core utilities
+	const traceContext = createTraceContext({ cid, parentCid });
+
+	// Run operation within core's context for automatic propagation
+	return runWithContext(traceContext, async () => {
 		try {
 			const result = await operation();
 			const durationMs = Math.max(0, Date.now() - startTime);
@@ -334,8 +343,11 @@ export function observeSync<T>(
 	const parentCid = options?.parentCid ?? currentContext?.cid;
 	const startTime = Date.now();
 
-	// Run operation within AsyncLocalStorage context for automatic propagation
-	return asyncLocalStorage.run({ cid, parentCid }, () => {
+	// Create trace context for automatic propagation via core utilities
+	const traceContext = createTraceContext({ cid, parentCid });
+
+	// Run operation within core's context for automatic propagation
+	return runWithContext(traceContext, () => {
 		try {
 			const result = operation();
 			const durationMs = Math.max(0, Date.now() - startTime);
