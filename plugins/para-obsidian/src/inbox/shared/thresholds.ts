@@ -11,7 +11,7 @@
  * @module inbox/shared/thresholds
  */
 
-import { SLO_DEFINITIONS } from "./slos.js";
+import { SLO_DEFINITIONS } from "./slo-tracker.js";
 
 /**
  * Performance threshold definitions for various operations.

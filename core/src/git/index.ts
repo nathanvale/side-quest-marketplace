@@ -7,6 +7,19 @@ import { realpath } from "node:fs/promises";
 import { resolve } from "node:path";
 import { spawnAndCollect } from "../spawn/index.js";
 
+// Re-export guard utilities
+export {
+	assertGitRepo,
+	ensureGitGuard,
+	type GetUncommittedFilesOptions,
+	type GitGuardLogger,
+	type GitGuardOptions,
+	getUncommittedFiles,
+	gitStatus,
+} from "./guard.js";
+// Re-export path utilities
+export { unescapeGitPath } from "./paths.js";
+
 /**
  * Get the root directory of the current git repository.
  *

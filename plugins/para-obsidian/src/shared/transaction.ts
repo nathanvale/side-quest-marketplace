@@ -4,40 +4,31 @@
  * Executes a series of operations atomically, with automatic rollback
  * on failure. Ensures all-or-nothing semantics for multi-step operations.
  *
+ * This module wraps @sidequest/core/concurrency with para-obsidian-specific
+ * instrumentation and logging.
+ *
  * @module shared/transaction
  */
 
+import {
+	type RollbackOperation as CoreRollbackOperation,
+	Transaction as CoreTransaction,
+	type TransactionResult as CoreTransactionResult,
+	executeTransaction as coreExecuteTransaction,
+} from "@sidequest/core/concurrency";
 import { observe } from "./instrumentation.js";
 import { txLogger } from "./logger.js";
 
 /**
- * Rollback operation definition
+ * Re-export types from core for backward compatibility
  */
-export interface RollbackOperation {
-	/** Operation name for logging */
-	readonly name: string;
-	/** Execute the operation, optionally returning rollback state */
-	readonly execute: () => Promise<unknown>;
-	/** Rollback the operation using captured state */
-	readonly rollback: (result?: unknown) => Promise<void>;
-}
-
-/**
- * Transaction execution result (discriminated union)
- */
-export type TransactionResult<T> =
-	| { readonly success: true; readonly data: T }
-	| {
-			readonly success: false;
-			readonly error: Error;
-			readonly failedAt: string;
-	  };
+export type RollbackOperation = CoreRollbackOperation;
+export type TransactionResult<T> = CoreTransactionResult<T>;
 
 /**
  * Transaction executor with automatic rollback on failure.
  *
- * Executes operations sequentially, capturing rollback state.
- * On failure, rolls back all completed operations in reverse order.
+ * Wraps core Transaction with para-obsidian instrumentation.
  *
  * @example
  * ```ts
@@ -63,8 +54,19 @@ export type TransactionResult<T> =
  * ```
  */
 export class Transaction {
-	private operations: RollbackOperation[] = [];
-	private completed: Array<{ op: RollbackOperation; result: unknown }> = [];
+	private coreTransaction: CoreTransaction;
+	private operationNames: string[] = [];
+
+	constructor() {
+		this.coreTransaction = new CoreTransaction({
+			logger: {
+				debug: (message, context) =>
+					txLogger.debug`${message} ${JSON.stringify(context ?? {})}`,
+				error: (message, context) =>
+					txLogger.error`${message} ${JSON.stringify(context ?? {})}`,
+			},
+		});
+	}
 
 	/**
 	 * Add an operation to the transaction
@@ -72,7 +74,8 @@ export class Transaction {
 	 * @param operation - Operation with execute and rollback functions
 	 */
 	add(operation: RollbackOperation): void {
-		this.operations.push(operation);
+		this.operationNames.push(operation.name);
+		this.coreTransaction.add(operation);
 	}
 
 	/**
@@ -86,30 +89,12 @@ export class Transaction {
 			txLogger,
 			"tx:execute",
 			async () => {
-				try {
-					let lastResult: unknown;
-
-					for (const op of this.operations) {
-						const result = await op.execute();
-						this.completed.push({ op, result });
-						lastResult = result;
-					}
-
-					return { success: true, data: lastResult as T };
-				} catch (error) {
-					const failedOp = this.operations[this.completed.length];
-					await this.rollback();
-					return {
-						success: false,
-						error: error as Error,
-						failedAt: failedOp?.name || "unknown",
-					};
-				}
+				return this.coreTransaction.execute<T>();
 			},
 			{
 				context: {
-					operationCount: this.operations.length,
-					operationNames: this.operations.map((op) => op.name),
+					operationCount: this.pendingCount,
+					operationNames: this.operationNames,
 				},
 				isSuccess: (result) => result.success,
 			},
@@ -117,56 +102,25 @@ export class Transaction {
 	}
 
 	/**
-	 * Manually rollback all completed operations.
-	 * Called automatically on execute() failure.
-	 */
-	private async rollback(): Promise<void> {
-		// Rollback in reverse order
-		for (const { op, result } of this.completed.reverse()) {
-			try {
-				await op.rollback(result);
-			} catch (rollbackError) {
-				const errorMessage =
-					rollbackError instanceof Error
-						? rollbackError.message
-						: String(rollbackError);
-				const errorStack =
-					rollbackError instanceof Error ? rollbackError.stack : undefined;
-
-				txLogger.error("MCP tool response", {
-					tool: "tx:rollbackOperation",
-					durationMs: 0,
-					success: false,
-					timestamp: new Date().toISOString(),
-					operationName: op.name,
-					error: errorMessage,
-					stack: errorStack,
-				});
-			}
-		}
-		this.completed = [];
-	}
-
-	/**
 	 * Clear all operations without executing
 	 */
 	clear(): void {
-		this.operations = [];
-		this.completed = [];
+		this.coreTransaction.clear();
+		this.operationNames = [];
 	}
 
 	/**
 	 * Get number of pending operations
 	 */
 	get pendingCount(): number {
-		return this.operations.length;
+		return this.coreTransaction.pendingCount;
 	}
 
 	/**
 	 * Get number of completed operations
 	 */
 	get completedCount(): number {
-		return this.completed.length;
+		return this.coreTransaction.completedCount;
 	}
 }
 
@@ -191,11 +145,14 @@ export async function executeTransaction<T = void>(
 		txLogger,
 		"tx:executeTransaction",
 		async () => {
-			const tx = new Transaction();
-			for (const op of operations) {
-				tx.add(op);
-			}
-			return tx.execute<T>();
+			return coreExecuteTransaction<T>(operations, {
+				logger: {
+					debug: (message, context) =>
+						txLogger.debug`${message} ${JSON.stringify(context ?? {})}`,
+					error: (message, context) =>
+						txLogger.error`${message} ${JSON.stringify(context ?? {})}`,
+				},
+			});
 		},
 		{
 			context: {

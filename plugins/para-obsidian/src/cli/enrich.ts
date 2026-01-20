@@ -18,7 +18,7 @@ import {
 	DEFAULT_ENRICHMENT_STRATEGIES,
 } from "../inbox/enrich/pipeline";
 import { createInboxFile } from "../inbox/scan/extractors";
-import { checkSLOBreach, recordSLOEvent } from "../inbox/shared/slos";
+import { checkSLOBreach, recordSLOEvent } from "../inbox/shared/slo-tracker.js";
 import {
 	createCorrelationId,
 	enrichLogger,

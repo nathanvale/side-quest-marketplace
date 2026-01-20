@@ -51,29 +51,17 @@ export { coreGetLogFile as getLogFile };
 // Response Formatting
 // ============================================================================
 
-/** Response format enum for tool outputs. */
-export enum ResponseFormat {
-	MARKDOWN = "markdown",
-	JSON = "json",
-}
+// Re-export core response formatting utilities for backward compatibility
+export {
+	formatError,
+	parseResponseFormat,
+	ResponseFormat,
+	respondError,
+	respondText,
+} from "@sidequest/core/mcp-response";
 
-/**
- * Parse response_format parameter to enum.
- */
-export function parseResponseFormat(value?: string): ResponseFormat {
-	return value === "json" ? ResponseFormat.JSON : ResponseFormat.MARKDOWN;
-}
-
-/**
- * Format an error for MCP response.
- */
-export function formatError(error: unknown, format: ResponseFormat): string {
-	const message = error instanceof Error ? error.message : String(error);
-	if (format === ResponseFormat.JSON) {
-		return JSON.stringify({ error: message, isError: true }, null, 2);
-	}
-	return `**Error:** ${message}`;
-}
+// Import ResponseFormat for use in local functions
+import type { ResponseFormat } from "@sidequest/core/mcp-response";
 
 /**
  * Append log file path to response text.
@@ -85,57 +73,15 @@ export function withLogFile(text: string, format: ResponseFormat): string {
 	return coreWithLogFile(text, format);
 }
 
-/**
- * Create a successful text response.
- */
-export function respondText(format: ResponseFormat, text: string) {
-	return {
-		content: [{ type: "text" as const, text: withLogFile(text, format) }],
-	};
-}
-
-/**
- * Create an error response with isError flag.
- */
-export function respondError(format: ResponseFormat, error: unknown) {
-	return {
-		isError: true,
-		content: [
-			{
-				type: "text" as const,
-				text: withLogFile(formatError(error, format), format),
-			},
-		],
-	};
-}
-
 // ============================================================================
 // Helper Functions
 // ============================================================================
 
-import {
-	parseDirs as coreParseDirs,
-	parseKeyValuePairs as coreParseKeyValuePairs,
+// Re-export core CLI utilities for backward compatibility
+export {
+	parseDirs,
+	parseKeyValuePairs,
 } from "@sidequest/core/cli";
-
-/**
- * Parse comma-separated directory list.
- * @deprecated Use parseDirs from @sidequest/core/cli instead
- */
-export function parseDirs(
-	value: string | undefined,
-): ReadonlyArray<string> | undefined {
-	// Adapt to core signature which accepts boolean | undefined
-	return coreParseDirs(value);
-}
-
-/**
- * Parse key=value pairs from string array.
- * @deprecated Use parseKeyValuePairs from @sidequest/core/cli instead
- */
-export function parseKeyValuePairs(pairs: string[]): Record<string, string> {
-	return coreParseKeyValuePairs(pairs);
-}
 
 /**
  * Coerce string value to appropriate JavaScript type.

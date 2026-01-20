@@ -9,6 +9,7 @@
 
 import { basename, join } from "node:path";
 import { pathExistsSync, readDir } from "@sidequest/core/fs";
+import { captureResourceMetrics } from "@sidequest/core/instrumentation";
 import pLimit from "p-limit";
 import {
 	DEFAULT_DESTINATIONS,
@@ -29,7 +30,6 @@ import {
 	inboxLogger,
 	initLoggerWithNotice,
 } from "../../shared/logger";
-import { captureResourceMetrics } from "../../shared/resource-metrics";
 import { buildSuggestion, DEFAULT_CLASSIFIERS } from "../classify/classifiers";
 import {
 	checkPdfToText,
@@ -48,7 +48,7 @@ import {
 	type InboxFile,
 } from "../scan/extractors";
 import { createInboxError } from "../shared/errors";
-import { checkSLOBreach, recordSLOEvent } from "../shared/slos";
+import { checkSLOBreach, recordSLOEvent } from "../shared/slo-tracker.js";
 import {
 	type BatchResult,
 	type ChallengeSuggestion,

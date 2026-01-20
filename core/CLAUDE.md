@@ -62,10 +62,12 @@ core/
 │   ├── logging/               # Structured logging with correlation IDs
 │   ├── mcp/                   # Simplified MCP server API (mcpez fork)
 │   ├── password/              # Password validation
+│   ├── slo/                   # SLO tracking with burn rate analysis
 │   ├── spawn/                 # Process spawning utilities
 │   ├── streams/               # Stream processing utilities
 │   ├── terminal/              # Terminal utilities (colors, formatting)
-│   └── utils/                 # General utilities
+│   ├── utils/                 # General utilities
+│   └── validation/            # Input validation (identifiers, numbers, names)
 ├── package.json               # Package metadata with subpath exports
 └── tsconfig.json              # TypeScript configuration (extends root)
 ```
@@ -264,6 +266,31 @@ Structured logging with correlation IDs for request tracing.
 - `metrics.ts` - Performance metrics
 - `config.ts` - Logger configuration
 
+### Validation Utilities (`src/validation/`)
+
+Input validation for identifiers, numbers, and names.
+
+**Why This Exists:**
+Common validation patterns (kebab-case IDs, priority ranges, area names) were
+duplicated across plugins. This module consolidates them with comprehensive
+tests and security hardening.
+
+**Modules:**
+- `identifiers.ts` - Kebab-case and camelCase validation (validateClassifierId, validateFieldName, validateTemplateName)
+- `numbers.ts` - Bounded numeric ranges (validatePriority 0-100, validateWeight 0.0-1.0)
+- `names.ts` - Human-readable names (validateAreaName, validateDisplayName)
+
+**Usage:**
+```typescript
+import { validateClassifierId, validatePriority } from "@sidequest/core/validation";
+
+const id = validateClassifierId('medical-bill'); // ✅ OK
+validateClassifierId('Medical-Bill'); // ❌ Error: must be kebab-case
+
+const priority = validatePriority(75); // ✅ OK
+validatePriority(150); // ❌ Error: must be 0-100
+```
+
 ### Terminal Utilities (`src/terminal/`)
 
 Terminal output formatting with color support.
@@ -284,6 +311,43 @@ Enhanced file system operations with safety checks.
 - File existence checks
 - Glob pattern matching (via `src/glob/`)
 
+### SLO Tracking (`src/slo/`)
+
+Service Level Objective tracking with error budgets and burn rate analysis.
+
+**Features:**
+- Event recording (violations and successes)
+- Burn rate calculation (error budget consumption)
+- Breach detection
+- Persistent JSONL storage with rotation
+- Circuit breaker for write failures
+
+**Files:**
+- `types.ts` - SLO types and definitions
+- `tracker.ts` - Main SLO tracking logic
+- `persistence.ts` - JSONL-based event storage
+
+**Usage:**
+```typescript
+import { createSLOTracker } from "@sidequest/core/slo";
+
+const tracker = createSLOTracker({
+  definitions: {
+    api_latency: {
+      name: "API Latency",
+      target: 0.95,
+      threshold: 1000,
+      unit: "ms",
+      window: "24h",
+      errorBudget: 0.05
+    }
+  }
+});
+
+tracker.recordEvent("api_latency", false, 850);
+const result = await tracker.checkBreach("api_latency", 1100);
+```
+
 ### Other Utilities
 
 | Module | Purpose |
@@ -300,6 +364,7 @@ Enhanced file system operations with safety checks.
 | `spawn` | Process spawning with stdio capture |
 | `streams` | Stream processing utilities |
 | `utils` | General-purpose utilities |
+| `validation` | Input validation (identifiers, numbers, names) |
 
 ---
 
@@ -323,10 +388,12 @@ The package.json uses subpath exports for explicit module boundaries:
     "./logging": "./src/logging/index.ts",
     "./mcp": "./src/mcp/index.ts",
     "./password": "./src/password/index.ts",
+    "./slo": "./src/slo/index.ts",
     "./spawn": "./src/spawn/index.ts",
     "./streams": "./src/streams/index.ts",
     "./terminal": "./src/terminal/index.ts",
     "./utils": "./src/utils/index.ts",
+    "./validation": "./src/validation/index.ts",
     "./validate/types": "./src/validate/types.ts",
     "./validate/runner": "./src/validate/runner.ts",
     "./validate/reporter": "./src/validate/reporter.ts",
@@ -341,6 +408,8 @@ import { validateHooksJson } from "@sidequest/core/validate/validators";
 import { tool, z } from "@sidequest/core/mcp";
 import { callModel } from "@sidequest/core/llm";
 import { logger } from "@sidequest/core/logging";
+import { createSLOTracker } from "@sidequest/core/slo";
+import { validateClassifierId, validatePriority } from "@sidequest/core/validation";
 ```
 
 ---

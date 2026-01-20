@@ -82,3 +82,13 @@ export {
 	observeSyncWithContext,
 	observeWithContext,
 } from "./observe.js";
+
+// Resource metrics (memory, heap, RSS)
+export {
+	type CaptureResourceMetricsOptions,
+	calculateResourceDelta,
+	captureResourceMetrics,
+	formatResourceMetrics,
+	type ResourceMetrics,
+	type ResourceMetricsLogger,
+} from "./resource-metrics.js";

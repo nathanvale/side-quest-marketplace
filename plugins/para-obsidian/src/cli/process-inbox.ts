@@ -14,7 +14,7 @@ import {
 	formatSuggestionsTable,
 	runInteractiveLoop,
 } from "../inbox";
-import { checkSLOBreach, recordSLOEvent } from "../inbox/shared/slos";
+import { checkSLOBreach, recordSLOEvent } from "../inbox/shared/slo-tracker.js";
 import { checkThreshold } from "../inbox/shared/thresholds";
 import { isCreateNoteSuggestion } from "../inbox/types";
 import {

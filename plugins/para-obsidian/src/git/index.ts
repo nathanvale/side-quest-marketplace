@@ -13,136 +13,30 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { pathExistsSync } from "@sidequest/core/fs";
 import { spawnAndCollect } from "@sidequest/core/spawn";
 import { discoverAttachments } from "../attachments/index";
-import { DEFAULT_DESTINATIONS, DEFAULT_PARA_FOLDERS } from "../config/defaults";
 import type { ParaObsidianConfig } from "../config/index";
+import { getManagedFolders, isInManagedFolder } from "../shared/folders.js";
 import { resolveVaultPath } from "../shared/fs";
 import { observe } from "../shared/instrumentation.js";
 import { gitLogger } from "../shared/logger.js";
+import { assertGitRepo, getUncommittedFiles } from "./guard-wrapper.js";
 
-/**
- * Unescapes git's C-style quoted paths.
- *
- * Git escapes non-ASCII UTF-8 bytes as octal sequences when core.quotepath=true (default).
- * Example: 🧾 (U+1F9FE) = UTF-8 bytes [F0 9F A7 BE] = \360\237\247\276 in git output
- *
- * Also handles standard C escape sequences: \n, \t, \r, \\, \"
- *
- * @param gitPath - Path from git status output (after quote stripping)
- * @returns Properly decoded UTF-8 path
- *
- * @example
- * ```typescript
- * unescapeGitPath("\\360\\237\\247\\276 Invoice.md") // "🧾 Invoice.md"
- * unescapeGitPath("file\\twith\\ttabs.md") // "file\twith\ttabs.md"
- * ```
- */
-export function unescapeGitPath(gitPath: string): string {
-	const bytes: number[] = [];
-	let i = 0;
+// Re-export from core for backward compatibility
+export { unescapeGitPath } from "@sidequest/core/git";
+// Re-export folder utilities
+export { getManagedFolders, isInManagedFolder } from "../shared/folders.js";
+// Re-export guard functions from wrapper (instrumented core implementations)
+export {
+	assertGitRepo,
+	ensureGitGuard,
+	type GetUncommittedFilesOptions,
+	getUncommittedFiles,
+	gitStatus,
+} from "./guard-wrapper.js";
 
-	while (i < gitPath.length) {
-		if (gitPath[i] === "\\" && i + 1 < gitPath.length) {
-			const nextChar = gitPath[i + 1];
-
-			// Check for octal escape \ooo (3 octal digits)
-			if (i + 3 < gitPath.length) {
-				const nextThree = gitPath.substring(i + 1, i + 4);
-				if (/^[0-7]{3}$/.test(nextThree)) {
-					bytes.push(Number.parseInt(nextThree, 8));
-					i += 4;
-					continue;
-				}
-			}
-
-			// Check for single-char escapes
-			switch (nextChar) {
-				case "n":
-					bytes.push(10);
-					i += 2;
-					continue;
-				case "t":
-					bytes.push(9);
-					i += 2;
-					continue;
-				case "r":
-					bytes.push(13);
-					i += 2;
-					continue;
-				case "\\":
-					bytes.push(92);
-					i += 2;
-					continue;
-				case '"':
-					bytes.push(34);
-					i += 2;
-					continue;
-			}
-		}
-
-		// Regular ASCII character - add its char code
-		bytes.push(gitPath.charCodeAt(i));
-		i++;
-	}
-
-	// Decode UTF-8 bytes to string
-	return new TextDecoder("utf-8").decode(new Uint8Array(bytes));
-}
-
-/**
- * Gets all PARA-managed folders from configuration.
- *
- * Combines folders from:
- * - paraFolders (inbox, projects, areas, resources, archives)
- * - defaultDestinations (Tasks, Daily Notes, Weekly Notes, etc.)
- *
- * @param config - Para-obsidian configuration
- * @returns Set of unique folder names that para-obsidian manages
- *
- * @example
- * ```typescript
- * const folders = getManagedFolders(config);
- * // Set { "00 Inbox", "01 Projects", "02 Areas", "Tasks", ... }
- * ```
- */
-export function getManagedFolders(config: ParaObsidianConfig): Set<string> {
-	const folders = new Set<string>();
-
-	// Add PARA folders (inbox, projects, areas, resources, archives)
-	const paraFolders = config.paraFolders ?? DEFAULT_PARA_FOLDERS;
-	for (const folder of Object.values(paraFolders)) {
-		folders.add(folder);
-	}
-
-	// Add destination folders (Tasks, Daily Notes, Weekly Notes, etc.)
-	const destinations = config.defaultDestinations ?? DEFAULT_DESTINATIONS;
-	for (const folder of Object.values(destinations)) {
-		folders.add(folder);
-	}
-
-	return folders;
-}
-
-/**
- * Checks if a file path is within a PARA-managed folder.
- *
- * @param filePath - Vault-relative file path
- * @param managedFolders - Set of managed folder names
- * @returns true if file is in a managed folder
- */
-export function isInManagedFolder(
-	filePath: string,
-	managedFolders: Set<string>,
-): boolean {
-	// Get the top-level folder from the path
-	const parts = filePath.split("/");
-	if (parts.length < 2) return false; // File at root level, not managed
-
-	const topFolder = parts[0];
-	return managedFolders.has(topFolder ?? "");
-}
+// getManagedFolders and isInManagedFolder moved to ../shared/folders.ts
+// and re-exported above
 
 /**
  * Gets the git repository root for a given directory.
@@ -159,229 +53,9 @@ async function getGitRootForDir(dir: string): Promise<string | null> {
 	return stdout.trim() || null;
 }
 
-/**
- * Asserts that a directory is inside a git repository.
- *
- * This is a safety guard to ensure write operations are version
- * controlled. Throws if the directory is not in a git repo.
- *
- * @param dir - Directory to check
- * @throws Error if directory is not inside a git repository
- *
- * @example
- * ```typescript
- * await assertGitRepo(config.vault);
- * // Proceed with write operations...
- * ```
- */
-export async function assertGitRepo(dir: string): Promise<void> {
-	const root = await getGitRootForDir(dir);
-	if (!root) {
-		throw new Error("Vault must be inside a git repository for writes.");
-	}
-
-	// Verify the directory is actually under the git root (handles symlinks)
-	// Use realpathSync to resolve symlinks (e.g., /var -> /private/var on macOS)
-	const realRoot = pathExistsSync(root) ? fs.realpathSync(root) : root;
-	const realDir = pathExistsSync(dir) ? fs.realpathSync(dir) : dir;
-	if (!realDir.startsWith(realRoot)) {
-		throw new Error("Vault must be inside a git repository for writes.");
-	}
-}
-
-/**
- * Checks the git status of a directory.
- *
- * @param dir - Directory to check
- * @returns Object with clean status (true if no uncommitted changes)
- * @throws Error if git status command fails
- *
- * @example
- * ```typescript
- * const { clean } = await gitStatus(config.vault);
- * if (!clean) {
- *   console.warn('Warning: uncommitted changes in vault');
- * }
- * ```
- */
-export async function gitStatus(dir: string): Promise<{ clean: boolean }> {
-	return observe(gitLogger, "git:getRepoStatus", async () => {
-		const { stdout, exitCode } = await spawnAndCollect(
-			["git", "status", "--porcelain"],
-			{ cwd: dir },
-		);
-		if (exitCode !== 0) throw new Error("git status failed");
-		const output = stdout.trim();
-		return { clean: output.length === 0 };
-	});
-}
-
-/**
- * Options for getting uncommitted files.
- */
-export interface GetUncommittedFilesOptions {
-	/** If true, return all file types. If false (default), return only .md files. */
-	readonly allFileTypes?: boolean;
-}
-
-/**
- * Gets all uncommitted files in a directory (staged and unstaged).
- *
- * Uses git status --porcelain to find modified, added, and untracked files.
- * By default, filters to only .md files. Use `allFileTypes: true` to include all files.
- *
- * @param dir - Directory to check
- * @param options - Options for filtering files
- * @returns Array of vault-relative paths to uncommitted files
- *
- * @example
- * ```typescript
- * // Get only markdown files (default)
- * const mdFiles = await getUncommittedFiles(config.vault);
- * // Returns: ['Projects/My Project.md', '00 Inbox/New Note.md']
- *
- * // Get all file types
- * const allFiles = await getUncommittedFiles(config.vault, { allFileTypes: true });
- * // Returns: ['Projects/My Project.md', '00 Inbox/doc.pdf', '00 Inbox/data.json']
- * ```
- */
-export async function getUncommittedFiles(
-	dir: string,
-	options?: GetUncommittedFilesOptions,
-): Promise<string[]> {
-	return observe(
-		gitLogger,
-		"git:getUncommittedFiles",
-		async () => {
-			const { stdout, exitCode } = await spawnAndCollect(
-				["git", "status", "--porcelain", "-uall"],
-				{ cwd: dir },
-			);
-			if (exitCode !== 0) throw new Error("git status failed");
-
-			// Split first, then filter empty lines
-			// Important: Don't trim() the whole stdout as it strips leading spaces
-			// from git status format (e.g., " M file.md" becomes "M file.md")
-			const lines = stdout.split("\n").filter((line) => line.length > 0);
-			const files: string[] = [];
-			const allFileTypes = options?.allFileTypes ?? false;
-
-			for (const line of lines) {
-				// Porcelain format: XY PATH (2 status chars + 1 space + path)
-				// X = index status, Y = working tree status
-				// Status codes: M (modified), A (added), ?? (untracked), etc.
-				// Extract path after the "XY " prefix (3 chars)
-				// Use match to handle any leading whitespace/status combo
-				const match = line.match(/^.{2}\s(.+)$/);
-				let filePath = match?.[1];
-				// Git quotes filenames containing spaces or special chars, e.g. "Note 1.md"
-				// It also escapes non-ASCII UTF-8 bytes as octal sequences, e.g. \360\237\247\276 for 🧾
-				// Strip surrounding quotes and decode escape sequences
-				if (filePath?.startsWith('"') && filePath.endsWith('"')) {
-					filePath = filePath.slice(1, -1);
-					filePath = unescapeGitPath(filePath);
-				}
-
-				if (!filePath) continue;
-
-				// Filter by file type if not including all
-				if (allFileTypes || filePath.endsWith(".md")) {
-					files.push(filePath);
-				}
-			}
-
-			return files;
-		},
-		{
-			context: {
-				repoPath: dir,
-				allFileTypes: options?.allFileTypes ?? false,
-			},
-		},
-	);
-}
-
-/**
- * Ensures the vault is inside a git repository and has no uncommitted
- * changes in PARA-managed folders.
- *
- * Only checks folders managed by para-obsidian (00 Inbox, 01 Projects, etc.).
- * Files outside PARA folders (Templates/, _Sort/, etc.) are ignored.
- *
- * @param config - Loaded para-obsidian configuration
- * @param options - Optional settings
- * @param options.checkAllFileTypes - If true, check all file types (not just .md). Default: false
- * @throws Error when guard conditions are not met
- *
- * @example
- * ```typescript
- * // Default: only check .md files
- * await ensureGitGuard(config);
- *
- * // Strict mode: check all file types (PDFs, JSON, etc.)
- * await ensureGitGuard(config, { checkAllFileTypes: true });
- *
- * // Exclude inbox folder (for scan() - we expect files in inbox)
- * await ensureGitGuard(config, { checkAllFileTypes: true, excludeInbox: true });
- * ```
- */
-export async function ensureGitGuard(
-	config: ParaObsidianConfig,
-	options?: {
-		checkAllFileTypes?: boolean;
-		excludeInbox?: boolean;
-		excludeAttachments?: boolean;
-	},
-): Promise<void> {
-	return observe(
-		gitLogger,
-		"git:ensureGitGuard",
-		async () => {
-			await assertGitRepo(config.vault);
-
-			// Get all uncommitted files and filter to PARA-managed folders only
-			const checkAllTypes = options?.checkAllFileTypes ?? false;
-			const excludeInbox = options?.excludeInbox ?? false;
-			const excludeAttachments = options?.excludeAttachments ?? false;
-			const allUncommitted = await getUncommittedFiles(config.vault, {
-				allFileTypes: checkAllTypes,
-			});
-
-			const managedFolders = getManagedFolders(config);
-
-			// Optionally exclude inbox folder (for scan operations where we expect inbox to have files)
-			// Optionally exclude attachments folder (orphaned attachments shouldn't block processing)
-			const inboxFolder = config.paraFolders?.inbox ?? "00 Inbox";
-			const attachmentsFolder = "Attachments";
-			const foldersToCheck = new Set([...managedFolders]);
-			if (excludeInbox) {
-				foldersToCheck.delete(inboxFolder);
-			}
-			if (excludeAttachments) {
-				foldersToCheck.delete(attachmentsFolder);
-			}
-
-			const uncommitted = allUncommitted.filter((file) =>
-				isInManagedFolder(file, foldersToCheck),
-			);
-
-			if (uncommitted.length > 0) {
-				const fileList = `\nUncommitted files:\n${uncommitted.map((f: string) => `  - ${f}`).join("\n")}`;
-				throw new Error(
-					`Vault has uncommitted changes. Commit before proceeding.${fileList}\n\nTo fix: Use para_commit MCP tool\n\nDO NOT use raw git commands or inspect the vault directly.`,
-				);
-			}
-		},
-		{
-			context: {
-				vaultPath: config.vault,
-				checkAllFileTypes: options?.checkAllFileTypes ?? false,
-				excludeInbox: options?.excludeInbox ?? false,
-				excludeAttachments: options?.excludeAttachments ?? false,
-			},
-		},
-	);
-}
+// assertGitRepo, gitStatus, getUncommittedFiles, and ensureGitGuard
+// moved to ./guard-wrapper.ts (which wraps @sidequest/core/git with instrumentation)
+// and re-exported above
 
 /**
  * Stages files for commit (new and modified files).
