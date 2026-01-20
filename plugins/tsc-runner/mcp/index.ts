@@ -12,7 +12,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { startServer, tool, z } from "@sidequest/core/mcp";
+import { ResponseFormat, wrapToolHandler } from "@sidequest/core/mcp-response";
 import { spawnWithTimeout } from "@sidequest/core/spawn";
+import { validatePathOrDefault } from "@sidequest/core/validation";
 import {
 	createCorrelationId,
 	initLogger,
@@ -23,15 +25,9 @@ import {
 	TSC_CONFIG_FILES,
 } from "../hooks/shared/tsc-config";
 import { parseTscOutput } from "../hooks/tsc-check";
-import { validatePathOrDefault } from "./path-validator";
 
 // Initialize logger on server startup
 initLogger().catch(console.error);
-
-enum ResponseFormat {
-	MARKDOWN = "markdown",
-	JSON = "json",
-}
 
 const TSC_TIMEOUT_MS = 30_000;
 
@@ -43,8 +39,25 @@ interface TscRunResult {
 	configPath: string;
 }
 
-function formatMarkdown(result: TscRunResult) {
+function formatResult(result: TscRunResult, format: ResponseFormat): string {
 	const parsed = parseTscOutput(result.output);
+
+	if (format === ResponseFormat.JSON) {
+		return JSON.stringify(
+			{
+				cwd: result.cwd,
+				configPath: result.configPath,
+				timedOut: result.timedOut,
+				exitCode: result.exitCode,
+				errors: parsed.errors,
+				errorCount: parsed.errorCount,
+			},
+			null,
+			2,
+		);
+	}
+
+	// Markdown format
 	if (result.timedOut) {
 		return `⏱️ TypeScript check timed out after ${TSC_TIMEOUT_MS / 1000}s in ${result.cwd}.`;
 	}
@@ -63,22 +76,6 @@ function formatMarkdown(result: TscRunResult) {
 	}
 
 	return lines.join("\n");
-}
-
-function formatJson(result: TscRunResult) {
-	const parsed = parseTscOutput(result.output);
-	return JSON.stringify(
-		{
-			cwd: result.cwd,
-			configPath: result.configPath,
-			timedOut: result.timedOut,
-			exitCode: result.exitCode,
-			errors: parsed.errors,
-			errorCount: parsed.errorCount,
-		},
-		null,
-		2,
-	);
 }
 
 async function resolveWorkdir(targetPath?: string): Promise<{
@@ -168,81 +165,26 @@ tool(
 			openWorldHint: false,
 		},
 	},
-	async (args: { path?: string; response_format?: string }) => {
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		mcpLogger.info("Tool request", {
-			cid,
-			tool: "tsc_check",
-			path: args.path,
-		});
-
-		try {
+	wrapToolHandler(
+		async (args: { path?: string }, format: ResponseFormat) => {
 			// Validate path for security
-			let validatedPath: string;
-			try {
-				validatedPath = await validatePathOrDefault(args.path);
-			} catch (error) {
-				mcpLogger.warn("Validation failed", {
-					cid,
-					tool: "tsc_check",
-					error: error instanceof Error ? error.message : "Unknown",
-				});
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: error instanceof Error ? error.message : "Invalid path",
-						},
-					],
-					isError: true,
-				};
-			}
+			const validatedPath = await validatePathOrDefault(args.path);
 
+			// Resolve working directory and config
 			const { cwd, configPath } = await resolveWorkdir(validatedPath);
+
+			// Run TypeScript compiler
 			const result = await runTsc(cwd, configPath);
-			const format =
-				args.response_format === "json"
-					? ResponseFormat.JSON
-					: ResponseFormat.MARKDOWN;
 
-			const parsed = parseTscOutput(result.output);
-			mcpLogger.info("Tool response", {
-				cid,
-				tool: "tsc_check",
-				errorCount: parsed.errorCount,
-				timedOut: result.timedOut,
-				durationMs: Date.now() - startTime,
-			});
-
-			const text =
-				format === ResponseFormat.JSON
-					? formatJson(result)
-					: formatMarkdown(result);
-
-			return {
-				content: [{ type: "text" as const, text }],
-			};
-		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : "Unknown tsc runner error";
-			mcpLogger.error("Tool error", {
-				cid,
-				tool: "tsc_check",
-				error: message,
-				durationMs: Date.now() - startTime,
-			});
-			return {
-				content: [
-					{
-						type: "text" as const,
-						text: `tsc runner error: ${message}`,
-					},
-				],
-				isError: true,
-			};
-		}
-	},
+			// Format and return result
+			return formatResult(result, format);
+		},
+		{
+			toolName: "tsc_check",
+			logger: mcpLogger,
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 startServer("tsc-runner", {

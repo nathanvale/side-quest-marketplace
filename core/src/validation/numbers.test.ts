@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { validatePriority, validateWeight } from "./numbers.ts";
+import {
+	validateInteger,
+	validatePriority,
+	validateWeight,
+} from "./numbers.ts";
 
 describe("validation/numbers", () => {
 	describe("validatePriority", () => {
@@ -41,6 +45,132 @@ describe("validation/numbers", () => {
 
 		test("rejects NaN", () => {
 			expect(() => validateWeight(Number.NaN)).toThrow("0.0 to 1.0");
+		});
+	});
+
+	describe("validateInteger", () => {
+		test("accepts valid integers", () => {
+			const result = validateInteger(42, { name: "count" });
+			expect(result.valid).toBe(true);
+			expect(result.value).toBe(42);
+		});
+
+		test("accepts zero", () => {
+			const result = validateInteger(0, { name: "count" });
+			expect(result.valid).toBe(true);
+			expect(result.value).toBe(0);
+		});
+
+		test("accepts negative integers", () => {
+			const result = validateInteger(-5, { name: "offset" });
+			expect(result.valid).toBe(true);
+			expect(result.value).toBe(-5);
+		});
+
+		test("parses string input by default", () => {
+			const result = validateInteger("42", { name: "count" });
+			expect(result.valid).toBe(true);
+			expect(result.value).toBe(42);
+		});
+
+		test("rejects string input when disabled", () => {
+			const result = validateInteger("42", {
+				name: "count",
+				allowStringInput: false,
+			});
+			expect(result.valid).toBe(false);
+			expect(result.error).toContain("must be a number");
+		});
+
+		test("uses default value when undefined", () => {
+			const result = validateInteger(undefined, {
+				name: "count",
+				defaultValue: 10,
+			});
+			expect(result.valid).toBe(true);
+			expect(result.value).toBe(10);
+		});
+
+		test("uses default value when null", () => {
+			const result = validateInteger(null, {
+				name: "count",
+				defaultValue: 10,
+			});
+			expect(result.valid).toBe(true);
+			expect(result.value).toBe(10);
+		});
+
+		test("rejects undefined without default", () => {
+			const result = validateInteger(undefined, { name: "count" });
+			expect(result.valid).toBe(false);
+			expect(result.error).toBe("count is required");
+		});
+
+		test("rejects null without default", () => {
+			const result = validateInteger(null, { name: "count" });
+			expect(result.valid).toBe(false);
+			expect(result.error).toBe("count is required");
+		});
+
+		test("rejects non-integers", () => {
+			const result = validateInteger(3.14, { name: "count" });
+			expect(result.valid).toBe(false);
+			expect(result.error).toBe("count must be an integer");
+		});
+
+		test("rejects NaN", () => {
+			const result = validateInteger(Number.NaN, { name: "count" });
+			expect(result.valid).toBe(false);
+			expect(result.error).toContain("must be a number");
+		});
+
+		test("rejects invalid string", () => {
+			const result = validateInteger("not a number", { name: "count" });
+			expect(result.valid).toBe(false);
+			expect(result.error).toContain("must be a number");
+		});
+
+		test("enforces minimum bound", () => {
+			const result = validateInteger(0, { name: "count", min: 1 });
+			expect(result.valid).toBe(false);
+			expect(result.error).toContain("must be between 1 and");
+		});
+
+		test("enforces maximum bound", () => {
+			const result = validateInteger(2000, { name: "count", max: 1000 });
+			expect(result.valid).toBe(false);
+			expect(result.error).toContain("must be between");
+			expect(result.error).toContain("and 1000");
+		});
+
+		test("accepts value at minimum bound", () => {
+			const result = validateInteger(1, { name: "count", min: 1, max: 100 });
+			expect(result.valid).toBe(true);
+			expect(result.value).toBe(1);
+		});
+
+		test("accepts value at maximum bound", () => {
+			const result = validateInteger(100, { name: "count", min: 1, max: 100 });
+			expect(result.valid).toBe(true);
+			expect(result.value).toBe(100);
+		});
+
+		test("works with custom min/max range", () => {
+			const result = validateInteger(50, { name: "count", min: 10, max: 90 });
+			expect(result.valid).toBe(true);
+			expect(result.value).toBe(50);
+		});
+
+		test("handles large positive integers", () => {
+			const result = validateInteger(1000000, { name: "count" });
+			expect(result.valid).toBe(true);
+			expect(result.value).toBe(1000000);
+		});
+
+		test("handles large negative integers", () => {
+			const result = validateInteger(-1000000, { name: "offset" });
+			expect(result.valid).toBe(true);
+			expect(result.value).toBe(-1000000);
 		});
 	});
 });

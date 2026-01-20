@@ -586,6 +586,21 @@ export function createTempFilePath(prefix = "temp", ext = ""): string {
 	return path.join(dir, `${prefix}-${crypto.randomUUID()}${ext}`);
 }
 
+/**
+ * Execute an operation that writes JSON output to a temp file.
+ * Handles creation, cleanup, and error recovery automatically.
+ *
+ * @param prefix - Prefix for temp file name
+ * @param fn - Function that receives temp path and returns execution result
+ * @returns Parsed JSON content from temp file
+ * @throws Error if exit code non-zero or output file not found
+ */
+export {
+	type TempFileExecutionResult,
+	withTempJsonFile,
+	withTempJsonFileSync,
+} from "./temp-json.js";
+
 // ============================================
 // ATOMIC WRITES - safe for concurrent access
 // ============================================
@@ -777,6 +792,11 @@ export {
 	restoreFromBackup,
 	safeReadJSON,
 } from "./backup.js";
+// Path utilities
+export {
+	expandTilde,
+	normalizePath,
+} from "./path.js";
 // Path safety and validation utilities
 export {
 	sanitizePattern,

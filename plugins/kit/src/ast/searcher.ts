@@ -11,6 +11,7 @@
 
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
+import { processInParallelChunks } from "@sidequest/core/concurrency";
 import { getAstLogger } from "../logger.js";
 import { getDefaultKitPath } from "../types.js";
 import type { SyntaxNode } from "./languages.js";
@@ -99,7 +100,6 @@ export class ASTSearcher {
 		} = options;
 
 		const astPattern = new ASTPattern(pattern, mode);
-		const matches: ASTMatch[] = [];
 
 		// Get all files to search (async directory traversal)
 		const files = await this.getMatchingFiles(filePattern);
@@ -113,38 +113,24 @@ export class ASTSearcher {
 			firstFiles: files.slice(0, 3),
 		});
 
-		// Process files in parallel chunks
-		for (let i = 0; i < files.length; i += PARALLEL_CHUNK_SIZE) {
-			if (matches.length >= maxResults) break;
-
-			const chunk = files.slice(i, i + PARALLEL_CHUNK_SIZE);
-			const chunkResults = await Promise.all(
-				chunk.map(async (filePath) => {
-					try {
-						return await this.searchFile(filePath, astPattern);
-					} catch (error) {
-						logger.error("Error parsing file", {
-							filePath,
-							error: error instanceof Error ? error.message : String(error),
-						});
-						return [];
-					}
-				}),
-			);
-
-			// Flatten results and add to matches
-			for (const fileMatches of chunkResults) {
-				for (const match of fileMatches) {
-					matches.push(match);
-					if (matches.length >= maxResults) break;
-				}
-				if (matches.length >= maxResults) break;
-			}
-		}
+		// Process files in parallel chunks using core utility
+		const matches = await processInParallelChunks({
+			items: files,
+			chunkSize: PARALLEL_CHUNK_SIZE,
+			maxResults,
+			processor: (filePath) => this.searchFile(filePath, astPattern),
+			onError: (filePath, error) => {
+				logger.error("Error parsing file", {
+					filePath,
+					error: error.message,
+				});
+				return [];
+			},
+		});
 
 		return {
 			count: matches.length,
-			matches: matches.slice(0, maxResults),
+			matches,
 			pattern,
 			mode,
 			path: this.repoPath,

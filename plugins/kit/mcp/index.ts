@@ -16,6 +16,7 @@
  * - JSONL file logging (for post-mortem debugging)
  */
 
+import { formatBytes } from "@sidequest/core/formatters";
 import {
 	createCorrelationId,
 	log,
@@ -23,6 +24,7 @@ import {
 	tool,
 	z,
 } from "@sidequest/core/mcp";
+import { wrapToolHandler } from "@sidequest/core/mcp-response";
 import { buildEnhancedPath, spawnSyncCollect } from "@sidequest/core/spawn";
 import {
 	executeAstSearch,
@@ -40,6 +42,29 @@ import {
 	ResponseFormat,
 	SearchMode,
 } from "../src/index.js";
+
+// ============================================================================
+// Logger Adapter
+// ============================================================================
+
+/**
+ * Adapter to bridge @sidequest/core/mcp log API to wrapToolHandler Logger interface.
+ *
+ * The wrapToolHandler expects: logger.info(message, properties)
+ * But @sidequest/core/mcp provides: log.info(properties, subsystem)
+ *
+ * This adapter inverts the signature and forwards to the correct subsystem.
+ */
+function createLoggerAdapter(subsystem: string) {
+	return {
+		info: (message: string, properties?: Record<string, unknown>) => {
+			log.info({ message, ...properties }, subsystem);
+		},
+		error: (message: string, properties?: Record<string, unknown>) => {
+			log.error({ message, ...properties }, subsystem);
+		},
+	};
+}
 
 // ============================================================================
 // Kit Index Find Tool
@@ -80,46 +105,31 @@ NOTE: Requires PROJECT_INDEX.json. Run kit_index_prime first if not present.`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { symbol_name, index_path, response_format } = args as {
-			symbol_name: string;
-			index_path?: string;
-			response_format?: string;
-		};
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		log.info(
-			{ cid: mcpCid, tool: "kit_index_find", args: { symbol_name } },
-			"symbols",
-		);
+	wrapToolHandler(
+		async (args, format) => {
+			const { symbol_name, index_path } = args as {
+				symbol_name: string;
+				index_path?: string;
+			};
+			const result = await executeIndexFind(symbol_name, index_path);
 
-		// Execute index find
-		const result = await executeIndexFind(symbol_name, index_path);
+			// Convert isError result to exception for wrapToolHandler
+			if ("isError" in result && result.isError) {
+				throw new Error(result.error);
+			}
 
-		// Format output
-		const format =
-			response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		log.info(
-			{
-				cid: mcpCid,
-				tool: "kit_index_find",
-				success: !("isError" in result),
-				durationMs: mcpDuration,
-			},
-			"symbols",
-		);
-
-		return {
-			...("isError" in result ? { isError: true } : {}),
-			content: [
-				{ type: "text" as const, text: formatIndexFindResults(result, format) },
-			],
-		};
-	},
+			const responseFormat =
+				format === ResponseFormat.JSON
+					? ResponseFormat.JSON
+					: ResponseFormat.MARKDOWN;
+			return formatIndexFindResults(result, responseFormat);
+		},
+		{
+			toolName: "kit_index_find",
+			logger: createLoggerAdapter("symbols"),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 // ============================================================================
@@ -160,50 +170,31 @@ NOTE: Requires PROJECT_INDEX.json. Run kit_index_prime first if not present.`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { index_path, top_n, response_format } = args as {
-			index_path?: string;
-			top_n?: number;
-			response_format?: string;
-		};
+	wrapToolHandler(
+		async (args, format) => {
+			const { index_path, top_n } = args as {
+				index_path?: string;
+				top_n?: number;
+			};
+			const result = await executeIndexStats(index_path, top_n);
 
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		log.info(
-			{ cid: mcpCid, tool: "kit_index_stats", args: { index_path } },
-			"symbols",
-		);
+			// Convert isError result to exception for wrapToolHandler
+			if ("isError" in result && result.isError) {
+				throw new Error(result.error);
+			}
 
-		// Execute index stats
-		const result = await executeIndexStats(index_path, top_n);
-
-		// Format output
-		const format =
-			response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		log.info(
-			{
-				cid: mcpCid,
-				tool: "kit_index_stats",
-				success: !("isError" in result),
-				durationMs: mcpDuration,
-			},
-			"symbols",
-		);
-
-		return {
-			...("isError" in result ? { isError: true } : {}),
-			content: [
-				{
-					type: "text" as const,
-					text: formatIndexStatsResults(result, format),
-				},
-			],
-		};
-	},
+			const responseFormat =
+				format === ResponseFormat.JSON
+					? ResponseFormat.JSON
+					: ResponseFormat.MARKDOWN;
+			return formatIndexStatsResults(result, responseFormat);
+		},
+		{
+			toolName: "kit_index_stats",
+			logger: createLoggerAdapter("symbols"),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 // ============================================================================
@@ -247,50 +238,31 @@ NOTE: Requires PROJECT_INDEX.json. Run kit_index_prime first if not present.`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { file_path, index_path, response_format } = args as {
-			file_path: string;
-			index_path?: string;
-			response_format?: string;
-		};
+	wrapToolHandler(
+		async (args, format) => {
+			const { file_path, index_path } = args as {
+				file_path: string;
+				index_path?: string;
+			};
+			const result = await executeIndexOverview(file_path, index_path);
 
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		log.info(
-			{ cid: mcpCid, tool: "kit_index_overview", args: { file_path } },
-			"symbols",
-		);
+			// Convert isError result to exception for wrapToolHandler
+			if ("isError" in result && result.isError) {
+				throw new Error(result.error);
+			}
 
-		// Execute index overview
-		const result = await executeIndexOverview(file_path, index_path);
-
-		// Format output
-		const format =
-			response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		log.info(
-			{
-				cid: mcpCid,
-				tool: "kit_index_overview",
-				success: !("isError" in result),
-				durationMs: mcpDuration,
-			},
-			"symbols",
-		);
-
-		return {
-			...("isError" in result ? { isError: true } : {}),
-			content: [
-				{
-					type: "text" as const,
-					text: formatIndexOverviewResults(result, format),
-				},
-			],
-		};
-	},
+			const responseFormat =
+				format === ResponseFormat.JSON
+					? ResponseFormat.JSON
+					: ResponseFormat.MARKDOWN;
+			return formatIndexOverviewResults(result, responseFormat);
+		},
+		{
+			toolName: "kit_index_overview",
+			logger: createLoggerAdapter("symbols"),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 // ============================================================================
@@ -331,50 +303,28 @@ Requires Kit CLI: uv tool install cased-kit`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { path, force, response_format } = args as {
-			path?: string;
-			force?: boolean;
-			response_format?: string;
-		};
+	wrapToolHandler(
+		async (args, format) => {
+			const { path, force } = args as { path?: string; force?: boolean };
+			const result = await executeIndexPrime(force, path);
 
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		log.info(
-			{ cid: mcpCid, tool: "kit_index_prime", args: { path, force } },
-			"symbols",
-		);
+			// Convert isError result to exception for wrapToolHandler
+			if ("isError" in result && result.isError) {
+				throw new Error(result.error);
+			}
 
-		// Execute index prime
-		const result = await executeIndexPrime(force, path);
-
-		// Format output
-		const format =
-			response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		log.info(
-			{
-				cid: mcpCid,
-				tool: "kit_index_prime",
-				success: !("isError" in result),
-				durationMs: mcpDuration,
-			},
-			"symbols",
-		);
-
-		return {
-			...("isError" in result ? { isError: true } : {}),
-			content: [
-				{
-					type: "text" as const,
-					text: formatIndexPrimeResults(result, format),
-				},
-			],
-		};
-	},
+			const responseFormat =
+				format === ResponseFormat.JSON
+					? ResponseFormat.JSON
+					: ResponseFormat.MARKDOWN;
+			return formatIndexPrimeResults(result, responseFormat);
+		},
+		{
+			toolName: "kit_index_prime",
+			logger: createLoggerAdapter("symbols"),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 // ============================================================================
@@ -429,74 +379,58 @@ To enable: uv tool install 'cased-kit[ml]'`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { query, path, top_k, chunk_by, build_index, response_format } =
-			args as {
+	wrapToolHandler(
+		async (args, format) => {
+			const { query, path, top_k, chunk_by, build_index } = args as {
 				query: string;
 				path?: string;
 				top_k?: number;
 				chunk_by?: "symbols" | "lines";
 				build_index?: boolean;
-				response_format?: string;
 			};
 
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		log.info(
-			{ cid: mcpCid, tool: "kit_semantic", args: { query } },
-			"semantic",
-		);
+			const formatStr = format === ResponseFormat.JSON ? "json" : "markdown";
+			const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
-		const format = response_format === "json" ? "json" : "markdown";
-		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
+			const cmd = [
+				"run",
+				`${pluginRoot}/src/cli.ts`,
+				"search",
+				query,
+				"--format",
+				formatStr,
+			];
 
-		const cmd = [
-			"run",
-			`${pluginRoot}/src/cli.ts`,
-			"search",
-			query,
-			"--format",
-			format,
-		];
+			if (path) {
+				cmd.push("--path", path);
+			}
+			if (top_k !== undefined) {
+				cmd.push("--top-k", String(top_k));
+			}
+			if (chunk_by) {
+				cmd.push("--chunk-by", chunk_by);
+			}
+			if (build_index) {
+				cmd.push("--build-index");
+			}
 
-		if (path) {
-			cmd.push("--path", path);
-		}
-		if (top_k !== undefined) {
-			cmd.push("--top-k", String(top_k));
-		}
-		if (chunk_by) {
-			cmd.push("--chunk-by", chunk_by);
-		}
-		if (build_index) {
-			cmd.push("--build-index");
-		}
+			const result = spawnSyncCollect(["bun", ...cmd], {
+				env: { PATH: buildEnhancedPath() },
+			});
 
-		const result = spawnSyncCollect(["bun", ...cmd], {
-			env: { PATH: buildEnhancedPath() },
-		});
+			// Convert non-zero exit code to exception for wrapToolHandler
+			if (result.exitCode !== 0) {
+				throw new Error(result.stderr || "Semantic search failed");
+			}
 
-		const mcpDuration = Date.now() - mcpStartTime;
-		log.info(
-			{
-				cid: mcpCid,
-				tool: "kit_semantic",
-				success: result.exitCode === 0,
-				durationMs: mcpDuration,
-			},
-			"semantic",
-		);
-
-		return {
-			...(result.exitCode !== 0 ? { isError: true } : {}),
-			content: [
-				{
-					type: "text" as const,
-					text: result.exitCode === 0 ? result.stdout : result.stderr,
-				},
-			],
-		};
-	},
+			return result.stdout;
+		},
+		{
+			toolName: "kit_semantic",
+			logger: createLoggerAdapter("semantic"),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 // ============================================================================
@@ -530,56 +464,37 @@ Filters out the function definition to show only actual call sites.`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { function_name, response_format } = args as {
-			function_name: string;
-			response_format?: string;
-		};
+	wrapToolHandler(
+		async (args, format) => {
+			const { function_name } = args as { function_name: string };
+			const formatStr = format === ResponseFormat.JSON ? "json" : "markdown";
+			const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		log.info(
-			{ cid: mcpCid, tool: "kit_callers", args: { function_name } },
-			"symbols",
-		);
+			const result = spawnSyncCollect(
+				[
+					"bun",
+					"run",
+					`${pluginRoot}/src/cli.ts`,
+					"callers",
+					function_name,
+					"--format",
+					formatStr,
+				],
+				{ env: { PATH: buildEnhancedPath() } },
+			);
 
-		const format = response_format === "json" ? "json" : "markdown";
-		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
+			if (result.exitCode !== 0) {
+				throw new Error(result.stderr || "Failed to find callers");
+			}
 
-		const result = spawnSyncCollect(
-			[
-				"bun",
-				"run",
-				`${pluginRoot}/src/cli.ts`,
-				"callers",
-				function_name,
-				"--format",
-				format,
-			],
-			{ env: { PATH: buildEnhancedPath() } },
-		);
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		log.info(
-			{
-				cid: mcpCid,
-				tool: "kit_callers",
-				success: result.exitCode === 0,
-				durationMs: mcpDuration,
-			},
-			"symbols",
-		);
-
-		return {
-			...(result.exitCode !== 0 ? { isError: true } : {}),
-			content: [
-				{
-					type: "text" as const,
-					text: result.exitCode === 0 ? result.stdout : result.stderr,
-				},
-			],
-		};
-	},
+			return result.stdout;
+		},
+		{
+			toolName: "kit_callers",
+			logger: createLoggerAdapter("symbols"),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 // ============================================================================
@@ -613,53 +528,34 @@ Note: Currently returns helpful error message for TypeScript/JavaScript (kit onl
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { function_name, response_format } = args as {
-			function_name: string;
-			response_format?: string;
-		};
+	wrapToolHandler(
+		async (args, format) => {
+			const { function_name } = args as { function_name: string };
+			const formatStr = format === ResponseFormat.JSON ? "json" : "markdown";
+			const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		log.info(
-			{ cid: mcpCid, tool: "kit_calls", args: { function_name } },
-			"symbols",
-		);
+			const result = spawnSyncCollect([
+				"bun",
+				"run",
+				`${pluginRoot}/src/cli.ts`,
+				"calls",
+				function_name,
+				"--format",
+				formatStr,
+			]);
 
-		const format = response_format === "json" ? "json" : "markdown";
-		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
+			if (result.exitCode !== 0) {
+				throw new Error(result.stderr || "Failed to find function calls");
+			}
 
-		const result = spawnSyncCollect([
-			"bun",
-			"run",
-			`${pluginRoot}/src/cli.ts`,
-			"calls",
-			function_name,
-			"--format",
-			format,
-		]);
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		log.info(
-			{
-				cid: mcpCid,
-				tool: "kit_calls",
-				success: result.exitCode === 0,
-				durationMs: mcpDuration,
-			},
-			"symbols",
-		);
-
-		return {
-			...(result.exitCode !== 0 ? { isError: true } : {}),
-			content: [
-				{
-					type: "text" as const,
-					text: result.exitCode === 0 ? result.stdout : result.stderr,
-				},
-			],
-		};
-	},
+			return result.stdout;
+		},
+		{
+			toolName: "kit_calls",
+			logger: createLoggerAdapter("symbols"),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 // ============================================================================
@@ -695,53 +591,37 @@ Note: Currently returns helpful error message for TypeScript/JavaScript (kit onl
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { file_path, response_format } = args as {
-			file_path: string;
-			response_format?: string;
-		};
+	wrapToolHandler(
+		async (args, format) => {
+			const { file_path } = args as { file_path: string };
+			const formatStr = format === ResponseFormat.JSON ? "json" : "markdown";
+			const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		log.info({ cid: mcpCid, tool: "kit_deps", args: { file_path } }, "symbols");
+			const result = spawnSyncCollect(
+				[
+					"bun",
+					"run",
+					`${pluginRoot}/src/cli.ts`,
+					"deps",
+					file_path,
+					"--format",
+					formatStr,
+				],
+				{ env: { PATH: buildEnhancedPath() } },
+			);
 
-		const format = response_format === "json" ? "json" : "markdown";
-		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
+			if (result.exitCode !== 0) {
+				throw new Error(result.stderr || "Failed to analyze dependencies");
+			}
 
-		const result = spawnSyncCollect(
-			[
-				"bun",
-				"run",
-				`${pluginRoot}/src/cli.ts`,
-				"deps",
-				file_path,
-				"--format",
-				format,
-			],
-			{ env: { PATH: buildEnhancedPath() } },
-		);
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		log.info(
-			{
-				cid: mcpCid,
-				tool: "kit_deps",
-				success: result.exitCode === 0,
-				durationMs: mcpDuration,
-			},
-			"symbols",
-		);
-
-		return {
-			...(result.exitCode !== 0 ? { isError: true } : {}),
-			content: [
-				{
-					type: "text" as const,
-					text: result.exitCode === 0 ? result.stdout : result.stderr,
-				},
-			],
-		};
-	},
+			return result.stdout;
+		},
+		{
+			toolName: "kit_deps",
+			logger: createLoggerAdapter("symbols"),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 // ============================================================================
@@ -778,48 +658,39 @@ Requires PROJECT_INDEX.json. Run kit_index_prime first if not present.`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { path, response_format } = args as {
-			path?: string;
-			response_format?: string;
-		};
+	wrapToolHandler(
+		async (args, format) => {
+			const { path } = args as { path?: string };
+			const formatStr = format === ResponseFormat.JSON ? "json" : "markdown";
+			const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		log.info({ cid: mcpCid, tool: "kit_dead", args: { path } }, "symbols");
+			const cmd = path
+				? [
+						"run",
+						`${pluginRoot}/src/cli.ts`,
+						"dead",
+						path,
+						"--format",
+						formatStr,
+					]
+				: ["run", `${pluginRoot}/src/cli.ts`, "dead", "--format", formatStr];
 
-		const format = response_format === "json" ? "json" : "markdown";
-		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
+			const result = spawnSyncCollect(["bun", ...cmd], {
+				env: { PATH: buildEnhancedPath() },
+			});
 
-		const cmd = path
-			? ["run", `${pluginRoot}/src/cli.ts`, "dead", path, "--format", format]
-			: ["run", `${pluginRoot}/src/cli.ts`, "dead", "--format", format];
+			if (result.exitCode !== 0) {
+				throw new Error(result.stderr || "Failed to find dead code");
+			}
 
-		const result = spawnSyncCollect(["bun", ...cmd], {
-			env: { PATH: buildEnhancedPath() },
-		});
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		log.info(
-			{
-				cid: mcpCid,
-				tool: "kit_dead",
-				success: result.exitCode === 0,
-				durationMs: mcpDuration,
-			},
-			"symbols",
-		);
-
-		return {
-			...(result.exitCode !== 0 ? { isError: true } : {}),
-			content: [
-				{
-					type: "text" as const,
-					text: result.exitCode === 0 ? result.stdout : result.stderr,
-				},
-			],
-		};
-	},
+			return result.stdout;
+		},
+		{
+			toolName: "kit_dead",
+			logger: createLoggerAdapter("symbols"),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 // ============================================================================
@@ -857,53 +728,37 @@ Accepts target as either:
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { target, response_format } = args as {
-			target: string;
-			response_format?: string;
-		};
+	wrapToolHandler(
+		async (args, format) => {
+			const { target } = args as { target: string };
+			const formatStr = format === ResponseFormat.JSON ? "json" : "markdown";
+			const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		log.info({ cid: mcpCid, tool: "kit_blast", args: { target } }, "symbols");
+			const result = spawnSyncCollect(
+				[
+					"bun",
+					"run",
+					`${pluginRoot}/src/cli.ts`,
+					"blast",
+					target,
+					"--format",
+					formatStr,
+				],
+				{ env: { PATH: buildEnhancedPath() } },
+			);
 
-		const format = response_format === "json" ? "json" : "markdown";
-		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
+			if (result.exitCode !== 0) {
+				throw new Error(result.stderr || "Failed to analyze blast radius");
+			}
 
-		const result = spawnSyncCollect(
-			[
-				"bun",
-				"run",
-				`${pluginRoot}/src/cli.ts`,
-				"blast",
-				target,
-				"--format",
-				format,
-			],
-			{ env: { PATH: buildEnhancedPath() } },
-		);
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		log.info(
-			{
-				cid: mcpCid,
-				tool: "kit_blast",
-				success: result.exitCode === 0,
-				durationMs: mcpDuration,
-			},
-			"symbols",
-		);
-
-		return {
-			...(result.exitCode !== 0 ? { isError: true } : {}),
-			content: [
-				{
-					type: "text" as const,
-					text: result.exitCode === 0 ? result.stdout : result.stderr,
-				},
-			],
-		};
-	},
+			return result.stdout;
+		},
+		{
+			toolName: "kit_blast",
+			logger: createLoggerAdapter("symbols"),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 // ============================================================================
@@ -939,53 +794,37 @@ Uses heuristics to identify likely exported symbols (PascalCase, UPPER_CASE, com
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { directory, response_format } = args as {
-			directory: string;
-			response_format?: string;
-		};
+	wrapToolHandler(
+		async (args, format) => {
+			const { directory } = args as { directory: string };
+			const formatStr = format === ResponseFormat.JSON ? "json" : "markdown";
+			const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		log.info({ cid: mcpCid, tool: "kit_api", args: { directory } }, "symbols");
+			const result = spawnSyncCollect(
+				[
+					"bun",
+					"run",
+					`${pluginRoot}/src/cli.ts`,
+					"api",
+					directory,
+					"--format",
+					formatStr,
+				],
+				{ env: { PATH: buildEnhancedPath() } },
+			);
 
-		const format = response_format === "json" ? "json" : "markdown";
-		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
+			if (result.exitCode !== 0) {
+				throw new Error(result.stderr || "Failed to list API");
+			}
 
-		const result = spawnSyncCollect(
-			[
-				"bun",
-				"run",
-				`${pluginRoot}/src/cli.ts`,
-				"api",
-				directory,
-				"--format",
-				format,
-			],
-			{ env: { PATH: buildEnhancedPath() } },
-		);
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		log.info(
-			{
-				cid: mcpCid,
-				tool: "kit_api",
-				success: result.exitCode === 0,
-				durationMs: mcpDuration,
-			},
-			"symbols",
-		);
-
-		return {
-			...(result.exitCode !== 0 ? { isError: true } : {}),
-			content: [
-				{
-					type: "text" as const,
-					text: result.exitCode === 0 ? result.stdout : result.stderr,
-				},
-			],
-		};
-	},
+			return result.stdout;
+		},
+		{
+			toolName: "kit_api",
+			logger: createLoggerAdapter("symbols"),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 // ============================================================================
@@ -1049,69 +888,49 @@ Requires Kit CLI: uv tool install cased-kit`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { dry_run, model, response_format } = args as {
-			dry_run?: boolean;
-			model?: string;
-			response_format?: string;
-		};
+	wrapToolHandler(
+		async (args, format) => {
+			const { dry_run, model } = args as { dry_run?: boolean; model?: string };
+			const formatStr = format === ResponseFormat.JSON ? "json" : "markdown";
+			const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		log.info(
-			{ cid: mcpCid, tool: "kit_commit", args: { dry_run, model } },
-			"commit",
-		);
+			// Default dry_run to true for safety
+			const dryRun = dry_run !== false;
 
-		const format = response_format === "json" ? "json" : "markdown";
-		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
+			const cmdArgs = [
+				"run",
+				`${pluginRoot}/src/cli.ts`,
+				"commit",
+				"--format",
+				formatStr,
+			];
 
-		// Default dry_run to true for safety
-		const dryRun = dry_run !== false;
+			if (dryRun) {
+				cmdArgs.push("--dry-run", "true");
+			} else {
+				cmdArgs.push("--dry-run", "false");
+			}
 
-		const cmdArgs = [
-			"run",
-			`${pluginRoot}/src/cli.ts`,
-			"commit",
-			"--format",
-			format,
-		];
+			if (model) {
+				cmdArgs.push("--model", model);
+			}
 
-		if (dryRun) {
-			cmdArgs.push("--dry-run", "true");
-		} else {
-			cmdArgs.push("--dry-run", "false");
-		}
+			const result = spawnSyncCollect(["bun", ...cmdArgs], {
+				env: { PATH: buildEnhancedPath() },
+			});
 
-		if (model) {
-			cmdArgs.push("--model", model);
-		}
+			if (result.exitCode !== 0) {
+				throw new Error(result.stderr || "Failed to generate commit message");
+			}
 
-		const result = spawnSyncCollect(["bun", ...cmdArgs], {
-			env: { PATH: buildEnhancedPath() },
-		});
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		log.info(
-			{
-				cid: mcpCid,
-				tool: "kit_commit",
-				success: result.exitCode === 0,
-				durationMs: mcpDuration,
-			},
-			"commit",
-		);
-
-		return {
-			...(result.exitCode !== 0 ? { isError: true } : {}),
-			content: [
-				{
-					type: "text" as const,
-					text: result.exitCode === 0 ? result.stdout : result.stderr,
-				},
-			],
-		};
-	},
+			return result.stdout;
+		},
+		{
+			toolName: "kit_commit",
+			logger: createLoggerAdapter("commit"),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 // ============================================================================
@@ -1157,66 +976,49 @@ IMPORTANT: Default update_pr_body=false for safety.`,
 			openWorldHint: true, // Makes API calls to GitHub
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { pr_url, update_pr_body, model, response_format } = args as {
-			pr_url: string;
-			update_pr_body?: boolean;
-			model?: string;
-			response_format?: string;
-		};
+	wrapToolHandler(
+		async (args, format) => {
+			const { pr_url, update_pr_body, model } = args as {
+				pr_url: string;
+				update_pr_body?: boolean;
+				model?: string;
+			};
+			const formatStr = format === ResponseFormat.JSON ? "json" : "markdown";
+			const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
 
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		log.info(
-			{ cid: mcpCid, tool: "kit_summarize", args: { pr_url, update_pr_body } },
-			"summarize",
-		);
+			const cmd = [
+				"run",
+				`${pluginRoot}/src/cli.ts`,
+				"summarize",
+				pr_url,
+				"--format",
+				formatStr,
+			];
 
-		const format = response_format === "json" ? "json" : "markdown";
-		const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || ".";
+			if (update_pr_body) {
+				cmd.push("--update-pr-body", "true");
+			}
 
-		const cmd = [
-			"run",
-			`${pluginRoot}/src/cli.ts`,
-			"summarize",
-			pr_url,
-			"--format",
-			format,
-		];
+			if (model) {
+				cmd.push("--model", model);
+			}
 
-		if (update_pr_body) {
-			cmd.push("--update-pr-body", "true");
-		}
+			const result = spawnSyncCollect(["bun", ...cmd], {
+				env: { PATH: buildEnhancedPath() },
+			});
 
-		if (model) {
-			cmd.push("--model", model);
-		}
+			if (result.exitCode !== 0) {
+				throw new Error(result.stderr || "Failed to summarize PR");
+			}
 
-		const result = spawnSyncCollect(["bun", ...cmd], {
-			env: { PATH: buildEnhancedPath() },
-		});
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		log.info(
-			{
-				cid: mcpCid,
-				tool: "kit_summarize",
-				success: result.exitCode === 0,
-				durationMs: mcpDuration,
-			},
-			"summarize",
-		);
-
-		return {
-			...(result.exitCode !== 0 ? { isError: true } : {}),
-			content: [
-				{
-					type: "text" as const,
-					text: result.exitCode === 0 ? result.stdout : result.stderr,
-				},
-			],
-		};
-	},
+			return result.stdout;
+		},
+		{
+			toolName: "kit_summarize",
+			logger: createLoggerAdapter("summarize"),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 // ============================================================================
@@ -1277,95 +1079,66 @@ Two modes:
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { pattern, mode, file_pattern, path, max_results, response_format } =
-			args as {
+	wrapToolHandler(
+		async (args, format) => {
+			const { pattern, mode, file_pattern, path, max_results } = args as {
 				pattern: string;
 				mode?: "simple" | "pattern";
 				file_pattern?: string;
 				path?: string;
 				max_results?: number;
-				response_format?: string;
 			};
 
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		log.info(
-			{ cid: mcpCid, tool: "kit_ast_search", args: { pattern, mode } },
-			"ast",
-		);
+			const result = await executeAstSearch({
+				pattern,
+				mode: mode === "pattern" ? SearchMode.PATTERN : SearchMode.SIMPLE,
+				filePattern: file_pattern,
+				path,
+				maxResults: max_results,
+			});
 
-		const result = await executeAstSearch({
-			pattern,
-			mode: mode === "pattern" ? SearchMode.PATTERN : SearchMode.SIMPLE,
-			filePattern: file_pattern,
-			path,
-			maxResults: max_results,
-		});
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		log.info(
-			{
-				cid: mcpCid,
-				tool: "kit_ast_search",
-				success: !("error" in result),
-				durationMs: mcpDuration,
-			},
-			"ast",
-		);
-
-		// Format output
-		const format = response_format === "json" ? "json" : "markdown";
-
-		if ("error" in result) {
-			return {
-				isError: true,
-				content: [
-					{
-						type: "text" as const,
-						text:
-							format === "json"
-								? JSON.stringify(result, null, 2)
-								: `**Error:** ${result.error}${result.hint ? `\n\n*Hint:* ${result.hint}` : ""}`,
-					},
-				],
-			};
-		}
-
-		if (format === "json") {
-			return {
-				content: [
-					{ type: "text" as const, text: JSON.stringify(result, null, 2) },
-				],
-			};
-		}
-
-		// Format as markdown
-		let markdown = `## AST Search Results\n\n`;
-		markdown += `**Pattern:** \`${result.pattern}\`\n`;
-		markdown += `**Mode:** ${result.mode}\n`;
-		markdown += `**Matches:** ${result.count}\n\n`;
-
-		if (result.matches.length === 0) {
-			markdown += "_No matches found_\n";
-		} else {
-			for (const match of result.matches) {
-				markdown += `### ${match.file}:${match.line}\n`;
-				markdown += `**Node type:** \`${match.nodeType}\`\n`;
-				if (match.context.parentFunction) {
-					markdown += `**In function:** \`${match.context.parentFunction}\`\n`;
-				}
-				if (match.context.parentClass) {
-					markdown += `**In class:** \`${match.context.parentClass}\`\n`;
-				}
-				markdown += `\`\`\`\n${match.text.slice(0, 300)}${match.text.length > 300 ? "..." : ""}\n\`\`\`\n\n`;
+			// Convert error result to exception for wrapToolHandler
+			if ("error" in result) {
+				throw new Error(
+					`${result.error}${result.hint ? `\nHint: ${result.hint}` : ""}`,
+				);
 			}
-		}
 
-		return {
-			content: [{ type: "text" as const, text: markdown }],
-		};
-	},
+			// Format based on response_format
+			if (format === ResponseFormat.JSON) {
+				return JSON.stringify(result, null, 2);
+			}
+
+			// Format as markdown
+			let markdown = `## AST Search Results\n\n`;
+			markdown += `**Pattern:** \`${result.pattern}\`\n`;
+			markdown += `**Mode:** ${result.mode}\n`;
+			markdown += `**Matches:** ${result.count}\n\n`;
+
+			if (result.matches.length === 0) {
+				markdown += "_No matches found_\n";
+			} else {
+				for (const match of result.matches) {
+					markdown += `### ${match.file}:${match.line}\n`;
+					markdown += `**Node type:** \`${match.nodeType}\`\n`;
+					if (match.context.parentFunction) {
+						markdown += `**In function:** \`${match.context.parentFunction}\`\n`;
+					}
+					if (match.context.parentClass) {
+						markdown += `**In class:** \`${match.context.parentClass}\`\n`;
+					}
+					markdown += `\`\`\`\n${match.text.slice(0, 300)}${match.text.length > 300 ? "..." : ""}\n\`\`\`\n\n`;
+				}
+			}
+
+			return markdown;
+		},
+		{
+			toolName: "kit_ast_search",
+			logger: createLoggerAdapter("ast"),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 // ============================================================================
@@ -1407,83 +1180,58 @@ Requires Kit CLI: uv tool install cased-kit`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { symbol, symbol_type, path, response_format } = args as {
-			symbol: string;
-			symbol_type?: string;
-			path?: string;
-			response_format?: string;
-		};
-
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		log.info({ cid: mcpCid, tool: "kit_usages", args: { symbol } }, "usages");
-
-		const result = executeKitUsages({
-			symbolName: symbol,
-			symbolType: symbol_type,
-			path,
-		});
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		log.info(
-			{
-				cid: mcpCid,
-				tool: "kit_usages",
-				success: !("error" in result),
-				durationMs: mcpDuration,
-			},
-			"usages",
-		);
-
-		// Format output
-		const format = response_format === "json" ? "json" : "markdown";
-
-		if ("error" in result) {
-			return {
-				isError: true,
-				content: [
-					{
-						type: "text" as const,
-						text:
-							format === "json"
-								? JSON.stringify(result, null, 2)
-								: `**Error:** ${result.error}${result.hint ? `\n\n*Hint:* ${result.hint}` : ""}`,
-					},
-				],
+	wrapToolHandler(
+		async (args, format) => {
+			const { symbol, symbol_type, path } = args as {
+				symbol: string;
+				symbol_type?: string;
+				path?: string;
 			};
-		}
 
-		if (format === "json") {
-			return {
-				content: [
-					{ type: "text" as const, text: JSON.stringify(result, null, 2) },
-				],
-			};
-		}
+			const result = executeKitUsages({
+				symbolName: symbol,
+				symbolType: symbol_type,
+				path,
+			});
 
-		// Format as markdown
-		let markdown = `## Symbol Usages\n\n`;
-		markdown += `**Symbol:** \`${result.symbolName}\`\n`;
-		markdown += `**Usages found:** ${result.count}\n\n`;
-
-		if (result.usages.length === 0) {
-			markdown += "_No usages found_\n";
-		} else {
-			for (const usage of result.usages) {
-				markdown += `### ${usage.file}${usage.line ? `:${usage.line}` : ""}\n`;
-				markdown += `**Type:** \`${usage.type}\` | **Name:** \`${usage.name}\`\n`;
-				if (usage.context) {
-					markdown += `\`\`\`\n${usage.context}\n\`\`\`\n`;
-				}
-				markdown += "\n";
+			// Convert error result to exception for wrapToolHandler
+			if ("error" in result) {
+				throw new Error(
+					`${result.error}${result.hint ? `\nHint: ${result.hint}` : ""}`,
+				);
 			}
-		}
 
-		return {
-			content: [{ type: "text" as const, text: markdown }],
-		};
-	},
+			// Format based on response_format
+			if (format === ResponseFormat.JSON) {
+				return JSON.stringify(result, null, 2);
+			}
+
+			// Format as markdown
+			let markdown = `## Symbol Usages\n\n`;
+			markdown += `**Symbol:** \`${result.symbolName}\`\n`;
+			markdown += `**Usages found:** ${result.count}\n\n`;
+
+			if (result.usages.length === 0) {
+				markdown += "_No usages found_\n";
+			} else {
+				for (const usage of result.usages) {
+					markdown += `### ${usage.file}${usage.line ? `:${usage.line}` : ""}\n`;
+					markdown += `**Type:** \`${usage.type}\` | **Name:** \`${usage.name}\`\n`;
+					if (usage.context) {
+						markdown += `\`\`\`\n${usage.context}\n\`\`\`\n`;
+					}
+					markdown += "\n";
+				}
+			}
+
+			return markdown;
+		},
+		{
+			toolName: "kit_usages",
+			logger: createLoggerAdapter("usages"),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 // ============================================================================
@@ -1524,83 +1272,52 @@ Requires Kit CLI: uv tool install cased-kit`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { path, subpath, response_format } = args as {
-			path?: string;
-			subpath?: string;
-			response_format?: string;
-		};
+	wrapToolHandler(
+		async (args, format) => {
+			const { path, subpath } = args as { path?: string; subpath?: string };
 
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		log.info(
-			{ cid: mcpCid, tool: "kit_file_tree", args: { path, subpath } },
-			"fileTree",
-		);
+			const result = executeKitFileTree({
+				path,
+				subpath,
+			});
 
-		const result = executeKitFileTree({
-			path,
-			subpath,
-		});
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		log.info(
-			{
-				cid: mcpCid,
-				tool: "kit_file_tree",
-				success: !("error" in result),
-				durationMs: mcpDuration,
-			},
-			"fileTree",
-		);
-
-		// Format output
-		const format = response_format === "json" ? "json" : "markdown";
-
-		if ("error" in result) {
-			return {
-				isError: true,
-				content: [
-					{
-						type: "text" as const,
-						text:
-							format === "json"
-								? JSON.stringify(result, null, 2)
-								: `**Error:** ${result.error}${result.hint ? `\n\n*Hint:* ${result.hint}` : ""}`,
-					},
-				],
-			};
-		}
-
-		if (format === "json") {
-			return {
-				content: [
-					{ type: "text" as const, text: JSON.stringify(result, null, 2) },
-				],
-			};
-		}
-
-		// Format as markdown tree
-		let markdown = `## File Tree\n\n`;
-		markdown += `**Path:** \`${result.path}\`${result.subpath ? ` (subpath: \`${result.subpath}\`)` : ""}\n`;
-		markdown += `**Entries:** ${result.count}\n\n`;
-
-		if (result.entries.length === 0) {
-			markdown += "_No entries found_\n";
-		} else {
-			markdown += "```\n";
-			for (const entry of result.entries) {
-				const icon = entry.isDir ? "📁" : "📄";
-				const size = entry.isDir ? "" : ` (${formatBytes(entry.size)})`;
-				markdown += `${icon} ${entry.path}${size}\n`;
+			// Convert error result to exception for wrapToolHandler
+			if ("error" in result) {
+				throw new Error(
+					`${result.error}${result.hint ? `\nHint: ${result.hint}` : ""}`,
+				);
 			}
-			markdown += "```\n";
-		}
 
-		return {
-			content: [{ type: "text" as const, text: markdown }],
-		};
-	},
+			// Format based on response_format
+			if (format === ResponseFormat.JSON) {
+				return JSON.stringify(result, null, 2);
+			}
+
+			// Format as markdown tree
+			let markdown = `## File Tree\n\n`;
+			markdown += `**Path:** \`${result.path}\`${result.subpath ? ` (subpath: \`${result.subpath}\`)` : ""}\n`;
+			markdown += `**Entries:** ${result.count}\n\n`;
+
+			if (result.entries.length === 0) {
+				markdown += "_No entries found_\n";
+			} else {
+				markdown += "```\n";
+				for (const entry of result.entries) {
+					const icon = entry.isDir ? "📁" : "📄";
+					const size = entry.isDir ? "" : ` (${formatBytes(entry.size)})`;
+					markdown += `${icon} ${entry.path}${size}\n`;
+				}
+				markdown += "```\n";
+			}
+
+			return markdown;
+		},
+		{
+			toolName: "kit_file_tree",
+			logger: createLoggerAdapter("fileTree"),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 // ============================================================================
@@ -1639,111 +1356,65 @@ Requires Kit CLI: uv tool install cased-kit`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { files, path, response_format } = args as {
-			files: string[];
-			path?: string;
-			response_format?: string;
-		};
+	wrapToolHandler(
+		async (args, format) => {
+			const { files, path } = args as { files: string[]; path?: string };
 
-		const mcpCid = createCorrelationId();
-		const mcpStartTime = Date.now();
-		log.info(
-			{
-				cid: mcpCid,
-				tool: "kit_file_content",
-				args: { fileCount: files.length },
-			},
-			"fileContent",
-		);
+			const result = executeKitFileContent({
+				filePaths: files,
+				path,
+			});
 
-		const result = executeKitFileContent({
-			filePaths: files,
-			path,
-		});
-
-		const mcpDuration = Date.now() - mcpStartTime;
-		log.info(
-			{
-				cid: mcpCid,
-				tool: "kit_file_content",
-				success: !("error" in result),
-				durationMs: mcpDuration,
-			},
-			"fileContent",
-		);
-
-		// Format output
-		const format = response_format === "json" ? "json" : "markdown";
-
-		if ("error" in result) {
-			return {
-				isError: true,
-				content: [
-					{
-						type: "text" as const,
-						text:
-							format === "json"
-								? JSON.stringify(result, null, 2)
-								: `**Error:** ${result.error}${result.hint ? `\n\n*Hint:* ${result.hint}` : ""}`,
-					},
-				],
-			};
-		}
-
-		if (format === "json") {
-			return {
-				content: [
-					{ type: "text" as const, text: JSON.stringify(result, null, 2) },
-				],
-			};
-		}
-
-		// Format as markdown
-		let markdown = `## File Contents\n\n`;
-		markdown += `**Files requested:** ${result.count}\n`;
-		markdown += `**Found:** ${result.files.filter((f) => f.found).length}\n\n`;
-
-		for (const file of result.files) {
-			markdown += `### ${file.file}\n`;
-			if (file.found) {
-				// Detect language for syntax highlighting
-				const ext = file.file.split(".").pop() || "";
-				const lang =
-					{
-						ts: "typescript",
-						js: "javascript",
-						py: "python",
-						json: "json",
-						md: "markdown",
-					}[ext] || "";
-				markdown += `\`\`\`${lang}\n${file.content}\n\`\`\`\n`;
-			} else {
-				markdown += `_Not found: ${file.error || "File does not exist"}_\n`;
+			// Convert error result to exception for wrapToolHandler
+			if ("error" in result) {
+				throw new Error(
+					`${result.error}${result.hint ? `\nHint: ${result.hint}` : ""}`,
+				);
 			}
-			markdown += "\n";
-		}
 
-		return {
-			content: [{ type: "text" as const, text: markdown }],
-		};
-	},
+			// Format based on response_format
+			if (format === ResponseFormat.JSON) {
+				return JSON.stringify(result, null, 2);
+			}
+
+			// Format as markdown
+			let markdown = `## File Contents\n\n`;
+			markdown += `**Files requested:** ${result.count}\n`;
+			markdown += `**Found:** ${result.files.filter((f) => f.found).length}\n\n`;
+
+			for (const file of result.files) {
+				markdown += `### ${file.file}\n`;
+				if (file.found) {
+					// Detect language for syntax highlighting
+					const ext = file.file.split(".").pop() || "";
+					const lang =
+						{
+							ts: "typescript",
+							js: "javascript",
+							py: "python",
+							json: "json",
+							md: "markdown",
+						}[ext] || "";
+					markdown += `\`\`\`${lang}\n${file.content}\n\`\`\`\n`;
+				} else {
+					markdown += `_Not found: ${file.error || "File does not exist"}_\n`;
+				}
+				markdown += "\n";
+			}
+
+			return markdown;
+		},
+		{
+			toolName: "kit_file_content",
+			logger: createLoggerAdapter("fileContent"),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 // ============================================================================
-// Utility Functions
+// Utility Functions - formatBytes now imported from @sidequest/core/formatters
 // ============================================================================
-
-/**
- * Format bytes to human readable string.
- */
-function formatBytes(bytes: number): string {
-	if (bytes === 0) return "0 B";
-	const k = 1024;
-	const sizes = ["B", "KB", "MB", "GB"];
-	const i = Math.floor(Math.log(bytes) / Math.log(k));
-	return `${Number.parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
-}
 
 // ============================================================================
 // Start Server

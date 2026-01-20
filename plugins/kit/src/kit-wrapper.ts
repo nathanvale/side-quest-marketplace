@@ -5,9 +5,9 @@
  * Uses Bun.spawnSync via shared helpers for synchronous execution to fit MCP tool patterns.
  */
 
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { withTempJsonFileSync } from "@sidequest/core/fs";
 import {
 	buildEnhancedPath,
 	ensureCommandAvailable,
@@ -204,10 +204,6 @@ export function executeKitGrep(options: GrepOptions): KitResult<GrepResult> {
 		args.push("--directory", directory);
 	}
 
-	// Use temp file for JSON output (kit grep doesn't support --format json)
-	const tempFile = join(tmpdir(), `kit-grep-${cid}.json`);
-	args.push("--output", tempFile);
-
 	grepLogger.info("Executing kit grep", {
 		cid,
 		pattern,
@@ -216,47 +212,18 @@ export function executeKitGrep(options: GrepOptions): KitResult<GrepResult> {
 	});
 
 	try {
-		const result = executeKit(args, { timeout: GREP_TIMEOUT });
-
-		// Check for errors
-		if (result.exitCode !== 0) {
-			grepLogger.error("Grep failed", {
-				cid,
-				exitCode: result.exitCode,
-				stderr: result.stderr,
-				durationMs: Date.now() - startTime,
-			});
-
-			// Clean up temp file if it exists
-			if (existsSync(tempFile)) {
-				rmSync(tempFile);
-			}
-
-			return createErrorFromOutput(result.stderr, result.exitCode).toJSON();
-		}
-
-		// Read and parse JSON output
-		if (!existsSync(tempFile)) {
-			grepLogger.error("Temp file not created", { cid });
-			return new KitError(
-				KitErrorType.OutputParseError,
-				"Grep completed but output file not found",
-			).toJSON();
-		}
-
-		const jsonContent = readFileSync(tempFile, "utf8");
-		rmSync(tempFile); // Clean up
-
-		let rawMatches: RawGrepMatch[];
-		try {
-			rawMatches = JSON.parse(jsonContent);
-		} catch {
-			grepLogger.error("Failed to parse grep output", { cid, jsonContent });
-			return new KitError(
-				KitErrorType.OutputParseError,
-				"Failed to parse grep JSON output",
-			).toJSON();
-		}
+		// Use temp file for JSON output with automatic cleanup
+		const rawMatches = withTempJsonFileSync<RawGrepMatch[]>(
+			`kit-grep-${cid}`,
+			(tempFile) => {
+				args.push("--output", tempFile);
+				const result = executeKit(args, { timeout: GREP_TIMEOUT });
+				return {
+					exitCode: result.exitCode,
+					stderr: result.stderr,
+				};
+			},
+		);
 
 		// Transform to our format
 		const matches: GrepMatch[] = rawMatches.map((m) => ({
@@ -279,13 +246,19 @@ export function executeKitGrep(options: GrepOptions): KitResult<GrepResult> {
 			path,
 		};
 	} catch (error) {
-		// Clean up temp file if it exists
-		if (existsSync(tempFile)) {
-			rmSync(tempFile);
-		}
-
 		const message = error instanceof Error ? error.message : "Unknown error";
 		grepLogger.error("Grep threw exception", { cid, error: message });
+
+		// Check if this is a Kit CLI error from withTempJsonFileSync
+		if (message.includes("Operation failed with exit code")) {
+			const exitCode = Number.parseInt(
+				message.match(/exit code (\d+)/)?.[1] || "1",
+				10,
+			);
+			const stderr = message.split(": ").slice(2).join(": ") || message;
+			return createErrorFromOutput(stderr, exitCode).toJSON();
+		}
+
 		return new KitError(KitErrorType.KitCommandFailed, message).toJSON();
 	}
 }
@@ -672,11 +645,8 @@ export function executeKitFileTree(
 
 	const { path = getDefaultKitPath(), subpath } = options;
 
-	// Use temp file for JSON output
-	const tempFile = join(tmpdir(), `kit-file-tree-${cid}.json`);
-
 	// Build command arguments
-	const args: string[] = ["file-tree", path, "--output", tempFile];
+	const args: string[] = ["file-tree", path];
 
 	if (subpath) {
 		args.push("--path", subpath);
@@ -690,50 +660,20 @@ export function executeKitFileTree(
 	});
 
 	try {
-		const result = executeKit(args, { timeout: FILE_TREE_TIMEOUT });
-
-		// Check for errors
-		if (result.exitCode !== 0) {
-			fileTreeLogger.error("File tree failed", {
-				cid,
-				exitCode: result.exitCode,
-				stderr: result.stderr,
-				durationMs: Date.now() - startTime,
-			});
-
-			// Clean up temp file if it exists
-			if (existsSync(tempFile)) {
-				rmSync(tempFile);
-			}
-
-			return createErrorFromOutput(result.stderr, result.exitCode).toJSON();
-		}
-
-		// Read and parse JSON output
-		if (!existsSync(tempFile)) {
-			fileTreeLogger.error("Temp file not created", { cid });
-			return new KitError(
-				KitErrorType.OutputParseError,
-				"File tree completed but output file not found",
-			).toJSON();
-		}
-
-		const jsonContent = readFileSync(tempFile, "utf8");
-		rmSync(tempFile); // Clean up
-
-		let rawEntries: RawFileTreeEntry[];
-		try {
-			rawEntries = JSON.parse(jsonContent);
-		} catch {
-			fileTreeLogger.error("Failed to parse file tree output", {
-				cid,
-				jsonContent,
-			});
-			return new KitError(
-				KitErrorType.OutputParseError,
-				"Failed to parse file tree JSON output",
-			).toJSON();
-		}
+		// Use temp file for JSON output with automatic cleanup
+		const rawEntries = withTempJsonFileSync<RawFileTreeEntry[]>(
+			`kit-file-tree-${cid}`,
+			(tempFile) => {
+				const argsWithOutput = [...args, "--output", tempFile];
+				const result = executeKit(argsWithOutput, {
+					timeout: FILE_TREE_TIMEOUT,
+				});
+				return {
+					exitCode: result.exitCode,
+					stderr: result.stderr,
+				};
+			},
+		);
 
 		// Transform to our format
 		const entries: FileTreeEntry[] = rawEntries.map((e) => ({
@@ -756,13 +696,19 @@ export function executeKitFileTree(
 			subpath,
 		};
 	} catch (error) {
-		// Clean up temp file if it exists
-		if (existsSync(tempFile)) {
-			rmSync(tempFile);
-		}
-
 		const message = error instanceof Error ? error.message : "Unknown error";
 		fileTreeLogger.error("File tree threw exception", { cid, error: message });
+
+		// Check if this is a Kit CLI error from withTempJsonFileSync
+		if (message.includes("Operation failed with exit code")) {
+			const exitCode = Number.parseInt(
+				message.match(/exit code (\d+)/)?.[1] || "1",
+				10,
+			);
+			const stderr = message.split(": ").slice(2).join(": ") || message;
+			return createErrorFromOutput(stderr, exitCode).toJSON();
+		}
+
 		return new KitError(KitErrorType.KitCommandFailed, message).toJSON();
 	}
 }
@@ -898,17 +844,8 @@ export function executeKitUsages(
 		).toJSON();
 	}
 
-	// Use temp file for JSON output
-	const tempFile = join(tmpdir(), `kit-usages-${cid}.json`);
-
 	// Build command arguments
-	const args: string[] = [
-		"usages",
-		path,
-		symbolName.trim(),
-		"--output",
-		tempFile,
-	];
+	const args: string[] = ["usages", path, symbolName.trim()];
 
 	if (symbolType) {
 		args.push("--type", symbolType);
@@ -923,50 +860,18 @@ export function executeKitUsages(
 	});
 
 	try {
-		const result = executeKit(args, { timeout: USAGES_TIMEOUT });
-
-		// Check for errors
-		if (result.exitCode !== 0) {
-			usagesLogger.error("Usages failed", {
-				cid,
-				exitCode: result.exitCode,
-				stderr: result.stderr,
-				durationMs: Date.now() - startTime,
-			});
-
-			// Clean up temp file if it exists
-			if (existsSync(tempFile)) {
-				rmSync(tempFile);
-			}
-
-			return createErrorFromOutput(result.stderr, result.exitCode).toJSON();
-		}
-
-		// Read and parse JSON output
-		if (!existsSync(tempFile)) {
-			usagesLogger.error("Temp file not created", { cid });
-			return new KitError(
-				KitErrorType.OutputParseError,
-				"Usages completed but output file not found",
-			).toJSON();
-		}
-
-		const jsonContent = readFileSync(tempFile, "utf8");
-		rmSync(tempFile); // Clean up
-
-		let rawUsages: RawSymbolUsage[];
-		try {
-			rawUsages = JSON.parse(jsonContent);
-		} catch {
-			usagesLogger.error("Failed to parse usages output", {
-				cid,
-				jsonContent,
-			});
-			return new KitError(
-				KitErrorType.OutputParseError,
-				"Failed to parse usages JSON output",
-			).toJSON();
-		}
+		// Use temp file for JSON output with automatic cleanup
+		const rawUsages = withTempJsonFileSync<RawSymbolUsage[]>(
+			`kit-usages-${cid}`,
+			(tempFile) => {
+				const argsWithOutput = [...args, "--output", tempFile];
+				const result = executeKit(argsWithOutput, { timeout: USAGES_TIMEOUT });
+				return {
+					exitCode: result.exitCode,
+					stderr: result.stderr,
+				};
+			},
+		);
 
 		// Transform to our format
 		const usages: SymbolUsage[] = rawUsages.map((u) => ({
@@ -991,13 +896,19 @@ export function executeKitUsages(
 			path,
 		};
 	} catch (error) {
-		// Clean up temp file if it exists
-		if (existsSync(tempFile)) {
-			rmSync(tempFile);
-		}
-
 		const message = error instanceof Error ? error.message : "Unknown error";
 		usagesLogger.error("Usages threw exception", { cid, error: message });
+
+		// Check if this is a Kit CLI error from withTempJsonFileSync
+		if (message.includes("Operation failed with exit code")) {
+			const exitCode = Number.parseInt(
+				message.match(/exit code (\d+)/)?.[1] || "1",
+				10,
+			);
+			const stderr = message.split(": ").slice(2).join(": ") || message;
+			return createErrorFromOutput(stderr, exitCode).toJSON();
+		}
+
 		return new KitError(KitErrorType.KitCommandFailed, message).toJSON();
 	}
 }

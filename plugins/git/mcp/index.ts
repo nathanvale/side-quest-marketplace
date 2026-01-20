@@ -12,6 +12,7 @@ import {
 	createPluginLogger,
 } from "@sidequest/core/logging";
 import { startServer, tool, z } from "@sidequest/core/mcp";
+import { ResponseFormat, wrapToolHandler } from "@sidequest/core/mcp-response";
 import {
 	ensureCommandAvailable,
 	spawnSyncCollect,
@@ -27,6 +28,25 @@ const { initLogger, getSubsystemLogger } = createPluginLogger({
 initLogger().catch(console.error);
 
 const mcpLogger = getSubsystemLogger("mcp");
+
+/**
+ * Adapter to bridge @sidequest/core/logging API to wrapToolHandler Logger interface.
+ *
+ * The wrapToolHandler expects: logger.info(message, properties)
+ * But @sidequest/core/logging provides: mcpLogger.info(properties)
+ *
+ * This adapter inverts the signature and forwards to the MCP subsystem logger.
+ */
+function createLoggerAdapter() {
+	return {
+		info: (message: string, properties?: Record<string, unknown>) => {
+			mcpLogger.info({ message, ...properties });
+		},
+		error: (message: string, properties?: Record<string, unknown>) => {
+			mcpLogger.error({ message, ...properties });
+		},
+	};
+}
 
 // Types
 
@@ -112,20 +132,6 @@ interface SearchOptions {
 }
 
 type GitResult<T> = T | ErrorResult;
-
-/**
- * Response format options for tool output
- */
-enum ResponseFormat {
-	MARKDOWN = "markdown",
-	JSON = "json",
-}
-
-function formatErrorMessage(message: string, format: ResponseFormat): string {
-	return format === ResponseFormat.JSON
-		? JSON.stringify({ error: message, isError: true })
-		: `**Error:** ${message}`;
-}
 
 function isError<T extends object>(
 	result: GitResult<T>,
@@ -723,73 +729,23 @@ tool(
 			openWorldHint: false,
 		},
 	},
-	async (args: { limit?: number; path?: string; response_format?: string }) => {
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		const { limit, path, response_format } = args;
-
-		mcpLogger.info("Tool request", {
-			cid,
-			tool: "git_get_recent_commits",
-			limit: limit ?? 10,
-			path,
-		});
-
-		const format =
-			response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { limit, path } = args as { limit?: number; path?: string };
 			const results = getRecentCommits(limit ?? 10, path);
 
 			if (isError(results)) {
-				mcpLogger.error("Tool failed", {
-					cid,
-					tool: "git_get_recent_commits",
-					error: results.error,
-					durationMs: Date.now() - startTime,
-				});
-				return {
-					isError: true,
-					content: [
-						{ type: "text" as const, text: formatCommits(results, format) },
-					],
-				};
+				throw new Error(results.error);
 			}
 
-			mcpLogger.info("Tool response", {
-				cid,
-				tool: "git_get_recent_commits",
-				success: true,
-				count: results.count,
-				durationMs: Date.now() - startTime,
-			});
-
-			return {
-				content: [
-					{ type: "text" as const, text: formatCommits(results, format) },
-				],
-			};
-		} catch (error) {
-			mcpLogger.error("Tool failed", {
-				cid,
-				tool: "git_get_recent_commits",
-				error: error instanceof Error ? error.message : "Unknown error",
-				durationMs: Date.now() - startTime,
-			});
-			const message = error instanceof Error ? error.message : "Unknown error";
-			return {
-				isError: true,
-				content: [
-					{
-						type: "text" as const,
-						text: formatErrorMessage(message, format),
-					},
-				],
-			};
-		}
-	},
+			return formatCommits(results, format);
+		},
+		{
+			toolName: "git_get_recent_commits",
+			logger: createLoggerAdapter(),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 tool(
@@ -825,31 +781,15 @@ tool(
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		const { query, search_code, limit, path, response_format } = args as {
-			query: string;
-			search_code?: boolean;
-			limit?: number;
-			path?: string;
-			response_format?: string;
-		};
+	wrapToolHandler(
+		async (args, format) => {
+			const { query, search_code, limit, path } = args as {
+				query: string;
+				search_code?: boolean;
+				limit?: number;
+				path?: string;
+			};
 
-		mcpLogger.info("Tool request", {
-			cid,
-			tool: "git_search_commits",
-			query,
-			search_code,
-			limit: limit ?? 20,
-		});
-
-		const format =
-			response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
-
-		try {
 			const results = searchCommits(query, {
 				limit: limit ?? 20,
 				searchCode: search_code ?? false,
@@ -857,47 +797,17 @@ tool(
 			});
 
 			if (isError(results)) {
-				mcpLogger.error("Tool failed", {
-					cid,
-					tool: "git_search_commits",
-					error: results.error,
-					durationMs: Date.now() - startTime,
-				});
-			} else {
-				mcpLogger.info("Tool response", {
-					cid,
-					tool: "git_search_commits",
-					success: true,
-					count: results.count,
-					durationMs: Date.now() - startTime,
-				});
+				throw new Error(results.error);
 			}
 
-			return {
-				...(isError(results) ? { isError: true } : {}),
-				content: [
-					{ type: "text" as const, text: formatCommits(results, format) },
-				],
-			};
-		} catch (error) {
-			mcpLogger.error("Tool failed", {
-				cid,
-				tool: "git_search_commits",
-				error: error instanceof Error ? error.message : "Unknown error",
-				durationMs: Date.now() - startTime,
-			});
-			const message = error instanceof Error ? error.message : "Unknown error";
-			return {
-				isError: true,
-				content: [
-					{
-						type: "text" as const,
-						text: formatErrorMessage(message, format),
-					},
-				],
-			};
-		}
-	},
+			return formatCommits(results, format);
+		},
+		{
+			toolName: "git_search_commits",
+			logger: createLoggerAdapter(),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 tool(
@@ -927,73 +837,28 @@ tool(
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		const { file, limit, path, response_format } = args as {
-			file: string;
-			limit?: number;
-			path?: string;
-			response_format?: string;
-		};
+	wrapToolHandler(
+		async (args, format) => {
+			const { file, limit, path } = args as {
+				file: string;
+				limit?: number;
+				path?: string;
+			};
 
-		mcpLogger.info("Tool request", {
-			cid,
-			tool: "git_get_file_history",
-			file,
-			limit: limit ?? 10,
-		});
-
-		const format =
-			response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
-
-		try {
 			const results = getFileHistory(file, limit ?? 10, path);
 
 			if (isError(results)) {
-				mcpLogger.error("Tool failed", {
-					cid,
-					tool: "git_get_file_history",
-					error: results.error,
-					durationMs: Date.now() - startTime,
-				});
-			} else {
-				mcpLogger.info("Tool response", {
-					cid,
-					tool: "git_get_file_history",
-					success: true,
-					count: results.count,
-					durationMs: Date.now() - startTime,
-				});
+				throw new Error(results.error);
 			}
 
-			return {
-				...(isError(results) ? { isError: true } : {}),
-				content: [
-					{ type: "text" as const, text: formatCommits(results, format) },
-				],
-			};
-		} catch (error) {
-			mcpLogger.error("Tool failed", {
-				cid,
-				tool: "git_get_file_history",
-				error: error instanceof Error ? error.message : "Unknown error",
-				durationMs: Date.now() - startTime,
-			});
-			const message = error instanceof Error ? error.message : "Unknown error";
-			return {
-				isError: true,
-				content: [
-					{
-						type: "text" as const,
-						text: formatErrorMessage(message, format),
-					},
-				],
-			};
-		}
-	},
+			return formatCommits(results, format);
+		},
+		{
+			toolName: "git_get_file_history",
+			logger: createLoggerAdapter(),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 tool(
@@ -1018,65 +883,23 @@ tool(
 			openWorldHint: false,
 		},
 	},
-	async (args: { path?: string; response_format?: string }) => {
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		const { path, response_format } = args;
-
-		mcpLogger.info("Tool request", { cid, tool: "git_get_status", path });
-
-		const format =
-			response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { path } = args as { path?: string };
 			const results = getStatus(path);
 
 			if (isError(results)) {
-				mcpLogger.error("Tool failed", {
-					cid,
-					tool: "git_get_status",
-					error: results.error,
-					durationMs: Date.now() - startTime,
-				});
-			} else {
-				mcpLogger.info("Tool response", {
-					cid,
-					tool: "git_get_status",
-					success: true,
-					staged: results.staged.length,
-					modified: results.modified.length,
-					untracked: results.untracked.length,
-					durationMs: Date.now() - startTime,
-				});
+				throw new Error(results.error);
 			}
 
-			return {
-				...(isError(results) ? { isError: true } : {}),
-				content: [
-					{ type: "text" as const, text: formatStatus(results, format) },
-				],
-			};
-		} catch (error) {
-			mcpLogger.error("Tool failed", {
-				cid,
-				tool: "git_get_status",
-				error: error instanceof Error ? error.message : "Unknown error",
-				durationMs: Date.now() - startTime,
-			});
-			const message = error instanceof Error ? error.message : "Unknown error";
-			return {
-				isError: true,
-				content: [
-					{
-						type: "text" as const,
-						text: formatErrorMessage(message, format),
-					},
-				],
-			};
-		}
-	},
+			return formatStatus(results, format);
+		},
+		{
+			toolName: "git_get_status",
+			logger: createLoggerAdapter(),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 tool(
@@ -1101,65 +924,23 @@ tool(
 			openWorldHint: false,
 		},
 	},
-	async (args: { path?: string; response_format?: string }) => {
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		const { path, response_format } = args;
-
-		mcpLogger.info("Tool request", { cid, tool: "git_get_branch_info", path });
-
-		const format =
-			response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { path } = args as { path?: string };
 			const results = getBranchInfo(path);
 
 			if (isError(results)) {
-				mcpLogger.error("Tool failed", {
-					cid,
-					tool: "git_get_branch_info",
-					error: results.error,
-					durationMs: Date.now() - startTime,
-				});
-			} else {
-				mcpLogger.info("Tool response", {
-					cid,
-					tool: "git_get_branch_info",
-					success: true,
-					current: results.current,
-					localCount: results.local.length,
-					remoteCount: results.remote.length,
-					durationMs: Date.now() - startTime,
-				});
+				throw new Error(results.error);
 			}
 
-			return {
-				...(isError(results) ? { isError: true } : {}),
-				content: [
-					{ type: "text" as const, text: formatBranchInfo(results, format) },
-				],
-			};
-		} catch (error) {
-			mcpLogger.error("Tool failed", {
-				cid,
-				tool: "git_get_branch_info",
-				error: error instanceof Error ? error.message : "Unknown error",
-				durationMs: Date.now() - startTime,
-			});
-			const message = error instanceof Error ? error.message : "Unknown error";
-			return {
-				isError: true,
-				content: [
-					{
-						type: "text" as const,
-						text: formatErrorMessage(message, format),
-					},
-				],
-			};
-		}
-	},
+			return formatBranchInfo(results, format);
+		},
+		{
+			toolName: "git_get_branch_info",
+			logger: createLoggerAdapter(),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 tool(
@@ -1188,67 +969,23 @@ tool(
 			openWorldHint: false,
 		},
 	},
-	async (args: { ref?: string; path?: string; response_format?: string }) => {
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		const { ref, path, response_format } = args;
-
-		mcpLogger.info("Tool request", {
-			cid,
-			tool: "git_get_diff_summary",
-			ref: ref ?? "HEAD",
-		});
-
-		const format =
-			response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { ref, path } = args as { ref?: string; path?: string };
 			const results = getDiffSummary(ref ?? "HEAD", path);
 
 			if (isError(results)) {
-				mcpLogger.error("Tool failed", {
-					cid,
-					tool: "git_get_diff_summary",
-					error: results.error,
-					durationMs: Date.now() - startTime,
-				});
-			} else {
-				mcpLogger.info("Tool response", {
-					cid,
-					tool: "git_get_diff_summary",
-					success: true,
-					filesChanged: results.files_changed,
-					durationMs: Date.now() - startTime,
-				});
+				throw new Error(results.error);
 			}
 
-			return {
-				...(isError(results) ? { isError: true } : {}),
-				content: [
-					{ type: "text" as const, text: formatDiffSummary(results, format) },
-				],
-			};
-		} catch (error) {
-			mcpLogger.error("Tool failed", {
-				cid,
-				tool: "git_get_diff_summary",
-				error: error instanceof Error ? error.message : "Unknown error",
-				durationMs: Date.now() - startTime,
-			});
-			const message = error instanceof Error ? error.message : "Unknown error";
-			return {
-				isError: true,
-				content: [
-					{
-						type: "text" as const,
-						text: formatErrorMessage(message, format),
-					},
-				],
-			};
-		}
-	},
+			return formatDiffSummary(results, format);
+		},
+		{
+			toolName: "git_get_diff_summary",
+			logger: createLoggerAdapter(),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 tool(
@@ -1273,63 +1010,23 @@ tool(
 			openWorldHint: false,
 		},
 	},
-	async (args: { path?: string; response_format?: string }) => {
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		const { path, response_format } = args;
-
-		mcpLogger.info("Tool request", { cid, tool: "git_get_stash_list", path });
-
-		const format =
-			response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { path } = args as { path?: string };
 			const results = getStashList(path);
 
 			if (isError(results)) {
-				mcpLogger.error("Tool failed", {
-					cid,
-					tool: "git_get_stash_list",
-					error: results.error,
-					durationMs: Date.now() - startTime,
-				});
-			} else {
-				mcpLogger.info("Tool response", {
-					cid,
-					tool: "git_get_stash_list",
-					success: true,
-					count: results.count,
-					durationMs: Date.now() - startTime,
-				});
+				throw new Error(results.error);
 			}
 
-			return {
-				...(isError(results) ? { isError: true } : {}),
-				content: [
-					{ type: "text" as const, text: formatStashList(results, format) },
-				],
-			};
-		} catch (error) {
-			mcpLogger.error("Tool failed", {
-				cid,
-				tool: "git_get_stash_list",
-				error: error instanceof Error ? error.message : "Unknown error",
-				durationMs: Date.now() - startTime,
-			});
-			const message = error instanceof Error ? error.message : "Unknown error";
-			return {
-				isError: true,
-				content: [
-					{
-						type: "text" as const,
-						text: formatErrorMessage(message, format),
-					},
-				],
-			};
-		}
-	},
+			return formatStashList(results, format);
+		},
+		{
+			toolName: "git_get_stash_list",
+			logger: createLoggerAdapter(),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 // Start the MCP server

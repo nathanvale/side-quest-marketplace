@@ -1,18 +1,21 @@
 /**
  * Formatters module - Output formatting utilities
  *
- * This module re-exports from terminal for backward compatibility.
- * New code should import directly from "@sidequest/core/terminal".
+ * This module re-exports from terminal for backward compatibility
+ * and provides additional formatting utilities.
  *
- * @deprecated Import from "@sidequest/core/terminal" instead
+ * @deprecated Terminal utilities - Import from "@sidequest/core/terminal" instead
  *
  * @example
  * ```ts
- * // Preferred (new code):
+ * // Preferred (new code - terminal utilities):
  * import { OutputFormat, parseOutputFormat, emphasize, color } from "@sidequest/core/terminal";
  *
  * // Legacy (still works):
  * import { OutputFormat, parseOutputFormat, emphasize, color } from "@sidequest/core/formatters";
+ *
+ * // New formatter utilities:
+ * import { formatBytes, getLanguageForExtension } from "@sidequest/core/formatters";
  * ```
  */
 
@@ -38,6 +41,10 @@ export {
 	warning,
 	yellow,
 } from "../terminal/index.js";
+
+// Export new formatter utilities
+export { formatBytes } from "./bytes.js";
+export { getLanguageForExtension } from "./syntax.js";
 
 // Legacy colors object for existing code that uses colors.red, colors.green, etc.
 // This provides the raw ANSI codes that were previously exported

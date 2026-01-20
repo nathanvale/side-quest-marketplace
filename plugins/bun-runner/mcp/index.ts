@@ -16,13 +16,21 @@ import {
 	createPluginLogger,
 } from "@sidequest/core/logging";
 import { startServer, tool, z } from "@sidequest/core/mcp";
+import {
+	createLoggerAdapter,
+	ResponseFormat,
+	wrapToolHandler,
+} from "@sidequest/core/mcp-response";
+import {
+	validatePath,
+	validateShellSafePattern,
+} from "@sidequest/core/validation";
 import { spawn } from "bun";
 import {
 	parseBunTestOutput,
 	type TestFailure,
 	type TestSummary,
 } from "./parse-utils";
-import { validatePath, validatePattern } from "./path-validator";
 
 // Initialize logger
 const { initLogger, getSubsystemLogger } = createPluginLogger({
@@ -36,14 +44,6 @@ initLogger().catch(console.error);
 const mcpLogger = getSubsystemLogger("mcp");
 
 // --- Types ---
-
-/**
- * Response format options for tool output
- */
-enum ResponseFormat {
-	MARKDOWN = "markdown",
-	JSON = "json",
-}
 
 // --- Parsing Functions (exported for testing) ---
 
@@ -363,30 +363,6 @@ function formatCoverageResult(
 	return output.trim();
 }
 
-/**
- * Create an error response for MCP tools.
- *
- * Why: MCP tools should return structured error responses with isError flag
- * so Claude knows the operation failed and can take corrective action.
- */
-function errorResponse(
-	message: string,
-	format: ResponseFormat = ResponseFormat.JSON,
-) {
-	return {
-		content: [
-			{
-				type: "text" as const,
-				text:
-					format === ResponseFormat.JSON
-						? JSON.stringify({ error: message, isError: true })
-						: `**Error:** ${message}`,
-			},
-		],
-		isError: true,
-	};
-}
-
 // --- Tools ---
 
 tool(
@@ -414,74 +390,40 @@ tool(
 			openWorldHint: false,
 		},
 	},
-	async (args: { pattern?: string; response_format?: string }) => {
-		const cid = createCorrelationId();
-		const startTime = Date.now();
+	wrapToolHandler(
+		async (args: Record<string, unknown>, format: ResponseFormat) => {
+			const { pattern } = args as { pattern?: string };
 
-		mcpLogger.info("Tool request", {
-			cid,
-			tool: "bun_runTests",
-			pattern: args.pattern,
-		});
-
-		// Validate pattern for security
-		if (args.pattern) {
-			try {
-				validatePattern(args.pattern);
+			// Validate pattern for security
+			if (pattern) {
+				validateShellSafePattern(pattern);
 				// If pattern looks like a path, validate it stays in repo
-				if (args.pattern.includes("/") || args.pattern.includes("..")) {
-					await validatePath(args.pattern);
+				if (pattern.includes("/") || pattern.includes("..")) {
+					await validatePath(pattern);
 				}
-			} catch (error) {
-				mcpLogger.error("Tool failed", {
-					cid,
-					tool: "bun_runTests",
-					error: error instanceof Error ? error.message : "Invalid pattern",
-					durationMs: Date.now() - startTime,
-				});
-				return errorResponse(
-					error instanceof Error ? error.message : "Invalid pattern",
-					ResponseFormat.JSON,
-				);
 			}
-		}
 
-		const format =
-			args.response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
+			const summary = await runBunTests(pattern);
 
-		try {
-			const summary = await runBunTests(args.pattern);
+			// Format the response
+			const text = formatTestSummary(summary, format);
 
-			mcpLogger.info("Tool response", {
-				cid,
-				tool: "bun_runTests",
-				success: true,
-				passed: summary.passed,
-				failed: summary.failed,
-				durationMs: Date.now() - startTime,
-			});
+			// If tests failed, mark as error by throwing
+			if (summary.failed > 0) {
+				const error = new Error(text);
+				// Attach summary for structured logging
+				(error as Error & { summary?: TestSummary }).summary = summary;
+				throw error;
+			}
 
-			return {
-				...(summary.failed > 0 ? { isError: true } : {}),
-				content: [
-					{ type: "text" as const, text: formatTestSummary(summary, format) },
-				],
-			};
-		} catch (error) {
-			mcpLogger.error("Tool failed", {
-				cid,
-				tool: "bun_runTests",
-				error: error instanceof Error ? error.message : "Unknown error",
-				durationMs: Date.now() - startTime,
-			});
-			return errorResponse(
-				error instanceof Error ? error.message : "Unknown error",
-				format,
-			);
-		}
-	},
+			return text;
+		},
+		{
+			toolName: "bun_runTests",
+			logger: createLoggerAdapter(mcpLogger),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 tool(
@@ -506,72 +448,34 @@ tool(
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		const { file, response_format } = args as {
-			file: string;
-			response_format?: string;
-		};
+	wrapToolHandler(
+		async (args: Record<string, unknown>, format: ResponseFormat) => {
+			const { file } = args as { file: string };
 
-		mcpLogger.info("Tool request", { cid, tool: "bun_testFile", file });
+			// Validate file path for security and get absolute path
+			const validatedFile = await validatePath(file);
 
-		// Validate file path for security and get absolute path
-		let validatedFile: string;
-		try {
-			validatedFile = await validatePath(file);
-		} catch (error) {
-			mcpLogger.error("Tool failed", {
-				cid,
-				tool: "bun_testFile",
-				error: error instanceof Error ? error.message : "Invalid file path",
-				durationMs: Date.now() - startTime,
-			});
-			return errorResponse(
-				error instanceof Error ? error.message : "Invalid file path",
-				ResponseFormat.JSON,
-			);
-		}
-
-		const format =
-			response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
-
-		try {
 			const summary = await runBunTests(validatedFile);
 
-			mcpLogger.info("Tool response", {
-				cid,
-				tool: "bun_testFile",
-				success: true,
-				passed: summary.passed,
-				failed: summary.failed,
-				durationMs: Date.now() - startTime,
-			});
+			// Format the response with file context
+			const text = formatTestSummary(summary, format, file);
 
-			return {
-				...(summary.failed > 0 ? { isError: true } : {}),
-				content: [
-					{
-						type: "text" as const,
-						text: formatTestSummary(summary, format, file),
-					},
-				],
-			};
-		} catch (error) {
-			mcpLogger.error("Tool failed", {
-				cid,
-				tool: "bun_testFile",
-				error: error instanceof Error ? error.message : "Unknown error",
-				durationMs: Date.now() - startTime,
-			});
-			return errorResponse(
-				error instanceof Error ? error.message : "Unknown error",
-				format,
-			);
-		}
-	},
+			// If tests failed, mark as error by throwing
+			if (summary.failed > 0) {
+				const error = new Error(text);
+				// Attach summary for structured logging
+				(error as Error & { summary?: TestSummary }).summary = summary;
+				throw error;
+			}
+
+			return text;
+		},
+		{
+			toolName: "bun_testFile",
+			logger: createLoggerAdapter(mcpLogger),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 tool(
@@ -593,52 +497,34 @@ tool(
 			openWorldHint: false,
 		},
 	},
-	async (args: { response_format?: string }) => {
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-
-		mcpLogger.info("Tool request", { cid, tool: "bun_testCoverage" });
-
-		const format =
-			args.response_format === "json"
-				? ResponseFormat.JSON
-				: ResponseFormat.MARKDOWN;
-
-		try {
+	wrapToolHandler(
+		async (_args: Record<string, unknown>, format: ResponseFormat) => {
 			const { summary, coverage } = await runBunTestCoverage();
 
-			mcpLogger.info("Tool response", {
-				cid,
-				tool: "bun_testCoverage",
-				success: true,
-				passed: summary.passed,
-				failed: summary.failed,
-				coverage: coverage.percent,
-				durationMs: Date.now() - startTime,
-			});
+			// Format the response
+			const text = formatCoverageResult(summary, coverage, format);
 
-			return {
-				...(summary.failed > 0 ? { isError: true } : {}),
-				content: [
-					{
-						type: "text" as const,
-						text: formatCoverageResult(summary, coverage, format),
-					},
-				],
-			};
-		} catch (error) {
-			mcpLogger.error("Tool failed", {
-				cid,
-				tool: "bun_testCoverage",
-				error: error instanceof Error ? error.message : "Unknown error",
-				durationMs: Date.now() - startTime,
-			});
-			return errorResponse(
-				error instanceof Error ? error.message : "Unknown error",
-				format,
-			);
-		}
-	},
+			// If tests failed, mark as error by throwing
+			if (summary.failed > 0) {
+				const error = new Error(text);
+				// Attach summary and coverage for structured logging
+				(
+					error as Error & { summary?: TestSummary; coverage?: typeof coverage }
+				).summary = summary;
+				(
+					error as Error & { summary?: TestSummary; coverage?: typeof coverage }
+				).coverage = coverage;
+				throw error;
+			}
+
+			return text;
+		},
+		{
+			toolName: "bun_testCoverage",
+			logger: createLoggerAdapter(mcpLogger),
+			createCid: createCorrelationId,
+		},
+	),
 );
 
 /**

@@ -1,19 +1,20 @@
 import { describe, expect, test } from "bun:test";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { expandTilde, normalizePath } from "@sidequest/core/fs";
 import {
-	expandTilde,
 	isRegexSafe,
 	isValidGlob,
-	normalizePath,
+	validateGlob,
+	validateRegex,
+} from "@sidequest/core/validation";
+import {
 	validateAstSearchInputs,
 	validateFileContentInputs,
 	validateFileTreeInputs,
-	validateGlob,
 	validateGrepInputs,
 	validatePath,
 	validatePositiveInt,
-	validateRegex,
 	validateSemanticInputs,
 	validateSymbolsInputs,
 	validateUsagesInputs,
@@ -222,13 +223,13 @@ describe("validateGlob", () => {
 	test("returns valid for good patterns", () => {
 		const result = validateGlob("**/*.ts");
 		expect(result.valid).toBe(true);
-		expect(result.pattern).toBe("**/*.ts");
+		expect(result.value).toBe("**/*.ts");
 	});
 
 	test("trims whitespace", () => {
 		const result = validateGlob("  *.ts  ");
 		expect(result.valid).toBe(true);
-		expect(result.pattern).toBe("*.ts");
+		expect(result.value).toBe("*.ts");
 	});
 
 	test("returns error for invalid patterns", () => {
@@ -279,7 +280,8 @@ describe("validateRegex", () => {
 	test("accepts valid regex", () => {
 		const result = validateRegex("function\\s+\\w+");
 		expect(result.valid).toBe(true);
-		expect(result.pattern).toBe("function\\s+\\w+");
+		expect(result.value).toBeInstanceOf(RegExp);
+		expect(result.value?.source).toBe("function\\s+\\w+");
 	});
 
 	test("rejects empty pattern", () => {
@@ -303,7 +305,8 @@ describe("validateRegex", () => {
 	test("trims whitespace", () => {
 		const result = validateRegex("  hello  ");
 		expect(result.valid).toBe(true);
-		expect(result.pattern).toBe("hello");
+		expect(result.value).toBeInstanceOf(RegExp);
+		expect(result.value?.source).toBe("hello");
 	});
 });
 

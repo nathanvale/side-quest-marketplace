@@ -19,6 +19,10 @@
  * - **setMcpLogger()** - Configure logger instance
  * - **setLogFile()** - Configure log file path
  *
+ * ### Logger Adapters
+ * - **createLoggerAdapter()** - Adapts LogTape logger to wrapToolHandler interface
+ * - Eliminates ~8 lines of boilerplate adapter code per plugin
+ *
  * ### Tool Handler Wrapper (RECOMMENDED)
  * - **wrapToolHandler()** - High-level wrapper reducing boilerplate from ~25 lines to ~5 lines
  * - Automatically handles: correlation IDs, logging, error handling, response formatting
@@ -73,11 +77,16 @@
  * });
  * ```
  *
- * ## Usage Example (High-Level Wrapper - Recommended)
+ * ## Usage Example (High-Level Wrapper with Adapter - Recommended)
  *
  * ```typescript
  * import { tool, z } from "@sidequest/core/mcp";
- * import { wrapToolHandler } from "@sidequest/core/mcp-response";
+ * import { wrapToolHandler, createLoggerAdapter } from "@sidequest/core/mcp-response";
+ * import { getLogger } from "@logtape/logtape";
+ * import { randomUUID } from "node:crypto";
+ *
+ * const logtapeLogger = getLogger("my-plugin.mcp");
+ * const logger = createLoggerAdapter(logtapeLogger);
  *
  * tool("my_tool", {
  *   inputSchema: {
@@ -92,7 +101,7 @@
  *   },
  *   {
  *     toolName: "my_tool",
- *     logger: myLogger,
+ *     logger: logger,  // Adapted LogTape logger
  *     createCid: () => randomUUID()
  *   }
  * ));
@@ -100,6 +109,8 @@
  *
  * @module mcp-response
  */
+
+export { createLoggerAdapter } from "./adapters";
 
 export {
 	type CorrelationIdGenerator,

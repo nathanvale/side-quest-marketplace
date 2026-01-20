@@ -19,7 +19,9 @@ export {
 	validateClassifierId,
 	validateDisplayName,
 	validateFieldName,
+	validateGlob,
 	validatePriority,
+	validateRegex,
 	validateTemplateName,
 	validateWeight,
 } from "@sidequest/core/validation";

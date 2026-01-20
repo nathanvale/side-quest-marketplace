@@ -17,11 +17,13 @@
 	],
 	"license": "MIT",
 	"commands": [
+		"./commands/clip.md",
 		"./commands/commit.md",
 		"./commands/create.md",
 		"./commands/create-classifier.md",
 		"./commands/create-note-template.md",
 		"./commands/daily-review.md",
+		"./commands/distill.md",
 		"./commands/enrich.md",
 		"./commands/meeting.md",
 		"./commands/search.md",
@@ -34,6 +36,7 @@
 	"mcpServers": ["./.mcp.json"],
 	"skills": [
 		"./skills/daily-review",
+		"./skills/distill-resource",
 		"./skills/log-triage",
 		"./skills/field-suggestions",
 		"./skills/template-assistant",

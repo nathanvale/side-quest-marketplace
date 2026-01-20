@@ -6,6 +6,7 @@
  */
 
 import { createRequire } from "node:module";
+import { ResourcePool } from "@sidequest/core/concurrency";
 import { Language, type Node, Parser } from "web-tree-sitter";
 import { getAstLogger } from "../logger.js";
 
@@ -40,11 +41,9 @@ export const SUPPORTED_LANGUAGES = [
 
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
-// Cached language instances
-const languageCache = new Map<string, Language>();
-
-// Parser instances per language (avoids race condition when language is swapped)
-const parserCache = new Map<string, Parser>();
+// Resource pools for cached instances
+const languagePool = new ResourcePool<SupportedLanguage, Language>();
+const parserPool = new ResourcePool<SupportedLanguage, Parser>();
 
 let initialized = false;
 
@@ -85,22 +84,15 @@ export async function getParser(language: SupportedLanguage): Promise<Parser> {
 
 	const logger = getAstLogger();
 
-	// Return cached parser if available
-	if (parserCache.has(language)) {
-		logger.debug("Using cached parser for language", { language });
-		return parserCache.get(language)!;
-	}
+	return parserPool.getOrCreate(language, async (lang) => {
+		logger.debug("Creating new parser for language", { language: lang });
 
-	logger.debug("Creating new parser for language", { language });
+		const parser = new Parser();
+		const grammar = await loadLanguage(lang);
+		parser.setLanguage(grammar);
 
-	// Create a new parser dedicated to this language
-	const parser = new Parser();
-	const lang = await loadLanguage(language);
-	parser.setLanguage(lang);
-
-	// Cache and return
-	parserCache.set(language, parser);
-	return parser;
+		return parser;
+	});
 }
 
 /**
@@ -112,31 +104,27 @@ export async function getParser(language: SupportedLanguage): Promise<Parser> {
 async function loadLanguage(language: SupportedLanguage): Promise<Language> {
 	const logger = getAstLogger();
 
-	if (languageCache.has(language)) {
-		logger.debug("Using cached language grammar", { language });
-		return languageCache.get(language)!;
-	}
+	return languagePool.getOrCreate(language, async (lang) => {
+		logger.debug("Loading language grammar from WASM", { language: lang });
 
-	logger.debug("Loading language grammar from WASM", { language });
-
-	try {
-		const wasmPath = require.resolve(
-			`tree-sitter-wasms/out/tree-sitter-${language}.wasm`,
-		);
-		const lang = await Language.load(wasmPath);
-		languageCache.set(language, lang);
-		logger.debug("Language grammar loaded successfully", {
-			language,
-			wasmPath,
-		});
-		return lang;
-	} catch (error) {
-		logger.error("Failed to load language grammar", {
-			language,
-			error: error instanceof Error ? error.message : String(error),
-		});
-		throw error;
-	}
+		try {
+			const wasmPath = require.resolve(
+				`tree-sitter-wasms/out/tree-sitter-${lang}.wasm`,
+			);
+			const grammar = await Language.load(wasmPath);
+			logger.debug("Language grammar loaded successfully", {
+				language: lang,
+				wasmPath,
+			});
+			return grammar;
+		} catch (error) {
+			logger.error("Failed to load language grammar", {
+				language: lang,
+				error: error instanceof Error ? error.message : String(error),
+			});
+			throw error;
+		}
+	});
 }
 
 /**

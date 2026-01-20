@@ -1,8 +1,8 @@
 /**
  * Concurrency utilities for safe concurrent operations.
  *
- * Provides primitives for file locking and transactional operations
- * with automatic rollback support.
+ * Provides primitives for file locking, transactional operations,
+ * resource pooling, and timeout management for async operations.
  *
  * ## File Locking
  *
@@ -45,6 +45,42 @@
  * }
  * ```
  *
+ * ## Resource Pooling
+ *
+ * Cache expensive resources that should be created once per key.
+ * Prevents duplicate creation even when called concurrently.
+ *
+ * ```typescript
+ * import { ResourcePool } from "@sidequest/core/concurrency";
+ *
+ * const parserPool = new ResourcePool<string, Parser>();
+ *
+ * export async function getParser(language: string): Promise<Parser> {
+ *   return parserPool.getOrCreate(language, async (lang) => {
+ *     const parser = new Parser();
+ *     const grammar = await loadGrammar(lang);
+ *     parser.setLanguage(grammar);
+ *     return parser;
+ *   });
+ * }
+ * ```
+ *
+ * ## Timeouts
+ *
+ * Wrap async operations with timeouts to prevent hanging indefinitely.
+ *
+ * ```typescript
+ * import { withTimeout } from "@sidequest/core/concurrency";
+ *
+ * try {
+ *   const result = await withTimeout(fetchData(), 5000);
+ * } catch (error) {
+ *   if (error instanceof TimeoutError) {
+ *     console.error(`Timed out after ${error.timeoutMs}ms`);
+ *   }
+ * }
+ * ```
+ *
  * @module core/concurrency
  */
 
@@ -56,7 +92,16 @@ export {
 	getDefaultLockDir,
 	withFileLock,
 } from "./file-lock.js";
-
+export {
+	type ParallelChunkOptions,
+	processInParallelChunks,
+} from "./parallel.js";
+export { ResourcePool } from "./resource-pool.js";
+export {
+	createTimeoutPromise,
+	TimeoutError,
+	withTimeout,
+} from "./timeout.js";
 export {
 	executeTransaction,
 	type RollbackOperation,

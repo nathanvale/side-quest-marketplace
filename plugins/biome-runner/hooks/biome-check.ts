@@ -12,11 +12,11 @@
  * - 2: Blocking error (unfixable lint errors remain, shown to Claude)
  */
 
+import { isFileInRepo } from "@sidequest/core/git";
 import { spawn } from "bun";
 import { parseBiomeOutput } from "../mcp/index";
 import { hasBiomeConfig, logMissingConfigHint } from "./shared/biome-config";
 import { BIOME_SUPPORTED_EXTENSIONS } from "./shared/constants";
-import { isFileInRepo } from "./shared/git-utils";
 import { biomeLogger, createCorrelationId, initLogger } from "./shared/logger";
 import { extractFilePaths, parseHookInput } from "./shared/types";
 

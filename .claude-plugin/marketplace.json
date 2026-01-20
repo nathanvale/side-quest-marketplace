@@ -89,8 +89,8 @@
 		{
 			"name": "para-obsidian",
 			"source": "./plugins/para-obsidian",
-			"description": "PARA-style Obsidian vault management with frontmatter validation, template versioning, and git auto-commit. Provides 20+ MCP tools, 11 slash commands, and 4 skills for complete vault operations including AI-assisted content injection.",
-			"version": "0.2.5",
+			"description": "PARA-style Obsidian vault management with frontmatter validation, template versioning, and git auto-commit. Provides 20+ MCP tools, 15 slash commands, and 7 skills for complete vault operations including AI-assisted content injection and progressive summarization distillation.",
+			"version": "0.2.6",
 			"author": {
 				"name": "Nathan Vale"
 			},
@@ -104,7 +104,10 @@
 				"frontmatter",
 				"mcp",
 				"ai-content",
-				"inbox-processing"
+				"inbox-processing",
+				"progressive-summarization",
+				"distillation",
+				"learning"
 			]
 		},
 		{

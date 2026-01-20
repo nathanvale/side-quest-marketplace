@@ -10,6 +10,7 @@ import { emphasize } from "@sidequest/core/terminal";
 import { filterByFrontmatter, searchText } from "../search/index";
 import { buildIndex, loadIndex, saveIndex } from "../search/indexer";
 import { semanticSearch } from "../search/semantic";
+import { validateRegex } from "../shared/validation";
 import type { CommandHandler } from "./types";
 import {
 	matchesDir,
@@ -124,10 +125,22 @@ export const handleSearch: CommandHandler = async (ctx) => {
 		? await filterByFrontmatter(config, { frontmatter, dir: dirs })
 		: [];
 
+	// Validate regex pattern if regex mode is enabled
+	const isRegexMode = flags.regex === true || flags.regex === "true";
+	if (isRegexMode) {
+		const validation = validateRegex(query);
+		if (!validation.valid) {
+			console.error(
+				emphasize.error(`Invalid regex pattern: ${validation.error}`),
+			);
+			return { success: false, exitCode: 1 };
+		}
+	}
+
 	const hits = await searchText(config, {
 		query,
 		dir: dirs,
-		regex: flags.regex === true || flags.regex === "true",
+		regex: isRegexMode,
 		maxResults:
 			typeof flags["max-results"] === "string"
 				? Number.parseInt(flags["max-results"], 10)

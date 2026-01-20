@@ -695,6 +695,8 @@ export function shuffle<T>(arr: T[]): T[] {
 // String utilities
 // ============================================================================
 
+export { capitalize } from "./string.js";
+
 /**
  * Truncate a string to a maximum length
  *

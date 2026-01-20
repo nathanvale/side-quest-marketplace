@@ -18,6 +18,7 @@ import {
 import { loadConfig } from "../config/index";
 import { filterByFrontmatter, searchText } from "../search/index";
 import { semanticSearch } from "../search/semantic";
+import { validateRegex } from "../shared/validation";
 
 // ============================================================================
 // Text Search Tool
@@ -101,6 +102,19 @@ Requires ripgrep (rg) to be installed.`,
 				? parseKeyValuePairs(frontmatter.split(","))
 				: undefined;
 
+			// Validate regex pattern if regex mode is enabled
+			const isRegexMode = regex ?? false;
+			if (isRegexMode) {
+				const validation = validateRegex(query);
+				if (!validation.valid) {
+					const format = parseResponseFormat(response_format);
+					return respondError(
+						format,
+						new Error(`Invalid regex pattern: ${validation.error}`),
+					);
+				}
+			}
+
 			// Apply frontmatter filters first if present
 			const allowedFiles = fmFilters
 				? await filterByFrontmatter(config, {
@@ -112,7 +126,7 @@ Requires ripgrep (rg) to be installed.`,
 			const hits = await searchText(config, {
 				query,
 				dir: dirs,
-				regex: regex ?? false,
+				regex: isRegexMode,
 				maxResults: max_results,
 				context,
 				allowedFiles,

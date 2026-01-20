@@ -4,6 +4,8 @@
  * Response formatters for MCP tool output in markdown and JSON formats.
  */
 
+import { formatBytes } from "@sidequest/core/formatters";
+import { capitalize, truncate } from "@sidequest/core/utils";
 import type { ASTSearchResult } from "./ast/types.js";
 import type {
 	ErrorResult,
@@ -242,20 +244,7 @@ export function formatError(
 // Utilities
 // ============================================================================
 
-/**
- * Truncate a string to a maximum length.
- */
-function truncate(str: string, maxLength: number): string {
-	if (str.length <= maxLength) return str;
-	return `${str.slice(0, maxLength - 3)}...`;
-}
-
-/**
- * Capitalize the first letter of a string.
- */
-function capitalize(str: string): string {
-	return str.charAt(0).toUpperCase() + str.slice(1);
-}
+// Note: truncate and capitalize functions now imported from @sidequest/core/utils
 
 /**
  * Get an icon for a symbol type.
@@ -329,16 +318,7 @@ export function formatFileTreeResults(
 	return lines.join("\n");
 }
 
-/**
- * Format bytes to human-readable size.
- */
-function formatBytes(bytes: number): string {
-	if (bytes === 0) return "0 B";
-	const k = 1024;
-	const sizes = ["B", "KB", "MB", "GB"];
-	const i = Math.floor(Math.log(bytes) / Math.log(k));
-	return `${Number.parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
-}
+// Note: formatBytes function now imported from @sidequest/core/formatters below
 
 // ============================================================================
 // File Content Formatters

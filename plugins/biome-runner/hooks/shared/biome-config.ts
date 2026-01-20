@@ -5,7 +5,7 @@
 
 import { exists } from "node:fs/promises";
 import { join } from "node:path";
-import { getGitRoot } from "./git-utils";
+import { getGitRoot } from "@sidequest/core/git";
 
 /**
  * Valid Biome configuration file names.

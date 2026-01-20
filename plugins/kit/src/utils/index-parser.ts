@@ -6,7 +6,7 @@
  */
 
 import { dirname, join, resolve } from "node:path";
-import { pathExistsSync } from "@sidequest/core/fs";
+import { findUpSync, pathExistsSync } from "@sidequest/core/fs";
 
 /**
  * Symbol definition from Kit CLI index
@@ -42,6 +42,8 @@ export interface ProjectIndex {
 /**
  * Search up directory tree for PROJECT_INDEX.json (git-style)
  *
+ * Note: Delegates to @sidequest/core/fs findUpSync for the file search.
+ *
  * @param startDir - Directory to start searching from (default: process.cwd())
  * @returns Absolute path to PROJECT_INDEX.json
  * @throws Error if index not found
@@ -49,21 +51,10 @@ export interface ProjectIndex {
 export async function findProjectIndex(
 	startDir: string = process.cwd(),
 ): Promise<string> {
-	let currentDir = resolve(startDir);
-	const root = resolve("/");
+	const indexPath = findUpSync("PROJECT_INDEX.json", startDir);
 
-	while (currentDir !== root) {
-		const indexPath = join(currentDir, "PROJECT_INDEX.json");
-		if (pathExistsSync(indexPath)) {
-			return indexPath;
-		}
-		currentDir = dirname(currentDir);
-	}
-
-	// Check root directory
-	const rootIndexPath = join(root, "PROJECT_INDEX.json");
-	if (pathExistsSync(rootIndexPath)) {
-		return rootIndexPath;
+	if (indexPath) {
+		return indexPath;
 	}
 
 	throw new Error(
