@@ -101,18 +101,17 @@ export function parseFrontmatterFilters(
 	return filters;
 }
 
+import { parseDirs as coreParseDirs } from "@sidequest/core/cli";
+
 /**
  * Parse --dir flag into array of directory paths.
+ * @deprecated Use parseDirs from @sidequest/core/cli instead
  */
 export function parseDirs(
 	value: string | boolean | undefined,
 	defaults?: ReadonlyArray<string>,
 ): ReadonlyArray<string> | undefined {
-	if (typeof value !== "string") return defaults;
-	return value
-		.split(",")
-		.map((s) => s.trim())
-		.filter(Boolean);
+	return coreParseDirs(value, defaults);
 }
 
 /**
@@ -155,6 +154,8 @@ export function matchesDir(
 	});
 }
 
+import { parseArgOverrides as coreParseArgOverrides } from "@sidequest/core/cli";
+
 /**
  * Parse --arg flags into key=value overrides.
  *
@@ -163,6 +164,7 @@ export function matchesDir(
  *
  * @param argFlags - Raw --arg flag value(s) from parseArgs
  * @returns Record mapping arg keys to their values
+ * @deprecated Use parseArgOverrides from @sidequest/core/cli instead
  *
  * @example
  * ```typescript
@@ -176,25 +178,7 @@ export function matchesDir(
 export function parseArgOverrides(
 	argFlags: string | boolean | (string | boolean)[] | undefined,
 ): Record<string, string> {
-	const overrides: Record<string, string> = {};
-
-	// Normalize to array of strings only
-	let stringFlags: string[];
-	if (typeof argFlags === "string") {
-		stringFlags = [argFlags];
-	} else if (Array.isArray(argFlags)) {
-		stringFlags = argFlags.filter((v): v is string => typeof v === "string");
-	} else {
-		stringFlags = [];
-	}
-
-	for (const arg of stringFlags) {
-		const [key, ...valueParts] = arg.split("=");
-		if (key && valueParts.length > 0) {
-			overrides[key] = valueParts.join("=");
-		}
-	}
-	return overrides;
+	return coreParseArgOverrides(argFlags);
 }
 
 /**

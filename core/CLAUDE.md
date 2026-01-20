@@ -153,6 +153,70 @@ tool("greet", {
 }, async ({ name }) => ({ content: [{ type: "text", text: `Hello ${name}!` }] }));
 ```
 
+### MCP Response Utilities (`src/mcp-response/`)
+
+High-level wrapper for MCP tool handlers that reduces boilerplate from ~25 lines to ~5 lines per tool.
+
+**Why This Exists:**
+Even with the simplified `@sidequest/core/mcp` API, tool handlers still need ~25 lines of repetitive code for correlation IDs, logging, error handling, and response formatting. The `wrapToolHandler` function automates all of this.
+
+**Key Features:**
+- Automatic correlation ID generation for request tracing
+- Automatic request/response logging with timing
+- Automatic error handling with categorization (transient, permanent, configuration, unknown)
+- Automatic response format parsing (JSON or Markdown)
+- Supports both data handlers (automatic formatting) and formatted handlers (custom formatting)
+- Custom log context support (sessionCid, userId, etc.)
+
+**Before (low-level API - ~25 lines per tool):**
+```typescript
+import { tool, z } from "@sidequest/core/mcp";
+import { parseResponseFormat, respondText, respondError, ResponseFormat } from "@sidequest/core/mcp-response";
+
+tool("para_config", {
+  inputSchema: { response_format: z.enum(["markdown", "json"]).optional() }
+}, async (args) => {
+  const cid = createCorrelationId();
+  const startTime = Date.now();
+  log({ cid, tool: "para_config", event: "request" });
+
+  try {
+    const config = loadConfig();
+    const format = parseResponseFormat(args.response_format);
+
+    log({ cid, tool: "para_config", event: "response", success: true, durationMs: Date.now() - startTime });
+
+    return respondText(format, JSON.stringify(config));
+  } catch (error) {
+    log({ cid, tool: "para_config", durationMs: Date.now() - startTime, success: false, error });
+    return respondError(format, error);
+  }
+});
+```
+
+**After (wrapToolHandler - ~5 lines per tool):**
+```typescript
+import { tool, z } from "@sidequest/core/mcp";
+import { wrapToolHandler } from "@sidequest/core/mcp-response";
+
+tool("para_config", {
+  inputSchema: { response_format: z.enum(["markdown", "json"]).optional() }
+}, wrapToolHandler(
+  async (args, format) => {
+    const config = loadConfig();
+    return config; // Wrapper handles formatting
+  },
+  { toolName: "para_config", logger: myLogger, createCid: () => randomUUID() }
+));
+```
+
+**Error Categorization:**
+The wrapper automatically categorizes errors for better observability:
+- **Transient** (NETWORK_ERROR) - ECONNREFUSED, ENOTFOUND, ETIMEDOUT, fetch failed
+- **Permanent** (NOT_FOUND, VALIDATION) - File not found, validation failures
+- **Configuration** (PERMISSION) - EACCES, EPERM, unauthorized
+- **Unknown** (UNKNOWN_ERROR) - Everything else
+
 ### LLM Integration (`src/llm/`)
 
 Utilities for calling LLMs (Claude headless CLI, Ollama API) with structured extraction.
@@ -231,6 +295,7 @@ Enhanced file system operations with safety checks.
 | `hash` | File hashing (MD5, SHA) |
 | `hooks` | Plugin hook utilities |
 | `html` | HTML generation and templating |
+| `mcp-response` | MCP tool handler wrapper (reduces boilerplate by ~20 lines per tool) |
 | `password` | Password validation rules |
 | `spawn` | Process spawning with stdio capture |
 | `streams` | Stream processing utilities |

@@ -153,3 +153,75 @@ export function coerceValue(raw: string): unknown {
 	}
 	return trimmed;
 }
+
+/**
+ * Parse comma-separated directory list from CLI flag.
+ *
+ * Handles various input types from CLI parsing:
+ * - String: "dir1,dir2,dir3" → ["dir1", "dir2", "dir3"]
+ * - Boolean/undefined: Returns defaults or undefined
+ *
+ * Trims whitespace and filters empty strings.
+ *
+ * @example
+ * parseDirs("Projects,Areas") // → ["Projects", "Areas"]
+ * parseDirs("Projects, Areas ") // → ["Projects", "Areas"]
+ * parseDirs(true, ["default"]) // → ["default"]
+ * parseDirs(undefined, ["default"]) // → ["default"]
+ */
+export function parseDirs(
+	value: string | boolean | undefined,
+	defaults?: ReadonlyArray<string>,
+): ReadonlyArray<string> | undefined {
+	if (typeof value !== "string") return defaults;
+	return value
+		.split(",")
+		.map((s) => s.trim())
+		.filter(Boolean);
+}
+
+/**
+ * Parse --arg flags into key=value overrides.
+ *
+ * Handles multiple input formats from CLI parsing:
+ * - String: "key=value" → { key: "value" }
+ * - Array: ["a=1", "b=2"] → { a: "1", b: "2" }
+ * - Mixed arrays with booleans (filters out non-strings)
+ *
+ * Supports values containing "=" signs (e.g., "url=https://example.com?a=b").
+ * Splits on first "=" and joins remaining parts as value.
+ *
+ * @example
+ * parseArgOverrides("priority=high") // → { priority: "high" }
+ * parseArgOverrides(["area=[[Work]]", "status=active"]) // → { area: "[[Work]]", status: "active" }
+ * parseArgOverrides("url=https://example.com?a=b") // → { url: "https://example.com?a=b" }
+ * parseArgOverrides([true, "key=val"]) // → { key: "val" } (filters out non-strings)
+ */
+export function parseArgOverrides(
+	argFlags: string | boolean | (string | boolean)[] | undefined,
+): Record<string, string> {
+	const overrides: Record<string, string> = {};
+
+	// Normalize to array of strings only
+	let stringFlags: string[];
+	if (typeof argFlags === "string") {
+		stringFlags = [argFlags];
+	} else if (Array.isArray(argFlags)) {
+		stringFlags = argFlags.filter((v): v is string => typeof v === "string");
+	} else {
+		stringFlags = [];
+	}
+
+	for (const arg of stringFlags) {
+		const [rawKey, ...valueParts] = arg.split("=");
+		if (rawKey && valueParts.length > 0) {
+			const key = rawKey.trim();
+			const value = valueParts.join("=").trim();
+			// Skip entries with empty key or value (after trimming)
+			if (key && value) {
+				overrides[key] = value;
+			}
+		}
+	}
+	return overrides;
+}

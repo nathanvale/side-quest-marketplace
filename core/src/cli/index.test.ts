@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { coerceValue, parseArgs, parseKeyValuePairs } from "./index";
+import {
+	coerceValue,
+	parseArgOverrides,
+	parseArgs,
+	parseDirs,
+	parseKeyValuePairs,
+} from "./index";
 
 describe("parseArgs", () => {
 	test("parses command and positional args", () => {
@@ -220,5 +226,124 @@ describe("coerceValue", () => {
 
 	test("handles whitespace-only string", () => {
 		expect(coerceValue("   ")).toBe("");
+	});
+});
+
+describe("parseDirs", () => {
+	test("parses comma-separated directories", () => {
+		expect(parseDirs("01_Projects,02_Areas")).toEqual([
+			"01_Projects",
+			"02_Areas",
+		]);
+	});
+
+	test("trims whitespace from directory names", () => {
+		expect(parseDirs("Projects, Areas , Resources")).toEqual([
+			"Projects",
+			"Areas",
+			"Resources",
+		]);
+	});
+
+	test("filters empty strings", () => {
+		expect(parseDirs("Projects,,Areas")).toEqual(["Projects", "Areas"]);
+	});
+
+	test("returns defaults for boolean true", () => {
+		expect(parseDirs(true, ["default"])).toEqual(["default"]);
+	});
+
+	test("returns defaults for undefined", () => {
+		expect(parseDirs(undefined, ["default"])).toEqual(["default"]);
+	});
+
+	test("returns undefined when no defaults provided", () => {
+		expect(parseDirs(true)).toBeUndefined();
+		expect(parseDirs(undefined)).toBeUndefined();
+	});
+
+	test("handles single directory", () => {
+		expect(parseDirs("Projects")).toEqual(["Projects"]);
+	});
+});
+
+describe("parseArgOverrides", () => {
+	test("parses single string with key=value", () => {
+		expect(parseArgOverrides("priority=high")).toEqual({ priority: "high" });
+	});
+
+	test("parses array of key=value pairs", () => {
+		expect(parseArgOverrides(["priority=high", "area=[[Work]]"])).toEqual({
+			priority: "high",
+			area: "[[Work]]",
+		});
+	});
+
+	test("handles values containing equals signs", () => {
+		expect(parseArgOverrides("url=https://example.com?a=b")).toEqual({
+			url: "https://example.com?a=b",
+		});
+	});
+
+	test("filters out non-string values from arrays", () => {
+		expect(parseArgOverrides(["priority=high", true])).toEqual({
+			priority: "high",
+		});
+	});
+
+	test("returns empty object for boolean true", () => {
+		expect(parseArgOverrides(true)).toEqual({});
+	});
+
+	test("returns empty object for undefined", () => {
+		expect(parseArgOverrides(undefined)).toEqual({});
+	});
+
+	test("skips malformed args without equals sign", () => {
+		expect(parseArgOverrides(["priority=high", "malformed"])).toEqual({
+			priority: "high",
+		});
+	});
+
+	test("skips args with empty key", () => {
+		expect(parseArgOverrides(["=value", "area=[[Work]]"])).toEqual({
+			area: "[[Work]]",
+		});
+	});
+
+	test("skips args with empty value", () => {
+		expect(parseArgOverrides(["key=", "area=[[Work]]"])).toEqual({
+			area: "[[Work]]",
+		});
+	});
+
+	test("handles empty array", () => {
+		expect(parseArgOverrides([])).toEqual({});
+	});
+
+	test("handles complex values with multiple equals", () => {
+		expect(
+			parseArgOverrides([
+				"formula=a=b+c",
+				"url=https://example.com?x=1&y=2",
+				"title=My Project",
+			]),
+		).toEqual({
+			formula: "a=b+c",
+			url: "https://example.com?x=1&y=2",
+			title: "My Project",
+		});
+	});
+
+	test("preserves wikilink formatting", () => {
+		expect(
+			parseArgOverrides([
+				"area=[[Work/Projects]]",
+				"project=[[Active Projects]]",
+			]),
+		).toEqual({
+			area: "[[Work/Projects]]",
+			project: "[[Active Projects]]",
+		});
 	});
 });

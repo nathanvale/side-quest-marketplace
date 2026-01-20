@@ -9,13 +9,13 @@
  * @module inbox/core/operations/execute-suggestion
  */
 
-import { realpathSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join } from "node:path";
 import {
 	ensureDirSync,
 	moveFile,
 	pathExistsSync,
 	readTextFileSync,
+	validatePathSafety,
 	writeTextFileSync,
 } from "@sidequest/core/fs";
 import { DEFAULT_PARA_FOLDERS } from "../../../config/defaults";
@@ -54,69 +54,6 @@ export interface ExecuteSuggestionConfig {
 	readonly inboxFolder: string;
 	readonly attachmentsFolder: string;
 	readonly templatesFolder: string;
-}
-
-/**
- * Validate that a destination path is safe and doesn't escape the vault boundary.
- *
- * **Security**: Uses realpath canonicalization to prevent symlink-based path traversal attacks.
- * This defends against attackers creating symlinks that escape the vault boundary.
- *
- * @param destination - The destination path to validate
- * @param vaultPath - The vault root path
- * @throws Error if path contains unsafe patterns or escapes vault
- */
-function validatePathSafety(destination: string, vaultPath: string): void {
-	// Reject suspicious patterns immediately
-	if (
-		destination.includes("..") ||
-		destination.includes("~") ||
-		destination.startsWith("/")
-	) {
-		throw new Error(`Unsafe path pattern in destination: "${destination}"`);
-	}
-
-	// Resolve symbolic links and normalize paths to prevent symlink attacks
-	const resolved = resolve(vaultPath, destination);
-	const vaultResolved = resolve(vaultPath);
-
-	// Canonicalize paths using realpath if they exist
-	// This prevents symlink-based path traversal (e.g., symlink pointing outside vault)
-	let canonicalResolved = resolved;
-	let canonicalVault = vaultResolved;
-
-	try {
-		// Try to canonicalize vault path (should always exist)
-		canonicalVault = realpathSync(vaultResolved);
-	} catch {
-		// Vault doesn't exist - use resolved path (safe for validation)
-	}
-
-	try {
-		// Try to canonicalize destination (may not exist yet)
-		// Walk up to find existing parent and canonicalize from there
-		let current = resolved;
-		while (!pathExistsSync(current) && current !== vaultResolved) {
-			current = dirname(current);
-		}
-		if (pathExistsSync(current)) {
-			const canonicalParent = realpathSync(current);
-			const relativeSuffix = resolved.slice(current.length);
-			canonicalResolved = canonicalParent + relativeSuffix;
-		}
-	} catch {
-		// Path doesn't exist yet - use resolved path (creation will fail if symlink attack)
-	}
-
-	// Check boundary using canonicalized paths
-	if (
-		!canonicalResolved.startsWith(`${canonicalVault}/`) &&
-		canonicalResolved !== canonicalVault
-	) {
-		throw new Error(
-			`Path traversal detected: "${destination}" escapes vault boundary`,
-		);
-	}
 }
 
 /**

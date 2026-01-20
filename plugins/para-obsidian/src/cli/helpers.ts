@@ -6,6 +6,8 @@
  * @module cli-helpers
  */
 
+import { parseArgOverrides as coreParseArgOverrides } from "@sidequest/core/cli";
+
 /**
  * Parse --arg flags into key=value overrides.
  *
@@ -14,6 +16,7 @@
  *
  * @param argFlags - Array of arg flag values in "key=value" format
  * @returns Record of key-value pairs
+ * @deprecated Use parseArgOverrides from @sidequest/core/cli instead
  *
  * @example
  * ```typescript
@@ -22,15 +25,5 @@
  * ```
  */
 export function parseArgOverrides(argFlags: string[]): Record<string, string> {
-	const overrides: Record<string, string> = {};
-	for (const arg of argFlags) {
-		const eqIndex = arg.indexOf("=");
-		if (eqIndex === -1) continue; // Skip malformed args
-		const key = arg.slice(0, eqIndex).trim();
-		const value = arg.slice(eqIndex + 1).trim();
-		if (key && value) {
-			overrides[key] = value;
-		}
-	}
-	return overrides;
+	return coreParseArgOverrides(argFlags);
 }

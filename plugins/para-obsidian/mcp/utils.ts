@@ -8,6 +8,14 @@
  */
 
 import { coerceValue as coreCoerceValue } from "@sidequest/core/cli";
+import {
+	getLogFile as coreGetLogFile,
+	log as coreLog,
+	setLogFile as coreSetLogFile,
+	setMcpLogger as coreSetMcpLogger,
+	withLogFile as coreWithLogFile,
+	type LogEntry,
+} from "@sidequest/core/mcp-response";
 import type { ParaObsidianConfig } from "../src/config";
 import {
 	createCorrelationId,
@@ -22,113 +30,22 @@ import {
 
 /**
  * Initialize the MCP logger (called once at startup).
+ * Configures core mcp-response logging module with plugin logger.
  */
 export async function initMcpLogger(): Promise<void> {
 	await initLogger();
+	// Configure core mcp-response logging module
+	coreSetMcpLogger(mcpLogger);
+	const logFile = getLogFile();
+	if (logFile) {
+		coreSetLogFile(logFile);
+	}
 }
 
-/**
- * Log entry structure for MCP tool invocations.
- *
- * Required fields:
- * - cid: Correlation ID for request tracing
- * - tool: Tool name (e.g., "para_config")
- *
- * For MetricsCollector compatibility (on response/error events):
- * - durationMs: Execution time in milliseconds
- * - success: Whether the tool succeeded
- */
-export interface LogEntry {
-	cid: string;
-	tool: string;
-	durationMs?: number;
-	success?: boolean;
-	[key: string]: unknown;
-}
-
-/**
- * Categorize an error based on its message.
- */
-function categorizeError(error: unknown): {
-	category: string;
-	code: string;
-} {
-	const message =
-		error instanceof Error ? error.message : String(error || "Unknown error");
-
-	// Network errors (transient - can retry)
-	if (/ECONNREFUSED|ENOTFOUND|ETIMEDOUT|fetch failed/i.test(message)) {
-		return { category: "transient", code: "NETWORK_ERROR" };
-	}
-
-	// Not found errors (permanent - won't be fixed by retrying)
-	if (/not found|ENOENT|404/i.test(message)) {
-		return { category: "permanent", code: "NOT_FOUND" };
-	}
-
-	// Validation errors (permanent - requires code/data fix)
-	if (/invalid|validation|schema|required/i.test(message)) {
-		return { category: "permanent", code: "VALIDATION" };
-	}
-
-	// Permission errors (configuration - requires setup/auth fix)
-	if (/permission|EACCES|EPERM|unauthorized/i.test(message)) {
-		return { category: "configuration", code: "PERMISSION" };
-	}
-
-	// Default
-	return { category: "unknown", code: "UNKNOWN_ERROR" };
-}
-
-/**
- * Log an MCP tool event.
- *
- * Uses standard LogTape signature: logger.info(message, properties)
- * This format enables MetricsCollector to parse tool invocation metrics.
- *
- * Required properties for metrics collection:
- * - tool: Tool name
- * - durationMs: Execution time in milliseconds
- * - success: Whether the tool succeeded
- */
-export function log(entry: LogEntry): void {
-	if (!mcpLogger) return;
-
-	const { error, success, ...rest } = entry;
-	const timestamp = new Date().toISOString();
-
-	// Successful operation - log as info
-	if (success !== false) {
-		mcpLogger.info("MCP tool response", {
-			...rest,
-			timestamp,
-		});
-		return;
-	}
-
-	// Failed operation - enhance error logging
-	const errorMessage =
-		error instanceof Error ? error.message : String(error || "Unknown error");
-	const { category, code } = categorizeError(error);
-
-	const properties: Record<string, unknown> = {
-		...rest,
-		error: errorMessage,
-		errorCategory: category,
-		errorCode: code,
-		timestamp,
-	};
-
-	// Add stack trace for Error objects
-	if (error instanceof Error && error.stack) {
-		properties.stack = error.stack;
-	}
-
-	mcpLogger.error("MCP tool response", properties);
-}
-
-// Re-export for convenience
-export { createCorrelationId, getLogFile };
+// Re-export core logging functions for convenience
+export { coreLog as log, type LogEntry };
+export { createCorrelationId };
+export { coreGetLogFile as getLogFile };
 
 // ============================================================================
 // Response Formatting
@@ -160,31 +77,12 @@ export function formatError(error: unknown, format: ResponseFormat): string {
 
 /**
  * Append log file path to response text.
+ *
+ * @deprecated Use the core version via `import { withLogFile } from "@sidequest/core/mcp-response"`.
+ * This wrapper is kept for backwards compatibility.
  */
 export function withLogFile(text: string, format: ResponseFormat): string {
-	const currentLogFile = getLogFile();
-	if (!currentLogFile) return text;
-
-	if (format === ResponseFormat.JSON) {
-		try {
-			const parsed = JSON.parse(text);
-			if (Array.isArray(parsed)) {
-				return JSON.stringify(
-					{ data: parsed, logFile: currentLogFile },
-					null,
-					2,
-				);
-			}
-			if (parsed && typeof parsed === "object") {
-				return JSON.stringify({ ...parsed, logFile: currentLogFile }, null, 2);
-			}
-		} catch {
-			// Fall through to wrapping below
-		}
-		return JSON.stringify({ data: text, logFile: currentLogFile }, null, 2);
-	}
-
-	return `${text}\n\nLogs: ${currentLogFile}`;
+	return coreWithLogFile(text, format);
 }
 
 /**
@@ -215,31 +113,28 @@ export function respondError(format: ResponseFormat, error: unknown) {
 // Helper Functions
 // ============================================================================
 
+import {
+	parseDirs as coreParseDirs,
+	parseKeyValuePairs as coreParseKeyValuePairs,
+} from "@sidequest/core/cli";
+
 /**
  * Parse comma-separated directory list.
+ * @deprecated Use parseDirs from @sidequest/core/cli instead
  */
 export function parseDirs(
 	value: string | undefined,
 ): ReadonlyArray<string> | undefined {
-	if (!value) return undefined;
-	return value
-		.split(",")
-		.map((s) => s.trim())
-		.filter(Boolean);
+	// Adapt to core signature which accepts boolean | undefined
+	return coreParseDirs(value);
 }
 
 /**
  * Parse key=value pairs from string array.
+ * @deprecated Use parseKeyValuePairs from @sidequest/core/cli instead
  */
 export function parseKeyValuePairs(pairs: string[]): Record<string, string> {
-	const result: Record<string, string> = {};
-	for (const pair of pairs) {
-		const [key, ...rest] = pair.split("=");
-		if (key && rest.length > 0) {
-			result[key.trim()] = rest.join("=").trim();
-		}
-	}
-	return result;
+	return coreParseKeyValuePairs(pairs);
 }
 
 /**
