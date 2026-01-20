@@ -1,11 +1,52 @@
 /**
- * teams-scrape plugin
+ * Teams-scrape plugin
  *
- * This is a pure skill plugin - no TypeScript code required.
- * The skill uses macos-automator MCP tools to capture Teams chat content.
+ * Extract and persist Microsoft Teams chat messages with:
+ * - Clipboard parsing from Teams format
+ * - Persistent storage with atomic writes
+ * - Deterministic new message detection
+ * - Full observability (logging, correlation IDs, timing)
  *
- * See skills/teams-scrape/SKILL.md for the full workflow.
+ * @module teams-scrape
  */
 
 /** Plugin marker for workspace validation */
 export const PLUGIN_NAME = "teams-scrape";
+
+// Logger exports
+export {
+	cliLogger,
+	createCorrelationId,
+	initLogger,
+	logDir,
+	logFile,
+	logger,
+	parserLogger,
+	storageLogger,
+} from "./logger.js";
+
+// Parser exports
+export {
+	generateMessageId,
+	parseAUDateToISO,
+	parseTeamsClipboard,
+} from "./parser.js";
+
+// Storage exports
+export {
+	CONFIG_DIR,
+	getStoragePath,
+	listStoredChats,
+	loadStoredChat,
+	mergeAndSave,
+	saveChat,
+	targetToSlug,
+} from "./storage.js";
+// Type exports
+export type {
+	CliCommand,
+	ListResult,
+	ScrapeResult,
+	StoredChat,
+	TeamsMessage,
+} from "./types.js";

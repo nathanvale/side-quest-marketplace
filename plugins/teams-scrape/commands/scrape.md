@@ -1,7 +1,6 @@
 ---
-name: scrape
 description: Scrape Microsoft Teams chat content to structured JSON
-usage: /teams-scrape:scrape <target-name>
+argument-hint: <target-name>
 ---
 
 # Scrape Teams Chat

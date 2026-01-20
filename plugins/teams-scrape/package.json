@@ -1,22 +1,26 @@
 {
 	"name": "@sidequest/teams-scrape",
 	"version": "1.0.0",
-	"description": "Microsoft Teams web scraping utilities for extracting meeting data and content",
+	"description": "Microsoft Teams chat extraction with persistence and new message detection",
 	"type": "module",
 	"main": "./src/index.ts",
+	"bin": {
+		"teams-scrape": "./src/cli.ts"
+	},
 	"scripts": {
 		"test": "bun test --recursive",
 		"typecheck": "tsc --noEmit",
 		"format": "biome format --write .",
 		"lint": "biome lint .",
-		"check": "biome check --write ."
+		"check": "biome check --write .",
+		"cli": "bun run ./src/cli.ts"
 	},
 	"keywords": [
 		"teams",
-		"scraping",
+		"chat",
 		"microsoft",
-		"playwright",
-		"web-scraping"
+		"macos-automation",
+		"scraping"
 	],
 	"author": {
 		"name": "Nathan Vale",
@@ -25,5 +29,7 @@
 	"devDependencies": {
 		"@types/bun": "latest"
 	},
-	"dependencies": {}
+	"dependencies": {
+		"@sidequest/core": "workspace:*"
+	}
 }
