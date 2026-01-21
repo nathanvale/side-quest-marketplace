@@ -114,6 +114,11 @@ function titleToFilename(title: string): string {
  * - `type` - Note type is determined by template
  * - `template_version` - Template version is determined by template
  *
+ * **Null placeholder handling**: After applying args, any remaining null
+ * placeholders are converted to empty strings. This preserves template
+ * field structure (e.g., `project:` stays as `project: ""` instead of
+ * being filtered out by serializeFrontmatter).
+ *
  * **Wikilink handling**: If an arg value contains wikilinks (e.g., `[[Travel]]`),
  * it's wrapped in quotes for valid YAML.
  *
@@ -123,12 +128,18 @@ function titleToFilename(title: string): string {
  *
  * @example
  * ```typescript
+<<<<<<< HEAD
  * const attrs = {
  *   title: "Old Title",
  *   resource_type: "reference",  // From template default
  *   type: "resource",
  *   created: "2025-01-01"
  * };
+||||||| parent of 2be77fe (fix(para-obsidian): preserve template frontmatter fields and prioritize argOverrides)
+ * const attrs = { title: "null", status: null, area: [["null"]] };
+=======
+ * const attrs = { title: "null", status: null, area: [["null"]], project: null };
+>>>>>>> 2be77fe (fix(para-obsidian): preserve template frontmatter fields and prioritize argOverrides)
  * const result = applyArgsToFrontmatter(attrs, {
  *   title: "New Title",
  *   resource_type: "meeting",  // Overrides template default
@@ -136,6 +147,7 @@ function titleToFilename(title: string): string {
  *   created: "2025-12-31",     // Protected - NOT overridden
  *   newField: "value"          // Added
  * });
+<<<<<<< HEAD
  * // {
  * //   title: "New Title",
  * //   resource_type: "meeting",    // ✅ Overridden
@@ -143,6 +155,12 @@ function titleToFilename(title: string): string {
  * //   created: "2025-01-01",        // ✅ Protected (unchanged)
  * //   newField: "value"             // ✅ Added
  * // }
+||||||| parent of 2be77fe (fix(para-obsidian): preserve template frontmatter fields and prioritize argOverrides)
+ * // { title: "My Trip", status: "active", area: "[[Travel]]" }
+=======
+ * // { title: "My Trip", status: "active", area: "[[Travel]]", project: "" }
+ * // Note: project is preserved as empty string, not filtered out
+>>>>>>> 2be77fe (fix(para-obsidian): preserve template frontmatter fields and prioritize argOverrides)
  * ```
  */
 /**
@@ -188,6 +206,15 @@ export function applyArgsToFrontmatter(
 		} else {
 			// Override existing value or add new field
 			result[key] = value;
+		}
+	}
+
+	// Convert remaining null placeholders to empty strings to preserve
+	// template field structure. This prevents serializeFrontmatter from
+	// filtering out fields like `project:` that should remain in the output.
+	for (const [key, value] of Object.entries(result)) {
+		if (isNullPlaceholder(value)) {
+			result[key] = "";
 		}
 	}
 

@@ -157,10 +157,26 @@ async function handleCreateFromSource(options: {
 		const wikilinkFields = getWikilinkFieldsFromRules(rules);
 		const urlFields = ["contact_url", "url", "website", "source_url"];
 
+		// Build a set of argOverride keys (lowercase) for quick lookup
+		const argOverrideKeys = new Set(
+			Object.keys(argOverrides ?? {}).map((k) => k.toLowerCase()),
+		);
+
 		for (const field of wikilinkFields) {
-			const extractedValue = Object.entries(extracted.args).find(([key]) =>
+			// Skip fields that have explicit argOverrides - they take priority
+			// and will be applied in the next loop
+			if (argOverrideKeys.has(field.toLowerCase())) {
+				continue;
+			}
+
+			// For AI-extracted values, prefer exact key match over partial match
+			// This prevents "Contract Area" from matching before "area"
+			const exactMatch = extracted.args[field];
+			const partialMatch = Object.entries(extracted.args).find(([key]) =>
 				key.toLowerCase().includes(field),
 			)?.[1];
+			const extractedValue = exactMatch ?? partialMatch;
+
 			frontmatterCleanup[field] = toWikilink(extractedValue ?? null);
 		}
 

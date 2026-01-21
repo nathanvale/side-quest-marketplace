@@ -642,6 +642,7 @@ area: "[[<% tp.system.prompt("Area") %>]]"
 		});
 
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+<<<<<<< HEAD
 		// Title should NOT be in frontmatter
 		expect(written).not.toMatch(/^title:/m);
 		// But title SHOULD be in H1 heading
@@ -649,6 +650,21 @@ area: "[[<% tp.system.prompt("Area") %>]]"
 		// Null values are now omitted following Obsidian best practices
 		// (prevents Dataview issues and keeps frontmatter clean)
 		expect(written).not.toContain("target_completion");
+||||||| parent of 2be77fe (fix(para-obsidian): preserve template frontmatter fields and prioritize argOverrides)
+		// Unsubstituted prompts should be replaced with empty strings
+		// preventing YAML parse errors from nested quotes
+		expect(written).toContain("title: 🎯 No Args Test");
+		// Null values are now omitted following Obsidian best practices
+		// (prevents Dataview issues and keeps frontmatter clean)
+		expect(written).not.toContain("target_completion");
+=======
+		// Unsubstituted prompts should be replaced with empty strings
+		// preventing YAML parse errors from nested quotes
+		expect(written).toContain("title: 🎯 No Args Test");
+		// Null placeholders are preserved as empty strings to maintain template structure
+		// This ensures fields like `project:` appear in the output even without values
+		expect(written).toContain('target_completion: ""');
+>>>>>>> 2be77fe (fix(para-obsidian): preserve template frontmatter fields and prioritize argOverrides)
 		expect(written).toContain('area: "[[]]"'); // empty wikilink
 		// Should NOT contain raw Templater patterns
 		expect(written).not.toContain("tp.system.prompt");
@@ -754,6 +770,45 @@ Body content`,
 		expect(written).toContain('area: "[[Travel]]"');
 		// H1 heading gets replaced with title (null → title)
 		expect(written).toContain("# ✈️ My Trip");
+		expect(written).not.toMatch(/: null\b/);
+		expect(written).not.toContain("[[null]]");
+	});
+
+	it("preserves null placeholder fields as empty strings when no arg provided", () => {
+		const vault = setupTest();
+		writeTemplate(
+			path.join(vault, "Templates"),
+			"meeting",
+			`---
+title: null
+type: meeting
+area: "[[null]]"
+project:
+summary: ""
+---
+# Meeting
+
+Notes here`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		// Only pass area, not project or summary
+		const result = createFromTemplate(loadConfig({ cwd: vault }), {
+			template: "meeting",
+			title: "Team Standup",
+			args: {
+				area: "[[Work]]",
+			},
+		});
+
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+		// area should be set from arg
+		expect(written).toContain('area: "[[Work]]"');
+		// project should be preserved as empty string (not filtered out)
+		expect(written).toContain('project: ""');
+		// summary should remain empty string
+		expect(written).toContain('summary: ""');
+		// Should NOT have raw null values
 		expect(written).not.toMatch(/: null\b/);
 		expect(written).not.toContain("[[null]]");
 	});
