@@ -10,6 +10,7 @@
  */
 
 import { resolve } from "node:path";
+import { validateFilenameForSubprocess as coreValidateFilename } from "@sidequest/core/fs";
 
 /**
  * Validates that a file path is safe for inbox processing.
@@ -66,6 +67,8 @@ export function validateInboxPath(filePath: string, vaultPath: string): string {
 /**
  * Validates filename for safe use in subprocesses.
  *
+ * Re-exports core's validateFilenameForSubprocess for consistency.
+ *
  * Prevents command injection by restricting characters to a safe subset.
  * Allows: alphanumeric, underscore, hyphen, dot, space
  *
@@ -83,9 +86,4 @@ export function validateInboxPath(filePath: string, vaultPath: string): string {
  * // → throws Error
  * ```
  */
-export function validateFilenameForSubprocess(filename: string): void {
-	// Allow alphanumeric, underscore, hyphen, dot, space
-	if (!/^[a-zA-Z0-9_\-. ]+$/.test(filename)) {
-		throw new Error(`Invalid characters in filename: ${filename}`);
-	}
-}
+export const validateFilenameForSubprocess = coreValidateFilename;

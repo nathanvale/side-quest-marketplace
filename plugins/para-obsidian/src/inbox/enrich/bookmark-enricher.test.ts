@@ -5,11 +5,11 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { RateLimiter } from "@sidequest/core/concurrency";
 import {
 	enrichBookmarkWithFirecrawl,
 	extractDomain,
 	isValidUrl,
-	RateLimiter,
 } from "./bookmark-enricher";
 import { BookmarkEnrichmentError } from "./types";
 

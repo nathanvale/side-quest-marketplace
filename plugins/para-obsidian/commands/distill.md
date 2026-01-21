@@ -1,7 +1,7 @@
 ---
 name: distill
 description: Distill clippings into resource notes with AI-guided progressive summarization
-argument-hint: [optional: specific clipping filename]
+argument-hint: "[optional: specific clipping filename]"
 disable-model-invocation: true
 ---
 

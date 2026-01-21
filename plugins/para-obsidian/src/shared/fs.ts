@@ -18,6 +18,8 @@ import {
 	pathExistsSync,
 	readDir,
 	readTextFileSync,
+	// Import sandbox utilities from core
+	resolveSandboxedPath,
 } from "@sidequest/core/fs";
 
 /**
@@ -29,16 +31,6 @@ export interface VaultPath {
 	readonly absolute: string;
 	/** Path relative to the vault root (e.g., "Projects/My Note.md"). */
 	readonly relative: string;
-}
-
-/**
- * Checks if a path is contained within a parent directory.
- * Used to prevent path traversal outside the vault.
- */
-function isSubPath(parent: string, child: string): boolean {
-	const rel = path.relative(parent, child);
-	// Valid subpath: non-empty, doesn't start with "..", and isn't absolute
-	return !!rel && !rel.startsWith("..") && !path.isAbsolute(rel);
 }
 
 /**
@@ -61,13 +53,8 @@ function isSubPath(parent: string, child: string): boolean {
  * ```
  */
 export function resolveVaultPath(vault: string, inputPath = "."): VaultPath {
-	const absolute = path.resolve(vault, inputPath);
-	// Allow exact vault root match OR valid subpath
-	if (!isSubPath(vault, absolute) && path.resolve(vault) !== absolute) {
-		throw new Error(`Path escapes vault: ${inputPath}`);
-	}
-	const relative = path.relative(vault, absolute);
-	return { absolute, relative: relative || "." };
+	// Use core's resolveSandboxedPath for security-critical validation
+	return resolveSandboxedPath(vault, inputPath);
 }
 
 /**

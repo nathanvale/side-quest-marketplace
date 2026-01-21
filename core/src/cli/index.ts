@@ -225,3 +225,80 @@ export function parseArgOverrides(
 	}
 	return overrides;
 }
+
+/**
+ * Normalize a flag value to single value (string or boolean).
+ * If array (from duplicate flags), returns the first element.
+ *
+ * Handles the common case where CLI parsers represent duplicate flags
+ * as arrays: `--key val1 --key val2` → `{ key: ["val1", "val2"] }`
+ *
+ * @param value - Raw flag value from CLI parser
+ * @returns First element if array, otherwise the value as-is
+ *
+ * @example
+ * normalizeFlagValue("test") // → "test"
+ * normalizeFlagValue(true) // → true
+ * normalizeFlagValue(["first", "second"]) // → "first"
+ * normalizeFlagValue(undefined) // → undefined
+ */
+export function normalizeFlagValue(
+	value: string | boolean | (string | boolean)[] | undefined,
+): string | boolean | undefined {
+	if (Array.isArray(value)) {
+		return value[0];
+	}
+	return value;
+}
+
+/**
+ * Normalize all flags in a record by converting array values to their first element.
+ *
+ * Used for functions that don't expect array flag values.
+ * Removes undefined values from the result.
+ *
+ * @param flags - Raw flags record from CLI parser
+ * @returns Normalized flags with single values only
+ *
+ * @example
+ * normalizeFlags({ single: "value", array: ["first", "second"], bool: true })
+ * // → { single: "value", array: "first", bool: true }
+ */
+export function normalizeFlags(
+	flags: Record<string, string | boolean | (string | boolean)[]>,
+): Record<string, string | boolean> {
+	const normalized: Record<string, string | boolean> = {};
+	for (const [key, value] of Object.entries(flags)) {
+		const norm = normalizeFlagValue(value);
+		if (norm !== undefined) {
+			normalized[key] = norm;
+		}
+	}
+	return normalized;
+}
+
+/**
+ * Parse comma-separated list from CLI flag value.
+ *
+ * Trims whitespace and filters empty strings.
+ * Returns empty array for non-string inputs.
+ *
+ * @param value - CLI flag value (string, boolean, or undefined)
+ * @returns Array of trimmed, non-empty strings
+ *
+ * @example
+ * parseCommaSeparatedList("a,b,c") // → ["a", "b", "c"]
+ * parseCommaSeparatedList("a, b , c") // → ["a", "b", "c"]
+ * parseCommaSeparatedList("a,,b") // → ["a", "b"]
+ * parseCommaSeparatedList(true) // → []
+ * parseCommaSeparatedList(undefined) // → []
+ */
+export function parseCommaSeparatedList(
+	value: string | boolean | undefined,
+): string[] {
+	if (typeof value !== "string") return [];
+	return value
+		.split(",")
+		.map((s) => s.trim())
+		.filter(Boolean);
+}

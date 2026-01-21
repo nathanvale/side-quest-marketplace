@@ -2,7 +2,7 @@
  * Concurrency utilities for safe concurrent operations.
  *
  * Provides primitives for file locking, transactional operations,
- * resource pooling, and timeout management for async operations.
+ * resource pooling, rate limiting, and timeout management for async operations.
  *
  * ## File Locking
  *
@@ -65,6 +65,21 @@
  * }
  * ```
  *
+ * ## Rate Limiting
+ *
+ * Enforce minimum delay between operations to respect API rate limits.
+ *
+ * ```typescript
+ * import { RateLimiter } from "@sidequest/core/concurrency";
+ *
+ * const limiter = new RateLimiter(2000); // 2s between requests
+ *
+ * for (const url of urls) {
+ *   await limiter.wait();
+ *   await fetch(url);
+ * }
+ * ```
+ *
  * ## Timeouts
  *
  * Wrap async operations with timeouts to prevent hanging indefinitely.
@@ -96,6 +111,7 @@ export {
 	type ParallelChunkOptions,
 	processInParallelChunks,
 } from "./parallel.js";
+export { RateLimiter } from "./rate-limiter.js";
 export { ResourcePool } from "./resource-pool.js";
 export {
 	createTimeoutPromise,

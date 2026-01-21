@@ -7,18 +7,20 @@
  * @module mcp-handlers/git
  */
 
+import { randomUUID } from "node:crypto";
+import { getLogger } from "@logtape/logtape";
 import { tool, z } from "@sidequest/core/mcp";
 import {
-	createCorrelationId,
-	log,
-	parseResponseFormat,
+	createLoggerAdapter,
 	ResponseFormat,
-	respondError,
-	respondText,
-} from "../../mcp/utils";
+	wrapToolHandler,
+} from "@sidequest/core/mcp-response";
 import { loadConfig } from "../config/index";
 import type { CommitAllResult, CommitNoteResult } from "../git/index";
 import { commitAllNotes, commitNote } from "../git/index";
+
+const logger = createLoggerAdapter(getLogger("para-obsidian.mcp"));
+const createCid = () => randomUUID();
 
 // ============================================================================
 // Commit Tool
@@ -61,48 +63,22 @@ Returns structured results with commit count, messages, and files.`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { file, response_format } = args as {
-			file?: string;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({
-			cid,
-			tool: "para_commit",
-			event: "request",
-			file: file ?? "all",
-		});
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { file } = args as { file?: string };
 			const config = loadConfig();
-			const format = parseResponseFormat(response_format);
 
 			// Single file commit
 			if (file) {
 				const result: CommitNoteResult = await commitNote(config, file);
 
-				log({
-					cid,
-					tool: "para_commit",
-					event: "response",
-					success: true,
-					committed: result.committed,
-					fileCount: result.files.length,
-					durationMs: Date.now() - startTime,
-				});
-
 				if (format === ResponseFormat.JSON) {
-					return respondText(format, JSON.stringify(result, null, 2));
+					return result;
 				}
 
 				// Markdown format
 				if (!result.committed) {
-					return respondText(
-						format,
-						`## Nothing to Commit\n\n**File:** ${file}\n\nThe note is already committed or has no changes.`,
-					);
+					return `## Nothing to Commit\n\n**File:** ${file}\n\nThe note is already committed or has no changes.`;
 				}
 
 				const lines = [
@@ -120,32 +96,19 @@ Returns structured results with commit count, messages, and files.`,
 					}
 				}
 
-				return respondText(format, lines.join("\n"));
+				return lines.join("\n");
 			}
 
 			// Commit all uncommitted notes
 			const result: CommitAllResult = await commitAllNotes(config);
 
-			log({
-				cid,
-				tool: "para_commit",
-				event: "response",
-				success: true,
-				total: result.total,
-				committed: result.committed,
-				durationMs: Date.now() - startTime,
-			});
-
 			if (format === ResponseFormat.JSON) {
-				return respondText(format, JSON.stringify(result, null, 2));
+				return result;
 			}
 
 			// Markdown format
 			if (result.total === 0) {
-				return respondText(
-					format,
-					"## No Uncommitted Notes\n\nAll notes in PARA folders are already committed.",
-				);
+				return "## No Uncommitted Notes\n\nAll notes in PARA folders are already committed.";
 			}
 
 			const lines = [
@@ -164,17 +127,8 @@ Returns structured results with commit count, messages, and files.`,
 				}
 			}
 
-			return respondText(format, lines.join("\n"));
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_commit",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return lines.join("\n");
+		},
+		{ toolName: "para_commit", logger, createCid },
+	),
 );

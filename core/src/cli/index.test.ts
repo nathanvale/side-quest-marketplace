@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
 	coerceValue,
+	normalizeFlags,
+	normalizeFlagValue,
 	parseArgOverrides,
 	parseArgs,
+	parseCommaSeparatedList,
 	parseDirs,
 	parseKeyValuePairs,
 } from "./index";
@@ -345,5 +348,98 @@ describe("parseArgOverrides", () => {
 			area: "[[Work/Projects]]",
 			project: "[[Active Projects]]",
 		});
+	});
+});
+
+describe("normalizeFlagValue", () => {
+	test("returns single value unchanged", () => {
+		expect(normalizeFlagValue("test")).toBe("test");
+		expect(normalizeFlagValue(true)).toBe(true);
+		expect(normalizeFlagValue(false)).toBe(false);
+	});
+
+	test("returns first element of array", () => {
+		expect(normalizeFlagValue(["first", "second"])).toBe("first");
+		expect(normalizeFlagValue([true, false])).toBe(true);
+	});
+
+	test("returns undefined for undefined", () => {
+		expect(normalizeFlagValue(undefined)).toBeUndefined();
+	});
+
+	test("returns undefined for empty array", () => {
+		expect(normalizeFlagValue([])).toBeUndefined();
+	});
+});
+
+describe("normalizeFlags", () => {
+	test("normalizes all flags", () => {
+		const flags = {
+			single: "value",
+			array: ["first", "second"],
+			bool: true,
+		};
+		const result = normalizeFlags(flags);
+		expect(result).toEqual({
+			single: "value",
+			array: "first",
+			bool: true,
+		});
+	});
+
+	test("removes undefined values", () => {
+		const flags: Record<string, string | boolean | (string | boolean)[]> = {
+			present: "value",
+		};
+		const result = normalizeFlags(flags);
+		expect(result).toEqual({ present: "value" });
+	});
+
+	test("handles mixed flag types", () => {
+		const flags = {
+			string: "value",
+			bool: true,
+			arrayStr: ["a", "b"],
+			arrayBool: [false, true],
+		};
+		const result = normalizeFlags(flags);
+		expect(result).toEqual({
+			string: "value",
+			bool: true,
+			arrayStr: "a",
+			arrayBool: false,
+		});
+	});
+
+	test("handles empty record", () => {
+		expect(normalizeFlags({})).toEqual({});
+	});
+});
+
+describe("parseCommaSeparatedList", () => {
+	test("parses comma-separated values", () => {
+		expect(parseCommaSeparatedList("a,b,c")).toEqual(["a", "b", "c"]);
+	});
+
+	test("trims whitespace", () => {
+		expect(parseCommaSeparatedList(" a , b , c ")).toEqual(["a", "b", "c"]);
+	});
+
+	test("filters empty strings", () => {
+		expect(parseCommaSeparatedList("a,,b")).toEqual(["a", "b"]);
+		expect(parseCommaSeparatedList("a, , b")).toEqual(["a", "b"]);
+	});
+
+	test("returns empty array for non-string", () => {
+		expect(parseCommaSeparatedList(true)).toEqual([]);
+		expect(parseCommaSeparatedList(undefined)).toEqual([]);
+	});
+
+	test("handles single value", () => {
+		expect(parseCommaSeparatedList("single")).toEqual(["single"]);
+	});
+
+	test("handles empty string", () => {
+		expect(parseCommaSeparatedList("")).toEqual([]);
 	});
 });

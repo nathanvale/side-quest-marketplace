@@ -7,22 +7,24 @@
  * @module mcp/tools/export
  */
 
+import { randomUUID } from "node:crypto";
+import { getLogger } from "@logtape/logtape";
 import { tool, z } from "@sidequest/core/mcp";
-import { OutputFormat } from "@sidequest/core/terminal";
 import {
-	createCorrelationId,
-	log,
-	parseResponseFormat,
+	createLoggerAdapter,
 	ResponseFormat,
-	respondError,
-	respondText,
-} from "../../mcp/utils";
+	wrapToolHandler,
+} from "@sidequest/core/mcp-response";
+import { OutputFormat } from "@sidequest/core/terminal";
 import {
 	handleExportBookmarks,
 	resolveOutputPath,
 } from "../cli/export-bookmarks";
 import type { CommandContext } from "../cli/types";
 import { loadConfig } from "../config/index";
+
+const logger = createLoggerAdapter(getLogger("para-obsidian.mcp"));
+const createCid = () => randomUUID();
 
 // ============================================================================
 // Export Bookmarks Tool
@@ -66,25 +68,13 @@ Returns the output file path and bookmark count.`,
 			openWorldHint: true,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { filter, output_path, response_format } = args as {
-			filter?: string;
-			output_path?: string;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({
-			cid,
-			tool: "para_export_bookmarks",
-			event: "request",
-			filter,
-			output_path,
-		});
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { filter, output_path } = args as {
+				filter?: string;
+				output_path?: string;
+			};
 			const config = loadConfig();
-			const format = parseResponseFormat(response_format);
 
 			// Resolve output path before calling handler
 			const unresolvedPath = output_path ?? "bookmarks.html";
@@ -108,40 +98,17 @@ Returns the output file path and bookmark count.`,
 			// Use CLI handler for business logic
 			const result = await handleExportBookmarks(ctx);
 
-			log({
-				cid,
-				tool: "para_export_bookmarks",
-				event: "response",
-				success: result.success,
-				durationMs: Date.now() - startTime,
-			});
-
 			if (!result.success) {
-				return respondError(format, new Error(result.error ?? "Export failed"));
+				throw new Error(result.error ?? "Export failed");
 			}
 
 			// Return the resolved path in response
 			if (format === ResponseFormat.JSON) {
-				return respondText(
-					format,
-					JSON.stringify({ success: true, output_path: resolvedPath }, null, 2),
-				);
+				return { success: true, output_path: resolvedPath };
 			}
 
-			return respondText(
-				format,
-				`Successfully exported bookmarks to ${resolvedPath}`,
-			);
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_export_bookmarks",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return `Successfully exported bookmarks to ${resolvedPath}`;
+		},
+		{ toolName: "para_export_bookmarks", logger, createCid },
+	),
 );

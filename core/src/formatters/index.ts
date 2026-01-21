@@ -40,11 +40,17 @@ export {
 	success,
 	warning,
 	yellow,
-} from "../terminal/index.js";
+} from "../terminal/index.ts";
 
 // Export new formatter utilities
-export { formatBytes } from "./bytes.js";
-export { getLanguageForExtension } from "./syntax.js";
+export { formatBytes } from "./bytes.ts";
+export { getLanguageForExtension } from "./syntax.ts";
+export {
+	formatDateWithSpaces,
+	formatDuration,
+	formatFilenameTime,
+	formatTime12Hour,
+} from "./time.ts";
 
 // Legacy colors object for existing code that uses colors.red, colors.green, etc.
 // This provides the raw ANSI codes that were previously exported

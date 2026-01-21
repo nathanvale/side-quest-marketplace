@@ -4,17 +4,16 @@
  * Index management and PARA list tools.
  */
 
+import { randomUUID } from "node:crypto";
+import { getLogger } from "@logtape/logtape";
 import { parseKeyValuePairs } from "@sidequest/core/cli";
 import { tool, z } from "@sidequest/core/mcp";
 import {
-	createCorrelationId,
-	log,
-	parseDirs,
-	parseResponseFormat,
+	createLoggerAdapter,
 	ResponseFormat,
-	respondError,
-	respondText,
-} from "../../mcp/utils";
+	wrapToolHandler,
+} from "@sidequest/core/mcp-response";
+import { parseDirs } from "../../mcp/utils";
 import { loadConfig } from "../config/index";
 import {
 	buildIndex,
@@ -23,6 +22,9 @@ import {
 	loadIndex,
 	saveIndex,
 } from "../search/indexer";
+
+const logger = createLoggerAdapter(getLogger("para-obsidian.mcp"));
+const createCid = () => randomUUID();
 
 // ============================================================================
 // Index Prime Tool
@@ -60,58 +62,22 @@ Index saved to .para-obsidian-index.json in vault root.`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { dir, response_format } = args as {
-			dir?: string;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({ cid, tool: "para_index_prime", event: "request" });
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { dir } = args as { dir?: string };
 			const config = loadConfig();
 			const dirs = parseDirs(dir);
 			const index = buildIndex(config, dirs);
 			const savedPath = saveIndex(config, index);
-			const format = parseResponseFormat(response_format);
-
-			log({
-				cid,
-				tool: "para_index_prime",
-				event: "response",
-				success: true,
-				count: index.entries.length,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(
-					format,
-					JSON.stringify(
-						{ indexPath: savedPath, count: index.entries.length },
-						null,
-						2,
-					),
-				);
+				return { indexPath: savedPath, count: index.entries.length };
 			}
 
-			return respondText(
-				format,
-				`## Index Built\n\n**Entries:** ${index.entries.length}\n**Saved to:** \`${savedPath}\``,
-			);
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_index_prime",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return `## Index Built\n\n**Entries:** ${index.entries.length}\n**Saved to:** \`${savedPath}\``;
+		},
+		{ toolName: "para_index_prime", logger, createCid },
+	),
 );
 
 // ============================================================================
@@ -151,17 +117,12 @@ Requires index to exist (run para_index_prime first).`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { frontmatter, dir, response_format } = args as {
-			frontmatter?: string;
-			dir?: string;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({ cid, tool: "para_index_query", event: "request", frontmatter });
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { frontmatter, dir } = args as {
+				frontmatter?: string;
+				dir?: string;
+			};
 			const config = loadConfig();
 			const index = loadIndex(config);
 			if (!index) {
@@ -194,22 +155,8 @@ Requires index to exist (run para_index_prime first).`,
 				return true;
 			});
 
-			const format = parseResponseFormat(response_format);
-
-			log({
-				cid,
-				tool: "para_index_query",
-				event: "response",
-				success: true,
-				resultCount: results.length,
-				durationMs: Date.now() - startTime,
-			});
-
 			if (format === ResponseFormat.JSON) {
-				return respondText(
-					format,
-					JSON.stringify({ count: results.length, results }, null, 2),
-				);
+				return { count: results.length, results };
 			}
 
 			const lines = ["## Index Query Results", ""];
@@ -221,19 +168,10 @@ Requires index to exist (run para_index_prime first).`,
 				}
 			}
 
-			return respondText(format, lines.join("\n"));
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_index_query",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return lines.join("\n");
+		},
+		{ toolName: "para_index_query", logger, createCid },
+	),
 );
 
 // ============================================================================
@@ -257,54 +195,21 @@ tool(
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({ cid, tool: "para_list_areas", event: "request" });
-
-		try {
+	wrapToolHandler(
+		async (_args, format) => {
 			const config = loadConfig();
 			const areas = listAreas(config);
-			const format = parseResponseFormat(
-				args.response_format as string | undefined,
-			);
-
-			log({
-				cid,
-				tool: "para_list_areas",
-				event: "response",
-				success: true,
-				count: areas.length,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(
-					format,
-					JSON.stringify({ areas, count: areas.length }, null, 2),
-				);
+				return { areas, count: areas.length };
 			}
 
-			return respondText(
-				format,
-				areas.length > 0
-					? `# Existing Areas (${areas.length})\n\n${areas.map((a) => `- ${a}`).join("\n")}`
-					: "No areas found in 02 Areas/",
-			);
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_list_areas",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(
-				args.response_format as string | undefined,
-			);
-			return respondError(format, error);
-		}
-	},
+			return areas.length > 0
+				? `# Existing Areas (${areas.length})\n\n${areas.map((a) => `- ${a}`).join("\n")}`
+				: "No areas found in 02 Areas/";
+		},
+		{ toolName: "para_list_areas", logger, createCid },
+	),
 );
 
 // ============================================================================
@@ -328,52 +233,19 @@ tool(
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({ cid, tool: "para_list_projects", event: "request" });
-
-		try {
+	wrapToolHandler(
+		async (_args, format) => {
 			const config = loadConfig();
 			const projects = listProjects(config);
-			const format = parseResponseFormat(
-				args.response_format as string | undefined,
-			);
-
-			log({
-				cid,
-				tool: "para_list_projects",
-				event: "response",
-				success: true,
-				count: projects.length,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(
-					format,
-					JSON.stringify({ projects, count: projects.length }, null, 2),
-				);
+				return { projects, count: projects.length };
 			}
 
-			return respondText(
-				format,
-				projects.length > 0
-					? `# Existing Projects (${projects.length})\n\n${projects.map((p) => `- ${p}`).join("\n")}`
-					: "No projects found in 01 Projects/",
-			);
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_list_projects",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(
-				args.response_format as string | undefined,
-			);
-			return respondError(format, error);
-		}
-	},
+			return projects.length > 0
+				? `# Existing Projects (${projects.length})\n\n${projects.map((p) => `- ${p}`).join("\n")}`
+				: "No projects found in 01 Projects/";
+		},
+		{ toolName: "para_list_projects", logger, createCid },
+	),
 );

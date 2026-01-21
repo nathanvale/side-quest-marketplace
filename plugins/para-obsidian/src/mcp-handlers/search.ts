@@ -4,21 +4,23 @@
  * Text and semantic search tools for vault content.
  */
 
+import { randomUUID } from "node:crypto";
+import { getLogger } from "@logtape/logtape";
 import { parseKeyValuePairs } from "@sidequest/core/cli";
 import { tool, z } from "@sidequest/core/mcp";
 import {
-	createCorrelationId,
-	log,
-	parseDirs,
-	parseResponseFormat,
+	createLoggerAdapter,
 	ResponseFormat,
-	respondError,
-	respondText,
-} from "../../mcp/utils";
+	wrapToolHandler,
+} from "@sidequest/core/mcp-response";
+import { parseDirs } from "../../mcp/utils";
 import { loadConfig } from "../config/index";
 import { filterByFrontmatter, searchText } from "../search/index";
 import { semanticSearch } from "../search/semantic";
 import { validateRegex } from "../shared/validation";
+
+const logger = createLoggerAdapter(getLogger("para-obsidian.mcp"));
+const createCid = () => randomUUID();
 
 // ============================================================================
 // Text Search Tool
@@ -73,29 +75,16 @@ Requires ripgrep (rg) to be installed.`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const {
-			query,
-			dir,
-			regex,
-			frontmatter,
-			max_results,
-			context,
-			response_format,
-		} = args as {
-			query: string;
-			dir?: string;
-			regex?: boolean;
-			frontmatter?: string;
-			max_results?: number;
-			context?: number;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({ cid, tool: "para_search", event: "request", query });
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { query, dir, regex, frontmatter, max_results, context } = args as {
+				query: string;
+				dir?: string;
+				regex?: boolean;
+				frontmatter?: string;
+				max_results?: number;
+				context?: number;
+			};
 			const config = loadConfig();
 			const dirs = parseDirs(dir);
 			const fmFilters = frontmatter
@@ -107,11 +96,7 @@ Requires ripgrep (rg) to be installed.`,
 			if (isRegexMode) {
 				const validation = validateRegex(query);
 				if (!validation.valid) {
-					const format = parseResponseFormat(response_format);
-					return respondError(
-						format,
-						new Error(`Invalid regex pattern: ${validation.error}`),
-					);
+					throw new Error(`Invalid regex pattern: ${validation.error}`);
 				}
 			}
 
@@ -132,19 +117,8 @@ Requires ripgrep (rg) to be installed.`,
 				allowedFiles,
 			});
 
-			const format = parseResponseFormat(response_format);
-
-			log({
-				cid,
-				tool: "para_search",
-				event: "response",
-				success: true,
-				hitCount: hits.length,
-				durationMs: Date.now() - startTime,
-			});
-
 			if (format === ResponseFormat.JSON) {
-				return respondText(format, JSON.stringify({ query, hits }, null, 2));
+				return { query, hits };
 			}
 
 			const lines = [`## Search Results: "${query}"`, ""];
@@ -156,19 +130,10 @@ Requires ripgrep (rg) to be installed.`,
 				}
 			}
 
-			return respondText(format, lines.join("\n"));
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_search",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return lines.join("\n");
+		},
+		{ toolName: "para_search", logger, createCid },
+	),
 );
 
 // ============================================================================
@@ -212,34 +177,19 @@ Falls back to text search if ML dependencies unavailable.`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { query, dir, limit, response_format } = args as {
-			query: string;
-			dir?: string;
-			limit?: number;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({ cid, tool: "para_semantic_search", event: "request", query });
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { query, dir, limit } = args as {
+				query: string;
+				dir?: string;
+				limit?: number;
+			};
 			const config = loadConfig();
 			const dirs = parseDirs(dir);
 			const hits = await semanticSearch(config, { query, dir: dirs, limit });
-			const format = parseResponseFormat(response_format);
-
-			log({
-				cid,
-				tool: "para_semantic_search",
-				event: "response",
-				success: true,
-				hitCount: hits.length,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(format, JSON.stringify({ query, hits }, null, 2));
+				return { query, hits };
 			}
 
 			const lines = [`## Semantic Search: "${query}"`, ""];
@@ -255,17 +205,8 @@ Falls back to text search if ML dependencies unavailable.`,
 				}
 			}
 
-			return respondText(format, lines.join("\n"));
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_semantic_search",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return lines.join("\n");
+		},
+		{ toolName: "para_semantic_search", logger, createCid },
+	),
 );

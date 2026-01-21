@@ -527,31 +527,3 @@ export async function enrichBookmarkWithFirecrawl(
 		{ parentCid, context: { url, sessionCid } },
 	);
 }
-
-/**
- * Rate limiter for batch operations.
- * Ensures minimum delay between requests.
- */
-export class RateLimiter {
-	private lastRequestTime = 0;
-	private readonly minDelayMs: number;
-
-	constructor(minDelayMs = 2000) {
-		this.minDelayMs = minDelayMs;
-	}
-
-	/**
-	 * Waits if necessary to respect rate limit.
-	 */
-	async wait(): Promise<void> {
-		const now = Date.now();
-		const elapsed = now - this.lastRequestTime;
-		const remaining = this.minDelayMs - elapsed;
-
-		if (remaining > 0) {
-			await new Promise((resolve) => setTimeout(resolve, remaining));
-		}
-
-		this.lastRequestTime = Date.now();
-	}
-}

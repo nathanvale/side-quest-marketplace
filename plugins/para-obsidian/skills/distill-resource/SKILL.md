@@ -21,10 +21,12 @@ By the time the resource note exists, the user has **internalized** the key insi
 ## Critical Rules
 
 1. **ALWAYS fetch full content** - Clipping notes are pointers; fetch the real content
-2. **Teach, don't summarize** - Explain concepts, ask questions, guide discovery
-3. **Layer 4 must be user's words** - Co-create the executive summary through dialogue
-4. **Use capture_reason** - If present, acknowledge why they saved this
-5. **Delete after distilling** - The clipping is transformed, not archived
+2. **ALWAYS use correct tool for domain** - See Phase 1.2 for mandatory tool selection
+3. **NEVER use Firecrawl for X/Twitter** - It will fail; use Chrome DevTools or ask user
+4. **Teach, don't summarize** - Explain concepts, ask questions, guide discovery
+5. **Layer 4 must be user's words** - Co-create the executive summary through dialogue
+6. **Use capture_reason** - If present, acknowledge why they saved this
+7. **Delete after distilling** - The clipping is transformed, not archived
 
 ## Workflow Overview
 
@@ -94,15 +96,91 @@ Extract:
 - `capture_reason` (if present - use in dialogue!)
 - Existing content (may be partial)
 
-### 1.2 Fetch Full Content
+### 1.2 Fetch Full Content - CRITICAL TOOL SELECTION
 
-Load enrichment strategy based on domain. See `./references/enrichment-strategies.md` for details.
+**YOU MUST select the correct tool based on domain. This is non-negotiable.**
 
-| Domain Pattern | Strategy |
-|----------------|----------|
-| `x.com`, `twitter.com` | Chrome DevTools (authenticated) |
-| `youtube.com`, `youtu.be` | YouTube Transcript MCP |
-| Everything else | Firecrawl |
+Parse the domain from the source URL first:
+```javascript
+const url = new URL(source);
+const domain = url.hostname.replace('www.', '');
+```
+
+#### Tool Selection Decision Tree
+
+```
+Is domain x.com or twitter.com?
+├─ YES → Use Chrome DevTools (Step A)
+│        ├─ Tool available? → Fetch content
+│        └─ Tool unavailable? → Ask user (Step D)
+│        **NEVER use Firecrawl for X/Twitter - it will always fail**
+│
+Is domain youtube.com or youtu.be?
+├─ YES → Use YouTube Transcript MCP (Step B)
+│
+Everything else?
+└─ YES → Use Firecrawl (Step C)
+```
+
+#### Step A: X/Twitter (Chrome DevTools) - TRY THIS FIRST FOR x.com/twitter.com
+
+**NEVER use Firecrawl for X/Twitter URLs. It is blocked and will fail.**
+
+```
+mcp__chrome-devtools__navigate_page({ url: "[source URL]" })
+```
+
+Wait for page load, then:
+
+```
+mcp__chrome-devtools__take_snapshot()
+```
+
+If Chrome DevTools tools are **not available** (tool not found error), go directly to **Step D** (User Fallback).
+
+#### Step B: YouTube (Transcript MCP)
+
+```
+mcp__youtube-transcript__get_video_info({ url: "[source URL]" })
+mcp__youtube-transcript__get_transcript({ url: "[source URL]" })
+```
+
+If transcript unavailable, use video description and note limitation.
+
+#### Step C: All Other URLs (Firecrawl)
+
+```
+mcp__firecrawl__firecrawl_scrape({
+  url: "[source URL]",
+  formats: ["markdown"],
+  onlyMainContent: true
+})
+```
+
+If Firecrawl fails, fall back to WebFetch.
+
+#### Step D: User Fallback (X/Twitter when Chrome DevTools unavailable)
+
+When Chrome DevTools MCP is not available for X/Twitter:
+
+1. Parse URL for username: `https://x.com/[username]/status/[id]`
+2. Check if clipping already has content
+3. Ask user:
+
+```
+I can't fetch X/Twitter content directly (Chrome DevTools MCP isn't available in this session).
+
+**Tweet by @[username]:** [source URL]
+
+Could you help? Either:
+1. **Paste the tweet text** here
+2. **Summarize what it's about** from memory
+3. **Skip this clipping** and move to the next one
+
+What would you prefer?
+```
+
+See `./references/enrichment-strategies.md` for additional details on each strategy.
 
 ### 1.3 Understand the Content
 
@@ -304,9 +382,32 @@ See `./references/progressive-summarization.md` for detailed dialogue patterns f
 |-------|----------|
 | Content fetch fails | Use existing clipping content, note limitations |
 | No source URL | Ask user to provide context manually |
-| Chrome DevTools unavailable | Parse URL, ask user for tweet content |
+| Chrome DevTools unavailable | **See below** - graceful user-assisted fallback |
 | YouTube transcript unavailable | Use video description, note limitation |
 | Resource creation fails | Show error, don't delete clipping |
+
+### Twitter/X.com Without Chrome DevTools
+
+Chrome DevTools MCP may not be configured in all sessions. When X/Twitter content can't be fetched:
+
+1. **Parse the URL** to extract username and tweet ID
+2. **Check existing clipping content** - it may have partial text already
+3. **Ask the user** with clear options:
+
+```
+I can't fetch X/Twitter content directly (Chrome DevTools MCP isn't available).
+
+**Tweet by @[username]:** [source URL]
+
+Could you help? Either:
+1. **Paste the tweet text** here
+2. **Summarize what it's about** from memory
+3. **Skip this clipping** and move to the next one
+
+What would you prefer?
+```
+
+4. **Proceed normally** once user provides content - the distillation dialogue works the same way
 
 ---
 

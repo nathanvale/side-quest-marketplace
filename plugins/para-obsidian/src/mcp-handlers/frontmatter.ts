@@ -4,18 +4,19 @@
  * Frontmatter extraction, validation, and migration tools.
  */
 
+import { randomUUID } from "node:crypto";
+import { getLogger } from "@logtape/logtape";
 import { tool, z } from "@sidequest/core/mcp";
+import {
+	createLoggerAdapter,
+	ResponseFormat,
+	wrapToolHandler,
+} from "@sidequest/core/mcp-response";
 import {
 	coerceValue,
 	computeFrontmatterHint,
-	createCorrelationId,
 	formatFrontmatterHint,
-	log,
 	parseDirs,
-	parseResponseFormat,
-	ResponseFormat,
-	respondError,
-	respondText,
 } from "../../mcp/utils";
 import { loadConfig } from "../config/index";
 import {
@@ -30,6 +31,9 @@ import {
 } from "../frontmatter/index";
 import { ensureGitGuard } from "../git/index";
 import { MIGRATIONS } from "../templates/migrations";
+
+const logger = createLoggerAdapter(getLogger("para-obsidian.mcp"));
+const createCid = () => randomUUID();
 
 // ============================================================================
 // Frontmatter Get Tool
@@ -63,51 +67,20 @@ Example output:
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { file, response_format } = args as {
-			file: string;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({ cid, tool: "para_frontmatter_get", event: "request", file });
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { file } = args as { file: string };
 			const config = loadConfig();
 			const { attributes } = readFrontmatterFile(config, file);
-			const format = parseResponseFormat(response_format);
-
-			log({
-				cid,
-				tool: "para_frontmatter_get",
-				event: "response",
-				success: true,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(
-					format,
-					JSON.stringify({ file, frontmatter: attributes }, null, 2),
-				);
+				return { file, frontmatter: attributes };
 			}
 
-			return respondText(
-				format,
-				`## Frontmatter: ${file}\n\n\`\`\`yaml\n${JSON.stringify(attributes, null, 2)}\n\`\`\``,
-			);
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_frontmatter_get",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return `## Frontmatter: ${file}\n\n\`\`\`yaml\n${JSON.stringify(attributes, null, 2)}\n\`\`\``;
+		},
+		{ toolName: "para_frontmatter_get", logger, createCid },
+	),
 );
 
 // ============================================================================
@@ -142,43 +115,18 @@ Validation rules configured per note type (project, area, resource, etc.).`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { file, response_format } = args as {
-			file: string;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({ cid, tool: "para_frontmatter_validate", event: "request", file });
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { file } = args as { file: string };
 			const config = loadConfig();
 			const result = validateFrontmatterFile(config, file);
-			const format = parseResponseFormat(response_format);
-
-			log({
-				cid,
-				tool: "para_frontmatter_validate",
-				event: "response",
-				success: true,
-				valid: result.valid,
-				issueCount: result.issues.length,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(
-					format,
-					JSON.stringify(
-						{
-							file: result.relative,
-							valid: result.valid,
-							issues: result.issues,
-						},
-						null,
-						2,
-					),
-				);
+				return {
+					file: result.relative,
+					valid: result.valid,
+					issues: result.issues,
+				};
 			}
 
 			const lines = [`## Validation: ${result.relative}`, ""];
@@ -191,19 +139,10 @@ Validation rules configured per note type (project, area, resource, etc.).`,
 				}
 			}
 
-			return respondText(format, lines.join("\n"));
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_frontmatter_validate",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return lines.join("\n");
+		},
+		{ toolName: "para_frontmatter_validate", logger, createCid },
+	),
 );
 
 // ============================================================================
@@ -252,19 +191,14 @@ Requires git repository with clean working tree (unless dry-run).`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { file, set, unset, dry_run, response_format } = args as {
-			file: string;
-			set?: Record<string, string>;
-			unset?: string[];
-			dry_run?: boolean;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({ cid, tool: "para_frontmatter_set", event: "request", file });
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { file, set, unset, dry_run } = args as {
+				file: string;
+				set?: Record<string, string>;
+				unset?: string[];
+				dry_run?: boolean;
+			};
 			const config = loadConfig();
 			const dryRun = dry_run ?? false;
 
@@ -290,20 +224,9 @@ Requires git repository with clean working tree (unless dry-run).`,
 				unset: unset ?? [],
 				dryRun,
 			});
-			const format = parseResponseFormat(response_format);
-
-			log({
-				cid,
-				tool: "para_frontmatter_set",
-				event: "response",
-				success: true,
-				updated: result.updated,
-				changeCount: result.changes.length,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(format, JSON.stringify(result, null, 2));
+				return result;
 			}
 
 			const verb = dryRun ? "Would update" : "Updated";
@@ -333,19 +256,10 @@ Requires git repository with clean working tree (unless dry-run).`,
 				}
 			}
 
-			return respondText(format, lines.join("\n"));
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_frontmatter_set",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return lines.join("\n");
+		},
+		{ toolName: "para_frontmatter_set", logger, createCid },
+	),
 );
 
 // ============================================================================
@@ -389,24 +303,13 @@ Requires git repository with clean working tree (unless dry-run).`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { file, force_version, dry_run, response_format } = args as {
-			file: string;
-			force_version?: number;
-			dry_run?: boolean;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({
-			cid,
-			tool: "para_frontmatter_migrate",
-			event: "request",
-			file,
-			force_version,
-		});
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { file, force_version, dry_run } = args as {
+				file: string;
+				force_version?: number;
+				dry_run?: boolean;
+			};
 			const config = loadConfig();
 			const dryRun = dry_run ?? false;
 			const result = migrateTemplateVersion(config, file, {
@@ -414,20 +317,9 @@ Requires git repository with clean working tree (unless dry-run).`,
 				dryRun,
 				migrate: MIGRATIONS,
 			});
-			const format = parseResponseFormat(response_format);
-
-			log({
-				cid,
-				tool: "para_frontmatter_migrate",
-				event: "response",
-				success: true,
-				updated: result.updated,
-				toVersion: result.toVersion,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(format, JSON.stringify(result, null, 2));
+				return result;
 			}
 
 			const verb = dryRun ? "Would migrate" : "Migrated";
@@ -445,19 +337,10 @@ Requires git repository with clean working tree (unless dry-run).`,
 				}
 			}
 
-			return respondText(format, lines.join("\n"));
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_frontmatter_migrate",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return lines.join("\n");
+		},
+		{ toolName: "para_frontmatter_migrate", logger, createCid },
+	),
 );
 
 // ============================================================================
@@ -513,24 +396,14 @@ Requires git repository with clean working tree (unless dry-run).`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { type, dir, force_version, dry_run, response_format } = args as {
-			type?: string;
-			dir?: string;
-			force_version?: number;
-			dry_run?: boolean;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({
-			cid,
-			tool: "para_frontmatter_migrate_all",
-			event: "request",
-			type,
-		});
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { type, dir, force_version, dry_run } = args as {
+				type?: string;
+				dir?: string;
+				force_version?: number;
+				dry_run?: boolean;
+			};
 			const config = loadConfig();
 			const dryRun = dry_run ?? false;
 			const dirs = parseDirs(dir);
@@ -541,21 +414,9 @@ Requires git repository with clean working tree (unless dry-run).`,
 				type,
 				migrate: MIGRATIONS,
 			});
-			const format = parseResponseFormat(response_format);
-
-			log({
-				cid,
-				tool: "para_frontmatter_migrate_all",
-				event: "response",
-				success: true,
-				updated: result.updated,
-				skipped: result.skipped,
-				errors: result.errors,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(format, JSON.stringify(result, null, 2));
+				return result;
 			}
 
 			const verb = dryRun ? "Would migrate" : "Migrated";
@@ -575,19 +436,10 @@ Requires git repository with clean working tree (unless dry-run).`,
 				}
 			}
 
-			return respondText(format, lines.join("\n"));
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_frontmatter_migrate_all",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return lines.join("\n");
+		},
+		{ toolName: "para_frontmatter_migrate_all", logger, createCid },
+	),
 );
 
 // ============================================================================
@@ -631,24 +483,13 @@ Used for:
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { type, to_version, dir, response_format } = args as {
-			type: string;
-			to_version: number;
-			dir?: string;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({
-			cid,
-			tool: "para_frontmatter_plan",
-			event: "request",
-			type,
-			to_version,
-		});
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { type, to_version, dir } = args as {
+				type: string;
+				to_version: number;
+				dir?: string;
+			};
 			const config = loadConfig();
 			const dirs = parseDirs(dir);
 			const plan = planTemplateVersionBump(config, {
@@ -656,20 +497,9 @@ Used for:
 				toVersion: to_version,
 				dir: dirs,
 			});
-			const format = parseResponseFormat(response_format);
-
-			log({
-				cid,
-				tool: "para_frontmatter_plan",
-				event: "response",
-				success: true,
-				outdated: plan.outdated,
-				missingVersion: plan.missingVersion,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(format, JSON.stringify(plan, null, 2));
+				return plan;
 			}
 
 			const lines = [
@@ -682,19 +512,10 @@ Used for:
 				`**Type mismatch:** ${plan.typeMismatch}`,
 			];
 
-			return respondText(format, lines.join("\n"));
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_frontmatter_plan",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return lines.join("\n");
+		},
+		{ toolName: "para_frontmatter_plan", logger, createCid },
+	),
 );
 
 // ============================================================================
@@ -753,24 +574,14 @@ Requires git repository with clean working tree (unless dry-run).`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { plan_file, statuses, dir, dry_run, response_format } = args as {
-			plan_file: string;
-			statuses?: string[];
-			dir?: string;
-			dry_run?: boolean;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({
-			cid,
-			tool: "para_frontmatter_apply_plan",
-			event: "request",
-			plan_file,
-		});
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { plan_file, statuses, dir, dry_run } = args as {
+				plan_file: string;
+				statuses?: string[];
+				dir?: string;
+				dry_run?: boolean;
+			};
 			const config = loadConfig();
 			const dryRun = dry_run ?? false;
 			const dirs = parseDirs(dir);
@@ -797,21 +608,9 @@ Requires git repository with clean working tree (unless dry-run).`,
 				dirs: dirs ?? [],
 				migrate: MIGRATIONS,
 			});
-			const format = parseResponseFormat(response_format);
-
-			log({
-				cid,
-				tool: "para_frontmatter_apply_plan",
-				event: "response",
-				success: true,
-				updated: result.updated,
-				skipped: result.skipped,
-				errors: result.errors,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(format, JSON.stringify(result, null, 2));
+				return result;
 			}
 
 			const verb = dryRun ? "Would apply" : "Applied";
@@ -831,17 +630,8 @@ Requires git repository with clean working tree (unless dry-run).`,
 				}
 			}
 
-			return respondText(format, lines.join("\n"));
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_frontmatter_apply_plan",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return lines.join("\n");
+		},
+		{ toolName: "para_frontmatter_apply_plan", logger, createCid },
+	),
 );

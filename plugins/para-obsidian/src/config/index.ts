@@ -12,7 +12,11 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { pathExistsSync, readTextFileSync } from "@sidequest/core/fs";
+import {
+	pathExistsSync,
+	readTextFileSync,
+	validateConfigPath,
+} from "@sidequest/core/fs";
 import { getErrorMessage } from "@sidequest/core/utils";
 import type { InboxConverter } from "../inbox";
 import {
@@ -149,52 +153,6 @@ function loadJsonIfExists<T>(filePath: string): Partial<T> | undefined {
 	}
 }
 
-/**
- * Validates that a config path is within expected safe locations.
- * Prevents path traversal attacks via PARA_OBSIDIAN_CONFIG env var.
- *
- * Safe locations:
- * - User's home directory (~/.config/)
- * - Current working directory or subdirectories
- * - Vault directory (if PARA_VAULT is set)
- *
- * Security: Canonicalizes path first to prevent bypasses like //etc/passwd
- *
- * @param configPath - Path to validate
- * @returns true if path is safe to load
- */
-function isConfigPathSafe(configPath: string): boolean {
-	// Canonicalize the path first to resolve any tricks like //etc/passwd
-	// This normalizes slashes, resolves symlinks, and makes absolute
-	const resolved = path.resolve(configPath);
-	const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
-	const cwd = process.cwd();
-
-	// Check for path traversal sequences in the original path
-	// This catches patterns like ../ before resolution
-	if (configPath.includes("..")) {
-		return false;
-	}
-
-	// Allow paths within home config directory
-	if (home && resolved.startsWith(path.join(home, ".config"))) {
-		return true;
-	}
-
-	// Allow paths within current working directory
-	if (resolved.startsWith(cwd)) {
-		return true;
-	}
-
-	// Allow paths within PARA_VAULT if already set
-	const vault = process.env.PARA_VAULT;
-	if (vault && resolved.startsWith(path.resolve(vault))) {
-		return true;
-	}
-
-	return false;
-}
-
 function resolveRcFromEnv(): string | undefined {
 	const explicit = process.env.PARA_OBSIDIAN_CONFIG;
 	if (!explicit || explicit.trim().length === 0) {
@@ -202,7 +160,11 @@ function resolveRcFromEnv(): string | undefined {
 	}
 
 	// Validate path is safe before returning
-	if (!isConfigPathSafe(explicit)) {
+	// Allow vault path if PARA_VAULT is set
+	const vault = process.env.PARA_VAULT;
+	const allowedRoots = vault ? [vault] : [];
+
+	if (!validateConfigPath(explicit, allowedRoots)) {
 		throw new Error(
 			`PARA_OBSIDIAN_CONFIG path is not allowed: ${explicit}. ` +
 				"Config files must be within home/.config/, the current directory, or the vault.",

@@ -4,18 +4,20 @@
  * Link rewriting tool for vault restructuring.
  */
 
+import { randomUUID } from "node:crypto";
+import { getLogger } from "@logtape/logtape";
 import { tool, z } from "@sidequest/core/mcp";
 import {
-	createCorrelationId,
-	log,
-	parseDirs,
-	parseResponseFormat,
+	createLoggerAdapter,
 	ResponseFormat,
-	respondError,
-	respondText,
-} from "../../mcp/utils";
+	wrapToolHandler,
+} from "@sidequest/core/mcp-response";
+import { parseDirs } from "../../mcp/utils";
 import { loadConfig } from "../config/index";
 import { type RewriteMapping, rewriteLinks } from "../links/rewrite";
+
+const logger = createLoggerAdapter(getLogger("para-obsidian.mcp"));
+const createCid = () => randomUUID();
 
 // ============================================================================
 // Rewrite Links Tool
@@ -79,28 +81,15 @@ Supports:
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { from, to, mapping, dir, dry_run, response_format } = args as {
-			from?: string;
-			to?: string;
-			mapping?: Record<string, string>;
-			dir?: string;
-			dry_run?: boolean;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({
-			cid,
-			tool: "para_rewrite_links",
-			event: "request",
-			from,
-			to,
-			hasMapping: !!mapping,
-			dry_run,
-		});
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { from, to, mapping, dir, dry_run } = args as {
+				from?: string;
+				to?: string;
+				mapping?: Record<string, string>;
+				dir?: string;
+				dry_run?: boolean;
+			};
 			const config = loadConfig();
 			// Default to dry-run for safety
 			const dryRun = dry_run ?? true;
@@ -127,33 +116,14 @@ Supports:
 				dryRun,
 				dirs,
 			});
-			const format = parseResponseFormat(response_format);
-
-			log({
-				cid,
-				tool: "para_rewrite_links",
-				event: "response",
-				success: true,
-				linksRewritten: result.linksRewritten,
-				notesUpdated: result.notesUpdated,
-				dryRun,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(
-					format,
-					JSON.stringify(
-						{
-							dryRun,
-							linksRewritten: result.linksRewritten,
-							notesUpdated: result.notesUpdated,
-							updates: result.updates,
-						},
-						null,
-						2,
-					),
-				);
+				return {
+					dryRun,
+					linksRewritten: result.linksRewritten,
+					notesUpdated: result.notesUpdated,
+					updates: result.updates,
+				};
 			}
 
 			const verb = dryRun ? "Would rewrite" : "Rewrote";
@@ -180,17 +150,8 @@ Supports:
 				}
 			}
 
-			return respondText(format, lines.join("\n"));
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_rewrite_links",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return lines.join("\n");
+		},
+		{ toolName: "para_rewrite_links", logger, createCid },
+	),
 );

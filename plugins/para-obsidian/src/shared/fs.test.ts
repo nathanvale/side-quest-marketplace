@@ -36,7 +36,7 @@ describe("fs helpers", () => {
 		const vault = setupTest();
 
 		expect(() => resolveVaultPath(vault, "../evil")).toThrow(
-			/path.*escapes vault/i,
+			/path.*escapes (vault|sandbox)/i,
 		);
 	});
 

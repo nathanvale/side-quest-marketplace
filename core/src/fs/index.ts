@@ -795,7 +795,9 @@ export {
 // Path utilities
 export {
 	expandTilde,
+	matchesDir,
 	normalizePath,
+	normalizePathFragment,
 } from "./path.js";
 // Path safety and validation utilities
 export {
@@ -803,6 +805,13 @@ export {
 	validateFilePath,
 	validatePathSafety,
 } from "./safety.js";
+// Sandbox path security utilities
+export {
+	resolveSandboxedPath,
+	type SandboxedPath,
+	validateConfigPath,
+	validateFilenameForSubprocess,
+} from "./sandbox.js";
 // Directory walking utilities
 export {
 	type FileVisitor,

@@ -12,20 +12,22 @@
  * @module mcp/tools/files
  */
 
+import { randomUUID } from "node:crypto";
+import { getLogger } from "@logtape/logtape";
 import { tool, z } from "@sidequest/core/mcp";
 import {
-	createCorrelationId,
-	log,
-	parseResponseFormat,
+	createLoggerAdapter,
 	ResponseFormat,
-	respondError,
-	respondText,
-} from "../../mcp/utils";
+	wrapToolHandler,
+} from "@sidequest/core/mcp-response";
 import { loadConfig } from "../config/index";
 import { renameWithLinkRewrite } from "../links/index";
 import { deleteFile } from "../notes/delete";
 import { type InsertMode, insertIntoNote } from "../notes/insert";
 import { listDir, readFile } from "../shared/fs";
+
+const logger = createLoggerAdapter(getLogger("para-obsidian.mcp"));
+const createCid = () => randomUUID();
 
 // ============================================================================
 // List Tool
@@ -57,47 +59,21 @@ Note: Returns vault-relative paths.`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { path, response_format } = args as {
-			path?: string;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({ cid, tool: "para_list", event: "request", path });
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { path } = args as { path?: string };
 			const config = loadConfig();
 			const dir = path ?? ".";
 			const entries = listDir(config.vault, dir);
-			const format = parseResponseFormat(response_format);
-
-			log({
-				cid,
-				tool: "para_list",
-				event: "response",
-				success: true,
-				count: entries.length,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(format, JSON.stringify({ dir, entries }, null, 2));
+				return { dir, entries };
 			}
 
-			return respondText(format, `## Files in ${dir}\n\n${entries.join("\n")}`);
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_list",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return `## Files in ${dir}\n\n${entries.join("\n")}`;
+		},
+		{ toolName: "para_list", logger, createCid },
+	),
 );
 
 // ============================================================================
@@ -126,45 +102,20 @@ Note: Paths are vault-relative (e.g., "Projects/My Note.md").`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { file, response_format } = args as {
-			file: string;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({ cid, tool: "para_read", event: "request", file });
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { file } = args as { file: string };
 			const config = loadConfig();
 			const content = readFile(config.vault, file);
-			const format = parseResponseFormat(response_format);
-
-			log({
-				cid,
-				tool: "para_read",
-				event: "response",
-				success: true,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(format, JSON.stringify({ file, content }, null, 2));
+				return { file, content };
 			}
 
-			return respondText(format, content);
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_read",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return content;
+		},
+		{ toolName: "para_read", logger, createCid },
+	),
 );
 
 // ============================================================================
@@ -219,34 +170,22 @@ Requires git repository with clean working tree.`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const {
-			template,
-			title,
-			dest,
-			args: templateArgs,
-			content,
-			response_format,
-		} = args as {
-			template: string;
-			title: string;
-			dest?: string;
-			args?: Record<string, string>;
-			content?: Record<string, string>;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({
-			cid,
-			tool: "para_create",
-			event: "request",
-			template,
-			title,
-			hasContent: !!content,
-		});
+	wrapToolHandler(
+		async (args, format) => {
+			const {
+				template,
+				title,
+				dest,
+				args: templateArgs,
+				content,
+			} = args as {
+				template: string;
+				title: string;
+				dest?: string;
+				args?: Record<string, string>;
+				content?: Record<string, string>;
+			};
 
-		try {
 			// Build CLI args - MCP is thin wrapper, CLI does heavy lifting
 			const cliArgs = [
 				"create",
@@ -288,20 +227,9 @@ Requires git repository with clean working tree.`,
 			}
 
 			const result = JSON.parse(stdout);
-			const format = parseResponseFormat(response_format);
-
-			log({
-				cid,
-				tool: "para_create",
-				event: "response",
-				success: true,
-				filePath: result.filePath,
-				sectionsInjected: result.sectionsInjected,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(format, JSON.stringify(result, null, 2));
+				return result;
 			}
 
 			// Format markdown output
@@ -318,19 +246,10 @@ Requires git repository with clean working tree.`,
 				}
 			}
 
-			return respondText(format, lines.join("\n"));
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_create",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return lines.join("\n");
+		},
+		{ toolName: "para_create", logger, createCid },
+	),
 );
 
 // ============================================================================
@@ -374,51 +293,25 @@ Requires git repository with clean working tree.`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { file, heading, content, mode, response_format } = args as {
-			file: string;
-			heading: string;
-			content: string;
-			mode: InsertMode;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({ cid, tool: "para_insert", event: "request", file, heading, mode });
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { file, heading, content, mode } = args as {
+				file: string;
+				heading: string;
+				content: string;
+				mode: InsertMode;
+			};
 			const config = loadConfig();
 			const result = insertIntoNote(config, { file, heading, content, mode });
-			const format = parseResponseFormat(response_format);
-
-			log({
-				cid,
-				tool: "para_insert",
-				event: "response",
-				success: true,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(format, JSON.stringify(result, null, 2));
+				return result;
 			}
 
-			return respondText(
-				format,
-				`## Text Inserted\n\n**File:** ${result.relative}\n**Mode:** ${mode}\n**Heading:** "${heading}"`,
-			);
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_insert",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return `## Text Inserted\n\n**File:** ${result.relative}\n**Mode:** ${mode}\n**Heading:** "${heading}"`;
+		},
+		{ toolName: "para_insert", logger, createCid },
+	),
 );
 
 // ============================================================================
@@ -456,34 +349,19 @@ Requires git repository with clean working tree (unless dry-run).`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { from, to, dry_run, response_format } = args as {
-			from: string;
-			to: string;
-			dry_run?: boolean;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({ cid, tool: "para_rename", event: "request", from, to, dry_run });
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { from, to, dry_run } = args as {
+				from: string;
+				to: string;
+				dry_run?: boolean;
+			};
 			const config = loadConfig();
 			const dryRun = dry_run ?? false;
 			const result = renameWithLinkRewrite(config, { from, to, dryRun });
-			const format = parseResponseFormat(response_format);
-
-			log({
-				cid,
-				tool: "para_rename",
-				event: "response",
-				success: true,
-				rewriteCount: result.rewrites.length,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(format, JSON.stringify(result, null, 2));
+				return result;
 			}
 
 			const verb = dryRun ? "Would rename" : "Renamed";
@@ -495,19 +373,10 @@ Requires git repository with clean working tree (unless dry-run).`,
 				`**Link rewrites:** ${result.rewrites.length}`,
 			];
 
-			return respondText(format, lines.join("\n"));
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_rename",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return lines.join("\n");
+		},
+		{ toolName: "para_rename", logger, createCid },
+	),
 );
 
 // ============================================================================
@@ -547,50 +416,24 @@ Requires git repository with clean working tree (unless dry-run).`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const { file, confirm, dry_run, response_format } = args as {
-			file: string;
-			confirm: boolean;
-			dry_run?: boolean;
-			response_format?: string;
-		};
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({ cid, tool: "para_delete", event: "request", file, confirm, dry_run });
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
+			const { file, confirm, dry_run } = args as {
+				file: string;
+				confirm: boolean;
+				dry_run?: boolean;
+			};
 			const config = loadConfig();
 			const dryRun = dry_run ?? false;
 			const result = deleteFile(config, { file, confirm, dryRun });
-			const format = parseResponseFormat(response_format);
-
-			log({
-				cid,
-				tool: "para_delete",
-				event: "response",
-				success: true,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(format, JSON.stringify(result, null, 2));
+				return result;
 			}
 
 			const verb = dryRun ? "Would delete" : "Deleted";
-			return respondText(
-				format,
-				`## ${verb} File\n\n**Path:** ${result.relative}`,
-			);
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_delete",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(response_format);
-			return respondError(format, error);
-		}
-	},
+			return `## ${verb} File\n\n**Path:** ${result.relative}`;
+		},
+		{ toolName: "para_delete", logger, createCid },
+	),
 );

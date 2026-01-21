@@ -8,6 +8,7 @@
  */
 
 import { basename, extname } from "node:path";
+import { formatDateWithSpaces } from "@sidequest/core/formatters";
 import { pathExistsSync } from "@sidequest/core/fs";
 
 /**
@@ -178,20 +179,8 @@ export function capitalizeFirst(s: string): string {
 	return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/**
- * Format a date string with spaces instead of hyphens.
- *
- * @param date - Date in YYYY-MM-DD format
- * @returns Date in YYYY MM DD format
- *
- * @example
- * ```typescript
- * formatDateWithSpaces("2024-12-10"); // "2024 12 10"
- * ```
- */
-export function formatDateWithSpaces(date: string): string {
-	return date.replace(/-/g, " ");
-}
+// Re-export formatDateWithSpaces from core for backward compatibility
+export { formatDateWithSpaces };
 
 /**
  * Extract the best date field from extracted fields.

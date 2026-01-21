@@ -7,6 +7,8 @@
  * @module voice/formatter
  */
 
+import { formatTime12Hour } from "@sidequest/core/formatters";
+
 /**
  * Format timestamp in Melbourne 12-hour time format.
  *
@@ -20,24 +22,10 @@
  *
  * @param date - Date object to format
  * @returns Formatted time string
+ * @deprecated Use formatTime12Hour from @sidequest/core/formatters instead
  */
 export function formatTimestamp(date: Date): string {
-	// Get hours in 24-hour format
-	const hours24 = date.getHours();
-
-	// Convert to 12-hour format
-	let hours12 = hours24 % 12;
-	if (hours12 === 0) {
-		hours12 = 12; // Midnight and noon are 12, not 0
-	}
-
-	// Get minutes with leading zero
-	const minutes = date.getMinutes().toString().padStart(2, "0");
-
-	// Determine am/pm (lowercase)
-	const period = hours24 < 12 ? "am" : "pm";
-
-	return `${hours12}:${minutes} ${period}`;
+	return formatTime12Hour(date);
 }
 
 /**
@@ -92,30 +80,8 @@ export function formatLogEntry(timestamp: Date, transcription: string): string {
 	return `- ${time} - 🎤 ${collapsed}`;
 }
 
-/**
- * Format time for use in filenames (no colons).
- *
- * Format: "h-mmam/pm" (no space between time and period)
- *
- * Examples:
- * - 2-45pm
- * - 10-30am
- * - 12-00am (midnight)
- * - 12-00pm (noon)
- *
- * @param date - Date object to format
- * @returns Filename-safe time string
- */
-export function formatFilenameTime(date: Date): string {
-	const hours24 = date.getHours();
-	let hours12 = hours24 % 12;
-	if (hours12 === 0) {
-		hours12 = 12;
-	}
-	const minutes = date.getMinutes().toString().padStart(2, "0");
-	const period = hours24 < 12 ? "am" : "pm";
-	return `${hours12}-${minutes}${period}`;
-}
+// Re-export formatFilenameTime from core for backward compatibility
+export { formatFilenameTime } from "@sidequest/core/formatters";
 
 /**
  * Format wikilink log entry for daily note.

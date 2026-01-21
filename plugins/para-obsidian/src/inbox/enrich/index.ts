@@ -9,12 +9,13 @@
  * @module inbox/enrich
  */
 
+// Re-export RateLimiter from core for convenience
+export { RateLimiter } from "@sidequest/core/concurrency";
 // Core enrichment functions
 export {
 	enrichBookmarkWithFirecrawl,
 	extractDomain,
 	isValidUrl,
-	RateLimiter,
 } from "./bookmark-enricher";
 // Pipeline
 export {

@@ -6,6 +6,7 @@
  * @module youtube-transcript/formatter
  */
 
+import { formatDuration } from "@sidequest/core/formatters";
 import type { TranscriptSegment } from "./types";
 import { DEFAULT_FORMAT_OPTIONS } from "./types";
 
@@ -20,16 +21,10 @@ import { DEFAULT_FORMAT_OPTIONS } from "./types";
  * formatTimestamp(65);   // "1:05"
  * formatTimestamp(3665); // "1:01:05"
  * ```
+ * @deprecated Use formatDuration from @sidequest/core/formatters instead
  */
 export function formatTimestamp(seconds: number): string {
-	const h = Math.floor(seconds / 3600);
-	const m = Math.floor((seconds % 3600) / 60);
-	const s = Math.floor(seconds % 60);
-
-	if (h > 0) {
-		return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-	}
-	return `${m}:${s.toString().padStart(2, "0")}`;
+	return formatDuration(seconds);
 }
 
 /**

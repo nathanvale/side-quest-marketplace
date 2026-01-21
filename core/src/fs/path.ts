@@ -60,3 +60,59 @@ export function normalizePath(inputPath: string, basePath?: string): string {
 		: resolve(basePath ?? process.cwd(), expanded);
 	return normalize(resolved);
 }
+
+/**
+ * Normalize a path fragment for comparison.
+ *
+ * Converts backslashes to forward slashes (Windows compatibility)
+ * and removes trailing slashes for consistent matching.
+ *
+ * Used for directory matching and path comparisons.
+ *
+ * @param input - Path fragment to normalize
+ * @returns Normalized path with forward slashes, no trailing slash
+ *
+ * @example
+ * normalizePathFragment('Projects\\Alpha') // => 'Projects/Alpha' (Windows)
+ * normalizePathFragment('Projects/Alpha/') // => 'Projects/Alpha'
+ * normalizePathFragment('Projects//Alpha///') // => 'Projects//Alpha' (preserves internal slashes)
+ */
+export function normalizePathFragment(input: string): string {
+	return input.replace(/\\/g, "/").replace(/\/+$/, "");
+}
+
+/**
+ * Check if a file path matches any of the given directories.
+ *
+ * Performs normalized comparisons to handle:
+ * - Windows backslashes
+ * - Trailing slashes
+ * - Subdirectory matching
+ *
+ * If no directories provided, matches all paths.
+ *
+ * @param file - File path to check
+ * @param dirs - Optional array of directory paths to match against
+ * @returns true if file is in any of the directories or subdirectories
+ *
+ * @example
+ * matchesDir('Projects/Alpha/note.md', ['Projects']) // => true
+ * matchesDir('Projects/Alpha', ['Projects']) // => true (exact match)
+ * matchesDir('Areas/Work', ['Projects']) // => false
+ * matchesDir('anything', undefined) // => true (no filter)
+ * matchesDir('anything', []) // => true (empty filter)
+ */
+export function matchesDir(
+	file: string,
+	dirs?: ReadonlyArray<string>,
+): boolean {
+	if (!dirs || dirs.length === 0) return true;
+	const normalizedFile = normalizePathFragment(file);
+	return dirs.some((dir) => {
+		const normalizedDir = normalizePathFragment(dir);
+		return (
+			normalizedFile === normalizedDir ||
+			normalizedFile.startsWith(`${normalizedDir}/`)
+		);
+	});
+}

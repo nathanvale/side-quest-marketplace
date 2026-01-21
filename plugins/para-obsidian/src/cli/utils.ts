@@ -7,6 +7,17 @@
  * @module cli/utils
  */
 
+import {
+	normalizeFlags as coreNormalizeFlags,
+	normalizeFlagValue as coreNormalizeFlagValue,
+	parseArgOverrides as coreParseArgOverrides,
+	parseDirs as coreParseDirs,
+	parseCommaSeparatedList,
+} from "@sidequest/core/cli";
+import {
+	matchesDir as coreMatchesDir,
+	normalizePathFragment as coreNormalizePathFragment,
+} from "@sidequest/core/fs";
 import { discoverAttachments } from "../attachments/index";
 import type { ParaObsidianConfig } from "../config/index";
 import type { NormalizedFlags, RawFlags } from "./types";
@@ -14,31 +25,23 @@ import type { NormalizedFlags, RawFlags } from "./types";
 /**
  * Normalize a flag value to single value (string or boolean).
  * If array, returns the first element. Otherwise returns as-is.
+ * @deprecated Use normalizeFlagValue from @sidequest/core/cli instead
  */
 export function normalizeFlagValue(
 	value: string | boolean | (string | boolean)[] | undefined,
 ): string | boolean | undefined {
-	if (Array.isArray(value)) {
-		return value[0];
-	}
-	return value;
+	return coreNormalizeFlagValue(value);
 }
 
 /**
  * Normalize flags record by converting all array values to their first element.
  * Used for functions that don't expect array flag values.
+ * @deprecated Use normalizeFlags from @sidequest/core/cli instead
  */
 export function normalizeFlags(
 	flags: Record<string, string | boolean | (string | boolean)[]>,
 ): NormalizedFlags {
-	const normalized: NormalizedFlags = {};
-	for (const [key, value] of Object.entries(flags)) {
-		const norm = normalizeFlagValue(value);
-		if (norm !== undefined) {
-			normalized[key] = norm;
-		}
-	}
-	return normalized;
+	return coreNormalizeFlags(flags);
 }
 
 /**
@@ -49,22 +52,14 @@ export function parseAttachments(flags: RawFlags | NormalizedFlags): string[] {
 	const raw = flags.attachments;
 	// Handle array case (take first element)
 	const value = Array.isArray(raw) ? raw[0] : raw;
-	if (typeof value !== "string") return [];
-	return value
-		.split(",")
-		.map((s) => s.trim())
-		.filter(Boolean);
+	return parseCommaSeparatedList(value);
 }
 
 /**
  * Parse --unset flag into array of field names.
  */
 export function parseUnset(input: string | boolean | undefined): string[] {
-	if (typeof input !== "string") return [];
-	return input
-		.split(",")
-		.map((s) => s.trim())
-		.filter(Boolean);
+	return parseCommaSeparatedList(input);
 }
 
 /**
@@ -101,8 +96,6 @@ export function parseFrontmatterFilters(
 	return filters;
 }
 
-import { parseDirs as coreParseDirs } from "@sidequest/core/cli";
-
 /**
  * Parse --dir flag into array of directory paths.
  * @deprecated Use parseDirs from @sidequest/core/cli instead
@@ -131,30 +124,22 @@ export function parseStatuses(
 
 /**
  * Normalize a path fragment for comparison (forward slashes, no trailing slash).
+ * @deprecated Use normalizePathFragment from @sidequest/core/fs instead
  */
 export function normalizePathFragment(input: string): string {
-	return input.replace(/\\/g, "/").replace(/\/+$/, "");
+	return coreNormalizePathFragment(input);
 }
 
 /**
  * Check if a file path matches any of the given directories.
+ * @deprecated Use matchesDir from @sidequest/core/fs instead
  */
 export function matchesDir(
 	file: string,
 	dirs?: ReadonlyArray<string>,
 ): boolean {
-	if (!dirs || dirs.length === 0) return true;
-	const normalizedFile = normalizePathFragment(file);
-	return dirs.some((dir) => {
-		const normalizedDir = normalizePathFragment(dir);
-		return (
-			normalizedFile === normalizedDir ||
-			normalizedFile.startsWith(`${normalizedDir}/`)
-		);
-	});
+	return coreMatchesDir(file, dirs);
 }
-
-import { parseArgOverrides as coreParseArgOverrides } from "@sidequest/core/cli";
 
 /**
  * Parse --arg flags into key=value overrides.

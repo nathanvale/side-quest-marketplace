@@ -9,17 +9,19 @@
  * @module mcp/tools/config
  */
 
+import { randomUUID } from "node:crypto";
+import { getLogger } from "@logtape/logtape";
 import { tool, z } from "@sidequest/core/mcp";
 import {
-	createCorrelationId,
-	log,
-	parseResponseFormat,
+	createLoggerAdapter,
 	ResponseFormat,
-	respondError,
-	respondText,
-} from "../../mcp/utils";
+	wrapToolHandler,
+} from "@sidequest/core/mcp-response";
 import { listTemplateVersions, loadConfig } from "../config/index";
 import { getTemplate, getTemplateFields } from "../templates/index";
+
+const logger = createLoggerAdapter(getLogger("para-obsidian.mcp"));
+const createCid = () => randomUUID();
 
 // ============================================================================
 // Configuration Tool
@@ -56,29 +58,15 @@ Configuration sources (precedence order):
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({ cid, tool: "para_config", event: "request" });
-
-		try {
+	wrapToolHandler(
+		async (_args, format) => {
 			const config = loadConfig();
-			const format = parseResponseFormat(
-				args.response_format as string | undefined,
-			);
-
-			log({
-				cid,
-				tool: "para_config",
-				event: "response",
-				success: true,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(format, JSON.stringify(config, null, 2));
+				return config; // Auto-formatted as JSON
 			}
 
+			// Custom markdown formatting
 			const lines = [
 				"## Para-Obsidian Configuration",
 				"",
@@ -97,21 +85,10 @@ Configuration sources (precedence order):
 				`**Frontmatter rules:** ${Object.keys(config.frontmatterRules ?? {}).length} types`,
 			);
 
-			return respondText(format, lines.join("\n"));
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_config",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(
-				args.response_format as string | undefined,
-			);
-			return respondError(format, error);
-		}
-	},
+			return lines.join("\n");
+		},
+		{ toolName: "para_config", logger, createCid },
+	),
 );
 
 // ============================================================================
@@ -139,51 +116,25 @@ catalog display.`,
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({ cid, tool: "para_templates", event: "request" });
-
-		try {
+	wrapToolHandler(
+		async (_args, format) => {
 			const config = loadConfig();
 			const templates = listTemplateVersions(config);
-			const format = parseResponseFormat(
-				args.response_format as string | undefined,
-			);
-
-			log({
-				cid,
-				tool: "para_templates",
-				event: "response",
-				success: true,
-				count: templates.length,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
-				return respondText(format, JSON.stringify({ templates }, null, 2));
+				return { templates }; // Auto-formatted as JSON
 			}
 
+			// Custom markdown formatting
 			const lines = ["## Template Versions", ""];
 			for (const tpl of templates) {
 				lines.push(`- **${tpl.name}:** v${tpl.version}`);
 			}
 
-			return respondText(format, lines.join("\n"));
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_templates",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(
-				args.response_format as string | undefined,
-			);
-			return respondError(format, error);
-		}
-	},
+			return lines.join("\n");
+		},
+		{ toolName: "para_templates", logger, createCid },
+	),
 );
 
 // ============================================================================
@@ -220,12 +171,8 @@ Example: For project template, shows you need:
 			openWorldHint: false,
 		},
 	},
-	async (args: Record<string, unknown>) => {
-		const cid = createCorrelationId();
-		const startTime = Date.now();
-		log({ cid, tool: "para_template_fields", event: "request", args });
-
-		try {
+	wrapToolHandler(
+		async (args, format) => {
 			const config = loadConfig();
 			const templateName = args.template as string;
 			const template = getTemplate(config, templateName);
@@ -235,19 +182,6 @@ Example: For project template, shows you need:
 			}
 
 			const fields = getTemplateFields(template);
-			const format = parseResponseFormat(
-				args.response_format as string | undefined,
-			);
-
-			log({
-				cid,
-				tool: "para_template_fields",
-				event: "response",
-				success: true,
-				template: templateName,
-				fieldCount: fields.length,
-				durationMs: Date.now() - startTime,
-			});
 
 			if (format === ResponseFormat.JSON) {
 				const requiredFields = fields.filter(
@@ -323,28 +257,23 @@ Example: For project template, shows you need:
 					}
 				}
 
-				return respondText(
-					format,
-					JSON.stringify(
-						{
-							template: templateName,
-							version: template.version,
-							fields: {
-								required: enhancedRequired,
-								auto: autoFields.map((f) => f.key),
-								body: bodyFields.map((f) => f.key),
-							},
-							frontmatter_hints: frontmatterHints,
-							example: Object.fromEntries(
-								enhancedRequired.map((f) => [f.key, f.example ?? "..."]),
-							),
-						},
-						null,
-						2,
+				// Return data - wrapper handles formatting
+				return {
+					template: templateName,
+					version: template.version,
+					fields: {
+						required: enhancedRequired,
+						auto: autoFields.map((f) => f.key),
+						body: bodyFields.map((f) => f.key),
+					},
+					frontmatter_hints: frontmatterHints,
+					example: Object.fromEntries(
+						enhancedRequired.map((f) => [f.key, f.example ?? "..."]),
 					),
-				);
+				};
 			}
 
+			// Custom markdown formatting
 			const lines = [
 				`## Template Fields: ${templateName} (v${template.version})`,
 				"",
@@ -402,19 +331,8 @@ Example: For project template, shows you need:
 				lines.push("```");
 			}
 
-			return respondText(format, lines.join("\n"));
-		} catch (error) {
-			log({
-				cid,
-				tool: "para_template_fields",
-				durationMs: Date.now() - startTime,
-				success: false,
-				error: error instanceof Error ? error.message : String(error),
-			});
-			const format = parseResponseFormat(
-				args.response_format as string | undefined,
-			);
-			return respondError(format, error);
-		}
-	},
+			return lines.join("\n");
+		},
+		{ toolName: "para_template_fields", logger, createCid },
+	),
 );
