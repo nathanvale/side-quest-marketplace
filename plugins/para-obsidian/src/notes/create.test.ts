@@ -781,13 +781,14 @@ Body`,
 		expect(written).toContain("target_completion: 2026-01-01");
 	});
 
-	it("does not replace non-null frontmatter values with args", () => {
+	it("args override non-null frontmatter values (except protected fields)", () => {
 		const vault = setupTest();
 		writeTemplate(
 			path.join(vault, "Templates"),
 			"test",
 			`---
 title: "null"
+type: test
 status: planning
 priority: high
 ---
@@ -799,15 +800,21 @@ Body`,
 			template: "test",
 			title: "Test Note",
 			args: {
-				status: "active",
-				priority: "low",
+				status: "active", // Should override "planning"
+				priority: "low", // Should override "high"
+				type: "project", // Should NOT override (protected field)
 			},
 		});
 
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		// status and priority should NOT be replaced since they weren't null
-		expect(written).toContain("status: planning");
-		expect(written).toContain("priority: high");
+		const { attributes } = parseFrontmatter(written);
+
+		// Args should override existing non-null values
+		expect(attributes.status).toBe("active");
+		expect(attributes.priority).toBe("low");
+
+		// Protected field should not be overridden
+		expect(attributes.type).toBe("test");
 	});
 
 	it("creates note from template with native placeholders", () => {
@@ -1333,5 +1340,391 @@ type: project
 
 		const result = extractEmojiPrefix(content);
 		expect(result).toBeUndefined();
+	});
+});
+
+describe("Bug Fixes", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
+	function setupTest(): string {
+		const vault = createTestVault();
+		trackVault(vault);
+		return vault;
+	}
+
+	it("handles Templater prompts with array options (4-arg form)", () => {
+		const vault = setupTest();
+		writeTemplate(
+			path.join(vault, "Templates"),
+			"resource",
+			`---
+title: "<% tp.system.prompt("Title") %>"
+type: resource
+source: <% tp.system.prompt("Source type", "article", false, ["book", "article", "video", "course"]) %>
+tags:
+  - resource
+---
+# <% tp.system.prompt("Title") %>
+
+Source: <% tp.system.prompt("Source type", "article", false, ["book", "article", "video", "course"]) %>`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		const result = createFromTemplate(loadConfig({ cwd: vault }), {
+			template: "resource",
+			title: "My Resource",
+			args: {
+				"Source type": "book",
+			},
+		});
+
+		expect(result.filePath).toBe("00 Inbox/📚 My Resource.md");
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+		expect(written).toContain("title: 📚 My Resource");
+		expect(written).toContain("source: book");
+		expect(written).toContain("Source: book");
+		// Should not contain unprocessed Templater syntax
+		expect(written).not.toContain("<% tp.system.prompt");
+	});
+
+	it("handles Templater prompts with array options (default value when not provided)", () => {
+		const vault = setupTest();
+		writeTemplate(
+			path.join(vault, "Templates"),
+			"resource",
+			`---
+title: "<% tp.system.prompt("Title") %>"
+type: resource
+source: <% tp.system.prompt("Source type", "article", false, ["book", "article", "video"]) %>
+tags:
+  - resource
+---
+# <% tp.system.prompt("Title") %>`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		// Don't provide "Source type" arg - should use default "article"
+		const result = createFromTemplate(loadConfig({ cwd: vault }), {
+			template: "resource",
+			title: "Default Resource",
+		});
+
+		expect(result.filePath).toBe("00 Inbox/📚 Default Resource.md");
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+		expect(written).toContain("title: 📚 Default Resource");
+		expect(written).toContain("source: article"); // Default value
+		// Should not contain unprocessed Templater syntax
+		expect(written).not.toContain("<% tp.system.prompt");
+	});
+
+	it("adds args to frontmatter even when field doesn't exist in template", () => {
+		const vault = setupTest();
+		writeTemplate(
+			path.join(vault, "Templates"),
+			"resource",
+			`---
+title: "<% tp.system.prompt("Title") %>"
+type: resource
+tags:
+  - resource
+---
+# <% tp.system.prompt("Title") %>`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		const result = createFromTemplate(loadConfig({ cwd: vault }), {
+			template: "resource",
+			title: "My Note",
+			args: {
+				source: "book",
+				author: "John Doe",
+				year: "2025",
+			},
+		});
+
+		expect(result.filePath).toBe("00 Inbox/📚 My Note.md");
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+		const { attributes } = parseFrontmatter(written);
+		// All args should be added to frontmatter even though template doesn't have these fields
+		expect(attributes.source).toBe("book");
+		expect(attributes.author).toBe("John Doe");
+		expect(attributes.year).toBe("2025");
+	});
+});
+
+describe("applyArgsToFrontmatter", () => {
+	const {
+		applyArgsToFrontmatter,
+	}: {
+		applyArgsToFrontmatter: typeof import("./create").applyArgsToFrontmatter;
+	} = require("./create");
+
+	it("overrides template default values with args", () => {
+		const attributes = {
+			title: "Test",
+			resource_type: "reference", // From template default
+			status: "active",
+			type: "resource",
+		};
+
+		const result = applyArgsToFrontmatter(attributes, {
+			resource_type: "meeting", // Should override template default
+			status: "completed", // Should override existing value
+		});
+
+		expect(result.resource_type).toBe("meeting");
+		expect(result.status).toBe("completed");
+	});
+
+	it("adds new fields that don't exist in template", () => {
+		const attributes = {
+			title: "Test",
+			type: "resource",
+		};
+
+		const result = applyArgsToFrontmatter(attributes, {
+			author: "John Doe",
+			year: "2025",
+			source: "book",
+		});
+
+		expect(result.author).toBe("John Doe");
+		expect(result.year).toBe("2025");
+		expect(result.source).toBe("book");
+	});
+
+	it("protects 'created' field from being overridden", () => {
+		const attributes = {
+			title: "Test",
+			created: "2025-01-01",
+			type: "resource",
+		};
+
+		const result = applyArgsToFrontmatter(attributes, {
+			created: "2025-12-31", // Should be ignored
+			title: "New Title", // Should be applied
+		});
+
+		expect(result.created).toBe("2025-01-01"); // Protected
+		expect(result.title).toBe("New Title"); // Not protected
+	});
+
+	it("protects 'type' field from being overridden", () => {
+		const attributes = {
+			title: "Test",
+			type: "resource",
+		};
+
+		const result = applyArgsToFrontmatter(attributes, {
+			type: "project", // Should be ignored
+			title: "New Title", // Should be applied
+		});
+
+		expect(result.type).toBe("resource"); // Protected
+		expect(result.title).toBe("New Title"); // Not protected
+	});
+
+	it("protects 'template_version' field from being overridden", () => {
+		const attributes = {
+			title: "Test",
+			type: "resource",
+			template_version: 4,
+		};
+
+		const result = applyArgsToFrontmatter(attributes, {
+			template_version: "999", // Should be ignored
+			title: "New Title", // Should be applied
+		});
+
+		expect(result.template_version).toBe(4); // Protected
+		expect(result.title).toBe("New Title"); // Not protected
+	});
+
+	it("handles multiple overrides and additions at once", () => {
+		const attributes = {
+			title: "Old Title",
+			resource_type: "reference", // Template default
+			status: "active",
+			type: "resource", // Protected
+			created: "2025-01-01", // Protected
+		};
+
+		const result = applyArgsToFrontmatter(attributes, {
+			title: "New Title", // Override
+			resource_type: "meeting", // Override template default
+			status: "completed", // Override
+			author: "Jane Doe", // Add new
+			year: "2025", // Add new
+			type: "project", // Try to override protected (should fail)
+			created: "2025-12-31", // Try to override protected (should fail)
+		});
+
+		// Overridden fields
+		expect(result.title).toBe("New Title");
+		expect(result.resource_type).toBe("meeting");
+		expect(result.status).toBe("completed");
+
+		// New fields
+		expect(result.author).toBe("Jane Doe");
+		expect(result.year).toBe("2025");
+
+		// Protected fields (unchanged)
+		expect(result.type).toBe("resource");
+		expect(result.created).toBe("2025-01-01");
+	});
+
+	it("preserves fields not mentioned in args", () => {
+		const attributes = {
+			title: "Test",
+			status: "active",
+			priority: "high",
+			tags: ["resource"],
+		};
+
+		const result = applyArgsToFrontmatter(attributes, {
+			status: "completed",
+		});
+
+		expect(result.status).toBe("completed"); // Overridden
+		expect(result.title).toBe("Test"); // Preserved
+		expect(result.priority).toBe("high"); // Preserved
+		expect(result.tags).toEqual(["resource"]); // Preserved
+	});
+
+	it("handles empty args object", () => {
+		const attributes = {
+			title: "Test",
+			status: "active",
+		};
+
+		const result = applyArgsToFrontmatter(attributes, {});
+
+		expect(result).toEqual(attributes); // No changes
+	});
+
+	describe("integration with createFromTemplate", () => {
+		const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+		afterEach(getAfterEachHook());
+
+		function setupTest(): string {
+			const vault = createTestVault();
+			trackVault(vault);
+			return vault;
+		}
+
+		it("args override Templater prompt defaults", () => {
+			const vault = setupTest();
+			// Template with a prompt that has a default value
+			writeTemplate(
+				path.join(vault, "Templates"),
+				"resource",
+				`---
+title: "<% tp.system.prompt("Title") %>"
+type: resource
+resource_type: <% tp.system.prompt("Resource type", "reference", false, ["reference", "meeting", "document"]) %>
+---
+# <% tp.system.prompt("Title") %>`,
+			);
+			process.env.PARA_VAULT = vault;
+
+			// Pass arg that should override the default "reference"
+			const result = createFromTemplate(loadConfig({ cwd: vault }), {
+				template: "resource",
+				title: "Team Sync Notes",
+				args: {
+					resource_type: "meeting", // Should override "reference" default
+				},
+			});
+
+			const written = fs.readFileSync(
+				path.join(vault, result.filePath),
+				"utf8",
+			);
+			const { attributes } = parseFrontmatter(written);
+
+			// resource_type should be "meeting" (from args), not "reference" (template default)
+			expect(attributes.resource_type).toBe("meeting");
+			expect(attributes.resource_type).not.toBe("reference");
+		});
+
+		it("args override native placeholder defaults", () => {
+			const vault = setupTest();
+			// Template with native placeholders with defaults
+			writeTemplate(
+				path.join(vault, "Templates"),
+				"project",
+				`---
+title: null
+type: project
+status: "{{status:planning}}"
+priority: "{{priority:medium}}"
+---
+# {{title}}`,
+			);
+			process.env.PARA_VAULT = vault;
+
+			// Pass args that should override defaults
+			const result = createFromTemplate(loadConfig({ cwd: vault }), {
+				template: "project",
+				title: "Launch Feature",
+				args: {
+					status: "active", // Should override "planning" default
+					priority: "high", // Should override "medium" default
+				},
+			});
+
+			const written = fs.readFileSync(
+				path.join(vault, result.filePath),
+				"utf8",
+			);
+			const { attributes } = parseFrontmatter(written);
+
+			expect(attributes.status).toBe("active");
+			expect(attributes.priority).toBe("high");
+		});
+
+		it("protected fields are not overridden even when passed in args", () => {
+			const vault = setupTest();
+			writeTemplate(
+				path.join(vault, "Templates"),
+				"resource",
+				`---
+title: null
+type: resource
+created: {{date:YYYY-MM-DD}}
+template_version: 2
+---
+# {{title}}`,
+			);
+			process.env.PARA_VAULT = vault;
+
+			// Try to override protected fields via args
+			const result = createFromTemplate(loadConfig({ cwd: vault }), {
+				template: "resource",
+				title: "Test Resource",
+				args: {
+					type: "project", // Should be ignored (protected)
+					created: "1999-01-01", // Should be ignored (protected)
+					template_version: "999", // Should be ignored (protected)
+					custom_field: "allowed", // Should be added (not protected)
+				},
+			});
+
+			const written = fs.readFileSync(
+				path.join(vault, result.filePath),
+				"utf8",
+			);
+			const { attributes } = parseFrontmatter(written);
+
+			// Protected fields remain unchanged
+			expect(attributes.type).toBe("resource");
+			expect(attributes.created).toMatch(/^\d{4}-\d{2}-\d{2}$/); // Today's date
+			expect(attributes.created).not.toBe("1999-01-01");
+			expect(attributes.template_version).toBe(2);
+
+			// Non-protected field is added
+			expect(attributes.custom_field).toBe("allowed");
+		});
 	});
 });

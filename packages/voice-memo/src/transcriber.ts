@@ -8,11 +8,11 @@
  *
  * Uses NVIDIA Parakeet model via MLX for fast Apple Silicon transcription.
  *
- * @module voice/transcriber
+ * @module voice-memo/transcriber
  */
 
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, isAbsolute, join } from "node:path";
 import { pathExistsSync } from "@sidequest/core/fs";
 
 /**
@@ -128,8 +128,6 @@ async function runParakeetMlx(
  * @throws Error if path is unsafe or invalid
  */
 function validateAudioPath(audioPath: string): void {
-	const { isAbsolute } = require("node:path");
-
 	// Must be absolute path (prevents relative path confusion)
 	if (!isAbsolute(audioPath)) {
 		throw new Error(

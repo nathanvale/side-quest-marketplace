@@ -24,6 +24,7 @@
 
 **Key Features:**
 - Intelligent inbox processing with LLM-assisted classification
+- **Voice Memo Processing** - Transcribe Apple Voice Memos and create capture notes with LLM cleanup
 - **Type A/B Document Processing** - DOCX files with mammoth/turndown for text & markdown extraction
 - **Enrichment Pipeline with Strategy Pattern** - YouTube transcript enrichment, bookmark content enrichment
 - **Routing Module** - Move processed notes from inbox to PARA destinations based on frontmatter
@@ -72,6 +73,11 @@ para create-note-template
 para enrich youtube --all          # Enrich all YouTube bookmarks with transcripts
 para enrich youtube "<file.md>"    # Enrich specific file
 para enrich-bookmark <file.md>     # Enrich bookmark with Firecrawl
+
+# Voice memo processing
+para voice                         # Sync new voice memos to daily notes
+para voice convert <path>          # Convert transcription file to capture note
+para voice convert --text "..."    # Convert inline text to capture note
 
 # Performance & Observability
 para slo [slo-name|--breaches]     # Monitor SLO health, burn rates, violations
@@ -171,7 +177,13 @@ para-obsidian/
 │   │   ├── resource-metrics.ts # LLM token usage tracking
 │   │   └── validation.ts      # Input validation
 │   ├── testing/               # Test utilities
-│   └── utils/                 # General utilities
+│   ├── utils/                 # General utilities
+│   └── voice/                 # Voice memo processing
+│       ├── index.ts           # Re-exports from @sidequest/voice-memo
+│       ├── note-creator.ts    # Obsidian note creation from transcriptions
+│       ├── note-creator.test.ts
+│       ├── formatter.ts       # Log entry formatting (daily notes)
+│       └── formatter.test.ts
 ├── mcp/
 │   ├── index.ts               # MCP server entry point
 │   └── utils.ts               # MCP utilities
@@ -232,6 +244,8 @@ para-obsidian/
 | `commands/trace.md` | Correlation ID trace analysis command |
 | `src/cli/shared/session.ts` | Session tracking and lifecycle management |
 | `src/inbox/shared/slos.ts` | 7 SLO definitions (latency, success, availability) |
+| `src/voice/note-creator.ts` | Voice memo to Obsidian note conversion with LLM cleanup |
+| `src/voice/formatter.ts` | Log entry formatting for daily notes |
 | `src/inbox/shared/slos-persistence.ts` | JSONL-based SLO event storage |
 | `src/inbox/shared/thresholds.ts` | Performance threshold constants |
 

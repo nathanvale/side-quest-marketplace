@@ -2,9 +2,9 @@
  * WebVTT (.vtt) subtitle file parser.
  *
  * Extracts text content from VTT files, stripping timestamps and metadata.
- * The extracted text can then be processed through the LLM cleanup pipeline.
+ * VTT is a standard format for timed text tracks (subtitles, captions).
  *
- * @module voice/vtt-parser
+ * @module vtt/parser
  */
 
 /**
@@ -27,6 +27,9 @@ export interface VttParseResult {
 
 /**
  * Check if a file path is a VTT file.
+ *
+ * @param filePath - Path to check
+ * @returns True if the file has a .vtt extension (case-insensitive)
  */
 export function isVttFile(filePath: string): boolean {
 	return filePath.toLowerCase().endsWith(".vtt");
@@ -55,6 +58,9 @@ function parseTimestamp(timestamp: string): string {
  * ```
  *
  * Also handles optional cue identifiers and styling tags.
+ *
+ * @param content - Raw VTT file content
+ * @returns Parsed result with cues array and combined raw text
  */
 export function parseVtt(content: string): VttParseResult {
 	const lines = content.split(/\r?\n/);
@@ -181,6 +187,9 @@ function stripVttTags(text: string): string {
  *
  * This is the main entry point - takes VTT content and returns clean text.
  * If speakers are detected, formats as "Speaker: text" for each cue.
+ *
+ * @param content - Raw VTT file content
+ * @returns Clean text extracted from the VTT, with optional speaker labels
  */
 export function extractTextFromVtt(content: string): string {
 	const result = parseVtt(content);

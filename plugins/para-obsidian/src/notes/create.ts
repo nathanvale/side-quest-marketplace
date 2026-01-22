@@ -103,58 +103,46 @@ function titleToFilename(title: string): string {
 }
 
 /**
- * Checks if a value represents null in frontmatter.
+ * Applies args directly to frontmatter fields, overriding existing values.
  *
- * Handles various null representations:
- * - YAML null: `null`
- * - Quoted null: `"null"`
- * - Wikilink with null: `"[[null]]"` (quoted string in YAML)
- * - Array with null: `[[null]]` (parsed as nested arrays)
+ * For each arg key-value pair:
+ * 1. If the field exists, replace its value (except protected fields)
+ * 2. If the field doesn't exist, add it as a new field
  *
- * @param value - The value to check
- * @returns True if the value represents null
- */
-function isNullPlaceholder(value: unknown): boolean {
-	if (value === null) return true;
-	if (value === "null") return true;
-	// Handle quoted wikilink case like "[[null]]" which stays as string
-	if (typeof value === "string" && value === "[[null]]") return true;
-	// Handle array case like [[null]] which parses as [["null"]] or [null]
-	if (Array.isArray(value)) {
-		if (value.length === 1) {
-			const inner = value[0];
-			if (inner === null || inner === "null") return true;
-			if (Array.isArray(inner) && inner.length === 1) {
-				return inner[0] === null || inner[0] === "null";
-			}
-		}
-	}
-	return false;
-}
-
-/**
- * Applies args directly to frontmatter fields with null placeholders.
- *
- * This handles templates that use `null` or `"null"` as placeholder values
- * instead of Templater prompts. For each arg key that matches a frontmatter
- * field name, if the field's value is null, it's replaced with the arg value.
+ * **Protected fields** that are never overridden:
+ * - `created` - Creation timestamp should be immutable
+ * - `type` - Note type is determined by template
+ * - `template_version` - Template version is determined by template
  *
  * **Wikilink handling**: If an arg value contains wikilinks (e.g., `[[Travel]]`),
  * it's wrapped in quotes for valid YAML.
  *
  * @param attributes - Parsed frontmatter attributes object
  * @param args - Key-value pairs to apply
- * @returns Updated attributes with null placeholders replaced
+ * @returns Updated attributes with args applied
  *
  * @example
  * ```typescript
- * const attrs = { title: "null", status: null, area: [["null"]] };
+ * const attrs = {
+ *   title: "Old Title",
+ *   resource_type: "reference",  // From template default
+ *   type: "resource",
+ *   created: "2025-01-01"
+ * };
  * const result = applyArgsToFrontmatter(attrs, {
- *   title: "My Trip",
- *   status: "active",
- *   area: "[[Travel]]"
+ *   title: "New Title",
+ *   resource_type: "meeting",  // Overrides template default
+ *   type: "task",              // Protected - NOT overridden
+ *   created: "2025-12-31",     // Protected - NOT overridden
+ *   newField: "value"          // Added
  * });
- * // { title: "My Trip", status: "active", area: "[[Travel]]" }
+ * // {
+ * //   title: "New Title",
+ * //   resource_type: "meeting",    // ✅ Overridden
+ * //   type: "resource",             // ✅ Protected (unchanged)
+ * //   created: "2025-01-01",        // ✅ Protected (unchanged)
+ * //   newField: "value"             // ✅ Added
+ * // }
  * ```
  */
 export function applyArgsToFrontmatter(
@@ -162,12 +150,16 @@ export function applyArgsToFrontmatter(
 	args: Record<string, string>,
 ): Record<string, unknown> {
 	const result = { ...attributes };
+	const protectedFields = ["created", "type", "template_version"];
 
 	for (const [key, value] of Object.entries(args)) {
-		// Only replace if the field exists and is a null placeholder
-		if (key in result && isNullPlaceholder(result[key])) {
-			result[key] = value;
+		// Skip protected fields - they should never be overridden by args
+		if (protectedFields.includes(key)) {
+			continue;
 		}
+
+		// Override existing value or add new field
+		result[key] = value;
 	}
 
 	return result;
@@ -226,13 +218,16 @@ export function applyArgsToTemplate(
 
 	// First, replace provided args
 	for (const [key, value] of Object.entries(args)) {
-		// Match both single-argument and two-argument forms
+		// Match three forms:
 		// Single: <% tp.system.prompt("key") %>
 		// Double: <% tp.system.prompt("key", "default") %>
+		// Four-arg with array: <% tp.system.prompt("key", "default", false, ["opt1", "opt2"]) %>
 		const singleArg = `<% tp.system.prompt("${key}") %>`;
 		const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 		const doubleArgPattern = `<% tp\\.system\\.prompt\\("${escapedKey}"\\s*,\\s*"[^"]*"\\s*\\)\\s*%>`;
 		const doubleArg = new RegExp(doubleArgPattern, "g");
+		const arrayOptionsPattern = `<% tp\\.system\\.prompt\\("${escapedKey}"\\s*,\\s*"[^"]*"\\s*,\\s*(?:true|false)\\s*,\\s*\\[[^\\]]*\\]\\s*\\)\\s*%>`;
+		const arrayOptionsArg = new RegExp(arrayOptionsPattern, "g");
 
 		// Check if the prompt is wrapped in wikilinks in the template
 		// Need to check both single-arg and double-arg forms
@@ -277,6 +272,7 @@ export function applyArgsToTemplate(
 
 		output = output.replaceAll(singleArg, effectiveValue);
 		output = output.replace(doubleArg, effectiveValue);
+		output = output.replace(arrayOptionsArg, effectiveValue);
 	}
 
 	// Second, replace any remaining optional prompts (with defaults) with their default values
@@ -287,7 +283,18 @@ export function applyArgsToTemplate(
 		return defaultValue;
 	});
 
-	// Third, replace any remaining required prompts (single-arg) with empty strings
+	// Third, replace prompts with array options (4-arg form) with their default values
+	// Match: <% tp.system.prompt("key", "default", false, ["option1", "option2"]) %>
+	const arrayOptionsPromptRegex =
+		/<% tp\.system\.prompt\("([^"]+)"\s*,\s*"([^"]*)"\s*,\s*(?:true|false)\s*,\s*\[[^\]]*\]\s*\)\s*%>/g;
+	output = output.replace(
+		arrayOptionsPromptRegex,
+		(_match, _key, defaultValue) => {
+			return defaultValue;
+		},
+	);
+
+	// Fourth, replace any remaining required prompts (single-arg) with empty strings
 	// This prevents YAML parse errors from unsubstituted patterns like:
 	// area: "[[<% tp.system.prompt("Area") %>]]" which contains nested quotes
 	// Match: <% tp.system.prompt("any") %>

@@ -168,4 +168,81 @@ Some text
 			expect(contentIndex).toBeLessThan(hrIndex);
 		});
 	});
+
+	it("matches heading with substring/partial match (e.g., 'Executive Summary' matches 'Layer 4: Executive Summary')", async () => {
+		await withTempVault(async (vault, config) => {
+			const file = "note.md";
+			writeVaultFile(
+				vault,
+				file,
+				`# Resource Note
+
+## Layer 1: Title
+
+## Layer 2: Author
+
+## Layer 3: Key Points
+
+## Layer 4: Executive Summary
+
+This is existing content.
+
+## Layer 5: References
+`,
+			);
+
+			insertIntoNote(config, {
+				file,
+				heading: "Executive Summary",
+				content: "New summary content.",
+				mode: "append",
+			});
+
+			const result = readVaultFile(vault, file);
+			expect(result).toContain("## Layer 4: Executive Summary");
+			expect(result).toContain(
+				"This is existing content.\nNew summary content.",
+			);
+		});
+	});
+
+	it("prefers exact match over substring match", async () => {
+		await withTempVault(async (vault, config) => {
+			const file = "note.md";
+			writeVaultFile(
+				vault,
+				file,
+				`# Note
+
+## Layer 1: Summary
+
+Content 1
+
+## Summary
+
+Content 2
+
+## Next Section
+`,
+			);
+
+			insertIntoNote(config, {
+				file,
+				heading: "Summary",
+				content: "Added to exact match.",
+				mode: "append",
+			});
+
+			const result = readVaultFile(vault, file);
+			// Should match "## Summary" (exact), not "## Layer 1: Summary" (substring)
+			const lines = result.split("\n");
+			const summaryIndex = lines.indexOf("## Summary");
+			const content2Index = lines.indexOf("Content 2");
+			const addedIndex = lines.indexOf("Added to exact match.");
+
+			// Verify content was added to exact match section (after "Content 2")
+			expect(addedIndex).toBeGreaterThan(content2Index);
+			expect(addedIndex).toBeGreaterThan(summaryIndex);
+		});
+	});
 });

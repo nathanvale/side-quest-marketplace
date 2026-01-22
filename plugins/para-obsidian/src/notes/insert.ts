@@ -74,6 +74,10 @@ function normalizeHeadingParam(heading: string): string {
  * - Dataview inline syntax (e.g., `# \`= this.file.name\``)
  * - Templater syntax (e.g., `# <% tp.file.title %>`)
  *
+ * Matching strategy:
+ * 1. Exact match (e.g., "Tasks" matches "## Tasks")
+ * 2. Substring match (e.g., "Executive Summary" matches "## Layer 4: Executive Summary")
+ *
  * @param lines - Array of document lines
  * @param heading - Heading title to find (with or without # prefix)
  * @returns Heading match with index and level, or undefined if not found
@@ -83,6 +87,7 @@ function findHeading(
 	heading: string,
 ): HeadingMatch | undefined {
 	const normalizedHeading = normalizeHeadingParam(heading);
+	let substringMatch: HeadingMatch | undefined;
 
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
@@ -103,11 +108,24 @@ function findHeading(
 			continue;
 		}
 
+		// Exact match - return immediately (highest priority)
 		if (trimmedTitle === normalizedHeading) {
 			return { index: i, level: hashes.length };
 		}
+
+		// Substring match fallback - store first match but continue looking for exact match
+		// Handles cases like "Executive Summary" matching "Layer 4: Executive Summary"
+		if (
+			!substringMatch &&
+			trimmedTitle.endsWith(normalizedHeading) &&
+			trimmedTitle.length > normalizedHeading.length
+		) {
+			substringMatch = { index: i, level: hashes.length };
+		}
 	}
-	return undefined;
+
+	// Return substring match if no exact match found
+	return substringMatch;
 }
 
 /**

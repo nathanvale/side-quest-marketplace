@@ -34,7 +34,8 @@
 			"linter": {
 				"rules": {
 					"suspicious": {
-						"noTemplateCurlyInString": "off"
+						"noTemplateCurlyInString": "off",
+						"noExplicitAny": "off"
 					},
 					"correctness": {
 						"noUnusedFunctionParameters": "off"

@@ -45,6 +45,7 @@ export {
 // Export new formatter utilities
 export { formatBytes } from "./bytes.ts";
 export { getLanguageForExtension } from "./syntax.ts";
+export { dedupeConsecutiveLines } from "./text.ts";
 export {
 	formatDateWithSpaces,
 	formatDuration,

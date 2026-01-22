@@ -12,6 +12,7 @@
 		"@modelcontextprotocol/sdk": "^1.25.1",
 		"@sidequest/core": "workspace:*",
 		"@sidequest/firecrawl": "workspace:*",
+		"@sidequest/voice-memo": "workspace:*",
 		"@types/turndown": "^5.0.6",
 		"date-fns": "^4.1.0",
 		"glob": "^13.0.0",

@@ -1,11 +1,11 @@
 /**
  * Tests for VTT parser module.
  *
- * @module voice/vtt-parser.test
+ * @module vtt/parser.test
  */
 
 import { describe, expect, test } from "bun:test";
-import { extractTextFromVtt, isVttFile, parseVtt } from "./vtt-parser.js";
+import { extractTextFromVtt, isVttFile, parseVtt } from "./parser.ts";
 
 describe("isVttFile", () => {
 	test("returns true for .vtt extension", () => {

@@ -335,11 +335,11 @@ tags:
 		expect(response).toContain("Example: area: [[Note Name]]");
 	});
 
-	test("provides hints for resource source_type field", () => {
+	test("provides hints for resource source_format field", () => {
 		const initialContent = `---
 title: My Resource
 type: resource
-source_type: article
+source_format: article
 created: 2024-01-01
 tags:
   - resource
@@ -351,15 +351,15 @@ tags:
 
 		const config = loadConfig();
 		const response = simulateFrontmatterSetResponse(config, "My Resource.md", {
-			source_type: "book",
+			source_format: "video",
 		});
 
-		expect(response).toContain("**Hint for source_type:**");
+		expect(response).toContain("**Hint for source_format:**");
 		expect(response).toContain("Type: enum");
 		expect(response).toContain(
-			"Allowed values: book, article, video, course, podcast, paper, web",
+			"Allowed values: article, video, audio, document, thread, image, book, course, podcast, paper",
 		);
-		expect(response).toContain("Example: source_type: book");
+		expect(response).toContain("Example: source_format: article");
 	});
 
 	test("no hints for unknown fields", () => {

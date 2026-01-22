@@ -4,7 +4,7 @@
  * Scans the Apple Voice Memos directory for .m4a files, parses timestamps
  * from filenames, and returns VoiceMemo objects ready for processing.
  *
- * @module voice/scanner
+ * @module voice-memo/scanner
  */
 
 import { lstatSync, readdirSync, statSync } from "node:fs";

@@ -5,7 +5,7 @@
  * transcriptions. State persisted to JSON file at:
  * ~/.config/para-obsidian/voice-state.json
  *
- * @module voice/state
+ * @module voice-memo/state
  */
 
 import { dirname } from "node:path";

@@ -1,8 +1,10 @@
 /**
- * Voice memo note creation module.
+ * Voice memo note creation module for para-obsidian.
  *
  * Creates individual note files from voice memo transcriptions.
  * Uses LLM to clean up transcription and generate summary.
+ *
+ * Directly imports para-obsidian implementations (no dependency injection).
  *
  * @module voice/note-creator
  */
@@ -18,39 +20,46 @@ import { callLLMWithMetadata } from "../inbox/core/llm/client.js";
 import { createCorrelationId, voiceLogger } from "../shared/logger.js";
 
 /**
- * Result of LLM processing for voice memo.
- */
-export interface VoiceMemoLLMResult {
-	readonly cleanedText: string;
-	readonly summary: string;
-	readonly success: boolean;
-	readonly error?: string;
-	readonly isFallback?: boolean;
-	readonly modelUsed?: string;
-}
-
-/**
  * Options for creating a voice memo note.
  */
 export interface CreateVoiceMemoNoteOptions {
-	readonly timestamp: Date;
-	readonly transcription: string;
-	readonly vaultPath: string;
-	readonly inboxFolder?: string;
-	readonly source?: string;
-	readonly sessionCid?: string;
-	/** Whether the source is a VTT file with speaker labels to preserve */
-	readonly isVttSource?: boolean;
+	timestamp: Date;
+	transcription: string;
+	vaultPath: string;
+	inboxFolder?: string;
+	source?: string;
+	sessionCid?: string;
+	isVttSource?: boolean;
+}
+
+/**
+ * Options for LLM processing.
+ */
+export interface ProcessWithLLMOptions {
+	sessionCid?: string;
+	isVttSource?: boolean;
 }
 
 /**
  * Result of voice memo note creation.
  */
 export interface VoiceMemoNoteResult {
-	readonly notePath: string;
-	readonly noteTitle: string;
-	readonly summary: string;
-	readonly llmResult: VoiceMemoLLMResult;
+	notePath: string;
+	noteTitle: string;
+	summary: string;
+	llmResult: VoiceMemoLLMResult;
+}
+
+/**
+ * Result of LLM processing.
+ */
+export interface VoiceMemoLLMResult {
+	cleanedText: string;
+	summary: string;
+	success: boolean;
+	error?: string;
+	isFallback?: boolean;
+	modelUsed?: string;
 }
 
 /**
@@ -311,6 +320,77 @@ export function basicCleanup(text: string): string {
 }
 
 /**
+ * Generate unique note path, handling collisions.
+ */
+function generateUniqueNotePath(basePath: string): string {
+	if (!pathExistsSync(basePath)) {
+		return basePath;
+	}
+
+	const ext = ".md";
+	const baseWithoutExt = basePath.slice(0, -ext.length);
+	let counter = 1;
+	let candidatePath = `${baseWithoutExt} ${counter}${ext}`;
+
+	while (pathExistsSync(candidatePath)) {
+		counter++;
+		candidatePath = `${baseWithoutExt} ${counter}${ext}`;
+	}
+
+	return candidatePath;
+}
+
+/**
+ * Format VTT-extracted text for display.
+ * Adds blank lines between speaker turns for readability.
+ *
+ * Input format (from extractTextFromVtt):
+ *   Speaker A: text
+ *   more text from A
+ *   Speaker B: text
+ *
+ * Output format:
+ *   Speaker A: text
+ *   more text from A
+ *
+ *   Speaker B: text
+ */
+function formatVttForDisplay(text: string): string {
+	const lines = text.split("\n");
+	const result: string[] = [];
+
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i] ?? "";
+		const prevLine = i > 0 ? lines[i - 1] : "";
+
+		// Add blank line before speaker labels (lines containing "Name:")
+		// but not at the start or if there's already a blank line
+		if (i > 0 && line.match(/^[A-Z][^:]+:/) && prevLine?.trim() !== "") {
+			result.push("");
+		}
+		result.push(line);
+	}
+
+	return result.join("\n");
+}
+
+/**
+ * Format datetime for frontmatter in Obsidian's native ISO format.
+ * Format: "YYYY-MM-DDTHH:mm"
+ */
+function formatDateTime(date: Date): string {
+	const year = date.getFullYear();
+	const month = (date.getMonth() + 1).toString().padStart(2, "0");
+	const day = date.getDate().toString().padStart(2, "0");
+	const hours = date.getHours().toString().padStart(2, "0");
+	const minutes = date.getMinutes().toString().padStart(2, "0");
+	return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+/** Maximum concurrent LLM calls for parallel chunk processing */
+const MAX_PARALLEL_CHUNKS = 4;
+
+/**
  * Process a single chunk with LLM cleanup.
  */
 async function processChunk(
@@ -347,93 +427,6 @@ async function generateSummary(
 	const parsed = parseVoiceMemoResponse(result.response);
 	return parsed.summary ?? "";
 }
-
-/**
- * Options for LLM processing.
- */
-export interface ProcessWithLLMOptions {
-	readonly sessionCid?: string;
-	/** Whether the source is a VTT file with speaker labels to preserve */
-	readonly isVttSource?: boolean;
-}
-
-/**
- * Process voice memo transcription with LLM cleanup and summarization.
- *
- * For long transcripts (>5000 chars), uses chunked processing:
- * 1. Split into ~4000 char chunks at paragraph boundaries
- * 2. Clean each chunk separately
- * 3. Generate summary from first chunk
- * 4. Combine all cleaned chunks
- *
- * @param transcription - Raw transcript text
- * @param options - Processing options including sessionCid and isVttSource
- */
-export async function processWithLLM(
-	transcription: string,
-	options: ProcessWithLLMOptions = {},
-): Promise<VoiceMemoLLMResult> {
-	const { sessionCid, isVttSource = false } = options;
-	const cid = createCorrelationId();
-
-	if (transcription.trim().length < 20) {
-		voiceLogger.debug`voice:llm:skip cid=${cid} sessionCid=${sessionCid ?? "none"} reason=too-short length=${transcription.length}`;
-		return {
-			cleanedText: transcription.trim(),
-			summary: "",
-			success: true,
-		};
-	}
-
-	try {
-		voiceLogger.info`voice:llm:start cid=${cid} sessionCid=${sessionCid ?? "none"} inputLength=${transcription.length} isVtt=${isVttSource}`;
-
-		// Use chunked processing for long transcripts
-		if (transcription.length > CHUNK_THRESHOLD_CHARS) {
-			return await processWithChunking(
-				transcription,
-				cid,
-				sessionCid,
-				isVttSource,
-			);
-		}
-
-		// Short transcripts: single LLM call
-		const prompt = buildVoiceMemoPrompt(transcription, isVttSource);
-		// Use Sonnet for better instruction following on long transcripts
-		const result = await callLLMWithMetadata(prompt, "haiku", undefined, {
-			sessionCid,
-		});
-		const parsed = parseVoiceMemoResponse(result.response);
-
-		if (!parsed.cleanedText || parsed.cleanedText.length < 10) {
-			throw new Error("LLM returned empty or invalid cleaned text");
-		}
-
-		voiceLogger.info`voice:llm:success cid=${cid} sessionCid=${sessionCid ?? "none"} cleanedLength=${parsed.cleanedText.length} summaryLength=${parsed.summary?.length ?? 0} model=${result.modelUsed}`;
-
-		return {
-			cleanedText: parsed.cleanedText,
-			summary: parsed.summary ?? "",
-			success: true,
-			isFallback: result.isFallback,
-			modelUsed: result.modelUsed,
-		};
-	} catch (error) {
-		const errorMsg = error instanceof Error ? error.message : String(error);
-		voiceLogger.error`voice:llm:error cid=${cid} sessionCid=${sessionCid ?? "none"} error=${errorMsg}`;
-
-		return {
-			cleanedText: basicCleanup(transcription),
-			summary: "",
-			success: false,
-			error: errorMsg,
-		};
-	}
-}
-
-/** Maximum concurrent LLM calls for parallel chunk processing */
-const MAX_PARALLEL_CHUNKS = 4;
 
 /**
  * Process long transcript using chunking strategy with parallel processing.
@@ -518,75 +511,85 @@ async function processWithChunking(
 }
 
 /**
- * Generate unique note path, handling collisions.
+ * Process voice memo transcription with LLM cleanup and summarization.
+ *
+ * For long transcripts (>20000 chars), uses chunked processing:
+ * 1. Split into ~15000 char chunks at paragraph boundaries
+ * 2. Clean each chunk separately
+ * 3. Generate summary from first chunk
+ * 4. Combine all cleaned chunks
+ *
+ * @param transcription - Raw transcript text
+ * @param options - Processing options including sessionCid and isVttSource
  */
-function generateUniqueNotePath(basePath: string): string {
-	if (!pathExistsSync(basePath)) {
-		return basePath;
+export async function processWithLLM(
+	transcription: string,
+	options: ProcessWithLLMOptions = {},
+): Promise<VoiceMemoLLMResult> {
+	const { sessionCid, isVttSource = false } = options;
+	const cid = createCorrelationId();
+
+	if (transcription.trim().length < 20) {
+		voiceLogger.debug`voice:llm:skip cid=${cid} sessionCid=${sessionCid ?? "none"} reason=too-short length=${transcription.length}`;
+		return {
+			cleanedText: transcription.trim(),
+			summary: "",
+			success: true,
+		};
 	}
 
-	const ext = ".md";
-	const baseWithoutExt = basePath.slice(0, -ext.length);
-	let counter = 1;
-	let candidatePath = `${baseWithoutExt} ${counter}${ext}`;
+	try {
+		voiceLogger.info`voice:llm:start cid=${cid} sessionCid=${sessionCid ?? "none"} inputLength=${transcription.length} isVtt=${isVttSource}`;
 
-	while (pathExistsSync(candidatePath)) {
-		counter++;
-		candidatePath = `${baseWithoutExt} ${counter}${ext}`;
-	}
-
-	return candidatePath;
-}
-
-/**
- * Format VTT-extracted text for display.
- * Adds blank lines between speaker turns for readability.
- *
- * Input format (from extractTextFromVtt):
- *   Speaker A: text
- *   more text from A
- *   Speaker B: text
- *
- * Output format:
- *   Speaker A: text
- *   more text from A
- *
- *   Speaker B: text
- */
-function formatVttForDisplay(text: string): string {
-	const lines = text.split("\n");
-	const result: string[] = [];
-
-	for (let i = 0; i < lines.length; i++) {
-		const line = lines[i] ?? "";
-		const prevLine = i > 0 ? lines[i - 1] : "";
-
-		// Add blank line before speaker labels (lines containing "Name:")
-		// but not at the start or if there's already a blank line
-		if (i > 0 && line.match(/^[A-Z][^:]+:/) && prevLine?.trim() !== "") {
-			result.push("");
+		// Use chunked processing for long transcripts
+		if (transcription.length > CHUNK_THRESHOLD_CHARS) {
+			return await processWithChunking(
+				transcription,
+				cid,
+				sessionCid,
+				isVttSource,
+			);
 		}
-		result.push(line);
+
+		// Short transcripts: single LLM call
+		const prompt = buildVoiceMemoPrompt(transcription, isVttSource);
+		// Use Haiku for better instruction following on long transcripts
+		const result = await callLLMWithMetadata(prompt, "haiku", undefined, {
+			sessionCid,
+		});
+		const parsed = parseVoiceMemoResponse(result.response);
+
+		if (!parsed.cleanedText || parsed.cleanedText.length < 10) {
+			throw new Error("LLM returned empty or invalid cleaned text");
+		}
+
+		voiceLogger.info`voice:llm:success cid=${cid} sessionCid=${sessionCid ?? "none"} cleanedLength=${parsed.cleanedText.length} summaryLength=${parsed.summary?.length ?? 0} model=${result.modelUsed}`;
+
+		return {
+			cleanedText: parsed.cleanedText,
+			summary: parsed.summary ?? "",
+			success: true,
+			isFallback: result.isFallback,
+			modelUsed: result.modelUsed,
+		};
+	} catch (error) {
+		const errorMsg = error instanceof Error ? error.message : String(error);
+		voiceLogger.error`voice:llm:error cid=${cid} sessionCid=${sessionCid ?? "none"} error=${errorMsg}`;
+
+		return {
+			cleanedText: basicCleanup(transcription),
+			summary: "",
+			success: false,
+			error: errorMsg,
+		};
 	}
-
-	return result.join("\n");
-}
-
-/**
- * Format datetime for frontmatter in Obsidian's native ISO format.
- * Format: "YYYY-MM-DDTHH:mm"
- */
-function formatDateTime(date: Date): string {
-	const year = date.getFullYear();
-	const month = (date.getMonth() + 1).toString().padStart(2, "0");
-	const day = date.getDate().toString().padStart(2, "0");
-	const hours = date.getHours().toString().padStart(2, "0");
-	const minutes = date.getMinutes().toString().padStart(2, "0");
-	return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
 /**
  * Create a voice memo note in the inbox folder.
+ *
+ * @param options - Note creation options
+ * @returns Note creation result with path, title, and LLM result
  */
 export async function createVoiceMemoNote(
 	options: CreateVoiceMemoNoteOptions,
@@ -630,28 +633,31 @@ export async function createVoiceMemoNote(
 	// Build frontmatter (summary goes here, not in body)
 	// Note: recorded is omitted for VTT sources because file mtime is unreliable
 	// (changes on download/copy). Users should provide --date when creating meetings from VTT.
-	const frontmatter: Record<string, unknown> = {
+	// areas/projects are empty arrays for users to optionally fill in before distilling
+	const frontmatterData: Record<string, unknown> = {
 		type: "transcription",
 		created: formatDateTime(new Date()),
 		source,
 		template_version: 1,
 		meeting: "",
+		areas: [],
+		projects: [],
 	};
 
 	// Only include recorded for non-VTT sources (voice memos have reliable timestamps)
 	if (!isVttSource) {
-		frontmatter.recorded = formatDateTime(timestamp);
+		frontmatterData.recorded = formatDateTime(timestamp);
 	}
 
 	// Add summary to frontmatter if present
 	if (llmResult.summary) {
-		frontmatter.summary = llmResult.summary;
+		frontmatterData.summary = llmResult.summary;
 	}
 
 	// Build note content - dynamic title and full cleaned transcript
 	const body = `# \`= this.file.name\`\n\n${llmResult.cleanedText}\n`;
 
-	const noteContent = serializeFrontmatter(frontmatter, body);
+	const noteContent = serializeFrontmatter(frontmatterData, body);
 
 	// Write note
 	writeTextFileSync(notePath, noteContent);

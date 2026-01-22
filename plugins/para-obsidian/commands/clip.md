@@ -1,6 +1,7 @@
 ---
+name: clip
 description: Create a clipping from a URL (for links you can't use Web Clipper on)
-argument-hint: <url>
+argument-hint: <url> [--reason "why you're saving this"]
 ---
 
 # Clip URL
@@ -11,7 +12,7 @@ Fetch content from a URL and create a clipping note in the inbox. Use this when 
 
 ```
 /para-obsidian:clip https://example.com/article
-/para-obsidian:clip https://x.com/user/status/123456
+/para-obsidian:clip https://x.com/user/status/123456 --reason "Great thread on testing"
 /para-obsidian:clip https://youtube.com/watch?v=abc123
 ```
 
@@ -19,7 +20,7 @@ Fetch content from a URL and create a clipping note in the inbox. Use this when 
 
 1. **Detect domain** - Determines content type from URL
 2. **Fetch content** - Uses appropriate strategy (Firecrawl, YouTube MCP, Chrome DevTools)
-3. **Create clipping** - Creates a clipping note in inbox with standard frontmatter
+3. **Create clipping** - Creates a `type: clipping` note in the inbox
 4. **Offer distillation** - Asks if you want to distill now or save for later
 
 ## Instructions
@@ -43,41 +44,47 @@ const domain = url.hostname.replace('www.', '');
 
 ### 3. Create Clipping Note
 
-Use the appropriate clipping template based on domain:
+Use the Write tool to create a clipping note that matches the Web Clipper format:
 
-```
-para_create({
-  template: "[matched-template]",  // youtube-video, tweet---x-post, article, etc.
-  title: "[Extracted Title]",
-  dest: "00 Inbox",
-  content: {
-    // Content sections based on template
-  },
-  response_format: "json"
-})
-```
+**Filename:** `✂️ [Title].md`
+**Destination:** `00 Inbox`
 
-### 4. Set Minimal Frontmatter
-
-```
-para_frontmatter_set({
-  file: "00 Inbox/[filename].md",
-  set: {
-    type: "clipping",
-    source: "[original URL]",
-    clipped: "[today's date YYYY-MM-DD]",
-    domain: "[extracted domain]"
-  },
-  response_format: "json"
-})
+**Frontmatter:**
+```yaml
+---
+type: clipping
+source: [URL]
+clipped: [YYYY-MM-DD]
+domain: [domain]
+capture_reason: [from --reason flag if provided]
+---
 ```
 
-### 5. Offer Distillation
+**Body:**
+```markdown
+# `= this.file.name`
+
+**Source:** [domain](url)
+**Clipped:** YYYY-MM-DD HH:mm
+
+---
+
+## Content
+
+[fetched content]
+```
+
+### 4. Offer Distillation
 
 After creating the clipping, ask:
 
 ```
-Clipping created: ✂️📰 [Title].md
+Created clipping: ✂️ [Title].md
+
+Frontmatter:
+- type: clipping
+- source: [URL]
+- domain: [domain]
 
 Would you like to:
 1. Distill now - Transform this into a resource note with learning dialogue
@@ -89,13 +96,17 @@ If user chooses to distill now, invoke the distill-resource skill.
 ## Example Session
 
 ```
-User: /para-obsidian:clip https://fortelabs.com/blog/basboverview/
+User: /para-obsidian:clip https://fortelabs.com/blog/basboverview/ --reason "Refresh on BASB methodology"
 
 AI: [Fetches content via Firecrawl]
 
-    Created clipping: ✂️📰 Building a Second Brain Overview.md
+    Created clipping: ✂️ Building a Second Brain Overview.md
 
-    Content: 3500 words about the BASB methodology...
+    Frontmatter:
+    - type: clipping
+    - source: https://fortelabs.com/blog/basboverview/
+    - domain: fortelabs.com
+    - capture_reason: "Refresh on BASB methodology"
 
     Would you like to:
     1. Distill now
@@ -112,3 +123,4 @@ AI: Saved to inbox. Run /para-obsidian:distill when ready to process.
 - The clipping can then be processed with `/para-obsidian:distill`
 - For Twitter/X, Chrome DevTools MCP is required for authenticated access
 - If content fetching fails, creates a minimal clipping with just the URL
+- Use `--reason` to capture why you're saving this (helps during distillation)

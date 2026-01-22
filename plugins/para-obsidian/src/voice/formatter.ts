@@ -1,104 +1,54 @@
 /**
- * Voice memo log entry formatting module.
+ * Obsidian-specific voice memo formatting utilities.
  *
- * Formats timestamps and transcriptions for insertion into daily notes.
- * Uses Melbourne timezone and 12-hour time format with lowercase am/pm.
+ * Provides formatting functions for daily note log entries,
+ * combining timestamp formatting from @sidequest/voice-memo
+ * with Obsidian-specific patterns like wikilinks.
  *
  * @module voice/formatter
  */
 
-import { formatTime12Hour } from "@sidequest/core/formatters";
+import { dedupeConsecutiveLines, formatTimestamp } from "@sidequest/voice-memo";
 
 /**
- * Format timestamp in Melbourne 12-hour time format.
+ * Format a voice memo log entry for daily notes.
+ * Format: "- H:MM am/pm - 🎤 transcription"
  *
- * Format: "h:mm am/pm" (no leading zero for hours, lowercase am/pm)
+ * @param date - Date/time of the voice memo
+ * @param transcription - Transcription text to format
+ * @returns Formatted log entry string
  *
- * Examples:
- * - 9:30 am
- * - 2:45 pm
- * - 12:00 am (midnight)
- * - 12:00 pm (noon)
- *
- * @param date - Date object to format
- * @returns Formatted time string
- * @deprecated Use formatTime12Hour from @sidequest/core/formatters instead
+ * @example
+ * ```ts
+ * const entry = formatLogEntry(new Date(), "Meeting notes about project");
+ * // Returns: "- 2:45 pm - 🎤 Meeting notes about project"
+ * ```
  */
-export function formatTimestamp(date: Date): string {
-	return formatTime12Hour(date);
+export function formatLogEntry(date: Date, transcription: string): string {
+	const timestamp = formatTimestamp(date);
+	const dedupedText = dedupeConsecutiveLines(transcription);
+	const singleLine = dedupedText.replace(/\n+/g, " ").trim();
+	return `- ${timestamp} - 🎤 ${singleLine}`;
 }
 
 /**
- * Remove consecutive duplicate lines from text.
+ * Format a wikilink log entry for daily notes.
+ * Format: "- H:MM am/pm - 🎤 [[Note Title]]"
  *
- * Handles whisper.cpp hallucination where the model gets stuck
- * repeating the same phrase when audio becomes quiet or noisy.
+ * Used when a full note is created from the voice memo
+ * and should be linked from the daily note.
  *
- * @param text - Text that may contain repeated lines
- * @returns Text with consecutive duplicates removed
+ * @param date - Date/time of the voice memo
+ * @param noteTitle - Title of the created note (without .md extension)
+ * @returns Formatted wikilink entry string
+ *
+ * @example
+ * ```ts
+ * const entry = formatWikilinkLogEntry(new Date(), "🎤 2025-01-22 2-45pm");
+ * // Returns: "- 2:45 pm - 🎤 [[🎤 2025-01-22 2-45pm]]"
+ * ```
  */
-export function dedupeConsecutiveLines(text: string): string {
-	const lines = text.split("\n");
-	const deduped: string[] = [];
-
-	for (const line of lines) {
-		const trimmed = line.trim();
-		// Skip empty lines and consecutive duplicates
-		if (trimmed && deduped[deduped.length - 1] !== trimmed) {
-			deduped.push(trimmed);
-		}
-	}
-
-	return deduped.join("\n");
-}
-
-/**
- * Format voice memo transcription as log entry.
- *
- * Format: "- {time} - 🎤 {transcription}"
- *
- * Example:
- * "- 2:45 pm - 🎤 Transcribed voice memo content here..."
- *
- * Processing:
- * 1. Removes consecutive duplicate lines (whisper hallucination fix)
- * 2. Collapses all newlines to single spaces (single bullet point)
- *
- * @param timestamp - Voice memo timestamp
- * @param transcription - Transcribed text content
- * @returns Formatted log entry ready for insertion
- */
-export function formatLogEntry(timestamp: Date, transcription: string): string {
-	const time = formatTimestamp(timestamp);
-
-	// Step 1: Remove consecutive duplicate lines (whisper hallucination)
-	const deduped = dedupeConsecutiveLines(transcription);
-
-	// Step 2: Collapse newlines to spaces for single bullet point
-	const collapsed = deduped.replace(/\n+/g, " ").trim();
-
-	return `- ${time} - 🎤 ${collapsed}`;
-}
-
-// Re-export formatFilenameTime from core for backward compatibility
-export { formatFilenameTime } from "@sidequest/core/formatters";
-
-/**
- * Format wikilink log entry for daily note.
- *
- * Format: "- {time} - 🎤 [[{noteTitle}]]"
- *
- * Used when creating voice memo notes instead of inline transcriptions.
- * The wikilink points to the separate voice memo note in the inbox.
- *
- * @param timestamp - Voice memo timestamp
- * @param noteTitle - Title of the voice memo note (for wikilink)
- * @returns Formatted log entry with wikilink
- */
-export function formatWikilinkLogEntry(
-	timestamp: Date,
-	noteTitle: string,
-): string {
-	const time = formatTimestamp(timestamp);
-	return `- ${time} - 🎤 [[${noteTitle}]]`;
+export function formatWikilinkLogEntry(date: Date, noteTitle: string): string {
+	const timestamp = formatTimestamp(date);
+	return `- ${timestamp} - 🎤 [[${noteTitle}]]`;
 }

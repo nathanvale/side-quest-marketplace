@@ -30,6 +30,7 @@
 		"./commands/slo.md",
 		"./commands/trace.md",
 		"./commands/validate.md",
+		"./commands/transcribe.md",
 		"./commands/triage.md",
 		"./commands/webclipper.md"
 	],

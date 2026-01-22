@@ -29,6 +29,7 @@
 		"./testing": "./src/testing/index.ts",
 		"./utils": "./src/utils/index.ts",
 		"./validation": "./src/validation/index.ts",
+		"./vtt": "./src/vtt/index.ts",
 		"./validate/types": "./src/validate/types.ts",
 		"./validate/runner": "./src/validate/runner.ts",
 		"./validate/reporter": "./src/validate/reporter.ts",

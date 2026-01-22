@@ -26,7 +26,8 @@ By the time the resource note exists, the user has **internalized** the key insi
 4. **Teach, don't summarize** - Explain concepts, ask questions, guide discovery
 5. **Layer 4 must be user's words** - Co-create the executive summary through dialogue
 6. **Use capture_reason** - If present, acknowledge why they saved this
-7. **Delete after distilling** - The clipping is transformed, not archived
+7. **Delete clippings after distilling** - The clipping is transformed into a resource
+8. **Voice transcripts are KEPT** - Link via `source_note`; only web clips are deleted
 
 ## Workflow Overview
 
@@ -50,7 +51,7 @@ Phase 6: Connections & Note Creation
 
 ## Phase 0: Find Clippings
 
-Scan inbox for notes with `type: clipping` frontmatter.
+Scan inbox for notes with `type: clipping` or `type: transcription` frontmatter.
 
 ```
 para_list({ path: "00 Inbox", response_format: "json" })
@@ -62,17 +63,17 @@ For each file, check frontmatter:
 para_frontmatter_get({ file: "00 Inbox/[filename]", response_format: "json" })
 ```
 
-**Detection criteria:** `type === "clipping"`
+**Detection criteria:** `type === "clipping"` OR `type === "transcription"`
 
 Present findings to user:
 
 ```
-Found 5 clippings to distill:
+Found 5 items to distill:
 
 1. ✂️📰 Arman Hezarkhani - Claude Code for iMessage
 2. ✂️🎬 Matt Pocock - TypeScript 5.5 Tips
-3. ✂️ Thread by @damianplayer
-4. ✂️📄 Ralph Loop Programming...
+3. 🎤 2024-01-22 3-45pm (voice memo)
+4. ✂️ Thread by @damianplayer
 5. ✂️ Building a Second Brain Overview
 
 Which one shall we start with?
@@ -96,9 +97,13 @@ Extract:
 - `capture_reason` (if present - use in dialogue!)
 - Existing content (may be partial)
 
+**Voice memo handling:** If `type: transcription`, the note already contains the transcription. Skip URL fetching - you have the content.
+
 ### 1.2 Fetch Full Content - CRITICAL TOOL SELECTION
 
-**YOU MUST select the correct tool based on domain. This is non-negotiable.**
+**Skip enrichment if `type: transcription`** - voice memos already have full content.
+
+For clippings, **YOU MUST select the correct tool based on domain. This is non-negotiable.**
 
 Parse the domain from the source URL first:
 ```javascript
@@ -109,6 +114,9 @@ const domain = url.hostname.replace('www.', '');
 #### Tool Selection Decision Tree
 
 ```
+Is type "transcription"?
+├─ YES → Skip enrichment (content is in the note)
+│
 Is domain x.com or twitter.com?
 ├─ YES → Use Chrome DevTools (Step A)
 │        ├─ Tool available? → Fetch content
@@ -304,26 +312,67 @@ Incorporate their language. The final summary should feel like THEIR words, not 
 
 ## Phase 6: Connections & Note Creation
 
-### 6.1 Fetch Vault Context
+### 6.1 Check for Pre-filled Connections
+
+First, check if the source note already has `areas` or `projects` filled in (from Phase 1 frontmatter):
+
+```
+para_frontmatter_get({ file: "00 Inbox/[selected note]", response_format: "json" })
+```
+
+If `areas` and/or `projects` arrays are non-empty, **use those directly** and skip to 6.3.
+
+**Example pre-filled transcription frontmatter:**
+```yaml
+type: transcription
+areas:
+  - "[[🌱 Work]]"
+  - "[[🌱 AI Practice]]"
+projects:
+  - "[[🎯 Oil Team Migration]]"
+```
+
+This speeds up distillation when users pre-fill connections in Obsidian before running `/distill`.
+
+### 6.2 Suggest Connections (if not pre-filled)
+
+Only if `areas` and `projects` are empty, fetch vault context and suggest:
 
 ```
 para_list_areas({ response_format: "json" })
 para_list_projects({ response_format: "json" })
 ```
 
-### 6.2 Suggest Connections
-
 Based on the dialogue, suggest relevant connections:
 
 ```
 This connects to:
-- [[🤖 AI Practice]] - The automation patterns could enhance your AI workflows
-- [[🏠 Home]] - The productivity principles apply to home projects too
+- [[🌱 AI Practice]] - The automation patterns could enhance your AI workflows
+- [[🎯 Home Automation]] - The productivity principles apply to this project
 
 Does that feel right? Any other connections?
 ```
 
-### 6.3 Create Resource Note
+### 6.3 Determine Resource Type
+
+Ask the user what type of resource this is:
+
+```
+What type of resource is this?
+- meeting (voice memo from a meeting)
+- tutorial (how-to content)
+- reference (documentation, specs)
+- article (blog post, news)
+- research (papers, studies)
+- issue (bug report, ticket)
+- decision (architecture decision)
+- idea (brainstorm, concept)
+- recipe (step-by-step process)
+- conversation (chat, interview)
+- how-to (practical guide)
+```
+
+### 6.4 Create Resource Note
 
 ```
 para_create({
@@ -331,25 +380,30 @@ para_create({
   title: "[Concise, meaningful title]",
   dest: "03 Resources",
   args: {
-    "Source type": "[article/video/course/etc]",
-    "Source URL (optional)": "[original URL]",
-    "Author (optional)": "[author if known]",
-    "Status": "completed"
+    "resource_type": "[from dialogue]",
+    "source": "[URL or [[🎤 note link]]]"
   },
   content: {
     "Summary": "[2-3 sentences from Phase 2]",
     "Key Insights": "[Bullet points from dialogue]",
     "Notable Quotes": "[Bold-worthy passages from Phase 3]",
-    "Layer 4: Executive Summary": "[USER'S takeaways from Phase 5]",
-    "Connections": "[Links from Phase 6]"
+    "Layer 1: Captured Notes": "[Raw quote/passage that captures the core - from Notable Quotes]",
+    "Layer 2: Bold Passages": "[Key insights with **bold** markers on important phrases]",
+    "Layer 3: Highlighted Core": "[1-2 sentence essence with ==highlight== on the core insight]",
+    "Executive Summary": "[USER'S takeaways from Phase 5]"
   },
   response_format: "json"
 })
 ```
 
-### 6.4 Delete Original Clipping
+### 6.5 Handle Original Note
 
-After successful creation:
+**For voice transcripts (`type: transcription`):**
+- KEEP the original transcription note
+- The new resource links to it via `source`
+
+**For web clippings (`type: clipping`):**
+- DELETE the original clipping after successful resource creation
 
 ```
 para_delete({
@@ -359,13 +413,13 @@ para_delete({
 })
 ```
 
-### 6.5 Offer Next or Done
+### 6.6 Offer Next or Done
 
 ```
-Created: 📦 [Resource Title].md
-Deleted: ✂️ [Original Clipping].md
+Created: 📚 [Resource Title].md → 03 Resources
+[Kept/Deleted]: [Original note status]
 
-[Count] clippings remaining. Next clipping, or done for now?
+[Count] items remaining. Next one, or done for now?
 ```
 
 ---
@@ -408,6 +462,15 @@ What would you prefer?
 ```
 
 4. **Proceed normally** once user provides content - the distillation dialogue works the same way
+
+### Voice Memo Processing
+
+Voice memos (`type: transcription`) are handled differently:
+
+1. **Content is already in the note** - no URL fetching needed
+2. **Original transcript is KEPT** - it's the source material
+3. **New resource is created** with `source_note` linking back
+4. **Both notes exist** - transcript for reference, resource for learning
 
 ---
 

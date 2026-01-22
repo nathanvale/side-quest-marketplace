@@ -49,16 +49,40 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			title: { type: "string" },
 			created: { type: "date" },
 			type: { type: "enum", enum: ["resource"] },
-			source_type: {
+			resource_type: {
 				type: "enum",
-				enum: ["book", "article", "video", "course", "podcast", "paper", "web"],
+				enum: [
+					"meeting",
+					"tutorial",
+					"reference",
+					"issue",
+					"conversation",
+					"idea",
+					"recipe",
+					"how-to",
+					"decision",
+					"research",
+					"article",
+				],
+				description:
+					"Classification for Dataview queries (e.g., show all meetings)",
 			},
-			source_url: { type: "string", optional: true },
-			author: { type: "string", optional: true },
-			status: {
-				type: "enum",
-				enum: ["to-read", "reading", "completed"],
+			source: {
+				type: "string",
 				optional: true,
+				description:
+					"Link to origin - URL or [[note link]] (e.g., voice memo, clipping)",
+			},
+			// PARA connections (multi-select arrays)
+			areas: {
+				type: "array",
+				optional: true,
+				description: "Wikilinks to related areas (multi-select)",
+			},
+			projects: {
+				type: "array",
+				optional: true,
+				description: "Wikilinks to related projects (multi-select)",
 			},
 		},
 	},
@@ -352,7 +376,7 @@ export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
 	project: 1,
 	trip: 1,
 	area: 1,
-	resource: 1,
+	resource: 2,
 	task: 1,
 	daily: 1,
 	"weekly-review": 1,

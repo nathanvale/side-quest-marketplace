@@ -5,6 +5,7 @@
 	"description": "SideQuest - ADHD-friendly Claude Code plugin marketplace",
 	"workspaces": [
 		"core",
+		"packages/*",
 		"plugins/*",
 		"plugins/*/mcp-servers/*"
 	],

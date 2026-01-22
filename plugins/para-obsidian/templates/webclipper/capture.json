@@ -7,15 +7,13 @@
     "noteContentFormat": "# `= this.file.name`\n\n**Source:** [{{domain}}]({{url}})\n**Clipped:** {{time|date:\"YYYY-MM-DD HH:mm\"}}\n\n---\n\n## Content\n\n{{content}}\n\n<!-- highlights:{{highlights|length}} -->",
     "properties": [
         { "name": "type", "value": "clipping", "type": "text" },
-        { "name": "clipping_type", "value": "", "type": "text" },
         { "name": "source", "value": "{{url}}", "type": "text" },
         {
             "name": "clipped",
             "value": "{{time|date:\"YYYY-MM-DD\"}}",
             "type": "date"
         },
-        { "name": "domain", "value": "{{domain}}", "type": "text" },
-        { "name": "distill_status", "value": "raw", "type": "text" }
+        { "name": "domain", "value": "{{domain}}", "type": "text" }
     ],
     "triggers": []
 }
