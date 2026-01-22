@@ -1603,6 +1603,55 @@ describe("applyArgsToFrontmatter", () => {
 		expect(result).toEqual(attributes); // No changes
 	});
 
+	it("parses JSON array strings into actual arrays", () => {
+		const attributes = {
+			title: "Test",
+			projects: [],
+			areas: [],
+		};
+
+		const result = applyArgsToFrontmatter(attributes, {
+			projects: '["[[🎯 Project A]]", "[[🎯 Project B]]"]',
+			areas: '["[[🌱 Work]]"]',
+		});
+
+		// Should be parsed as arrays, not strings
+		expect(Array.isArray(result.projects)).toBe(true);
+		expect(Array.isArray(result.areas)).toBe(true);
+		expect(result.projects).toEqual(["[[🎯 Project A]]", "[[🎯 Project B]]"]);
+		expect(result.areas).toEqual(["[[🌱 Work]]"]);
+	});
+
+	it("keeps non-JSON strings as strings", () => {
+		const attributes = {
+			title: "Test",
+			source: "",
+		};
+
+		const result = applyArgsToFrontmatter(attributes, {
+			source: "[[🎤 2026-01-22 1-33pm]]", // Wikilink, not JSON array
+			description: "A regular string",
+		});
+
+		expect(result.source).toBe("[[🎤 2026-01-22 1-33pm]]");
+		expect(result.description).toBe("A regular string");
+	});
+
+	it("handles malformed JSON array strings gracefully", () => {
+		const attributes = {
+			title: "Test",
+		};
+
+		const result = applyArgsToFrontmatter(attributes, {
+			notArray: "[invalid json",
+			alsoNotArray: "[]extra",
+		});
+
+		// Should remain as strings since they're not valid JSON arrays
+		expect(result.notArray).toBe("[invalid json");
+		expect(result.alsoNotArray).toBe("[]extra");
+	});
+
 	describe("integration with createFromTemplate", () => {
 		const { trackVault, getAfterEachHook } = useTestVaultCleanup();
 		afterEach(getAfterEachHook());

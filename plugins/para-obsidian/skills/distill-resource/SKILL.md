@@ -44,6 +44,8 @@ Phase 4: Layer 3 - The Essence
     ↓
 Phase 5: Layer 4 - Executive Summary (USER'S WORDS)
     ↓
+Phase 5.5: Action Items (collaborative extraction)
+    ↓
 Phase 6: Connections & Note Creation
 ```
 
@@ -310,6 +312,40 @@ Incorporate their language. The final summary should feel like THEIR words, not 
 
 ---
 
+## Phase 5.5: Action Items
+
+**Extract actionable next steps from the content through dialogue.**
+
+### Propose Action Items
+
+Based on the content, identify potential action items:
+
+```
+I noticed some potential action items:
+
+- [ ] [Proposed action 1 - based on content]
+- [ ] [Proposed action 2 - based on content]
+
+Are these things you want to track? Any others I missed?
+```
+
+### Collaborate on Actions
+
+User might:
+- Confirm the proposed actions
+- Rephrase in their own words
+- Add items you missed
+- Remove items that aren't relevant
+- Say "no actions needed" (that's fine!)
+
+**Guidelines:**
+- Only propose actions that are **concrete and actionable**
+- For meetings: focus on commitments, follow-ups, dependencies
+- For articles: focus on "try this" or "apply this to X"
+- Don't force actions - some resources are purely reference material
+
+---
+
 ## Phase 6: Connections & Note Creation
 
 ### 6.1 Check for Pre-filled Connections
@@ -390,7 +426,8 @@ para_create({
     "Layer 1: Captured Notes": "[Raw quote/passage that captures the core - from Notable Quotes]",
     "Layer 2: Bold Passages": "[Key insights with **bold** markers on important phrases]",
     "Layer 3: Highlighted Core": "[1-2 sentence essence with ==highlight== on the core insight]",
-    "Executive Summary": "[USER'S takeaways from Phase 5]"
+    "Executive Summary": "[USER'S takeaways from Phase 5]",
+    "Action Items": "[Checkbox list from Phase 5.5, or empty if none]"
   },
   response_format: "json"
 })

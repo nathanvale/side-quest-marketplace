@@ -145,6 +145,25 @@ function titleToFilename(title: string): string {
  * // }
  * ```
  */
+/**
+ * Attempts to parse a string as JSON array.
+ * Returns the parsed array if valid, otherwise returns undefined.
+ */
+function tryParseJsonArray(value: string): unknown[] | undefined {
+	if (!value.startsWith("[") || !value.endsWith("]")) {
+		return undefined;
+	}
+	try {
+		const parsed = JSON.parse(value);
+		if (Array.isArray(parsed)) {
+			return parsed;
+		}
+	} catch {
+		// Not valid JSON
+	}
+	return undefined;
+}
+
 export function applyArgsToFrontmatter(
 	attributes: Record<string, unknown>,
 	args: Record<string, string>,
@@ -158,8 +177,15 @@ export function applyArgsToFrontmatter(
 			continue;
 		}
 
-		// Override existing value or add new field
-		result[key] = value;
+		// Check if value is a JSON array string (e.g., '["[[Project]]"]')
+		// If so, parse it to an actual array for proper YAML serialization
+		const parsedArray = tryParseJsonArray(value);
+		if (parsedArray !== undefined) {
+			result[key] = parsedArray;
+		} else {
+			// Override existing value or add new field
+			result[key] = value;
+		}
 	}
 
 	return result;

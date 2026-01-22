@@ -13,7 +13,9 @@
             "value": "{{time|date:\"YYYY-MM-DD\"}}",
             "type": "date"
         },
-        { "name": "domain", "value": "{{domain}}", "type": "text" }
+        { "name": "domain", "value": "{{domain}}", "type": "text" },
+        { "name": "areas", "value": "", "type": "multitext" },
+        { "name": "projects", "value": "", "type": "multitext" }
     ],
     "triggers": []
 }
