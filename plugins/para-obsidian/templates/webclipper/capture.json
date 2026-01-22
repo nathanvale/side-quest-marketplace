@@ -1,21 +1,17 @@
 {
-    "schemaVersion": "0.1.0",
-    "name": "Capture",
-    "behavior": "create",
-    "noteNameFormat": "✂️ {{title|safe_name|slice:0,80|trim}}",
-    "path": "00 Inbox",
-    "noteContentFormat": "# `= this.file.name`\n\n**Source:** [{{domain}}]({{url}})\n**Clipped:** {{time|date:\"YYYY-MM-DD HH:mm\"}}\n\n---\n\n## Content\n\n{{content}}\n\n<!-- highlights:{{highlights|length}} -->",
-    "properties": [
-        { "name": "type", "value": "clipping", "type": "text" },
-        { "name": "source", "value": "{{url}}", "type": "text" },
-        {
-            "name": "clipped",
-            "value": "{{time|date:\"YYYY-MM-DD\"}}",
-            "type": "date"
-        },
-        { "name": "domain", "value": "{{domain}}", "type": "text" },
-        { "name": "areas", "value": "", "type": "multitext" },
-        { "name": "projects", "value": "", "type": "multitext" }
-    ],
-    "triggers": []
+	"schemaVersion": "0.1.0",
+	"name": "Capture",
+	"behavior": "create",
+	"noteContentFormat": "# `= this.file.name`\n\n**Source:** [{{domain}}]({{url}})\n**Clipped:** {{time|date:\"YYYY-MM-DD HH:mm\"}}\n\n---\n\n## Content\n\n{{content}}\n\n<!-- highlights:{{highlights|length}} -->",
+	"properties": [
+		{ "name": "type", "value": "clipping", "type": "text" },
+		{ "name": "source", "value": "{{url}}", "type": "text" },
+		{ "name": "clipped", "value": "{{time|date:\"YYYY-MM-DD\"}}", "type": "date" },
+		{ "name": "domain", "value": "{{domain}}", "type": "text" },
+		{ "name": "areas", "value": "", "type": "multitext" },
+		{ "name": "projects", "value": "", "type": "multitext" }
+	],
+	"triggers": [],
+	"noteNameFormat": "✂️ {{title|safe_name|slice:0,80|trim}}",
+	"path": "00 Inbox"
 }
