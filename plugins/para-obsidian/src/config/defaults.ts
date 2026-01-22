@@ -148,6 +148,8 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 				enum: ["inspiring", "useful", "personal", "surprising"],
 			},
 			urgency: { type: "enum", enum: ["high", "medium", "low"] },
+			areas: { type: "array", optional: true },
+			projects: { type: "array", optional: true },
 		},
 	},
 	checklist: {
