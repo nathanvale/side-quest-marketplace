@@ -24,7 +24,6 @@ import {
 	handleEnrich,
 	handleEnrichBookmark,
 	handleExportBookmarks,
-	handleExportWebClipperTemplate,
 	handleFindOrphans,
 	handleFrontmatter,
 	handleGit,
@@ -80,7 +79,6 @@ function printUsage(): void {
 		"  para enrich <action> [target|--all] [--dry-run] [--format md|json]",
 		"    Actions: youtube",
 		"  para export-bookmarks [--filter type:bookmark] [--out path] [--format md|json]",
-		"  para export-webclipper-template [-o path] [--format md|json]",
 		"  para clipper list|export|sync|convert|convert-all [--out path] [--format md|json]",
 		"  para create-classifier [--quick]",
 		"  para create-note-template",
@@ -297,12 +295,6 @@ async function main(): Promise<void> {
 
 			case "export-bookmarks": {
 				const result = await handleExportBookmarks(ctx);
-				if (!result.success) process.exit(result.exitCode ?? 1);
-				break;
-			}
-
-			case "export-webclipper-template": {
-				const result = await handleExportWebClipperTemplate(ctx);
 				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}

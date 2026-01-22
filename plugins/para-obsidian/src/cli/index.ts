@@ -34,7 +34,6 @@ export { handleEnrich } from "./enrich";
 export { handleEnrichBookmark } from "./enrich-bookmark";
 // Export commands
 export { handleExportBookmarks } from "./export-bookmarks";
-export { handleExportWebClipperTemplate } from "./export-webclipper-template";
 // Frontmatter commands
 export {
 	computeFrontmatterHints,
