@@ -40,7 +40,7 @@ const createCid = () => randomUUID();
 // ============================================================================
 
 tool(
-	"para_frontmatter_get",
+	"para_fm_get",
 	{
 		description: `Extract frontmatter from a note.
 
@@ -79,7 +79,7 @@ Example output:
 
 			return `## Frontmatter: ${file}\n\n\`\`\`yaml\n${JSON.stringify(attributes, null, 2)}\n\`\`\``;
 		},
-		{ toolName: "para_frontmatter_get", logger, createCid },
+		{ toolName: "para_fm_get", logger, createCid },
 	),
 );
 
@@ -88,7 +88,7 @@ Example output:
 // ============================================================================
 
 tool(
-	"para_frontmatter_validate",
+	"para_fm_validate",
 	{
 		description: `Validate frontmatter against type rules.
 
@@ -141,7 +141,7 @@ Validation rules configured per note type (project, area, resource, etc.).`,
 
 			return lines.join("\n");
 		},
-		{ toolName: "para_frontmatter_validate", logger, createCid },
+		{ toolName: "para_fm_validate", logger, createCid },
 	),
 );
 
@@ -150,7 +150,7 @@ Validation rules configured per note type (project, area, resource, etc.).`,
 // ============================================================================
 
 tool(
-	"para_frontmatter_set",
+	"para_fm_set",
 	{
 		description: `Update frontmatter fields.
 
@@ -258,7 +258,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 
 			return lines.join("\n");
 		},
-		{ toolName: "para_frontmatter_set", logger, createCid },
+		{ toolName: "para_fm_set", logger, createCid },
 	),
 );
 
@@ -267,7 +267,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 // ============================================================================
 
 tool(
-	"para_frontmatter_migrate",
+	"para_fm_migrate",
 	{
 		description: `Migrate note to latest template version.
 
@@ -339,7 +339,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 
 			return lines.join("\n");
 		},
-		{ toolName: "para_frontmatter_migrate", logger, createCid },
+		{ toolName: "para_fm_migrate", logger, createCid },
 	),
 );
 
@@ -348,7 +348,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 // ============================================================================
 
 tool(
-	"para_frontmatter_migrate_all",
+	"para_fm_migrate_all",
 	{
 		description: `Bulk migrate notes by type to latest template version.
 
@@ -438,7 +438,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 
 			return lines.join("\n");
 		},
-		{ toolName: "para_frontmatter_migrate_all", logger, createCid },
+		{ toolName: "para_fm_migrate_all", logger, createCid },
 	),
 );
 
@@ -447,7 +447,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 // ============================================================================
 
 tool(
-	"para_frontmatter_plan",
+	"para_fm_plan",
 	{
 		description: `Plan template version bump for a note type.
 
@@ -458,7 +458,7 @@ Analyzes notes and generates a migration plan showing:
 - Ahead notes (template_version > target)
 - Type mismatches
 
-Plan can be saved to JSON and executed via para_frontmatter_apply_plan.
+Plan can be saved to JSON and executed via para_fm_apply_plan.
 
 Used for:
 - Impact assessment before migrations
@@ -514,7 +514,7 @@ Used for:
 
 			return lines.join("\n");
 		},
-		{ toolName: "para_frontmatter_plan", logger, createCid },
+		{ toolName: "para_fm_plan", logger, createCid },
 	),
 );
 
@@ -523,9 +523,9 @@ Used for:
 // ============================================================================
 
 tool(
-	"para_frontmatter_apply_plan",
+	"para_fm_apply_plan",
 	{
-		description: `Execute a migration plan from para_frontmatter_plan.
+		description: `Execute a migration plan from para_fm_plan.
 
 Takes a plan JSON file and migrates matching notes. Supports filtering:
 - statuses: Which entry statuses to process (outdated, missing-version, current)
@@ -632,6 +632,6 @@ Requires git repository with clean working tree (unless dry-run).`,
 
 			return lines.join("\n");
 		},
-		{ toolName: "para_frontmatter_apply_plan", logger, createCid },
+		{ toolName: "para_fm_apply_plan", logger, createCid },
 	),
 );

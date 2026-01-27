@@ -20,7 +20,7 @@ You are preparing resources for progressive summarization.
    para_list({ path: "03 Resources", response_format: "json" })
 
    For each file, check frontmatter:
-   para_frontmatter_get({ file: "03 Resources/[filename]", response_format: "json" })
+   para_fm_get({ file: "03 Resources/[filename]", response_format: "json" })
 
    Filter for: distilled === false (or distilled field missing)
 

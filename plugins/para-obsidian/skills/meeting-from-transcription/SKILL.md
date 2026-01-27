@@ -2,7 +2,7 @@
 name: meeting-from-transcription
 description: Create meeting notes from transcription files. Extracts metadata (date, type, summary) and creates bi-directional links. Use when converting voice memo transcriptions (.md) or VTT files (.vtt) into structured meeting notes, or when asked to "create a meeting from a transcription".
 context: fork
-allowed-tools: Read, Bash, mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_commit, mcp__plugin_para-obsidian_para-obsidian__para_frontmatter_set, mcp__plugin_para-obsidian_para-obsidian__para_index_prime, mcp__plugin_para-obsidian_para-obsidian__para_index_query, AskUserQuestion
+allowed-tools: Read, Bash, mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_commit, mcp__plugin_para-obsidian_para-obsidian__para_fm_set, mcp__plugin_para-obsidian_para-obsidian__para_index_prime, mcp__plugin_para-obsidian_para-obsidian__para_index_query, AskUserQuestion
 ---
 
 # Meeting from Transcription
@@ -116,7 +116,7 @@ Or if project instead of area:
 Extract meeting filename from CLI output, then:
 
 ```
-para_frontmatter_set({
+para_fm_set({
   file: "<TRANSCRIPTION_PATH>",
   set: { "meeting": "[[<MEETING_NOTE_NAME>]]" },
   response_format: "json"

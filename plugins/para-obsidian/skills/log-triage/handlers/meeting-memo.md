@@ -54,7 +54,7 @@ para_create({
 **Step 2: Set frontmatter**
 
 ```
-para_frontmatter_set({
+para_fm_set({
   file: "00 Inbox/🗣️ Note Title.md",
   set: {
     meeting_type: "general",

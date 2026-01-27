@@ -52,7 +52,7 @@ para_create({
 ```
 
 ```
-para_frontmatter_set({
+para_fm_set({
   file: "00 Inbox/📥 Take out the trash.md",
   set: {
     source: "reminder",
@@ -78,7 +78,7 @@ para_create({
 ```
 
 ```
-para_frontmatter_set({
+para_fm_set({
   file: "00 Inbox/📥 Tomorrow is a new day.md",
   set: {
     source: "thought",

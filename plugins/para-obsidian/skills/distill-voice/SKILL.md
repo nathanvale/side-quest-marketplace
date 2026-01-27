@@ -2,7 +2,7 @@
 name: distill-voice
 description: Process voice memo transcriptions into resource proposals. Analyzes spoken content, determines meeting type or category, returns structured proposal. Used by triage coordinator as subagent worker.
 user-invocable: false
-allowed-tools: mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_frontmatter_get
+allowed-tools: mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_fm_get
 ---
 
 # Distill Voice Memo
@@ -53,7 +53,7 @@ Return a JSON proposal:
 
 ```
 para_read({ file: "[input file]", response_format: "json" })
-para_frontmatter_get({ file: "[input file]", response_format: "json" })
+para_fm_get({ file: "[input file]", response_format: "json" })
 ```
 
 Extract:

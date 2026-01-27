@@ -8,9 +8,9 @@ describe("para-obsidian MCP metadata", () => {
 		expect(TOOL_NAMES.length).toBeGreaterThan(10);
 		expect(TOOL_NAMES).toContain("templates");
 		expect(TOOL_NAMES).toContain("semantic_search");
-		expect(TOOL_NAMES).toContain("frontmatter_plan");
-		expect(TOOL_NAMES).toContain("frontmatter_apply_plan");
-		expect(TOOL_NAMES).toContain("frontmatter_set");
-		expect(TOOL_NAMES).toContain("frontmatter_migrate_all");
+		expect(TOOL_NAMES).toContain("fm_plan");
+		expect(TOOL_NAMES).toContain("fm_apply_plan");
+		expect(TOOL_NAMES).toContain("fm_set");
+		expect(TOOL_NAMES).toContain("fm_migrate_all");
 	});
 });

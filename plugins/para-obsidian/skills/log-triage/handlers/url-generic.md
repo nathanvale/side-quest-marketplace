@@ -70,7 +70,7 @@ para_create({
 ```
 
 ```
-para_frontmatter_set({
+para_fm_set({
   file: "00 Inbox/...",
   set: {
     source: "https://...",

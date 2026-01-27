@@ -115,7 +115,7 @@ para-obsidian/
 │   ├── mcp-handlers/          # MCP tool implementations (6 modules)
 │   │   ├── config.ts          # para_config, para_templates
 │   │   ├── files.ts           # para_list, para_read, para_create, etc.
-│   │   ├── frontmatter.ts     # para_frontmatter_*, para_hints
+│   │   ├── frontmatter.ts     # para_fm_*, para_hints
 │   │   ├── indexer.ts         # para_index_*, para_list_*
 │   │   ├── links.ts           # para_rewrite_links
 │   │   └── search.ts          # para_search, para_semantic
@@ -446,7 +446,7 @@ The plugin provides 20+ MCP tools organized by domain:
 | Files | `para_list`, `para_read`, `para_create`, `para_insert`, `para_rename`, `para_delete` |
 | Search | `para_search`, `para_semantic` |
 | Index | `para_index_prime`, `para_index_query`, `para_list_areas`, `para_list_tags` |
-| Frontmatter | `para_frontmatter_get`, `para_frontmatter_validate`, `para_frontmatter_set`, `para_hints` |
+| Frontmatter | `para_fm_get`, `para_fm_validate`, `para_fm_set`, `para_hints` |
 | Links | `para_rewrite_links`, `para_find_orphans` |
 
 **Tool Response Format:** Always include `response_format: "json"` for token efficiency.

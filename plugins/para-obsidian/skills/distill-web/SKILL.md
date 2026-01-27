@@ -2,7 +2,7 @@
 name: distill-web
 description: Process web clippings into resource proposals. Fetches full content, analyzes, returns structured proposal. Used by triage coordinator as subagent worker.
 user-invocable: false
-allowed-tools: mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_frontmatter_get, mcp__firecrawl__firecrawl_scrape, mcp__youtube-transcript__get_video_info, mcp__youtube-transcript__get_transcript, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__take_snapshot, WebFetch
+allowed-tools: mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_fm_get, mcp__firecrawl__firecrawl_scrape, mcp__youtube-transcript__get_video_info, mcp__youtube-transcript__get_transcript, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__take_snapshot, WebFetch
 ---
 
 # Distill Web Clipping
@@ -48,7 +48,7 @@ Return a JSON proposal:
 
 ```
 para_read({ file: "[input file]", response_format: "json" })
-para_frontmatter_get({ file: "[input file]", response_format: "json" })
+para_fm_get({ file: "[input file]", response_format: "json" })
 ```
 
 Extract:

@@ -54,7 +54,7 @@ para_create({
 ## Set Frontmatter
 
 ```
-para_frontmatter_set({
+para_fm_set({
   file: "00 Inbox/✂️🎬 {Channel} - {Video Title}.md",
   set: {
     source: "https://www.youtube.com/watch?v=...",

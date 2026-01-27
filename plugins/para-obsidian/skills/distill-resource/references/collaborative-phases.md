@@ -151,7 +151,7 @@ para_insert({
 ### Mark as Distilled
 
 ```typescript
-para_frontmatter_set({
+para_fm_set({
   file: "03 Resources/[filename]",
   set: { "distilled": "true" },
   response_format: "json"
