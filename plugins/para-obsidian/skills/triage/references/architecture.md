@@ -1,105 +1,261 @@
 # Triage Architecture
 
-## The Correct Architecture
+## Design Philosophy
+
+**Problem:** When processing 50 inbox items, two things pollute context:
+1. Enriched content (50 transcripts, 50 articles) flowing through coordinator
+2. Sequential analysis causing context accumulation
+
+**Solution:**
+1. Each subagent handles BOTH enrichment AND analysis (isolated context)
+2. Enriched content never touches coordinator
+3. Subagents persist proposals immediately (crash resilience)
+4. Single table review (no context rot from back-and-forth)
+
+---
+
+## Flow Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│       PHASE 1a: PARALLEL ENRICHMENT (Stateless APIs)        │
-│  • YouTube videos → parallel youtube-transcript calls       │
-│  • Public articles → parallel Firecrawl scrape calls        │
-│  • GitHub repos → parallel Firecrawl scrape calls           │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│       PHASE 1b: SEQUENTIAL ENRICHMENT (Browser Required)    │
-│  • Twitter/X threads → Chrome DevTools (one at a time)      │
-│  • Confluence pages → Chrome DevTools (one at a time)       │
-│  • Any auth-required site → Chrome DevTools (sequential)    │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│              PHASE 2: PARALLEL ANALYSIS                     │
-│  All enriched content → parallel subagents (batch of 3)     │
-│  Each subagent has fresh context, analyzes one item         │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│              PHASE 3: SEQUENTIAL REVIEW                     │
-│  Present proposals one at a time for user approval          │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         PHASE 1: INITIALIZE                              │
+│  Coordinator:                                                            │
+│  • Scan inbox                                                            │
+│  • Create tasks via TaskCreate (status: pending)                         │
+│  • Load vault context (areas, projects) ONCE                             │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    PHASE 2: ENRICH + ANALYZE (SUBAGENTS)                 │
+│                                                                          │
+│   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                  │
+│   │  Subagent 1  │  │  Subagent 2  │  │  Subagent 3  │  ...             │
+│   │              │  │              │  │              │                  │
+│   │ 1. Enrich    │  │ 1. Enrich    │  │ 1. Enrich    │                  │
+│   │    (fetch)   │  │    (fetch)   │  │    (fetch)   │                  │
+│   │ 2. Analyze   │  │ 2. Analyze   │  │ 2. Analyze   │                  │
+│   │ 3. TaskUpdate│  │ 3. TaskUpdate│  │ 3. TaskUpdate│                  │
+│   │    (persist) │  │    (persist) │  │    (persist) │                  │
+│   └──────────────┘  └──────────────┘  └──────────────┘                  │
+│                                                                          │
+│   • Parallel for YouTube, articles (batches of 5)                        │
+│   • Sequential for X/Twitter (single Chrome browser)                     │
+│   • Enriched content stays in subagent context                           │
+│   • Coordinator context stays CLEAN                                      │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    PHASE 3: SINGLE TABLE REVIEW                          │
+│                                                                          │
+│   Coordinator reads proposals from task metadata:                        │
+│                                                                          │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │ | #  | Title              | Area        | Project    | Type  | │   │
+│   │ |----|-------------------|-------------|------------|-------| │   │
+│   │ | 1  | ClawdBot Setup    | AI Practice | Clawdbot   | video | │   │
+│   │ | 2  | AI Libraries      | AI Practice | -          | video | │   │
+│   │ | 3  | Pizza Moncur      | Home        | -          | ref   | │   │
+│   │ | .. | ...               | ...         | ...        | ...   | │   │
+│   │                                                                 │   │
+│   │ Actions: A (all) | E 1,3 (edit) | D 5 (delete) | Q (quit)      │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+│   ONE interaction point. User sees everything, decides once.             │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    PHASE 4: EDIT (if requested)                          │
+│                                                                          │
+│   Only for items user selected with "E 1,3,7"                            │
+│   Quick inline: Change area? Project? Delete?                            │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    PHASE 5: BATCH EXECUTE                                │
+│                                                                          │
+│   Coordinator:                                                           │
+│   • Create all resources (para_create for each)                          │
+│   • Handle originals (delete clippings, archive transcriptions)          │
+│   • Mark tasks completed                                                 │
+│   • Report summary                                                       │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Detailed Architecture: Enrich → Analyze → Review
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    COORDINATOR (You)                         │
-│  • Scans inbox, groups by SOURCE TYPE (not just item type)  │
-│  • Groups items by enrichment capability:                   │
-│    - Parallel-capable: YouTube, public articles, GitHub     │
-│    - Sequential-only: Twitter/X, Confluence, auth sites     │
-│  • Runs enrichment BEFORE spawning analysis subagents       │
-│  • Spawns analysis subagents in parallel (batch of 3)       │
-│  • Presents proposals ONE AT A TIME for review              │
-└─────────────────────────────────────────────────────────────┘
-                              │
-         ┌────────────────────┼────────────────────┐
-         ▼                    ▼                    ▼
-┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
-│ ENRICH PARALLEL │  │ ENRICH PARALLEL │  │ ENRICH SEQUENTIAL│
-│ (YouTube MCP)   │  │ (Firecrawl)     │  │ (Chrome DevTools)│
-│                 │  │                 │  │                  │
-│ 3 videos at     │  │ 3 articles at   │  │ 1 Twitter thread │
-│ once ✅         │  │ once ✅         │  │ at a time ⏳     │
-└─────────────────┘  └─────────────────┘  └─────────────────┘
-         │                    │                    │
-         └────────────────────┼────────────────────┘
-                              ▼
-         ┌────────────────────┼────────────────────┐
-         ▼                    ▼                    ▼
-┌─────────────┐      ┌─────────────┐      ┌─────────────┐
-│  Subagent   │      │  Subagent   │      │  Subagent   │
-│  ANALYZE    │      │  ANALYZE    │      │  ANALYZE    │
-│  (Item 1)   │      │  (Item 2)   │      │  (Item 3)   │
-│             │      │             │      │             │
-│ Has full    │      │ Has full    │      │ Has full    │
-│ enriched    │      │ enriched    │      │ enriched    │
-│ content ✅  │      │ content ✅  │      │ content ✅  │
-└─────────────┘      └─────────────┘      └─────────────┘
-         │                    │                    │
-         └────────────────────┼────────────────────┘
-                              ▼
-                    ┌─────────────────┐
-                    │  Review Queue   │
-                    │  (Sequential)   │
-                    └─────────────────┘
-```
+---
 
 ## Why This Architecture?
 
-1. **Enrichment-aware batching** - Groups items by what CAN parallelize, not just item count
-2. **Context isolation** - Each analysis subagent has fresh context, no rot
-3. **Optimal parallelization** - YouTube/Firecrawl run parallel; Chrome DevTools sequential
-4. **Full content for analysis** - Subagents receive enriched content, not just stubs
-5. **Collaborative review** - User approves/edits proposals one at a time
-6. **Native task tracking** - TodoWrite provides visibility (`Ctrl+T`) and persistence
-7. **Resume capability** - TodoRead shows pending tasks on restart
+### 1. Context Isolation
+Each subagent gets fresh 200k token context. Enriched content (transcripts, articles, threads) stays in subagent context and never pollutes the coordinator.
 
-## Philosophy: Solving Context Rot
+### 2. Coordinator Stays Clean
+The coordinator only sees:
+- Task metadata (small)
+- Proposals (title, summary, area, project, type)
+- No 10k+ token transcripts or articles
 
-This skill solves the **context rot problem**: when processing 20 inbox items sequentially, context fills up by item 5. By isolating each item's analysis in a subagent:
+### 3. Crash Resilience
+Subagents persist via TaskUpdate immediately. If crash at item 23:
+- Items 1-22: proposals saved in task metadata
+- Items 23-50: still pending
+- Resume: only re-process pending items
 
-1. **Fresh context per item** - No pollution from previous items
-2. **Parallel speed** - 3x faster than sequential
-3. **Proposals not actions** - Subagents suggest, coordinator executes
-4. **Collaborative review** - User stays in control
-5. **Native task tracking** - TodoWrite provides visibility and persistence
+### 4. Single Review Point
+No back-and-forth per item. User sees complete table, decides once:
+- "A" to accept all
+- "E 1,3" to tweak specific items
+- "D 5" to delete
 
-The coordinator's context only holds:
-- Vault metadata (areas, projects)
-- Review queue (lightweight proposals)
-- Task graph (managed by TodoWrite)
+### 5. Efficient Execution
+Batch create all resources. No waiting between items.
 
-Heavy lifting happens in subagent contexts that are discarded after use.
+### 6. Batch Size: Why 5?
+
+Subagents spawn in batches of 5 for these reasons:
+
+| Factor | Constraint |
+|--------|-----------|
+| **API concurrency** | Claude API handles ~5 parallel requests well |
+| **Token budget** | 5 haiku subagents × ~2k tokens = ~10k tokens/batch |
+| **Progress visibility** | User sees "Batch 1/10 complete" feedback |
+| **Error isolation** | If batch fails, only 5 items need retry |
+| **Memory** | Reasonable memory footprint for parallel execution |
+
+Adjust batch size based on:
+- Smaller batches (3) for complex content requiring sonnet
+- Larger batches (10) for simple categorization with haiku
+
+---
+
+## State Machine
+
+```
+                    ┌─────────────┐
+         TaskCreate │   pending   │
+                    └──────┬──────┘
+                           │
+              Subagent: enrich + analyze + TaskUpdate
+                           │
+                    ┌──────▼──────┐
+                    │ in_progress │  ← proposal saved in metadata
+                    └──────┬──────┘
+                           │
+              para_create executed
+                           │
+                    ┌──────▼──────┐
+                    │  completed  │
+                    └─────────────┘
+```
+
+---
+
+## Resume Flow
+
+```
+User runs /triage
+        │
+        ▼
+   TaskList()
+        │
+        ▼
+  ┌─────────────────────────────────────┐
+  │ Any tasks with subject "Triage:*"?  │
+  └──────────────┬──────────────────────┘
+                 │
+        ┌────────┴────────┐
+        │                 │
+       Yes               No
+        │                 │
+        ▼                 ▼
+  Show resume prompt    Start fresh
+  "32 analyzed,         (Phase 1)
+   18 pending"
+        │
+        ▼
+  Skip to Phase 2
+  (only process pending)
+```
+
+---
+
+## Comparison: Old vs New
+
+| Aspect | Old (Coordinator Enriches) | New (Subagent Enriches) |
+|--------|---------------------------|------------------------|
+| Enriched content | Flows through coordinator | Stays in subagent |
+| Coordinator context | Polluted (500k+ tokens) | Clean (small metadata) |
+| Subagent job | Analyze only | Enrich + Analyze |
+| Tool calls | Coordinator + Subagent | Subagent only |
+| Crash recovery | Proposals saved | Proposals saved |
+
+---
+
+## Error Handling
+
+### Subagent Fails to Persist
+
+If a subagent crashes before calling TaskUpdate:
+
+1. Task remains `status: pending` (no proposal in metadata)
+2. Resume flow detects pending tasks
+3. User offered to re-process only pending items
+4. No manual intervention needed
+
+```
+Subagent spawned → Crash before TaskUpdate
+                         ↓
+              Task stays "pending"
+                         ↓
+              Resume detects pending
+                         ↓
+              Re-spawn subagent for that item
+```
+
+### Subagent Returns Invalid Proposal
+
+If subagent persists but proposal is malformed:
+
+1. Task has `status: in_progress` with bad metadata
+2. Phase 3 table rendering skips or flags invalid proposals
+3. User can choose to delete (D) or edit (E) flagged items
+4. Alternatively, mark as pending for re-analysis
+
+### Enrichment Fails
+
+If subagent can't fetch content (timeout, 404, rate limit):
+
+1. Subagent stores `enrichmentFailed: true` in task metadata
+2. Table shows warning for that item
+3. User can retry (R), delete (D), or skip (S)
+
+### Batch Failure
+
+If entire batch fails (API error, rate limit):
+
+1. All 5 tasks remain pending
+2. Wait and retry the batch
+3. Consider reducing batch size temporarily
+
+### Best Practice
+
+Always check task metadata before presenting table:
+
+```typescript
+const validProposals = tasks.filter(t =>
+  t.status === "in_progress" &&
+  t.metadata?.proposal?.title &&
+  t.metadata?.proposal?.area
+);
+
+const invalidTasks = tasks.filter(t =>
+  t.status === "in_progress" && !t.metadata?.proposal?.title
+);
+
+if (invalidTasks.length > 0) {
+  console.log(`⚠️ ${invalidTasks.length} items have invalid proposals`);
+}
+```

@@ -1,156 +1,264 @@
 # Subagent Prompts
 
+## Overview
+
+Each subagent handles BOTH enrichment AND analysis for a single inbox item. This keeps enriched content out of the coordinator's context.
+
+**Subagent responsibilities:**
+1. Fetch full content (enrich)
+2. Analyze and create proposal
+3. Persist via TaskUpdate
+
+**Coordinator responsibilities:**
+1. Scan inbox, create tasks
+2. Load vault context (areas/projects) ONCE
+3. Spawn subagents with context
+4. Present table, handle edits
+5. Execute para_create calls
+
+---
+
 ## Model Selection
 
 | Task | Model | Rationale |
 |------|-------|-----------|
-| Initial analysis | `haiku` | Fast, cheap, good enough for categorization |
-| Deep analysis (3 options) | `sonnet` | Smarter reasoning for nuanced interpretation |
+| Enrich + Analyze | `haiku` | Fast, cheap, good for categorization |
+| Complex content | `sonnet` | Use if haiku struggles with nuance |
 
-## Analysis Prompt (Initial)
+---
 
-Use this prompt when spawning subagents for initial item analysis:
+## Combined Enrich + Analyze Prompt
 
-```
+**CRITICAL:** Coordinator passes vault context. Subagent fetches content and creates proposal.
+
+```typescript
 Task({
   subagent_type: "general-purpose",
-  description: "Distill clipping: [title]",
+  description: "Process: ${title}",
   model: "haiku",
   prompt: `
-    You are processing a single inbox item. Return a PROPOSAL, not a final note.
+    You are processing a single inbox item: enrich, analyze, and persist.
 
-    ## Item
-    File: 00 Inbox/[filename]
-    Type: [clipping|transcription|attachment]
+    ## Item Details
+    Task ID: ${taskId}
+    File: ${file}
+    Source URL: ${sourceUrl}
+    Source Type: ${sourceType}
 
-    ## Enriched Content
-    [Full content from enrichment phase - transcript, article text, etc.]
+    ## Vault Context (pre-loaded - use these, don't fetch)
 
-    ## Your Task
-    1. Read the note: para_read({ file: "...", response_format: "json" })
-    2. Analyze the enriched content provided above
-    3. Categorize and extract hints for organization
-    4. Return a structured proposal (see format below)
+    ### Areas
+    ${JSON.stringify(areas, null, 2)}
 
-    ## Proposal Format (JSON)
-    {
-      "file": "00 Inbox/[filename]",
-      "type": "[clipping|transcription|attachment]",
-      "proposed_title": "[meaningful title]",
-      "proposed_template": "[resource|gift|booking|etc]",
-      "summary": "[2-3 sentences]",
-      "categorization_hints": ["...", "...", "..."],
-      "suggested_areas": ["[[Area]]"],
-      "suggested_projects": ["[[Project]]"],
-      "resource_type": "[article|meeting|tutorial|etc]",
-      "source_format": "[video|article|audio|etc]",
-      "confidence": "[high|medium|low]",
-      "notes": "[any special considerations]"
-    }
+    ### Projects
+    ${JSON.stringify(projects, null, 2)}
 
-    ## Available Areas
-    [areas list]
+    **CRITICAL:** Only use areas/projects from the lists above. Never hallucinate names.
 
-    ## Available Projects
-    [projects list]
+    ## Step 1: Enrich (fetch full content)
+
+    Based on source type, fetch the content:
+
+    **YouTube:**
+    \`\`\`
+    mcp__youtube-transcript__get_transcript({ url: "${sourceUrl}" })
+    \`\`\`
+    If transcript unavailable, use:
+    \`\`\`
+    mcp__youtube-transcript__get_video_info({ url: "${sourceUrl}" })
+    \`\`\`
+
+    **Article/GitHub:**
+    \`\`\`
+    mcp__firecrawl__firecrawl_scrape({ url: "${sourceUrl}", formats: ["markdown"] })
+    \`\`\`
+
+    **X/Twitter:**
+    \`\`\`
+    mcp__chrome-devtools__navigate_page({ url: "${sourceUrl}", timeout: 30000 })
+    mcp__chrome-devtools__take_snapshot({})
+    \`\`\`
+    Extract tweet text from snapshot.
+
+    **Voice/Attachment:**
+    Content already in file:
+    \`\`\`
+    para_read({ file: "${file}" })
+    \`\`\`
+
+    ## Step 2: Analyze
+
+    Based on the enriched content, create a proposal:
+
+    - **title**: Meaningful, descriptive title (not the filename)
+    - **summary**: 2-3 sentences capturing key value/insights
+    - **area**: Wikilink to existing area [[Area Name]]
+    - **project**: Wikilink to existing project, or null if none applies
+    - **resourceType**: One of: article | video | thread | meeting | reference | tutorial
+
+    ## Step 3: Persist (CRITICAL - do not skip)
+
+    **This is the most important step.** Call TaskUpdate to save your work:
+
+    \`\`\`
+    TaskUpdate({
+      taskId: "${taskId}",
+      status: "in_progress",
+      metadata: {
+        proposal: {
+          title: "Your proposed title",
+          summary: "Your 2-3 sentence summary",
+          area: "[[Existing Area]]",
+          project: "[[Existing Project]]" or null,
+          resourceType: "article"
+        }
+      }
+    })
+    \`\`\`
+
+    This ensures your work survives if the session crashes.
+
+    ## Output
+
+    After calling TaskUpdate, confirm:
+    "Proposal saved for: [title]"
   `
 })
 ```
 
-**CRITICAL**: Run 3 Task calls in a single message for parallel execution.
+---
 
-## Deep Analysis Prompt (3 Options)
+## Spawning in Parallel
 
-When user chooses "3" (Deeper), spawn a subagent that returns **multiple options**:
+**CRITICAL:** To run subagents in parallel, include multiple Task calls in a single message.
 
-```
-Task({
-  subagent_type: "general-purpose",
-  description: "Deep analysis: [title]",
-  model: "sonnet",
-  prompt: `
-    You are doing DEEP ANALYSIS of an inbox item.
-    Return 3 DIFFERENT categorization options for the user to choose from.
-
-    ## Item
-    [Full content from original proposal]
-
-    ## Your Task
-    Analyze this content deeply and propose 3 DIFFERENT ways to categorize it:
-
-    1. **Option A**: [Most likely interpretation]
-    2. **Option B**: [Alternative framing]
-    3. **Option C**: [Creative/unexpected angle]
-
-    For voice memos especially, consider:
-    - Is this a meeting? What type? (standup, 1:1, planning, retro)
-    - Is this personal reflection? Journal entry?
-    - Is this a brainstorm? Ideas to capture?
-    - Is this task-related? Action items?
-
-    ## Return Format (JSON)
-    {
-      "options": [
-        {
-          "label": "A",
-          "interpretation": "[How you see this content]",
-          "proposed_title": "...",
-          "proposed_template": "...",
-          "resource_type": "...",
-          "summary": "...",
-          "categorization_hints": [...],
-          "suggested_areas": [...],
-          "suggested_projects": [...],
-          "rationale": "[Why this interpretation]"
-        },
-        { "label": "B", ... },
-        { "label": "C", ... }
-      ]
-    }
-
-    ## Available Areas
-    [areas list]
-
-    ## Available Projects
-    [projects list]
-  `
-})
+```typescript
+// Single message with 5 Task calls = parallel execution
+Task({ subagent_type: "general-purpose", description: "Process: Item 1", ... })
+Task({ subagent_type: "general-purpose", description: "Process: Item 2", ... })
+Task({ subagent_type: "general-purpose", description: "Process: Item 3", ... })
+Task({ subagent_type: "general-purpose", description: "Process: Item 4", ... })
+Task({ subagent_type: "general-purpose", description: "Process: Item 5", ... })
 ```
 
-## Proposal JSON Schema
+**EXCEPTION:** X/Twitter items must be sequential (single Chrome browser instance).
+
+---
+
+## Proposal Schema
 
 ```typescript
 interface Proposal {
-  file: string;                    // Original inbox file path
-  type: "clipping" | "transcription" | "attachment";
-  proposed_title: string;          // Meaningful title for the note
-  proposed_template: string;       // resource, gift, booking, etc.
-  summary: string;                 // 2-3 sentence summary
-  categorization_hints: string[];          // 3-5 bullet points
-  suggested_areas: string[];       // Wikilinks like [[Area Name]]
-  suggested_projects: string[];    // Wikilinks like [[Project Name]]
-  resource_type: string;           // article, meeting, tutorial, etc.
-  source_format: string;           // video, article, audio, etc.
-  confidence: "high" | "medium" | "low";
-  notes?: string;                  // Special considerations
+  title: string;           // Meaningful title
+  summary: string;         // 2-3 sentences
+  area: string;            // Wikilink: "[[Area Name]]"
+  project: string | null;  // Wikilink or null
+  resourceType: string;    // article, video, thread, meeting, reference, tutorial
 }
 
-interface DeepAnalysisOption extends Proposal {
-  label: "A" | "B" | "C";
-  interpretation: string;          // How this option interprets the content
-  rationale: string;               // Why this interpretation makes sense
-}
-
-interface DeepAnalysisResponse {
-  options: DeepAnalysisOption[];
+interface TaskMetadata {
+  file: string;            // Original inbox file path
+  itemType: string;        // clipping, transcription, attachment
+  sourceType: string;      // youtube, twitter, article, etc.
+  sourceUrl: string;       // Original URL
+  proposal: Proposal | null;
 }
 ```
 
+---
+
+## para_create Format
+
+**CRITICAL:** Frontmatter-only approach. ALL data in `args`, NEVER in `content`.
+
+### Why Frontmatter-Only?
+
+The resource template uses Dataview to render frontmatter:
+```markdown
+## Summary
+`= this.summary`
+```
+
+This means:
+- `summary` frontmatter is rendered in the Summary section
+- Users can search/filter on `summary` via Dataview
+- Content injection (`content: {}`) breaks searchability
+
+### Correct Format
+
+```typescript
+para_create({
+  template: "resource",
+  title: proposal.title,
+  dest: "03 Resources",
+  args: {
+    summary: proposal.summary,           // Rendered by Dataview
+    source: sourceUrl,                   // Original URL
+    resource_type: proposal.resourceType,
+    areas: proposal.area,                // "[[Area Name]]" - wikilink
+    projects: proposal.project,          // "[[Project]]" or omit if null
+    distilled: "false"                   // Always include
+  }
+  // ❌ NEVER use: content: { "Summary": "..." }
+})
+```
+
+### Field Rules
+
+| Field | Format | Required |
+|-------|--------|----------|
+| `summary` | Plain text, 2-3 sentences | Yes |
+| `source` | URL or wikilink | Yes |
+| `resource_type` | article, video, thread, etc. | Yes |
+| `areas` | Wikilink: `"[[Name]]"` | Yes |
+| `projects` | Wikilink or omit | No |
+| `distilled` | `"false"` | Yes |
+
+### Fields to NEVER Pass
+
+| Field | Why Not |
+|-------|---------|
+| `content` parameter | Breaks Dataview rendering |
+| `area` (singular) | Wrong field name - use `areas` |
+| `project` (singular) | Wrong field name - use `projects` |
+| `type` | Auto-set by template |
+
+---
+
+## Coordinator Responsibility
+
+The coordinator (main agent) loads vault context ONCE in Phase 1:
+
+```typescript
+// Phase 1: Load vault context
+const areas = await para_list_areas({ response_format: "json" });
+const projects = await para_list_projects({ response_format: "json" });
+
+// Phase 2: Pass to every subagent prompt
+const prompt = `
+  ## Vault Context
+  ### Areas
+  ${JSON.stringify(areas, null, 2)}
+  ### Projects
+  ${JSON.stringify(projects, null, 2)}
+  ...
+`;
+```
+
+**Why this matters:**
+- 50 items × 2 tool calls = 100 tool calls saved
+- Faster subagent execution (no round-trip to MCP)
+- Consistent context across all subagents
+- Coordinator context stays clean (no enriched content)
+
+---
+
 ## Best Practices
 
-1. **Always include enriched content** - Don't make subagents fetch content again
-2. **Provide vault context** - Areas and projects help with categorization
-3. **Use haiku for speed** - Initial analysis doesn't need sonnet
-4. **Use sonnet for depth** - Multiple interpretations benefit from reasoning
-5. **Return JSON** - Structured output is easier to process
-6. **Include confidence** - Helps user decide if deeper analysis is needed
+1. **Subagents enrich their own content** - Keeps coordinator context clean
+2. **Pass vault context from coordinator** - Saves tool calls
+3. **Only use real areas/projects** - Never hallucinate names
+4. **Persist immediately** - TaskUpdate right after analysis
+5. **Use haiku** - Fast, cheap, good enough for categorization
+6. **Return confirmation** - "Proposal saved for: [title]"
+7. **X/Twitter is sequential** - Single Chrome browser instance

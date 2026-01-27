@@ -1,77 +1,72 @@
 ---
 name: triage
-description: Process inbox items using parallel subagents with sequential review. Uses native TodoWrite for task tracking with encoded dependencies. Single-session workflow.
+description: Process inbox items using parallel subagents with single-table review. Subagents persist proposals immediately via TaskUpdate for crash resilience.
 user-invocable: true
 disable-model-invocation: true
-allowed-tools: Task, Read, TodoWrite, TodoRead, AskUserQuestion, mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_list, mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_delete, mcp__plugin_para-obsidian_para-obsidian__para_rename, mcp__plugin_para-obsidian_para-obsidian__para_frontmatter_get, mcp__plugin_para-obsidian_para-obsidian__para_list_areas, mcp__plugin_para-obsidian_para-obsidian__para_list_projects, mcp__youtube-transcript__get_transcript, mcp__youtube-transcript__get_video_info, mcp__firecrawl__firecrawl_scrape, mcp__firecrawl__firecrawl_search, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__take_snapshot, mcp__chrome-devtools__list_pages, mcp__chrome-devtools__select_page, mcp__chrome-devtools__new_page
+allowed-tools: Task, Read, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_list, mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_delete, mcp__plugin_para-obsidian_para-obsidian__para_rename, mcp__plugin_para-obsidian_para-obsidian__para_frontmatter_get, mcp__plugin_para-obsidian_para-obsidian__para_frontmatter_set, mcp__plugin_para-obsidian_para-obsidian__para_list_areas, mcp__plugin_para-obsidian_para-obsidian__para_list_projects, mcp__youtube-transcript__get_transcript, mcp__youtube-transcript__get_video_info, mcp__firecrawl__firecrawl_scrape, mcp__firecrawl__firecrawl_search, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__take_snapshot, mcp__chrome-devtools__list_pages, mcp__chrome-devtools__select_page, mcp__chrome-devtools__new_page
 ---
 
 # Triage Coordinator
 
-Process inbox items - single file or bulk with **parallel subagents** and **sequential review**.
+Process inbox items with **parallel subagents** and **single-table review**.
 
-Uses **native TodoWrite** for task tracking with encoded dependencies `[DEPS:id1,id2]`.
+**Key design:** Subagents persist proposals immediately via TaskUpdate. If session crashes at item 23 of 50, items 1-22 are saved and resumable.
 
 ## Scope
 
-**Single-session workflow.** This skill runs in one Claude Code session.
-
-### What Triage Does
-
-- **Organize** inbox items into PARA destinations
-- **Categorize** items with template, type, and connections
-- **Summarize** content for quick reference (frontmatter only)
-- Create notes with `distilled: false` (Layer 1 content)
-
-### What Triage Does NOT Do
-
-- **Progressive summarization** - Use `/para-obsidian:distill-resource` for Layers 2-4
-- **Deep learning** - Triage creates quick captures, not studied notes
-- **Insight extraction** - `categorization_hints` are for organization, not learning
+**Single-session workflow.** Creates quick resource notes with `distilled: false`. Use `/para-obsidian:distill-resource` for progressive summarization.
 
 ---
 
 ## Architecture Overview
 
-The triage workflow follows: **Enrich → Analyze → Review**
+```
+Phase 1: Initialize (coordinator)
+├── Scan inbox, create tasks (status: pending)
+└── Load vault context (areas, projects)
 
-1. **Enrichment** - Fetch full content (parallel for YouTube/Firecrawl, sequential for Chrome DevTools)
-2. **Analysis** - Spawn parallel subagents (batch of 3) with enriched content
-3. **Review** - Present proposals one at a time for user approval
+Phase 2: Enrich + Analyze (subagents)
+├── Each subagent: fetch content → analyze → persist proposal
+├── Parallel for YouTube, articles (batches of 5)
+├── Sequential for X/Twitter (single browser)
+└── Enriched content stays in subagent context (coordinator stays clean)
 
-**See:** [architecture.md](references/architecture.md) for detailed diagrams.
+Phase 3: Present (coordinator)
+├── Read all tasks, filter for analyzed
+├── Render table with all proposals
+└── User chooses: Accept all, Edit specific, Delete specific
+
+Phase 4: Edit (only if requested)
+└── Quick inline edits for selected items
+
+Phase 5: Execute (coordinator)
+├── Create all resources (para_create)
+├── Delete/archive originals
+└── Cleanup tasks
+```
+
+**Key insight:** Subagents handle BOTH enrichment AND analysis. Enriched content never flows through coordinator context.
+
+**See:** [architecture.md](references/architecture.md) for diagrams.
 
 ---
 
 ## Input Routing
 
-Check the `$ARGUMENTS`:
+Check `$ARGUMENTS`:
 
 | Input | Action |
 |-------|--------|
-| Empty or `all` | Bulk processing (scan inbox, batch of 3) |
-| `clippings` / `voice` / `attachments` | Filter by type, then bulk process |
-| `"filename.md"` | Single file → direct to worker skill |
-
-**Single file mode:** Skip batching, spawn one subagent, present proposal, done.
+| Empty or `all` | Full inbox processing |
+| `clippings` / `voice` / `attachments` | Filter by type |
+| `"filename.md"` | Single file mode (skip batching) |
 
 ---
 
-## Phase 0: Initialize Session
+## Phase 0: Check for Resume
 
-### 0.0 Check for Single File Mode
-
-If `$ARGUMENTS` is a filename (contains `.md`):
-1. Read frontmatter to determine type
-2. Spawn single worker subagent
-3. Present proposal
-4. Execute action
-5. Done (no batching needed)
-
-### 0.1 Check for Resume
-
-```
-TodoRead()
+```typescript
+TaskList()
 ```
 
 Filter for tasks where `id.startsWith("triage:")`.
@@ -79,267 +74,327 @@ Filter for tasks where `id.startsWith("triage:")`.
 If existing triage tasks found:
 ```
 Found existing triage session:
-• 3 completed
-• 2 pending
-• 1 in progress
+• 32 analyzed (proposals saved)
+• 18 pending
 
-Resume from where you left off? (y/n)
+Resume? (y/n)
 ```
 
-**See:** [todowrite-patterns.md](references/todowrite-patterns.md) for dependency encoding.
+If yes → Skip to Phase 2 (process pending items only).
 
-### 0.2 Load Vault Context
+---
 
-```
+## Phase 1: Initialize
+
+### 1.1 Load Vault Context
+
+```typescript
 para_list_areas({ response_format: "json" })
 para_list_projects({ response_format: "json" })
 ```
 
-Store for connection suggestions.
+### 1.2 Scan Inbox
 
-### 0.3 Scan Inbox
-
-```
+```typescript
 para_list({ path: "00 Inbox", response_format: "json" })
 ```
 
-Categorize by **TWO dimensions**:
+Categorize each item by:
 
-**1. Item Type (for analysis skill selection):**
-
+**Item Type (for analysis skill):**
 | Type | Detection | Analysis Skill |
 |------|-----------|----------------|
 | `clipping` | `type === "clipping"` | distill-web |
 | `transcription` | `type === "transcription"` | distill-voice |
-| `attachment` | PDF/DOCX in Attachments | distill-attachment |
+| `attachment` | PDF/DOCX | distill-attachment |
 
-**2. Source Type (for enrichment):**
+**Source Type (for enrichment):**
+| Source | Detection | Tool | Parallel? |
+|--------|-----------|------|-----------|
+| YouTube | `youtube.com` domain | youtube-transcript | ✅ Yes |
+| X/Twitter | `x.com` or `twitter.com` | Chrome DevTools | ❌ No |
+| GitHub | `github.com` | Firecrawl | ✅ Yes |
+| Public article | Default | Firecrawl | ✅ Yes |
+| Voice/Attachment | Has content | None | N/A |
 
-| Source | Enrichment Tool | Parallel? |
-|--------|-----------------|-----------|
-| YouTube | `youtube-transcript` MCP | ✅ Yes |
-| Twitter/X | Chrome DevTools | ❌ No |
-| Public article | Firecrawl | ✅ Yes |
-| Voice memo | None (has content) | N/A |
+**CRITICAL - X/Twitter:** Web Clipper captures only stubs. You MUST enrich via Chrome DevTools regardless of clipping content.
 
-**See:** [enrichment-strategies.md](references/enrichment-strategies.md) for full details.
-
-### 0.4 Create Task Graph
-
-Create all tasks upfront with dependencies:
+### 1.3 Create All Tasks Upfront
 
 ```typescript
-TodoWrite({
-  todos: [
-    // Batch 1 - parallel
-    { id: "triage:batch-1:item-1", content: "[DEPS:none] Distill: ✂️ Article 1", status: "pending" },
-    { id: "triage:batch-1:item-2", content: "[DEPS:none] Distill: ✂️ Article 2", status: "pending" },
-    { id: "triage:batch-1:item-3", content: "[DEPS:none] Distill: 🎤 Voice memo", status: "pending" },
-
-    // Batch 1 review - blocked until items done
-    { id: "triage:batch-1:review", content: "[DEPS:triage:batch-1:item-1,...] Review batch 1", status: "pending" },
-
-    // Cleanup
-    { id: "triage:cleanup", content: "[DEPS:triage:batch-N:review] Cleanup session", status: "pending" }
-  ]
+// For each inbox item:
+TaskCreate({
+  subject: "Triage: ✂️ Article Name",
+  description: "File: 00 Inbox/✂️ Article.md\nType: clipping\nSource: youtube",
+  activeForm: "Analyzing article",
+  metadata: {
+    file: "00 Inbox/✂️ Article.md",
+    itemType: "clipping",
+    sourceType: "youtube",
+    proposal: null  // Filled by subagent
+  }
 })
 ```
 
-**See:** [todowrite-patterns.md](references/todowrite-patterns.md) for full task graph example.
+Task IDs are auto-generated. Store mapping: `{ taskId → file }`.
 
-### 0.5 Present Summary
+### 1.4 Present Summary
 
 ```
-Found 6 items in inbox:
+Found 50 items in inbox:
 
 📋 By Type:
-• 4 clippings (web articles, threads)
-• 1 voice memo
-• 1 attachment
+• 40 clippings
+• 8 voice memos
+• 2 attachments
 
-Starting enrichment phase...
+📋 By Enrichment:
+• 35 parallel (YouTube, articles)
+• 5 sequential (X/Twitter)
+• 10 no enrichment needed
+
+Starting subagent processing...
 ```
 
 ---
 
-## Phase 1: Enrichment
+## Phase 2: Parallel Enrich + Analyze
 
-**CRITICAL:** Enrichment happens BEFORE analysis. Subagents receive full content, not stubs.
+**Key insight:** Each subagent handles BOTH enrichment AND analysis. This keeps enriched content out of the coordinator's context.
 
-### 1.1 Parallel Enrichment (YouTube, Firecrawl)
+### 2.1 Spawn Subagents
 
-```typescript
-// Run simultaneously
-mcp__youtube-transcript__get_transcript({ url: "..." })
-mcp__firecrawl__firecrawl_scrape({ url: "...", formats: ["markdown"] })
-```
+For each batch of 5 items, spawn subagents **in a single message** for parallel execution.
 
-### 1.2 Sequential Enrichment (Chrome DevTools)
-
-```typescript
-// One at a time - Chrome DevTools is single browser instance
-mcp__chrome-devtools__navigate_page({ url: "https://x.com/user/status/123" })
-mcp__chrome-devtools__take_snapshot({})
-// Complete before starting next
-```
-
-**See:** [enrichment-strategies.md](references/enrichment-strategies.md) for why Chrome DevTools cannot parallelize.
-
----
-
-## Phase 2: Parallel Analysis
-
-### 2.1 Find Unblocked Tasks
-
-```
-TodoRead() → find where:
-  - status === "pending"
-  - [DEPS:...] all completed (or DEPS:none)
-```
-
-### 2.2 Mark In Progress
-
-```
-TodoRead() → update status to "in_progress" → TodoWrite(all)
-```
-
-### 2.3 Spawn Subagents
-
-For each batch of 3 items, spawn subagents **in parallel**:
+**EXCEPTION:** X/Twitter items must be sequential (single Chrome browser). Process these separately after parallel items complete.
 
 ```typescript
 Task({
   subagent_type: "general-purpose",
-  description: "Distill clipping: [title]",
+  description: "Process: Article Title",
   model: "haiku",
-  prompt: `[Analysis prompt with enriched content]`
+  prompt: `
+    You are processing a single inbox item: enrich, analyze, and persist.
+
+    ## Item
+    Task ID: ${taskId}
+    File: ${file}
+    Source URL: ${sourceUrl}
+    Source Type: ${sourceType}  // youtube, twitter, article, voice, attachment
+
+    ## Vault Context (use these, don't fetch)
+
+    ### Areas
+    ${JSON.stringify(areas, null, 2)}
+
+    ### Projects
+    ${JSON.stringify(projects, null, 2)}
+
+    ## Step 1: Enrich (fetch full content)
+
+    Based on source type, fetch the content:
+
+    **YouTube:**
+    mcp__youtube-transcript__get_transcript({ url: "${sourceUrl}" })
+
+    **Article/GitHub:**
+    mcp__firecrawl__firecrawl_scrape({ url: "${sourceUrl}", formats: ["markdown"] })
+
+    **X/Twitter:**
+    mcp__chrome-devtools__navigate_page({ url: "${sourceUrl}", timeout: 30000 })
+    mcp__chrome-devtools__take_snapshot({})
+
+    **Voice/Attachment:** Content already in file, use para_read.
+
+    ## Step 2: Analyze
+
+    Based on the enriched content, create a proposal:
+    - title: Meaningful, descriptive title
+    - summary: 2-3 sentences capturing key value
+    - area: Wikilink from vault [[Area Name]]
+    - project: Wikilink or null
+    - resourceType: article|video|thread|meeting|reference
+
+    **CRITICAL:** Only use areas/projects from the lists above.
+
+    ## Step 3: Persist (CRITICAL - do not skip)
+
+    TaskUpdate({
+      taskId: "${taskId}",
+      status: "in_progress",
+      metadata: {
+        proposal: {
+          title: "...",
+          summary: "...",
+          area: "[[Area]]",
+          project: "[[Project]]" or null,
+          resourceType: "..."
+        }
+      }
+    })
+
+    This ensures your work survives if the session crashes.
+  `
 })
 ```
 
-**CRITICAL**: Run 3 Task calls in a single message for parallel execution.
+**CRITICAL:** Run 5 Task calls in a single message for parallel execution.
 
-**See:** [subagent-prompts.md](references/subagent-prompts.md) for full prompt templates.
+**See:** [subagent-prompts.md](references/subagent-prompts.md) for full templates.
 
-### 2.4 Collect Proposals & Mark Complete
+### 2.2 Handle X/Twitter Separately
 
-1. Parse JSON proposal from each subagent
-2. Store in review queue
-3. Mark task completed in TodoWrite
+X/Twitter requires Chrome DevTools (single browser instance). Process sequentially AFTER parallel items:
+
+```typescript
+// After all parallel subagents complete, process Twitter items one at a time
+for (const twitterItem of twitterItems) {
+  Task({
+    subagent_type: "general-purpose",
+    description: "Process: Twitter Thread",
+    model: "haiku",
+    prompt: `... same prompt with sourceType: "twitter" ...`
+  })
+  // Wait for completion before next
+}
+```
+
+### 2.3 Wait for Completion
+
+All subagents persist their own proposals via TaskUpdate. Coordinator context stays clean.
 
 ---
 
-## Phase 3: Sequential Review
+## Phase 3: Present Single Table
 
-Mark review task in progress, then present proposals ONE AT A TIME:
+### 3.1 Read All Proposals
 
+```typescript
+TaskList()
+// Filter: id contains "triage" AND metadata.proposal !== null
 ```
-## Proposal 1 of 3
 
-**📝 [Proposed Title]**
-From: ✂️ [Original filename]
+### 3.2 Render Table
 
-### Summary
-[2-3 sentences]
+```markdown
+# Inbox Triage: 50 items
 
-### Key Insights
-- [Insight 1]
-- [Insight 2]
+| #  | Title                           | Area          | Project      | Type  |
+|----|--------------------------------|---------------|--------------|-------|
+| 1  | ClawdBot Setup Guide           | 🤖 AI Practice | 🎯 Clawdbot  | video |
+| 2  | AI Replacing Libraries         | 🤖 AI Practice | -            | video |
+| 3  | Pizza Moncur Restaurant        | 🏡 Home        | -            | ref   |
+| .. | ...                            | ...           | ...          | ...   |
+| 50 | Meeting Notes Q1               | 💼 Work        | -            | meet  |
 
-### Classification
-| Template | resource |
-| Type | article |
+## Actions
+• **A** - Accept all and execute
+• **E 1,3,7** - Edit items 1, 3, 7 before accepting
+• **D 5,12** - Delete items 5 and 12
+• **Q** - Quit (proposals saved for resume)
+```
+
+**See:** [output-templates.md](references/output-templates.md)
 
 ---
 
-**Actions:** A (Accept) | E (Edit) | S (Skip) | D (Delete) | 3 (Deeper) | Q (Quit)
+## Phase 4: Edit (If Requested)
+
+For each item in edit list:
+
+```
+## Editing Item 3: Pizza Moncur Restaurant
+
+Current:
+• Area: 🏡 Home
+• Project: -
+
+Change: (A)rea, (P)roject, (D)elete, or Enter to skip?
 ```
 
-**See:** [output-templates.md](references/output-templates.md) for full format.
-
-### Action Handling
-
-| Action | Behavior |
-|--------|----------|
-| **A** | Create note, handle original |
-| **E** | Ask what to change, re-present |
-| **S** | Skip, move to next |
-| **D** | Delete (with confirmation) |
-| **3** | Spawn deep analysis subagent (model: sonnet) |
-| **Q** | Exit (tasks persist in TodoWrite) |
-
-### "3" (Deeper) Action
-
-Spawn subagent with `model: "sonnet"` that returns 3 different categorization options.
-
-**See:** [subagent-prompts.md](references/subagent-prompts.md#deep-analysis-prompt) for prompt.
+Quick inline edits. Update task metadata with changes.
 
 ---
 
-## Phase 4: Execute Approved Actions
+## Phase 5: Execute
 
-**IMPORTANT:** Always include `distilled: "false"` in args. Triage creates quick resource notes - use `/para-obsidian:distill-resource` for full progressive summarization.
+### 5.1 Create Resources
 
-### For Clippings
-```
-para_create({ template, title, dest: "03 Resources", args: {..., distilled: "false"} })
-para_delete({ file: "00 Inbox/[original]", confirm: true })
-```
+**CRITICAL:** Use frontmatter-only approach. ALL data in `args`, NEVER in `content`.
 
-### For Transcriptions
-```
-para_create({ template, title, dest: "03 Resources", args: {..., distilled: "false"} })
-para_rename({ from: "00 Inbox/[original]", to: "04 Archives/Transcriptions/..." })
-```
-
-### For Attachments
-```
-para_create({ template: "resource", args: {..., distilled: "false"} })
-// Attachment stays in place, linked via source field
-```
-
----
-
-## Phase 5: Cleanup
-
-When all reviews complete:
-
-```
-TodoRead() → filter OUT all triage:* tasks → TodoWrite(remaining)
+```typescript
+para_create({
+  template: "resource",
+  title: proposal.title,
+  dest: "03 Resources",
+  args: {
+    summary: proposal.summary,
+    source: originalUrl,
+    resource_type: proposal.resourceType,
+    areas: proposal.area,           // Wikilink: "[[Area]]"
+    projects: proposal.project,      // Wikilink or omit
+    distilled: "false"
+  }
+})
 ```
 
-Report completion:
+### 5.2 Handle Originals
+
+| Type | Action |
+|------|--------|
+| Clipping | `para_delete({ file, confirm: true })` |
+| Transcription | `para_rename({ from, to: "04 Archives/Transcriptions/..." })` |
+| Attachment | Keep in place (linked via source) |
+
+### 5.3 Cleanup Tasks
+
+```typescript
+// Mark each as completed
+TaskUpdate({ taskId, status: "completed" })
+
+// Or delete all triage tasks
+// (Tasks auto-cleanup when session ends)
+```
+
+### 5.4 Report
+
 ```
 ✅ Triage complete!
 
-Processed 6 items:
-• 4 accepted → created resource notes
-• 1 skipped
-• 1 deleted
+Processed 50 items:
+• 47 accepted → created resource notes
+• 1 edited → created with changes
+• 2 deleted
+
+Use /para-obsidian:distill-resource to add progressive summarization.
 ```
 
 ---
 
 ## Quick Reference
 
-### Batch Size
-**3 items** per batch.
+### Task States
 
-### Task ID Format
-```
-triage:batch-1:item-1   → Analysis task
-triage:batch-1:review   → Review phase
-triage:cleanup          → Final cleanup
-```
+| State | Meaning |
+|-------|---------|
+| `pending` | Created, not yet analyzed |
+| `in_progress` | Subagent completed, proposal saved |
+| `completed` | Resource created |
 
-### Dependency Encoding
-```
-[DEPS:none]           → Can start immediately
-[DEPS:id1,id2]        → Blocked by id1 AND id2
-```
+### Resume Capability
 
-### Models
-- **Haiku** for initial analysis (fast, cheap)
-- **Sonnet** for deep analysis (smarter)
+If session crashes/quits:
+1. Tasks with `status: "in_progress"` have proposals saved
+2. Tasks with `status: "pending"` need re-analysis
+3. Run `/triage` again → detects existing tasks → offers resume
+
+### Enrichment Constraints
+
+| Source | Parallel? | Reason |
+|--------|-----------|--------|
+| YouTube | ✅ Yes | Stateless API |
+| Firecrawl | ✅ Yes | Batch API |
+| Chrome DevTools | ❌ No | Single browser instance |
 
 ---
 
@@ -347,8 +402,8 @@ triage:cleanup          → Final cleanup
 
 | File | Content |
 |------|---------|
-| [architecture.md](references/architecture.md) | Diagrams, phase overview, philosophy |
-| [enrichment-strategies.md](references/enrichment-strategies.md) | Tool selection by source type |
-| [subagent-prompts.md](references/subagent-prompts.md) | Analysis and deep analysis prompts |
-| [output-templates.md](references/output-templates.md) | Proposal format, review UI |
-| [todowrite-patterns.md](references/todowrite-patterns.md) | Dependency encoding, task graph |
+| [architecture.md](references/architecture.md) | Flow diagrams, design rationale |
+| [enrichment-strategies.md](references/enrichment-strategies.md) | Tool selection by source |
+| [subagent-prompts.md](references/subagent-prompts.md) | Analysis prompt templates |
+| [output-templates.md](references/output-templates.md) | Table format, actions |
+| [task-patterns.md](references/task-patterns.md) | TaskCreate/Update API usage |
