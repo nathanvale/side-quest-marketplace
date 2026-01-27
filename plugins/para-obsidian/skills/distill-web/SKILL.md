@@ -61,11 +61,13 @@ Extract:
 
 **CRITICAL: Select tool based on domain.**
 
-| Domain | Tool | Notes |
-|--------|------|-------|
-| `x.com`, `twitter.com` | Chrome DevTools | Firecrawl blocked |
-| `youtube.com`, `youtu.be` | YouTube Transcript MCP | Get transcript |
-| Everything else | Firecrawl | `onlyMainContent: true` |
+See @plugins/para-obsidian/references/content-sourcing/url-routing.md for full routing logic.
+
+| Domain | Tool | Reference |
+|--------|------|-----------|
+| `x.com`, `twitter.com` | Chrome DevTools | @plugins/para-obsidian/references/content-sourcing/x-twitter.md |
+| `youtube.com`, `youtu.be` | YouTube Transcript MCP | @plugins/para-obsidian/references/content-sourcing/youtube.md |
+| Everything else | Firecrawl | @plugins/para-obsidian/references/content-sourcing/firecrawl.md |
 
 #### For X/Twitter
 ```
@@ -73,7 +75,7 @@ mcp__chrome-devtools__navigate_page({ url: "[source]" })
 mcp__chrome-devtools__take_snapshot()
 ```
 
-If Chrome DevTools unavailable, note in `notes` field.
+If Chrome DevTools unavailable, note in `notes` field and follow user-assisted fallback in x-twitter.md.
 
 #### For YouTube
 ```

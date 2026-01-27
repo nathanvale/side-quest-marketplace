@@ -2,6 +2,13 @@
 
 When fetching full source content during distillation, use the appropriate tool based on the domain.
 
+## Content Sourcing Reference
+
+See the shared content sourcing documentation for detailed patterns:
+@plugins/para-obsidian/references/content-sourcing/url-routing.md
+
+## Quick Reference
+
 | Domain | Tool |
 |--------|------|
 | `youtube.com`, `youtu.be` | `mcp__youtube-transcript__get_transcript` |
