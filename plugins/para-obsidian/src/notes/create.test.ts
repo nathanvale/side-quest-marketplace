@@ -28,10 +28,11 @@ describe("createFromTemplate", () => {
 			path.join(vault, "Templates"),
 			"project",
 			`---
-title: "<% tp.system.prompt("title") %>"
 type: project
 template_version: 4
 ---
+# My Project
+
 Body`,
 		);
 		process.env.PARA_VAULT = vault;
@@ -39,12 +40,12 @@ Body`,
 		const result = createFromTemplate(loadConfig({ cwd: vault }), {
 			template: "project",
 			title: "My Project",
-			args: { title: "My Project" },
 		});
 
 		expect(result.filePath.endsWith(".md")).toBe(true);
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written.includes("My Project")).toBe(true);
+		// Title should NOT be in frontmatter (filename IS the title)
+		expect(written).not.toMatch(/^title:/m);
 		expect(written).toContain("template_version: 4");
 	});
 
@@ -66,7 +67,6 @@ Body`,
 			path.join(vault, "Templates"),
 			"capture",
 			`---
-title: "<% tp.system.prompt("Title") %>"
 type: capture
 ---
 # <% tp.system.prompt("Title") %>`,
@@ -81,8 +81,9 @@ type: capture
 
 		expect(result.filePath).toBe("00 Inbox/My Capture Note.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		// YAML serializer may or may not quote simple strings
-		expect(written).toContain("title: My Capture Note");
+		// Title should NOT be in frontmatter (filename IS the title)
+		expect(written).not.toMatch(/^title:/m);
+		// But title SHOULD be in H1 heading
 		expect(written).toContain("# My Capture Note");
 	});
 
@@ -92,7 +93,6 @@ type: capture
 			path.join(vault, "Templates"),
 			"project",
 			`---
-title: "<% tp.system.prompt("Title") %>"
 type: project
 status: active
 start_date: <% tp.date.now("YYYY-MM-DD") %>
@@ -121,7 +121,8 @@ Area: <% tp.system.prompt("Area") %>`,
 
 		expect(result.filePath).toBe("00 Inbox/🎯 Build Dashboard.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written).toContain("title: 🎯 Build Dashboard");
+		// Title should NOT be in frontmatter
+		expect(written).not.toMatch(/^title:/m);
 		expect(written).toContain("target_completion: 2025-12-31");
 		// Wikilink gets parsed as array by YAML, check for Work
 		expect(written).toContain("Work");
@@ -134,7 +135,6 @@ Area: <% tp.system.prompt("Area") %>`,
 			path.join(vault, "Templates"),
 			"area",
 			`---
-title: "<% tp.system.prompt("Title") %>"
 type: area
 status: active
 tags:
@@ -156,7 +156,8 @@ Description: <% tp.system.prompt("Description") %>`,
 
 		expect(result.filePath).toBe("00 Inbox/🌱 Engineering.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written).toContain("title: 🌱 Engineering");
+		// Title should NOT be in frontmatter
+		expect(written).not.toMatch(/^title:/m);
 		expect(written).toContain(
 			"Description: Technical skills and software development",
 		);
@@ -168,7 +169,6 @@ Description: <% tp.system.prompt("Description") %>`,
 			path.join(vault, "Templates"),
 			"resource",
 			`---
-title: "<% tp.system.prompt("Title") %>"
 type: resource
 source: <% tp.system.prompt("Source type (book/article/video/course/podcast/etc.)") %>
 topic: <% tp.system.prompt("Main topic") %>
@@ -193,7 +193,8 @@ Topic: <% tp.system.prompt("Main topic") %>`,
 
 		expect(result.filePath).toBe("00 Inbox/📚 Refactoring UI.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written).toContain("title: 📚 Refactoring UI");
+		// Title should NOT be in frontmatter
+		expect(written).not.toMatch(/^title:/m);
 		expect(written).toContain("source: book");
 		expect(written).toContain("Topic: User interface design");
 	});
@@ -204,7 +205,6 @@ Topic: <% tp.system.prompt("Main topic") %>`,
 			path.join(vault, "Templates"),
 			"task",
 			`---
-title: "<% tp.system.prompt("Title") %>"
 type: task
 task_type: <% tp.system.prompt("Task type (task/reminder/habit/chore)") %>
 status: not-started
@@ -230,7 +230,8 @@ Effort: <% tp.system.prompt("Effort (small/medium/large)") %>`,
 
 		expect(result.filePath).toBe("00 Inbox/Review PR.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written).toContain("title: Review PR");
+		// Title should NOT be in frontmatter
+		expect(written).not.toMatch(/^title:/m);
 		expect(written).toContain("task_type: task");
 		expect(written).toContain("Effort: small");
 	});
@@ -241,7 +242,6 @@ Effort: <% tp.system.prompt("Effort (small/medium/large)") %>`,
 			path.join(vault, "Templates"),
 			"resource",
 			`---
-title: "<% tp.system.prompt("Title") %>"
 type: resource
 source: <% tp.system.prompt("Source type") %>
 source_url: "<% tp.system.prompt("Source URL (optional)", "") %>"
@@ -269,7 +269,8 @@ Author: <% tp.system.prompt("Author (optional)", "") %>`,
 
 		expect(result.filePath).toBe("00 Inbox/📚 Building A Second Brain.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written).toContain("title: 📚 Building a Second Brain");
+		// Title should NOT be in frontmatter
+		expect(written).not.toMatch(/^title:/m);
 		expect(written).toContain("source: book");
 		expect(written).toContain("source_url: https://example.com");
 		expect(written).toContain("author: Tiago Forte");
@@ -283,7 +284,6 @@ Author: <% tp.system.prompt("Author (optional)", "") %>`,
 			path.join(vault, "Templates"),
 			"resource",
 			`---
-title: "<% tp.system.prompt("Title") %>"
 type: resource
 source: <% tp.system.prompt("Source type") %>
 source_url: "<% tp.system.prompt("Source URL (optional)", "") %>"
@@ -309,7 +309,8 @@ Source: <% tp.system.prompt("Source type") %>`,
 
 		expect(result.filePath).toBe("00 Inbox/📚 Quick Note.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written).toContain("title: 📚 Quick Note");
+		// Title should NOT be in frontmatter
+		expect(written).not.toMatch(/^title:/m);
 		expect(written).toContain("source: article");
 		// Empty strings may or may not have quotes after YAML parsing
 		expect(written).toMatch(/source_url:\s*(""|''|$)/);
@@ -404,7 +405,6 @@ Body`,
 			path.join(vault, "Templates"),
 			"resource",
 			`---
-title: "<% tp.system.prompt("Resource title") %>"
 type: resource
 source: <% tp.system.prompt("Source type (book/article/video/course/podcast/etc.)") %>
 tags:
@@ -428,8 +428,9 @@ Source: <% tp.system.prompt("Source type (book/article/video/course/podcast/etc.
 		});
 
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		// Title should be substituted in both frontmatter and body
-		expect(written).toContain("title: 📚 Melbourne Coffee Guide");
+		// Title should NOT be in frontmatter (filename IS the title)
+		expect(written).not.toMatch(/^title:/m);
+		// But title SHOULD be in H1 heading
 		expect(written).toContain("# 📚 Melbourne Coffee Guide");
 		// No unsubstituted prompts should remain for title
 		expect(written).not.toContain('tp.system.prompt("Resource title")');
@@ -441,7 +442,6 @@ Source: <% tp.system.prompt("Source type (book/article/video/course/podcast/etc.
 			path.join(vault, "Templates"),
 			"project",
 			`---
-title: "<% tp.system.prompt("Project title") %>"
 type: project
 start_date: <% tp.date.now("YYYY-MM-DD") %>
 target_completion: <% tp.system.prompt("Target completion date (YYYY-MM-DD)") %>
@@ -463,7 +463,9 @@ tags:
 		});
 
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written).toContain("title: 🎯 Launch Dark Mode");
+		// Title should NOT be in frontmatter
+		expect(written).not.toMatch(/^title:/m);
+		// But title SHOULD be in H1 heading
 		expect(written).toContain("# 🎯 Launch Dark Mode");
 		expect(written).not.toContain('tp.system.prompt("Project title")');
 	});
@@ -474,7 +476,6 @@ tags:
 			path.join(vault, "Templates"),
 			"area",
 			`---
-title: "<% tp.system.prompt("Area title") %>"
 type: area
 status: active
 tags:
@@ -490,7 +491,9 @@ tags:
 		});
 
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written).toContain("title: 🌱 Health & Fitness");
+		// Title should NOT be in frontmatter
+		expect(written).not.toMatch(/^title:/m);
+		// But title SHOULD be in H1 heading
 		expect(written).toContain("# 🌱 Health & Fitness");
 		expect(written).not.toContain('tp.system.prompt("Area title")');
 	});
@@ -502,7 +505,6 @@ tags:
 			path.join(vault, "Templates"),
 			"capture",
 			`---
-title: "<% tp.system.prompt("Title") %>"
 type: capture
 ---
 # <% tp.system.prompt("Title") %>`,
@@ -515,7 +517,9 @@ type: capture
 		});
 
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written).toContain("title: Quick Note");
+		// Title should NOT be in frontmatter
+		expect(written).not.toMatch(/^title:/m);
+		// But title SHOULD be in H1 heading
 		expect(written).toContain("# Quick Note");
 		expect(written).not.toContain('tp.system.prompt("Title")');
 	});
@@ -623,7 +627,6 @@ tags:
 			path.join(vault, "Templates"),
 			"project",
 			`---
-title: "<% tp.system.prompt("Project title") %>"
 type: project
 target_completion: <% tp.system.prompt("Target date") %>
 area: "[[<% tp.system.prompt("Area") %>]]"
@@ -639,9 +642,10 @@ area: "[[<% tp.system.prompt("Area") %>]]"
 		});
 
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		// Unsubstituted prompts should be replaced with empty strings
-		// preventing YAML parse errors from nested quotes
-		expect(written).toContain("title: 🎯 No Args Test");
+		// Title should NOT be in frontmatter
+		expect(written).not.toMatch(/^title:/m);
+		// But title SHOULD be in H1 heading
+		expect(written).toContain("# 🎯 No Args Test");
 		// Null values are now omitted following Obsidian best practices
 		// (prevents Dataview issues and keeps frontmatter clean)
 		expect(written).not.toContain("target_completion");
@@ -722,7 +726,6 @@ project: "[[<% tp.system.prompt("Project (optional)", "") %>]]"
 			path.join(vault, "Templates"),
 			"trip",
 			`---
-title: "null"
 status: null
 start_date: null
 area: "[[null]]"
@@ -744,11 +747,12 @@ Body content`,
 		});
 
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		// Title gets "✈️ " prefix (emoji + single space) and may or may not be quoted depending on YAML serialization
-		expect(written).toMatch(/title: "?✈️ My Trip"?/);
+		// Title should NOT be in frontmatter
+		expect(written).not.toMatch(/^title:/m);
 		expect(written).toContain("status: active");
 		expect(written).toContain("start_date: 2025-12-26");
 		expect(written).toContain('area: "[[Travel]]"');
+		// H1 heading gets replaced with title (null → title)
 		expect(written).toContain("# ✈️ My Trip");
 		expect(written).not.toMatch(/: null\b/);
 		expect(written).not.toContain("[[null]]");
@@ -760,7 +764,6 @@ Body content`,
 			path.join(vault, "Templates"),
 			"test",
 			`---
-title: null
 target_completion: null
 ---
 Body`,
@@ -776,8 +779,8 @@ Body`,
 		});
 
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		// Title may or may not be quoted depending on YAML serialization
-		expect(written).toMatch(/title: "?Test Note"?/);
+		// Title should NOT be in frontmatter
+		expect(written).not.toMatch(/^title:/m);
 		expect(written).toContain("target_completion: 2026-01-01");
 	});
 
@@ -823,7 +826,6 @@ Body`,
 			path.join(vault, "Templates"),
 			"native-test",
 			`---
-title: null
 type: project
 status: "{{status:planning}}"
 template_version: 1
@@ -841,9 +843,11 @@ Created on {{date:YYYY-MM-DD}}.`,
 		});
 
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written).toContain("title: My Native Project");
+		// Title should NOT be in frontmatter
+		expect(written).not.toMatch(/^title:/m);
 		// Status should be replaced (YAML may or may not keep quotes)
 		expect(written).toMatch(/status:\s*"?active"?/);
+		// But title SHOULD be in H1 heading
 		expect(written).toContain("# My Native Project");
 		// Date should be replaced with actual date (not {{date:...}})
 		expect(written).not.toContain("{{date:");
@@ -857,7 +861,6 @@ Created on {{date:YYYY-MM-DD}}.`,
 			"emoji-test",
 			`---
 emoji_prefix: "🎯 "
-title: null
 type: project
 template_version: 1
 ---
@@ -874,8 +877,8 @@ template_version: 1
 		expect(result.filePath).toContain("🎯 My Goal.md");
 
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		// Title in frontmatter should have emoji
-		expect(written).toContain("title: 🎯 My Goal");
+		// Title should NOT be in frontmatter
+		expect(written).not.toMatch(/^title:/m);
 		// H1 should have emoji
 		expect(written).toContain("# 🎯 My Goal");
 		// emoji_prefix should be removed from output frontmatter
@@ -1359,7 +1362,6 @@ describe("Bug Fixes", () => {
 			path.join(vault, "Templates"),
 			"resource",
 			`---
-title: "<% tp.system.prompt("Title") %>"
 type: resource
 source: <% tp.system.prompt("Source type", "article", false, ["book", "article", "video", "course"]) %>
 tags:
@@ -1381,7 +1383,8 @@ Source: <% tp.system.prompt("Source type", "article", false, ["book", "article",
 
 		expect(result.filePath).toBe("00 Inbox/📚 My Resource.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written).toContain("title: 📚 My Resource");
+		// Title should NOT be in frontmatter
+		expect(written).not.toMatch(/^title:/m);
 		expect(written).toContain("source: book");
 		expect(written).toContain("Source: book");
 		// Should not contain unprocessed Templater syntax
@@ -1394,7 +1397,6 @@ Source: <% tp.system.prompt("Source type", "article", false, ["book", "article",
 			path.join(vault, "Templates"),
 			"resource",
 			`---
-title: "<% tp.system.prompt("Title") %>"
 type: resource
 source: <% tp.system.prompt("Source type", "article", false, ["book", "article", "video"]) %>
 tags:
@@ -1412,7 +1414,8 @@ tags:
 
 		expect(result.filePath).toBe("00 Inbox/📚 Default Resource.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-		expect(written).toContain("title: 📚 Default Resource");
+		// Title should NOT be in frontmatter
+		expect(written).not.toMatch(/^title:/m);
 		expect(written).toContain("source: article"); // Default value
 		// Should not contain unprocessed Templater syntax
 		expect(written).not.toContain("<% tp.system.prompt");
@@ -1496,54 +1499,66 @@ describe("applyArgsToFrontmatter", () => {
 
 	it("protects 'created' field from being overridden", () => {
 		const attributes = {
-			title: "Test",
 			created: "2025-01-01",
 			type: "resource",
 		};
 
 		const result = applyArgsToFrontmatter(attributes, {
 			created: "2025-12-31", // Should be ignored
-			title: "New Title", // Should be applied
+			status: "active", // Should be applied
 		});
 
 		expect(result.created).toBe("2025-01-01"); // Protected
-		expect(result.title).toBe("New Title"); // Not protected
+		expect(result.status).toBe("active"); // Not protected
 	});
 
 	it("protects 'type' field from being overridden", () => {
 		const attributes = {
-			title: "Test",
 			type: "resource",
 		};
 
 		const result = applyArgsToFrontmatter(attributes, {
 			type: "project", // Should be ignored
-			title: "New Title", // Should be applied
+			status: "active", // Should be applied
 		});
 
 		expect(result.type).toBe("resource"); // Protected
-		expect(result.title).toBe("New Title"); // Not protected
+		expect(result.status).toBe("active"); // Not protected
 	});
 
 	it("protects 'template_version' field from being overridden", () => {
 		const attributes = {
-			title: "Test",
 			type: "resource",
 			template_version: 4,
 		};
 
 		const result = applyArgsToFrontmatter(attributes, {
 			template_version: "999", // Should be ignored
-			title: "New Title", // Should be applied
+			status: "active", // Should be applied
 		});
 
 		expect(result.template_version).toBe(4); // Protected
-		expect(result.title).toBe("New Title"); // Not protected
+		expect(result.status).toBe("active"); // Not protected
+	});
+
+	it("protects 'title' field from being overridden", () => {
+		const attributes = {
+			title: "Old Title",
+			type: "resource",
+		};
+
+		const result = applyArgsToFrontmatter(attributes, {
+			title: "New Title", // Should be ignored - filename IS the title
+			status: "active", // Should be applied
+		});
+
+		expect(result.title).toBe("Old Title"); // Protected
+		expect(result.status).toBe("active"); // Not protected
 	});
 
 	it("handles multiple overrides and additions at once", () => {
 		const attributes = {
-			title: "Old Title",
+			title: "Old Title", // Protected
 			resource_type: "reference", // Template default
 			status: "active",
 			type: "resource", // Protected
@@ -1551,7 +1566,7 @@ describe("applyArgsToFrontmatter", () => {
 		};
 
 		const result = applyArgsToFrontmatter(attributes, {
-			title: "New Title", // Override
+			title: "New Title", // Try to override protected (should fail)
 			resource_type: "meeting", // Override template default
 			status: "completed", // Override
 			author: "Jane Doe", // Add new
@@ -1561,7 +1576,6 @@ describe("applyArgsToFrontmatter", () => {
 		});
 
 		// Overridden fields
-		expect(result.title).toBe("New Title");
 		expect(result.resource_type).toBe("meeting");
 		expect(result.status).toBe("completed");
 
@@ -1569,7 +1583,8 @@ describe("applyArgsToFrontmatter", () => {
 		expect(result.author).toBe("Jane Doe");
 		expect(result.year).toBe("2025");
 
-		// Protected fields (unchanged)
+		// Protected fields (unchanged) - includes title now
+		expect(result.title).toBe("Old Title");
 		expect(result.type).toBe("resource");
 		expect(result.created).toBe("2025-01-01");
 	});

@@ -2,7 +2,7 @@
 name: smart-commit
 description: Creates well-formatted git commits using Conventional Commits specification. Use when committing changes, creating commits, staging and committing files, or when asked to save work with a proper commit message.
 model: claude-sonnet-4-5-20250929
-allowed-tools: Bash(git status:*), Bash(git add:*), Bash(git diff:*), Bash(git log:*), Bash(git commit:*), mcp__git_git-intelligence__*
+allowed-tools: Bash(git status:*), Bash(git add:*), Bash(git diff:*), Bash(git log:*), Bash(git commit:*), git_*
 ---
 
 # Smart Commit

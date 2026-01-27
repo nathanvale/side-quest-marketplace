@@ -24,21 +24,27 @@ All MCP tool calls MUST include `response_format: "json"` — saves 40-60% token
 
 | Plugin | Tools | Use For |
 |--------|-------|---------|
-| **Git** | `mcp__git_git-intelligence__git_get_recent_commits`, `git_search_commits`, `git_get_status` | History, status |
+| **Git** | `git_get_recent_commits`, `git_search_commits`, `git_get_status` | History, status |
 | **Bun** | `bun_runTests`, `bun_testFile`, `bun_testCoverage` | Testing |
 | **Biome** | `biome_lintCheck`, `biome_lintFix`, `biome_formatCheck` | Linting |
-| **TSC** | `mcp__tsc-runner_tsc-runner__tsc_check` | Type checking |
-| **Atuin** | `mcp__atuin_bash-history__atuin_search_history`, `atuin_history_insights` | Shell history |
+| **TSC** | `tsc_check` | Type checking |
+| **Atuin** | `atuin_search_history`, `atuin_history_insights` | Shell history |
 
 ---
 
 ## Tool Naming Convention
 
-```
-mcp__<plugin>_<server>__<tool>
+**In source code (what you write):**
+```typescript
+tool("my_tool", { ... });  // Short name only
 ```
 
-Example: `mcp__git_git-intelligence__git_get_recent_commits`
+**Final registered name (Claude Code adds prefix):**
+```
+mcp__plugin_<plugin>_<server>__my_tool
+```
+
+**IMPORTANT:** Never include the `mcp__` prefix in source code. Claude Code auto-prefixes, causing double-prefixing and 64-character limit errors if you include it.
 
 ---
 

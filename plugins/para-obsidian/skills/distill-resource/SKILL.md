@@ -1,469 +1,389 @@
 ---
 name: distill-resource
-description: Transform clippings into deeply understood resource notes through AI-guided progressive summarization. Implements BASB Distill phase with Socratic dialogue. Use when processing clippings from inbox, learning from saved content, or creating resource notes from raw captures.
-allowed-tools: Read, Edit, AskUserQuestion, mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_list, mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_delete, mcp__plugin_para-obsidian_para-obsidian__para_frontmatter_get, mcp__plugin_para-obsidian_para-obsidian__para_frontmatter_set, mcp__plugin_para-obsidian_para-obsidian__para_list_areas, mcp__plugin_para-obsidian_para-obsidian__para_list_projects, mcp__plugin_para-obsidian_para-obsidian__para_config, mcp__plugin_para-obsidian_para-obsidian__para_template_fields, mcp__firecrawl__firecrawl_scrape, mcp__youtube-transcript__get_video_info, mcp__youtube-transcript__get_transcript, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__take_snapshot, mcp__chrome-devtools__evaluate_script, WebFetch
+description: Guide progressive summarization of undistilled resources. Finds resources with distilled:false, acts as Tiago Forte to help extract key insights through the layers approach. Use when you want to deeply learn from saved content.
+argument-hint: [filename.md] or empty for auto-discovery
+user-invocable: true
+disable-model-invocation: true
+allowed-tools: Task, Read, Edit, AskUserQuestion, mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_list, mcp__plugin_para-obsidian_para-obsidian__para_insert, mcp__plugin_para-obsidian_para-obsidian__para_frontmatter_get, mcp__plugin_para-obsidian_para-obsidian__para_frontmatter_set, mcp__plugin_para-obsidian_para-obsidian__para_search, mcp__firecrawl__firecrawl_scrape, mcp__youtube-transcript__get_video_info, mcp__youtube-transcript__get_transcript, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__take_snapshot, WebFetch
 ---
 
 # Distill Resource
 
-Transform raw clippings into deeply understood resource notes through collaborative learning.
+**Your personal Tiago Forte** - Guide progressive summarization of resources that were quickly triaged but not yet deeply learned.
 
 ## Core Philosophy
 
-**Distillation and learning are the same act.** This skill makes you (the AI) a learning partner who:
-1. Reads and understands the source content deeply
-2. Teaches the user through explanation and questioning
-3. Guides progressive summarization (Layers 1-4)
-4. Creates a resource note that captures genuine understanding
+From Tiago Forte's Progressive Summarization:
 
-By the time the resource note exists, the user has **internalized** the key insights.
+> "The challenge is not acquiring knowledge. The challenge is knowing which knowledge is worth acquiring. And then building a system to forward bits of it through time."
 
-## Critical Rules
+**You are designing notes for Future You** - a demanding, skeptical customer who needs proof upfront that reviewing a note will be worthwhile. You must balance:
 
-1. **ALWAYS fetch full content** - Clipping notes are pointers; fetch the real content
-2. **ALWAYS use correct tool for domain** - See Phase 1.2 for mandatory tool selection
-3. **NEVER use Firecrawl for X/Twitter** - It will fail; use Chrome DevTools or ask user
-4. **Teach, don't summarize** - Explain concepts, ask questions, guide discovery
-5. **Layer 4 must be user's words** - Co-create the executive summary through dialogue
-6. **Use capture_reason** - If present, acknowledge why they saved this
-7. **Delete clippings after distilling** - The clipping is transformed into a resource
-8. **Voice transcripts are KEPT** - Link via `source_note`; only web clips are deleted
+- **Discoverability** (compression) - Make it scannable at a glance
+- **Understanding** (context) - Preserve enough detail to be useful
+
+This skill guides users through **opportunistic compression** - summarizing in layers, only doing as much as the information deserves.
+
+---
+
+## The Layers
+
+See [layer-definitions.md](references/layer-definitions.md) for details on the progressive summarization layers.
+
+---
 
 ## Workflow Overview
 
 ```
-Phase 0: Find Clippings
+Phase 0: SUBAGENT - Prep Work (minimizes context rot)
+    │   - Find undistilled resources
+    │   - Fetch full source content
+    │   - Analyze and prepare proposal
+    │   - Return concise summary for collaboration
     ↓
-Phase 1: Read & Enrich (ALWAYS fetch full content)
+Phase 1: MAIN WINDOW - User Selection
     ↓
-Phase 2: Teaching & Understanding
+Phase 2: MAIN WINDOW - Layer 2 Collaborative Bolding
     ↓
-Phase 3: Layer 2 - What Resonates?
+Phase 3: MAIN WINDOW - Layer 3 Highlighted Core
     ↓
-Phase 4: Layer 3 - The Essence
+Phase 4: MAIN WINDOW - Layer 4 Executive Summary (user's words)
     ↓
-Phase 5: Layer 4 - Executive Summary (USER'S WORDS)
-    ↓
-Phase 5.5: Action Items (collaborative extraction)
-    ↓
-Phase 6: Connections & Note Creation
+Phase 5: Update Note & Mark Distilled
 ```
 
 ---
 
-## Phase 0: Find Clippings
+## Phase 0: Subagent Prep Work
 
-Scan inbox for notes with `type: clipping` or `type: transcription` frontmatter.
+**CRITICAL:** Use a subagent to do the heavy lifting. This keeps large source content OUT of the main conversation context.
 
-```
-para_list({ path: "00 Inbox", response_format: "json" })
-```
-
-For each file, check frontmatter:
+### 0.1 Spawn Prep Subagent
 
 ```
-para_frontmatter_get({ file: "00 Inbox/[filename]", response_format: "json" })
-```
+Task({
+  subagent_type: "general-purpose",
+  description: "Prep distillation: find undistilled resources",
+  model: "haiku",
+  prompt: `
+You are preparing resources for progressive summarization.
 
-**Detection criteria:** `type === "clipping"` OR `type === "transcription"`
+## Your Task
 
-Present findings to user:
+1. **Find undistilled resources:**
+   para_list({ path: "03 Resources", response_format: "json" })
 
-```
-Found 5 items to distill:
+   For each file, check frontmatter:
+   para_frontmatter_get({ file: "03 Resources/[filename]", response_format: "json" })
 
-1. ✂️📰 Arman Hezarkhani - Claude Code for iMessage
-2. ✂️🎬 Matt Pocock - TypeScript 5.5 Tips
-3. 🎤 2024-01-22 3-45pm (voice memo)
-4. ✂️ Thread by @damianplayer
-5. ✂️ Building a Second Brain Overview
+   Filter for: distilled === false (or distilled field missing)
 
-Which one shall we start with?
-```
+2. **Sort by recency** (most recent first by 'created' date)
 
----
+3. **Return JSON:**
+   {
+     "undistilled_count": N,
+     "resources": [
+       {
+         "file": "03 Resources/📚 Title.md",
+         "title": "Title",
+         "created": "2024-01-25",
+         "age": "2 days ago",
+         "summary": "Brief summary from frontmatter",
+         "resource_type": "article",
+         "source": "https://..."
+       }
+     ]
+   }
 
-## Phase 1: Read & Enrich
-
-**ALWAYS fetch full content** from the source URL. The clipping note is just a pointer.
-
-### 1.1 Read Clipping Note
-
-```
-para_read({ file: "00 Inbox/[selected clipping]", response_format: "json" })
-```
-
-Extract:
-- `source` (URL)
-- `domain` (for strategy selection)
-- `capture_reason` (if present - use in dialogue!)
-- Existing content (may be partial)
-
-**Voice memo handling:** If `type: transcription`, the note already contains the transcription. Skip URL fetching - you have the content.
-
-### 1.2 Fetch Full Content - CRITICAL TOOL SELECTION
-
-**Skip enrichment if `type: transcription`** - voice memos already have full content.
-
-For clippings, **YOU MUST select the correct tool based on domain. This is non-negotiable.**
-
-Parse the domain from the source URL first:
-```javascript
-const url = new URL(source);
-const domain = url.hostname.replace('www.', '');
-```
-
-#### Tool Selection Decision Tree
-
-```
-Is type "transcription"?
-├─ YES → Skip enrichment (content is in the note)
-│
-Is domain x.com or twitter.com?
-├─ YES → Use Chrome DevTools (Step A)
-│        ├─ Tool available? → Fetch content
-│        └─ Tool unavailable? → Ask user (Step D)
-│        **NEVER use Firecrawl for X/Twitter - it will always fail**
-│
-Is domain youtube.com or youtu.be?
-├─ YES → Use YouTube Transcript MCP (Step B)
-│
-Everything else?
-└─ YES → Use Firecrawl (Step C)
-```
-
-#### Step A: X/Twitter (Chrome DevTools) - TRY THIS FIRST FOR x.com/twitter.com
-
-**NEVER use Firecrawl for X/Twitter URLs. It is blocked and will fail.**
-
-```
-mcp__chrome-devtools__navigate_page({ url: "[source URL]" })
-```
-
-Wait for page load, then:
-
-```
-mcp__chrome-devtools__take_snapshot()
-```
-
-If Chrome DevTools tools are **not available** (tool not found error), go directly to **Step D** (User Fallback).
-
-#### Step B: YouTube (Transcript MCP)
-
-```
-mcp__youtube-transcript__get_video_info({ url: "[source URL]" })
-mcp__youtube-transcript__get_transcript({ url: "[source URL]" })
-```
-
-If transcript unavailable, use video description and note limitation.
-
-#### Step C: All Other URLs (Firecrawl)
-
-```
-mcp__firecrawl__firecrawl_scrape({
-  url: "[source URL]",
-  formats: ["markdown"],
-  onlyMainContent: true
+Return ONLY the JSON, no other text.
+  `
 })
 ```
 
-If Firecrawl fails, fall back to WebFetch.
+### 0.2 Present Selection to User
 
-#### Step D: User Fallback (X/Twitter when Chrome DevTools unavailable)
-
-When Chrome DevTools MCP is not available for X/Twitter:
-
-1. Parse URL for username: `https://x.com/[username]/status/[id]`
-2. Check if clipping already has content
-3. Ask user:
+Parse the subagent result and present:
 
 ```
-I can't fetch X/Twitter content directly (Chrome DevTools MCP isn't available in this session).
+Found [N] undistilled resources:
 
-**Tweet by @[username]:** [source URL]
+1. 📚 Claude Code Multi-Agent Patterns (2 days ago)
+   Article about orchestrating AI agents
 
-Could you help? Either:
-1. **Paste the tweet text** here
-2. **Summarize what it's about** from memory
-3. **Skip this clipping** and move to the next one
+2. 📚 TypeScript 5.5 Inference Tips (5 days ago)
+   Video tutorial on new TS features
 
-What would you prefer?
+Which one would you like to distill? (number, or "1" for most recent)
 ```
 
-See `./references/enrichment-strategies.md` for additional details on each strategy.
-
-### 1.3 Understand the Content
-
-Before proceeding, you (the AI) must deeply understand:
-- The main argument or thesis
-- Key concepts and how they connect
-- Why this matters (the "so what?")
-- Potential applications or implications
+**WAIT for user selection.**
 
 ---
 
-## Phase 2: Teaching & Understanding
+## Phase 1: Fetch Content via Subagent
 
-Now **teach** the user about what you found. This is Socratic dialogue, not a data dump.
+Once user selects a resource, spawn another subagent to fetch and analyze the content:
 
-### Opening (Acknowledge capture_reason if present)
-
-If the clipping has `capture_reason`:
+### 1.1 Spawn Content Subagent
 
 ```
-I see you captured this because "[capture_reason]". Let me explain what I found...
+Task({
+  subagent_type: "general-purpose",
+  description: "Fetch and analyze: [resource title]",
+  model: "sonnet",
+  prompt: `
+You are preparing content for progressive summarization.
+
+## Resource
+File: [selected file path]
+Source: [source URL from frontmatter]
+
+## Your Task
+
+1. **Read the resource note:**
+   para_read({ file: "[path]", response_format: "json" })
+
+2. **Fetch full source content** (if Layer 1 is sparse):
+
+   For YouTube: mcp__youtube-transcript__get_transcript({ url: "[source]" })
+   For articles: mcp__firecrawl__firecrawl_scrape({ url: "[source]", formats: ["markdown"], onlyMainContent: true })
+   For X/Twitter: Note that Chrome DevTools is needed, return "NEEDS_USER_HELP" for Twitter URLs
+
+3. **Analyze the content and return JSON:**
+   {
+     "title": "Resource title",
+     "source": "URL",
+     "existing_summary": "From frontmatter",
+     "content_overview": "2-3 sentence overview of what this content covers",
+     "key_topics": ["Topic 1", "Topic 2", "Topic 3"],
+     "suggested_bold_passages": [
+       {
+         "passage": "The actual text to potentially bold",
+         "why": "Why this is important"
+       }
+     ],
+     "suggested_highlights": [
+       "The absolute essence - 1-2 sentences"
+     ],
+     "questions_for_user": [
+       "What drew you to save this?",
+       "How does this connect to your current work?"
+     ],
+     "needs_user_help": false  // true if Twitter URL couldn't be fetched
+   }
+
+Keep suggested_bold_passages to 5-7 items max.
+Return ONLY the JSON, no other text.
+  `
+})
 ```
 
-If no capture_reason:
+### 1.2 Present to User (Concise)
+
+The subagent did the heavy lifting. Now present a **concise** summary to start collaboration:
 
 ```
-I've read through this [article/video/thread]. Here's what it's about...
-```
+## 📚 [Title]
 
-### Explain the Core Concepts
+**Source:** [URL]
+**Overview:** [content_overview from subagent]
 
-- **What is this about?** (2-3 sentences)
-- **What's the key argument?** (main thesis)
-- **Why does it matter?** (implications)
-
-### Invite Engagement
-
-```
-What drew you to clip this? What aspect interests you most?
-```
-
-Wait for user response. Their answer guides the rest of the dialogue.
+**Key topics:**
+1. [Topic 1]
+2. [Topic 2]
+3. [Topic 3]
 
 ---
 
-## Phase 3: Layer 2 - What Resonates?
+Ready to start progressive summarization? We'll work through:
+1. **Bold** the most important passages
+2. **Highlight** the absolute essence
+3. Create your **Executive Summary**
 
-Present the passages you found most important and ask what resonates with THEM.
-
-### Present Bold-Worthy Passages
-
+[Question from subagent - e.g., "What drew you to save this?"]
 ```
-I found these passages particularly important:
-
-1. "[Quote A]" - This captures the core mechanism because...
-
-2. "[Quote B]" - This is significant because...
-
-3. "[Quote C]" - This challenges the common assumption that...
-
-What resonates with YOU? Anything I missed that struck you?
-```
-
-### Collaborate on Selection
-
-User might:
-- Agree with your selections
-- Add their own passages
-- Shift focus to different aspects
-
-Honor their input - this is THEIR learning, not yours.
 
 ---
 
-## Phase 4: Layer 3 - The Essence
+## Phase 2: Layer 2 - Bold Passages (Collaborative)
 
-Distill to the absolute core. Confirm with user.
+### 2.1 Your Role as Tiago Forte
 
-### Present Distilled Essence
+Act as a learning partner, not just a summarizer. You should:
+
+1. **Teach** - Explain key concepts as you encounter them
+2. **Question** - Ask what resonates with the user
+3. **Guide** - Help identify what's truly important vs. just interesting
+
+### 2.2 Use Subagent's Suggestions
+
+Present the subagent's suggested bold passages one at a time:
 
 ```
-Of everything we've discussed, the absolute essence is:
+Here's a passage that stood out:
 
-[1-2 sentence distillation capturing the core insight]
+> [passage from suggested_bold_passages]
 
-Does that capture it? Or is the core something else for you?
+**Why it matters:** [why from subagent]
+
+Would you **bold** this? (yes / no / your pick for something else)
 ```
 
-### Iterate if Needed
+### 2.3 Build the Bold Layer
 
-User might refine or redirect. The goal is arriving at THEIR understanding of the essence, not imposing yours.
+As user approves/modifies, build up:
+
+```
+Great. Here's Layer 2 so far:
+
+**[Bolded passage 1]**
+
+**[Bolded passage 2]**
+
+[Continue, or move to Layer 3?]
+```
+
+See [layer-definitions.md](references/layer-definitions.md) for compression targets.
 
 ---
 
-## Phase 5: Layer 4 - Executive Summary
+## Phase 3: Layer 3 - Highlighted Core (Collaborative)
 
-**CRITICAL:** Layer 4 must be in the USER'S OWN WORDS.
-
-### Propose Takeaways
+### 3.1 Review Bold Passages
 
 ```
-Let's agree on 3-5 things to remember. I propose:
+Here's everything we bolded:
 
-1. [Takeaway based on dialogue]
-2. [Takeaway based on dialogue]
-3. [Takeaway based on dialogue]
+**[Passage 1]**
+**[Passage 2]**
+**[Passage 3]**
 
-How would YOU phrase these? What's missing? What would you add?
+Now for Layer 3: What's the ==absolute essence==?
+
+The subagent suggested: "[suggested_highlights from earlier]"
+
+Does that resonate, or would you highlight something different?
 ```
 
-### Co-Create the Summary
+### 3.2 Capture Highlights
 
-User will:
-- Rephrase in their own words
-- Add or remove items
-- Prioritize differently
+```
+Perfect. Layer 3 (Highlighted Core):
 
-Incorporate their language. The final summary should feel like THEIR words, not yours.
+==The key insight is [highlighted passage]==
+
+Ready for the final layer - your Executive Summary?
+```
 
 ---
 
-## Phase 5.5: Action Items
+## Phase 4: Layer 4 - Executive Summary (User's Words)
 
-**Extract actionable next steps from the content through dialogue.**
+### 4.1 The User's Words
 
-### Propose Action Items
-
-Based on the content, identify potential action items:
+**This is the most important layer.** It must be in the user's own words, not yours.
 
 ```
-I noticed some potential action items:
+## Layer 4: Executive Summary
 
-- [ ] [Proposed action 1 - based on content]
-- [ ] [Proposed action 2 - based on content]
+This is where you capture what YOU learned - in your own words.
 
-Are these things you want to track? Any others I missed?
+Based on our conversation, what are the 3-5 things you want to remember?
+
+Don't just repeat what the article said. What does this mean for YOU?
 ```
 
-### Collaborate on Actions
+### 4.2 Guide Without Dictating
 
-User might:
-- Confirm the proposed actions
-- Rephrase in their own words
-- Add items you missed
-- Remove items that aren't relevant
-- Say "no actions needed" (that's fine!)
+If user struggles, offer prompts:
 
-**Guidelines:**
-- Only propose actions that are **concrete and actionable**
-- For meetings: focus on commitments, follow-ups, dependencies
-- For articles: focus on "try this" or "apply this to X"
-- Don't force actions - some resources are purely reference material
+```
+Some questions to spark your thinking:
+
+- What surprised you most?
+- What will you do differently because of this?
+- How does this connect to something you're working on?
+- What's the one thing you'd tell a friend about this?
+```
+
+### 4.3 Capture Their Summary
+
+```
+Great summary! Here's what we'll save:
+
+**Executive Summary:**
+1. [User's takeaway 1]
+2. [User's takeaway 2]
+3. [User's takeaway 3]
+
+Does this capture it? (yes / adjust)
+```
 
 ---
 
-## Phase 6: Connections & Note Creation
+## Phase 5: Update Note & Mark Distilled
 
-### 6.1 Check for Pre-filled Connections
-
-First, check if the source note already has `areas` or `projects` filled in (from Phase 1 frontmatter):
+### 5.1 Update the Resource Content
 
 ```
-para_frontmatter_get({ file: "00 Inbox/[selected note]", response_format: "json" })
-```
+para_insert({
+  file: "03 Resources/[filename]",
+  heading: "Layer 2: Bold Passages",
+  content: "[Bolded passages from Phase 2]",
+  position: "replace",
+  response_format: "json"
+})
 
-If `areas` and/or `projects` arrays are non-empty, **use those directly** and skip to 6.3.
+para_insert({
+  file: "03 Resources/[filename]",
+  heading: "Layer 3: Highlighted Core",
+  content: "[Highlighted content from Phase 3]",
+  position: "replace",
+  response_format: "json"
+})
 
-**Example pre-filled transcription frontmatter:**
-```yaml
-type: transcription
-areas:
-  - "[[🌱 Work]]"
-  - "[[🌱 AI Practice]]"
-projects:
-  - "[[🎯 Oil Team Migration]]"
-```
-
-This speeds up distillation when users pre-fill connections in Obsidian before running `/distill`.
-
-### 6.2 Suggest Connections (if not pre-filled)
-
-Only if `areas` and `projects` are empty, fetch vault context and suggest:
-
-```
-para_list_areas({ response_format: "json" })
-para_list_projects({ response_format: "json" })
-```
-
-Based on the dialogue, suggest relevant connections:
-
-```
-This connects to:
-- [[🌱 AI Practice]] - The automation patterns could enhance your AI workflows
-- [[🎯 Home Automation]] - The productivity principles apply to this project
-
-Does that feel right? Any other connections?
-```
-
-### 6.3 Determine Resource Type
-
-Ask the user what type of resource this is:
-
-```
-What type of resource is this?
-- meeting (voice memo from a meeting)
-- tutorial (how-to content)
-- reference (documentation, specs)
-- article (blog post, news)
-- research (papers, studies)
-- issue (bug report, ticket)
-- decision (architecture decision)
-- idea (brainstorm, concept)
-- recipe (step-by-step process)
-- conversation (chat, interview)
-- how-to (practical guide)
-```
-
-### 6.4 Create Resource Note
-
-```
-para_create({
-  template: "resource",
-  title: "[Concise, meaningful title]",
-  dest: "03 Resources",
-  args: {
-    "resource_type": "[from dialogue]",
-    "source": "[URL or [[🎤 note link]]]"
-  },
-  content: {
-    "Summary": "[2-3 sentences from Phase 2]",
-    "Key Insights": "[Bullet points from dialogue]",
-    "Notable Quotes": "[Bold-worthy passages from Phase 3]",
-    "Layer 1: Captured Notes": "[Raw quote/passage that captures the core - from Notable Quotes]",
-    "Layer 2: Bold Passages": "[Key insights with **bold** markers on important phrases]",
-    "Layer 3: Highlighted Core": "[1-2 sentence essence with ==highlight== on the core insight]",
-    "Executive Summary": "[USER'S takeaways from Phase 5]",
-    "Action Items": "[Checkbox list from Phase 5.5, or empty if none]"
-  },
+para_insert({
+  file: "03 Resources/[filename]",
+  heading: "Layer 4: Executive Summary",
+  content: "[User's summary from Phase 4]",
+  position: "replace",
   response_format: "json"
 })
 ```
 
-### 6.5 Handle Original Note
-
-**For voice transcripts (`type: transcription`):**
-- KEEP the original transcription note
-- The new resource links to it via `source`
-
-**For web clippings (`type: clipping`):**
-- DELETE the original clipping after successful resource creation
+### 5.2 Mark as Distilled
 
 ```
-para_delete({
-  file: "00 Inbox/[original clipping]",
-  confirm: true,
+para_frontmatter_set({
+  file: "03 Resources/[filename]",
+  set: { "distilled": "true" },
   response_format: "json"
 })
 ```
 
-### 6.6 Offer Next or Done
+### 5.3 Completion
 
 ```
-Created: 📚 [Resource Title].md → 03 Resources
-[Kept/Deleted]: [Original note status]
+✅ Distillation complete!
 
-[Count] items remaining. Next one, or done for now?
+**📚 [Resource Title]** is now fully processed.
+
+You've transformed raw information into personal knowledge:
+- Layer 2: Bolded the important parts
+- Layer 3: Highlighted the essence
+- Layer 4: Captured YOUR takeaways
+
+---
+
+[N] undistilled resources remaining. Distill another? (yes / done)
 ```
 
 ---
 
-## Dialogue Examples
+## Persona: Tiago Forte
 
-See `./references/progressive-summarization.md` for detailed dialogue patterns for each layer.
+See [tiago-forte-persona.md](references/tiago-forte-persona.md) for voice guidance.
 
 ---
 
@@ -471,49 +391,36 @@ See `./references/progressive-summarization.md` for detailed dialogue patterns f
 
 | Error | Recovery |
 |-------|----------|
-| Content fetch fails | Use existing clipping content, note limitations |
-| No source URL | Ask user to provide context manually |
-| Chrome DevTools unavailable | **See below** - graceful user-assisted fallback |
-| YouTube transcript unavailable | Use video description, note limitation |
-| Resource creation fails | Show error, don't delete clipping |
+| No undistilled resources | "Great news - all your resources are distilled! Run /para-obsidian:triage to process new inbox items." |
+| Source URL unavailable | Work with existing Layer 1 content |
+| Twitter URL (needs_user_help) | Ask user to paste tweet content |
+| User wants to skip a layer | Allow it, but note the resource won't be fully distilled |
+| User abandons mid-session | Note stays as-is (distilled: false), can resume later |
 
-### Twitter/X.com Without Chrome DevTools
+---
 
-Chrome DevTools MCP may not be configured in all sessions. When X/Twitter content can't be fetched:
+## Quick Mode
 
-1. **Parse the URL** to extract username and tweet ID
-2. **Check existing clipping content** - it may have partial text already
-3. **Ask the user** with clear options:
+If user says "quick" or "fast", the content subagent already has suggestions. Present them all at once:
 
 ```
-I can't fetch X/Twitter content directly (Chrome DevTools MCP isn't available).
+Quick mode - here's my proposal based on the analysis:
 
-**Tweet by @[username]:** [source URL]
+**Layer 2 (Bold):**
+[suggested_bold_passages from subagent]
 
-Could you help? Either:
-1. **Paste the tweet text** here
-2. **Summarize what it's about** from memory
-3. **Skip this clipping** and move to the next one
+**Layer 3 (Highlight):**
+[suggested_highlights from subagent]
 
-What would you prefer?
+**Layer 4 (Summary):** [You need to write this part!]
+What are YOUR takeaways?
+
+Adjust anything, or give me your summary to save?
 ```
-
-4. **Proceed normally** once user provides content - the distillation dialogue works the same way
-
-### Voice Memo Processing
-
-Voice memos (`type: transcription`) are handled differently:
-
-1. **Content is already in the note** - no URL fetching needed
-2. **Original transcript is KEPT** - it's the source material
-3. **New resource is created** with `source_note` linking back
-4. **Both notes exist** - transcript for reference, resource for learning
 
 ---
 
 ## References
 
-Load these as needed:
-
-- **Enrichment strategies**: `./references/enrichment-strategies.md` - Domain-specific content fetching
-- **Progressive summarization**: `./references/progressive-summarization.md` - Layer 1-4 dialogue patterns
+- [Progressive Summarization](https://fortelabs.com/blog/progressive-summarization-a-practical-technique-for-designing-discoverable-notes/) - Tiago Forte's original article
+- [BASB Book](https://www.buildingasecondbrain.com/book) - Full methodology

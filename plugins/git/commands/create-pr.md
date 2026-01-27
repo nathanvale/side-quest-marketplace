@@ -1,7 +1,7 @@
 ---
 description: Create pull requests using GitHub CLI with Conventional Commits format
 model: claude-sonnet-4-5-20250929
-allowed-tools: Bash(git push:*), Bash(gh pr:*), mcp__git_git-intelligence__get_recent_commits, mcp__git_git-intelligence__get_diff_summary
+allowed-tools: Bash(git push:*), Bash(gh pr:*), git_get_recent_commits, git_get_diff_summary
 ---
 
 # Create Pull Request

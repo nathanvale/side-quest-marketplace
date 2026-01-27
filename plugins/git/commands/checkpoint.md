@@ -1,7 +1,7 @@
 ---
 description: Create a quick WIP checkpoint commit to save your current work
 model: claude-haiku-4-5-20251001
-allowed-tools: Bash(git add:*), Bash(git commit:*), mcp__git_git-intelligence__get_diff_summary
+allowed-tools: Bash(git add:*), Bash(git commit:*), git_get_diff_summary
 argument-hint: [description]
 ---
 

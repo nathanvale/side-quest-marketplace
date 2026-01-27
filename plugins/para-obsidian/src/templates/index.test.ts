@@ -211,7 +211,7 @@ No frontmatter here`);
 		expect(detectTitlePromptKey(template)).toBe("Title");
 	});
 
-	test("only matches prompts in frontmatter, not body", () => {
+	test("matches prompts in body when no frontmatter title (templates no longer have title field)", () => {
 		const template = createTestTemplate(`---
 type: test
 ---
@@ -219,8 +219,8 @@ type: test
 
 This is body content with a title prompt.`);
 
-		// Should fall back to "Title" since "Body title" is not in frontmatter
-		expect(detectTitlePromptKey(template)).toBe("Title");
+		// Now matches body prompts since title was removed from frontmatter
+		expect(detectTitlePromptKey(template)).toBe("Body title");
 	});
 
 	test("handles whitespace variations in prompt syntax", () => {

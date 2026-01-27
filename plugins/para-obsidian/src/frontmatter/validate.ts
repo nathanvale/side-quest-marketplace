@@ -150,6 +150,15 @@ function validateField(
 			}
 			return undefined;
 		}
+		case "boolean": {
+			if (typeof value !== "boolean") {
+				return {
+					field,
+					message: `expected boolean, got ${formatValueForError(value)}${optionalHint}`,
+				};
+			}
+			return undefined;
+		}
 		default:
 			return { field, message: "unknown rule" };
 	}

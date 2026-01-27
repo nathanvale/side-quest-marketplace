@@ -704,7 +704,7 @@ function formatStashList(
 // Register tools
 
 tool(
-	"mcp__git_git-intelligence__git_get_recent_commits",
+	"git_get_recent_commits",
 	{
 		description:
 			"Get recent git commits with hash, message, author, and relative time. Use this to understand recent changes before making related edits.",
@@ -749,7 +749,7 @@ tool(
 );
 
 tool(
-	"mcp__git_git-intelligence__git_search_commits",
+	"git_search_commits",
 	{
 		description:
 			"Search git commit history by message or code changes. Use --grep style search for commit messages, or -S style search for code changes.",
@@ -811,7 +811,7 @@ tool(
 );
 
 tool(
-	"mcp__git_git-intelligence__git_get_file_history",
+	"git_get_file_history",
 	{
 		description:
 			"Get commit history for a specific file, following renames. Use this to understand how a file evolved over time.",
@@ -862,7 +862,7 @@ tool(
 );
 
 tool(
-	"mcp__git_git-intelligence__git_get_status",
+	"git_get_status",
 	{
 		description:
 			"Get current repository status including branch, staged changes, modified files, and untracked files.",
@@ -903,7 +903,7 @@ tool(
 );
 
 tool(
-	"mcp__git_git-intelligence__git_get_branch_info",
+	"git_get_branch_info",
 	{
 		description:
 			"Get branch information including current branch, tracking status, and list of local/remote branches.",
@@ -944,7 +944,7 @@ tool(
 );
 
 tool(
-	"mcp__git_git-intelligence__git_get_diff_summary",
+	"git_get_diff_summary",
 	{
 		description:
 			"Get a summary of changes (files changed, lines added/deleted) compared to a reference.",
@@ -989,7 +989,7 @@ tool(
 );
 
 tool(
-	"mcp__git_git-intelligence__git_get_stash_list",
+	"git_get_stash_list",
 	{
 		description:
 			"Get list of stashed changes. Use this to see saved work before operations or to recover stashed changes.",

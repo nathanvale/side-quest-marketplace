@@ -116,7 +116,8 @@ export interface FrontmatterHint {
 		| "number"
 		| "array"
 		| "wikilink"
-		| "enum";
+		| "enum"
+		| "boolean";
 	/** Example values for this field. */
 	readonly examples?: ReadonlyArray<string>;
 	/** Human-readable description of the field. */

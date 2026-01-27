@@ -1,48 +1,66 @@
 ---
-description: Create PARA notes with AI-powered metadata extraction
-argument-hint: <template> <description of what you want to create>
+description: "[DEPRECATED] Create PARA notes - use /create-project or /create-area instead"
+argument-hint: <template> <description>
 allowed-tools: Bash(para-obsidian:*)
 ---
 
-# Create PARA Notes
+# Create PARA Notes (Deprecated)
 
-Create notes using AI to extract metadata from your description.
+> **DEPRECATED:** This command bypasses collaborative validation.
+> Use the specialized commands instead for better results.
 
-## Usage
+## Recommended Commands
+
+| Instead of | Use |
+|------------|-----|
+| `/para-obsidian:create project ...` | `/para-obsidian:create-project` |
+| `/para-obsidian:create area ...` | `/para-obsidian:create-area` |
+
+### Why the Change?
+
+The new skills provide:
+- **Area validation** - Ensures projects link to existing areas (no broken wikilinks)
+- **PARA guidance** - Validates projects have outcomes/deadlines, areas are truly ongoing
+- **Collaborative workflow** - Confirms before creating, offers corrections
+- **Duplicate prevention** - Checks existing areas/projects first
+
+## Still Available (Legacy)
+
+This command still works for quick creation or scripting:
 
 ```
 /para-obsidian:create <template> <description>
 ```
 
-## Examples
+### Examples
 
 ```
-/para-obsidian:create area I need to manage my dog Muffin - vet visits, grooming every 6 weeks, food subscription, daily walks
-/para-obsidian:create task Book the plumber to fix the kitchen sink, it's been leaking for a week
-/para-obsidian:create project Planning our trip to Tasmania in January 2026
+/para-obsidian:create task Book the plumber to fix the kitchen sink
+/para-obsidian:create resource Article about TypeScript 5.5
+/para-obsidian:create booking Flight to Sydney on March 15
 ```
 
-## Available Templates
+### Templates Still Supported
 
-| Template | Use For |
-|----------|---------|
-| `task` | Single actionable items |
-| `project` | Multi-step goals with deadlines |
-| `area` | Ongoing responsibilities |
-| `resource` | Reference material |
-| `trip` | Travel planning |
-| `booking` | Reservations and tickets |
-| `capture` | Quick notes to process later |
-| `daily` | Daily journal entry |
+| Template | Use For | Better Alternative |
+|----------|---------|-------------------|
+| `project` | Multi-step goals | `/para-obsidian:create-project` |
+| `area` | Ongoing responsibilities | `/para-obsidian:create-area` |
+| `task` | Single actionable items | (no change) |
+| `resource` | Reference material | (no change) |
+| `trip` | Travel planning | (no change) |
+| `booking` | Reservations and tickets | (no change) |
+| `capture` | Quick notes | (no change) |
+| `daily` | Daily journal entry | (no change) |
 
 ---
 
-## Instructions
+## Instructions (Legacy Behavior)
 
-When the user invokes this command:
+When invoked with a template:
 
 1. **Extract the template** from the first argument
-2. **Pass everything else** as `--source-text` to the CLI for AI extraction
+2. **Pass everything else** as `--source-text` to the CLI
 
 ```bash
 bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts create \
@@ -55,4 +73,4 @@ The CLI will:
 - Create the note with proper frontmatter
 - Place it in the correct PARA folder
 
-**Model**: Uses `sonnet` by default. Override with `--model haiku` for faster/cheaper extraction.
+**Warning:** This bypasses area validation. Projects may be created with invalid area links.

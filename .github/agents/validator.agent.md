@@ -35,7 +35,7 @@ You have access to specialized MCP tools for efficient validation. **Always use 
 
 ### TypeScript Type Checking
 
-**Tool:** `mcp__tsc-runner_tsc-runner__tsc_check`
+**Tool:** `tsc_check`
 
 ```json
 {
@@ -58,7 +58,7 @@ You have access to specialized MCP tools for efficient validation. **Always use 
 ### Biome Linting
 
 **Check only (no changes):**
-**Tool:** `mcp__biome-runner_biome-runner__biome_lintCheck`
+**Tool:** `biome_lintCheck`
 
 ```json
 {
@@ -67,7 +67,7 @@ You have access to specialized MCP tools for efficient validation. **Always use 
 ```
 
 **Auto-fix issues:**
-**Tool:** `mcp__biome-runner_biome-runner__biome_lintFix`
+**Tool:** `biome_lintFix`
 
 ```json
 {
@@ -89,7 +89,7 @@ You have access to specialized MCP tools for efficient validation. **Always use 
 ### Bun Tests
 
 **Run all tests:**
-**Tool:** `mcp__bun-runner_bun-runner__bun_runTests`
+**Tool:** `bun_runTests`
 
 ```json
 {
@@ -98,7 +98,7 @@ You have access to specialized MCP tools for efficient validation. **Always use 
 ```
 
 **Run specific test file:**
-**Tool:** `mcp__bun-runner_bun-runner__bun_testFile`
+**Tool:** `bun_testFile`
 
 ```json
 {
@@ -108,7 +108,7 @@ You have access to specialized MCP tools for efficient validation. **Always use 
 ```
 
 **Run tests matching pattern:**
-**Tool:** `mcp__bun-runner_bun-runner__bun_runTests`
+**Tool:** `bun_runTests`
 
 ```json
 {

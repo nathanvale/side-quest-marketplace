@@ -169,7 +169,10 @@ export function applyArgsToFrontmatter(
 	args: Record<string, string>,
 ): Record<string, unknown> {
 	const result = { ...attributes };
-	const protectedFields = ["created", "type", "template_version"];
+	// Protected fields should never be added/overridden by args
+	// - title: filename IS the title, no need in frontmatter
+	// - created/type/template_version: managed by template system
+	const protectedFields = ["created", "type", "template_version", "title"];
 
 	for (const [key, value] of Object.entries(args)) {
 		// Skip protected fields - they should never be overridden by args
@@ -557,11 +560,9 @@ export function createFromTemplate(
 		body = body.replace(/\{\{content\}\}/g, "");
 	}
 
-	// Only inject title if template explicitly has a title field with null/placeholder
-	// Don't auto-add title - filename IS the title (avoids redundancy)
-	if (attributes.title === "null" || attributes.title === null) {
-		attributes.title = displayTitle;
-	}
+	// Remove title from frontmatter if present - filename IS the title
+	// Templates should use `# `= this.file.name`` for the heading
+	delete attributes.title;
 
 	// Merge in extra frontmatter fields (e.g., LLM suggestions)
 	if (options.extraFrontmatter) {

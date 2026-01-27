@@ -639,7 +639,6 @@ export async function createVoiceMemoNote(
 		created: formatDateTime(new Date()),
 		source,
 		template_version: 1,
-		meeting: "",
 		areas: [],
 		projects: [],
 	};

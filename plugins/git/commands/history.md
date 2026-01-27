@@ -1,7 +1,7 @@
 ---
 description: Explore git commit history using git-intelligence MCP tools
 model: claude-haiku-4-5-20251001
-allowed-tools: mcp__git_git-intelligence__get_recent_commits, mcp__git_git-intelligence__search_commits, mcp__git_git-intelligence__get_diff_summary
+allowed-tools: git_get_recent_commits, git_search_commits, git_get_diff_summary
 argument-hint: [search-query]
 ---
 

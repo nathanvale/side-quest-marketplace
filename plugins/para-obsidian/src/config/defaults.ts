@@ -84,6 +84,29 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 				optional: true,
 				description: "Wikilinks to related projects (multi-select)",
 			},
+			source_format: {
+				type: "enum",
+				enum: [
+					"article",
+					"video",
+					"audio",
+					"document",
+					"thread",
+					"image",
+					"book",
+					"course",
+					"podcast",
+					"paper",
+				],
+				optional: true,
+				description: "Format of the source material",
+			},
+			distilled: {
+				type: "boolean",
+				optional: true,
+				description:
+					"Whether the resource has been fully distilled through progressive summarization",
+			},
 		},
 	},
 	task: {

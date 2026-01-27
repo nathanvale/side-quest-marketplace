@@ -24,7 +24,7 @@ const server = new Server(
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [{
-    name: "mcp__my-plugin_my-server__my_tool",
+    name: "my_tool",  // Short name only - Claude Code adds prefix automatically
     description: "What this tool does",
     inputSchema: {
       type: "object",
@@ -81,9 +81,34 @@ await server.connect(new StdioServerTransport());
 
 ## Tool Naming Convention
 
+**CRITICAL:** Claude Code automatically prefixes plugin MCP tools with `mcp__plugin_<plugin>_<server>__`. You must use **short names only** in your source code.
+
+### What You Write (Source Code)
+
+```typescript
+tool("my_tool", { ... });           // Short name only
+startServer("my-server", { ... });  // Server name for prefix
 ```
-mcp__<plugin>_<server>__<tool>
+
+### What Claude Code Registers (Final Name)
+
 ```
+mcp__plugin_my-plugin_my-server__my_tool
+```
+
+### Why This Matters
+
+- **64-character limit**: Final tool names cannot exceed 64 characters (API constraint)
+- **Double-prefixing bug**: If you write `mcp__my-plugin_my-server__my_tool` in source, Claude Code adds another prefix, exceeding the limit
+- **Correct pattern**: Short names like `git_get_status`, `tsc_check`, `copy`
+
+### Examples
+
+| Plugin | Short Name (Source) | Final Name (Registered) |
+|--------|---------------------|-------------------------|
+| git | `git_get_recent_commits` | `mcp__plugin_git_git-intelligence__git_get_recent_commits` |
+| kit | `kit_index_find` | `mcp__plugin_kit_kit__kit_index_find` |
+| clipboard | `copy` | `mcp__plugin_clipboard_clipboard__copy` |
 
 ---
 

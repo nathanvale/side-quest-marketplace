@@ -17,7 +17,9 @@
 - **NEVER** create circular dependencies between plugins
 
 **MCP Server Conventions:**
-- Tool names: `mcp__<plugin-name>_<server-name>__<tool_name>`
+- Tool names: Use **short names only** in source code (e.g., `my_tool`, `git_get_status`)
+- Claude Code auto-prefixes with `mcp__plugin_<plugin>_<server>__` — never include this in source
+- **64-char limit**: Final tool names cannot exceed 64 characters (API constraint)
 - **ALWAYS** include `response_format` parameter: `"markdown"` (default) or `"json"`
 - **ALWAYS** add `isError: true` flag to error responses
 - **ALWAYS** use `${CLAUDE_PLUGIN_ROOT}` in `.mcp.json` for plugin-relative paths
@@ -204,7 +206,7 @@ Full reference with examples: @./docs/MCP_TOOLS.md
 ## Plugin Architecture
 
 Standard structure: `.claude-plugin/`, `commands/`, `hooks/`, `mcp/`, `skills/`, `src/`
-Tool naming: `mcp__<name>_<server>__<tool>`
+Tool naming: Short names in source (e.g., `my_tool`), Claude Code adds `mcp__plugin_<plugin>_<server>__` prefix
 MCP server config: `.mcp.json` with `${CLAUDE_PLUGIN_ROOT}` paths
 
 **Create plugin:** `/plugin-template:create my-plugin`

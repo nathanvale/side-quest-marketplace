@@ -14,11 +14,24 @@ Generates: `plugin.json`, `package.json`, `tsconfig.json`, source scaffold
 
 ### Tool Naming (REQUIRED)
 
-```
-mcp__<plugin>_<server>__<tool>
+**CRITICAL:** Use **short names only** in source code. Claude Code automatically adds `mcp__plugin_<plugin>_<server>__` prefix.
+
+**In source code:**
+```typescript
+tool("my_tool", { ... });  // Short name
 ```
 
-Example: `mcp__git_git-intelligence__git_get_recent_commits`
+**Claude Code registers as:**
+```
+mcp__plugin_<plugin>_<server>__my_tool
+```
+
+**Why:** Final tool names have a 64-character limit. Using full prefixes in source causes double-prefixing and API errors.
+
+**Examples:**
+- `git_get_recent_commits` → `mcp__plugin_git_git-intelligence__git_get_recent_commits`
+- `kit_index_find` → `mcp__plugin_kit_kit__kit_index_find`
+- `tsc_check` → `mcp__plugin_tsc-runner_tsc-runner__tsc_check`
 
 ### Required Parameters
 

@@ -57,7 +57,14 @@ export interface FrontmatterRules {
  */
 export interface FieldRule {
 	/** The expected data type for this field. */
-	readonly type: "string" | "date" | "number" | "array" | "wikilink" | "enum";
+	readonly type:
+		| "string"
+		| "date"
+		| "number"
+		| "array"
+		| "wikilink"
+		| "enum"
+		| "boolean";
 	/** For enum types, the allowed values. */
 	readonly enum?: ReadonlyArray<string>;
 	/** For array types, values that must be present in the array. */

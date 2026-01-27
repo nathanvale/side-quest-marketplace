@@ -118,18 +118,22 @@ export function getTemplate(
  * - `"Resource title"` (resource template)
  * - etc.
  *
- * This function scans frontmatter for prompts containing "title"
- * (case-insensitive) and returns the exact key for arg substitution.
+ * This function scans the entire template content for prompts containing
+ * "title" (case-insensitive) and returns the exact key for arg substitution.
+ *
+ * NOTE: Title is no longer stored in frontmatter (filename IS the title).
+ * Templates now have the title prompt in the H1 heading instead:
+ * `# <% tp.system.prompt("Resource title") %>`
  *
  * @param template - Template info with content to analyze
  * @returns The detected title prompt key, or "Title" as fallback
  *
  * @example
  * ```typescript
- * // Template with: title: "<% tp.system.prompt("Resource title") %>"
+ * // Template with: # <% tp.system.prompt("Resource title") %>
  * detectTitlePromptKey(template); // "Resource title"
  *
- * // Template with: title: "<% tp.system.prompt("Title") %>"
+ * // Template with: # <% tp.system.prompt("Title") %>
  * detectTitlePromptKey(template); // "Title"
  *
  * // Template without title prompt
@@ -137,12 +141,10 @@ export function getTemplate(
  * ```
  */
 export function detectTitlePromptKey(template: TemplateInfo): string {
-	const frontmatterMatch = template.content.match(/^---\n([\s\S]*?)\n---/);
-	const frontmatter = frontmatterMatch?.[1] ?? "";
-
-	// Find prompt key containing "title" (case-insensitive)
+	// Search entire template content for title prompts
+	// (was frontmatter-only, but now title is in body heading)
 	const titlePromptRegex = /<%\s*tp\.system\.prompt\("([^"]*title[^"]*)"\)/i;
-	const match = frontmatter.match(titlePromptRegex);
+	const match = template.content.match(titlePromptRegex);
 
 	return match?.[1] ?? "Title";
 }

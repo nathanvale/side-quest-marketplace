@@ -16,7 +16,8 @@ interface FrontmatterHint {
 		| "number"
 		| "array"
 		| "wikilink"
-		| "enum";
+		| "enum"
+		| "boolean";
 	readonly examples?: ReadonlyArray<string>;
 	readonly description?: string;
 }
