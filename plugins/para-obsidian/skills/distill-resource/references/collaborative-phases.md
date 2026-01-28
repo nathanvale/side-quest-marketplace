@@ -122,31 +122,62 @@ Does this capture it? (yes / adjust)
 
 ### Update the Resource Content
 
+**CRITICAL:** Use `para_replace_section` to REPLACE template content, not `para_insert` which appends.
+
 ```typescript
-para_insert({
+// Replace Key Insights section (remove template placeholders)
+para_replace_section({
+  file: "03 Resources/[filename]",
+  heading: "Key Insights",
+  content: "[Formatted key insights from Phase 2]",
+  response_format: "json"
+})
+
+// Replace Notable Quotes section
+para_replace_section({
+  file: "03 Resources/[filename]",
+  heading: "Notable Quotes",
+  content: "[Bold passages as blockquotes]",
+  response_format: "json"
+})
+
+// Replace Layer 2 section (inside Progressive Summary)
+para_replace_section({
   file: "03 Resources/[filename]",
   heading: "Layer 2: Bold Passages",
   content: "[Bolded passages from Phase 2]",
-  position: "replace",
   response_format: "json"
 })
 
-para_insert({
+// Replace Layer 3 section
+para_replace_section({
   file: "03 Resources/[filename]",
   heading: "Layer 3: Highlighted Core",
   content: "[Highlighted content from Phase 3]",
-  position: "replace",
   response_format: "json"
 })
 
-para_insert({
+// Replace Layer 4 section
+para_replace_section({
   file: "03 Resources/[filename]",
   heading: "Layer 4: Executive Summary",
   content: "[User's summary from Phase 4]",
-  position: "replace",
+  response_format: "json"
+})
+
+// Replace Action Items with research tasks identified
+para_replace_section({
+  file: "03 Resources/[filename]",
+  heading: "Action Items",
+  content: "[Action items from discussion, or remove placeholder]",
   response_format: "json"
 })
 ```
+
+**Why `para_replace_section` instead of `para_insert`:**
+- `para_insert` appends/prepends, leaving template placeholders behind
+- `para_replace_section` completely replaces content under a heading
+- This removes `<!-- comments -->` and placeholder bullets like `- / - / -`
 
 ### Mark as Distilled
 

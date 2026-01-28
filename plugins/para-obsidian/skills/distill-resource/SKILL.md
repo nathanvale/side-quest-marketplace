@@ -5,7 +5,7 @@ argument-hint: [filename.md] or empty for auto-discovery
 user-invocable: true
 disable-model-invocation: true
 model: sonnet
-allowed-tools: Task, Read, Edit, AskUserQuestion, mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_list, mcp__plugin_para-obsidian_para-obsidian__para_insert, mcp__plugin_para-obsidian_para-obsidian__para_fm_get, mcp__plugin_para-obsidian_para-obsidian__para_fm_set, mcp__plugin_para-obsidian_para-obsidian__para_search, mcp__firecrawl__firecrawl_scrape, mcp__youtube-transcript__get_video_info, mcp__youtube-transcript__get_transcript, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__take_snapshot, WebFetch
+allowed-tools: Task, Read, Edit, AskUserQuestion, mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_list, mcp__plugin_para-obsidian_para-obsidian__para_insert, mcp__plugin_para-obsidian_para-obsidian__para_replace_section, mcp__plugin_para-obsidian_para-obsidian__para_fm_get, mcp__plugin_para-obsidian_para-obsidian__para_fm_set, mcp__plugin_para-obsidian_para-obsidian__para_search, mcp__plugin_para-obsidian_para-obsidian__para_commit, mcp__firecrawl__firecrawl_scrape, mcp__youtube-transcript__get_video_info, mcp__youtube-transcript__get_transcript, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__take_snapshot, WebFetch
 ---
 
 # Distill Resource
@@ -109,7 +109,9 @@ See [layer-definitions.md](references/layer-definitions.md) for compression targ
 
 Update the note with all layers and mark as distilled.
 
-See [collaborative-phases.md](references/collaborative-phases.md) for para_insert patterns.
+**CRITICAL:** Use `para_replace_section` to replace template content, not `para_insert` which appends and leaves template cruft behind.
+
+See [collaborative-phases.md](references/collaborative-phases.md) for `para_replace_section` patterns.
 
 ---
 

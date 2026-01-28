@@ -9,6 +9,7 @@ export const TOOL_NAMES = [
 	"index_query",
 	"create",
 	"insert",
+	"replace_section",
 	"rename",
 	"delete",
 	"fm_get",

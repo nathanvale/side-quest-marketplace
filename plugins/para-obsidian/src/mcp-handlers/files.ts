@@ -23,7 +23,11 @@ import {
 import { loadConfig } from "../config/index";
 import { renameWithLinkRewrite } from "../links/index";
 import { deleteFile } from "../notes/delete";
-import { type InsertMode, insertIntoNote } from "../notes/insert";
+import {
+	type InsertMode,
+	insertIntoNote,
+	replaceSectionContent,
+} from "../notes/insert";
 import { listDir, readFile } from "../shared/fs";
 
 const logger = createLoggerAdapter(getLogger("para-obsidian.mcp"));
@@ -311,6 +315,104 @@ Requires git repository with clean working tree.`,
 			return `## Text Inserted\n\n**File:** ${result.relative}\n**Mode:** ${mode}\n**Heading:** "${heading}"`;
 		},
 		{ toolName: "para_insert", logger, createCid },
+	),
+);
+
+// ============================================================================
+// Replace Section Tool
+// ============================================================================
+
+tool(
+	"para_replace_section",
+	{
+		description: `Replace all content under a heading.
+
+Unlike para_insert which appends/prepends, this completely replaces
+the section content between a heading and the next heading of equal
+or higher level.
+
+Use for: updating dataview queries, replacing AI-generated content,
+rewriting entire sections.
+
+Preserves the heading itself - only content below it is replaced.
+
+Requires git repository with clean working tree (unless dry-run).`,
+		inputSchema: {
+			file: z.string().describe('File path (e.g., "Projects/My Note.md")'),
+			heading: z
+				.string()
+				.describe(
+					'Heading to target. Accepts with or without # prefix (e.g., "Tasks" or "## Tasks")',
+				),
+			content: z.string().describe("New content to replace the section with"),
+			preserve_comments: z
+				.boolean()
+				.optional()
+				.describe("Keep HTML comments in section (default: false)"),
+			dry_run: z
+				.boolean()
+				.optional()
+				.describe("Preview changes without writing (default: false)"),
+			response_format: z
+				.enum(["markdown", "json"])
+				.optional()
+				.describe("Output format: 'markdown' (default) or 'json'"),
+		},
+		annotations: {
+			readOnlyHint: false,
+			destructiveHint: true,
+			idempotentHint: true,
+			openWorldHint: false,
+		},
+	},
+	wrapToolHandler(
+		async (args, format) => {
+			const { file, heading, content, preserve_comments, dry_run } = args as {
+				file: string;
+				heading: string;
+				content: string;
+				preserve_comments?: boolean;
+				dry_run?: boolean;
+			};
+			const config = loadConfig();
+			const dryRun = dry_run ?? false;
+
+			// For dry-run, we still call the function but don't write
+			// TODO: Add proper dry-run support to replaceSectionContent
+			if (dryRun) {
+				// Just validate that file and heading exist
+				const { readFile } = await import("../shared/fs");
+				const fileContent = readFile(config.vault, file);
+				const headingPattern = new RegExp(
+					`^#+\\s+${heading.replace(/^#+\s*/, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
+					"m",
+				);
+				if (!headingPattern.test(fileContent)) {
+					throw new Error(`Heading not found: ${heading}`);
+				}
+				return format === ResponseFormat.JSON
+					? {
+							relative: file,
+							dryRun: true,
+							wouldReplace: heading,
+						}
+					: `## Dry Run\n\n**File:** ${file}\n**Would replace section:** "${heading}"`;
+			}
+
+			const result = replaceSectionContent(config, {
+				file,
+				heading,
+				content,
+				preserveComments: preserve_comments,
+			});
+
+			if (format === ResponseFormat.JSON) {
+				return result;
+			}
+
+			return `## Section Replaced\n\n**File:** ${result.relative}\n**Heading:** "${heading}"\n**Lines removed:** ${result.linesRemoved}\n**Lines added:** ${result.linesAdded}`;
+		},
+		{ toolName: "para_replace_section", logger, createCid },
 	),
 );
 

@@ -314,7 +314,7 @@ export interface ReplaceSectionOptions {
  *
  * @param config - Para-obsidian configuration
  * @param options - Replace options (file, heading, content)
- * @returns Result with relative path
+ * @returns Result with relative path and line counts
  * @throws Error if file doesn't exist or heading not found
  *
  * @example
@@ -329,21 +329,40 @@ export interface ReplaceSectionOptions {
 export function replaceSectionContent(
 	config: ParaObsidianConfig,
 	options: ReplaceSectionOptions,
-): { relative: string } {
+): { relative: string; linesRemoved: number; linesAdded: number } {
 	const target = resolveVaultPath(config.vault, options.file);
-	if (!fs.existsSync(target.absolute)) {
+	if (fsLogger) {
+		fsLogger.debug`fs:replaceSection:start vault=${config.vault} file=${options.file} heading=${options.heading}`;
+	}
+
+	if (!pathExistsSync(target.absolute)) {
+		if (fsLogger) {
+			fsLogger.error`fs:replaceSection:fileNotFound file=${target.absolute}`;
+		}
 		throw new Error(`File not found: ${options.file}`);
 	}
 
-	const raw = fs.readFileSync(target.absolute, "utf8");
+	const raw = readTextFileSync(target.absolute);
 	const lines = normalizeLines(raw);
 	const heading = findHeading(lines, options.heading);
 	if (!heading) {
+		// Log available headings for debugging
+		const availableHeadings: string[] = [];
+		for (const line of lines) {
+			const match = /^(#+)\s+(.*)$/.exec(line?.trim() ?? "");
+			if (match?.[2]) {
+				availableHeadings.push(`${match[1]} ${match[2]}`);
+			}
+		}
+		if (fsLogger) {
+			fsLogger.error`fs:replaceSection:headingNotFound heading=${options.heading} available=${availableHeadings.join(", ")}`;
+		}
 		throw new Error(`Heading not found: ${options.heading}`);
 	}
 
 	const sectionEnd = findSectionEnd(lines, heading.index, heading.level);
 	const sectionStart = heading.index + 1;
+	const linesRemoved = sectionEnd - sectionStart;
 
 	// Extract comments if preserving
 	const comments: string[] = [];
@@ -362,6 +381,7 @@ export function replaceSectionContent(
 		options.preserveComments && comments.length > 0
 			? [...comments, "", ...newContent, ""]
 			: ["", ...newContent, ""];
+	const linesAdded = newSection.length;
 
 	// Replace section content
 	const updatedLines = [
@@ -370,9 +390,13 @@ export function replaceSectionContent(
 		...lines.slice(sectionEnd),
 	];
 
-	fs.writeFileSync(target.absolute, updatedLines.join("\n"), "utf8");
+	writeTextFileSync(target.absolute, updatedLines.join("\n"));
 
-	return { relative: target.relative };
+	if (fsLogger) {
+		fsLogger.info`fs:replaceSection:success file=${target.relative} heading=${options.heading} linesRemoved=${linesRemoved} linesAdded=${linesAdded}`;
+	}
+
+	return { relative: target.relative, linesRemoved, linesAdded };
 }
 
 /**

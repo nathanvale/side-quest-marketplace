@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { readVaultFile, withTempVault, writeVaultFile } from "../testing/utils";
-import { insertIntoNote } from "./insert";
+import { insertIntoNote, replaceSectionContent } from "./insert";
 
 describe("insertIntoNote", () => {
 	it("appends content at end of section", async () => {
@@ -243,6 +243,220 @@ Content 2
 			// Verify content was added to exact match section (after "Content 2")
 			expect(addedIndex).toBeGreaterThan(content2Index);
 			expect(addedIndex).toBeGreaterThan(summaryIndex);
+		});
+	});
+});
+
+describe("replaceSectionContent", () => {
+	it("replaces content under a heading", async () => {
+		await withTempVault(async (vault, config) => {
+			const file = "note.md";
+			writeVaultFile(
+				vault,
+				file,
+				`# Title
+
+## Tasks
+
+- old task 1
+- old task 2
+
+## Notes
+
+Some notes here
+`,
+			);
+
+			const result = replaceSectionContent(config, {
+				file,
+				heading: "Tasks",
+				content: "- new task",
+			});
+
+			expect(result.relative).toBe(file);
+			expect(result.linesRemoved).toBeGreaterThan(0);
+
+			const content = readVaultFile(vault, file);
+			expect(content).toContain("## Tasks");
+			expect(content).toContain("- new task");
+			expect(content).not.toContain("- old task 1");
+			expect(content).not.toContain("- old task 2");
+			expect(content).toContain("## Notes");
+			expect(content).toContain("Some notes here");
+		});
+	});
+
+	it("replaces dataview query block", async () => {
+		await withTempVault(async (vault, config) => {
+			const file = "note.md";
+			writeVaultFile(
+				vault,
+				file,
+				`# Project
+
+## Tasks
+
+\`\`\`dataview
+TASK FROM "wrong/path"
+\`\`\`
+
+## Notes
+
+text
+`,
+			);
+
+			replaceSectionContent(config, {
+				file,
+				heading: "Tasks",
+				content: '```dataview\nTASK FROM "correct/path"\n```',
+			});
+
+			const content = readVaultFile(vault, file);
+			expect(content).toContain('TASK FROM "correct/path"');
+			expect(content).not.toContain('TASK FROM "wrong/path"');
+		});
+	});
+
+	it("preserves HTML comments when option is set", async () => {
+		await withTempVault(async (vault, config) => {
+			const file = "note.md";
+			writeVaultFile(
+				vault,
+				file,
+				`# Title
+
+## Section
+
+<!-- keep this comment -->
+Old content here
+
+## Next
+`,
+			);
+
+			replaceSectionContent(config, {
+				file,
+				heading: "Section",
+				content: "New content",
+				preserveComments: true,
+			});
+
+			const content = readVaultFile(vault, file);
+			expect(content).toContain("<!-- keep this comment -->");
+			expect(content).toContain("New content");
+			expect(content).not.toContain("Old content");
+		});
+	});
+
+	it("removes HTML comments when option is not set", async () => {
+		await withTempVault(async (vault, config) => {
+			const file = "note.md";
+			writeVaultFile(
+				vault,
+				file,
+				`# Title
+
+## Section
+
+<!-- this will be removed -->
+Old content here
+
+## Next
+`,
+			);
+
+			replaceSectionContent(config, {
+				file,
+				heading: "Section",
+				content: "New content",
+			});
+
+			const content = readVaultFile(vault, file);
+			expect(content).not.toContain("<!-- this will be removed -->");
+			expect(content).toContain("New content");
+		});
+	});
+
+	it("throws when file not found", async () => {
+		await withTempVault(async (_vault, config) => {
+			expect(() =>
+				replaceSectionContent(config, {
+					file: "nonexistent.md",
+					heading: "Tasks",
+					content: "new",
+				}),
+			).toThrow("File not found");
+		});
+	});
+
+	it("throws when heading not found", async () => {
+		await withTempVault(async (vault, config) => {
+			const file = "note.md";
+			writeVaultFile(vault, file, `# Title\n\n## Tasks\n\nContent\n`);
+
+			expect(() =>
+				replaceSectionContent(config, {
+					file,
+					heading: "Missing",
+					content: "new",
+				}),
+			).toThrow("Heading not found");
+		});
+	});
+
+	it("accepts heading with # prefix", async () => {
+		await withTempVault(async (vault, config) => {
+			const file = "note.md";
+			writeVaultFile(
+				vault,
+				file,
+				`# Title\n\n## Tasks\n\nOld content\n\n## Next\n`,
+			);
+
+			replaceSectionContent(config, {
+				file,
+				heading: "## Tasks",
+				content: "New content",
+			});
+
+			const content = readVaultFile(vault, file);
+			expect(content).toContain("New content");
+			expect(content).not.toContain("Old content");
+		});
+	});
+
+	it("stops at horizontal rule boundary", async () => {
+		await withTempVault(async (vault, config) => {
+			const file = "note.md";
+			writeVaultFile(
+				vault,
+				file,
+				`# Title
+
+## Summary
+
+Old summary
+
+---
+
+Metadata below line
+
+## Next
+`,
+			);
+
+			replaceSectionContent(config, {
+				file,
+				heading: "Summary",
+				content: "New summary",
+			});
+
+			const content = readVaultFile(vault, file);
+			expect(content).toContain("New summary");
+			expect(content).not.toContain("Old summary");
+			// Metadata below --- should be preserved
+			expect(content).toContain("Metadata below line");
 		});
 	});
 });

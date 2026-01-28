@@ -444,7 +444,7 @@ The plugin provides 20+ MCP tools organized by domain:
 | Domain | Tools |
 |--------|-------|
 | Config | `para_config`, `para_templates`, `para_template_fields` |
-| Files | `para_list`, `para_read`, `para_create`, `para_insert`, `para_rename`, `para_delete` |
+| Files | `para_list`, `para_read`, `para_create`, `para_insert`, `para_replace_section`, `para_rename`, `para_delete` |
 | Search | `para_search`, `para_semantic` |
 | Index | `para_index_prime`, `para_index_query`, `para_list_areas`, `para_list_tags` |
 | Frontmatter | `para_fm_get`, `para_fm_validate`, `para_fm_set`, `para_hints` |
