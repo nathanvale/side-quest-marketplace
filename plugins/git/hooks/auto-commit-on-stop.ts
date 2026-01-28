@@ -136,11 +136,7 @@ function generateCommitMessage(prompt: string | null): string {
 
 	return `chore(wip): ${truncatedPrompt}
 
-Auto-committed by Claude Code Stop hook.
-Session work in progress - run /git:commit to squash.
-
-Generated with [Claude Code](https://claude.ai/code)
-Co-Authored-By: Claude <noreply@anthropic.com>`;
+Session work in progress - run /git:commit to squash.`;
 }
 
 /**

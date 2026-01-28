@@ -206,15 +206,12 @@ describe("generateCommitMessage", () => {
 	test("generates message with valid prompt", () => {
 		const result = generateCommitMessage("add validation to form");
 		expect(result).toContain("chore(wip): add validation to form");
-		expect(result).toContain("Auto-committed by Claude Code Stop hook");
 		expect(result).toContain("Session work in progress");
-		expect(result).toContain("Co-Authored-By: Claude <noreply@anthropic.com>");
 	});
 
 	test("uses fallback for null prompt", () => {
 		const result = generateCommitMessage(null);
 		expect(result).toContain("chore(wip): session checkpoint");
-		expect(result).toContain("Auto-committed by Claude Code Stop hook");
 	});
 
 	test("uses fallback for empty prompt", () => {
@@ -237,9 +234,7 @@ describe("generateCommitMessage", () => {
 
 		expect(lines[0]).toMatch(/^chore\(wip\):/);
 		expect(lines[1]).toBe("");
-		expect(lines[2]).toContain("Auto-committed");
-		expect(result).toContain("Claude Code");
-		expect(result).toContain("Co-Authored-By");
+		expect(lines[2]).toContain("Session work in progress");
 	});
 });
 
@@ -359,9 +354,7 @@ describe("printUserNotification", () => {
 	test("extracts subject line from full commit message", () => {
 		const fullMessage = `chore(wip): add validation
 
-Auto-committed by Claude Code Stop hook.
-
-Co-Authored-By: Claude <noreply@anthropic.com>`;
+Session work in progress - run /git:commit to squash.`;
 
 		const consoleSpy = {
 			calls: [] as string[],
@@ -379,6 +372,6 @@ Co-Authored-By: Claude <noreply@anthropic.com>`;
 
 		const output = consoleSpy.calls.join("\n");
 		expect(output).toContain("chore(wip): add validation");
-		expect(output).not.toContain("Auto-committed"); // Body should not appear
+		expect(output).not.toContain("Session work in progress"); // Body should not appear
 	});
 });
