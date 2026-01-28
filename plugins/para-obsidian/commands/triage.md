@@ -10,7 +10,7 @@ Process inbox items with intelligent routing. Single file or bulk processing.
 ## Usage
 
 ```
-/para-obsidian:triage                     # Process all inbox items (batches of 3)
+/para-obsidian:triage                     # Process all inbox items (batches of 5)
 /para-obsidian:triage "✂️ Article.md"    # Process single clipping
 /para-obsidian:triage "🎤 Voice memo.md" # Process single voice memo
 /para-obsidian:triage clippings           # Only web clippings
@@ -23,11 +23,12 @@ Process inbox items with intelligent routing. Single file or bulk processing.
 **Single file:** Routes directly to appropriate worker skill, presents proposal for review.
 
 **Bulk processing:**
-1. **Scans inbox** - Finds clippings, transcriptions, and attachments
-2. **Batches of 3** - Processes 3 items in parallel using subagents
-3. **Sequential review** - Presents proposals one at a time
-4. **Collaborative actions** - Accept, Edit, Skip, Delete, or go Deeper
-5. **State persistence** - Quit anytime, resume later
+1. **Syncs voice memos** - Runs `para voice` to transcribe any new Apple Voice Memos into inbox
+2. **Scans inbox** - Finds clippings, transcriptions, and attachments
+3. **Batches of 5** - Processes 5 items in parallel using subagents
+4. **Sequential review** - Presents proposals one at a time
+5. **Collaborative actions** - Accept, Edit, Skip, Delete, or go Deeper
+6. **State persistence** - Quit anytime, resume later
 
 ## Instructions
 
@@ -77,7 +78,7 @@ AI: Found 9 items in inbox:
     • 3 voice memos
     • 2 attachments (PDFs)
 
-    Processing batch 1 of 3...
+    Processing batch 1 of 2...
 
 AI: ## Proposal 1 of 3
 
@@ -104,7 +105,7 @@ AI: ✅ Created: 📚 Claude Code iMessage Integration.md
 
 **The Solution:**
 - Each item analyzed in isolated subagent context (no rot)
-- 3 items processed simultaneously (3x faster)
+- 5 items processed simultaneously (5x faster)
 - Only lightweight proposals return to main context
 - You review one at a time (collaborative control)
 
@@ -124,6 +125,6 @@ AI: Found saved progress: 4 of 9 items processed.
 | Mode | When | Behavior |
 |------|------|----------|
 | **Single** | Filename provided | Direct to worker, one proposal, done |
-| **Bulk** | No filename | Scan inbox, batch of 3, sequential review |
+| **Bulk** | No filename | Scan inbox, batch of 5, sequential review |
 
 Single file mode is simpler - no batching, no state persistence, just process and done.

@@ -129,3 +129,30 @@ When enrichment fails for an item:
 4. **User decides**: retry, delete, or skip
 
 This ensures no item is silently dropped - user always has visibility into failures.
+
+---
+
+## Enrichment Constraints
+
+| Source | Parallel? | Reason |
+|--------|-----------|--------|
+| YouTube | ✅ Yes | Stateless API |
+| Firecrawl | ✅ Yes | Batch API |
+| Chrome DevTools | ❌ No | Single browser instance (Chrome DevTools MCP limitation) |
+
+---
+
+## Voice Memo Special Cases
+
+Voice memos are the most ambiguous content type:
+
+| Pattern | proposed_template | meeting_type |
+|---------|-------------------|--------------|
+| Multiple speakers + status updates | meeting | standup |
+| Two people + career topics | meeting | 1on1 |
+| Sprint planning discussion | meeting | planning |
+| Single speaker thinking aloud | resource (idea) | null |
+| Quick reminder | capture | null |
+| Teams VTT file | meeting | (inferred) |
+
+**Key insight:** Personal voice memos (iOS) vs Teams VTTs have different contexts. iOS is usually ideas/reminders. VTTs are usually meetings.

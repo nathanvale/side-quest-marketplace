@@ -111,6 +111,12 @@ If `para_create` fails:
 }
 ```
 
+## Layer 1 Content Injection
+
+**This skill does NOT inject Layer 1 content.** It only creates the note with frontmatter.
+
+Layer 1 injection (populating "Layer 1: Captured Notes" via `para_replace_section`) is the **calling subagent's responsibility**. The triage subagent has the enriched content in its context and calls `para_replace_section` after `para_create`. See [subagent-prompts.md](../triage/references/subagent-prompts.md) Step 4 for details.
+
 ## Why This Skill Exists
 
 Extracted from triage orchestrator Phase 5 to enable:
