@@ -494,6 +494,7 @@ export function createFromTemplate(
 	// Apply template-specific title prefix from multiple sources (priority order):
 	// 1. Template frontmatter emoji_prefix (native, preferred)
 	// 2. Config titlePrefixes (existing approach)
+	// Note: We pass extraFrontmatter to support source_format emoji for resources
 	let displayTitle = options.title;
 	if (
 		templateEmojiPrefix &&
@@ -502,7 +503,13 @@ export function createFromTemplate(
 		displayTitle = `${templateEmojiPrefix}${displayTitle}`;
 	} else {
 		// Fall back to config-based prefix (existing behavior)
-		displayTitle = applyTitlePrefix(options.title, options.template, config);
+		// Pass extraFrontmatter so we can access source_format for resource emoji
+		displayTitle = applyTitlePrefix(
+			options.title,
+			options.template,
+			config,
+			options.extraFrontmatter,
+		);
 	}
 
 	// Resolve destination: explicit > config default > vault root

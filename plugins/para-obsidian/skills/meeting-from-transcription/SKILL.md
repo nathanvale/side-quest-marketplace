@@ -1,11 +1,24 @@
 ---
 name: meeting-from-transcription
-description: Create meeting notes from transcription files. Extracts metadata (date, type, summary) and creates bi-directional links. Use when converting voice memo transcriptions (.md) or VTT files (.vtt) into structured meeting notes, or when asked to "create a meeting from a transcription".
+description: "[DEPRECATED] Use /para-obsidian:triage instead. Creates meeting notes from transcriptions - now integrated into unified triage workflow."
 context: fork
-allowed-tools: Read, Bash, mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_commit, mcp__plugin_para-obsidian_para-obsidian__para_fm_set, mcp__plugin_para-obsidian_para-obsidian__para_index_prime, mcp__plugin_para-obsidian_para-obsidian__para_index_query, AskUserQuestion
+allowed-tools: Read, mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_commit, mcp__plugin_para-obsidian_para-obsidian__para_fm_set, mcp__plugin_para-obsidian_para-obsidian__para_index_prime, mcp__plugin_para-obsidian_para-obsidian__para_index_query, AskUserQuestion
 ---
 
 # Meeting from Transcription
+
+> **DEPRECATED:** This skill's functionality has been absorbed into the unified triage workflow.
+>
+> **Use instead:** `/para-obsidian:triage`
+>
+> The triage orchestrator now handles ALL inbox content including voice memos and VTT files.
+> It automatically detects meeting content and routes to the `create-meeting` worker skill.
+>
+> For direct meeting creation from a proposal, use the `create-meeting` worker skill.
+
+---
+
+## Legacy Documentation (for reference)
 
 Create meeting notes from transcription sources with intelligent metadata extraction.
 
@@ -88,28 +101,43 @@ para_commit({ response_format: "json" })
 
 ### Step 5: Create Meeting Note
 
-```bash
-cd ${CLAUDE_PLUGIN_ROOT} && bun src/cli.ts create \
-  --template meeting \
-  --source-text "<TRANSCRIPT_BODY>" \
-  --arg "meeting_date=<DATE>" \
-  --arg "meeting_type=<TYPE>" \
-  --arg "transcription=[[<NOTE_NAME>]]" \
-  --arg "summary=<SUMMARY>" \
-  --arg "area=[[<AREA_NAME>]]"
+```typescript
+para_create({
+  template: "meeting",
+  title: "<MEETING_TITLE>",
+  dest: "04 Archives/Meetings",  // Meeting notes go to Archives
+  args: {
+    meeting_date: "<DATE>",           // ISO format: YYYY-MM-DDTHH:mm:ss
+    meeting_type: "<TYPE>",           // standup, 1on1, planning, retro, general
+    transcription: "[[<NOTE_NAME>]]", // Note name without path
+    summary: "<SUMMARY>",
+    area: "[[<AREA_NAME>]]",          // OR project instead
+    project: "[[<PROJECT_NAME>]]"     // Optional if area provided
+  },
+  content: {
+    "Attendees": "- [[Person 1]]\n- [[Person 2]]",
+    "Notes": "- Key point 1\n- Key point 2",
+    "Decisions Made": "- Decision 1",
+    "Action Items": "- [ ] @person - Task (due: YYYY-MM-DD)",
+    "Follow-up": "- Next steps"
+  },
+  response_format: "json"
+})
 ```
 
-Or if project instead of area:
-```bash
-  --arg "project=[[<PROJECT_NAME>]]"
-```
-
-**Arguments:**
+**Arguments (frontmatter):**
 - `meeting_date` — ISO format: `YYYY-MM-DDTHH:mm:ss`
-- `meeting_type` — One of: `1-on-1`, `standup`, `planning`, `retro`, `review`, `interview`, `stakeholder`, `general`
+- `meeting_type` — One of: `standup`, `1on1`, `planning`, `retro`, `workshop`, `general`
 - `transcription` — Note name WITHOUT path or `.md` extension, wrapped in `[[...]]`
 - `summary` — Concise 1-line description (max 100 chars)
-- `area` OR `project` — **REQUIRED** (one of these must be provided) — Wikilink to parent area or project
+- `area` OR `project` — **REQUIRED** (one of these must be provided) — Wikilink to parent
+
+**Content (body sections):**
+- `"Attendees"` — Bulleted wikilinks to attendees
+- `"Notes"` — Key discussion points
+- `"Decisions Made"` — Important decisions
+- `"Action Items"` — Checkbox tasks with assignee and due date
+- `"Follow-up"` — Next steps
 
 ### Step 6: Link Transcription to Meeting
 

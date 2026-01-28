@@ -44,6 +44,7 @@ import {
 } from "../voice";
 import { startSession } from "./shared/session";
 import type { CommandContext, CommandResult } from "./types";
+import { handleVoiceServe } from "./voice-server";
 
 /**
  * Format a date as YYYY-MM-DD using local time (not UTC).
@@ -191,6 +192,10 @@ export async function handleVoice(ctx: CommandContext): Promise<CommandResult> {
 	// Route to subcommand
 	if (subcommand === "convert") {
 		return await handleVoiceConvert(ctx);
+	}
+
+	if (subcommand === "serve") {
+		return await handleVoiceServe(ctx);
 	}
 
 	// Default: existing voice transcription

@@ -348,23 +348,18 @@ const areaV2To3: MigrationFn = (ctx): MigrationResult => {
 	return { attributes: next, body: ctx.body, changes };
 };
 
-/** resource v2→v3: renames source→source_type, removes areas/reviewed */
+/** resource v2→v3: ensures distilled field exists, removes reviewed */
 const resourceV2To3: MigrationFn = (ctx): MigrationResult => {
 	const next = { ...ctx.attributes };
 	const changes: string[] = [];
 
-	// Rename source → source_type
-	if ("source" in next && !("source_type" in next)) {
-		next.source_type = next.source;
-		delete next.source;
-		changes.push("renamed: source → source_type");
+	// Ensure distilled field exists
+	if (!("distilled" in next)) {
+		next.distilled = false;
+		changes.push("added: distilled = false");
 	}
 
-	// Remove obsolete fields
-	if ("areas" in next) {
-		delete next.areas;
-		changes.push("removed: areas");
-	}
+	// Remove obsolete reviewed field
 	if ("reviewed" in next) {
 		delete next.reviewed;
 		changes.push("removed: reviewed");

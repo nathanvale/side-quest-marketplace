@@ -1,22 +1,23 @@
 ---
 name: template-assistant
 description: Generate intelligent content for PARA Obsidian vault templates. Use when asked to create new notes (project, area, resource, task, capture, daily, weekly-review, booking, checklist, itinerary, trip-research), populate template sections with AI-generated content, or understand what fields a template requires before creation.
+allowed-tools: mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_list_areas, mcp__plugin_para-obsidian_para-obsidian__para_list_projects, mcp__plugin_para-obsidian_para-obsidian__para_templates, mcp__plugin_para-obsidian_para-obsidian__para_template_fields, mcp__plugin_para-obsidian_para-obsidian__para_fm_validate, AskUserQuestion
 ---
 
 # Template Assistant Skill
 
 ## Workflow
 
-### 0. Gather Vault Context (NEW)
+### 0. Gather Vault Context
 
 Before creating notes, understand what already exists:
 
-```bash
-# List existing areas
-bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts list-areas --format json
+```typescript
+// List existing areas
+para_list_areas({ response_format: "json" })
 
-# List existing projects (for task linking)
-bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts list-projects --format json
+// List existing projects (for task linking)
+para_list_projects({ response_format: "json" })
 ```
 
 **CRITICAL: Classification vs Invention**
@@ -44,8 +45,8 @@ When selecting areas/projects, you are CLASSIFYING content into existing categor
 
 ### 1. Discover Template Structure
 
-```bash
-bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts template-fields project --format json
+```typescript
+para_template_fields({ template: "project", response_format: "json" })
 ```
 
 Returns required args, auto-filled fields, and body sections.
@@ -73,26 +74,34 @@ Ask focused questions matching the template type:
 
 **Metadata-Heavy** (task, booking, checklist, capture): Focus on frontmatter, minimal body content
 
-**CRITICAL:** When generating wikilinks for frontmatter args, do NOT include quotes:
-- ✅ Correct: `--arg "Area=[[Product]]"`
-- ❌ Wrong: `--arg "Area=\"[[Product]]\""`
+**CRITICAL:** When generating wikilinks for frontmatter args, do NOT include extra quotes:
+- ✅ Correct: `"Area": "[[Product]]"`
+- ❌ Wrong: `"Area": "\"[[Product]]\""`
 
 This ensures Dataview queries work correctly.
 
 ### 4. Create Note with Content
 
-```bash
-bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts create --template project \
-  --title "Launch Dark Mode" \
-  --arg "Area=[[Product]]" \
-  --arg "Target completion date (YYYY-MM-DD)=2025-03-31" \
-  --content '{"Why This Matters": "Dark mode reduces eye strain...", "Success Criteria": "- [ ] Theme toggle works\n- [ ] Persists across sessions"}'
+```typescript
+para_create({
+  template: "project",
+  title: "Launch Dark Mode",
+  args: {
+    "Area": "[[Product]]",
+    "Target completion date (YYYY-MM-DD)": "2025-03-31"
+  },
+  content: {
+    "Why This Matters": "Dark mode reduces eye strain and improves accessibility for users who work in low-light environments.",
+    "Success Criteria": "- [ ] Theme toggle works\n- [ ] Persists across sessions\n- [ ] Respects system preference"
+  },
+  response_format: "json"
+})
 ```
 
 ### 5. Validate Result
 
-```bash
-bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts frontmatter validate "Launch Dark Mode.md" --format json
+```typescript
+para_fm_validate({ file: "Launch Dark Mode.md", response_format: "json" })
 ```
 
 ---
@@ -101,9 +110,9 @@ bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts frontmatter validate "Launch Dark Mode.md" 
 
 | Error | Resolution |
 |-------|------------|
-| Template not found | Run `bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts templates` to list available templates |
-| Missing required arg | Run `bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts template-fields <template>` to discover requirements |
-| Section not injected | Heading may not exist in template |
+| Template not found | Use `para_templates({ response_format: "json" })` to list available templates |
+| Missing required arg | Use `para_template_fields({ template: "<name>", response_format: "json" })` to discover requirements |
+| Section not injected | Heading may not exist in template - check template structure |
 | Vault not git repo | Ensure PARA_VAULT is an initialized git repository |
 
 ---
@@ -120,15 +129,26 @@ Load these as needed based on the task:
 
 ## Vault-Aware Workflows
 
-### Automatic Mode (convert command)
+### Automatic Mode (convert workflow)
 
-The convert command uses **classification-based prompting** to intelligently populate area/project fields:
+The convert workflow uses **classification-based prompting** to intelligently populate area/project fields:
 
-```bash
-bun ${CLAUDE_PLUGIN_ROOT}/src/cli.ts convert note.md --template project
-# Vault context: 5 areas, 12 projects, 20 tags
-# LLM analyzes content and classifies into existing [[Health]] area
-# Example: "fitness tracking" content → [[Health]] (not "Wellness" or "Fitness")
+```typescript
+// Read existing note content
+para_read({ file: "note.md", response_format: "json" })
+
+// Get vault context for classification
+para_list_areas({ response_format: "json" })
+para_list_projects({ response_format: "json" })
+
+// Create with classified area (LLM analyzes content and classifies)
+para_create({
+  template: "project",
+  title: "Fitness Tracking App",
+  args: { "Area": "[[Health]]" },  // Classified into existing area
+  response_format: "json"
+})
+// Example: "fitness tracking" content → [[Health]] (not "Wellness" or "Fitness")
 ```
 
 **How classification works:**

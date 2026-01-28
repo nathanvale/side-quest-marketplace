@@ -45,12 +45,14 @@ TaskUpdate({
 
 ### TaskList
 
-Returns all tasks with summary info. No parameters.
+Returns all tasks with **summary info only**. No parameters.
 
 ```typescript
 TaskList()
 // Returns: { id, subject, status, owner, blockedBy }[]
 ```
+
+**CRITICAL:** TaskList does NOT return metadata. To read proposals, you must call TaskGet for each task.
 
 ### TaskGet
 
@@ -58,7 +60,10 @@ Returns full details for a specific task including description and metadata.
 
 ```typescript
 TaskGet({ taskId: string })
+// Returns: { id, subject, description, status, owner, metadata, blockedBy, blocks }
 ```
+
+**This is the only way to retrieve metadata.** Use TaskList to get IDs, then TaskGet for full details.
 
 ---
 
@@ -250,11 +255,73 @@ for (const task of triageTasks) {
 
 ---
 
+## Retrieving Proposals from Subagents
+
+**CRITICAL:** There are TWO ways data flows from subagents back to the coordinator:
+
+### 1. Task Metadata (Persistence)
+
+Subagent calls `TaskUpdate` with `metadata.proposal`. This is for **crash resilience** - if the session dies, proposals are saved.
+
+```typescript
+TaskUpdate({
+  taskId: "abc123",
+  status: "in_progress",
+  metadata: { proposal: { title: "...", area: "[[...]]", ... } }
+})
+```
+
+To retrieve: Must call `TaskGet(taskId)` for EACH task - TaskList doesn't return metadata.
+
+```typescript
+// ❌ WRONG - TaskList doesn't include metadata
+const tasks = TaskList();
+const proposals = tasks.filter(t => t.metadata?.proposal); // metadata is undefined!
+
+// ✅ CORRECT - Use TaskGet for each task
+const tasks = TaskList().filter(t => t.subject.startsWith("Triage:"));
+const proposals = [];
+for (const task of tasks) {
+  if (task.status === "in_progress") {
+    const full = TaskGet({ taskId: task.id });
+    if (full.metadata?.proposal) {
+      proposals.push({ taskId: task.id, ...full.metadata.proposal });
+    }
+  }
+}
+```
+
+### 2. Subagent Response Text (Immediate Use)
+
+Subagent returns structured text in its response. This is for **immediate coordinator use** - no extra tool calls needed.
+
+```typescript
+// Subagent returns:
+`PROPOSAL_JSON:{"title":"Sprint Planning","area":"[[💼 Work]]","project":"[[🎯 GMS]]",...}`
+
+// Coordinator extracts:
+const match = subagentResponse.match(/PROPOSAL_JSON:(\{.*\})/);
+const proposal = JSON.parse(match[1]);
+```
+
+### Which to Use?
+
+| Method | When | Pros | Cons |
+|--------|------|------|------|
+| Response text | Normal flow | No extra calls, immediate | Lost if not captured |
+| TaskGet loop | Resume flow | Crash-resilient | N tool calls for N tasks |
+
+**Recommended pattern:** Use response text for normal operation, TaskGet loop only on resume.
+
+---
+
 ## Best Practices
 
 1. **Subject prefix** - All triage tasks start with "Triage:" for easy filtering
 2. **Store file path in metadata** - Needed for para_create and para_delete
 3. **Store source URL in metadata** - Needed for resource frontmatter
 4. **Persist proposal immediately** - Subagents call TaskUpdate before returning
-5. **Use in_progress for analyzed** - Distinguishes from pending (not analyzed) and completed (resource created)
-6. **Check for existing session first** - Offer resume before creating new tasks
+5. **Return structured proposal text** - Subagents return parseable proposal for coordinator
+6. **Use in_progress for analyzed** - Distinguishes from pending (not analyzed) and completed (resource created)
+7. **Check for existing session first** - Offer resume before creating new tasks
+8. **Never read content in coordinator** - All file reads happen in subagents only

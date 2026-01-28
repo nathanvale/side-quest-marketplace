@@ -88,13 +88,36 @@ Task({
 
     ## Step 2: Analyze
 
-    Based on the enriched content, create a proposal:
+    Based on the enriched content, create a proposal with ALL required fields:
 
-    - **title**: Meaningful, descriptive title (not the filename)
+    ### Core Fields (required for all types)
+    - **proposed_title**: Meaningful, descriptive title (not the filename)
+    - **proposed_template**: "resource" | "meeting" | "capture"
     - **summary**: 2-3 sentences capturing key value/insights
     - **area**: Wikilink to existing area [[Area Name]]
     - **project**: Wikilink to existing project, or null if none applies
-    - **resourceType**: One of: article | video | thread | meeting | reference | tutorial
+    - **resourceType**: One of: article | video | thread | meeting | reference | idea
+
+    ### UX Fields (required for review table)
+    - **categorization_hints**: Array of 3 key points explaining why you chose this categorization
+      Example: ["Multiple speakers discussing sprint tasks", "Action items assigned with deadlines", "Technical backlog prioritization"]
+    - **source_format**: "article" | "video" | "audio" | "document" | "thread" | "image"
+    - **confidence**: "high" | "medium" | "low"
+      - high: Clear format, obvious categorization
+      - medium: Likely correct but could be wrong
+      - low: Ambiguous, multiple valid interpretations (triggers "Deeper" option)
+    - **notes**: Special considerations or caveats (e.g., "Transcription has garbled names", "Could also be a brainstorm session")
+
+    ### Meeting-Specific Fields (when proposed_template === "meeting")
+    - **meeting_type**: standup | 1on1 | planning | retro | workshop | general
+    - **meeting_date**: ISO date from recorded/created field
+    - **attendees**: Array of wikilinks/names ["[[June Xu]]", "Speaker 3"]
+    - **meeting_notes**: Array of key discussion points
+    - **decisions**: Array of decisions made
+    - **action_items**: Array of { assignee, task, due } objects
+    - **follow_up**: Array of next steps
+
+    **CRITICAL:** Only use areas/projects from the vault context above. Never hallucinate names.
 
     ## Step 3: Persist (CRITICAL - do not skip)
 
@@ -118,10 +141,43 @@ Task({
 
     This ensures your work survives if the session crashes.
 
-    ## Output
+    ## Output (CRITICAL - Dual Communication)
 
-    After calling TaskUpdate, confirm:
-    "Proposal saved for: [title]"
+    You must provide BOTH for the coordinator:
+
+    ### 1. Persist to Task (crash resilience)
+    Call TaskUpdate as shown in Step 3.
+
+    ### 2. Return Structured Text (immediate use)
+    After TaskUpdate, return a parseable proposal so the coordinator doesn't need extra tool calls:
+
+    \`\`\`
+    PROPOSAL_JSON:{"taskId":"${taskId}","proposed_title":"Your Title","proposed_template":"resource","summary":"2-3 sentences","area":"[[Area]]","project":"[[Project]]","resourceType":"article","source_format":"article","confidence":"medium","categorization_hints":["hint1","hint2","hint3"],"notes":null,"file":"${file}"}
+    \`\`\`
+
+    This allows the coordinator to use your proposal immediately without calling TaskGet.
+
+    **Example complete output (resource):**
+    \`\`\`
+    ✓ Analyzed: "Claude Code iMessage Integration"
+      Area: [[🤖 AI Practice]]
+      Project: [[🎯 Clawdbot Setup & Integration]]
+      Type: article
+      Confidence: high
+
+    PROPOSAL_JSON:{"taskId":"1","proposed_title":"Claude Code iMessage Integration","proposed_template":"resource","summary":"Tutorial showing how to integrate Claude Code with iMessage for AI-powered messaging...","area":"[[🤖 AI Practice]]","project":"[[🎯 Clawdbot Setup & Integration]]","resourceType":"article","source_format":"video","confidence":"high","categorization_hints":["YouTube tutorial format","Step-by-step integration guide","Focuses on iMessage automation"],"notes":null,"file":"00 Inbox/✂️ Claude Code iMessage.md"}
+    \`\`\`
+
+    **Example complete output (meeting):**
+    \`\`\`
+    ✓ Analyzed: "Sprint 47 Planning Session"
+      Area: [[💼 Work]]
+      Project: [[🎯 GMS - Gift Card Management System]]
+      Type: meeting (planning)
+      Confidence: high
+
+    PROPOSAL_JSON:{"taskId":"2","proposed_title":"Sprint 47 Planning Session","proposed_template":"meeting","summary":"GMS team sprint planning covering voucher API dependencies, bulk print order features, and backlog prioritization.","area":"[[💼 Work]]","project":"[[🎯 GMS - Gift Card Management System]]","resourceType":"meeting","source_format":"audio","confidence":"high","categorization_hints":["Multiple speakers with status updates","Action items assigned with deadlines","Sprint backlog discussion"],"notes":"All speakers from GMS squad - project auto-inferred","meeting_type":"planning","meeting_date":"2026-01-28","attendees":["[[June Xu]]","[[Mustafa Jalil]]"],"meeting_notes":["..."],"decisions":["..."],"action_items":[{"assignee":"[[June Xu]]","task":"Review PR","due":"2026-01-30"}],"follow_up":["..."],"file":"00 Inbox/🎤 2026-01-28 4-27pm.md"}
+    \`\`\`
   `
 })
 ```
@@ -149,17 +205,34 @@ Task({ subagent_type: "general-purpose", description: "Process: Item 5", ... })
 
 ```typescript
 interface Proposal {
-  title: string;           // Meaningful title
-  summary: string;         // 2-3 sentences
-  area: string;            // Wikilink: "[[Area Name]]"
-  project: string | null;  // Wikilink or null
-  resourceType: string;    // article, video, thread, meeting, reference, tutorial
+  // Core fields (all types)
+  proposed_title: string;        // Meaningful, descriptive title
+  proposed_template: "resource" | "meeting" | "capture";
+  summary: string;               // 2-3 sentences capturing key value
+  area: string;                  // Wikilink: "[[Area Name]]"
+  project: string | null;        // Wikilink or null
+  resourceType: string;          // article, video, thread, meeting, reference, idea
+
+  // UX fields (for review table and "Deeper" option)
+  categorization_hints: string[];  // 3 key points explaining categorization
+  source_format: "article" | "video" | "audio" | "document" | "thread" | "image";
+  confidence: "high" | "medium" | "low";  // Triggers "Deeper" when low
+  notes: string | null;          // Special considerations for reviewer
+
+  // Meeting-specific fields
+  meeting_type?: "standup" | "1on1" | "planning" | "retro" | "workshop" | "general";
+  meeting_date?: string;         // ISO date from recorded field
+  attendees?: string[];          // ["[[Name]]", "Speaker 3"]
+  meeting_notes?: string[];      // Key discussion points
+  decisions?: string[];          // Decisions made
+  action_items?: Array<{ assignee?: string; task: string; due?: string }>;
+  follow_up?: string[];          // Next steps
 }
 
 interface TaskMetadata {
   file: string;            // Original inbox file path
   itemType: string;        // clipping, transcription, attachment
-  sourceType: string;      // youtube, twitter, article, etc.
+  sourceType: string;      // youtube, twitter, article, voice, attachment
   sourceUrl: string;       // Original URL
   proposal: Proposal | null;
 }
@@ -259,6 +332,7 @@ const prompt = `
 2. **Pass vault context from coordinator** - Saves tool calls
 3. **Only use real areas/projects** - Never hallucinate names
 4. **Persist immediately** - TaskUpdate right after analysis
-5. **Use haiku** - Fast, cheap, good enough for categorization
-6. **Return confirmation** - "Proposal saved for: [title]"
+5. **Return PROPOSAL_JSON** - Structured text for coordinator to parse
+6. **Use haiku** - Fast, cheap, good enough for categorization
 7. **X/Twitter is sequential** - Single Chrome browser instance
+8. **Dual communication** - Both TaskUpdate (persistence) AND structured text (immediate use)

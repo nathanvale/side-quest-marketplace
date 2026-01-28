@@ -37,18 +37,21 @@
 	],
 	"mcpServers": ["./.mcp.json"],
 	"skills": [
+		"./skills/analyze-attachment",
+		"./skills/analyze-voice",
+		"./skills/analyze-web",
 		"./skills/create-area",
+		"./skills/create-meeting",
 		"./skills/create-project",
+		"./skills/create-resource",
 		"./skills/daily-review",
-		"./skills/distill-attachment",
 		"./skills/distill-resource",
-		"./skills/distill-voice",
-		"./skills/distill-web",
-		"./skills/triage",
 		"./skills/field-suggestions",
 		"./skills/log-triage",
 		"./skills/meeting-from-transcription",
+		"./skills/para-classifier",
 		"./skills/template-assistant",
+		"./skills/triage",
 		"./skills/webclipper-templates"
 	]
 }

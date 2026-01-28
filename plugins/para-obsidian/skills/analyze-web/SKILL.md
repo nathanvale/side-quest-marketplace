@@ -1,13 +1,13 @@
 ---
-name: distill-web
-description: Process web clippings into resource proposals. Fetches full content, analyzes, returns structured proposal. Used by triage coordinator as subagent worker.
+name: analyze-web
+description: Analyze web clippings and return resource proposals. Fetches full content via enrichment, analyzes content, returns structured proposal. Worker skill for triage orchestrator.
 user-invocable: false
 allowed-tools: mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_fm_get, mcp__firecrawl__firecrawl_scrape, mcp__youtube-transcript__get_video_info, mcp__youtube-transcript__get_transcript, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__take_snapshot, WebFetch
 ---
 
-# Distill Web Clipping
+# Analyze Web Clipping
 
-Process a single web clipping and return a **proposal** (not a final note).
+Analyze a single web clipping and return a **proposal** (not a final note).
 
 ## Input
 
@@ -98,7 +98,7 @@ Determine:
 1. **Template**: Is this learning material (`resource`) or reference (`gift`, `booking`, etc.)?
 2. **Resource type**: `article`, `tutorial`, `reference`, `thread`, `issue`, `idea`
 3. **Source format**: `video`, `article`, `thread`, `document`
-4. **Categorization hints**: 3 bullets for organizing (NOT deep learning - use distill-resource)
+4. **Categorization hints**: 3 bullets for organizing (NOT deep learning - use /para-obsidian:distill-resource)
 5. **Connections**: Which areas/projects does this relate to?
 
 ### Step 4: Return Proposal

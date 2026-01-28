@@ -401,7 +401,7 @@ export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
 	project: 1,
 	trip: 1,
 	area: 1,
-	resource: 2,
+	resource: 3,
 	task: 1,
 	daily: 1,
 	"weekly-review": 1,
@@ -534,4 +534,26 @@ export const DEFAULT_TITLE_PREFIXES: Partial<Record<string, string>> = {
 	letter: "📄 ",
 	cv: "📄 ",
 	meeting: "🗣️ ",
+};
+
+/**
+ * Emoji mapping for resource source_format field.
+ * Provides visual discoverability for different content types.
+ *
+ * Resources use a two-emoji pattern: base (📚) + format-specific emoji.
+ * For example: "📚🎬 TypeScript Deep Dive" (resource + video format)
+ *
+ * See @../skills/para-classifier/references/emoji-mapping.md for full guidelines.
+ */
+export const SOURCE_FORMAT_EMOJIS: Record<string, string> = {
+	article: "📰",
+	video: "🎬",
+	audio: "🎧",
+	document: "📄",
+	thread: "🧵",
+	image: "🖼️",
+	book: "📖",
+	course: "🎓",
+	podcast: "🎙️",
+	paper: "📑",
 };

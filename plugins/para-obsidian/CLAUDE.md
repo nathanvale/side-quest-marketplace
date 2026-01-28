@@ -78,6 +78,7 @@ para enrich-bookmark <file.md>     # Enrich bookmark with Firecrawl
 para voice                         # Sync new voice memos to daily notes
 para voice convert <path>          # Convert transcription file to capture note
 para voice convert --text "..."    # Convert inline text to capture note
+para voice serve [--port 3847]     # HTTP server for iOS Shortcuts integration
 
 # Performance & Observability
 para slo [slo-name|--breaches]     # Monitor SLO health, burn rates, violations

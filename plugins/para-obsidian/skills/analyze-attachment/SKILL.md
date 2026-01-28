@@ -1,13 +1,13 @@
 ---
-name: distill-attachment
-description: Process PDF/DOCX attachments into resource proposals. Uses para-obsidian CLI for extraction, analyzes content, returns structured proposal. Also serves as documentation for using the para scan CLI.
+name: analyze-attachment
+description: Analyze PDF/DOCX attachments and return resource proposals. Uses para-obsidian CLI for extraction, analyzes content, returns structured proposal. Worker skill for triage orchestrator.
 user-invocable: false
 allowed-tools: Bash, mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_list
 ---
 
-# Distill Attachment
+# Analyze Attachment
 
-Process PDF or DOCX attachments and return a **proposal** (not a final note).
+Analyze PDF or DOCX attachments and return a **proposal** (not a final note).
 
 ## Skills as Documentation
 
@@ -26,25 +26,31 @@ You receive:
 
 ## Output
 
-Return a JSON proposal:
+Return a JSON proposal with ALL fields (UX fields are required for the review table):
 
 ```json
 {
+  // Identity
   "file": "00 Inbox/Attachments/document.pdf",
   "type": "attachment",
+
+  // Core proposal fields
   "proposed_title": "Descriptive Title",
   "proposed_template": "resource|invoice|booking|document",
   "summary": "2-3 sentence summary of document content",
-  "key_insights": [
-    "First key finding",
-    "Second key finding"
-  ],
   "suggested_areas": ["[[🌱 Area Name]]"],
   "suggested_projects": ["[[🎯 Project Name]]"],
   "document_type": "invoice|contract|cv|letter|medical|report|manual",
-  "source_format": "document",
-  "confidence": "high|medium|low",
-  "notes": "Any extraction issues or special considerations"
+
+  // UX fields (REQUIRED - for review table and "Deeper" option)
+  "categorization_hints": [
+    "First key finding about the document",
+    "Second key finding",
+    "Third key finding"
+  ],
+  "source_format": "document",  // Always "document" for attachments
+  "confidence": "high|medium|low",  // low triggers "Deeper" option
+  "notes": "Any extraction issues or special considerations"  // or null
 }
 ```
 
@@ -153,7 +159,7 @@ This preserves the original document while creating a searchable, connected note
   "proposed_title": "Telstra Invoice January 2024",
   "proposed_template": "invoice",
   "summary": "Monthly Telstra bill for January 2024. Total amount $89.95 for mobile plan. Due date February 15, 2024.",
-  "key_insights": [
+  "categorization_hints": [
     "Monthly mobile plan charge: $89.95",
     "Due date: February 15, 2024",
     "Account number: 1234567890"

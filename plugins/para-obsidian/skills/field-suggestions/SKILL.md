@@ -1,3 +1,10 @@
+---
+name: field-suggestions
+description: Generate AI-assisted frontmatter field suggestions using para-obsidian LLM utilities. Demonstrates 3-layer architecture (constraints, prompt-builder, orchestration) for metadata extraction.
+user-invocable: false
+allowed-tools: []
+---
+
 # Field Suggestions Skill
 
 ## Purpose

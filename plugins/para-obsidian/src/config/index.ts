@@ -80,6 +80,27 @@ export interface FieldRule {
 }
 
 /**
+ * Represents a person/contact for transcription speaker matching.
+ * Used to improve transcription accuracy by providing known names and context.
+ */
+export interface Stakeholder {
+	/** Full name as it appears in transcriptions (e.g., "Nathan Vale"). */
+	readonly name: string;
+	/** Email address (optional, for contact lookup). */
+	readonly email?: string;
+	/** Role or job title (e.g., "Tech Lead", "Product Owner", "Developer"). */
+	readonly role?: string;
+	/** Company or organization (e.g., "Bunnings"). */
+	readonly company?: string;
+	/** Squad or team name (e.g., "GMS", "POS Yellow"). */
+	readonly squad?: string;
+	/** Related project wikilink (e.g., "[[🎯 GMS - Gift Card Management System]]"). */
+	readonly project?: string;
+	/** Nickname or alias used in transcriptions (e.g., "MJ" for "Mustafa Jalil"). */
+	readonly alias?: string;
+}
+
+/**
  * Main configuration object for para-obsidian operations.
  *
  * This configuration controls vault location, template handling,
@@ -128,6 +149,12 @@ export interface ParaObsidianConfig {
 	 * Can also be set via PARA_LLM_TIMEOUT_MS env var (takes precedence).
 	 */
 	readonly llmTimeoutMs?: number;
+	/**
+	 * Known people for transcription speaker matching.
+	 * Helps improve transcription accuracy by providing names, roles, and context.
+	 * Used by voice memo processing and meeting note creation.
+	 */
+	readonly stakeholders?: ReadonlyArray<Stakeholder>;
 }
 
 /**
