@@ -1,7 +1,7 @@
 ---
 name: daily-review
 description: Journaling partner that helps extract deeper meaning from daily logs. Use when the user wants to review their day, process logs into journal entries, or mentions "daily review".
-allowed-tools: Read, mcp__para-obsidian_para-obsidian__para_read, mcp__para-obsidian_para-obsidian__para_list, mcp__para-obsidian_para-obsidian__para_insert, mcp__firecrawl__firecrawl_scrape, WebFetch
+allowed-tools: Read, mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_list, mcp__plugin_para-obsidian_para-obsidian__para_insert, mcp__firecrawl__firecrawl_scrape, WebFetch
 ---
 
 # Daily Review - Your Journaling Partner

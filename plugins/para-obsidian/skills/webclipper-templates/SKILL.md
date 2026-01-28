@@ -1,6 +1,8 @@
 ---
 name: webclipper-templates
 description: Web Clipper template management for ADHD-friendly capture workflow. Single universal template with zero-decision capture, automatic classification, and deferred organization. Use for template installation, understanding the capture pipeline, or troubleshooting Web Clipper issues.
+user-invocable: true
+allowed-tools: Read, Bash
 ---
 
 # Web Clipper Templates

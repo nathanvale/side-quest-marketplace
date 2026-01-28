@@ -133,14 +133,6 @@ para_replace_section({
   response_format: "json"
 })
 
-// Replace Notable Quotes section
-para_replace_section({
-  file: "03 Resources/[filename]",
-  heading: "Notable Quotes",
-  content: "[Bold passages as blockquotes]",
-  response_format: "json"
-})
-
 // Replace Layer 2 section (inside Progressive Summary)
 para_replace_section({
   file: "03 Resources/[filename]",

@@ -105,16 +105,15 @@ Complete catalog of all 11 PARA templates with their structure and content requi
 1. Source Information - Metadata table
 2. Summary - Core message (2-3 sentences)
 3. Key Insights - Most valuable ideas (numbered)
-4. Notable Quotes - Passages worth remembering
-5. Progressive Summary
+4. Progressive Summary
    - Layer 1: Captured Notes
    - Layer 2: Bold Passages
    - Layer 3: Highlighted Core
    - Layer 4: Executive Summary
-6. Connections - Related notes, contradictions, supports
-7. Action Items - What to DO with this knowledge
-8. Questions Raised - What you still want to know
-9. Personal Reflection - How this changes your thinking
+5. Connections - Related notes, contradictions, supports
+6. Action Items - What to DO with this knowledge
+7. Questions Raised - What you still want to know
+8. Personal Reflection - How this changes your thinking
 
 ---
 

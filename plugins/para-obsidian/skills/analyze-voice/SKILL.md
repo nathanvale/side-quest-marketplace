@@ -1,15 +1,15 @@
 ---
 name: analyze-voice
-description: Analyze voice memo transcriptions and return resource/meeting proposals. Extracts speakers, notes, decisions, action items for meeting body content. Worker skill for triage orchestrator.
+description: Analyze voice memo transcriptions, create notes with appropriate content, and return lightweight proposals. For resources (ideas, reflections), creates note with Layer 1 transcription. For meetings, extracts structured body content. Worker skill for triage orchestrator.
 user-invocable: false
-allowed-tools: mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_fm_get
+allowed-tools: mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_fm_get, mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_replace_section, mcp__plugin_para-obsidian_para-obsidian__para_rename
 ---
 
 # Analyze Voice Memo
 
-Analyze a single voice memo transcription and return a **proposal** (not a final note).
+Analyze a single voice memo transcription, **create the appropriate note**, and return a lightweight proposal.
 
-**Key design:** This skill reads the full transcription content so the coordinator never has to. All extracted content (attendees, notes, decisions, action items) is captured in the proposal for injection into the meeting body.
+**Key design:** This skill reads the full transcription AND creates the note before returning. For meetings, it extracts structured body content. For resources (ideas, reflections), it injects the transcription as Layer 1. The full content stays in subagent context - only the proposal flows back.
 
 ## Input
 
@@ -21,7 +21,7 @@ You receive:
 
 ## Output
 
-Return a JSON proposal with ALL fields (UX fields are required for the review table):
+Return a JSON proposal with ALL fields (note: the note is already created):
 
 ```json
 {
@@ -36,6 +36,10 @@ Return a JSON proposal with ALL fields (UX fields are required for the review ta
   "suggested_areas": ["[[🌱 Work]]"],
   "suggested_projects": ["[[🎯 Project Name]]"],
   "resource_type": "meeting",  // meeting|conversation|idea|reflection
+
+  // Creation fields (NEW - note already created)
+  "created": "04 Archives/Meetings/Sprint 42 Planning.md",  // or "03 Resources/..." for resources
+  "layer1_injected": true,  // For resources only (meetings use structured sections)
 
   // UX fields (REQUIRED - for review table and "Deeper" option)
   "categorization_hints": [
@@ -183,9 +187,89 @@ Look for:
 
 **Follow-up:** Items for future discussion or preparation.
 
-### Step 6: Return Proposal
+### Step 6: Create Note & Archive Original
 
-Return the JSON proposal structure with all extracted body content. Do NOT create the note.
+**This is where content stays isolated.** Create the appropriate note type before returning.
+
+#### For Meetings (`proposed_template === "meeting"`):
+
+```
+para_create({
+  template: "meeting",
+  title: proposed_title,
+  dest: "04 Archives/Meetings",
+  args: {
+    meeting_date: meeting_date,
+    meeting_type: meeting_type,
+    transcription: `[[${originalFileName}]]`,
+    summary: summary,
+    area: suggested_areas[0],
+    project: suggested_projects[0] || null
+  },
+  content: {
+    "Attendees": attendees.map(a => `- ${a}`).join('\n'),
+    "Notes": meeting_notes.map(n => `- ${n}`).join('\n'),
+    "Decisions Made": decisions.map(d => `- ${d}`).join('\n'),
+    "Action Items": action_items.map(i => formatActionItem(i)).join('\n'),
+    "Follow-up": follow_up.map(f => `- ${f}`).join('\n')
+  },
+  response_format: "json"
+})
+```
+
+**Note:** Meetings use structured body sections, NOT Layer 1. Set `layer1_injected: null` for meetings.
+
+#### For Resources (`proposed_template === "resource"`):
+
+```
+para_create({
+  template: "resource",
+  title: proposed_title,
+  dest: "03 Resources",
+  args: {
+    summary: summary,
+    source: `[[${originalFileName}]]`,
+    resource_type: resource_type,
+    source_format: "audio",
+    areas: suggested_areas[0],
+    projects: suggested_projects[0] || null,
+    distilled: "false"
+  },
+  response_format: "json"
+})
+```
+
+Then inject transcription as Layer 1:
+
+```
+para_replace_section({
+  file: createdFilePath,
+  heading: "Layer 1: Captured Notes",
+  content: formatTranscriptionForLayer1(transcription),
+  response_format: "json"
+})
+```
+
+**Layer 1 Format for Voice (see @../analyze-web/references/layer1-formatting.md):**
+- If transcription <2k tokens: Include full transcription
+- If transcription >2k tokens: Sample key segments with timestamps
+- Always add: `*Transcription captured. Use /distill-resource to extract key insights.*`
+
+#### Archive Original Transcription
+
+For both meetings and resources:
+
+```
+para_rename({
+  from: originalFile,
+  to: "04 Archives/Transcriptions/[filename]",
+  response_format: "json"
+})
+```
+
+### Step 7: Return Proposal
+
+Return the lightweight JSON proposal. The note is already created.
 
 ## Voice Memo Challenges
 
@@ -210,7 +294,7 @@ Voice memos are the **hardest to categorize** because:
 
 ## Example Output
 
-### Meeting Proposal (with body content)
+### Meeting Proposal (note already created)
 
 ```json
 {
@@ -219,6 +303,8 @@ Voice memos are the **hardest to categorize** because:
   "proposed_title": "Sprint 42 Planning Session",
   "proposed_template": "meeting",
   "summary": "Team planning session discussing priorities for Sprint 42. Focus on completing the migration project and addressing tech debt in the auth module.",
+  "created": "04 Archives/Meetings/Sprint 42 Planning Session.md",
+  "layer1_injected": null,
   "categorization_hints": [
     "Migration project is highest priority",
     "Auth module tech debt blocking other work",
@@ -257,7 +343,7 @@ Voice memos are the **hardest to categorize** because:
 }
 ```
 
-### Resource Proposal (voice memo → idea)
+### Resource Proposal (voice memo → idea, note already created with Layer 1)
 
 ```json
 {
@@ -266,6 +352,8 @@ Voice memos are the **hardest to categorize** because:
   "proposed_title": "API Gateway Caching Idea",
   "proposed_template": "resource",
   "summary": "Quick brainstorm about implementing response caching at the API gateway level to reduce database load.",
+  "created": "03 Resources/API Gateway Caching Idea.md",
+  "layer1_injected": true,
   "categorization_hints": [
     "Redis-based caching at gateway",
     "TTL based on endpoint patterns",

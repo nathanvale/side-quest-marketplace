@@ -48,7 +48,6 @@
 		"./skills/distill-resource",
 		"./skills/field-suggestions",
 		"./skills/log-triage",
-		"./skills/meeting-from-transcription",
 		"./skills/para-classifier",
 		"./skills/template-assistant",
 		"./skills/triage",

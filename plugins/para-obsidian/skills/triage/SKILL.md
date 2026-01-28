@@ -3,6 +3,7 @@ name: triage
 description: Unified inbox processor - handles ALL content types (clippings, transcriptions, VTT files, attachments) with parallel subagents and single-table review. Routes to appropriate creator based on proposed_template.
 user-invocable: true
 disable-model-invocation: true
+context: fork
 allowed-tools: Task, Read, Bash, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, mcp__plugin_para-obsidian_para-obsidian__para_list, mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_delete, mcp__plugin_para-obsidian_para-obsidian__para_rename, mcp__plugin_para-obsidian_para-obsidian__para_fm_get, mcp__plugin_para-obsidian_para-obsidian__para_fm_set, mcp__plugin_para-obsidian_para-obsidian__para_list_areas, mcp__plugin_para-obsidian_para-obsidian__para_list_projects
 ---
 
@@ -53,27 +54,28 @@ Phase 1: Initialize (coordinator)
 ├── Scan inbox, detect VTT files, create tasks
 └── Load vault context (areas, projects)
 
-Phase 2: Enrich + Analyze (subagents)
+Phase 2: Enrich + Analyze + Create (subagents)
 ├── Route to correct analyzer based on item type
 ├── Parallel for YouTube, articles (batches of 5)
 ├── Sequential for X/Twitter (single browser)
+├── CREATE notes (but DO NOT delete originals)
 └── Enriched content stays in subagent context
 
-Phase 3: Present (coordinator)
-├── Read all tasks, filter for analyzed
-├── Render table with all proposals (resources AND meetings)
-└── User chooses: Accept all, Edit specific, Delete specific
+Phase 3: Present & Collaborate (coordinator) ← CHECKPOINT
+├── Render table with all proposals
+├── **ASK USER** - accept/edit/delete?
+└── User reviews and can modify area/project/title
 
 Phase 4: Edit (only if requested)
-└── Quick inline edits for selected items
+└── Apply edits via para_fm_set or re-create
 
-Phase 5: Execute (coordinator)
-├── Route to correct creator based on proposed_template
-├── Handle originals (delete/archive)
-└── Cleanup tasks
+Phase 5: Execute (coordinator) ← AFTER APPROVAL
+├── Delete/archive originals (only now!)
+├── Apply any remaining edits
+└── Cleanup tasks + report
 ```
 
-**Key insight:** Subagents handle BOTH enrichment AND analysis. Enriched content never flows through coordinator context.
+**Key insight:** Subagents create notes but originals stay until user approves. This enables collaborative review while keeping content isolated.
 
 **See:** [architecture.md](references/architecture.md) for diagrams.
 
@@ -354,9 +356,11 @@ Starting subagent processing...
 
 ---
 
-## Phase 2: Parallel Enrich + Analyze
+## Phase 2: Parallel Enrich + Analyze + Create
 
-**Key insight:** Each subagent handles BOTH enrichment AND analysis. This keeps enriched content out of the coordinator's context.
+**Key insight:** Each subagent handles enrichment, analysis, AND note creation. Content stays isolated in subagent context - only lightweight proposals flow back to coordinator.
+
+**CRITICAL:** Subagents create notes but **DO NOT delete/archive originals**. Deletion happens in Phase 5 AFTER user review and approval.
 
 ### 2.1 Spawn Subagents
 
@@ -370,7 +374,7 @@ Task({
   description: "Process: Article Title",
   model: "haiku",
   prompt: `
-    You are processing a single inbox item: enrich, analyze, and persist.
+    You are processing a single inbox item: enrich, analyze, CREATE NOTE, and persist.
 
     ## Item
     Task ID: ${taskId}
@@ -449,7 +453,70 @@ Task({
 
     **CRITICAL:** Only use areas/projects from the lists above.
 
-    ## Step 3: Persist (CRITICAL - do not skip)
+    ## Step 3: Create Note & Inject Layer 1 (CRITICAL - before returning)
+
+    **This step keeps content isolated.** Create the note NOW so full content
+    never flows back to coordinator.
+
+    ### For Resources (proposed_template === "resource"):
+
+    1. Create the resource note:
+       para_create({
+         template: "resource",
+         title: proposed_title,
+         dest: "03 Resources",
+         args: {
+           summary, source: sourceUrl, resource_type, source_format,
+           areas: area, projects: project, distilled: "false"
+         },
+         response_format: "json"
+       })
+
+    2. Format & truncate Layer 1 content (target: 2-3k tokens):
+       - Articles: First 3 paragraphs + headings + conclusion
+       - YouTube: Sample ~10% of segments with timestamps
+       - Threads: Full content (usually short)
+       - Voice: Full transcription if short, sampled if long
+
+    3. Inject Layer 1:
+       para_replace_section({
+         file: createdFilePath,
+         heading: "Layer 1: Captured Notes",
+         content: formattedContent,
+         response_format: "json"
+       })
+
+    4. **DO NOT delete original** - coordinator handles deletion after user review
+
+    Set created: path to new note, layer1_injected: true (or false if injection failed)
+
+    ### For Meetings (proposed_template === "meeting"):
+
+    1. Create meeting note with structured body:
+       para_create({
+         template: "meeting",
+         title: proposed_title,
+         dest: "04 Archives/Meetings",
+         args: { meeting_date, meeting_type, summary, area, project },
+         content: {
+           "Attendees": attendees.map(a => "- " + a).join("\\n"),
+           "Notes": meeting_notes.map(n => "- " + n).join("\\n"),
+           "Decisions Made": decisions.map(d => "- " + d).join("\\n"),
+           "Action Items": formatActionItems(action_items),
+           "Follow-up": follow_up.map(f => "- " + f).join("\\n")
+         },
+         response_format: "json"
+       })
+
+    2. **DO NOT archive original** - coordinator handles archiving after user review
+
+    Set created: path to new note, layer1_injected: null (meetings use structured body, not Layer 1)
+
+    ### For Captures (proposed_template === "capture"):
+
+    Do NOT create a note. Item stays in inbox. Set created: null, layer1_injected: null
+
+    ## Step 4: Persist (CRITICAL - do not skip)
 
     TaskUpdate({
       taskId: "${taskId}",
@@ -463,6 +530,10 @@ Task({
           area: "[[Area]]",
           project: "[[Project]]" or null,
           resourceType: "...",
+
+          // Creation fields (NEW)
+          created: "03 Resources/Title.md" or "04 Archives/Meetings/Title.md" or null,
+          layer1_injected: true | false | null,  // null for meetings/captures
 
           // UX fields (REQUIRED)
           categorization_hints: ["hint1", "hint2", "hint3"],
@@ -484,16 +555,16 @@ Task({
 
     This ensures your work survives if the session crashes.
 
-    ## Step 4: Return Structured Output (CRITICAL)
+    ## Step 5: Return Structured Output (CRITICAL)
 
     After TaskUpdate, return a parseable JSON line so the coordinator can use your
     proposal immediately WITHOUT calling TaskGet or reading the file:
 
-    For resources:
-    PROPOSAL_JSON:{"taskId":"${taskId}","proposed_title":"...","proposed_template":"resource","summary":"...","area":"[[Area]]","project":"[[Project]]","resourceType":"...","source_format":"video","confidence":"high","categorization_hints":["hint1","hint2","hint3"],"notes":null,"file":"${file}"}
+    For resources (note already created):
+    PROPOSAL_JSON:{"taskId":"${taskId}","proposed_title":"...","proposed_template":"resource","summary":"...","area":"[[Area]]","project":"[[Project]]","resourceType":"...","source_format":"video","confidence":"high","categorization_hints":["hint1","hint2","hint3"],"notes":null,"file":"${file}","created":"03 Resources/Title.md","layer1_injected":true}
 
-    For meetings (include ALL fields):
-    PROPOSAL_JSON:{"taskId":"${taskId}","proposed_title":"...","proposed_template":"meeting","summary":"...","area":"[[Area]]","project":"[[Project]]","resourceType":"meeting","source_format":"audio","confidence":"high","categorization_hints":["hint1","hint2","hint3"],"notes":"All speakers from same squad","meeting_type":"planning","meeting_date":"2026-01-28","file":"${file}","attendees":["[[Name]]"],"meeting_notes":["..."],"decisions":["..."],"action_items":[{"assignee":"[[Name]]","task":"...","due":"..."}],"follow_up":["..."]}
+    For meetings (note already created):
+    PROPOSAL_JSON:{"taskId":"${taskId}","proposed_title":"...","proposed_template":"meeting","summary":"...","area":"[[Area]]","project":"[[Project]]","resourceType":"meeting","source_format":"audio","confidence":"high","categorization_hints":["hint1","hint2","hint3"],"notes":"All speakers from same squad","meeting_type":"planning","meeting_date":"2026-01-28","file":"${file}","created":"04 Archives/Meetings/Title.md","layer1_injected":null,"attendees":["[[Name]]"],"meeting_notes":["..."],"decisions":["..."],"action_items":[{"assignee":"[[Name]]","task":"...","due":"..."}],"follow_up":["..."]}
 
     The coordinator parses this line directly - faster than TaskGet.
   `
@@ -543,7 +614,9 @@ for (const result of subagentResults) {
 
 ---
 
-## Phase 3: Present Single Table
+## Phase 3: Present & Collaborate
+
+**Key insight:** This is the collaborative checkpoint. Notes are already created, but originals still exist. User reviews proposals and can edit before we clean up.
 
 ### 3.1 Collect Proposals from Subagents
 
@@ -621,6 +694,22 @@ Legend: ✓ = high confidence, ~ = medium, ? = low (use "3" for alternatives)
 
 **See:** [output-templates.md](references/output-templates.md)
 
+### 3.3 Collaborative Checkpoint (REQUIRED)
+
+**CRITICAL:** Always ask before proceeding. Use AskUserQuestion or direct prompt:
+
+```
+Notes created. Want to change anything?
+
+• **A** - Accept all as-is → proceed to cleanup
+• **E 1,3** - Edit items 1 and 3 (area/project/title)
+• **D 5** - Delete item 5 (removes created note too)
+• **3 2** - Get 3 alternative categorizations for item 2
+• **Q** - Quit (notes exist, originals preserved, resume later)
+```
+
+**Never skip this step.** Even for single items, ask: "Looks good? Or change area/project?"
+
 ---
 
 ## Phase 4: Edit (If Requested)
@@ -642,142 +731,84 @@ Quick inline edits. Update task metadata with changes.
 
 ---
 
-## Phase 5: Execute
+## Phase 5: Execute (After User Approval)
 
-### 5.1 Route to Creator by Template
+**Key insight:** Notes are ALREADY created by subagents in Phase 2. Phase 5 handles:
+1. Apply any edits from Phase 4
+2. **Delete/archive originals** (only now, after user approved)
+3. Task cleanup
+4. Reporting
 
-**CRITICAL:** Route to correct creator skill based on `proposed_template`.
+### 5.1 Check Creation Status
 
-| proposed_template | Creator Skill | Destination |
-|-------------------|---------------|-------------|
-| `resource` | create-resource | `03 Resources/` |
-| `meeting` | create-meeting | Area-based Meetings folder |
-| `capture` | (skip creation) | Stays in `00 Inbox/` |
+For each proposal, check `created` and `layer1_injected` fields:
 
-### 5.2 Create Resources
+| created | layer1_injected | Status | Action |
+|---------|-----------------|--------|--------|
+| path | true | Resource created, Layer 1 populated | Mark task completed |
+| path | false | Resource created, Layer 1 failed | Mark completed, note in report |
+| path | null | Meeting created (no Layer 1 needed) | Mark task completed |
+| null | null | Capture (stays in inbox) | Mark task completed |
+| null | - | Creation failed | Retry with create-resource/create-meeting |
 
-For items with `proposed_template === "resource"`:
+### 5.2 Handle Edited Items
 
+If user edited proposals in Phase 4, the changes may require re-creating the note:
+
+**For changed title:**
 ```typescript
+// Delete the auto-created note
+para_delete({ file: proposal.created, confirm: true })
+
+// Re-create with new title
 para_create({
-  template: "resource",
-  title: proposal.proposed_title,
-  dest: "03 Resources",
-  args: {
-    summary: proposal.summary,
-    source: originalUrl,
-    resource_type: proposal.resourceType,
-    source_format: proposal.source_format,  // Enables 📚🎬 emoji prefix
-    areas: proposal.area,           // Wikilink: "[[Area]]"
-    projects: proposal.project,      // Wikilink or omit
-    distilled: "false"
-  }
+  template: proposal.proposed_template,
+  title: editedTitle,
+  ...
 })
 ```
 
-### 5.3 Create Meetings
-
-For items with `proposed_template === "meeting"`:
-
-#### 5.3.1 Confirm Project (Required for Meetings)
-
-Meetings require either an area or project. Before creating, confirm the project assignment:
-
-**If stakeholder-inferred project exists:**
-```
-Meeting: "Sprint 42 Planning"
-Speakers detected: June Xu, MJ, Joshua Green
-Inferred project: [[🎯 GMS - Gift Card Management System]] (all speakers in GMS squad)
-
-Is this correct? (y/n/other)
-```
-
-**If no project inferred:**
-```
-Meeting: "Sprint 42 Planning"
-No project could be inferred from speakers.
-
-Select project:
-1. [[🎯 GMS - Gift Card Management System]]
-2. [[🎯 Clawdbot Setup & Integration]]
-3. [[🎯 Learn IndyDevDan Agentic Coding Principles]]
-4. (other - enter wikilink)
-5. (none - use area only)
-```
-
-#### 5.3.2 Create Meeting Note
-
-**CRITICAL:** Use `para_create` with `content` parameter to populate body sections.
-
+**For changed area/project:**
 ```typescript
-// Format body content from proposal
-const attendeesContent = proposal.attendees
-  .map(a => `- ${a}`)
-  .join('\n');
-
-const notesContent = proposal.meeting_notes
-  .map(n => `- ${n}`)
-  .join('\n');
-
-const decisionsContent = proposal.decisions
-  .map(d => `- ${d}`)
-  .join('\n');
-
-const actionItemsContent = proposal.action_items
-  .map(item => {
-    const assignee = item.assignee ? `${item.assignee} - ` : '';
-    const due = item.due ? ` (due: ${item.due})` : '';
-    return `- [ ] ${assignee}${item.task}${due}`;
-  })
-  .join('\n');
-
-const followUpContent = proposal.follow_up
-  .map(f => `- ${f}`)
-  .join('\n');
-
-// Create meeting with populated body sections
-para_create({
-  template: "meeting",
-  title: proposal.proposed_title,
-  dest: "04 Archives/Meetings",  // Meeting notes go to Archives
-  args: {
-    meeting_date: proposal.meeting_date,
-    meeting_type: proposal.meeting_type,
-    transcription: `[[${transcriptionNoteName}]]`,
-    summary: proposal.summary,
-    area: proposal.area,
-    project: confirmedProject || null
-  },
-  content: {
-    "Attendees": attendeesContent,
-    "Notes": notesContent,
-    "Decisions Made": decisionsContent,
-    "Action Items": actionItemsContent,
-    "Follow-up": followUpContent
-  },
-  response_format: "json"
-})
-```
-
-Then link transcription to meeting:
-
-```typescript
+// Update frontmatter on existing note
 para_fm_set({
-  file: originalFile,
-  set: { "meeting": `[[${meetingNoteName}]]` },
+  file: proposal.created,
+  set: { areas: editedArea, projects: editedProject },
   response_format: "json"
 })
 ```
 
-### 5.4 Handle Originals
+### 5.3 Delete/Archive Originals (AFTER approval)
 
-| Type | Template | Action |
-|------|----------|--------|
-| Clipping | resource | `para_delete({ file, confirm: true })` |
-| Transcription | resource | `para_rename({ to: "04 Archives/Transcriptions/..." })` |
-| Transcription | meeting | `para_rename({ to: "04 Archives/Transcriptions/..." })` |
-| Attachment | resource | Keep in place (linked via source) |
-| Any | capture | Keep in inbox (no action) |
+**This is when originals are removed** - only after user has reviewed and approved.
+
+```typescript
+// For each accepted proposal:
+if (proposal.proposed_template === "resource") {
+  // Delete original clipping
+  para_delete({ file: proposal.file, confirm: true, response_format: "json" })
+} else if (proposal.proposed_template === "meeting") {
+  // Archive original transcription
+  para_rename({
+    from: proposal.file,
+    to: "04 Archives/Transcriptions/...",
+    response_format: "json"
+  })
+}
+// Captures stay in inbox - no deletion
+```
+
+### 5.4 Handle Creation Failures
+
+If subagent failed to create a note (rare), fall back to coordinator creation:
+
+```typescript
+// Only if proposal.created is null AND proposed_template !== "capture"
+if (!proposal.created && proposal.proposed_template !== "capture") {
+  // Use create-resource or create-meeting skill
+  // This is the fallback path - subagents should handle most cases
+}
+```
 
 ### 5.5 Cleanup Tasks
 
@@ -789,15 +820,15 @@ TaskUpdate({ taskId, status: "completed" })
 // (Tasks auto-cleanup when session ends)
 ```
 
-### 5.6 Report
+### 5.5 Report
 
 ```
 ✅ Triage complete!
 
 Processed 50 items:
-• 42 resources created
+• 42 resources created (40 with Layer 1, 2 without)
 • 5 meetings created
-• 1 edited → created with changes
+• 1 edited → re-created with changes
 • 2 captures (stayed in inbox)
 
 Use /para-obsidian:distill-resource to add progressive summarization.
@@ -811,16 +842,17 @@ Use /para-obsidian:distill-resource to add progressive summarization.
 
 | State | Meaning |
 |-------|---------|
-| `pending` | Created, not yet analyzed |
-| `in_progress` | Subagent completed, proposal saved |
-| `completed` | Note created |
+| `pending` | Created, not yet processed |
+| `in_progress` | Subagent completed: note created, proposal saved, **original still exists** |
+| `completed` | User approved, original deleted/archived, task done |
 
 ### Resume Capability
 
 If session crashes/quits:
-1. Tasks with `status: "in_progress"` have proposals saved
-2. Tasks with `status: "pending"` need re-analysis
+1. Tasks with `status: "in_progress"` have notes created + proposals saved + **originals preserved**
+2. Tasks with `status: "pending"` need full processing
 3. Run `/triage` again → detects existing tasks → offers resume
+4. Resume shows proposals for review → user approves → then cleanup happens
 
 ### Enrichment Constraints
 

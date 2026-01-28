@@ -1,6 +1,7 @@
 ---
 name: create-project
 description: Create PARA project notes with validated area connections and PARA philosophy guidance. Ensures projects have clear outcomes, deadlines, and valid area relationships. Use when creating new projects to ensure they follow PARA method correctly.
+user-invocable: true
 allowed-tools: AskUserQuestion, mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_list_areas, mcp__plugin_para-obsidian_para-obsidian__para_list_projects, mcp__plugin_para-obsidian_para-obsidian__para_template_fields, mcp__plugin_para-obsidian_para-obsidian__para_config
 ---
 

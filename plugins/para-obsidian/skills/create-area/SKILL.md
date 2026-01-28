@@ -1,6 +1,7 @@
 ---
 name: create-area
 description: Create PARA area notes for ongoing life responsibilities. Validates that the concept is truly an area (ongoing, no end date) rather than a project. Use when establishing new life domains or responsibilities to track.
+user-invocable: true
 allowed-tools: AskUserQuestion, mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_list_areas, mcp__plugin_para-obsidian_para-obsidian__para_template_fields, mcp__plugin_para-obsidian_para-obsidian__para_config
 ---
 
