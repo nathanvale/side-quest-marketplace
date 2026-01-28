@@ -275,9 +275,8 @@ X/Twitter requires Chrome DevTools (single browser instance). Process sequential
 // After all parallel subagents complete, process Twitter items one at a time
 for (const twitterItem of twitterItems) {
   Task({
-    subagent_type: "general-purpose",
+    subagent_type: "triage-worker",
     description: "Process: Twitter Thread",
-    model: "haiku",
     prompt: `... same prompt with sourceType: "twitter" ...`
   })
   // Wait for completion before next

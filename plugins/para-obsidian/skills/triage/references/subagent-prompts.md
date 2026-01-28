@@ -22,10 +22,8 @@ Each subagent handles BOTH enrichment AND analysis for a single inbox item. This
 
 ## Model Selection
 
-| Task | Model | Rationale |
-|------|-------|-----------|
-| Enrich + Analyze | `haiku` | Fast, cheap, good for categorization |
-| Complex content | `sonnet` | Use if haiku struggles with nuance |
+The `triage-worker` agent is configured with `model: haiku` (fast, cheap, good for categorization).
+Override is not needed per-invocation — the model is set in the agent definition at `agents/triage-worker.md`.
 
 ---
 
@@ -35,9 +33,8 @@ Each subagent handles BOTH enrichment AND analysis for a single inbox item. This
 
 ```typescript
 Task({
-  subagent_type: "general-purpose",
+  subagent_type: "triage-worker",
   description: "Process: ${title}",
-  model: "haiku",
   prompt: `
     You are processing a single inbox item: enrich, analyze, and persist.
 
@@ -170,7 +167,7 @@ Task({
     | **Voice memo** | Full transcription if <2k tokens, else key segments with timestamps |
     | **Attachment** | Key extracted passages with page references |
 
-    **Format as clean markdown.** Use headings, paragraphs, and blockquotes as appropriate. Do NOT wrap in code blocks.
+    **Format as clean markdown.** Use `####` headings or deeper (never `#`, `##`, or `###`) since Layer 1 is already a `###` heading. Use paragraphs and blockquotes as appropriate. Do NOT wrap in code blocks.
 
     If para_replace_section fails, keep the created note (still useful) and set \`layer1_injected: false\`.
     If content is empty or unparseable, set \`layer1_injected: false\` and skip injection.
@@ -248,11 +245,11 @@ Task({
 
 ```typescript
 // Single message with 5 Task calls = parallel execution
-Task({ subagent_type: "general-purpose", description: "Process: Item 1", ... })
-Task({ subagent_type: "general-purpose", description: "Process: Item 2", ... })
-Task({ subagent_type: "general-purpose", description: "Process: Item 3", ... })
-Task({ subagent_type: "general-purpose", description: "Process: Item 4", ... })
-Task({ subagent_type: "general-purpose", description: "Process: Item 5", ... })
+Task({ subagent_type: "triage-worker", description: "Process: Item 1", ... })
+Task({ subagent_type: "triage-worker", description: "Process: Item 2", ... })
+Task({ subagent_type: "triage-worker", description: "Process: Item 3", ... })
+Task({ subagent_type: "triage-worker", description: "Process: Item 4", ... })
+Task({ subagent_type: "triage-worker", description: "Process: Item 5", ... })
 ```
 
 **EXCEPTION:** X/Twitter items must be sequential (single Chrome browser instance).
@@ -399,6 +396,7 @@ const prompt = `
 5. **Layer 1 is soft failure** - If injection fails, keep the note (still useful without Layer 1)
 6. **Persist immediately** - TaskUpdate right after creation + injection
 7. **Return PROPOSAL_JSON** - Structured text for coordinator to parse (include created + layer1_injected)
-8. **Use haiku** - Fast, cheap, good enough for categorization
+8. **Use `triage-worker` agent** - Dedicated agent with MCP tools, model set to haiku
 9. **X/Twitter is sequential** - Single Chrome browser instance
 10. **Dual communication** - Both TaskUpdate (persistence) AND structured text (immediate use)
+11. **Commit after creation** - Call `para_commit` after `para_create` (vault needs clean tree)

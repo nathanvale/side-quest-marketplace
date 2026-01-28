@@ -36,6 +36,7 @@
 		"./commands/webclipper.md"
 	],
 	"mcpServers": ["./.mcp.json"],
+	"agents": ["./agents/triage-worker.md"],
 	"skills": [
 		"./skills/analyze-attachment",
 		"./skills/analyze-voice",
