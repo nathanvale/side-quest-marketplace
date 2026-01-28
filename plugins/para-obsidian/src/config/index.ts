@@ -10,9 +10,12 @@
  *
  * @module config
  */
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
+import { readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
+	ensureParentDir,
 	pathExistsSync,
 	readTextFileSync,
 	validateConfigPath,
@@ -359,4 +362,55 @@ export function listTemplateVersions(
 		name,
 		version,
 	}));
+}
+
+/**
+ * Save stakeholders to user config file.
+ *
+ * Reads existing config from ~/.config/para-obsidian/config.json,
+ * updates only the `stakeholders` key (preserving all other config),
+ * and writes atomically using temp file + rename pattern.
+ *
+ * @param stakeholders - Array of stakeholder objects to save
+ * @throws Error if write fails
+ *
+ * @example
+ * ```typescript
+ * await saveStakeholders([
+ *   { name: "June Xu", role: "Developer", email: "JXu3@bunnings.com.au" },
+ *   { name: "Mustafa Jalil", alias: "MJ", role: "Backend Dev" },
+ * ]);
+ * ```
+ */
+export async function saveStakeholders(
+	stakeholders: readonly Stakeholder[],
+): Promise<void> {
+	const configPath = resolveUserRc();
+
+	// Read existing config or start fresh
+	let existing: Record<string, unknown> = {};
+	if (pathExistsSync(configPath)) {
+		try {
+			const raw = readTextFileSync(configPath);
+			existing = JSON.parse(raw) as Record<string, unknown>;
+		} catch {
+			// If corrupt, start fresh but preserve nothing
+			existing = {};
+		}
+	}
+
+	// Update only the stakeholders key
+	const updated = { ...existing, stakeholders };
+	const content = JSON.stringify(updated, null, "\t");
+
+	// Atomic write: temp + rename
+	const tempPath = `${configPath}.tmp.${randomUUID()}`;
+	try {
+		await ensureParentDir(configPath);
+		await writeFile(tempPath, content, "utf-8");
+		await rename(tempPath, configPath);
+	} catch (error) {
+		await unlink(tempPath).catch(() => {});
+		throw error;
+	}
 }
