@@ -360,11 +360,21 @@ export const handleCreate: CommandHandler = async (ctx) => {
 	const argsForTemplate = parseKeyValuePairs(argValues);
 
 	await ensureGitGuard(config);
+
+	// Extract source_format for extraFrontmatter so applyTitlePrefix can add the emoji
+	// This enables "📚🎬 Title" pattern for resources with source_format: "video"
+	const extraFrontmatter: Record<string, unknown> = {};
+	if (argsForTemplate.source_format) {
+		extraFrontmatter.source_format = argsForTemplate.source_format;
+	}
+
 	const result = createFromTemplate(config, {
 		template,
 		title,
 		dest,
 		args: argsForTemplate,
+		extraFrontmatter:
+			Object.keys(extraFrontmatter).length > 0 ? extraFrontmatter : undefined,
 	});
 
 	let injectionResult:

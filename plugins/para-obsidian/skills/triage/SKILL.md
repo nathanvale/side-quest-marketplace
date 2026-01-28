@@ -667,6 +667,7 @@ para_create({
     summary: proposal.summary,
     source: originalUrl,
     resource_type: proposal.resourceType,
+    source_format: proposal.source_format,  // Enables 📚🎬 emoji prefix
     areas: proposal.area,           // Wikilink: "[[Area]]"
     projects: proposal.project,      // Wikilink or omit
     distilled: "false"

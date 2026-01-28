@@ -49,7 +49,7 @@ para_create({
     summary: proposal.summary,
     source: proposal.source_url,
     resource_type: proposal.resource_type,
-    source_format: proposal.source_format,
+    source_format: proposal.source_format,  // Enables 📚🎬 emoji prefix (video, thread, etc.)
     areas: proposal.suggested_areas[0],
     projects: proposal.suggested_projects[0] || null,
     author: proposal.author || null,
