@@ -758,7 +758,7 @@ Body content`,
 		expect(written).not.toContain("[[null]]");
 	});
 
-	it("preserves null placeholder fields as empty strings when no arg provided", () => {
+	it("omits null placeholder fields when no arg provided", () => {
 		const vault = setupTest();
 		writeTemplate(
 			path.join(vault, "Templates"),
@@ -788,9 +788,9 @@ Notes here`,
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		// area should be set from arg
 		expect(written).toContain('area: "[[Work]]"');
-		// project should be preserved as empty string (not filtered out)
-		expect(written).toContain('project: ""');
-		// summary should remain empty string
+		// project (YAML null) is omitted following Obsidian best practices
+		expect(written).not.toContain("project");
+		// summary was already empty string in template, stays as-is
 		expect(written).toContain('summary: ""');
 		// Should NOT have raw null values
 		expect(written).not.toMatch(/: null\b/);
