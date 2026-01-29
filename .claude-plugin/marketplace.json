@@ -315,7 +315,15 @@
 				"name": "Nathan Vale"
 			},
 			"category": "productivity",
-			"keywords": ["productivity", "dotfiles", "shell", "development", "automation", "hyperflow", "superwhisper"]
+			"keywords": [
+				"productivity",
+				"dotfiles",
+				"shell",
+				"development",
+				"automation",
+				"hyperflow",
+				"superwhisper"
+			]
 		},
 		{
 			"name": "melanie",
@@ -326,7 +334,14 @@
 				"name": "Nathan Vale"
 			},
 			"category": "personal",
-			"keywords": ["communication", "relationship", "message-drafting", "meme-creation", "voice-matching", "personal-assistant"]
+			"keywords": [
+				"communication",
+				"relationship",
+				"message-drafting",
+				"meme-creation",
+				"voice-matching",
+				"personal-assistant"
+			]
 		}
 	]
 }
