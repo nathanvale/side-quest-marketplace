@@ -48,6 +48,7 @@
 		"./skills/clip",
 		"./skills/content-processing",
 		"./skills/create-area",
+		"./skills/create-from-context",
 		"./skills/create-meeting",
 		"./skills/create-project",
 		"./skills/create-resource",

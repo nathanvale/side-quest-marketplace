@@ -80,10 +80,10 @@ If neither present:
 Transform proposal arrays into markdown for template section injection:
 
 ```javascript
-// Attendees → bulleted wikilinks
-const attendeesContent = proposal.attendees
-  .map(a => `- ${a}`)
-  .join('\n');
+// Attendees → comma-separated string for frontmatter
+const attendeesString = proposal.attendees
+  .map(a => a.replace(/^\[\[|\]\]$/g, ''))  // Strip wikilink brackets for frontmatter
+  .join(', ');
 
 // Notes → bulleted list
 const notesContent = proposal.meeting_notes
@@ -126,12 +126,12 @@ para_create({
     meeting_type: proposal.meeting_type,
     transcription: `[[${transcriptionNoteName}]]`,  // Note name without path
     summary: proposal.summary,
+    attendees: attendeesString,
     area: proposal.suggested_areas[0],
     project: proposal.suggested_projects[0] || null
   },
   content: {
     // Use section headings from creation_meta.sections
-    "<discovered-attendees-section>": attendeesContent,
     "<discovered-notes-section>": notesContent,
     "<discovered-decisions-section>": decisionsContent,
     "<discovered-action-items-section>": actionItemsContent,
@@ -146,6 +146,7 @@ para_create({
 - `meeting_type` — See [meeting-types.md](references/meeting-types.md)
 - `transcription` — Note name WITHOUT path or `.md`, wrapped in `[[...]]`
 - `summary` — Concise 1-line description (max 100 chars)
+- `attendees` — Comma-separated names (displayed via dataview `= this.attendees`)
 - `area` OR `project` — **One required** — Wikilink to parent
 
 **Content (body sections):** Use section headings from `creation_meta.sections` discovered in Step 0. Match the heading text exactly as returned by `para_template_fields`.
@@ -182,7 +183,7 @@ para_rename({
   "created": "Meetings/🗣️ Sprint 42 Planning Session.md",
   "transcription_archived": "04 Archives/Transcriptions/🎤 2024-01-22 3-45pm.md",
   "meeting_type": "planning",
-  "sections_populated": ["Attendees", "Notes", "Decisions Made", "Action Items", "Follow-up"]
+  "sections_populated": ["Notes", "Decisions Made", "Action Items", "Follow-up"]
 }
 ```
 
@@ -191,13 +192,6 @@ para_rename({
 See [references/meeting-types.md](references/meeting-types.md) for valid values and inference signals.
 
 ## Body Content Formatting Examples
-
-### Attendees Section
-```markdown
-- [[June Xu]]
-- [[Mustafa Jalil]]
-- Speaker 3
-```
 
 ### Notes Section
 ```markdown
