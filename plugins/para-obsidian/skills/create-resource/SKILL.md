@@ -21,9 +21,9 @@ You receive a proposal object from an analyzer skill:
   "proposed_template": "resource",
   "summary": "2-3 sentence summary",
   "categorization_hints": ["hint1", "hint2", "hint3"],
-  "suggested_areas": ["[[🌱 Area Name]]"],
-  "suggested_projects": ["[[🎯 Project Name]]"],
-  "resource_type": "article|tutorial|reference|thread|video|idea",
+  "area": "[[🌱 Area Name]]",
+  "project": "[[🎯 Project Name]]",
+  "resourceType": "article|tutorial|reference|thread|video|idea",
   "source_format": "article|video|thread|document|audio",
   "author": "Author Name",
   "source_url": "https://..."
@@ -48,10 +48,12 @@ para_create({
   args: {
     summary: proposal.summary,
     source: proposal.source_url,
-    resource_type: proposal.resource_type,
+    resource_type: proposal.resourceType,
     source_format: proposal.source_format,  // Enables 📚🎬 emoji prefix (video, thread, etc.)
-    areas: proposal.suggested_areas[0],
-    projects: proposal.suggested_projects[0] || null,
+    // Single area: pass string directly — "[[🌱 Area]]"
+    // Multiple areas: pass JSON array string — '["[[🌱 Area 1]]", "[[🌱 Area 2]]"]'
+    areas: Array.isArray(proposal.area) ? JSON.stringify(proposal.area) : proposal.area,
+    projects: Array.isArray(proposal.project) ? JSON.stringify(proposal.project) : proposal.project,
     author: proposal.author || null,
     distilled: "false"
   },
@@ -59,7 +61,11 @@ para_create({
 })
 ```
 
+**Note:** `para_create` parses JSON array strings automatically via `tryParseJsonArray()`. Single wikilink strings are backward-compatible (stored as-is in frontmatter).
+
 ### Step 2: Handle Original File
+
+**Note:** During triage (`/para-obsidian:triage`), cleanup is owned by the coordinator's Phase 5 — not this skill. The triage-worker creates notes inline and the coordinator handles deletion/archival after user approval. This step only applies when `create-resource` is used as a **standalone skill** outside triage.
 
 Based on the original file type:
 
@@ -91,8 +97,8 @@ The resource template expects these frontmatter fields:
 | `source` | Yes | Original URL or file link |
 | `resource_type` | Yes | article, tutorial, reference, thread, video, idea |
 | `source_format` | No | article, video, thread, document, audio |
-| `areas` | Yes | Wikilink to parent area |
-| `projects` | No | Wikilink to related project |
+| `areas` | Yes | Wikilink string or JSON array of wikilinks (e.g., `'["[[A1]]", "[[A2]]"]'`) |
+| `projects` | No | Wikilink string or JSON array of wikilinks |
 | `author` | No | Content author if known |
 | `distilled` | Yes | Always "false" for new resources |
 
