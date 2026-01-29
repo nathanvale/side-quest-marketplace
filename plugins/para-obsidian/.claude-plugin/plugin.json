@@ -27,6 +27,7 @@
 		"./commands/daily-review.md",
 		"./commands/enrich.md",
 		"./commands/meeting.md",
+		"./commands/quick-resource.md",
 		"./commands/search.md",
 		"./commands/slo.md",
 		"./commands/trace.md",
@@ -50,6 +51,7 @@
 		"./skills/field-suggestions",
 		"./skills/log-triage",
 		"./skills/para-classifier",
+		"./skills/quick-resource",
 		"./skills/template-assistant",
 		"./skills/triage",
 		"./skills/webclipper-templates"
