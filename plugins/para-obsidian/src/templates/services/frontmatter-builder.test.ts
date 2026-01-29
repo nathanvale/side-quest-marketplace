@@ -222,3 +222,153 @@ template_version: 1
 		);
 	});
 });
+
+describe("generateFrontmatter (native syntax)", () => {
+	test("generates native string field", () => {
+		const fields: TemplateField[] = [
+			{
+				name: "title",
+				displayName: "Title",
+				type: "string",
+				required: true,
+			},
+		];
+
+		const result = generateFrontmatter(fields, 1, "native");
+
+		expect(result).toBe(
+			`---
+title: "{{Title}}"
+template_version: 1
+---`,
+		);
+	});
+
+	test("generates native auto-fill date field", () => {
+		const fields: TemplateField[] = [
+			{
+				name: "created",
+				displayName: "Created",
+				type: "date",
+				required: true,
+				autoFill: 'tp.date.now("YYYY-MM-DDTHH:mm:ss")',
+			},
+		];
+
+		const result = generateFrontmatter(fields, 1, "native");
+
+		expect(result).toBe(
+			`---
+created: "{{date:YYYY-MM-DDTHH:mm:ss}}"
+template_version: 1
+---`,
+		);
+	});
+
+	test("generates native enum field with default", () => {
+		const fields: TemplateField[] = [
+			{
+				name: "status",
+				displayName: "Status",
+				type: "enum",
+				required: true,
+				enumValues: ["active", "on-hold"],
+				default: "active",
+			},
+		];
+
+		const result = generateFrontmatter(fields, 1, "native");
+
+		expect(result).toBe(
+			`---
+status: "{{Status:active}}"
+template_version: 1
+---`,
+		);
+	});
+
+	test("generates native wikilink field", () => {
+		const fields: TemplateField[] = [
+			{
+				name: "area",
+				displayName: "Area",
+				type: "wikilink",
+				required: true,
+			},
+		];
+
+		const result = generateFrontmatter(fields, 1, "native");
+
+		expect(result).toBe(
+			`---
+area: "[[{{Area}}]]"
+template_version: 1
+---`,
+		);
+	});
+
+	test("generates native array field as empty array", () => {
+		const fields: TemplateField[] = [
+			{
+				name: "depends_on",
+				displayName: "Depends On",
+				type: "array",
+				required: false,
+				default: "[]",
+			},
+		];
+
+		const result = generateFrontmatter(fields, 1, "native");
+
+		expect(result).toBe(
+			`---
+depends_on: []
+template_version: 1
+---`,
+		);
+	});
+
+	test("generates native complex frontmatter", () => {
+		const fields: TemplateField[] = [
+			{
+				name: "title",
+				displayName: "Title",
+				type: "string",
+				required: true,
+			},
+			{
+				name: "created",
+				displayName: "Created",
+				type: "date",
+				required: true,
+				autoFill: 'tp.date.now("YYYY-MM-DDTHH:mm:ss")',
+			},
+			{
+				name: "status",
+				displayName: "Status",
+				type: "enum",
+				required: true,
+				enumValues: ["active", "on-hold"],
+				default: "active",
+			},
+			{
+				name: "area",
+				displayName: "Area",
+				type: "wikilink",
+				required: true,
+			},
+		];
+
+		const result = generateFrontmatter(fields, 1, "native");
+
+		expect(result).toBe(
+			`---
+title: "{{Title}}"
+created: "{{date:YYYY-MM-DDTHH:mm:ss}}"
+status: "{{Status:active}}"
+area: "[[{{Area}}]]"
+template_version: 1
+---`,
+		);
+	});
+});

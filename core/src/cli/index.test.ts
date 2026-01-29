@@ -230,6 +230,29 @@ describe("coerceValue", () => {
 	test("handles whitespace-only string", () => {
 		expect(coerceValue("   ")).toBe("");
 	});
+
+	test("splits single-word comma-separated values into array", () => {
+		expect(coerceValue("a,b,c")).toEqual(["a", "b", "c"]);
+		expect(coerceValue("tag1, tag2, tag3")).toEqual(["tag1", "tag2", "tag3"]);
+	});
+
+	test("keeps prose strings with commas as strings", () => {
+		expect(
+			coerceValue(
+				"Official docs covering auth methods, model routing, and config",
+			),
+		).toBe("Official docs covering auth methods, model routing, and config");
+		expect(
+			coerceValue("Active bug where auth fails, three workarounds documented"),
+		).toBe("Active bug where auth fails, three workarounds documented");
+	});
+
+	test("splits wikilink lists into arrays", () => {
+		expect(coerceValue("[[Area 1]], [[Area 2]]")).toEqual([
+			"[[Area 1]]",
+			"[[Area 2]]",
+		]);
+	});
 });
 
 describe("parseDirs", () => {

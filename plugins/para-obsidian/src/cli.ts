@@ -26,6 +26,7 @@ import {
 	handleExportBookmarks,
 	handleFindOrphans,
 	handleFrontmatter,
+	handleGenerateTemplates,
 	handleGit,
 	handleInboxMove,
 	handleIndex,
@@ -85,6 +86,9 @@ function printUsage(): void {
 		"  para registry list|remove|clear [--format md|json]",
 		'  para enrich-bookmark <file.md|"*.md"> [--dry-run] [--force] [--delay N] [--yes]',
 		"  para enrich-bookmark --url <url> [--format md|json]",
+		"",
+		"Template Generation:",
+		"  para generate-templates [--dry-run] [--output <dir>] [--format md|json]",
 		"",
 		"Migration:",
 		"  para migrate:remove-tags [--dry-run] [--verbose] [--format md|json]",
@@ -391,6 +395,12 @@ async function main(): Promise<void> {
 
 			case "voice": {
 				const result = await handleVoice(ctx);
+				if (!result.success) process.exit(result.exitCode ?? 1);
+				break;
+			}
+
+			case "generate-templates": {
+				const result = await handleGenerateTemplates(ctx);
 				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}

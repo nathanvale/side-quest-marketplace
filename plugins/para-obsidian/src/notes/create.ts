@@ -19,7 +19,7 @@
 import path from "node:path";
 import { ensureDirSync, writeTextFileSync } from "@sidequest/core/fs";
 import { getErrorMessage } from "@sidequest/core/utils";
-
+import { DEFAULT_FRONTMATTER_RULES } from "../config/defaults";
 import type { ParaObsidianConfig } from "../config/index";
 import { parseFrontmatter, serializeFrontmatter } from "../frontmatter/index";
 import { generateUniqueNotePath } from "../inbox/core/engine-utils";
@@ -128,18 +128,12 @@ function titleToFilename(title: string): string {
  *
  * @example
  * ```typescript
-<<<<<<< HEAD
  * const attrs = {
  *   title: "Old Title",
  *   resource_type: "reference",  // From template default
  *   type: "resource",
  *   created: "2025-01-01"
  * };
-||||||| parent of 2be77fe (fix(para-obsidian): preserve template frontmatter fields and prioritize argOverrides)
- * const attrs = { title: "null", status: null, area: [["null"]] };
-=======
- * const attrs = { title: "null", status: null, area: [["null"]], project: null };
->>>>>>> 2be77fe (fix(para-obsidian): preserve template frontmatter fields and prioritize argOverrides)
  * const result = applyArgsToFrontmatter(attrs, {
  *   title: "New Title",
  *   resource_type: "meeting",  // Overrides template default
@@ -147,20 +141,13 @@ function titleToFilename(title: string): string {
  *   created: "2025-12-31",     // Protected - NOT overridden
  *   newField: "value"          // Added
  * });
-<<<<<<< HEAD
  * // {
  * //   title: "New Title",
- * //   resource_type: "meeting",    // ✅ Overridden
- * //   type: "resource",             // ✅ Protected (unchanged)
- * //   created: "2025-01-01",        // ✅ Protected (unchanged)
- * //   newField: "value"             // ✅ Added
+ * //   resource_type: "meeting",    // Overridden
+ * //   type: "resource",             // Protected (unchanged)
+ * //   created: "2025-01-01",        // Protected (unchanged)
+ * //   newField: "value"             // Added
  * // }
-||||||| parent of 2be77fe (fix(para-obsidian): preserve template frontmatter fields and prioritize argOverrides)
- * // { title: "My Trip", status: "active", area: "[[Travel]]" }
-=======
- * // { title: "My Trip", status: "active", area: "[[Travel]]", project: "" }
- * // Note: project is preserved as empty string, not filtered out
->>>>>>> 2be77fe (fix(para-obsidian): preserve template frontmatter fields and prioritize argOverrides)
  * ```
  */
 /**
@@ -182,19 +169,77 @@ function tryParseJsonArray(value: string): unknown[] | undefined {
 	return undefined;
 }
 
+/**
+ * Splits a comma-separated string of wikilinks into an array.
+ *
+ * Handles values like `"[[🌱 Home Server]], [[🤖 AI Practice]]"` which
+ * contain wikilink syntax that conflicts with JSON array detection
+ * (the `[[` prefix looks nothing like `[` for JSON purposes).
+ *
+ * Only splits when the value contains at least one wikilink with a comma separator.
+ * Single wikilinks like `"[[🌱 Home Server]]"` are wrapped in an array.
+ */
+function tryParseCommaSeparatedWikilinks(
+	value: string,
+): string[] | undefined {
+	// Must contain at least one wikilink
+	if (!value.includes("[[")) {
+		return undefined;
+	}
+	const items = value
+		.split(/,\s*/)
+		.map((s) => s.trim())
+		.filter(Boolean);
+	if (items.length === 0) {
+		return undefined;
+	}
+	// Every item must be a wikilink
+	if (!items.every((item) => item.startsWith("[[") && item.endsWith("]]"))) {
+		return undefined;
+	}
+	return items;
+}
+
 export function applyArgsToFrontmatter(
 	attributes: Record<string, unknown>,
 	args: Record<string, string>,
+	templateName?: string,
 ): Record<string, unknown> {
 	const result = { ...attributes };
 	// Protected fields should never be added/overridden by args
 	// - title: filename IS the title, no need in frontmatter
 	// - created/type/template_version: managed by template system
-	const protectedFields = ["created", "type", "template_version", "title"];
+	const protectedFields = new Set([
+		"created",
+		"type",
+		"template_version",
+		"title",
+	]);
+
+	// Build valid fields set and type map from frontmatter rules when available.
+	// Templates with rules only accept known fields — unknown args are filtered.
+	// Templates without rules accept everything (backward compat).
+	let validFields: Set<string> | undefined;
+	let fieldTypes: Record<string, string> | undefined;
+	if (templateName) {
+		const rules = DEFAULT_FRONTMATTER_RULES[templateName];
+		if (rules?.required) {
+			validFields = new Set(Object.keys(rules.required));
+			fieldTypes = Object.fromEntries(
+				Object.entries(rules.required).map(([k, v]) => [k, v.type]),
+			);
+		}
+	}
 
 	for (const [key, value] of Object.entries(args)) {
 		// Skip protected fields - they should never be overridden by args
-		if (protectedFields.includes(key)) {
+		if (protectedFields.has(key)) {
+			continue;
+		}
+
+		// Filter unknown args when template has validation rules
+		if (validFields && !validFields.has(key)) {
+			logger.warn`create:args:filtered field=${key} template=${templateName}`;
 			continue;
 		}
 
@@ -203,6 +248,11 @@ export function applyArgsToFrontmatter(
 		const parsedArray = tryParseJsonArray(value);
 		if (parsedArray !== undefined) {
 			result[key] = parsedArray;
+		} else if (fieldTypes?.[key] === "array") {
+			// Field is declared as array type — parse comma-separated wikilinks
+			// e.g., "[[🌱 Home Server]], [[🤖 AI Practice]]" → ["[[🌱 Home Server]]", "[[🤖 AI Practice]]"]
+			const wikilinks = tryParseCommaSeparatedWikilinks(value);
+			result[key] = wikilinks ?? [value];
 		} else {
 			// Override existing value or add new field
 			result[key] = value;
@@ -565,6 +615,7 @@ export function createFromTemplate(
 	const attributes = applyArgsToFrontmatter(
 		rawAttributes,
 		argsForFrontmatter,
+		options.template,
 	) as Record<string, unknown>;
 
 	// Remove emoji_prefix from output - it's a template config, not a note field

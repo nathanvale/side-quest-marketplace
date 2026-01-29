@@ -147,4 +147,170 @@ describe("generateBody", () => {
 `,
 		);
 	});
+
+	test("renders content field after heading", () => {
+		const sections: TemplateSection[] = [
+			{
+				heading: "Action Items",
+				hasPrompt: false,
+				content: "- [ ] ",
+			},
+		];
+
+		const result = generateBody(sections);
+
+		expect(result).toContain("## Action Items\n\n- [ ] \n");
+	});
+
+	test("renders multi-line content (Dataview query)", () => {
+		const sections: TemplateSection[] = [
+			{
+				heading: "Active Projects",
+				hasPrompt: false,
+				content:
+					'```dataview\nTABLE status\nFROM "01 Projects"\nWHERE status = "active"\n```',
+			},
+		];
+
+		const result = generateBody(sections);
+
+		expect(result).toContain("```dataview");
+		expect(result).toContain('FROM "01 Projects"');
+	});
+
+	test("renders inline field table content", () => {
+		const sections: TemplateSection[] = [
+			{
+				heading: "Overview",
+				hasPrompt: false,
+				content: "| | |\n|---|---|\n| **Status** | `= this.status` |",
+			},
+		];
+
+		const result = generateBody(sections);
+
+		expect(result).toContain("`= this.status`");
+	});
+});
+
+describe("generateBody (native syntax)", () => {
+	test("uses native title heading", () => {
+		const sections: TemplateSection[] = [];
+
+		const result = generateBody(sections, "native");
+
+		expect(result).toBe("# {{title}}\n\n");
+	});
+
+	test("renders sections with content in native mode", () => {
+		const sections: TemplateSection[] = [
+			{
+				heading: "Notes",
+				hasPrompt: false,
+				content: "- [ ]",
+			},
+			{
+				heading: "Details",
+				hasPrompt: false,
+			},
+		];
+
+		const result = generateBody(sections, "native");
+
+		expect(result).toBe(
+			`# {{title}}
+
+## Notes
+
+- [ ]
+
+## Details
+
+`,
+		);
+	});
+
+	test("renders comment after heading", () => {
+		const sections: TemplateSection[] = [
+			{
+				heading: "Summary",
+				hasPrompt: false,
+				comment: "Key points in 2-3 sentences",
+			},
+		];
+
+		const result = generateBody(sections, "native");
+
+		expect(result).toBe(
+			`# {{title}}
+
+## Summary
+
+<!-- Key points in 2-3 sentences -->
+
+`,
+		);
+	});
+
+	test("renders comment before content", () => {
+		const sections: TemplateSection[] = [
+			{
+				heading: "Action Items",
+				hasPrompt: false,
+				content: "- [ ]",
+				comment: "What will you DO with this knowledge?",
+			},
+		];
+
+		const result = generateBody(sections, "native");
+
+		expect(result).toBe(
+			`# {{title}}
+
+## Action Items
+
+<!-- What will you DO with this knowledge? -->
+
+- [ ]
+
+`,
+		);
+	});
+
+	test("section without comment renders normally", () => {
+		const sections: TemplateSection[] = [
+			{
+				heading: "Notes",
+				hasPrompt: false,
+				content: "- [ ]",
+			},
+		];
+
+		const result = generateBody(sections, "native");
+
+		expect(result).toBe(
+			`# {{title}}
+
+## Notes
+
+- [ ]
+
+`,
+		);
+	});
+
+	test("skips Templater prompts in native mode", () => {
+		const sections: TemplateSection[] = [
+			{
+				heading: "Notes",
+				hasPrompt: true,
+				promptText: "Enter notes",
+			},
+		];
+
+		const result = generateBody(sections, "native");
+
+		expect(result).not.toContain("tp.system.prompt");
+		expect(result).toContain("## Notes");
+	});
 });

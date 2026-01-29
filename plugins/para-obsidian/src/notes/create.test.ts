@@ -191,7 +191,7 @@ Topic: <% tp.system.prompt("Main topic") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("00 Inbox/📚 Refactoring UI.md");
+		expect(result.filePath).toBe("03 Resources/📚 Refactoring UI.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		// Title should NOT be in frontmatter
 		expect(written).not.toMatch(/^title:/m);
@@ -267,7 +267,7 @@ Author: <% tp.system.prompt("Author (optional)", "") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("00 Inbox/📚 Building A Second Brain.md");
+		expect(result.filePath).toBe("03 Resources/📚 Building A Second Brain.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		// Title should NOT be in frontmatter
 		expect(written).not.toMatch(/^title:/m);
@@ -307,7 +307,7 @@ Source: <% tp.system.prompt("Source type") %>`,
 			},
 		});
 
-		expect(result.filePath).toBe("00 Inbox/📚 Quick Note.md");
+		expect(result.filePath).toBe("03 Resources/📚 Quick Note.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		// Title should NOT be in frontmatter
 		expect(written).not.toMatch(/^title:/m);
@@ -323,27 +323,49 @@ Source: <% tp.system.prompt("Source type") %>`,
 			title: "My Project",
 			type: "project",
 			prefix: "🎯 ",
+			dest: "00 Inbox",
 		},
-		{ template: "area", title: "Health", type: "area", prefix: "🌱 " },
+		{
+			template: "area",
+			title: "Health",
+			type: "area",
+			prefix: "🌱 ",
+			dest: "00 Inbox",
+		},
 		{
 			template: "resource",
 			title: "Atomic Habits",
 			type: "resource",
 			prefix: "📚 ",
+			dest: "03 Resources",
 		},
-		{ template: "task", title: "Review PR", type: "task", prefix: "" },
-		{ template: "daily", title: "2025-12-06", type: "daily", prefix: "" },
+		{
+			template: "task",
+			title: "Review PR",
+			type: "task",
+			prefix: "",
+			dest: "00 Inbox",
+		},
+		{
+			template: "daily",
+			title: "2025-12-06",
+			type: "daily",
+			prefix: "",
+			dest: "00 Inbox",
+		},
 		{
 			template: "capture",
 			title: "Quick Thought",
 			type: "capture",
 			prefix: "",
+			dest: "00 Inbox",
 		},
-	])("creates $type in 00 Inbox by default (PARA method)", ({
+	])("creates $type in default destination (PARA method)", ({
 		template,
 		title,
 		type,
 		prefix,
+		dest,
 	}) => {
 		it(`creates ${template}`, () => {
 			const vault = setupTest();
@@ -363,9 +385,9 @@ Body`,
 				title,
 			});
 
-			expect(result.filePath).toBe(`00 Inbox/${prefix}${title}.md`);
+			expect(result.filePath).toBe(`${dest}/${prefix}${title}.md`);
 			expect(
-				fs.existsSync(path.join(vault, "00 Inbox", `${prefix}${title}.md`)),
+				fs.existsSync(path.join(vault, dest, `${prefix}${title}.md`)),
 			).toBe(true);
 		});
 	});
@@ -1420,7 +1442,7 @@ Source: <% tp.system.prompt("Source type", "article", false, ["book", "article",
 			},
 		});
 
-		expect(result.filePath).toBe("00 Inbox/📚 My Resource.md");
+		expect(result.filePath).toBe("03 Resources/📚 My Resource.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		// Title should NOT be in frontmatter
 		expect(written).not.toMatch(/^title:/m);
@@ -1451,7 +1473,7 @@ tags:
 			title: "Default Resource",
 		});
 
-		expect(result.filePath).toBe("00 Inbox/📚 Default Resource.md");
+		expect(result.filePath).toBe("03 Resources/📚 Default Resource.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		// Title should NOT be in frontmatter
 		expect(written).not.toMatch(/^title:/m);
@@ -1460,7 +1482,7 @@ tags:
 		expect(written).not.toContain("<% tp.system.prompt");
 	});
 
-	it("adds args to frontmatter even when field doesn't exist in template", () => {
+	it("adds valid args to frontmatter and filters unknown args for templates with rules", () => {
 		const vault = setupTest();
 		writeTemplate(
 			path.join(vault, "Templates"),
@@ -1479,16 +1501,48 @@ tags:
 			template: "resource",
 			title: "My Note",
 			args: {
+				source: "book", // valid resource field
+				resource_type: "reference", // valid resource field
+				year: "2025", // NOT a valid resource field — filtered
+			},
+		});
+
+		expect(result.filePath).toBe("03 Resources/📚 My Note.md");
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+		const { attributes } = parseFrontmatter(written);
+		// Valid args should be added
+		expect(attributes.source).toBe("book");
+		expect(attributes.resource_type).toBe("reference");
+		// Unknown args filtered for templates with rules
+		expect(attributes.year).toBeUndefined();
+	});
+
+	it("adds all args to frontmatter for templates without rules", () => {
+		const vault = setupTest();
+		writeTemplate(
+			path.join(vault, "Templates"),
+			"custom-type",
+			`---
+title: "<% tp.system.prompt("Title") %>"
+type: custom
+---
+# <% tp.system.prompt("Title") %>`,
+		);
+		process.env.PARA_VAULT = vault;
+
+		const result = createFromTemplate(loadConfig({ cwd: vault }), {
+			template: "custom-type",
+			title: "My Note",
+			args: {
 				source: "book",
 				author: "John Doe",
 				year: "2025",
 			},
 		});
 
-		expect(result.filePath).toBe("00 Inbox/📚 My Note.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		const { attributes } = parseFrontmatter(written);
-		// All args should be added to frontmatter even though template doesn't have these fields
+		// All args should be added — no rules to filter against
 		expect(attributes.source).toBe("book");
 		expect(attributes.author).toBe("John Doe");
 		expect(attributes.year).toBe("2025");
@@ -1691,6 +1745,85 @@ describe("applyArgsToFrontmatter", () => {
 		expect(result.description).toBe("A regular string");
 	});
 
+	describe("arg filtering with template rules", () => {
+		it("filters unknown args when template has frontmatter rules", () => {
+			const attributes = {
+				type: "resource",
+				resource_type: "reference",
+			};
+
+			// "resource" template has rules — "bogus_field" is not a valid field
+			const result = applyArgsToFrontmatter(
+				attributes,
+				{
+					resource_type: "meeting", // valid field — should pass
+					bogus_field: "should be filtered", // unknown — should be filtered
+					source: "https://example.com", // valid field — should pass
+				},
+				"resource",
+			);
+
+			expect(result.resource_type).toBe("meeting");
+			expect(result.source).toBe("https://example.com");
+			expect(result.bogus_field).toBeUndefined();
+		});
+
+		it("allows all args when template has no frontmatter rules", () => {
+			const attributes = {
+				type: "custom",
+			};
+
+			// "custom" template has no rules — all args should pass through
+			const result = applyArgsToFrontmatter(
+				attributes,
+				{
+					any_field: "allowed",
+					another: "also allowed",
+				},
+				"custom",
+			);
+
+			expect(result.any_field).toBe("allowed");
+			expect(result.another).toBe("also allowed");
+		});
+
+		it("allows all args when no template name provided (backward compat)", () => {
+			const attributes = {
+				type: "resource",
+			};
+
+			// No template name — should accept everything
+			const result = applyArgsToFrontmatter(attributes, {
+				anything: "goes",
+				custom: "field",
+			});
+
+			expect(result.anything).toBe("goes");
+			expect(result.custom).toBe("field");
+		});
+
+		it("still protects system fields even with template rules", () => {
+			const attributes = {
+				type: "booking",
+				created: "2025-01-01",
+			};
+
+			const result = applyArgsToFrontmatter(
+				attributes,
+				{
+					type: "hacked", // protected
+					created: "1999-01-01", // protected
+					booking_type: "flight", // valid
+				},
+				"booking",
+			);
+
+			expect(result.type).toBe("booking");
+			expect(result.created).toBe("2025-01-01");
+			expect(result.booking_type).toBe("flight");
+		});
+	});
+
 	it("handles malformed JSON array strings gracefully", () => {
 		const attributes = {
 			title: "Test",
@@ -1704,6 +1837,103 @@ describe("applyArgsToFrontmatter", () => {
 		// Should remain as strings since they're not valid JSON arrays
 		expect(result.notArray).toBe("[invalid json");
 		expect(result.alsoNotArray).toBe("[]extra");
+	});
+
+	describe("comma-separated wikilinks for array fields", () => {
+		it("splits comma-separated wikilinks into arrays for array-typed fields", () => {
+			const attributes = {
+				type: "resource",
+				areas: [],
+				projects: [],
+			};
+
+			const result = applyArgsToFrontmatter(
+				attributes,
+				{
+					areas: "[[🌱 Home Server]], [[🤖 AI Practice]]",
+				},
+				"resource",
+			);
+
+			expect(Array.isArray(result.areas)).toBe(true);
+			expect(result.areas).toEqual([
+				"[[🌱 Home Server]]",
+				"[[🤖 AI Practice]]",
+			]);
+		});
+
+		it("wraps a single wikilink in an array for array-typed fields", () => {
+			const attributes = {
+				type: "resource",
+				areas: [],
+			};
+
+			const result = applyArgsToFrontmatter(
+				attributes,
+				{
+					areas: "[[🤖 AI Practice]]",
+				},
+				"resource",
+			);
+
+			expect(Array.isArray(result.areas)).toBe(true);
+			expect(result.areas).toEqual(["[[🤖 AI Practice]]"]);
+		});
+
+		it("wraps non-wikilink strings in an array for array-typed fields", () => {
+			const attributes = {
+				type: "project",
+				depends_on: [],
+			};
+
+			const result = applyArgsToFrontmatter(
+				attributes,
+				{
+					depends_on: "some-value",
+				},
+				"project",
+			);
+
+			// Non-wikilink value should still be wrapped in array
+			expect(Array.isArray(result.depends_on)).toBe(true);
+			expect(result.depends_on).toEqual(["some-value"]);
+		});
+
+		it("still prefers JSON array syntax over comma splitting", () => {
+			const attributes = {
+				type: "resource",
+				areas: [],
+			};
+
+			const result = applyArgsToFrontmatter(
+				attributes,
+				{
+					areas: '["[[🌱 Home Server]]", "[[🤖 AI Practice]]"]',
+				},
+				"resource",
+			);
+
+			expect(Array.isArray(result.areas)).toBe(true);
+			expect(result.areas).toEqual([
+				"[[🌱 Home Server]]",
+				"[[🤖 AI Practice]]",
+			]);
+		});
+
+		it("does not coerce to array when no template name provided", () => {
+			const attributes = {
+				areas: [],
+			};
+
+			const result = applyArgsToFrontmatter(attributes, {
+				areas: "[[🌱 Home Server]], [[🤖 AI Practice]]",
+			});
+
+			// Without template context, stays as string (backward compat)
+			expect(result.areas).toBe(
+				"[[🌱 Home Server]], [[🤖 AI Practice]]",
+			);
+		});
 	});
 
 	describe("integration with createFromTemplate", () => {
@@ -1810,7 +2040,7 @@ template_version: 2
 					type: "project", // Should be ignored (protected)
 					created: "1999-01-01", // Should be ignored (protected)
 					template_version: "999", // Should be ignored (protected)
-					custom_field: "allowed", // Should be added (not protected)
+					resource_type: "meeting", // Should be added (valid resource field)
 				},
 			});
 
@@ -1826,8 +2056,8 @@ template_version: 2
 			expect(attributes.created).not.toBe("1999-01-01");
 			expect(attributes.template_version).toBe(2);
 
-			// Non-protected field is added
-			expect(attributes.custom_field).toBe("allowed");
+			// Valid non-protected field is added
+			expect(attributes.resource_type).toBe("meeting");
 		});
 	});
 });

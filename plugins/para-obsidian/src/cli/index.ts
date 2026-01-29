@@ -48,6 +48,8 @@ export {
 	handleFrontmatterValidateAll,
 	suggestFieldsForType,
 } from "./frontmatter";
+// Generate commands
+export { handleGenerateTemplates } from "./generate-templates";
 // Git commands
 export { handleGit, handleInsert } from "./git";
 // Inbox commands

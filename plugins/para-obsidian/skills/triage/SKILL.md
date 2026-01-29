@@ -22,22 +22,21 @@ allowed-tools: Task, Read, Bash, TaskCreate, TaskUpdate, TaskList, TaskGet, AskU
 
 ## Skill Architecture
 
-This orchestrator coordinates a three-tier skill system:
+This orchestrator spawns `triage-worker` agents, each self-contained with preloaded skills:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Tier 1: REFERENCE SKILLS (Knowledge)                       │
-│  - para-classifier (PARA philosophy, emoji mapping)         │
-│  - content-sourcing (URL routing, tool selection)           │
+│  - para-classifier      (PARA philosophy, emoji mapping)    │
+│  - content-processing   (note creation, Layer 1, commit)    │
+│  - content-sourcing     (URL routing, tool selection)        │
 └─────────────────────────────────────────────────────────────┘
                             ↓ loaded by
 ┌─────────────────────────────────────────────────────────────┐
-│  Tier 2: WORKER SKILLS (Leaf nodes - do ONE thing)          │
+│  Tier 2: WORKER SKILLS (preloaded into triage-worker agent) │
 │  - analyze-web         (analyze web content → proposal)     │
 │  - analyze-voice       (analyze transcription → proposal)   │
 │  - analyze-attachment  (analyze PDF/DOCX → proposal)        │
-│  - create-resource     (create resource note from proposal) │
-│  - create-meeting      (create meeting from proposal)       │
 └─────────────────────────────────────────────────────────────┘
                             ↓ orchestrated by
 ┌─────────────────────────────────────────────────────────────┐
@@ -45,6 +44,8 @@ This orchestrator coordinates a three-tier skill system:
 │  - triage              (unified inbox processing)           │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+**Note:** `content-processing` is the canonical pipeline for note creation, Layer 1 injection, and commit — shared by `triage-worker` and `quick-create`. `create-resource` and `create-meeting` are standalone skills for non-triage workflows.
 
 ---
 
@@ -198,13 +199,7 @@ cd ${CLAUDE_PLUGIN_ROOT} && bun src/cli.ts voice convert "<vtt-path>" --format j
 
 **Source Type (for enrichment within analyzer):**
 
-| Source | Detection | Tool | Parallel? |
-|--------|-----------|------|-----------|
-| YouTube | `youtube.com` domain | youtube-transcript | ✅ Yes |
-| X/Twitter | `x.com` or `twitter.com` | Chrome DevTools | ❌ No |
-| GitHub | `github.com` | Firecrawl | ✅ Yes |
-| Public article | Default | Firecrawl | ✅ Yes |
-| Voice/Attachment | Has content | None (para_read) | N/A |
+See [enrichment-strategies.md](references/enrichment-strategies.md) for the canonical routing table (source detection, tool selection, parallelization constraints).
 
 **CRITICAL - X/Twitter:** Web Clipper captures only stubs. You MUST enrich via Chrome DevTools regardless of clipping content.
 
@@ -266,6 +261,26 @@ Pass these variables to each subagent:
 - `areas`, `projects`, `stakeholders` (from Phase 1)
 
 Each subagent will: enrich content, analyze, create note, persist via TaskUpdate, and return `PROPOSAL_JSON:{...}`.
+
+### 2.1.1 Model Selection by Item Type
+
+Override the agent's default model based on content complexity:
+
+| Item Type | Model | Why |
+|-----------|-------|-----|
+| `clipping` | `haiku` (default) | Enrichment provides strong source content |
+| `transcription` | `sonnet` | Ambiguous speakers, nuanced categorization |
+| `vtt` (converted) | `sonnet` | Same as transcription |
+
+```typescript
+// Pass model override in Task call:
+Task({
+  subagent_type: "triage-worker",
+  model: itemType === "transcription" ? "sonnet" : undefined,  // undefined = use agent default (haiku)
+  description: "Process: ...",
+  prompt: `...`
+})
+```
 
 ### 2.2 Handle X/Twitter Separately
 
@@ -377,15 +392,20 @@ These provide the framework for determining note types and source_format values.
 
 ## Worker Skills
 
-This orchestrator delegates to these worker skills:
+The `triage-worker` agent has these skills preloaded:
 
 | Skill | Purpose | When Used |
 |-------|---------|-----------|
 | [analyze-web](../analyze-web/SKILL.md) | Analyze web clippings | `itemType === "clipping"` |
 | [analyze-voice](../analyze-voice/SKILL.md) | Analyze transcriptions | `itemType === "transcription"` |
 | [analyze-attachment](../analyze-attachment/SKILL.md) | Analyze PDF/DOCX | `itemType === "attachment"` |
-| [create-resource](../create-resource/SKILL.md) | Create resource note | `proposed_template === "resource"` |
-| [create-meeting](../create-meeting/SKILL.md) | Create meeting note | `proposed_template === "meeting"` |
+
+**Standalone skills** (not used during triage — the worker handles creation inline):
+
+| Skill | Purpose | When Used |
+|-------|---------|-----------|
+| [create-resource](../create-resource/SKILL.md) | Create resource note | Non-triage workflows |
+| [create-meeting](../create-meeting/SKILL.md) | Create meeting note | Non-triage workflows |
 
 ---
 

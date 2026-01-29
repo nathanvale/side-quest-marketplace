@@ -1,21 +1,25 @@
 /**
  * Frontmatter builder service for template generation.
  *
- * Generates YAML frontmatter with Templater prompts and auto-fill fields.
+ * Generates YAML frontmatter with Templater prompts or native {{field}} syntax.
  * Handles proper quoting for wikilinks and multi-line values.
  *
  * @module templates/services/frontmatter-builder
  */
 import type { TemplateField } from "../types";
 
+/** Template syntax mode for generation. */
+export type TemplateSyntax = "templater" | "native";
+
 /**
  * Generates YAML frontmatter from field definitions.
  *
- * Creates valid YAML with Templater prompt syntax for interactive fields
- * and auto-fill expressions for computed fields (like dates).
+ * Creates valid YAML with either Templater prompt syntax or native {{field}}
+ * placeholders, depending on the `syntax` option.
  *
  * @param fields - Frontmatter field definitions
  * @param version - Template version number
+ * @param syntax - Template syntax mode (default: "templater")
  * @returns YAML frontmatter block (with --- delimiters)
  *
  * @example
@@ -24,14 +28,20 @@ import type { TemplateField } from "../types";
  *   { name: "title", displayName: "Title", type: "string", required: true },
  *   { name: "created", displayName: "Created", type: "date", required: true,
  *     autoFill: 'tp.date.now("YYYY-MM-DD")' },
- *   { name: "status", displayName: "Status", type: "enum", required: true,
- *     enumValues: ["active", "on-hold"], default: "active" }
  * ];
- * const yaml = generateFrontmatter(fields, 1);
+ * // Templater:
+ * generateFrontmatter(fields, 1);
  * // ---
  * // title: "<% tp.system.prompt("Title") %>"
  * // created: <% tp.date.now("YYYY-MM-DD") %>
- * // status: "<% tp.system.prompt("Status", "active") %>"
+ * // template_version: 1
+ * // ---
+ *
+ * // Native:
+ * generateFrontmatter(fields, 1, "native");
+ * // ---
+ * // title: "{{Title}}"
+ * // created: "{{date:YYYY-MM-DDTHH:mm:ss}}"
  * // template_version: 1
  * // ---
  * ```
@@ -39,11 +49,14 @@ import type { TemplateField } from "../types";
 export function generateFrontmatter(
 	fields: readonly TemplateField[],
 	version: number,
+	syntax: TemplateSyntax = "templater",
 ): string {
 	const lines = ["---"];
 
 	for (const field of fields) {
-		lines.push(buildFieldLine(field));
+		lines.push(
+			syntax === "native" ? buildNativeFieldLine(field) : buildFieldLine(field),
+		);
 	}
 
 	lines.push(`template_version: ${version}`);
@@ -53,7 +66,7 @@ export function generateFrontmatter(
 }
 
 /**
- * Builds a single YAML field line with appropriate Templater syntax.
+ * Builds a single YAML field line with Templater syntax.
  *
  * @param field - Field definition
  * @returns YAML line (e.g., 'title: "<% tp.system.prompt("Title") %>"')
@@ -88,9 +101,48 @@ function buildFieldLine(field: TemplateField): string {
 }
 
 /**
- * Builds a wikilink field with proper quoting.
+ * Builds a single YAML field line with native {{field}} syntax.
  *
- * Wikilinks in YAML frontmatter need to be quoted to preserve [[ ]].
+ * @param field - Field definition
+ * @returns YAML line (e.g., 'title: "{{Title}}"')
+ */
+function buildNativeFieldLine(field: TemplateField): string {
+	const { name, displayName, autoFill, type } = field;
+
+	// Auto-fill date fields → native {{date:FORMAT}} syntax
+	if (autoFill) {
+		const formatMatch = autoFill.match(/tp\.date\.now\("([^"]+)"\)/);
+		const format = formatMatch?.[1] ?? "YYYY-MM-DD";
+		return `${name}: "{{date:${format}}}"`;
+	}
+
+	// Wikilink fields → "[[{{Field Name}}]]"
+	if (type === "wikilink") {
+		return `${name}: "[[{{${displayName}}}]]"`;
+	}
+
+	// Array fields → literal empty array
+	if (type === "array") {
+		return `${name}: []`;
+	}
+
+	// Enum fields with default → {{Field Name:default}}
+	if (type === "enum" && field.enumValues) {
+		const defaultVal = field.default ?? field.enumValues[0] ?? "";
+		return `${name}: "{{${displayName}:${defaultVal}}}"`;
+	}
+
+	// Fields with a default value → {{Field Name:default}}
+	if (field.default && field.default !== "" && field.default !== "[]") {
+		return `${name}: "{{${displayName}:${field.default}}}"`;
+	}
+
+	// Required prompted fields → {{Field Name}}
+	return `${name}: "{{${displayName}}}"`;
+}
+
+/**
+ * Builds a wikilink field with proper quoting (Templater syntax).
  *
  * @param name - Field name
  * @param displayName - Human-readable name

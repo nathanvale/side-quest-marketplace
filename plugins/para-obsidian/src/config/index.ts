@@ -26,6 +26,7 @@ import {
 	DEFAULT_CONVERTERS as DEFAULT_INBOX_CONVERTERS,
 	mergeConverters,
 } from "../inbox";
+import type { TemplateSection } from "./defaults";
 import {
 	DEFAULT_AVAILABLE_MODELS,
 	DEFAULT_DESTINATIONS,
@@ -33,9 +34,15 @@ import {
 	DEFAULT_MODEL,
 	DEFAULT_PARA_FOLDERS,
 	DEFAULT_PARA_SEARCH_FOLDERS,
+	DEFAULT_TEMPLATE_SECTIONS,
 	DEFAULT_TEMPLATE_VERSIONS,
 	DEFAULT_TITLE_PREFIXES,
 } from "./defaults";
+import {
+	mergeFrontmatterRules,
+	mergePerTemplate,
+	mergeTemplateSections,
+} from "./merge";
 
 /**
  * Defines validation rules for frontmatter fields by note type.
@@ -140,6 +147,10 @@ export interface ParaObsidianConfig {
 	readonly defaultParaSearchFolders?: ReadonlyArray<string>;
 	/** Title prefixes for specific template types (e.g., "research" → "Research -"). */
 	readonly titlePrefixes?: Partial<Record<string, string>>;
+	/** Template body section overrides. Replaces default sections for specified templates. */
+	readonly templateSections?: Partial<
+		Record<string, ReadonlyArray<TemplateSection>>
+	>;
 	/** Inbox converter overrides (merged with defaults). */
 	readonly inboxConverters?: ReadonlyArray<
 		Partial<InboxConverter> & { id: string }
@@ -322,15 +333,31 @@ export function loadConfig(
 		templatesDir,
 		autoCommit: merged.autoCommit ?? true,
 		suggestedTags: merged.suggestedTags ?? [],
-		frontmatterRules: merged.frontmatterRules ?? DEFAULT_FRONTMATTER_RULES,
-		templateVersions: merged.templateVersions ?? DEFAULT_TEMPLATE_VERSIONS,
-		defaultDestinations: merged.defaultDestinations ?? DEFAULT_DESTINATIONS,
+		frontmatterRules: mergeFrontmatterRules(
+			DEFAULT_FRONTMATTER_RULES,
+			merged.frontmatterRules ?? {},
+		),
+		templateVersions: mergePerTemplate(
+			DEFAULT_TEMPLATE_VERSIONS,
+			merged.templateVersions ?? {},
+		),
+		defaultDestinations: mergePerTemplate(
+			DEFAULT_DESTINATIONS,
+			merged.defaultDestinations ?? {},
+		),
 		availableModels: merged.availableModels ?? [...DEFAULT_AVAILABLE_MODELS],
 		defaultModel: merged.defaultModel ?? DEFAULT_MODEL,
 		paraFolders,
 		defaultParaSearchFolders,
 		defaultSearchDirs,
-		titlePrefixes: merged.titlePrefixes ?? DEFAULT_TITLE_PREFIXES,
+		titlePrefixes: mergePerTemplate(
+			DEFAULT_TITLE_PREFIXES as Record<string, string>,
+			(merged.titlePrefixes ?? {}) as Record<string, string>,
+		),
+		templateSections: mergeTemplateSections(
+			DEFAULT_TEMPLATE_SECTIONS,
+			merged.templateSections ?? {},
+		),
 		inboxConverters: mergeConverters(
 			DEFAULT_INBOX_CONVERTERS,
 			merged.inboxConverters ?? [],

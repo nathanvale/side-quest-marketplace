@@ -2,68 +2,13 @@
 
 ## Overview
 
-The triage skill uses Claude Code's native Task system for:
+The triage skill uses Claude Code's native Task system (TaskCreate, TaskUpdate, TaskList, TaskGet) for:
 - Progress tracking (visible via `Ctrl+T`)
 - Crash resilience (subagents persist proposals immediately)
 - Resume capability (tasks survive session restarts)
 - Cross-session sharing (via `CLAUDE_CODE_TASK_LIST_ID`)
 
----
-
-## Task API Reference
-
-### TaskCreate
-
-Creates a new task. Returns the generated task ID.
-
-```typescript
-TaskCreate({
-  subject: string;        // Brief title (imperative: "Analyze article")
-  description: string;    // Detailed info about the task
-  activeForm?: string;    // Present continuous ("Analyzing article")
-  metadata?: object;      // Arbitrary data (file, proposal, etc.)
-})
-```
-
-### TaskUpdate
-
-Updates an existing task. Metadata is merged (set key to null to delete).
-
-```typescript
-TaskUpdate({
-  taskId: string;                    // Required
-  status?: "pending" | "in_progress" | "completed";
-  subject?: string;
-  description?: string;
-  activeForm?: string;
-  owner?: string;
-  metadata?: object;                 // Merged with existing
-  addBlocks?: string[];              // Task IDs this blocks
-  addBlockedBy?: string[];           // Task IDs that block this
-})
-```
-
-### TaskList
-
-Returns all tasks with **summary info only**. No parameters.
-
-```typescript
-TaskList()
-// Returns: { id, subject, status, owner, blockedBy }[]
-```
-
 **CRITICAL:** TaskList does NOT return metadata. To read proposals, you must call TaskGet for each task.
-
-### TaskGet
-
-Returns full details for a specific task including description and metadata.
-
-```typescript
-TaskGet({ taskId: string })
-// Returns: { id, subject, description, status, owner, metadata, blockedBy, blocks }
-```
-
-**This is the only way to retrieve metadata.** Use TaskList to get IDs, then TaskGet for full details.
 
 ---
 
@@ -210,108 +155,20 @@ This ensures your work survives if the session crashes.
 
 ## Cross-Session Sharing
 
-To share tasks across terminal sessions:
-
-```bash
-CLAUDE_CODE_TASK_LIST_ID=triage-session claude
-```
-
-Tasks stored in `~/.claude/tasks/triage-session/`.
-
-Useful for:
-- Running triage in one terminal, reviewing in another
-- Pausing work overnight, resuming next day
-- Team collaboration on shared inbox
+To share tasks across terminal sessions, set `CLAUDE_CODE_TASK_LIST_ID=triage-session` when launching Claude.
 
 ---
 
-## Task Cleanup
+## Proposal Retrieval
 
-### After Successful Completion
+Two data flows from subagents to coordinator:
 
-```typescript
-// Option 1: Mark all completed
-for (const task of triageTasks) {
-  TaskUpdate({ taskId: task.id, status: "completed" });
-}
+| Method | When | How |
+|--------|------|-----|
+| **Response text** | Normal flow | Parse `PROPOSAL_JSON:{...}` from subagent output |
+| **TaskGet loop** | Resume flow | Call `TaskGet(taskId)` for each `in_progress` task |
 
-// Option 2: Tasks auto-cleanup when session ends
-// (depends on settings)
-```
-
-### Canceling a Triage Session
-
-To abandon a triage session:
-
-```typescript
-// Clear all triage tasks
-const tasks = TaskList();
-const triageTasks = tasks.filter(t => t.subject.startsWith("Triage:"));
-
-for (const task of triageTasks) {
-  TaskUpdate({ taskId: task.id, status: "completed" });
-}
-```
-
----
-
-## Retrieving Proposals from Subagents
-
-**CRITICAL:** There are TWO ways data flows from subagents back to the coordinator:
-
-### 1. Task Metadata (Persistence)
-
-Subagent calls `TaskUpdate` with `metadata.proposal`. This is for **crash resilience** - if the session dies, proposals are saved.
-
-```typescript
-TaskUpdate({
-  taskId: "abc123",
-  status: "in_progress",
-  metadata: { proposal: { title: "...", area: "[[...]]", ... } }
-})
-```
-
-To retrieve: Must call `TaskGet(taskId)` for EACH task - TaskList doesn't return metadata.
-
-```typescript
-// ❌ WRONG - TaskList doesn't include metadata
-const tasks = TaskList();
-const proposals = tasks.filter(t => t.metadata?.proposal); // metadata is undefined!
-
-// ✅ CORRECT - Use TaskGet for each task
-const tasks = TaskList().filter(t => t.subject.startsWith("Triage:"));
-const proposals = [];
-for (const task of tasks) {
-  if (task.status === "in_progress") {
-    const full = TaskGet({ taskId: task.id });
-    if (full.metadata?.proposal) {
-      proposals.push({ taskId: task.id, ...full.metadata.proposal });
-    }
-  }
-}
-```
-
-### 2. Subagent Response Text (Immediate Use)
-
-Subagent returns structured text in its response. This is for **immediate coordinator use** - no extra tool calls needed.
-
-```typescript
-// Subagent returns:
-`PROPOSAL_JSON:{"title":"Sprint Planning","area":"[[💼 Work]]","project":"[[🎯 GMS]]",...}`
-
-// Coordinator extracts:
-const match = subagentResponse.match(/PROPOSAL_JSON:(\{.*\})/);
-const proposal = JSON.parse(match[1]);
-```
-
-### Which to Use?
-
-| Method | When | Pros | Cons |
-|--------|------|------|------|
-| Response text | Normal flow | No extra calls, immediate | Lost if not captured |
-| TaskGet loop | Resume flow | Crash-resilient | N tool calls for N tasks |
-
-**Recommended pattern:** Use response text for normal operation, TaskGet loop only on resume.
+**Use response text for normal operation, TaskGet loop only on resume.** See [execution-phases.md](execution-phases.md) for implementation code.
 
 ---
 

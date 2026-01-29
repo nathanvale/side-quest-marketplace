@@ -146,10 +146,19 @@ export function coerceValue(raw: string): unknown {
 		}
 	}
 	if (trimmed.includes(",")) {
-		return trimmed
+		const segments = trimmed
 			.split(",")
 			.map((s) => s.trim())
 			.filter(Boolean);
+		// Prose detection: if segments average more than 2 words, this is a
+		// sentence with commas rather than a tag/value list — return as string.
+		const avgWordCount =
+			segments.reduce((sum, s) => sum + s.split(/\s+/).length, 0) /
+			segments.length;
+		if (avgWordCount > 2) {
+			return trimmed;
+		}
+		return segments;
 	}
 	return trimmed;
 }

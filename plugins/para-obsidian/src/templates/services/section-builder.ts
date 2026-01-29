@@ -1,48 +1,50 @@
 /**
  * Section builder service for template generation.
  *
- * Generates markdown body sections with headings and Templater prompts.
+ * Generates markdown body sections with headings, optional content,
+ * and Templater or native syntax prompts.
  *
  * @module templates/services/section-builder
  */
 import type { TemplateSection } from "../types";
+import type { TemplateSyntax } from "./frontmatter-builder";
 
 /**
  * Generates markdown body from section definitions.
  *
- * Creates level-2 headings with optional Templater prompts.
+ * Creates level-2 headings with optional content blocks and Templater/native prompts.
  * Includes title heading at the top.
  *
  * @param sections - Section definitions
+ * @param syntax - Template syntax mode (default: "templater")
  * @returns Markdown body content
  *
  * @example
  * ```typescript
  * const sections = [
- *   { heading: "Why This Matters", hasPrompt: true,
- *     promptText: "What is the goal?" },
- *   { heading: "Success Criteria", hasPrompt: true,
- *     promptText: "How will you know it's done?" },
- *   { heading: "Next Actions", hasPrompt: false }
+ *   { heading: "Notes", hasPrompt: false, content: "- [ ] " },
+ *   { heading: "Details", hasPrompt: false }
  * ];
- * const body = generateBody(sections);
- * // # <% tp.system.prompt("Title") %>
+ * const body = generateBody(sections, "native");
+ * // # {{title}}
  * //
- * // ## Why This Matters
+ * // ## Notes
  * //
- * // <% tp.system.prompt("What is the goal?") %>
+ * // - [ ]
  * //
- * // ## Success Criteria
- * //
- * // <% tp.system.prompt("How will you know it's done?") %>
- * //
- * // ## Next Actions
+ * // ## Details
  * //
  * ```
  */
-export function generateBody(sections: readonly TemplateSection[]): string {
+export function generateBody(
+	sections: readonly TemplateSection[],
+	syntax: TemplateSyntax = "templater",
+): string {
+	const titleLine =
+		syntax === "native" ? "# {{title}}" : '# <% tp.system.prompt("Title") %>';
+
 	const lines: string[] = [
-		'# <% tp.system.prompt("Title") %>',
+		titleLine,
 		"", // Blank line after title
 	];
 
@@ -50,7 +52,20 @@ export function generateBody(sections: readonly TemplateSection[]): string {
 		lines.push(`## ${section.heading}`);
 		lines.push(""); // Blank line after heading
 
-		if (section.hasPrompt && section.promptText) {
+		// Emit guidance comment if defined
+		if (section.comment) {
+			lines.push(`<!-- ${section.comment} -->`);
+			lines.push(""); // Blank line after comment
+		}
+
+		// Emit content block if defined
+		if (section.content) {
+			lines.push(section.content);
+			lines.push(""); // Blank line after content
+		}
+
+		// Emit Templater prompt if applicable (only in templater mode)
+		if (syntax === "templater" && section.hasPrompt && section.promptText) {
 			lines.push(`<% tp.system.prompt("${section.promptText}") %>`);
 			lines.push(""); // Blank line after prompt
 		}

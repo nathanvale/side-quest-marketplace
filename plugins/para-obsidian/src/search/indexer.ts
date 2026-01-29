@@ -96,6 +96,8 @@ export function buildIndex(
 	// Collect all Markdown files from specified directories
 	for (const entry of dirs) {
 		const resolved = resolveVaultPath(config.vault, entry).absolute;
+		// Skip directories that don't exist (e.g., subdirectory destinations like "04 Archives/Bookings")
+		if (!pathExistsSync(resolved)) continue;
 		for (const rel of globFilesSync("**/*.md", {
 			cwd: resolved,
 			absolute: false,

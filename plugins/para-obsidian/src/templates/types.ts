@@ -7,6 +7,10 @@
  * @module templates/types
  */
 
+// Re-export TemplateSection from the single source of truth (defaults.ts)
+import type { TemplateSection as TemplateSectionImport } from "../config/defaults.js";
+export type TemplateSection = TemplateSectionImport;
+
 /**
  * Field type for frontmatter values.
  */
@@ -36,18 +40,6 @@ export interface TemplateField {
 	readonly autoFill?: string;
 	/** Valid values for enum type. */
 	readonly enumValues?: readonly string[];
-}
-
-/**
- * Definition of a markdown section in a template body.
- */
-export interface TemplateSection {
-	/** Section heading text (without ##). */
-	readonly heading: string;
-	/** Whether this section has an interactive prompt. */
-	readonly hasPrompt: boolean;
-	/** Prompt text to show user (if hasPrompt is true). */
-	readonly promptText?: string;
 }
 
 /**

@@ -1,5 +1,7 @@
 # Enrichment Strategies
 
+> **Canonical source** for enrichment routing. Other files (SKILL.md, triage-worker.md) reference this document rather than duplicating the routing table.
+
 ## Overview
 
 Clippings are **stubs** - they contain URLs but not full content. Enrichment fetches the actual content before analysis.

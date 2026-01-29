@@ -2,12 +2,15 @@
 name: analyze-attachment
 description: Analyze PDF/DOCX attachments and return resource proposals. Uses para-obsidian CLI for extraction, analyzes content, returns structured proposal. Worker skill for triage orchestrator.
 user-invocable: false
-allowed-tools: Bash, mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_list
 ---
 
 # Analyze Attachment
 
-Analyze PDF or DOCX attachments and return a **proposal** (not a final note).
+Analyze PDF or DOCX attachments and return a **proposal**. Unlike web clippings and voice memos, attachments follow a **proposal-only flow** — the triage-worker agent handles note creation after receiving the proposal.
+
+## Architecture Note
+
+**Different from analyze-web/analyze-voice:** Those skills create notes AND inject Layer 1 content before returning. Attachments use CLI extraction (`para scan`) which has its own workflow, so this skill returns a proposal only. The triage-worker creates the note using the proposal fields.
 
 ## Skills as Documentation
 
@@ -26,33 +29,11 @@ You receive:
 
 ## Output
 
-Return a JSON proposal with ALL fields (UX fields are required for the review table):
+Return a JSON proposal per @plugins/para-obsidian/skills/triage/references/proposal-schema.md.
 
-```json
-{
-  // Identity
-  "file": "00 Inbox/Attachments/document.pdf",
-  "type": "attachment",
+**Key:** Use `area` (single wikilink), `project` (single wikilink or null), `resourceType` (camelCase). Include `file`, `type: "attachment"`, and `document_type` alongside the standard proposal fields.
 
-  // Core proposal fields
-  "proposed_title": "Descriptive Title",
-  "proposed_template": "resource|invoice|booking|document",
-  "summary": "2-3 sentence summary of document content",
-  "suggested_areas": ["[[🌱 Area Name]]"],
-  "suggested_projects": ["[[🎯 Project Name]]"],
-  "document_type": "invoice|contract|cv|letter|medical|report|manual",
-
-  // UX fields (REQUIRED - for review table and "Deeper" option)
-  "categorization_hints": [
-    "First key finding about the document",
-    "Second key finding",
-    "Third key finding"
-  ],
-  "source_format": "document",  // Always "document" for attachments
-  "confidence": "high|medium|low",  // low triggers "Deeper" option
-  "notes": "Any extraction issues or special considerations"  // or null
-}
-```
+For attachments, always set `source_format: "document"`. Include `document_type` (invoice, contract, cv, letter, medical, report, manual) as an attachment-specific field.
 
 ## Workflow
 
@@ -164,8 +145,8 @@ This preserves the original document while creating a searchable, connected note
     "Due date: February 15, 2024",
     "Account number: 1234567890"
   ],
-  "suggested_areas": ["[[🌱 Finance]]"],
-  "suggested_projects": [],
+  "area": "[[🌱 Finance]]",
+  "project": null,
   "document_type": "invoice",
   "source_format": "document",
   "confidence": "high",

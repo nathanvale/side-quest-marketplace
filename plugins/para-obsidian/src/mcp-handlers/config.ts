@@ -17,6 +17,12 @@ import {
 	ResponseFormat,
 	wrapToolHandler,
 } from "@sidequest/core/mcp-response";
+import {
+	DEFAULT_DESTINATIONS,
+	DEFAULT_FRONTMATTER_RULES,
+	DEFAULT_TEMPLATE_SECTIONS,
+	DEFAULT_TITLE_PREFIXES,
+} from "../config/defaults";
 import { listTemplateVersions, loadConfig } from "../config/index";
 import { getTemplate, getTemplateFields } from "../templates/index";
 
@@ -257,6 +263,40 @@ Example: For project template, shows you need:
 					}
 				}
 
+				// Build creation_meta from defaults
+				const creationMeta: {
+					dest: string;
+					titlePrefix?: string;
+					sections?: Array<{ heading: string; hasPrompt: boolean }>;
+				} = {
+					dest:
+						config.defaultDestinations?.[templateName] ??
+						DEFAULT_DESTINATIONS[templateName] ??
+						"00 Inbox",
+				};
+				const titlePrefix = DEFAULT_TITLE_PREFIXES[templateName];
+				if (titlePrefix) {
+					creationMeta.titlePrefix = titlePrefix;
+				}
+				const sections = DEFAULT_TEMPLATE_SECTIONS[templateName];
+				if (sections) {
+					creationMeta.sections = [...sections];
+				}
+
+				// Build validArgs from frontmatter rules
+				const validArgRules =
+					config.frontmatterRules?.[templateName] ??
+					DEFAULT_FRONTMATTER_RULES[templateName];
+				const validArgs = validArgRules?.required
+					? Object.keys(validArgRules.required).filter(
+							(k) =>
+								k !== "created" &&
+								k !== "type" &&
+								k !== "template_version" &&
+								k !== "title",
+						)
+					: undefined;
+
 				// Return data - wrapper handles formatting
 				return {
 					template: templateName,
@@ -267,6 +307,8 @@ Example: For project template, shows you need:
 						body: bodyFields.map((f) => f.key),
 					},
 					frontmatter_hints: frontmatterHints,
+					creation_meta: creationMeta,
+					validArgs,
 					example: Object.fromEntries(
 						enhancedRequired.map((f) => [f.key, f.example ?? "..."]),
 					),

@@ -2,7 +2,6 @@
 name: analyze-voice
 description: Analyze voice memo transcriptions, create notes with appropriate content, and return lightweight proposals. For resources (ideas, reflections), creates note with Layer 1 transcription. For meetings, extracts structured body content. Worker skill for triage orchestrator.
 user-invocable: false
-allowed-tools: mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_fm_get, mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_replace_section, mcp__plugin_para-obsidian_para-obsidian__para_rename
 ---
 
 # Analyze Voice Memo
@@ -21,79 +20,11 @@ You receive:
 
 ## Output
 
-Return a JSON proposal with ALL fields (note: the note is already created):
+Return a JSON proposal per @plugins/para-obsidian/skills/triage/references/proposal-schema.md.
 
-```json
-{
-  // Identity
-  "file": "00 Inbox/🎤 2024-01-22 3-45pm.md",
-  "type": "transcription",
+**Key:** Use `area` (single wikilink), `project` (single wikilink or null), `resourceType` (camelCase). Include `file`, `type: "transcription"`, `created`, and `layer1_injected` alongside the standard proposal fields.
 
-  // Core proposal fields
-  "proposed_title": "Descriptive Title from Content",
-  "proposed_template": "meeting",  // "resource" | "meeting" | "capture"
-  "summary": "2-3 sentence summary of what was discussed",
-  "suggested_areas": ["[[🌱 Work]]"],
-  "suggested_projects": ["[[🎯 Project Name]]"],
-  "resource_type": "meeting",  // meeting|conversation|idea|reflection
-
-  // Creation fields (NEW - note already created)
-  "created": "04 Archives/Meetings/Sprint 42 Planning.md",  // or "03 Resources/..." for resources
-  "layer1_injected": true,  // For resources only (meetings use structured sections)
-
-  // UX fields (REQUIRED - for review table and "Deeper" option)
-  "categorization_hints": [
-    "Multiple speakers with status updates",
-    "Action items assigned with deadlines",
-    "Sprint backlog prioritization discussion"
-  ],
-  "source_format": "audio",  // Always "audio" for voice memos
-  "confidence": "high",  // "high"|"medium"|"low" - low triggers "Deeper" option
-  "notes": "All speakers from GMS squad - project auto-inferred",  // or null
-
-  // Meeting-specific fields (when proposed_template === "meeting")
-  "meeting_type": "planning",  // standup|1on1|planning|retro|workshop|general
-  "meeting_date": "2024-01-22T15:45:00",
-  "attendees": ["[[John Smith]]", "[[Jane Doe]]", "Speaker 3"],
-  "meeting_notes": [
-    "Migration timeline: 3-week phased approach",
-    "Tech debt blocking several features",
-    "New hire onboarding next week"
-  ],
-  "decisions": [
-    "Proceed with phased migration approach",
-    "Prioritize auth module refactor"
-  ],
-  "action_items": [
-    { "assignee": "[[John Smith]]", "task": "Review migration PR", "due": "2024-01-25" },
-    { "assignee": "[[Jane Doe]]", "task": "Schedule auth refactor meeting", "due": null },
-    { "task": "Prepare onboarding materials for new hire", "due": "2024-01-29" }
-  ],
-  "follow_up": [
-    "Demo Phase 1 at next standup",
-    "Check in on auth progress mid-week"
-  ]
-}
-```
-
-### UX Fields (REQUIRED - for review table)
-
-| Field | Description |
-|-------|-------------|
-| `categorization_hints` | Array of 3 key points explaining why this categorization was chosen |
-| `source_format` | Always `"audio"` for voice memos |
-| `confidence` | `"high"` \| `"medium"` \| `"low"` - low triggers "Deeper" option in review |
-| `notes` | Special considerations (e.g., "Could also be a brainstorm session") or null |
-
-### Body Content Fields (for meetings)
-
-| Field | Description |
-|-------|-------------|
-| `attendees` | List of speaker names as wikilinks (if matched) or plain text |
-| `meeting_notes` | Key discussion points, observations, notable comments |
-| `decisions` | Important decisions reached in the meeting |
-| `action_items` | Structured tasks with assignee, description, and optional due date |
-| `follow_up` | Next steps, items to prepare, future meeting items |
+For voice memos, always set `source_format: "audio"`. For meetings, include meeting-specific fields (`meeting_type`, `meeting_date`, `attendees`, `meeting_notes`, `decisions`, `action_items`, `follow_up`).
 
 ## Workflow
 
@@ -187,85 +118,22 @@ Look for:
 
 **Follow-up:** Items for future discussion or preparation.
 
-### Step 6: Create Note & Archive Original
+### Step 6: Create Note
 
-**This is where content stays isolated.** Create the appropriate note type before returning.
+**This is where content stays isolated.** Follow the triage-worker's note creation workflow (see `agents/triage-worker.md`):
 
-#### For Meetings (`proposed_template === "meeting"`):
+1. **Create note** via `para_create` with frontmatter-only args
+2. **Commit** via `para_commit` (vault needs clean working tree)
+3. **Inject Layer 1** via `para_replace_section` (resources only — meetings use structured body sections)
 
-```
-para_create({
-  template: "meeting",
-  title: proposed_title,
-  dest: "04 Archives/Meetings",
-  args: {
-    meeting_date: meeting_date,
-    meeting_type: meeting_type,
-    transcription: `[[${originalFileName}]]`,
-    summary: summary,
-    area: suggested_areas[0],
-    project: suggested_projects[0] || null
-  },
-  content: {
-    "Attendees": attendees.map(a => `- ${a}`).join('\n'),
-    "Notes": meeting_notes.map(n => `- ${n}`).join('\n'),
-    "Decisions Made": decisions.map(d => `- ${d}`).join('\n'),
-    "Action Items": action_items.map(i => formatActionItem(i)).join('\n'),
-    "Follow-up": follow_up.map(f => `- ${f}`).join('\n')
-  },
-  response_format: "json"
-})
-```
+**Meeting-specific:** Pass meeting body content (attendees, notes, decisions, action items, follow-up) via `content` parameter. Set `layer1_injected: null` for meetings.
 
-**Note:** Meetings use structured body sections, NOT Layer 1. Set `layer1_injected: null` for meetings.
-
-#### For Resources (`proposed_template === "resource"`):
-
-```
-para_create({
-  template: "resource",
-  title: proposed_title,
-  dest: "03 Resources",
-  args: {
-    summary: summary,
-    source: `[[${originalFileName}]]`,
-    resource_type: resource_type,
-    source_format: "audio",
-    areas: suggested_areas[0],
-    projects: suggested_projects[0] || null,
-    distilled: "false"
-  },
-  response_format: "json"
-})
-```
-
-Then inject transcription as Layer 1:
-
-```
-para_replace_section({
-  file: createdFilePath,
-  heading: "Layer 1: Captured Notes",
-  content: formatTranscriptionForLayer1(transcription),
-  response_format: "json"
-})
-```
-
-**Layer 1 Format for Voice (see @../analyze-web/references/layer1-formatting.md):**
+**Resource-specific:** Inject transcription as Layer 1 content.
 - If transcription <2k tokens: Include full transcription
 - If transcription >2k tokens: Sample key segments with timestamps
 - Always add: `*Transcription captured. Use /distill-resource to extract key insights.*`
 
-#### Archive Original Transcription
-
-For both meetings and resources:
-
-```
-para_rename({
-  from: originalFile,
-  to: "04 Archives/Transcriptions/[filename]",
-  response_format: "json"
-})
-```
+**IMPORTANT:** Do NOT archive or delete the original transcription. Cleanup is the coordinator's responsibility (Phase 5, after user review).
 
 ### Step 7: Return Proposal
 
@@ -310,9 +178,9 @@ Voice memos are the **hardest to categorize** because:
     "Auth module tech debt blocking other work",
     "New hire starting next week needs onboarding"
   ],
-  "suggested_areas": ["[[🌱 Work]]"],
-  "suggested_projects": ["[[🎯 GMS - Gift Card Management System]]"],
-  "resource_type": "meeting",
+  "area": "[[🌱 Work]]",
+  "project": "[[🎯 GMS - Gift Card Management System]]",
+  "resourceType": "meeting",
   "source_format": "audio",
   "meeting_type": "planning",
   "meeting_date": "2024-01-22T15:45:00",
@@ -359,9 +227,9 @@ Voice memos are the **hardest to categorize** because:
     "TTL based on endpoint patterns",
     "Could reduce DB load by 40%"
   ],
-  "suggested_areas": ["[[🌱 Work]]"],
-  "suggested_projects": ["[[🎯 Performance Optimization]]"],
-  "resource_type": "idea",
+  "area": "[[🌱 Work]]",
+  "project": "[[🎯 Performance Optimization]]",
+  "resourceType": "idea",
   "source_format": "audio",
   "meeting_type": null,
   "meeting_date": null,

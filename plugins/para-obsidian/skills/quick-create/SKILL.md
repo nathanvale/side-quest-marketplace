@@ -3,14 +3,15 @@ name: quick-create
 description: Create a note from any URL with automatic template routing, enrichment, and content injection. Detects resource, meeting, invoice, and booking content automatically.
 argument-hint: "<url> [--template resource|meeting|invoice|booking] [--area '[[Area]]'] [--project '[[Project]]'] [--title 'Title']"
 user-invocable: true
-allowed-tools: AskUserQuestion, ToolSearch, WebFetch, mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_replace_section, mcp__plugin_para-obsidian_para-obsidian__para_commit, mcp__plugin_para-obsidian_para-obsidian__para_list_areas, mcp__plugin_para-obsidian_para-obsidian__para_list_projects, mcp__plugin_para-obsidian_para-obsidian__para_fm_set, mcp__firecrawl__firecrawl_scrape, mcp__youtube-transcript__get_video_info, mcp__youtube-transcript__get_transcript, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__take_snapshot
+context: fork
+allowed-tools: AskUserQuestion, ToolSearch, WebFetch, mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_replace_section, mcp__plugin_para-obsidian_para-obsidian__para_commit, mcp__plugin_para-obsidian_para-obsidian__para_list_areas, mcp__plugin_para-obsidian_para-obsidian__para_list_projects, mcp__plugin_para-obsidian_para-obsidian__para_fm_set, mcp__plugin_para-obsidian_para-obsidian__para_template_fields, mcp__firecrawl__firecrawl_scrape, mcp__youtube-transcript__get_video_info, mcp__youtube-transcript__get_transcript, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__take_snapshot
 ---
 
 # Quick Create
 
 Create a note from any URL in one invocation. Enriches content, classifies it, routes to the correct template (resource, meeting, invoice, booking), and commits to vault.
 
-**Key design:** Runs inline (not as subagent), so it naturally has access to everything discussed in the current session. If you already fetched a YouTube transcript or scraped an article earlier in the conversation, reuse that content instead of fetching again.
+**Key design:** Runs in a forked subagent for execution fidelity. The URL contains everything needed — the subagent fetches content fresh. This ensures all workflow phases (especially area/project gates) are followed as the driving task, not advisory context.
 
 ## Input
 
@@ -24,42 +25,58 @@ Parse from skill arguments:
 | `--project` | No | `--project '[[🎯 Claude Code Mastery]]'` |
 | `--title` | No | `--title 'Custom Title Here'` |
 
+## Shared Skills (Reference Knowledge)
+
+This skill delegates to canonical shared skills rather than duplicating logic:
+
+| Skill | Purpose | Reference |
+|-------|---------|-----------|
+| **Enrichment routing** | Tool selection by URL domain | @../triage/references/enrichment-strategies.md |
+| **Classification** | Template, area, resourceType decision tree | @../para-classifier/references/classification-decision-tree.md |
+| **Emoji mapping** | source_format → title prefix | @../para-classifier/references/emoji-mapping.md |
+| **Content processing** | Create → commit → inject → commit pipeline | @../content-processing/SKILL.md |
+| **Proposal schema** | Canonical field names and types | @../triage/references/proposal-schema.md |
+
+---
+
 ## Workflow
 
-### Phase 1: Input & Context
+### Phase 1: Initialize
 
-1. **Parse arguments** - Extract URL and optional flags (`--template`, `--area`, `--project`, `--title`)
-2. **Check conversation context** - Before fetching, check if URL content already exists in the conversation (e.g., YouTube transcript already pulled, Firecrawl already scraped, user-provided notes). Use existing content first.
-3. **Load vault context** if `--area` or `--project` not provided:
+**Step 1 — Load vault context (ALWAYS, before anything else):**
 
 ```
 para_list_areas({ response_format: "json" })
 para_list_projects({ response_format: "json" })
 ```
 
+Store the full lists. These are needed for classification validation, proposal display, and the Edit flow. Load them even if `--area` or `--project` flags are provided — flags still need validation against the vault.
+
+**Step 2 — Parse arguments:** Extract URL and optional flags (`--template`, `--area`, `--project`, `--title`).
+
 ### Phase 2: Enrich
 
-Follow the content-processing skill's enrichment routing (via @plugins/para-obsidian/skills/triage/references/enrichment-strategies.md).
+Follow the enrichment routing from @../triage/references/enrichment-strategies.md.
 
-**Select tool based on domain.** See @../triage/references/content-sourcing for full routing logic.
+**Select tool based on URL domain:**
 
-| Domain | Tool | Reference |
-|--------|------|-----------|
-| `x.com`, `twitter.com` | Chrome DevTools | @references/content-sourcing/x-twitter.md |
-| `youtube.com`, `youtu.be` | YouTube Transcript MCP | @references/content-sourcing/youtube.md |
-| Everything else | Firecrawl | @references/content-sourcing/firecrawl.md |
-
-**Skip enrichment** if content already exists in conversation context.
+| Domain | Tool |
+|--------|------|
+| `youtube.com`, `youtu.be` | YouTube Transcript MCP (`get_video_info` + `get_transcript`) |
+| `x.com`, `twitter.com` | Chrome DevTools (`navigate_page` + `take_snapshot`) |
+| Everything else | Firecrawl (`firecrawl_scrape`) |
 
 **Fallback chain:** If Firecrawl fails or is unavailable, use `WebFetch` as fallback.
 
-### Phase 3: Classify & Format
+### Phase 3: Classify & Propose
+
+This phase combines classification with proposal presentation. The user gate (AskUserQuestion) fires at the end — nothing is created until the user approves.
 
 #### 3.1 Determine Template
 
 If `--template` flag provided, use that value directly (skip auto-detection).
 
-Otherwise, using @../para-classifier/references/classification-decision-tree.md, determine the `proposed_template`:
+Otherwise, use @../para-classifier/references/classification-decision-tree.md to determine `proposed_template`:
 
 | Content Signal | Template |
 |----------------|----------|
@@ -68,15 +85,17 @@ Otherwise, using @../para-classifier/references/classification-decision-tree.md,
 | Meeting notes, standup, retro, 1:1 | `meeting` |
 | Everything else (articles, videos, threads) | `resource` |
 
-#### 3.2 Classify Content (template-specific)
+#### 3.2 Classify Content
 
-**For resources:** Determine `resourceType` (article, video, thread, reference, idea), `source_format`, `author`, summary.
+Use the classification decision tree to extract template-specific fields.
 
-**For meetings:** Extract `meeting_type`, `meeting_date`, attendees, notes, decisions, action items, follow-up.
+**For resources:** `resourceType` (article, video, thread, reference, idea), `source_format`, `author`, summary.
 
-**For invoices:** Extract `provider`, `invoice_date`, `amount`, `currency`, `status`.
+**For meetings:** `meeting_type`, `meeting_date`, attendees, notes, decisions, action items, follow-up.
 
-**For bookings:** Extract `booking_type`, `booking_ref`, `provider`, `booking_date`, `cost`, `currency`, `status`.
+**For invoices:** `provider`, `invoice_date`, `amount`, `currency`, `status`.
+
+**For bookings:** `booking_type`, `booking_ref`, `provider`, `booking_date`, `cost`, `currency`, `status`.
 
 #### 3.3 Map Emoji Prefix (resources only)
 
@@ -91,123 +110,194 @@ Using @../para-classifier/references/emoji-mapping.md, determine the emoji prefi
 
 Non-resource templates use their own naming conventions (no emoji prefix).
 
-#### 3.4 Suggest Area & Project
+#### 3.4 Suggest Area & Project (REQUIRED — NEVER EMPTY)
+
+**You MUST populate area before presenting the proposal. NEVER present a proposal with empty areas.**
+
+If `--area` flag provided, use that value (still validate it exists in the loaded areas list).
 
 If not provided via flags:
-- Match content against available areas and projects
-- Prefer the most specific match
-- If no confident match, suggest the most likely candidate
-- **Multiple areas:** When content clearly spans multiple domains (e.g., AI + Home Server), suggest multiple areas. Use AskUserQuestion with a multi-select option or "Both" choice.
+1. Match content against the areas and projects loaded in Phase 1
+2. Prefer the most specific match
+3. **Multiple areas:** When content clearly spans multiple domains (e.g., AI + Home Server), suggest multiple areas as an array
+4. Assign `confidence` level: `"high"` (obvious match), `"medium"` (reasonable guess), `"low"` (ambiguous)
+
+**If no confident match is found:** Use `AskUserQuestion` immediately to ask the user to select from the loaded areas list. Do NOT proceed with empty areas.
+
+```
+AskUserQuestion({
+  questions: [{
+    question: "Which area does this content belong to?",
+    header: "Area",
+    options: [
+      // Populate from para_list_areas results
+      { label: "🤖 AI Practice", description: "AI and machine learning content" },
+      { label: "🌱 Home Server", description: "Home infrastructure and self-hosting" },
+      // ... more areas from vault
+    ],
+    multiSelect: true  // Allow multiple areas when content spans domains
+  }]
+})
+```
 
 **Format for `para_create` args:**
 - Single area: `areas: "[[🌱 AI Practice]]"` (string)
 - Multiple areas: `areas: '["[[🌱 AI Practice]]", "[[🌱 Home Server]]"]'` (JSON array string)
 
-`para_create` parses JSON array strings automatically. Obsidian stores as proper YAML list:
-```yaml
-areas:
-  - "[[🤖 AI Practice]]"
-  - "[[🌱 Home Server]]"
-```
+`para_create` parses JSON array strings automatically via `tryParseJsonArray()`.
 
 #### 3.5 Format Layer 1 Content (resources only)
 
-Follow the content-processing skill's Layer 1 formatting rules (see content-processing skill, "Layer 1 Injection" section).
+For resources, prepare the Layer 1 content now so it can be previewed in the proposal and injected in Phase 4. Follow the content-processing skill's Layer 1 formatting rules:
 
-### Phase 4: Propose & Confirm
+- Use `####` headings or deeper (never `#`, `##`, `###`)
+- Articles: first 3 paragraphs + key headings with topic sentences + conclusion (2-3k tokens)
+- YouTube: ~10% sampled transcript segments with timestamps (2-3k tokens)
+- Threads: full thread content in order
 
-Present a template-conditional proposal to the user:
+#### 3.6 Build Proposal (canonical schema)
+
+Build the proposal using the canonical schema from @../triage/references/proposal-schema.md:
+
+```typescript
+{
+  proposed_title: string,           // With emoji prefix if applicable
+  proposed_template: "resource" | "meeting" | "invoice" | "booking",
+  summary: string,                  // 2-3 sentences
+  area: string | string[],         // "[[Area]]" or ["[[Area 1]]", "[[Area 2]]"]
+  project: string | string[] | null, // "[[Project]]", ["[[P1]]", "[[P2]]"], or null
+  resourceType: string,            // article, video, thread, etc.
+  source_format: string,           // article, video, thread, document
+  confidence: "high" | "medium" | "low",
+  categorization_hints: string[],  // 3 bullet points explaining why this area/template
+  notes: string | null,            // Special considerations (null if none)
+}
+```
+
+**Note:** The canonical schema also includes `"capture"` as a `proposed_template` value. Quick-create never produces captures — URL input always has enough content to classify into a specific template.
+
+#### 3.7 Present Proposal & Gate
+
+**STOP — Validate before presenting:**
+- `area` is populated (at least one area selected or suggested)
+- `title` is populated
+- `summary` is populated
+
+If any field is missing, go back to the relevant step. Never present a proposal with empty areas.
+
+Present the proposal, then use `AskUserQuestion` to gate:
 
 **Resource proposal:**
 ```
 Resource Proposal:
-  Title:    [emoji] [proposed title]
-  Type:     [resourceType] ([source_format])
-  Area:     [[🌱 Area Name]]
-  Project:  [[🎯 Project Name]] (or "none")
-  Author:   [author or "unknown"]
-  Summary:  [2-3 sentence summary]
+  Title:       [emoji] [proposed title]
+  Type:        [resourceType] ([source_format])
+  Area:        [[🌱 Area Name]] (or multiple: [[A]], [[B]])
+  Project:     [[🎯 Project Name]] (or "none")
+  Author:      [author or "unknown"]
+  Confidence:  [high|medium|low]
+  Summary:     [2-3 sentence summary]
+  Why:         • [categorization_hint_1]
+               • [categorization_hint_2]
+               • [categorization_hint_3]
 
 Layer 1 preview:
   [first ~200 chars of formatted Layer 1 content...]
-
-Accept / Edit / Cancel?
 ```
 
 **Meeting proposal:**
 ```
 Meeting Proposal:
-  Title:      [proposed title]
-  Type:       [meeting_type]
-  Date:       [meeting_date]
-  Area:       [[🌱 Area Name]]
-  Project:    [[🎯 Project Name]] (or "none")
-  Attendees:  [count] participants
-  Summary:    [2-3 sentence summary]
-
-Accept / Edit / Cancel?
+  Title:       [proposed title]
+  Type:        [meeting_type]
+  Date:        [meeting_date]
+  Area:        [[🌱 Area Name]]
+  Project:     [[🎯 Project Name]] (or "none")
+  Attendees:   [count] participants
+  Confidence:  [high|medium|low]
+  Summary:     [2-3 sentence summary]
+  Why:         • [hint_1] • [hint_2] • [hint_3]
 ```
 
 **Invoice proposal:**
 ```
 Invoice Proposal:
-  Title:      [proposed title]
-  Provider:   [provider]
-  Date:       [invoice_date]
-  Amount:     [amount] [currency]
-  Status:     [status]
-  Area:       [[🌱 Area Name]]
-  Summary:    [2-3 sentence summary]
-
-Accept / Edit / Cancel?
+  Title:       [proposed title]
+  Provider:    [provider]
+  Date:        [invoice_date]
+  Amount:      [amount] [currency]
+  Status:      [status]
+  Area:        [[🌱 Area Name]]
+  Confidence:  [high|medium|low]
+  Summary:     [2-3 sentence summary]
+  Why:         • [hint_1] • [hint_2] • [hint_3]
 ```
 
 **Booking proposal:**
 ```
 Booking Proposal:
-  Title:      [proposed title]
-  Type:       [booking_type]
-  Provider:   [provider]
-  Date:       [booking_date]
-  Reference:  [booking_ref]
-  Cost:       [cost] [currency] (or "not specified")
-  Status:     [status]
-  Area:       [[🌱 Area Name]]
-  Summary:    [2-3 sentence summary]
-
-Accept / Edit / Cancel?
+  Title:       [proposed title]
+  Type:        [booking_type]
+  Provider:    [provider]
+  Date:        [booking_date]
+  Reference:   [booking_ref]
+  Cost:        [cost] [currency] (or "not specified")
+  Status:      [status]
+  Area:        [[🌱 Area Name]]
+  Confidence:  [high|medium|low]
+  Summary:     [2-3 sentence summary]
+  Why:         • [hint_1] • [hint_2] • [hint_3]
 ```
 
-Use AskUserQuestion with options:
-- **Accept** - Create as proposed
-- **Edit** - Let user modify fields before creation
-- **Cancel** - Abort without creating anything
+**Gate — AskUserQuestion (REQUIRED):**
 
-If user chooses **Edit**, ask which fields to change and re-present the updated proposal.
+```
+AskUserQuestion({
+  questions: [{
+    question: "How would you like to proceed with this proposal?",
+    header: "Action",
+    options: [
+      { label: "Accept", description: "Create the note as proposed" },
+      { label: "Edit", description: "Modify area, project, title, or template before creation" },
+      { label: "Cancel", description: "Abort without creating anything" }
+    ],
+    multiSelect: false
+  }]
+})
+```
 
-### Phase 5: Create & Commit
+**If user picks Edit:** Ask which field to change using `AskUserQuestion`. Show available options (areas list from Phase 1, projects list, templates). Update the proposal fields, then re-present the proposal and gate again.
 
-Follow the **content-processing** skill's generic pipeline. All templates use the same flow:
+**If user picks Cancel:** Exit cleanly. Report "Cancelled — no changes made."
 
-1. **Discover metadata** — `para_template_fields({ template: proposed_template })` to get `creation_meta` (dest, prefix, sections) and `validArgs`.
-2. **Create note** — `para_create({ template, title, args })` with only valid fields from classification. Destination auto-resolved, invalid fields filtered.
-3. **Commit** — `para_commit` immediately after creation.
-4. **If resource** — Inject Layer 1 via `para_replace_section` into "Layer 1: Captured Notes", then commit again.
-5. **If meeting** — Pass structured body via `content` parameter on `para_create` (attendees, notes, decisions, action items, follow-up).
+**If user picks Accept:** Proceed to Phase 4.
 
-**Omit** any args with null values (never pass `null`). See content-processing skill for null-safety rules.
+### Phase 4: Create & Commit
+
+Follow the **content-processing** skill pipeline (@../content-processing/SKILL.md). All templates use the same flow:
+
+1. **Discover metadata** — `para_template_fields({ template: proposed_template, response_format: "json" })` to get `creation_meta` (dest, prefix, sections) and `validArgs`.
+2. **Create note** — `para_create({ template, title, args, response_format: "json" })` with only valid fields from classification. Destination auto-resolved, invalid fields filtered.
+3. **Commit** — `para_commit({ message: "Add [template]: [title]", response_format: "json" })` immediately after creation.
+4. **If resource** — Inject Layer 1 via `para_replace_section` into "Layer 1: Captured Notes", then commit again with `"Add Layer 1: [title]"`.
+5. **If meeting** — Pass structured body via `content` parameter on `para_create` (attendees, notes, decisions, action items, follow-up). See content-processing skill for the exact format.
+
+**Null-safety:** Omit any args with null values (never pass `null`). See content-processing skill for null-safety rules.
 
 **If injection fails (resources):** Continue without Layer 1. The resource still exists — user can add content later via `/para-obsidian:distill-resource`.
 
-#### 5.1 Report Success
+#### Success Report
+
+Report with canonical status fields (`created`, `layer1_injected`):
 
 **Resource success:**
 ```
 Created: 03 Resources/[Title].md
-  Area:     [[🌱 Area Name]]
-  Project:  [[🎯 Project Name]]
-  Layer 1:  ✓ injected (or "⚠ skipped - [reason]")
-  Commit:   ✓ committed (or "⚠ skipped - [reason]")
+  Area:          [[🌱 Area Name]] (or multiple areas)
+  Project:       [[🎯 Project Name]]
+  Confidence:    [high|medium|low]
+  Layer 1:       ✓ injected (or "⚠ skipped - [reason]")
+  Commit:        ✓ committed (or "⚠ skipped - [reason]")
 
 Use /para-obsidian:distill-resource to deepen with progressive summarization.
 ```
@@ -215,29 +305,31 @@ Use /para-obsidian:distill-resource to deepen with progressive summarization.
 **Meeting success:**
 ```
 Created: 03 Resources/Meetings/[Title].md
-  Area:     [[🌱 Area Name]]
-  Project:  [[🎯 Project Name]]
-  Sections: ✓ populated (attendees, notes, decisions, action items, follow-up)
-  Commit:   ✓ committed
+  Area:          [[🌱 Area Name]]
+  Project:       [[🎯 Project Name]]
+  Sections:      ✓ populated (attendees, notes, decisions, action items, follow-up)
+  Commit:        ✓ committed
 ```
 
 **Invoice success:**
 ```
 Created: 04 Archives/Invoices/[Title].md
-  Provider: [provider]
-  Amount:   [amount] [currency]
-  Status:   [status]
-  Commit:   ✓ committed
+  Provider:      [provider]
+  Amount:        [amount] [currency]
+  Status:        [status]
+  Commit:        ✓ committed
 ```
 
 **Booking success:**
 ```
 Created: 04 Archives/Bookings/[Title].md
-  Provider: [provider]
-  Date:     [booking_date]
-  Ref:      [booking_ref]
-  Commit:   ✓ committed
+  Provider:      [provider]
+  Date:          [booking_date]
+  Ref:           [booking_ref]
+  Commit:        ✓ committed
 ```
+
+---
 
 ## Error Handling
 
@@ -277,11 +369,4 @@ Created: 04 Archives/Bookings/[Title].md
 ### Force Template Override
 ```
 /para-obsidian:quick-create https://some-url.com/page --template invoice --area '[[🏠 Personal Finance]]'
-```
-
-### URL from Conversation
-```
-User: [earlier in conversation, already scraped an article via Firecrawl]
-User: /para-obsidian:quick-create https://already-scraped-url.com/article
-→ Skill reuses existing content from conversation context
 ```
