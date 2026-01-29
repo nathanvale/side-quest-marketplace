@@ -3,6 +3,7 @@
 		"para-obsidian": {
 			"command": "bun",
 			"args": ["run", "${CLAUDE_PLUGIN_ROOT}/mcp/index.ts"],
+			"cwd": "${CLAUDE_PLUGIN_ROOT}",
 			"env": {
 				"PARA_VAULT": "${PARA_VAULT}"
 			}

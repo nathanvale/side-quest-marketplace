@@ -209,15 +209,6 @@ export function applyArgsToFrontmatter(
 		}
 	}
 
-	// Convert remaining null placeholders to empty strings to preserve
-	// template field structure. This prevents serializeFrontmatter from
-	// filtering out fields like `project:` that should remain in the output.
-	for (const [key, value] of Object.entries(result)) {
-		if (isNullPlaceholder(value)) {
-			result[key] = "";
-		}
-	}
-
 	return result;
 }
 

@@ -153,14 +153,6 @@
         "@types/bun": "latest",
       },
     },
-    "plugins/melanie": {
-      "name": "@sidequest/melanie",
-      "version": "1.0.0",
-    },
-    "plugins/nvcc": {
-      "name": "@sidequest/nvcc",
-      "version": "1.0.0",
-    },
     "plugins/para-obsidian": {
       "name": "@sidequest/para-obsidian",
       "version": "1.0.0",
@@ -413,10 +405,6 @@
     "@sidequest/kit": ["@sidequest/kit@workspace:plugins/kit"],
 
     "@sidequest/mcp-manager": ["@sidequest/mcp-manager@workspace:plugins/mcp-manager"],
-
-    "@sidequest/melanie": ["@sidequest/melanie@workspace:plugins/melanie"],
-
-    "@sidequest/nvcc": ["@sidequest/nvcc@workspace:plugins/nvcc"],
 
     "@sidequest/para-obsidian": ["@sidequest/para-obsidian@workspace:plugins/para-obsidian"],
 

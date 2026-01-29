@@ -642,7 +642,6 @@ area: "[[<% tp.system.prompt("Area") %>]]"
 		});
 
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
-<<<<<<< HEAD
 		// Title should NOT be in frontmatter
 		expect(written).not.toMatch(/^title:/m);
 		// But title SHOULD be in H1 heading
@@ -650,21 +649,6 @@ area: "[[<% tp.system.prompt("Area") %>]]"
 		// Null values are now omitted following Obsidian best practices
 		// (prevents Dataview issues and keeps frontmatter clean)
 		expect(written).not.toContain("target_completion");
-||||||| parent of 2be77fe (fix(para-obsidian): preserve template frontmatter fields and prioritize argOverrides)
-		// Unsubstituted prompts should be replaced with empty strings
-		// preventing YAML parse errors from nested quotes
-		expect(written).toContain("title: 🎯 No Args Test");
-		// Null values are now omitted following Obsidian best practices
-		// (prevents Dataview issues and keeps frontmatter clean)
-		expect(written).not.toContain("target_completion");
-=======
-		// Unsubstituted prompts should be replaced with empty strings
-		// preventing YAML parse errors from nested quotes
-		expect(written).toContain("title: 🎯 No Args Test");
-		// Null placeholders are preserved as empty strings to maintain template structure
-		// This ensures fields like `project:` appear in the output even without values
-		expect(written).toContain('target_completion: ""');
->>>>>>> 2be77fe (fix(para-obsidian): preserve template frontmatter fields and prioritize argOverrides)
 		expect(written).toContain('area: "[[]]"'); // empty wikilink
 		// Should NOT contain raw Templater patterns
 		expect(written).not.toContain("tp.system.prompt");
