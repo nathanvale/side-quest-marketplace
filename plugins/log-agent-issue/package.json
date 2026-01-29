@@ -1,0 +1,16 @@
+{
+	"name": "@sidequest/log-agent-issue",
+	"version": "1.0.0",
+	"description": "Fire-and-forget structured issue logger for subagents",
+	"type": "module",
+	"scripts": {
+		"test": "echo 'No tests'",
+		"typecheck": "tsc --noEmit",
+		"format": "biome format --write .",
+		"lint": "biome lint .",
+		"check": "biome check --write ."
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	}
+}
