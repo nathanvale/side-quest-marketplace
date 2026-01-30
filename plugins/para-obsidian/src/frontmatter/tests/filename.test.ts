@@ -28,7 +28,7 @@ describe("filename validation", () => {
 
 		writeVaultFile(
 			testVault,
-			"My Project Note.md",
+			"🎯 My Project Note.md",
 			`---
 title: My Project Note
 type: project
@@ -38,13 +38,12 @@ start_date: 2025-01-01
 target_completion: 2025-12-31
 area: "[[Work]]"
 template_version: 4
-tags: [project]
 ---
 Content`,
 		);
 
 		const config = loadConfig({ cwd: testVault });
-		const result = validateFrontmatterFile(config, "My Project Note.md");
+		const result = validateFrontmatterFile(config, "🎯 My Project Note.md");
 
 		expect(result.valid).toBe(true);
 		expect(result.issues).toHaveLength(0);
@@ -74,7 +73,6 @@ start_date: 2025-01-01
 target_completion: 2025-12-31
 area: "[[Work]]"
 template_version: 4
-tags: [project]
 ---
 Content`,
 		);
@@ -83,9 +81,12 @@ Content`,
 		const result = validateFrontmatterFile(config, "my project note.md");
 
 		expect(result.valid).toBe(false);
-		expect(result.issues).toHaveLength(1);
-		expect(result.issues[0]?.field).toBe("filename");
-		expect(result.issues[0]?.message).toContain("Title Case");
+		// Two issues: lowercase filename + missing expected prefix
+		expect(result.issues).toHaveLength(2);
+		expect(result.issues.some((i) => i.message.includes("Title Case"))).toBe(
+			true,
+		);
+		expect(result.issues.some((i) => i.message.includes("🎯"))).toBe(true);
 	});
 
 	test("accepts emoji prefixes in filenames", () => {
@@ -188,7 +189,7 @@ Content`,
 		expect(invalidChars.test("ValidName")).toBe(false);
 	});
 
-	test("allows files without type-specific prefix if no prefix configured", () => {
+	test("accepts files with correct type-specific prefix", () => {
 		const testVault = setupTestVault({
 			".paraobsidianrc": JSON.stringify({
 				titlePrefixes: {
@@ -202,7 +203,7 @@ Content`,
 
 		writeVaultFile(
 			testVault,
-			"My Project.md",
+			"🎯 My Project.md",
 			`---
 title: My Project
 type: project
@@ -212,15 +213,13 @@ start_date: 2025-01-01
 target_completion: 2025-12-31
 area: "[[Work]]"
 template_version: 4
-tags: [project]
 ---
 Content`,
 		);
 
 		const config = loadConfig({ cwd: testVault });
-		const result = validateFrontmatterFile(config, "My Project.md");
+		const result = validateFrontmatterFile(config, "🎯 My Project.md");
 
 		expect(result.valid).toBe(true);
-		// No prefix issue because 'project' type doesn't have a prefix configured
 	});
 });
