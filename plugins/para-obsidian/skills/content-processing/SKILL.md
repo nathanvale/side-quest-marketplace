@@ -85,7 +85,7 @@ para_template_fields({
 
 Response includes:
 - `creation_meta.dest` — default destination directory
-- `creation_meta.titlePrefix` — emoji prefix (if any)
+- `creation_meta.titlePrefix` — emoji prefix (auto-applied by `para_create`; do NOT add to title manually)
 - `creation_meta.sections` — body section headings (if any)
 - `validArgs` — list of accepted field names for this template
 - `frontmatter_hints` — enum values, types, and constraints

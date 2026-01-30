@@ -7,7 +7,7 @@
 ```typescript
 interface Proposal {
   // Core fields (all types)
-  proposed_title: string;        // Meaningful, descriptive title
+  proposed_title: string;        // Plain descriptive title — NO emoji prefix (para_create adds it automatically)
   proposed_template: "resource" | "meeting" | "invoice" | "booking" | "capture";
   summary: string;               // 2-3 sentences capturing key value
   area: string | string[];       // Single: "[[Area]]" or multi: ["[[Area 1]]", "[[Area 2]]"]

@@ -18,45 +18,14 @@ import { fieldRulesToTemplateFields } from "../templates/services/field-bridge";
 import type { CommandContext, CommandResult } from "./types";
 
 /**
- * Explicit file name overrides for templates that don't follow the default
- * stripping convention. Maps template key → vault filename (without .md).
- *
- * This handles cases where the vault uses different naming than the defaults.ts key,
- * such as "youtube-video" instead of "youtube" for clippings, or compound names
- * like "app---software" for the app clipping.
- */
-const CLIPPING_FILE_NAMES: Record<string, string> = {
-	"clipping-youtube": "youtube-video",
-	"clipping-course": "course---tutorial",
-	"clipping-app": "app---software",
-	"clipping-product": "product---gift-idea",
-	"clipping-tweet": "tweet---x-post",
-	"clipping-chatgpt": "chatgpt-conversation",
-	"clipping-claude": "claude-conversation",
-};
-
-/**
  * Maps a template name from defaults.ts to its vault-relative file path.
  *
- * Convention:
- * - PARA templates → `Templates/<name>.md`
- * - Clipping templates → `Templates/Clippings/<stripped-name>.md`
- * - Processor templates → `Templates/Clippings/<stripped-name>-processor.md`
+ * All templates live flat in `Templates/<name>.md` — no subdirectories.
  *
  * @param templateName - Template key from DEFAULT_FRONTMATTER_RULES
  * @returns Vault-relative file path
  */
 export function templateNameToFilePath(templateName: string): string {
-	if (templateName.startsWith("clipping-")) {
-		const fileName =
-			CLIPPING_FILE_NAMES[templateName] ??
-			templateName.replace("clipping-", "");
-		return `Templates/Clippings/${fileName}.md`;
-	}
-	if (templateName.startsWith("processor-")) {
-		const stripped = templateName.replace("processor-", "");
-		return `Templates/Clippings/${stripped}-processor.md`;
-	}
 	return `Templates/${templateName}.md`;
 }
 

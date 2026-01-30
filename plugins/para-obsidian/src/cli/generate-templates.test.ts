@@ -28,34 +28,8 @@ describe("templateNameToFilePath", () => {
 		expect(templateNameToFilePath("meeting")).toBe("Templates/meeting.md");
 	});
 
-	test("maps clipping template to Clippings subdirectory", () => {
-		expect(templateNameToFilePath("clipping-article")).toBe(
-			"Templates/Clippings/article.md",
-		);
-		expect(templateNameToFilePath("clipping-book")).toBe(
-			"Templates/Clippings/book.md",
-		);
-	});
-
-	test("maps clipping with override name", () => {
-		expect(templateNameToFilePath("clipping-youtube")).toBe(
-			"Templates/Clippings/youtube-video.md",
-		);
-		expect(templateNameToFilePath("clipping-course")).toBe(
-			"Templates/Clippings/course---tutorial.md",
-		);
-		expect(templateNameToFilePath("clipping-app")).toBe(
-			"Templates/Clippings/app---software.md",
-		);
-	});
-
-	test("maps processor template with -processor suffix", () => {
-		expect(templateNameToFilePath("processor-article")).toBe(
-			"Templates/Clippings/article-processor.md",
-		);
-		expect(templateNameToFilePath("processor-youtube")).toBe(
-			"Templates/Clippings/youtube-processor.md",
-		);
+	test("maps unified clipping template to Templates root", () => {
+		expect(templateNameToFilePath("clipping")).toBe("Templates/clipping.md");
 	});
 });
 
@@ -108,11 +82,11 @@ describe("generateAllTemplates", () => {
 		expect(area?.filePath).toBe("Templates/area.md");
 	});
 
-	test("clipping templates have correct file paths", () => {
+	test("clipping template has correct file path", () => {
 		const results = generateAllTemplates(TEST_CONFIG, { dryRun: true });
 
-		const article = results.find((r) => r.templateName === "clipping-article");
-		expect(article?.filePath).toBe("Templates/Clippings/article.md");
+		const clipping = results.find((r) => r.templateName === "clipping");
+		expect(clipping?.filePath).toBe("Templates/clipping.md");
 	});
 
 	test("uses config overrides instead of defaults", () => {
@@ -167,11 +141,20 @@ describe("generateAllTemplates (file output)", () => {
 		expect(content).toContain("{{title}}");
 	});
 
-	test("creates Clippings subdirectory", () => {
+	test("writes unified clipping template flat in Templates directory", () => {
 		generateAllTemplates(TEST_CONFIG, { outputDir: tmpDir });
 
+		// No subdirectories — all templates are flat
 		const clippingsDir = path.join(tmpDir, "Templates/Clippings");
-		expect(fs.existsSync(clippingsDir)).toBe(true);
+		expect(fs.existsSync(clippingsDir)).toBe(false);
+
+		// Unified clipping template exists
+		const clippingPath = path.join(tmpDir, "Templates/clipping.md");
+		expect(fs.existsSync(clippingPath)).toBe(true);
+
+		// Old per-type templates should NOT exist
+		const articlePath = path.join(tmpDir, "Templates/clipping-article.md");
+		expect(fs.existsSync(articlePath)).toBe(false);
 	});
 
 	test("skips unchanged files on second run", () => {

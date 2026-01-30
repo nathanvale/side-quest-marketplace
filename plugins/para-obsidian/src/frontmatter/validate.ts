@@ -19,6 +19,7 @@ import { parseFrontmatter } from "./parse";
 import type {
 	BulkValidationFileResult,
 	BulkValidationResult,
+	PreWriteFilterResult,
 	ValidationIssue,
 	ValidationResult,
 } from "./types";
@@ -162,6 +163,139 @@ function validateField(
 		default:
 			return { field, message: "unknown rule" };
 	}
+}
+
+// =============================================================================
+// Pre-Write Field Filtering
+// =============================================================================
+
+/**
+ * Fields managed by the template/system layer that bypass schema filtering.
+ * These are always accepted regardless of note type rules.
+ */
+const SYSTEM_MANAGED_FIELDS = new Set([
+	"title",
+	"type",
+	"created",
+	"template_version",
+]);
+
+/**
+ * Filters fields against a note type's schema before writing.
+ *
+ * Categorizes each field as accepted, unknown, invalid, or forbidden.
+ * When no rules exist for the note type (or noteType is undefined),
+ * all fields are accepted for backward compatibility.
+ *
+ * @param fields - Key-value pairs to filter
+ * @param noteType - The note's type (from frontmatter `type` field)
+ * @param config - Para-obsidian config containing frontmatterRules
+ * @returns Categorized result with accepted fields and skip reasons
+ *
+ * @example
+ * ```typescript
+ * const result = filterFieldsForWrite(
+ *   { status: 'completed', foobar: 'oops' },
+ *   'project',
+ *   config,
+ * );
+ * // result.accepted: { status: 'completed' }
+ * // result.skippedUnknown: [{ field: 'foobar', reason: '...' }]
+ * ```
+ */
+export function filterFieldsForWrite(
+	fields: Record<string, unknown>,
+	noteType: string | undefined,
+	config: ParaObsidianConfig,
+): PreWriteFilterResult {
+	const rules = noteType ? config.frontmatterRules?.[noteType] : undefined;
+
+	// No rules for this note type → accept everything (backward compat)
+	if (!rules) {
+		return {
+			accepted: { ...fields },
+			skippedUnknown: [],
+			skippedInvalid: [],
+			skippedForbidden: [],
+			allAccepted: true,
+			noteType,
+		};
+	}
+
+	// Build known fields from rules.required keys
+	const knownFields = new Set(
+		rules.required ? Object.keys(rules.required) : [],
+	);
+	const forbiddenFields = new Set(rules.forbidden ?? []);
+
+	const accepted: Record<string, unknown> = {};
+	const skippedUnknown: Array<{ field: string; reason: string }> = [];
+	const skippedInvalid: Array<{ field: string; reason: string }> = [];
+	const skippedForbidden: Array<{ field: string; reason: string }> = [];
+
+	for (const [field, value] of Object.entries(fields)) {
+		// System-managed fields always pass through
+		if (SYSTEM_MANAGED_FIELDS.has(field)) {
+			accepted[field] = value;
+			continue;
+		}
+
+		// Forbidden fields are rejected
+		if (forbiddenFields.has(field)) {
+			skippedForbidden.push({
+				field,
+				reason: `field not allowed for type '${noteType}'`,
+			});
+			continue;
+		}
+
+		// Unknown fields (not in schema) are rejected
+		if (!knownFields.has(field)) {
+			skippedUnknown.push({
+				field,
+				reason: `not a valid field for type '${noteType}'`,
+			});
+			continue;
+		}
+
+		// Known field: null/undefined means "clear this field" → accept
+		if (value === null || value === undefined) {
+			accepted[field] = value;
+			continue;
+		}
+
+		// Validate value against the field rule
+		const rule = rules.required?.[field];
+		if (!rule) {
+			// Should not happen since field is in knownFields, but be safe
+			accepted[field] = value;
+			continue;
+		}
+
+		const issue = validateField(field, value, rule);
+		if (issue) {
+			skippedInvalid.push({
+				field,
+				reason: issue.message,
+			});
+		} else {
+			accepted[field] = value;
+		}
+	}
+
+	const allAccepted =
+		skippedUnknown.length === 0 &&
+		skippedInvalid.length === 0 &&
+		skippedForbidden.length === 0;
+
+	return {
+		accepted,
+		skippedUnknown,
+		skippedInvalid,
+		skippedForbidden,
+		allAccepted,
+		noteType,
+	};
 }
 
 // =============================================================================

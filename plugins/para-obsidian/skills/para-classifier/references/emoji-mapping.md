@@ -34,9 +34,11 @@ url: https://fortelabs.com/blog/...
 ---
 ```
 
-**Filename convention:** `[emoji][title].md`
+**Filename convention:** `[base-prefix][format-emoji] [title].md`
 
-Example: `📰 Progressive Summarization Guide.md`
+The base prefix (`📚` for resources) and format emoji (`📰` for article) are applied **automatically by `para_create`** via `applyTitlePrefix()`. **NEVER add emoji prefixes manually** — pass plain titles to `para_create` and let the code handle it.
+
+Example: Title `"Progressive Summarization Guide"` with `source_format: article` → `📚📰 Progressive Summarization Guide.md`
 
 ---
 
@@ -220,24 +222,28 @@ Example: `📰 Progressive Summarization Guide.md`
 
 ### Resource Files
 
+All resource filenames have base prefix `📚` + source_format emoji (applied automatically):
+
 ```
-📰 Progressive Summarization Guide.md
-🎬 Kent C Dodds - Testing JavaScript.md
-🎙️ Changelog - TypeScript 5.0.md
-🧵 Dan Abramov - React Reconciliation.md
-📖 Building a Second Brain - Chapter 3.md
-🎓 Frontend Masters - TypeScript Fundamentals.md
+📚📰 Progressive Summarization Guide.md        (article)
+📚🎬 Kent C Dodds - Testing JavaScript.md      (video)
+📚🎙️ Changelog - TypeScript 5.0.md             (podcast)
+📚🧵 Dan Abramov - React Reconciliation.md     (thread)
+📚📖 Building a Second Brain - Chapter 3.md    (book)
+📚🎓 Frontend Masters - TypeScript Fundamentals.md (course)
 ```
 
 ### Clipping Files (web clipper)
 
-Add `✂️` prefix for web clipper captures:
+Web clipper captures use `✂️` clip prefix before the format emoji:
 
 ```
 ✂️📰 How to Build a Second Brain.md
 ✂️🎬 Introduction to Progressive Summarization.md
 ✂️🧵 Thread on Note-Taking Systems.md
 ```
+
+**Note:** Clippings are inbox items; the `📚` base prefix is added when they are triaged into resources.
 
 **Clip emoji indicates:** "Captured via web clipper, may need cleanup"
 

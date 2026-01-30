@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 
+import { DEFAULT_FRONTMATTER_RULES } from "../config/defaults";
+import type { ParaObsidianConfig } from "../config/index";
 import { loadConfig } from "../config/index";
 import { parseFrontmatter } from "../frontmatter/index";
 import { createTestVault, useTestVaultCleanup } from "../testing/utils";
@@ -1745,27 +1747,29 @@ describe("applyArgsToFrontmatter", () => {
 		expect(result.description).toBe("A regular string");
 	});
 
-	describe("arg filtering with template rules", () => {
-		it("filters unknown args when template has frontmatter rules", () => {
+	describe("arg passthrough (filtering delegated to createFromTemplate)", () => {
+		it("passes through all args including unknown fields (no filtering at this layer)", () => {
 			const attributes = {
 				type: "resource",
 				resource_type: "reference",
 			};
 
-			// "resource" template has rules — "bogus_field" is not a valid field
+			// applyArgsToFrontmatter no longer filters — all args pass through.
+			// Field gating is handled by filterFieldsForWrite in createFromTemplate.
 			const result = applyArgsToFrontmatter(
 				attributes,
 				{
-					resource_type: "meeting", // valid field — should pass
-					bogus_field: "should be filtered", // unknown — should be filtered
-					source: "https://example.com", // valid field — should pass
+					resource_type: "meeting",
+					bogus_field: "passes through now",
+					source: "https://example.com",
 				},
+				undefined,
 				"resource",
 			);
 
 			expect(result.resource_type).toBe("meeting");
 			expect(result.source).toBe("https://example.com");
-			expect(result.bogus_field).toBeUndefined();
+			expect(result.bogus_field).toBe("passes through now");
 		});
 
 		it("allows all args when template has no frontmatter rules", () => {
@@ -1773,13 +1777,13 @@ describe("applyArgsToFrontmatter", () => {
 				type: "custom",
 			};
 
-			// "custom" template has no rules — all args should pass through
 			const result = applyArgsToFrontmatter(
 				attributes,
 				{
 					any_field: "allowed",
 					another: "also allowed",
 				},
+				undefined,
 				"custom",
 			);
 
@@ -1802,7 +1806,7 @@ describe("applyArgsToFrontmatter", () => {
 			expect(result.custom).toBe("field");
 		});
 
-		it("still protects system fields even with template rules", () => {
+		it("still protects system fields even without filtering", () => {
 			const attributes = {
 				type: "booking",
 				created: "2025-01-01",
@@ -1813,8 +1817,9 @@ describe("applyArgsToFrontmatter", () => {
 				{
 					type: "hacked", // protected
 					created: "1999-01-01", // protected
-					booking_type: "flight", // valid
+					booking_type: "flight", // passes through
 				},
+				undefined,
 				"booking",
 			);
 
@@ -1840,6 +1845,11 @@ describe("applyArgsToFrontmatter", () => {
 	});
 
 	describe("comma-separated wikilinks for array fields", () => {
+		// Minimal config with frontmatterRules for array coercion tests
+		const configWithRules = {
+			frontmatterRules: DEFAULT_FRONTMATTER_RULES,
+		} as ParaObsidianConfig;
+
 		it("splits comma-separated wikilinks into arrays for array-typed fields", () => {
 			const attributes = {
 				type: "resource",
@@ -1852,6 +1862,7 @@ describe("applyArgsToFrontmatter", () => {
 				{
 					areas: "[[🌱 Home Server]], [[🤖 AI Practice]]",
 				},
+				configWithRules,
 				"resource",
 			);
 
@@ -1873,6 +1884,7 @@ describe("applyArgsToFrontmatter", () => {
 				{
 					areas: "[[🤖 AI Practice]]",
 				},
+				configWithRules,
 				"resource",
 			);
 
@@ -1891,6 +1903,7 @@ describe("applyArgsToFrontmatter", () => {
 				{
 					depends_on: "some-value",
 				},
+				configWithRules,
 				"project",
 			);
 
@@ -1910,6 +1923,7 @@ describe("applyArgsToFrontmatter", () => {
 				{
 					areas: '["[[🌱 Home Server]]", "[[🤖 AI Practice]]"]',
 				},
+				configWithRules,
 				"resource",
 			);
 
@@ -1930,9 +1944,7 @@ describe("applyArgsToFrontmatter", () => {
 			});
 
 			// Without template context, stays as string (backward compat)
-			expect(result.areas).toBe(
-				"[[🌱 Home Server]], [[🤖 AI Practice]]",
-			);
+			expect(result.areas).toBe("[[🌱 Home Server]], [[🤖 AI Practice]]");
 		});
 	});
 
@@ -1984,6 +1996,7 @@ resource_type: <% tp.system.prompt("Resource type", "reference", false, ["refere
 		it("args override native placeholder defaults", () => {
 			const vault = setupTest();
 			// Template with native placeholders with defaults
+			// Use schema-valid fields: status and start_date are in project rules
 			writeTemplate(
 				path.join(vault, "Templates"),
 				"project",
@@ -1991,7 +2004,7 @@ resource_type: <% tp.system.prompt("Resource type", "reference", false, ["refere
 title: null
 type: project
 status: "{{status:planning}}"
-priority: "{{priority:medium}}"
+start_date: "{{start_date:2025-01-01}}"
 ---
 # {{title}}`,
 			);
@@ -2003,7 +2016,7 @@ priority: "{{priority:medium}}"
 				title: "Launch Feature",
 				args: {
 					status: "active", // Should override "planning" default
-					priority: "high", // Should override "medium" default
+					start_date: "2025-06-15", // Should override "2025-01-01" default
 				},
 			});
 
@@ -2014,7 +2027,7 @@ priority: "{{priority:medium}}"
 			const { attributes } = parseFrontmatter(written);
 
 			expect(attributes.status).toBe("active");
-			expect(attributes.priority).toBe("high");
+			expect(attributes.start_date).toBe("2025-06-15");
 		});
 
 		it("protected fields are not overridden even when passed in args", () => {

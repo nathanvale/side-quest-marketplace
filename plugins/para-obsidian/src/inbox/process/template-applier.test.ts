@@ -27,12 +27,12 @@ describe("getTemplatePath", () => {
 
 	test("returns correct path for youtube template", () => {
 		const path = getTemplatePath("youtube");
-		expect(path).toContain("Templates/Clippings/youtube.md");
+		expect(path).toContain("Templates/clipping-youtube.md");
 	});
 
 	test("returns correct path for generic template", () => {
 		const path = getTemplatePath("generic");
-		expect(path).toContain("Templates/Clippings/generic.md");
+		expect(path).toContain("Templates/clipping-generic.md");
 	});
 });
 

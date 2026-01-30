@@ -10,10 +10,11 @@ import type { ParaObsidianConfig } from "../config/index";
 import { resolveVaultPath } from "../shared/fs";
 import { serializeFrontmatter } from "./parse";
 import type {
+	PreWriteFilterResult,
 	UpdateFrontmatterOptions,
 	UpdateFrontmatterResult,
 } from "./types";
-import { readFrontmatterFile } from "./validate";
+import { filterFieldsForWrite, readFrontmatterFile } from "./validate";
 
 /**
  * Updates frontmatter fields in a file.
@@ -48,8 +49,20 @@ export function updateFrontmatterFile(
 	const changes: string[] = [];
 	const next = { ...before };
 
+	// Apply pre-write filtering when configured
+	let filtered: PreWriteFilterResult | undefined;
+	let effectiveSet = options.set ?? {};
+	if (options.preWriteFilter && options.set) {
+		filtered = filterFieldsForWrite(
+			options.set,
+			options.preWriteFilter.noteType,
+			options.preWriteFilter.config,
+		);
+		effectiveSet = filtered.accepted;
+	}
+
 	// Apply set operations
-	for (const [key, value] of Object.entries(options.set ?? {})) {
+	for (const [key, value] of Object.entries(effectiveSet)) {
 		const previous = next[key];
 		const same =
 			typeof previous === "object" && typeof value === "object"
@@ -93,5 +106,6 @@ export function updateFrontmatterFile(
 			before,
 			after: next,
 		},
+		...(filtered ? { filtered } : {}),
 	};
 }

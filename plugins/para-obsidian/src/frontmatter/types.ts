@@ -98,6 +98,32 @@ export interface BulkValidationResult {
 }
 
 // =============================================================================
+// Pre-Write Filter Types
+// =============================================================================
+
+/**
+ * Result of filtering frontmatter fields before writing.
+ *
+ * Categorizes each field as accepted, skipped-unknown, skipped-invalid,
+ * or skipped-forbidden based on the note type's schema rules.
+ * Enables AI agents to self-correct by reporting exactly why fields were rejected.
+ */
+export interface PreWriteFilterResult {
+	/** Fields that passed validation and will be written. */
+	readonly accepted: Record<string, unknown>;
+	/** Fields not defined in the schema for this note type. */
+	readonly skippedUnknown: ReadonlyArray<{ field: string; reason: string }>;
+	/** Fields defined in schema but with invalid values (wrong type/enum). */
+	readonly skippedInvalid: ReadonlyArray<{ field: string; reason: string }>;
+	/** Fields explicitly forbidden for this note type. */
+	readonly skippedForbidden: ReadonlyArray<{ field: string; reason: string }>;
+	/** True when all input fields were accepted (no skips). */
+	readonly allAccepted: boolean;
+	/** The note type used for filtering (undefined if type couldn't be determined). */
+	readonly noteType: string | undefined;
+}
+
+// =============================================================================
 // Update Types
 // =============================================================================
 
@@ -111,6 +137,11 @@ export interface UpdateFrontmatterOptions {
 	readonly unset?: ReadonlyArray<string>;
 	/** If true, report changes without writing to disk. */
 	readonly dryRun?: boolean;
+	/** When provided, filters set fields against the note type's schema before writing. */
+	readonly preWriteFilter?: {
+		readonly config: ParaObsidianConfig;
+		readonly noteType: string | undefined;
+	};
 }
 
 /**
@@ -132,6 +163,8 @@ export interface UpdateFrontmatterResult {
 		readonly before: Record<string, unknown>;
 		readonly after: Record<string, unknown>;
 	};
+	/** Pre-write filter result when filtering was applied. */
+	readonly filtered?: PreWriteFilterResult;
 }
 
 // =============================================================================

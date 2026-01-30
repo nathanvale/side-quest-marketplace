@@ -19,9 +19,12 @@
 import path from "node:path";
 import { ensureDirSync, writeTextFileSync } from "@sidequest/core/fs";
 import { getErrorMessage } from "@sidequest/core/utils";
-import { DEFAULT_FRONTMATTER_RULES } from "../config/defaults";
 import type { ParaObsidianConfig } from "../config/index";
-import { parseFrontmatter, serializeFrontmatter } from "../frontmatter/index";
+import {
+	filterFieldsForWrite,
+	parseFrontmatter,
+	serializeFrontmatter,
+} from "../frontmatter/index";
 import { generateUniqueNotePath } from "../inbox/core/engine-utils";
 import { resolveVaultPath } from "../shared/fs";
 import { templatesLogger as logger } from "../shared/logger";
@@ -179,9 +182,7 @@ function tryParseJsonArray(value: string): unknown[] | undefined {
  * Only splits when the value contains at least one wikilink with a comma separator.
  * Single wikilinks like `"[[🌱 Home Server]]"` are wrapped in an array.
  */
-function tryParseCommaSeparatedWikilinks(
-	value: string,
-): string[] | undefined {
+function tryParseCommaSeparatedWikilinks(value: string): string[] | undefined {
 	// Must contain at least one wikilink
 	if (!value.includes("[[")) {
 		return undefined;
@@ -200,31 +201,32 @@ function tryParseCommaSeparatedWikilinks(
 	return items;
 }
 
+/**
+ * Protected fields that should never be added/overridden by args.
+ * - title: filename IS the title, no need in frontmatter
+ * - created/type/template_version: managed by template system
+ */
+const PROTECTED_FIELDS = new Set([
+	"created",
+	"type",
+	"template_version",
+	"title",
+]);
+
 export function applyArgsToFrontmatter(
 	attributes: Record<string, unknown>,
 	args: Record<string, string>,
+	config?: ParaObsidianConfig,
 	templateName?: string,
 ): Record<string, unknown> {
 	const result = { ...attributes };
-	// Protected fields should never be added/overridden by args
-	// - title: filename IS the title, no need in frontmatter
-	// - created/type/template_version: managed by template system
-	const protectedFields = new Set([
-		"created",
-		"type",
-		"template_version",
-		"title",
-	]);
 
-	// Build valid fields set and type map from frontmatter rules when available.
-	// Templates with rules only accept known fields — unknown args are filtered.
-	// Templates without rules accept everything (backward compat).
-	let validFields: Set<string> | undefined;
+	// Build type map from runtime config for array coercion.
+	// Field filtering is handled by filterFieldsForWrite in createFromTemplate.
 	let fieldTypes: Record<string, string> | undefined;
-	if (templateName) {
-		const rules = DEFAULT_FRONTMATTER_RULES[templateName];
+	if (config && templateName) {
+		const rules = config.frontmatterRules?.[templateName];
 		if (rules?.required) {
-			validFields = new Set(Object.keys(rules.required));
 			fieldTypes = Object.fromEntries(
 				Object.entries(rules.required).map(([k, v]) => [k, v.type]),
 			);
@@ -233,13 +235,7 @@ export function applyArgsToFrontmatter(
 
 	for (const [key, value] of Object.entries(args)) {
 		// Skip protected fields - they should never be overridden by args
-		if (protectedFields.has(key)) {
-			continue;
-		}
-
-		// Filter unknown args when template has validation rules
-		if (validFields && !validFields.has(key)) {
-			logger.warn`create:args:filtered field=${key} template=${templateName}`;
+		if (PROTECTED_FIELDS.has(key)) {
 			continue;
 		}
 
@@ -615,6 +611,7 @@ export function createFromTemplate(
 	const attributes = applyArgsToFrontmatter(
 		rawAttributes,
 		argsForFrontmatter,
+		config,
 		options.template,
 	) as Record<string, unknown>;
 
@@ -640,9 +637,52 @@ export function createFromTemplate(
 	// Templates should use `# `= this.file.name`` for the heading
 	delete attributes.title;
 
+	// Filter args-contributed fields against note type schema.
+	// applyArgsToFrontmatter handles coercion; filterFieldsForWrite handles gating.
+	const noteType = attributes.type as string | undefined;
+	const argsFieldKeys = Object.keys(argsForFrontmatter).filter(
+		(k) => k in attributes && !PROTECTED_FIELDS.has(k),
+	);
+	if (argsFieldKeys.length > 0) {
+		const argsToFilter: Record<string, unknown> = {};
+		for (const key of argsFieldKeys) {
+			argsToFilter[key] = attributes[key];
+		}
+		const argsFilter = filterFieldsForWrite(argsToFilter, noteType, config);
+		if (!argsFilter.allAccepted) {
+			for (const key of Object.keys(argsToFilter)) {
+				if (!(key in argsFilter.accepted)) {
+					delete attributes[key];
+				}
+			}
+			for (const s of [
+				...argsFilter.skippedUnknown,
+				...argsFilter.skippedInvalid,
+				...argsFilter.skippedForbidden,
+			]) {
+				logger.warn`create:args:skipped field=${s.field} reason=${s.reason}`;
+			}
+		}
+	}
+
 	// Merge in extra frontmatter fields (e.g., LLM suggestions)
+	// Filter against note type schema to reject unknown/invalid fields
 	if (options.extraFrontmatter) {
-		Object.assign(attributes, options.extraFrontmatter);
+		const filterResult = filterFieldsForWrite(
+			options.extraFrontmatter,
+			attributes.type as string | undefined,
+			config,
+		);
+		Object.assign(attributes, filterResult.accepted);
+		if (!filterResult.allAccepted) {
+			for (const s of [
+				...filterResult.skippedUnknown,
+				...filterResult.skippedInvalid,
+				...filterResult.skippedForbidden,
+			]) {
+				logger.warn`create:extraFrontmatter:skipped field=${s.field} reason=${s.reason}`;
+			}
+		}
 	}
 
 	// Template version should come from the template file itself, not config

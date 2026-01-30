@@ -5,7 +5,7 @@
  * to create typed notes from raw clippings.
  *
  * Templates use `{{variable}}` syntax for substitution.
- * Template locations: `Templates/Clippings/{type}.md`
+ * Template locations: `Templates/clipping-{type}.md`
  *
  * @module inbox/process/template-applier
  */
@@ -24,7 +24,7 @@ import type { ClippingType, TemplateVariables } from "./types.js";
  * @example
  * ```typescript
  * const path = getTemplatePath("youtube");
- * // => "/path/to/vault/Templates/Clippings/youtube.md"
+ * // => "/path/to/vault/Templates/clipping-youtube.md"
  * ```
  */
 export function getTemplatePath(type: ClippingType): string {
@@ -34,7 +34,7 @@ export function getTemplatePath(type: ClippingType): string {
 	const templatesPath = templatesDir.startsWith("/")
 		? templatesDir
 		: join(config.vault, templatesDir);
-	return join(templatesPath, "Clippings", `${type}.md`);
+	return join(templatesPath, `clipping-${type}.md`);
 }
 
 /**
@@ -70,7 +70,7 @@ export async function templateExists(type: ClippingType): Promise<boolean> {
  *
  * @example
  * ```typescript
- * // Tries: article-processor.md -> article.md -> generic.md
+ * // Tries: processor-article.md -> clipping-article.md -> clipping-generic.md
  * const template = await readTemplate("article");
  * ```
  */
@@ -80,30 +80,29 @@ export async function readTemplate(type: ClippingType): Promise<string> {
 	const templatesPath = templatesDir.startsWith("/")
 		? templatesDir
 		: join(config.vault, templatesDir);
-	const clippingsDir = join(templatesPath, "Clippings");
 
-	// Try processor template first (e.g., article-processor.md)
-	const processorPath = join(clippingsDir, `${type}-processor.md`);
+	// Try processor template first (e.g., processor-article.md)
+	const processorPath = join(templatesPath, `processor-${type}.md`);
 	try {
 		return await readFile(processorPath, "utf-8");
 	} catch {
-		// Try type-specific template (e.g., article.md)
-		const typePath = join(clippingsDir, `${type}.md`);
+		// Try clipping-specific template (e.g., clipping-article.md)
+		const typePath = join(templatesPath, `clipping-${type}.md`);
 		try {
 			return await readFile(typePath, "utf-8");
 		} catch {
-			// Fall back to generic template
+			// Fall back to generic clipping template
 			if (type !== "generic") {
-				const genericPath = join(clippingsDir, "generic.md");
+				const genericPath = join(templatesPath, "clipping-generic.md");
 				try {
 					return await readFile(genericPath, "utf-8");
 				} catch {
 					throw new Error(
-						`Template not found: ${type}-processor.md, ${type}.md, or generic.md`,
+						`Template not found: processor-${type}.md, clipping-${type}.md, or clipping-generic.md`,
 					);
 				}
 			}
-			throw new Error(`Template not found: ${type}.md`);
+			throw new Error(`Template not found: clipping-${type}.md`);
 		}
 	}
 }

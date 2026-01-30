@@ -389,631 +389,32 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 		},
 	},
 
-	// === CLIPPING TEMPLATES ===
-	"clipping-article": {
+	// === UNIFIED CLIPPING TEMPLATE ===
+	clipping: {
 		required: {
 			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["article"] },
+			clipping_type: {
+				type: "string",
+				description:
+					"Content type (article, youtube, recipe, etc.) — set by clipping processor at runtime",
+			},
 			source: { type: "string" },
 			clipped: { type: "date" },
-			author: { type: "string", optional: true },
-			site_name: { type: "string", optional: true },
-			published: { type: "date", optional: true },
-			modified: { type: "date", optional: true },
-			section: { type: "string", optional: true },
-			word_count: { type: "number", optional: true },
 			distill_status: {
 				type: "enum",
 				enum: ["raw", "in-progress", "distilled"],
 				optional: true,
 			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-youtube": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["youtube"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			video_id: { type: "string", optional: true },
-			channel: { type: "string", optional: true },
-			published: { type: "date", optional: true },
-			duration: { type: "string", optional: true },
-			consumption_status: {
-				type: "enum",
-				enum: ["to-watch", "watching", "watched"],
+			areas: {
+				type: "array",
 				optional: true,
+				description: "Wikilinks to related areas (multi-select)",
 			},
-			transcript_status: {
-				type: "enum",
-				enum: ["pending", "available", "unavailable"],
+			projects: {
+				type: "array",
 				optional: true,
+				description: "Wikilinks to related projects (multi-select)",
 			},
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-book": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["book"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			author: { type: "string", optional: true },
-			rating: { type: "number", optional: true },
-			pages: { type: "number", optional: true },
-			published: { type: "date", optional: true },
-			consumption_status: {
-				type: "enum",
-				enum: ["to-read", "reading", "read"],
-				optional: true,
-			},
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-recipe": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["recipe"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			author: { type: "string", optional: true },
-			prep_time: { type: "string", optional: true },
-			cook_time: { type: "string", optional: true },
-			total_time: { type: "string", optional: true },
-			servings: { type: "string", optional: true },
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-restaurant": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["restaurant"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			name: { type: "string", optional: true },
-			cuisine: { type: "string", optional: true },
-			price_range: { type: "string", optional: true },
-			address: { type: "string", optional: true },
-			suburb: { type: "string", optional: true },
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-accommodation": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["accommodation"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			platform: { type: "string", optional: true },
-			property_type: { type: "string", optional: true },
-			price: { type: "string", optional: true },
-			currency: {
-				type: "enum",
-				enum: ["AUD", "USD", "EUR", "GBP"],
-				optional: true,
-			},
-			address: { type: "string", optional: true },
-			suburb: { type: "string", optional: true },
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-place": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["place"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			name: { type: "string", optional: true },
-			address: { type: "string", optional: true },
-			suburb: { type: "string", optional: true },
-			category: { type: "string", optional: true },
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-github-repo": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["github-repo"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			owner: { type: "string", optional: true },
-			language: { type: "string", optional: true },
-			stars: { type: "number", optional: true },
-			updated: { type: "date", optional: true },
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-podcast-episode": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["podcast-episode"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			platform: { type: "string", optional: true },
-			show: { type: "string", optional: true },
-			host: { type: "string", optional: true },
-			published: { type: "date", optional: true },
-			consumption_status: {
-				type: "enum",
-				enum: ["to-listen", "listening", "listened"],
-				optional: true,
-			},
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-movie": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["movie"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			year: { type: "string", optional: true },
-			director: { type: "string", optional: true },
-			rating: { type: "number", optional: true },
-			consumption_status: {
-				type: "enum",
-				enum: ["to-watch", "watching", "watched"],
-				optional: true,
-			},
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-event": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["event"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			event_date: { type: "string", optional: true },
-			venue: { type: "string", optional: true },
-			address: { type: "string", optional: true },
-			city: { type: "string", optional: true },
-			price: { type: "string", optional: true },
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-documentation": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["documentation"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			domain: { type: "string", optional: true },
-			technology: { type: "string", optional: true },
-			section: { type: "string", optional: true },
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-highlight-only": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["highlight-only"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			source_title: { type: "string", optional: true },
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-job-posting": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["job-posting"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			platform: { type: "string", optional: true },
-			company: { type: "string", optional: true },
-			job_title: { type: "string", optional: true },
-			location: { type: "string", optional: true },
-			posted: { type: "date", optional: true },
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-product": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["product---gift-idea"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			platform: { type: "string", optional: true },
-			price: { type: "string", optional: true },
-			currency: { type: "string", optional: true },
-			brand: { type: "string", optional: true },
-			rating: { type: "number", optional: true },
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-reddit-post": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["reddit-post"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			subreddit: { type: "string", optional: true },
-			author: { type: "string", optional: true },
-			posted: { type: "date", optional: true },
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-stack-overflow": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["stack-overflow"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			tags: { type: "array", optional: true },
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-tweet": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["tweet---x-post"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			author: { type: "string", optional: true },
-			handle: { type: "string", optional: true },
-			posted: { type: "date", optional: true },
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-wikipedia": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["wikipedia"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			category: { type: "string", optional: true },
-			language: { type: "string", optional: true },
-			modified: { type: "date", optional: true },
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-chatgpt": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["chatgpt-conversation"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			ai_model: { type: "string", optional: true },
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-claude": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["claude-conversation"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			ai_model: { type: "string", optional: true },
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-course": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["course---tutorial"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			platform: { type: "string", optional: true },
-			instructor: { type: "string", optional: true },
-			price: { type: "string", optional: true },
-			rating: { type: "number", optional: true },
-			consumption_status: {
-				type: "enum",
-				enum: ["to-learn", "learning", "learned"],
-				optional: true,
-			},
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"clipping-app": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["app---software"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			developer: { type: "string", optional: true },
-			price: { type: "string", optional: true },
-			rating: { type: "number", optional: true },
-			category: { type: "string", optional: true },
-			platform: { type: "string", optional: true },
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
-				optional: true,
-			},
-			related: { type: "array", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-
-	// === PROCESSOR TEMPLATES ===
-	"processor-article": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["article"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			author: { type: "string", optional: true },
-			status: { type: "enum", enum: ["to-read", "read"], optional: true },
-			summary: { type: "string", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"processor-youtube": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["youtube"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			author: { type: "string", optional: true },
-			status: {
-				type: "enum",
-				enum: ["to-watch", "watched"],
-				optional: true,
-			},
-			summary: { type: "string", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"processor-recipe": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["recipe"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			author: { type: "string", optional: true },
-			status: { type: "enum", enum: ["to-cook", "cooked"], optional: true },
-			summary: { type: "string", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"processor-restaurant": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["restaurant"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			summary: { type: "string", optional: true },
-			name: { type: "string", optional: true },
-			cuisine: { type: "string", optional: true },
-			suburb: { type: "string", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"processor-accommodation": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["accommodation"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			platform: { type: "string", optional: true },
-			status: {
-				type: "enum",
-				enum: ["to-review", "reviewed"],
-				optional: true,
-			},
-			summary: { type: "string", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"processor-place": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["place"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			platform: { type: "string", optional: true },
-			status: {
-				type: "enum",
-				enum: ["to-review", "reviewed"],
-				optional: true,
-			},
-			summary: { type: "string", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"processor-github": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["github"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			summary: { type: "string", optional: true },
-			github_username: { type: "string", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"processor-social": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["social"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			platform: { type: "string", optional: true },
-			status: {
-				type: "enum",
-				enum: ["to-review", "reviewed"],
-				optional: true,
-			},
-			summary: { type: "string", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
-		},
-	},
-	"processor-generic": {
-		required: {
-			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: { type: "enum", enum: ["generic"] },
-			source: { type: "string" },
-			clipped: { type: "date" },
-			author: { type: "string", optional: true },
-			status: {
-				type: "enum",
-				enum: ["unprocessed", "processed"],
-				optional: true,
-			},
-			summary: { type: "string", optional: true },
-			project: { type: "array", optional: true },
-			area: { type: "array", optional: true },
 		},
 	},
 };
@@ -1054,7 +455,11 @@ export const DEFAULT_TEMPLATE_SECTIONS: Partial<
 			content:
 				"| Field | Value |\n| --- | --- |\n| **Status** | `= this.status` |\n| **Start Date** | `= this.start_date` |\n| **Target** | `= this.target_completion` |\n| **Area** | `= this.area` |\n| **Depends On** | `= this.depends_on` |\n| **Blocks** | `= this.blocks` |",
 		},
-		{ heading: "Why This Matters", hasPrompt: false },
+		{
+			heading: "Why This Matters",
+			hasPrompt: false,
+			comment: "What problem does this solve? Why now?",
+		},
 		{ heading: "Tasks", hasPrompt: false, content: "- [ ]" },
 		{
 			heading: "Meetings",
@@ -1070,7 +475,11 @@ export const DEFAULT_TEMPLATE_SECTIONS: Partial<
 		},
 		{ heading: "Stakeholders", hasPrompt: false },
 		{ heading: "Risks & Blockers", hasPrompt: false },
-		{ heading: "Notes", hasPrompt: false },
+		{
+			heading: "Notes",
+			hasPrompt: false,
+			comment: "Context, ideas, learnings",
+		},
 	],
 	area: [
 		{
@@ -1079,7 +488,11 @@ export const DEFAULT_TEMPLATE_SECTIONS: Partial<
 			content:
 				"| Field | Value |\n|---|---|\n| **Status** | `= this.status` |\n| **Created** | `= this.created` |",
 		},
-		{ heading: "Description", hasPrompt: false },
+		{
+			heading: "Description",
+			hasPrompt: false,
+			comment: "What does this area encompass?",
+		},
 		{
 			heading: "Standards to Maintain",
 			hasPrompt: false,
@@ -1114,7 +527,11 @@ export const DEFAULT_TEMPLATE_SECTIONS: Partial<
 			content:
 				"- Am I giving this area enough attention?\n- What's working well?\n- What's one thing I could improve?\n- Are there any projects that should emerge from this area?",
 		},
-		{ heading: "Notes", hasPrompt: false },
+		{
+			heading: "Notes",
+			hasPrompt: false,
+			comment: "Observations, ideas, improvements",
+		},
 	],
 	resource: [
 		{
@@ -1189,7 +606,11 @@ export const DEFAULT_TEMPLATE_SECTIONS: Partial<
 			content:
 				"| Field | Value |\n|---|---|\n| **Type** | `= this.task_type` |\n| **Status** | `= this.status` |\n| **Due Date** | `= this.due_date` |\n| **Priority** | `= this.priority` |\n| **Effort** | `= this.effort` |\n| **Project** | `= this.project` |\n| **Area** | `= this.area` |",
 		},
-		{ heading: "Description", hasPrompt: false },
+		{
+			heading: "Description",
+			hasPrompt: false,
+			comment: "What is this task? What's the desired outcome?",
+		},
 		{
 			heading: "Success Criteria",
 			hasPrompt: false,
@@ -1201,20 +622,46 @@ export const DEFAULT_TEMPLATE_SECTIONS: Partial<
 			content:
 				"| Field | Value |\n|---|---|\n| **Depends On** | `= this.depends_on` |\n| **Blocks** | `= this.blocks` |",
 		},
-		{ heading: "Notes", hasPrompt: false },
+		{
+			heading: "Notes",
+			hasPrompt: false,
+			comment: "Context, blockers, resources needed",
+		},
 	],
 	daily: [
-		{ heading: "Today's Focus", hasPrompt: false },
+		{
+			heading: "Today's Focus",
+			hasPrompt: false,
+			comment: "What is the ONE thing that would make today a success?",
+		},
 		{
 			heading: "Tasks",
 			hasPrompt: false,
 			content:
 				"> [!danger]- Overdue\n> ```dataview\n> TASK\n> WHERE !completed AND due < date(today)\n> SORT due ASC\n> ```\n\n> [!todo]+ Today\n> ```dataview\n> TASK\n> WHERE !completed AND (due = date(today) OR scheduled = date(today))\n> SORT file.name ASC\n> ```\n\n> [!warning]- Upcoming (7 days)\n> ```dataview\n> TASK\n> WHERE !completed AND due > date(today) AND due <= date(today) + dur(7 days)\n> SORT due ASC\n> ```\n\n> [!success]- Completed Today\n> ```dataview\n> TASK\n> WHERE completed AND completion = date(today)\n> SORT file.name ASC\n> ```",
 		},
-		{ heading: "Dashboard", hasPrompt: false },
-		{ heading: "End of Day", hasPrompt: false },
-		{ heading: "Gratitude", hasPrompt: false, content: "1.\n2.\n3." },
-		{ heading: "Tomorrow", hasPrompt: false, content: "- [ ]" },
+		{
+			heading: "Dashboard",
+			hasPrompt: false,
+			comment: "Quick thoughts, ideas, observations throughout the day",
+		},
+		{
+			heading: "End of Day",
+			hasPrompt: false,
+			comment: "What did you accomplish? What got in the way?",
+		},
+		{
+			heading: "Gratitude",
+			hasPrompt: false,
+			content: "1.\n2.\n3.",
+			comment: "Three things you're grateful for today",
+		},
+		{
+			heading: "Tomorrow",
+			hasPrompt: false,
+			content: "- [ ]",
+			comment: "Set yourself up for success",
+		},
 		{ heading: "Log", hasPrompt: false },
 	],
 	"weekly-review": [
@@ -1225,7 +672,12 @@ export const DEFAULT_TEMPLATE_SECTIONS: Partial<
 				"| Field | Value |\n|---|---|\n| **Week** | `= this.week` |\n| **Created** | `= this.created` |\n| **Focus Areas** | `= this.focus_areas` |",
 		},
 		{ heading: "Phase 1: Clear the Mind", hasPrompt: false },
-		{ heading: "Brain Dump", hasPrompt: false },
+		{
+			heading: "Brain Dump",
+			hasPrompt: false,
+			comment:
+				"Get everything out of your head. Don't organize yet, just dump.",
+		},
 		{
 			heading: "Inbox Status",
 			hasPrompt: false,
@@ -1238,8 +690,13 @@ export const DEFAULT_TEMPLATE_SECTIONS: Partial<
 			hasPrompt: false,
 			content:
 				"| Day | Key Events |\n|---|---|\n| Mon | |\n| Tue | |\n| Wed | |\n| Thu | |\n| Fri | |\n| Sat | |\n| Sun | |",
+			comment: "What happened? Key events, meetings, commitments",
 		},
-		{ heading: "Upcoming Week", hasPrompt: false },
+		{
+			heading: "Upcoming Week",
+			hasPrompt: false,
+			comment: "What's scheduled? Prepare for it.",
+		},
 		{ heading: "Phase 3: Review Projects", hasPrompt: false },
 		{
 			heading: "Active Projects",
@@ -1259,14 +716,20 @@ export const DEFAULT_TEMPLATE_SECTIONS: Partial<
 			heading: "This Week's Wins",
 			hasPrompt: false,
 			content: "1.\n2.\n3.",
+			comment: "Celebrate wins, no matter how small",
 		},
 		{
 			heading: "This Week's Challenges",
 			hasPrompt: false,
 			content: "1.\n2.",
+			comment: "Learning opportunities, not failures",
 		},
 		{ heading: "Lessons Learned", hasPrompt: false },
-		{ heading: "Phase 6: Express & Create", hasPrompt: false },
+		{
+			heading: "Phase 6: Express & Create",
+			hasPrompt: false,
+			comment: "What can you produce from your captured knowledge?",
+		},
 		{ heading: "Phase 7: Plan Next Week", hasPrompt: false },
 		{
 			heading: "Top 3 Priorities",
@@ -1279,21 +742,34 @@ export const DEFAULT_TEMPLATE_SECTIONS: Partial<
 			content:
 				"| Metric | Count |\n|---|---|\n| Inbox items processed | |\n| Notes created | |\n| Projects completed | |\n| Projects started | |\n| Resources added | |",
 		},
-		{ heading: "Reflections", hasPrompt: false },
+		{
+			heading: "Reflections",
+			hasPrompt: false,
+			comment: "Any additional reflections",
+		},
 	],
 	capture: [
-		{ heading: "Capture", hasPrompt: false },
+		{
+			heading: "Capture",
+			hasPrompt: false,
+			comment: "The raw content you're saving",
+		},
 		{
 			heading: "Why I Saved This",
 			hasPrompt: false,
 			content:
 				"| Field | Value |\n|---|---|\n| **Source** | `= this.source` |\n| **Resonance** | `= this.resonance` |\n| **Urgency** | `= this.urgency` |\n| **Captured** | `= this.created` |",
 		},
-		{ heading: "Processing Notes", hasPrompt: false },
+		{
+			heading: "Processing Notes",
+			hasPrompt: false,
+			comment: "To be filled during inbox processing",
+		},
 		{
 			heading: "Connections",
 			hasPrompt: false,
 			content: "**Projects:**\n`= this.projects`\n\n**Areas:**\n`= this.areas`",
+			comment: "What does this relate to?",
 		},
 		{
 			heading: "Next Actions",
@@ -1319,7 +795,11 @@ export const DEFAULT_TEMPLATE_SECTIONS: Partial<
 			content:
 				"| When | Action |\n|---|---|\n| 2 weeks before | |\n| 1 week before | |\n| Day before | |\n| Day of | |",
 		},
-		{ heading: "Notes", hasPrompt: false },
+		{
+			heading: "Notes",
+			hasPrompt: false,
+			comment: "Special considerations, reminders",
+		},
 	],
 	booking: [
 		{ heading: "Booking Details", hasPrompt: false },
@@ -1330,12 +810,24 @@ export const DEFAULT_TEMPLATE_SECTIONS: Partial<
 				"| Field | Value |\n|---|---|\n| **Cost** | `= this.cost` `= this.currency` |\n| **Payment Status** | `= this.payment_status` |\n| **Booking Type** | `= this.booking_type` |",
 		},
 		{ heading: "Contact & Reference", hasPrompt: false },
-		{ heading: "Confirmation Details", hasPrompt: false },
-		{ heading: "Important Notes", hasPrompt: false },
+		{
+			heading: "Confirmation Details",
+			hasPrompt: false,
+			comment: "Paste or summarize confirmation details here",
+		},
+		{
+			heading: "Important Notes",
+			hasPrompt: false,
+			comment: "Check-in times, requirements, restrictions",
+		},
 		{ heading: "Attachments", hasPrompt: false },
 	],
 	itinerary: [
-		{ heading: "Overview", hasPrompt: false },
+		{
+			heading: "Overview",
+			hasPrompt: false,
+			comment: "Driving times, transfers, logistics",
+		},
 		{ heading: "Morning", hasPrompt: false, content: "- [ ]" },
 		{ heading: "Afternoon", hasPrompt: false, content: "- [ ]" },
 		{ heading: "Evening", hasPrompt: false, content: "- [ ]" },
@@ -1343,15 +835,28 @@ export const DEFAULT_TEMPLATE_SECTIONS: Partial<
 			heading: "Meals",
 			hasPrompt: false,
 			content: "**Breakfast:**\n**Lunch:**\n**Dinner:**",
+			comment: "Weather, reservations, timing",
 		},
 		{ heading: "Notes", hasPrompt: false },
 	],
 	research: [
-		{ heading: "Overview", hasPrompt: false },
+		{
+			heading: "Overview",
+			hasPrompt: false,
+			comment: "What is this research about? Why is it relevant?",
+		},
 		{ heading: "Considered Alternatives", hasPrompt: false },
-		{ heading: "Decision", hasPrompt: false },
+		{
+			heading: "Decision",
+			hasPrompt: false,
+			comment: "What did you decide?",
+		},
 		{ heading: "Consequences", hasPrompt: false },
-		{ heading: "Sources", hasPrompt: false },
+		{
+			heading: "Sources",
+			hasPrompt: false,
+			comment: "Where did this info come from?",
+		},
 	],
 	session: [
 		{
@@ -1425,9 +930,21 @@ export const DEFAULT_TEMPLATE_SECTIONS: Partial<
 			content:
 				"| Field | Value |\n|---|---|\n| **Invoice Date** | `= this.invoice_date` |\n| **Due Date** | `= this.due_date` |\n| **Amount** | `= this.amount` `= this.currency` |\n| **Status** | `= this.status` |\n| **Provider** | `= this.provider` |",
 		},
-		{ heading: "Payment Details", hasPrompt: false },
-		{ heading: "Claim Details", hasPrompt: false },
-		{ heading: "Attachments", hasPrompt: false },
+		{
+			heading: "Payment Details",
+			hasPrompt: false,
+			comment: "Bank details, payment method, reference number",
+		},
+		{
+			heading: "Claim Details",
+			hasPrompt: false,
+			comment: "Medicare/health insurance claim info if applicable",
+		},
+		{
+			heading: "Attachments",
+			hasPrompt: false,
+			comment: "Link to invoice PDF",
+		},
 		{ heading: "Notes", hasPrompt: false },
 	],
 	"medical-statement": [
@@ -1472,290 +989,11 @@ export const DEFAULT_TEMPLATE_SECTIONS: Partial<
 	],
 	letter: [{ heading: "Content", hasPrompt: false, content: "{{content}}" }],
 
-	// === CLIPPING TEMPLATES ===
-	"clipping-article": [
+	// === UNIFIED CLIPPING TEMPLATE ===
+	clipping: [
 		{ heading: "AI Summary", hasPrompt: false },
-		{
-			heading: "Article Info",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Author** | `= this.author` |\n| **Site** | `= this.site_name` |\n| **Section** | `= this.section` |\n| **Published** | `= this.published` |\n| **Modified** | `= this.modified` |\n| **Reading Time** | `= this.word_count` words |",
-		},
 		{ heading: "Why I Saved This", hasPrompt: false },
-		{ heading: "Key Takeaways", hasPrompt: false },
 		{ heading: "Content", hasPrompt: false },
-	],
-	"clipping-youtube": [
-		{ heading: "AI Summary", hasPrompt: false },
-		{
-			heading: "Video Info",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Channel** | `= this.channel` |\n| **Published** | `= this.published` |\n| **Duration** | `= this.duration` |\n| **Views** | `= this.view_count` |",
-		},
-		{ heading: "Why I Saved This", hasPrompt: false },
-		{ heading: "Description", hasPrompt: false },
-		{ heading: "Key Timestamps", hasPrompt: false },
-		{ heading: "Notes", hasPrompt: false },
-		{ heading: "Transcript", hasPrompt: false },
-	],
-	"clipping-book": [
-		{ heading: "AI Summary", hasPrompt: false },
-		{
-			heading: "Book Details",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Author** | `= this.author` |\n| **Rating** | `= this.rating`/5 (`= this.ratings_count` ratings) |\n| **Pages** | `= this.pages` |\n| **Genre** | `= this.genres` |\n| **Publisher** | `= this.publisher` |\n| **Published** | `= this.published` |\n| **Series** | `= this.series` #`= this.series_position` |\n| **Format** | `= this.format` |\n| **ISBN** | `= this.isbn` |",
-		},
-		{ heading: "Why I Want to Read This", hasPrompt: false },
-		{ heading: "Description", hasPrompt: false },
-		{ heading: "Notes", hasPrompt: false },
-	],
-	"clipping-recipe": [
-		{ heading: "AI Summary", hasPrompt: false },
-		{
-			heading: "Quick Info",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Author** | `= this.author` |\n| **Prep Time** | `= this.prep_time` |\n| **Cook Time** | `= this.cook_time` |\n| **Total Time** | `= this.total_time` |\n| **Servings** | `= this.servings` |\n| **Cuisine** | `= this.cuisine` |\n| **Category** | `= this.category` |\n| **Diet** | `= this.diet` |\n| **Rating** | `= this.rating`/5 (`= this.rating_count` ratings) |",
-		},
-		{
-			heading: "Nutrition (per serving)",
-			hasPrompt: false,
-			content:
-				"| Calories | Protein | Carbs | Fat | Fiber |\n|---|---|---|---|---|\n| `= this.calories` | `= this.protein` | `= this.carbs` | `= this.fat` | `= this.fiber` |",
-		},
-		{ heading: "Why I Want to Make This", hasPrompt: false },
-		{ heading: "Ingredients", hasPrompt: false },
-		{ heading: "Instructions", hasPrompt: false },
-		{ heading: "Notes", hasPrompt: false },
-	],
-	"clipping-restaurant": [
-		{
-			heading: "At a Glance",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Cuisine** | `= this.cuisine` |\n| **Price Range** | `= this.price_range` |\n| **Rating** | `= this.rating` |\n| **Address** | `= this.address` |\n| **Suburb** | `= this.suburb` |\n| **State** | `= this.state` |\n| **Phone** | `= this.phone` |",
-		},
-		{ heading: "Hours", hasPrompt: false, content: "`= this.hours`" },
-		{ heading: "Why I Want to Try This", hasPrompt: false },
-		{ heading: "Notes", hasPrompt: false },
-	],
-	"clipping-accommodation": [
-		{
-			heading: "At a Glance",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Platform** | `= this.platform` |\n| **Type** | `= this.property_type` |\n| **Price** | `= this.price` `= this.currency` |\n| **Rating** | `= this.rating` (`= this.review_count` reviews) |\n| **Address** | `= this.address` |\n| **Suburb** | `= this.suburb` |\n| **Region** | `= this.region` |\n| **Check-in** | `= this.check_in` |\n| **Check-out** | `= this.check_out` |\n| **Pets** | `= this.pets_allowed` |",
-		},
-		{ heading: "Amenities", hasPrompt: false, content: "`= this.amenities`" },
-		{ heading: "Why I'm Interested", hasPrompt: false },
-		{ heading: "Notes", hasPrompt: false },
-	],
-	"clipping-place": [
-		{
-			heading: "At a Glance",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Category** | `= this.category` |\n| **Address** | `= this.address` |\n| **Suburb** | `= this.suburb` |\n| **State** | `= this.state` |\n| **Country** | `= this.country` |\n| **Rating** | `= this.rating` |",
-		},
-		{ heading: "Why I Saved This", hasPrompt: false },
-		{ heading: "Notes", hasPrompt: false },
-	],
-	"clipping-github-repo": [
-		{ heading: "AI Summary", hasPrompt: false },
-		{
-			heading: "At a Glance",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Owner** | `= this.owner` |\n| **Language** | `= this.language` |\n| **License** | `= this.license` |\n| **Stars** | `= this.stars` |\n| **Forks** | `= this.forks` |\n| **Last Updated** | `= this.updated` |\n| **Topics** | `= this.topics` |",
-		},
-		{ heading: "Why I'm Interested", hasPrompt: false },
-		{ heading: "README", hasPrompt: false },
-	],
-	"clipping-podcast-episode": [
-		{ heading: "AI Summary", hasPrompt: false },
-		{
-			heading: "Episode Info",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Show** | `= this.show` |\n| **Episode** | `= this.episode_number` |\n| **Season** | `= this.season` |\n| **Host** | `= this.host` |\n| **Duration** | `= this.duration` |\n| **Published** | `= this.published` |\n| **Platform** | `= this.platform` |",
-		},
-		{ heading: "Why I Want to Listen", hasPrompt: false },
-		{ heading: "Description", hasPrompt: false },
-		{ heading: "Notes", hasPrompt: false },
-	],
-	"clipping-movie": [
-		{ heading: "AI Summary", hasPrompt: false },
-		{
-			heading: "Movie Info",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Year** | `= this.year` |\n| **Director** | `= this.director` |\n| **Cast** | `= this.cast` |\n| **Rating** | `= this.rating`/10 (`= this.rating_count` ratings) |\n| **Runtime** | `= this.runtime` |\n| **Genre** | `= this.genre` |\n| **Content Rating** | `= this.content_rating` |\n| **Production** | `= this.production` |",
-		},
-		{ heading: "Why I Want to Watch This", hasPrompt: false },
-		{ heading: "Description", hasPrompt: false },
-		{ heading: "Notes", hasPrompt: false },
-	],
-	"clipping-event": [
-		{ heading: "AI Summary", hasPrompt: false },
-		{
-			heading: "Event Details",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Date** | `= this.event_date` |\n| **End** | `= this.event_end` |\n| **Door Time** | `= this.door_time` |\n| **Status** | `= this.event_status` |\n| **Mode** | `= this.attendance_mode` |\n| **Venue** | `= this.venue` |\n| **Address** | `= this.address` |\n| **City** | `= this.city`, `= this.state` |\n| **Price** | `= this.price` |\n| **Organizer** | `= this.organizer` |\n| **Performer** | `= this.performer` |",
-		},
-		{ heading: "Why I Want to Attend", hasPrompt: false },
-		{ heading: "Description", hasPrompt: false },
-	],
-	"clipping-documentation": [
-		{
-			heading: "Info",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Domain** | `= this.domain` |\n| **Technology** | `= this.technology` |\n| **Version** | `= this.version` |\n| **Section** | `= this.section` |\n| **Clipped** | `= this.clipped` |",
-		},
-		{ heading: "AI Summary", hasPrompt: false },
-		{ heading: "Why I Saved This", hasPrompt: false },
-		{ heading: "Key Snippets", hasPrompt: false },
-	],
-	"clipping-highlight-only": [{ heading: "Highlights", hasPrompt: false }],
-	"clipping-job-posting": [
-		{ heading: "AI Summary", hasPrompt: false },
-		{
-			heading: "Job Details",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Company** | `= this.company` |\n| **Location** | `= this.location` |\n| **Region** | `= this.region` |\n| **Remote** | `= this.remote` |\n| **Type** | `= this.employment_type` |\n| **Salary** | `= this.salary` |\n| **Experience** | `= this.experience` |\n| **Posted** | `= this.posted` |\n| **Expires** | `= this.expires` |\n| **Platform** | `= this.platform` |",
-		},
-		{ heading: "Why I'm Interested", hasPrompt: false },
-		{ heading: "Description", hasPrompt: false },
-		{ heading: "Requirements", hasPrompt: false },
-		{ heading: "Benefits", hasPrompt: false },
-		{ heading: "Notes", hasPrompt: false },
-	],
-	"clipping-product": [
-		{ heading: "AI Summary", hasPrompt: false },
-		{
-			heading: "Details",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Price** | `= this.price` `= this.currency` |\n| **Brand** | `= this.brand` |\n| **Rating** | `= this.rating`/5 (`= this.rating_count` reviews) |\n| **Availability** | `= this.availability` |\n| **SKU** | `= this.sku` |\n| **Platform** | `= this.platform` |\n| **Gift For** | `= this.gift_for` |",
-		},
-		{ heading: "Why I Clipped This", hasPrompt: false },
-		{ heading: "Description", hasPrompt: false },
-		{ heading: "Notes", hasPrompt: false },
-	],
-	"clipping-reddit-post": [
-		{ heading: "AI Summary", hasPrompt: false },
-		{
-			heading: "Post Info",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Subreddit** | `= this.subreddit` |\n| **Author** | `= this.author` |\n| **Posted** | `= this.posted` |\n| **Score** | `= this.score` |\n| **Comments** | `= this.comment_count` |",
-		},
-		{ heading: "Why I Saved This", hasPrompt: false },
-		{ heading: "Key Comments", hasPrompt: false },
-	],
-	"clipping-stack-overflow": [
-		{ heading: "AI Summary", hasPrompt: false },
-		{ heading: "Problem", hasPrompt: false },
-		{ heading: "Top Answer", hasPrompt: false },
-	],
-	"clipping-tweet": [
-		{
-			heading: "Tweet Info",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Author** | `= this.author` |\n| **Handle** | `= this.handle` |\n| **Posted** | `= this.posted` |\n| **Likes** | `= this.likes` |\n| **Retweets** | `= this.retweets` |\n| **Clipped** | `= this.clipped` |",
-		},
-		{ heading: "Why I Saved This", hasPrompt: false },
-		{ heading: "Thread / Replies", hasPrompt: false },
-	],
-	"clipping-wikipedia": [
-		{
-			heading: "Info",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Category** | `= this.category` |\n| **Language** | `= this.language` |\n| **Last Modified** | `= this.modified` |\n| **Clipped** | `= this.clipped` |",
-		},
-		{ heading: "AI Summary", hasPrompt: false },
-		{ heading: "Summary", hasPrompt: false, content: "`= this.summary`" },
-		{ heading: "Why I Saved This", hasPrompt: false },
-		{ heading: "Key Points", hasPrompt: false },
-	],
-	"clipping-chatgpt": [
-		{ heading: "Why I Saved This", hasPrompt: false },
-		{ heading: "Conversation", hasPrompt: false },
-	],
-	"clipping-claude": [
-		{ heading: "Why I Saved This", hasPrompt: false },
-		{ heading: "Conversation", hasPrompt: false },
-	],
-	"clipping-course": [
-		{ heading: "AI Summary", hasPrompt: false },
-		{
-			heading: "At a Glance",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Instructor** | `= this.instructor` |\n| **Provider** | `= this.provider` |\n| **Price** | `= this.price` `= this.currency` |\n| **Rating** | `= this.rating`/5 (`= this.rating_count` ratings) |\n| **Duration** | `= this.duration` |\n| **Level** | `= this.level` |\n| **Language** | `= this.language` |\n| **Platform** | `= this.platform` |",
-		},
-		{ heading: "Why I Want to Take This", hasPrompt: false },
-		{ heading: "Description", hasPrompt: false },
-		{ heading: "Syllabus", hasPrompt: false },
-		{ heading: "Notes", hasPrompt: false },
-	],
-	"clipping-app": [
-		{ heading: "AI Summary", hasPrompt: false },
-		{
-			heading: "At a Glance",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Developer** | `= this.developer` |\n| **Price** | `= this.price` `= this.currency` |\n| **Rating** | `= this.rating`/5 (`= this.rating_count` ratings) |\n| **Category** | `= this.category` |\n| **Platform** | `= this.platform` |\n| **Version** | `= this.version` |\n| **Size** | `= this.size` |",
-		},
-		{ heading: "Why I'm Interested", hasPrompt: false },
-		{ heading: "Description", hasPrompt: false },
-		{ heading: "Notes", hasPrompt: false },
-	],
-
-	// === PROCESSOR TEMPLATES ===
-	"processor-article": [
-		{ heading: "Content", hasPrompt: false, content: "{{scraped_content}}" },
-	],
-	"processor-youtube": [
-		{ heading: "Why I Saved This", hasPrompt: false },
-		{ heading: "Transcript", hasPrompt: false, content: "{{transcript}}" },
-	],
-	"processor-recipe": [
-		{ heading: "Ingredients", hasPrompt: false, content: "{{ingredients}}" },
-		{ heading: "Instructions", hasPrompt: false, content: "{{instructions}}" },
-		{ heading: "Notes", hasPrompt: false },
-	],
-	"processor-restaurant": [
-		{
-			heading: "At a Glance",
-			hasPrompt: false,
-			content:
-				"| | |\n|---|---|\n| **Cuisine** | `= this.cuisine` |\n| **Price Range** | `= this.price_range` |\n| **Location** | `= this.suburb`, `= this.city` |\n| **Address** | `= this.address` |\n| **Phone** | `= this.phone` |\n| **Chef** | `= this.chef` |",
-		},
-		{ heading: "Specialties", hasPrompt: false, content: "{{specialties}}" },
-		{ heading: "Notes", hasPrompt: false, content: "{{content}}" },
-	],
-	"processor-accommodation": [
-		{ heading: "Booking Details", hasPrompt: false, content: "{{content}}" },
-	],
-	"processor-place": [
-		{ heading: "Notes", hasPrompt: false, content: "{{content}}" },
-	],
-	"processor-github": [
-		{ heading: "Notes", hasPrompt: false, content: "{{content}}" },
-	],
-	"processor-social": [
-		{ heading: "Content", hasPrompt: false, content: "{{content}}" },
-	],
-	"processor-generic": [
-		{ heading: "Why I Saved This", hasPrompt: false },
-		{ heading: "Content", hasPrompt: false, content: "{{content}}" },
 	],
 };
 
@@ -1783,40 +1021,8 @@ export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
 	"employment-contract": 1,
 	document: 1,
 	meeting: 1,
-	// Clipping templates
-	"clipping-article": 2,
-	"clipping-youtube": 3,
-	"clipping-book": 2,
-	"clipping-recipe": 2,
-	"clipping-restaurant": 1,
-	"clipping-accommodation": 2,
-	"clipping-place": 1,
-	"clipping-github-repo": 2,
-	"clipping-podcast-episode": 2,
-	"clipping-movie": 2,
-	"clipping-event": 2,
-	"clipping-documentation": 2,
-	"clipping-highlight-only": 1,
-	"clipping-job-posting": 2,
-	"clipping-product": 2,
-	"clipping-reddit-post": 2,
-	"clipping-stack-overflow": 1,
-	"clipping-tweet": 2,
-	"clipping-wikipedia": 2,
-	"clipping-chatgpt": 1,
-	"clipping-claude": 1,
-	"clipping-course": 2,
-	"clipping-app": 2,
-	// Processor templates
-	"processor-article": 4,
-	"processor-youtube": 4,
-	"processor-recipe": 4,
-	"processor-restaurant": 1,
-	"processor-accommodation": 4,
-	"processor-place": 4,
-	"processor-github": 1,
-	"processor-social": 4,
-	"processor-generic": 4,
+	// Unified clipping template
+	clipping: 1,
 };
 
 /**
@@ -1844,40 +1050,8 @@ export const DEFAULT_DESTINATIONS: Record<string, string> = {
 	bookmark: "00 Inbox",
 	"medical-statement": "00 Inbox",
 	meeting: "03 Resources/Meetings",
-	// Clipping templates - all to inbox for processing
-	"clipping-article": "00 Inbox",
-	"clipping-youtube": "00 Inbox",
-	"clipping-book": "00 Inbox",
-	"clipping-recipe": "00 Inbox",
-	"clipping-restaurant": "00 Inbox",
-	"clipping-accommodation": "00 Inbox",
-	"clipping-place": "00 Inbox",
-	"clipping-github-repo": "00 Inbox",
-	"clipping-podcast-episode": "00 Inbox",
-	"clipping-movie": "00 Inbox",
-	"clipping-event": "00 Inbox",
-	"clipping-documentation": "00 Inbox",
-	"clipping-highlight-only": "00 Inbox",
-	"clipping-job-posting": "00 Inbox",
-	"clipping-product": "00 Inbox",
-	"clipping-reddit-post": "00 Inbox",
-	"clipping-stack-overflow": "00 Inbox",
-	"clipping-tweet": "00 Inbox",
-	"clipping-wikipedia": "00 Inbox",
-	"clipping-chatgpt": "00 Inbox",
-	"clipping-claude": "00 Inbox",
-	"clipping-course": "00 Inbox",
-	"clipping-app": "00 Inbox",
-	// Processor templates - all to inbox for processing
-	"processor-article": "00 Inbox",
-	"processor-youtube": "00 Inbox",
-	"processor-recipe": "00 Inbox",
-	"processor-restaurant": "00 Inbox",
-	"processor-accommodation": "00 Inbox",
-	"processor-place": "00 Inbox",
-	"processor-github": "00 Inbox",
-	"processor-social": "00 Inbox",
-	"processor-generic": "00 Inbox",
+	// Unified clipping template
+	clipping: "00 Inbox",
 	// Attachments folder (for git operations, not template destination)
 	attachments: "Attachments",
 };
@@ -1966,31 +1140,8 @@ export const DEFAULT_TITLE_PREFIXES: Partial<Record<string, string>> = {
 	letter: "📄 ",
 	cv: "📄 ",
 	meeting: "🗣️ ",
-	// Clipping templates
-	"clipping-article": "✂️📰 ",
-	"clipping-youtube": "✂️📺 ",
-	"clipping-book": "✂️📚 ",
-	"clipping-recipe": "✂️🍳 ",
-	"clipping-restaurant": "✂️🍽️ ",
-	"clipping-accommodation": "✂️🏨 ",
-	"clipping-place": "✂️📍 ",
-	"clipping-github-repo": "✂️💻 ",
-	"clipping-podcast-episode": "✂️🎙️ ",
-	"clipping-movie": "✂️🎬 ",
-	"clipping-event": "✂️🎫 ",
-	"clipping-documentation": "✂️📖 ",
-	"clipping-highlight-only": "✂️ ",
-	"clipping-job-posting": "✂️💼 ",
-	"clipping-product": "✂️🎁 ",
-	"clipping-reddit-post": "✂️🔶 ",
-	"clipping-stack-overflow": "✂️💬 ",
-	"clipping-tweet": "✂️🐦 ",
-	"clipping-wikipedia": "✂️📖 ",
-	"clipping-chatgpt": "✂️🤖 ",
-	"clipping-claude": "✂️🤖 ",
-	"clipping-course": "✂️🎓 ",
-	"clipping-app": "✂️📱 ",
-	// Processor templates - no prefixes (programmatic creation)
+	// Unified clipping template — type-specific emojis added at runtime via CLIPPING_TYPE_EMOJI
+	clipping: "✂️ ",
 };
 
 /**

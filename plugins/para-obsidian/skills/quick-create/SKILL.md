@@ -33,7 +33,7 @@ This skill delegates to canonical shared skills rather than duplicating logic:
 |-------|---------|-----------|
 | **Enrichment routing** | Tool selection by URL domain | @../triage/references/enrichment-strategies.md |
 | **Classification** | Template, area, resourceType decision tree | @../para-classifier/references/classification-decision-tree.md |
-| **Emoji mapping** | source_format → title prefix | @../para-classifier/references/emoji-mapping.md |
+| **Emoji mapping** | source_format → title prefix (auto-applied by `para_create`, do NOT add manually) | @../para-classifier/references/emoji-mapping.md |
 | **Content processing** | Create → commit → inject → commit pipeline | @../content-processing/SKILL.md |
 | **Proposal schema** | Canonical field names and types | @../triage/references/proposal-schema.md |
 
@@ -97,18 +97,15 @@ Use the classification decision tree to extract template-specific fields.
 
 **For bookings:** `booking_type`, `booking_ref`, `provider`, `booking_date`, `cost`, `currency`, `status`.
 
-#### 3.3 Map Emoji Prefix (resources only)
+#### 3.3 Title — NO Emoji Prefix
 
-Using @../para-classifier/references/emoji-mapping.md, determine the emoji prefix for the note title based on `source_format`:
+**NEVER add emoji prefixes to the title.** `para_create` automatically applies the correct emoji prefix via `applyTitlePrefix()` using the template type and `source_format` frontmatter field. Adding emojis manually causes double-prefixing (e.g., `📚 📚📰 Title`).
 
-| Source Format | Prefix |
-|---------------|--------|
-| video | `📺 ` |
-| thread | `🧵 ` |
-| article | (none - default resource) |
-| document | `📄 ` |
+Pass a plain, descriptive title:
+- Good: `"The Task Tool - Claude Code's Agent Orchestration System"`
+- Bad: `"📚📰 The Task Tool - Claude Code's Agent Orchestration System"`
 
-Non-resource templates use their own naming conventions (no emoji prefix).
+The code handles: base prefix (`📚` for resources) + source_format emoji (`📰` for article, `🎬` for video, etc.) automatically.
 
 #### 3.4 Suggest Area & Project (REQUIRED — NEVER EMPTY)
 
@@ -161,7 +158,7 @@ Build the proposal using the canonical schema from @../triage/references/proposa
 
 ```typescript
 {
-  proposed_title: string,           // With emoji prefix if applicable
+  proposed_title: string,           // Plain title — NO emoji prefix (para_create adds it)
   proposed_template: "resource" | "meeting" | "invoice" | "booking",
   summary: string,                  // 2-3 sentences
   area: string | string[],         // "[[Area]]" or ["[[Area 1]]", "[[Area 2]]"]
@@ -190,7 +187,7 @@ Present the proposal, then use `AskUserQuestion` to gate:
 **Resource proposal:**
 ```
 Resource Proposal:
-  Title:       [emoji] [proposed title]
+  Title:       [proposed title] (emoji auto-applied by para_create)
   Type:        [resourceType] ([source_format])
   Area:        [[🌱 Area Name]] (or multiple: [[A]], [[B]])
   Project:     [[🎯 Project Name]] (or "none")

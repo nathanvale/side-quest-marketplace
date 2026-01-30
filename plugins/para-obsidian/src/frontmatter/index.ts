@@ -36,6 +36,8 @@ export type {
 	MigrationFn,
 	MigrationHooks,
 	MigrationResult,
+	// Pre-write filter types
+	PreWriteFilterResult,
 	// Update types
 	UpdateFrontmatterOptions,
 	UpdateFrontmatterResult,
@@ -59,6 +61,7 @@ export { parseFrontmatter, serializeFrontmatter } from "./parse";
 // =============================================================================
 
 export {
+	filterFieldsForWrite,
 	readFrontmatterFile,
 	validateFrontmatter,
 	validateFrontmatterBulk,

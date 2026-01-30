@@ -223,6 +223,7 @@ Requires git repository with clean working tree (unless dry-run).`,
 				set: typedSet,
 				unset: unset ?? [],
 				dryRun,
+				preWriteFilter: { config, noteType },
 			});
 
 			if (format === ResponseFormat.JSON) {
@@ -237,6 +238,20 @@ Requires git repository with clean working tree (unless dry-run).`,
 				lines.push("**Changes:**");
 				for (const change of result.changes) {
 					lines.push(`- ${change}`);
+				}
+			}
+
+			// Report skipped fields from pre-write filtering
+			if (result.filtered && !result.filtered.allAccepted) {
+				lines.push("", "**Skipped fields:**");
+				for (const s of result.filtered.skippedUnknown) {
+					lines.push(`- ${s.field}: unknown (${s.reason})`);
+				}
+				for (const s of result.filtered.skippedInvalid) {
+					lines.push(`- ${s.field}: invalid (${s.reason})`);
+				}
+				for (const s of result.filtered.skippedForbidden) {
+					lines.push(`- ${s.field}: forbidden (${s.reason})`);
 				}
 			}
 

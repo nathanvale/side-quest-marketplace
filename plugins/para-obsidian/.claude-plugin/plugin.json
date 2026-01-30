@@ -17,7 +17,6 @@
 	],
 	"license": "MIT",
 	"commands": [
-		"./commands/clip.md",
 		"./commands/commit.md",
 		"./commands/create.md",
 		"./commands/create-area.md",
@@ -55,6 +54,7 @@
 		"./skills/quick-create",
 		"./skills/template-assistant",
 		"./skills/triage",
+		"./skills/clip",
 		"./skills/webclipper-templates"
 	]
 }
