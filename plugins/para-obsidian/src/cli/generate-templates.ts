@@ -11,10 +11,15 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { color } from "@sidequest/core/terminal";
+import { generateWebClipperJson } from "../clipper/converter";
 import type { ParaObsidianConfig } from "../config/index";
 import { generateTemplate } from "../templates/generator";
-import { fieldRulesToTemplateFields } from "../templates/services/field-bridge";
+import {
+	buildTemplateConfig,
+	fieldRulesToTemplateFields,
+} from "../templates/services/field-bridge";
 import type { CommandContext, CommandResult } from "./types";
 
 /**
@@ -71,32 +76,13 @@ export function generateAllTemplates(
 
 	const frontmatterRules = config.frontmatterRules ?? {};
 	const templateSections = config.templateSections ?? {};
-	const templateVersions = config.templateVersions ?? {};
+	const templateBodyConfig = config.templateBodyConfig ?? {};
 
 	for (const templateName of Object.keys(frontmatterRules)) {
-		const rules = frontmatterRules[templateName];
-		if (!rules) continue;
+		const templateConfig = buildTemplateConfig(templateName, config);
+		if (!templateConfig) continue;
 
-		const fields = fieldRulesToTemplateFields(rules);
-		const sections = templateSections[templateName] ?? [];
-		const version = templateVersions[templateName] ?? 1;
-
-		// Determine the noteType — strip clipping-/processor- prefixes
-		const noteType = templateName
-			.replace(/^clipping-/, "")
-			.replace(/^processor-/, "");
-
-		const content = generateTemplate(
-			{
-				name: templateName,
-				displayName: templateName,
-				noteType,
-				version,
-				fields,
-				sections,
-			},
-			{ syntax: "native" },
-		);
+		const content = generateTemplate(templateConfig, { syntax: "native" });
 
 		const relativePath = templateNameToFilePath(templateName);
 		const result: GenerateResult = {
@@ -131,6 +117,59 @@ export function generateAllTemplates(
 			// No output dir — just report what would be generated
 			results.push({ ...result, reason: "no-output-dir" });
 		}
+	}
+
+	// Generate Web Clipper JSON for templates with body config
+	const pluginRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+	for (const [templateName, bodyConf] of Object.entries(templateBodyConfig)) {
+		if (!bodyConf) continue;
+		const rules = frontmatterRules[templateName];
+		if (!rules) continue;
+
+		const fields = fieldRulesToTemplateFields(rules);
+		const sections = templateSections[templateName] ?? [];
+		const titlePrefixes = config.titlePrefixes ?? {};
+		const destinations = config.defaultDestinations ?? {};
+
+		const json = generateWebClipperJson({
+			templateName,
+			displayName: "Capture",
+			fields,
+			sections,
+			bodyConfig: bodyConf,
+			titlePrefix: titlePrefixes[templateName] ?? "",
+			destination: destinations[templateName] ?? "00 Inbox",
+		});
+
+		const jsonContent = `${JSON.stringify(json, null, "\t")}\n`;
+		const jsonRelativePath = "templates/webclipper/capture.json";
+		const jsonResult: GenerateResult = {
+			templateName: `${templateName} (webclipper)`,
+			filePath: jsonRelativePath,
+			written: false,
+			content: jsonContent,
+		};
+
+		if (dryRun) {
+			results.push({ ...jsonResult, reason: "dry-run" });
+			continue;
+		}
+
+		// Web Clipper JSON is written to plugin root, not vault
+		const jsonFullPath = path.join(pluginRoot, jsonRelativePath);
+		const jsonDir = path.dirname(jsonFullPath);
+		fs.mkdirSync(jsonDir, { recursive: true });
+
+		if (fs.existsSync(jsonFullPath)) {
+			const existing = fs.readFileSync(jsonFullPath, "utf-8");
+			if (existing === jsonContent) {
+				results.push({ ...jsonResult, reason: "unchanged" });
+				continue;
+			}
+		}
+
+		fs.writeFileSync(jsonFullPath, jsonContent, "utf-8");
+		results.push({ ...jsonResult, written: true });
 	}
 
 	return results;

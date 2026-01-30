@@ -24,7 +24,8 @@ import {
 	DEFAULT_TITLE_PREFIXES,
 } from "../config/defaults";
 import { listTemplateVersions, loadConfig } from "../config/index";
-import { getTemplate, getTemplateFields } from "../templates/index";
+import { resolveTemplate } from "../notes/create";
+import { getTemplateFields } from "../templates/index";
 
 const logger = createLoggerAdapter(getLogger("para-obsidian.mcp"));
 const createCid = () => randomUUID();
@@ -181,7 +182,7 @@ Example: For project template, shows you need:
 		async (args, format) => {
 			const config = loadConfig();
 			const templateName = args.template as string;
-			const template = getTemplate(config, templateName);
+			const template = resolveTemplate(config, templateName);
 
 			if (!template) {
 				throw new Error(`Template not found: ${templateName}`);
@@ -268,6 +269,11 @@ Example: For project template, shows you need:
 					dest: string;
 					titlePrefix?: string;
 					sections?: Array<{ heading: string; hasPrompt: boolean }>;
+					bodyConfig?: {
+						titleLine?: string;
+						preamble?: string;
+					};
+					contentTargets?: string[];
 				} = {
 					dest:
 						config.defaultDestinations?.[templateName] ??
@@ -278,9 +284,31 @@ Example: For project template, shows you need:
 				if (titlePrefix) {
 					creationMeta.titlePrefix = titlePrefix;
 				}
-				const sections = DEFAULT_TEMPLATE_SECTIONS[templateName];
-				if (sections) {
-					creationMeta.sections = [...sections];
+				const templateSections =
+					config.templateSections?.[templateName] ??
+					DEFAULT_TEMPLATE_SECTIONS[templateName];
+				if (templateSections) {
+					creationMeta.sections = [...templateSections];
+				}
+
+				// Add bodyConfig if template has custom body structure
+				const bodyConfig = config.templateBodyConfig?.[templateName];
+				if (bodyConfig) {
+					creationMeta.bodyConfig = {
+						titleLine: bodyConfig.titleLine,
+						preamble: bodyConfig.preamble,
+					};
+				}
+
+				// Compute content targets: sections safe for content injection
+				// Exclude sections with static/Dataview content (they have `content` set)
+				if (templateSections) {
+					const contentTargets = templateSections
+						.filter((s) => !s.content)
+						.map((s) => s.heading);
+					if (contentTargets.length > 0) {
+						creationMeta.contentTargets = contentTargets;
+					}
 				}
 
 				// Build validArgs from frontmatter rules

@@ -8,6 +8,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	compareTemplates,
 	extractTemplateMetadata,
+	generateWebClipperJson,
 	webClipperToTemplater,
 } from "./converter";
 import type { WebClipperTemplate } from "./types";
@@ -132,7 +133,7 @@ describe("webClipperToTemplater", () => {
 		expect(result.success).toBe(true);
 		// Type is derived from template name, not properties
 		expect(result.content).toContain("type: article");
-		expect(result.content).toContain("template_version: 1");
+		expect(result.content).toContain("template_version: 2");
 		expect(result.content).toContain("status: to-read");
 	});
 
@@ -570,6 +571,274 @@ describe("webClipperToTemplater - H1 uses Dataview syntax", () => {
 		// Multi-emoji prefix (✂️🎙️) should be extracted correctly
 		expect(result.content).toContain('if (!title.startsWith("✂️🎙️"))');
 		expect(result.content).toContain('await tp.file.rename("✂️🎙️ " + title)');
+	});
+});
+
+describe("generateWebClipperJson", () => {
+	test("generates valid Web Clipper template from defaults config", () => {
+		const result = generateWebClipperJson({
+			templateName: "clipping",
+			displayName: "Capture",
+			fields: [
+				{
+					name: "type",
+					displayName: "Type",
+					type: "enum",
+					required: true,
+					enumValues: ["clipping"],
+					default: "clipping",
+				},
+				{
+					name: "source",
+					displayName: "Source",
+					type: "string",
+					required: true,
+				},
+				{
+					name: "clipped",
+					displayName: "Clipped",
+					type: "date",
+					required: true,
+					autoFill: 'tp.date.now("YYYY-MM-DDTHH:mm:ss")',
+				},
+				{
+					name: "domain",
+					displayName: "Domain",
+					type: "string",
+					required: false,
+				},
+				{
+					name: "areas",
+					displayName: "Areas",
+					type: "array",
+					required: false,
+					default: "[]",
+				},
+				{
+					name: "projects",
+					displayName: "Projects",
+					type: "array",
+					required: false,
+					default: "[]",
+				},
+				{
+					name: "resource_type",
+					displayName: "Resource Type",
+					type: "string",
+					required: false,
+				},
+				{
+					name: "capture_reason",
+					displayName: "Capture Reason",
+					type: "string",
+					required: false,
+				},
+			],
+			sections: [{ heading: "Content", hasPrompt: false }],
+			bodyConfig: {
+				titleLine: "# `= this.file.name`",
+				preamble:
+					"**Source:** `= this.source`\n**Clipped:** `= this.clipped`\n\n---",
+				footer: "<!-- highlights:{{highlights|length}} -->",
+				skipTemplateVersion: true,
+			},
+			titlePrefix: "✂️",
+			destination: "00 Inbox",
+		});
+
+		expect(result.schemaVersion).toBe("0.1.0");
+		expect(result.name).toBe("Capture");
+		expect(result.behavior).toBe("create");
+		expect(result.path).toBe("00 Inbox");
+		expect(result.noteNameFormat).toBe("✂️ {{title|safe_name|slice:0,80|trim}}");
+		expect(result.triggers).toEqual([]);
+	});
+
+	test("maps known fields to Web Clipper variables", () => {
+		const result = generateWebClipperJson({
+			templateName: "clipping",
+			displayName: "Capture",
+			fields: [
+				{
+					name: "type",
+					displayName: "Type",
+					type: "enum",
+					required: true,
+					enumValues: ["clipping"],
+				},
+				{
+					name: "source",
+					displayName: "Source",
+					type: "string",
+					required: true,
+				},
+				{
+					name: "clipped",
+					displayName: "Clipped",
+					type: "date",
+					required: true,
+				},
+				{
+					name: "domain",
+					displayName: "Domain",
+					type: "string",
+					required: false,
+				},
+			],
+			sections: [{ heading: "Content", hasPrompt: false }],
+			bodyConfig: {
+				titleLine: "# `= this.file.name`",
+				skipTemplateVersion: true,
+			},
+			titlePrefix: "✂️",
+			destination: "00 Inbox",
+		});
+
+		const type = result.properties.find((p) => p.name === "type");
+		expect(type?.value).toBe("clipping");
+		expect(type?.type).toBe("text");
+
+		const source = result.properties.find((p) => p.name === "source");
+		expect(source?.value).toBe("{{url}}");
+		expect(source?.type).toBe("text");
+
+		const clipped = result.properties.find((p) => p.name === "clipped");
+		expect(clipped?.value).toBe('{{time|date:"YYYY-MM-DD"}}');
+		expect(clipped?.type).toBe("date");
+
+		const domain = result.properties.find((p) => p.name === "domain");
+		expect(domain?.value).toBe("{{domain}}");
+		expect(domain?.type).toBe("text");
+	});
+
+	test("array fields become multitext with empty value", () => {
+		const result = generateWebClipperJson({
+			templateName: "clipping",
+			displayName: "Capture",
+			fields: [
+				{
+					name: "areas",
+					displayName: "Areas",
+					type: "array",
+					required: false,
+					default: "[]",
+				},
+			],
+			sections: [{ heading: "Content", hasPrompt: false }],
+			bodyConfig: { titleLine: "# Title", skipTemplateVersion: true },
+			titlePrefix: "",
+			destination: "00 Inbox",
+		});
+
+		const areas = result.properties.find((p) => p.name === "areas");
+		expect(areas?.type).toBe("multitext");
+		expect(areas?.value).toBe("");
+	});
+
+	test("builds noteContentFormat from bodyConfig and sections", () => {
+		const result = generateWebClipperJson({
+			templateName: "clipping",
+			displayName: "Capture",
+			fields: [],
+			sections: [{ heading: "Content", hasPrompt: false }],
+			bodyConfig: {
+				titleLine: "# `= this.file.name`",
+				preamble:
+					"**Source:** `= this.source`\n**Clipped:** `= this.clipped`\n\n---",
+				footer: "<!-- highlights:{{highlights|length}} -->",
+			},
+			titlePrefix: "✂️",
+			destination: "00 Inbox",
+		});
+
+		expect(result.noteContentFormat).toContain("# `= this.file.name`");
+		expect(result.noteContentFormat).toContain("**Source:** `= this.source`");
+		expect(result.noteContentFormat).toContain("## Content");
+		expect(result.noteContentFormat).toContain("{{content}}");
+		expect(result.noteContentFormat).toContain(
+			"<!-- highlights:{{highlights|length}} -->",
+		);
+	});
+
+	test("output matches expected capture.json structure", () => {
+		const result = generateWebClipperJson({
+			templateName: "clipping",
+			displayName: "Capture",
+			fields: [
+				{
+					name: "type",
+					displayName: "Type",
+					type: "enum",
+					required: true,
+					enumValues: ["clipping"],
+				},
+				{
+					name: "source",
+					displayName: "Source",
+					type: "string",
+					required: true,
+				},
+				{
+					name: "clipped",
+					displayName: "Clipped",
+					type: "date",
+					required: true,
+				},
+				{
+					name: "domain",
+					displayName: "Domain",
+					type: "string",
+					required: false,
+				},
+				{
+					name: "areas",
+					displayName: "Areas",
+					type: "array",
+					required: false,
+				},
+				{
+					name: "projects",
+					displayName: "Projects",
+					type: "array",
+					required: false,
+				},
+				{
+					name: "resource_type",
+					displayName: "Resource Type",
+					type: "string",
+					required: false,
+				},
+				{
+					name: "capture_reason",
+					displayName: "Capture Reason",
+					type: "string",
+					required: false,
+				},
+			],
+			sections: [{ heading: "Content", hasPrompt: false }],
+			bodyConfig: {
+				titleLine: "# `= this.file.name`",
+				preamble:
+					"**Source:** `= this.source`\n**Clipped:** `= this.clipped`\n\n---",
+				footer: "<!-- highlights:{{highlights|length}} -->",
+				skipTemplateVersion: true,
+			},
+			titlePrefix: "✂️",
+			destination: "00 Inbox",
+		});
+
+		// Match the hand-maintained capture.json structure
+		expect(result.properties).toHaveLength(8);
+		expect(result.properties.map((p) => p.name)).toEqual([
+			"type",
+			"source",
+			"clipped",
+			"domain",
+			"areas",
+			"projects",
+			"resource_type",
+			"capture_reason",
+		]);
 	});
 });
 

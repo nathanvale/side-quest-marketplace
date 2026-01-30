@@ -169,6 +169,60 @@ template_version: 1
 		);
 	});
 
+	test("generates template with bodyConfig (clipping)", () => {
+		const config: TemplateConfig = {
+			name: "clipping",
+			displayName: "Clipping",
+			noteType: "clipping",
+			version: 2,
+			fields: [
+				{
+					name: "type",
+					displayName: "Type",
+					type: "enum",
+					required: true,
+					enumValues: ["clipping"],
+					default: "clipping",
+				},
+				{
+					name: "source",
+					displayName: "Source",
+					type: "string",
+					required: true,
+				},
+			],
+			sections: [
+				{
+					heading: "Capture Reason",
+					hasPrompt: false,
+					content: "`= this.capture_reason`",
+				},
+				{ heading: "Content", hasPrompt: false },
+			],
+			bodyConfig: {
+				titleLine: "# `= this.file.name`",
+				preamble:
+					"**Source:** `= this.source`\n**Clipped:** `= this.clipped`\n\n---",
+			},
+		};
+
+		const result = generateTemplate(config, { syntax: "native" });
+
+		// Has template_version
+		expect(result).toContain("template_version: 2");
+		// Custom H1
+		expect(result).toContain("# `= this.file.name`");
+		expect(result).not.toContain("# {{title}}");
+		// Preamble
+		expect(result).toContain("**Source:** `= this.source`");
+		expect(result).toContain("**Clipped:** `= this.clipped`");
+		// Capture Reason section with Dataview inline
+		expect(result).toContain("## Capture Reason");
+		expect(result).toContain("`= this.capture_reason`");
+		// Content section
+		expect(result).toContain("## Content");
+	});
+
 	test("generates template with all field types", () => {
 		const config: TemplateConfig = {
 			name: "comprehensive",

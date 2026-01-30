@@ -41,8 +41,9 @@ export function generateTemplate(
 		config.fields,
 		config.version,
 		syntax,
+		{ skipTemplateVersion: config.bodyConfig?.skipTemplateVersion },
 	);
-	const body = generateBody(config.sections, syntax);
+	const body = generateBody(config.sections, syntax, config.bodyConfig);
 
 	return `${frontmatter}\n\n${body}`;
 }

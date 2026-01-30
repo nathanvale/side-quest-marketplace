@@ -2,6 +2,22 @@
 
 Process `youtube.com` or `youtu.be` URLs into clipping notes.
 
+## Step 0 — Discover Template Metadata
+
+Before creating notes, query the youtube-video template for its current structure:
+
+```
+para_template_fields({ template: "youtube-video", response_format: "json" })
+```
+
+Extract from response:
+- `validArgs` → which args to pass (e.g., `source`, `video_id`, `channel`, `duration`, `published`, `clipped`)
+- `creation_meta.dest` → destination folder
+- `creation_meta.contentTargets` → section headings for content injection
+- `creation_meta.sections` → all body section headings (e.g., `"Description"`, `"Transcript"`, `"AI Summary"`)
+
+Use these discovered values instead of hardcoding them.
+
 ## Extraction Tools
 
 Use YouTube MCP tools (from `youtube-transcript` server):
@@ -29,33 +45,32 @@ Returns: Full transcript text (may be paginated - check for `next_cursor`)
 
 ## Note Creation (Single Call)
 
-The `youtube-video` template has these headings for content injection:
-- `## Description` - Video description from API
-- `## Transcript` - Full transcript from API
-- `## AI Summary` - Generated summary (3 bullet points)
+Use the section headings discovered from Step 0 (`creation_meta.sections`) for content injection. Typical sections include Description, Transcript, and AI Summary.
 
 ```
 para_create({
   template: "youtube-video",
   title: "{Channel} - {Video Title}",
-  dest: "00 Inbox",
+  dest: "<discovered-dest>",
   args: {},
   content: {
-    "Description": "[Video description from API]",
-    "Transcript": "[Full transcript from get_transcript]",
-    "AI Summary": "> - Key insight 1\n> - Key insight 2\n> - Key insight 3"
+    "<discovered-description-section>": "[Video description from API]",
+    "<discovered-transcript-section>": "[Full transcript from get_transcript]",
+    "<discovered-ai-summary-section>": "> - Key insight 1\n> - Key insight 2\n> - Key insight 3"
   },
   response_format: "json"
 })
 ```
 
-**CRITICAL:** Use exact heading names: `"Description"`, `"Transcript"`, `"AI Summary"`.
+**CRITICAL:** Use the exact heading names from `creation_meta.sections` discovered in Step 0. Do not hardcode section names.
 
 ## Set Frontmatter
 
+Use the fields from `validArgs` discovered in Step 0:
+
 ```
 para_fm_set({
-  file: "00 Inbox/✂️🎬 {Channel} - {Video Title}.md",
+  file: "<discovered-dest>/✂️🎬 {Channel} - {Video Title}.md",
   set: {
     source: "https://www.youtube.com/watch?v=...",
     video_id: "dQw4w9WgXcQ",
@@ -76,7 +91,7 @@ para_fm_set({
 ```markdown
 ---
 type: clipping
-clipping_type: youtube-video
+resource_type: youtube-video
 source: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 video_id: dQw4w9WgXcQ
 channel: Rick Astley
@@ -85,7 +100,6 @@ published: 2009-10-25
 clipped: 2026-01-09
 consumption_status: to-watch
 transcript_status: complete
-distill_status: raw
 ---
 
 # Rick Astley - Never Gonna Give You Up

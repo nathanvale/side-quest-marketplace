@@ -26,7 +26,7 @@ import {
 	DEFAULT_CONVERTERS as DEFAULT_INBOX_CONVERTERS,
 	mergeConverters,
 } from "../inbox";
-import type { TemplateSection } from "./defaults";
+import type { TemplateBodyConfig, TemplateSection } from "./defaults";
 import {
 	DEFAULT_AVAILABLE_MODELS,
 	DEFAULT_DESTINATIONS,
@@ -34,6 +34,7 @@ import {
 	DEFAULT_MODEL,
 	DEFAULT_PARA_FOLDERS,
 	DEFAULT_PARA_SEARCH_FOLDERS,
+	DEFAULT_TEMPLATE_BODY_CONFIG,
 	DEFAULT_TEMPLATE_SECTIONS,
 	DEFAULT_TEMPLATE_VERSIONS,
 	DEFAULT_TITLE_PREFIXES,
@@ -151,6 +152,8 @@ export interface ParaObsidianConfig {
 	readonly templateSections?: Partial<
 		Record<string, ReadonlyArray<TemplateSection>>
 	>;
+	/** Template body configuration overrides (custom H1, preamble, footer). */
+	readonly templateBodyConfig?: Partial<Record<string, TemplateBodyConfig>>;
 	/** Inbox converter overrides (merged with defaults). */
 	readonly inboxConverters?: ReadonlyArray<
 		Partial<InboxConverter> & { id: string }
@@ -357,6 +360,10 @@ export function loadConfig(
 		templateSections: mergeTemplateSections(
 			DEFAULT_TEMPLATE_SECTIONS,
 			merged.templateSections ?? {},
+		),
+		templateBodyConfig: mergePerTemplate(
+			DEFAULT_TEMPLATE_BODY_CONFIG as Record<string, TemplateBodyConfig>,
+			(merged.templateBodyConfig ?? {}) as Record<string, TemplateBodyConfig>,
 		),
 		inboxConverters: mergeConverters(
 			DEFAULT_INBOX_CONVERTERS,

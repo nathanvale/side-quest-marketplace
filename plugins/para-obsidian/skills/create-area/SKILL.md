@@ -180,29 +180,45 @@ Examples for "Health":
 **Ready to create?** (yes / tell me what to change)
 ```
 
-### 3.2 Create Area Note
+### 3.2 Discover Template Metadata
+
+Before creating, query the area template for its current structure:
+
+```
+para_template_fields({ template: "area", response_format: "json" })
+```
+
+Extract from response:
+- `validArgs` → which args to pass (e.g., status field name)
+- `creation_meta.dest` → destination folder
+- `creation_meta.sections` → body section headings
+- `creation_meta.titlePrefix` → emoji prefix (auto-applied)
+
+### 3.3 Create Area Note
+
+Use discovered values from Step 3.2 (`creation_meta.dest` for dest, `creation_meta.sections` for section headings, `validArgs` for field names):
 
 ```
 para_create({
   template: "area",
-  title: "[Area name without emoji - template adds 🌱]",
-  dest: "02 Areas",
+  title: "[Area name without emoji - template adds prefix]",
+  dest: "<discovered-dest>",
   args: {
-    "Status (active/inactive)": "active"
+    "<discovered-status-field>": "active"
   },
   content: {
-    "Description": "[What this area encompasses]",
-    "Standards to Maintain": "[Checklist from Phase 2.1]",
-    "Routines & Habits": "[Routines from Phase 2.2]"
+    "<discovered-description-section>": "[What this area encompasses]",
+    "<discovered-standards-section>": "[Checklist from Phase 2.1]",
+    "<discovered-routines-section>": "[Routines from Phase 2.2]"
   },
   response_format: "json"
 })
 ```
 
-### 3.3 Confirm Creation
+### 3.4 Confirm Creation
 
 ```
-Created: 🌱 [Area Name].md → 02 Areas
+Created: 🌱 [Area Name].md → [discovered-dest]
 
 This area is now ready to:
 - Track projects that serve this responsibility

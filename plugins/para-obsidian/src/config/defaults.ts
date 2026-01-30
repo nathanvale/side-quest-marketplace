@@ -155,24 +155,6 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 			focus_areas: { type: "string", optional: true },
 		},
 	},
-	capture: {
-		required: {
-			created: { type: "date" },
-			type: { type: "enum", enum: ["capture"] },
-			status: { type: "enum", enum: ["inbox"] },
-			source: {
-				type: "enum",
-				enum: ["thought", "article", "conversation", "meeting", "email"],
-			},
-			resonance: {
-				type: "enum",
-				enum: ["inspiring", "useful", "personal", "surprising"],
-			},
-			urgency: { type: "enum", enum: ["high", "medium", "low"] },
-			areas: { type: "array", optional: true },
-			projects: { type: "array", optional: true },
-		},
-	},
 	checklist: {
 		required: {
 			created: { type: "date" },
@@ -393,17 +375,12 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 	clipping: {
 		required: {
 			type: { type: "enum", enum: ["clipping"] },
-			clipping_type: {
-				type: "string",
-				description:
-					"Content type (article, youtube, recipe, etc.) — set by clipping processor at runtime",
-			},
 			source: { type: "string" },
 			clipped: { type: "date" },
-			distill_status: {
-				type: "enum",
-				enum: ["raw", "in-progress", "distilled"],
+			domain: {
+				type: "string",
 				optional: true,
+				description: "Domain of the source URL (e.g. github.com)",
 			},
 			areas: {
 				type: "array",
@@ -414,6 +391,17 @@ export const DEFAULT_FRONTMATTER_RULES: NonNullable<
 				type: "array",
 				optional: true,
 				description: "Wikilinks to related projects (multi-select)",
+			},
+			resource_type: {
+				type: "string",
+				optional: true,
+				description:
+					"Content type (article, youtube, recipe, etc.) — set during triage",
+			},
+			capture_reason: {
+				type: "string",
+				optional: true,
+				description: "Why this was clipped — set during triage",
 			},
 		},
 	},
@@ -471,7 +459,7 @@ export const DEFAULT_TEMPLATE_SECTIONS: Partial<
 			heading: "Key Resources",
 			hasPrompt: false,
 			content:
-				'```dataview\nTABLE\n  clipping_type as "Type",\n  summary as "Summary",\n  clipped as "Clipped"\nWHERE type = "clipping" AND (contains(project, this.file.link) OR contains(projects, this.file.link))\nSORT clipped DESC\n```',
+				'```dataview\nTABLE\n  resource_type as "Type",\n  domain as "Domain",\n  clipped as "Clipped"\nWHERE type = "clipping" AND (contains(project, this.file.link) OR contains(projects, this.file.link))\nSORT clipped DESC\n```',
 		},
 		{ heading: "Stakeholders", hasPrompt: false },
 		{ heading: "Risks & Blockers", hasPrompt: false },
@@ -748,35 +736,6 @@ export const DEFAULT_TEMPLATE_SECTIONS: Partial<
 			comment: "Any additional reflections",
 		},
 	],
-	capture: [
-		{
-			heading: "Capture",
-			hasPrompt: false,
-			comment: "The raw content you're saving",
-		},
-		{
-			heading: "Why I Saved This",
-			hasPrompt: false,
-			content:
-				"| Field | Value |\n|---|---|\n| **Source** | `= this.source` |\n| **Resonance** | `= this.resonance` |\n| **Urgency** | `= this.urgency` |\n| **Captured** | `= this.created` |",
-		},
-		{
-			heading: "Processing Notes",
-			hasPrompt: false,
-			comment: "To be filled during inbox processing",
-		},
-		{
-			heading: "Connections",
-			hasPrompt: false,
-			content: "**Projects:**\n`= this.projects`\n\n**Areas:**\n`= this.areas`",
-			comment: "What does this relate to?",
-		},
-		{
-			heading: "Next Actions",
-			hasPrompt: false,
-			content: "- [ ] Process within 48 hours",
-		},
-	],
 	checklist: [
 		{
 			heading: "Status",
@@ -991,10 +950,49 @@ export const DEFAULT_TEMPLATE_SECTIONS: Partial<
 
 	// === UNIFIED CLIPPING TEMPLATE ===
 	clipping: [
-		{ heading: "AI Summary", hasPrompt: false },
-		{ heading: "Why I Saved This", hasPrompt: false },
+		{
+			heading: "Capture Reason",
+			hasPrompt: false,
+			content: "`= this.capture_reason`",
+		},
 		{ heading: "Content", hasPrompt: false },
 	],
+};
+
+/**
+ * Body configuration overrides for template generation.
+ *
+ * Templates with body config get custom H1 lines, preamble blocks,
+ * and footer content instead of the standard `# {{title}}` heading.
+ * Used to align vault templates with Web Clipper output format.
+ */
+export interface TemplateBodyConfig {
+	/** Custom H1 line (replaces default `# {{title}}`). */
+	readonly titleLine?: string;
+	/** Content between H1 and first ## section. */
+	readonly preamble?: string;
+	/** Content after the last section (Web Clipper only, not emitted in vault template). */
+	readonly footer?: string;
+	/** Whether to skip template_version in frontmatter. */
+	readonly skipTemplateVersion?: boolean;
+}
+
+/**
+ * Default body configuration per template type.
+ *
+ * Templates listed here get custom body structure instead of the
+ * standard `# {{title}}` heading. Currently only clipping uses this
+ * to match Web Clipper output format.
+ */
+export const DEFAULT_TEMPLATE_BODY_CONFIG: Partial<
+	Record<string, TemplateBodyConfig>
+> = {
+	clipping: {
+		titleLine: "# `= this.file.name`",
+		preamble:
+			"**Source:** `= this.source`\n**Clipped:** `= this.clipped`\n\n---",
+		footer: "<!-- highlights:{{highlights|length}} -->",
+	},
 };
 
 export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
@@ -1006,7 +1004,6 @@ export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
 	task: 1,
 	daily: 1,
 	"weekly-review": 1,
-	capture: 1,
 	checklist: 1,
 	booking: 1,
 	itinerary: 1,
@@ -1022,7 +1019,7 @@ export const DEFAULT_TEMPLATE_VERSIONS: Record<string, number> = {
 	document: 1,
 	meeting: 1,
 	// Unified clipping template
-	clipping: 1,
+	clipping: 2,
 };
 
 /**
@@ -1039,7 +1036,6 @@ export const DEFAULT_DESTINATIONS: Record<string, string> = {
 	task: "00 Inbox",
 	daily: "00 Inbox",
 	"weekly-review": "00 Inbox",
-	capture: "00 Inbox",
 	booking: "04 Archives/Bookings",
 	checklist: "00 Inbox",
 	itinerary: "00 Inbox",
@@ -1119,7 +1115,7 @@ export const DEFAULT_PARA_SEARCH_FOLDERS = [
  * - Specific types (research, booking, trip) get prefixes
  * - Resources follow Forte's style (no prefix)
  * - Tasks don't need prefixes (action-oriented by nature)
- * - Captures are temporary inbox items (no prefix)
+ * - Tasks are action-oriented (no prefix)
  * - Clippings use ✂️ plus type-specific emoji
  */
 export const DEFAULT_TITLE_PREFIXES: Partial<Record<string, string>> = {

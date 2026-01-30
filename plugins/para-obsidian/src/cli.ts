@@ -35,7 +35,6 @@ import {
 	handleList,
 	handleListAreas,
 	handleMigrateRemoveTags,
-	handleProcess,
 	handleProcessInbox,
 	handleRead,
 	handleRegistry,
@@ -74,7 +73,6 @@ function printUsage(): void {
 		"  para rewrite-links --from <link> --to <link> [--dry-run] [--format md|json]",
 		"",
 		"Inbox Processing:",
-		"  para process [--dry-run] [--verbose] [--skip-enrichment] [--format md|json]",
 		"  para process-inbox [--auto] [--preview] [--dry-run] [--filter pattern] [--force]",
 		"  para inbox move [--format md|json]",
 		"  para enrich <action> [target|--all] [--dry-run] [--format md|json]",
@@ -100,7 +98,6 @@ function printUsage(): void {
 		"  para voice serve [--port 3847]      # Start HTTP server for iOS Shortcuts",
 		"",
 		"Shorter aliases:",
-		"  para p           (alias for process)",
 		"  para scan        (alias for process-inbox)",
 		"  para execute     (alias for process-inbox --auto)",
 		"  para move        (alias for inbox move)",
@@ -277,19 +274,6 @@ async function main(): Promise<void> {
 
 			case "git": {
 				const result = await handleGit(ctx);
-				if (!result.success) process.exit(result.exitCode ?? 1);
-				break;
-			}
-
-			case "process": {
-				const result = await handleProcess(ctx);
-				if (!result.success) process.exit(result.exitCode ?? 1);
-				break;
-			}
-
-			case "p": {
-				// Alias for 'process'
-				const result = await handleProcess(ctx);
 				if (!result.success) process.exit(result.exitCode ?? 1);
 				break;
 			}

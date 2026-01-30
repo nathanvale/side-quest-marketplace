@@ -4,9 +4,9 @@
  * Strategy for classifying raw web clippings by type.
  *
  * This strategy:
- * 1. Checks if file has type:clipping and distill_status:raw
+ * 1. Checks if file has type:clipping and no resource_type yet
  * 2. Classifies clipping type from URL and content patterns
- * 3. Sets clipping_type and distill_status:classified
+ * 3. Sets resource_type for downstream enrichment
  * 4. For YouTube: extracts video_id and sets transcript_status:pending
  *
  * Features:
@@ -34,7 +34,7 @@ const log = enrichLogger;
 /**
  * Clipping classification strategy.
  *
- * Handles files with type:clipping and distill_status:raw.
+ * Handles files with type:clipping that have no resource_type yet.
  * Classifies the clipping type and prepares for downstream enrichment.
  */
 export const clippingClassificationStrategy: EnrichmentStrategy = {
@@ -53,14 +53,14 @@ export const clippingClassificationStrategy: EnrichmentStrategy = {
 			};
 		}
 
-		// Must have raw distill_status
-		if (frontmatter.distill_status !== "raw") {
+		// Must not already have a resource_type (not yet classified)
+		if (frontmatter.resource_type) {
 			if (log) {
-				log.debug`Clipping eligibility: not raw file=${file.filename} status=${frontmatter.distill_status}`;
+				log.debug`Clipping eligibility: already classified file=${file.filename} resource_type=${frontmatter.resource_type}`;
 			}
 			return {
 				eligible: false,
-				reason: "Clipping already classified or skipped",
+				reason: "Clipping already classified",
 			};
 		}
 
@@ -138,7 +138,7 @@ export const clippingClassificationStrategy: EnrichmentStrategy = {
 
 /**
  * Applies clipping classification enrichment to frontmatter.
- * Updates clipping_type, distill_status, and optionally video_id/transcript_status.
+ * Sets resource_type and optionally video_id/transcript_status.
  *
  * @param frontmatter - Original frontmatter
  * @param enrichment - Enrichment data from strategy
@@ -150,8 +150,7 @@ export function applyClippingClassification(
 ): Record<string, unknown> {
 	const updated: Record<string, unknown> = {
 		...frontmatter,
-		clipping_type: enrichment.clippingType,
-		distill_status: "classified",
+		resource_type: enrichment.clippingType,
 		classified_at: enrichment.classifiedAt,
 	};
 

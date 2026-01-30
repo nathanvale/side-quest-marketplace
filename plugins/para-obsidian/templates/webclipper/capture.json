@@ -2,7 +2,7 @@
 	"schemaVersion": "0.1.0",
 	"name": "Capture",
 	"behavior": "create",
-	"noteContentFormat": "# `= this.file.name`\n\n**Source:** [{{domain}}]({{url}})\n**Clipped:** {{time|date:\"YYYY-MM-DD HH:mm\"}}\n\n---\n\n## Content\n\n{{content}}\n\n<!-- highlights:{{highlights|length}} -->",
+	"noteContentFormat": "# `= this.file.name`\n\n**Source:** `= this.source`\n**Clipped:** `= this.clipped`\n\n---\n\n## Capture Reason\n\n`= this.capture_reason`\n\n## Content\n\n{{content}}\n\n<!-- highlights:{{highlights|length}} -->",
 	"properties": [
 		{
 			"name": "type",

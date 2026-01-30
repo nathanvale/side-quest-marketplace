@@ -31,7 +31,6 @@ type: clipping
 source: <url>
 clipped: <date>
 domain: <domain>
-distill_status: raw
 ```
 
 No decisions required. No analysis paralysis. Just capture.
@@ -98,13 +97,6 @@ Optional - stored in frontmatter as `capture_reason`.
 ```
 plugins/para-obsidian/templates/webclipper/capture.json
 ```
-
----
-
-## Archived Templates
-
-Previous 15 specialized templates are in `archived/` for reference.
-They were replaced to reduce decision fatigue at capture time.
 
 ---
 

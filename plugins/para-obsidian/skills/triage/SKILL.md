@@ -351,7 +351,7 @@ Notes are ALREADY created by subagents. Phase 5 handles:
 | `transcription` | **Archive** via `para_rename` to `04 Archives/Transcriptions/`, then **update** resource note `source` to `[[archived note]]` via `para_fm_set` | Raw recordings have intrinsic value - NEVER delete. Resource note must link back to archived transcription |
 | `clipping` | **Delete** via `para_delete` | Content captured in resource note |
 | `attachment` | **Delete** inbox note via `para_delete` | PDF/DOCX stays in `Attachments/` |
-| `capture` | **Keep** in inbox | No action needed |
+| `clipping` (non-URL) | **Keep** in inbox | Thought/conversation clippings are manual review items |
 
 **NEVER use `para_delete` on transcriptions.** Always use `para_rename` to archive them.
 

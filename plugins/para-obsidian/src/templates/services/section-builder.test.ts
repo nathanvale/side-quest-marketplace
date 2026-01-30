@@ -314,3 +314,68 @@ describe("generateBody (native syntax)", () => {
 		expect(result).toContain("## Notes");
 	});
 });
+
+describe("generateBody (bodyConfig)", () => {
+	test("uses custom titleLine from bodyConfig", () => {
+		const sections: TemplateSection[] = [
+			{ heading: "Content", hasPrompt: false },
+		];
+
+		const result = generateBody(sections, "native", {
+			titleLine: "# `= this.file.name`",
+		});
+
+		expect(result).toContain("# `= this.file.name`");
+		expect(result).not.toContain("# {{title}}");
+	});
+
+	test("inserts preamble between title and sections", () => {
+		const sections: TemplateSection[] = [
+			{ heading: "Content", hasPrompt: false },
+		];
+
+		const result = generateBody(sections, "native", {
+			titleLine: "# `= this.file.name`",
+			preamble:
+				"**Source:** `= this.source`\n**Clipped:** `= this.clipped`\n\n---",
+		});
+
+		expect(result).toBe(
+			`# \`= this.file.name\`
+
+**Source:** \`= this.source\`
+**Clipped:** \`= this.clipped\`
+
+---
+
+## Content
+
+`,
+		);
+	});
+
+	test("footer is NOT emitted in body (Web Clipper only)", () => {
+		const sections: TemplateSection[] = [
+			{ heading: "Content", hasPrompt: false },
+		];
+
+		const result = generateBody(sections, "native", {
+			titleLine: "# `= this.file.name`",
+			footer: "<!-- highlights:{{highlights|length}} -->",
+		});
+
+		// Footer should NOT appear in vault template body
+		expect(result).not.toContain("highlights");
+	});
+
+	test("bodyConfig with no titleLine falls back to syntax default", () => {
+		const sections: TemplateSection[] = [];
+
+		const result = generateBody(sections, "native", {
+			preamble: "Some preamble",
+		});
+
+		expect(result).toContain("# {{title}}");
+		expect(result).toContain("Some preamble");
+	});
+});

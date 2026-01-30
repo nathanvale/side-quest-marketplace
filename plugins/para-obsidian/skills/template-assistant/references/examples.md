@@ -163,33 +163,6 @@ para_create({
 
 ---
 
-## Capture Examples
-
-### Quick Idea
-
-**User:** "Capture: What if we used AI to generate meeting summaries automatically?"
-
-**Generated MCP Call:**
-```typescript
-para_create({
-  template: "capture",
-  title: "AI Meeting Summary Idea",
-  args: {
-    "Title": "AI Meeting Summary Idea",
-    "Captured from (thought/article/conversation/etc.)": "thought",
-    "Resonance (inspiring/useful/personal/surprising)": "useful",
-    "Urgency (high/medium/low)": "medium",
-    "Content": "What if we used AI to generate meeting summaries automatically? Could integrate with Zoom/Teams recordings, extract action items, and push to project notes."
-  },
-  content: {
-    "Why I Saved This": "This could save significant time on meeting overhead. Potential application to [[Productivity Tools]] research. Worth exploring existing solutions before building."
-  },
-  response_format: "json"
-})
-```
-
----
-
 ## Conversation Flow Example
 
 ### Full Project Creation Dialogue
@@ -226,7 +199,7 @@ I'll generate success criteria and next actions based on typical web redesign pr
 
 **Error:** "Template not found: projectt"
 
-**Recovery:** "I couldn't find template 'projectt'. Did you mean 'project'? Use `para_templates({ response_format: "json" })` to list available templates: project, area, resource, task, capture, daily, weekly-review, booking, checklist, itinerary-day, trip-research."
+**Recovery:** "I couldn't find template 'projectt'. Did you mean 'project'? Use `para_templates({ response_format: "json" })` to list available templates: project, area, resource, task, clipping, daily, weekly-review, booking, checklist, itinerary-day, trip-research."
 
 ### Missing Required Arg
 

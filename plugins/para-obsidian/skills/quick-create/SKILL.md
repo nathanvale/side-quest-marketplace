@@ -171,7 +171,7 @@ Build the proposal using the canonical schema from @../triage/references/proposa
 }
 ```
 
-**Note:** The canonical schema also includes `"capture"` as a `proposed_template` value. Quick-create never produces captures — URL input always has enough content to classify into a specific template.
+**Note:** Quick-create always classifies URL input into a specific template (resource, meeting, invoice, booking). For quick text captures without classification, use `/para-obsidian:clip` instead.
 
 #### 3.7 Present Proposal & Gate
 

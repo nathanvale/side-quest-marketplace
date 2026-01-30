@@ -371,4 +371,77 @@ template_version: 1
 ---`,
 		);
 	});
+
+	test("skipTemplateVersion omits template_version line", () => {
+		const fields: TemplateField[] = [
+			{
+				name: "type",
+				displayName: "Type",
+				type: "enum",
+				required: true,
+				enumValues: ["clipping"],
+				default: "clipping",
+			},
+		];
+
+		const result = generateFrontmatter(fields, 1, "native", {
+			skipTemplateVersion: true,
+		});
+
+		expect(result).toBe(
+			`---
+type: "{{Type:clipping}}"
+---`,
+		);
+		expect(result).not.toContain("template_version");
+	});
+
+	test("optional string field with no default emits empty value in native syntax", () => {
+		const fields: TemplateField[] = [
+			{
+				name: "resource_type",
+				displayName: "Resource Type",
+				type: "string",
+				required: false,
+			},
+		];
+
+		const result = generateFrontmatter(fields, 1, "native");
+
+		expect(result).toContain('resource_type: ""');
+		expect(result).not.toContain("{{Resource Type}}");
+	});
+
+	test("optional string field with empty default emits empty value in native syntax", () => {
+		const fields: TemplateField[] = [
+			{
+				name: "capture_reason",
+				displayName: "Capture Reason",
+				type: "string",
+				required: false,
+				default: "",
+			},
+		];
+
+		const result = generateFrontmatter(fields, 1, "native");
+
+		expect(result).toContain('capture_reason: ""');
+	});
+
+	test("optional wikilink field still uses wikilink syntax in native mode", () => {
+		const fields: TemplateField[] = [
+			{
+				name: "project",
+				displayName: "Project",
+				type: "wikilink",
+				required: false,
+				default: "",
+			},
+		];
+
+		const result = generateFrontmatter(fields, 1, "native");
+
+		// Wikilinks are handled before the optional-empty check
+		expect(result).toContain('project: "[[{{Project}}]]"');
+	});
 });

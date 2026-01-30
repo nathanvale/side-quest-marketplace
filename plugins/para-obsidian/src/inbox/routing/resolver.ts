@@ -8,6 +8,11 @@
 
 import { join } from "node:path";
 import { isDirectorySync } from "@sidequest/core/fs";
+import { DEFAULT_PARA_FOLDERS } from "../../config/defaults";
+
+// Well-known folder paths from DEFAULT_PARA_FOLDERS (compile-time safe constants)
+const PROJECTS_FOLDER = DEFAULT_PARA_FOLDERS.projects!;
+const AREAS_FOLDER = DEFAULT_PARA_FOLDERS.areas!;
 
 /**
  * Strip wikilink brackets from a field value.
@@ -190,9 +195,9 @@ export function resolveDestination(
 		}
 
 		// Case-insensitive lookup for folder or note file
-		const match = findMatchingPath("01 Projects", cleanProject, vaultPath);
+		const match = findMatchingPath(PROJECTS_FOLDER, cleanProject, vaultPath);
 		if (match) {
-			const folderPath = join("01 Projects", match.name);
+			const folderPath = join(PROJECTS_FOLDER, match.name);
 			if (match.isFolder) {
 				// Folder exists, route directly into it
 				return { destination: folderPath };
@@ -201,7 +206,7 @@ export function resolveDestination(
 			return {
 				destination: folderPath,
 				colocate: {
-					sourceNotePath: join("01 Projects", `${match.name}.md`),
+					sourceNotePath: join(PROJECTS_FOLDER, `${match.name}.md`),
 					folderPath,
 				},
 			};
@@ -219,9 +224,9 @@ export function resolveDestination(
 		}
 
 		// Case-insensitive lookup for folder or note file
-		const match = findMatchingPath("02 Areas", cleanArea, vaultPath);
+		const match = findMatchingPath(AREAS_FOLDER, cleanArea, vaultPath);
 		if (match) {
-			const folderPath = join("02 Areas", match.name);
+			const folderPath = join(AREAS_FOLDER, match.name);
 			if (match.isFolder) {
 				// Folder exists, route directly into it
 				return { destination: folderPath };
@@ -230,7 +235,7 @@ export function resolveDestination(
 			return {
 				destination: folderPath,
 				colocate: {
-					sourceNotePath: join("02 Areas", `${match.name}.md`),
+					sourceNotePath: join(AREAS_FOLDER, `${match.name}.md`),
 					folderPath,
 				},
 			};

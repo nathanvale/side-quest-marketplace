@@ -2,6 +2,22 @@
 
 Process `twitter.com` or `x.com` URLs into clipping notes.
 
+## Step 0 — Discover Template Metadata
+
+Before creating notes, query the tweet template for its current structure:
+
+```
+para_template_fields({ template: "tweet---x-post", response_format: "json" })
+```
+
+Extract from response:
+- `validArgs` → which args to pass (e.g., `source`, `clipped`, `author`, `handle`, `posted`, `ai_summary`, `topics`, `sentiment`)
+- `creation_meta.dest` → destination folder
+- `creation_meta.contentTargets` → section headings for content injection
+- `creation_meta.sections` → all body section headings
+
+Use these discovered values instead of hardcoding them.
+
 ## Extraction Challenge
 
 **X requires JavaScript** - Firecrawl and WebFetch cannot scrape X.com directly.
@@ -41,23 +57,25 @@ Generate these from the scraped content:
 
 ## Note Creation
 
+Use discovered values from Step 0 (`creation_meta.dest` for dest, `creation_meta.contentTargets` for section headings, `validArgs` for field names):
+
 ```
 para_create({
   template: "tweet---x-post",
   title: "{Author} - {AI-generated 3-6 word topic}",
-  dest: "00 Inbox",
+  dest: "<discovered-dest>",
   content: {
-    "Content": "[Full post text]",
-    "AI Summary": "> [Generated summary]"
+    "<discovered-content-target>": "[Full post text]",
+    "<discovered-ai-summary-section>": "> [Generated summary]"
   },
   response_format: "json"
 })
 ```
 
-Then set frontmatter:
+Then set frontmatter (use only fields from `validArgs`):
 ```
 para_fm_set({
-  file: "00 Inbox/...",
+  file: "<discovered-dest>/...",
   set: {
     source: "https://x.com/...",
     author: "Matt Pocock",
@@ -81,7 +99,7 @@ Generate a unique title from content to prevent filename collisions.
 ```markdown
 ---
 type: clipping
-clipping_type: tweet
+resource_type: tweet
 source: "https://x.com/mattpocockuk/status/123456789"
 clipped: 2026-01-09
 author: Matt Pocock
@@ -90,7 +108,6 @@ posted: 2026-01-09
 ai_summary: AI coding agent loops using Ralph and Claude
 topics: AI, programming, automation
 sentiment: positive
-distill_status: raw
 ---
 
 # Matt Pocock - AI Coding Agents With Ralph

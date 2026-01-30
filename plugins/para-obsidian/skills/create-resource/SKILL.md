@@ -2,7 +2,7 @@
 name: create-resource
 description: Create resource notes from analyzed proposals. Use when triage orchestrator routes a proposal with proposed_template=resource. Handles frontmatter setup and original file cleanup via para_create.
 user-invocable: false
-allowed-tools: mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_delete, mcp__plugin_para-obsidian_para-obsidian__para_rename
+allowed-tools: mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_delete, mcp__plugin_para-obsidian_para-obsidian__para_rename, mcp__plugin_para-obsidian_para-obsidian__para_template_fields
 ---
 
 # Create Resource
@@ -36,15 +36,31 @@ Create the resource note and handle the original file.
 
 ## Workflow
 
+### Step 0: Discover Template Metadata
+
+Before creating the note, query the resource template for its current structure:
+
+```
+para_template_fields({ template: "resource", response_format: "json" })
+```
+
+Extract from response:
+- `validArgs` → which args to pass to `para_create`
+- `creation_meta.dest` → destination folder
+- `creation_meta.contentTargets` → section headings for content injection (e.g., `["Layer 1: Captured Notes"]`)
+- `creation_meta.sections` → all body section headings
+
 ### Step 1: Create Resource Note
 
 **CRITICAL:** Use frontmatter-only approach. ALL data in `args`, NEVER in `content`.
+
+Use discovered `validArgs` for field names and `creation_meta.dest` for destination:
 
 ```
 para_create({
   template: "resource",
   title: proposal.proposed_title,
-  dest: "03 Resources",
+  dest: "<discovered-dest>",
   args: {
     summary: proposal.summary,
     source: proposal.source_url,
@@ -89,7 +105,7 @@ Return success with created file path:
 
 ## Frontmatter Fields
 
-The resource template expects these frontmatter fields:
+Use `validArgs` from Step 0 to determine accepted fields. The resource template typically accepts these frontmatter fields, but always verify against discovered `validArgs`:
 
 | Field | Required | Description |
 |-------|----------|-------------|
@@ -121,7 +137,7 @@ If `para_create` fails:
 
 **This skill does NOT inject Layer 1 content.** It only creates the note with frontmatter.
 
-Layer 1 injection (populating "Layer 1: Captured Notes" via `para_replace_section`) is the **calling subagent's responsibility**. The triage subagent has the enriched content in its context and calls `para_replace_section` after `para_create`. See [subagent-prompts.md](../triage/references/subagent-prompts.md) Step 4 for details.
+Layer 1 injection (populating the content target section discovered via `creation_meta.contentTargets[0]` in Step 0, typically "Layer 1: Captured Notes") is the **calling subagent's responsibility**. The triage subagent has the enriched content in its context and calls `para_replace_section` after `para_create`. See [subagent-prompts.md](../triage/references/subagent-prompts.md) Step 4 for details.
 
 ## Why This Skill Exists
 

@@ -12,6 +12,7 @@ import { confirm } from "@inquirer/prompts";
 import { readTextFile } from "@sidequest/core/fs";
 import { globFiles } from "@sidequest/core/glob";
 import { emphasize } from "@sidequest/core/terminal";
+import { DEFAULT_PARA_FOLDERS } from "../config/defaults";
 import { parseFrontmatter } from "../frontmatter/parse";
 import {
 	createEnrichmentPipeline,
@@ -29,13 +30,13 @@ import type { CommandContext, CommandResult } from "./types";
 
 /**
  * Helper to check if frontmatter attributes represent a YouTube note.
- * Accepts both `type: "youtube"` and `type: "clipping"` with `clipping_type: "youtube"`.
+ * Accepts both `type: "youtube"` and `type: "clipping"` with `resource_type: "youtube"`.
  */
 function isYouTubeNote(attributes: Record<string, unknown>): boolean {
 	const type = attributes.type as string | undefined;
-	const clippingType = attributes.clipping_type as string | undefined;
+	const resourceType = attributes.resource_type as string | undefined;
 	return (
-		type === "youtube" || (type === "clipping" && clippingType === "youtube")
+		type === "youtube" || (type === "clipping" && resourceType === "youtube")
 	);
 }
 
@@ -168,7 +169,7 @@ async function handleEnrichYouTube(
 
 	try {
 		const vaultPath = config.vault;
-		const inboxPath = join(vaultPath, "00 Inbox");
+		const inboxPath = join(vaultPath, DEFAULT_PARA_FOLDERS.inbox!);
 
 		if (enrichLogger) {
 			enrichLogger.info`enrich:youtube:start cid=${cid} sessionCid=${sessionCid} target=${target ?? "all"} isAll=${isAll}`;
@@ -242,7 +243,7 @@ async function handleEnrichYouTube(
 				const { attributes } = parseFrontmatter(content);
 
 				const type = attributes.type as string | undefined;
-				const clippingType = attributes.clipping_type as string | undefined;
+				const resourceType = attributes.resource_type as string | undefined;
 				const transcriptStatus = attributes.transcript_status as
 					| string
 					| undefined;
@@ -250,7 +251,7 @@ async function handleEnrichYouTube(
 				if (!isYouTubeNote(attributes)) {
 					const typeInfo =
 						type === "clipping"
-							? `clipping/${clippingType ?? "none"}`
+							? `clipping/${resourceType ?? "none"}`
 							: (type ?? "none");
 					const errorMsg = `File is not a YouTube note (type: ${typeInfo})`;
 
@@ -266,7 +267,7 @@ async function handleEnrichYouTube(
 									error: errorMsg,
 									sessionCid,
 									type: type ?? "none",
-									clipping_type: clippingType,
+									resource_type: resourceType,
 								},
 								null,
 								2,

@@ -277,11 +277,12 @@ type: meeting
 
 **Classification:**
 ```yaml
-type: capture
+type: clipping
+source: thought
 ```
 
 **Reasoning:**
-- Short length (quick capture)
+- Short length (quick thought)
 - Single idea
 - Temporary note
 - Not formal meeting
@@ -518,7 +519,7 @@ type: cv
 - Could fit multiple categories
 - User context needed
 
-**Examples:** Long voice memo (meeting vs capture?), article with video
+**Examples:** Long voice memo (meeting vs clipping?), article with video
 
 ### Low Confidence (Ask User)
 - No clear classifier

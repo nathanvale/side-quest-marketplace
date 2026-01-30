@@ -28,6 +28,8 @@ import {
 import { generateUniqueNotePath } from "../inbox/core/engine-utils";
 import { resolveVaultPath } from "../shared/fs";
 import { templatesLogger as logger } from "../shared/logger";
+import { generateTemplate } from "../templates/generator";
+import type { TemplateInfo } from "../templates/index";
 import {
 	applyDateSubstitutions,
 	detectTitlePromptKey,
@@ -38,6 +40,7 @@ import {
 	hasNativePlaceholders,
 	hasTemplaterSyntax,
 } from "../templates/placeholder";
+import { buildTemplateConfig } from "../templates/services/field-bridge";
 import { applyTitlePrefix } from "../utils/title";
 import { stripWikilinksOrValue } from "../utils/wikilinks";
 import { insertIntoNote, replaceSectionContent } from "./insert";
@@ -514,10 +517,50 @@ export function extractEmojiPrefix(content: string): string | undefined {
 }
 
 /**
+ * Resolves a template by name, checking vault files first then generating from defaults.
+ *
+ * Resolution order:
+ * 1. Vault `.md` file (preserves user customizations and Templater-syntax templates)
+ * 2. Generate from defaults.ts config (single source of truth) — no vault file needed
+ *
+ * This ensures:
+ * - Existing vault templates (including Templater syntax) continue to work
+ * - Skills that create notes via MCP (no vault file) get correct structure from defaults
+ * - The "Template Query API" pattern works: skills call `para_template_fields` to discover
+ *   fields/sections, then `para_create` — defaults provide the template content
+ *
+ * @param config - Para-obsidian configuration
+ * @param templateName - Template name (without .md extension)
+ * @returns Template info, or undefined if not found in either source
+ */
+export function resolveTemplate(
+	config: ParaObsidianConfig,
+	templateName: string,
+): TemplateInfo | undefined {
+	// Check vault file first (preserves user customizations)
+	const vaultTemplate = getTemplate(config, templateName);
+	if (vaultTemplate) return vaultTemplate;
+
+	// Generate from defaults when no vault file exists (single source of truth)
+	const templateConfig = buildTemplateConfig(templateName, config);
+	if (templateConfig) {
+		const content = generateTemplate(templateConfig, { syntax: "native" });
+		return {
+			name: templateName,
+			path: `defaults:${templateName}`,
+			version: templateConfig.version,
+			content,
+		};
+	}
+
+	return undefined;
+}
+
+/**
  * Creates a new note from a template.
  *
  * This function:
- * 1. Loads the specified template
+ * 1. Resolves the template (from defaults or vault file)
  * 2. Detects syntax (native placeholders or Templater)
  * 3. Applies appropriate substitutions for dates and fields
  * 4. Handles emoji_prefix from template frontmatter
@@ -548,7 +591,7 @@ export function createFromTemplate(
 	config: ParaObsidianConfig,
 	options: CreateOptions,
 ): { filePath: string; content: string } {
-	const tpl = getTemplate(config, options.template);
+	const tpl = resolveTemplate(config, options.template);
 	if (!tpl) throw new Error(`Template not found: ${options.template}`);
 
 	// Check for emoji_prefix in template frontmatter (new native approach)

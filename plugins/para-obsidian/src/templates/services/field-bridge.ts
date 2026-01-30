@@ -5,10 +5,18 @@
  * suitable for template generation. This enables generating templates
  * directly from the same rules used for validation.
  *
+ * Also provides `buildTemplateConfig()` which constructs a complete
+ * TemplateConfig from defaults — the single source of truth for
+ * template structure. Used by `createFromTemplate()` and `generateAllTemplates()`.
+ *
  * @module templates/services/field-bridge
  */
-import type { FieldRule, FrontmatterRules } from "../../config/index";
-import type { TemplateField } from "../types";
+import type {
+	FieldRule,
+	FrontmatterRules,
+	ParaObsidianConfig,
+} from "../../config/index";
+import type { TemplateConfig, TemplateField } from "../types";
 
 /**
  * Converts frontmatter rules for a template type into TemplateField definitions.
@@ -175,4 +183,48 @@ function fieldRuleToTemplateField(
  */
 function toDisplayName(name: string): string {
 	return name.replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * Builds a complete TemplateConfig from the merged configuration defaults.
+ *
+ * This is the single source of truth for template structure — it reads
+ * frontmatter rules, sections, body config, and version from config
+ * (which merges defaults + user overrides) and produces a TemplateConfig
+ * suitable for `generateTemplate()`.
+ *
+ * Used by:
+ * - `createFromTemplate()` to generate templates in-memory (no vault file dependency)
+ * - `generateAllTemplates()` to produce vault `.md` files (DRY)
+ *
+ * @param templateName - Template key (e.g., "clipping", "project")
+ * @param config - Loaded para-obsidian configuration (merged defaults + user overrides)
+ * @returns Complete TemplateConfig, or undefined if no rules exist for this template
+ */
+export function buildTemplateConfig(
+	templateName: string,
+	config: ParaObsidianConfig,
+): TemplateConfig | undefined {
+	const rules = config.frontmatterRules?.[templateName];
+	if (!rules) return undefined;
+
+	const fields = fieldRulesToTemplateFields(rules);
+	const sections = config.templateSections?.[templateName] ?? [];
+	const version = config.templateVersions?.[templateName] ?? 1;
+	const bodyConfig = config.templateBodyConfig?.[templateName];
+
+	// Determine the noteType — strip clipping-/processor- prefixes
+	const noteType = templateName
+		.replace(/^clipping-/, "")
+		.replace(/^processor-/, "");
+
+	return {
+		name: templateName,
+		displayName: templateName,
+		noteType,
+		version,
+		fields,
+		sections,
+		bodyConfig,
+	};
 }

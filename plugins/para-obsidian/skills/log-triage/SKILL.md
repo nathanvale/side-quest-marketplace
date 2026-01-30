@@ -99,5 +99,5 @@ Use the Edit tool on the daily note directly.
 Use `para_config` to get vault and templates path.
 Use `para_template_fields` to inspect required fields.
 
-**Primary:** `meeting`, `capture`
+**Primary:** `meeting`, `clipping`
 **Clippings:** In `Templates/Clippings/` - matched by URL domain

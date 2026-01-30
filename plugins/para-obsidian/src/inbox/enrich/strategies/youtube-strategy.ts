@@ -34,13 +34,13 @@ const log = enrichLogger;
 
 /**
  * Check if frontmatter represents a YouTube note.
- * Accepts both `type: "youtube"` and `type: "clipping"` with `clipping_type: "youtube"`.
+ * Accepts both `type: "youtube"` and `type: "clipping"` with `resource_type: "youtube"`.
  */
 function isYouTubeFrontmatter(frontmatter: Record<string, unknown>): boolean {
 	const type = frontmatter.type as string | undefined;
-	const clippingType = frontmatter.clipping_type as string | undefined;
+	const resourceType = frontmatter.resource_type as string | undefined;
 	return (
-		type === "youtube" || (type === "clipping" && clippingType === "youtube")
+		type === "youtube" || (type === "clipping" && resourceType === "youtube")
 	);
 }
 
@@ -339,13 +339,13 @@ export const youtubeEnrichmentStrategy: EnrichmentStrategy = {
 	canEnrich(ctx: EnrichmentContext): EnrichmentEligibility {
 		const { frontmatter, file } = ctx;
 
-		// Must be a YouTube video type (either type:youtube or type:clipping with clipping_type:youtube)
+		// Must be a YouTube video type (either type:youtube or type:clipping with resource_type:youtube)
 		if (!isYouTubeFrontmatter(frontmatter)) {
 			const type = frontmatter.type as string | undefined;
-			const clippingType = frontmatter.clipping_type as string | undefined;
+			const resourceType = frontmatter.resource_type as string | undefined;
 			const typeInfo =
 				type === "clipping"
-					? `clipping/${clippingType ?? "none"}`
+					? `clipping/${resourceType ?? "none"}`
 					: (type ?? "none");
 			return {
 				eligible: false,

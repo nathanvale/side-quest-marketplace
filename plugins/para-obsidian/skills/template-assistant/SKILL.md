@@ -1,6 +1,6 @@
 ---
 name: template-assistant
-description: Generate intelligent content for PARA Obsidian vault templates. Use when asked to create new notes (project, area, resource, task, capture, daily, weekly-review, booking, checklist, itinerary, trip-research), populate template sections with AI-generated content, or understand what fields a template requires before creation.
+description: Generate intelligent content for PARA Obsidian vault templates. Use when asked to create new notes (project, area, resource, task, clipping, daily, weekly-review, booking, checklist, itinerary, trip-research), populate template sections with AI-generated content, or understand what fields a template requires before creation.
 user-invocable: true
 allowed-tools: mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_list_areas, mcp__plugin_para-obsidian_para-obsidian__para_list_projects, mcp__plugin_para-obsidian_para-obsidian__para_templates, mcp__plugin_para-obsidian_para-obsidian__para_template_fields, mcp__plugin_para-obsidian_para-obsidian__para_fm_validate, AskUserQuestion
 ---
@@ -73,7 +73,7 @@ Ask focused questions matching the template type:
 
 **Content-Heavy** (project, resource, weekly-review, daily): Generate paragraphs, bullet lists, `[[wikilinks]]`
 
-**Metadata-Heavy** (task, booking, checklist, capture): Focus on frontmatter, minimal body content
+**Metadata-Heavy** (task, booking, checklist): Focus on frontmatter, minimal body content
 
 **CRITICAL:** When generating wikilinks for frontmatter args, do NOT include extra quotes:
 - ✅ Correct: `"Area": "[[Product]]"`
@@ -124,7 +124,7 @@ Load these as needed based on the task:
 
 - **Template details**: `./references/template-catalog.md` — Full catalog of all 11 templates with required args and body sections
 - **Generation patterns**: `./references/content-strategies.md` — Template-specific content generation strategies (goal clarification, success criteria, risk identification)
-- **Examples**: `./references/examples.md` — Complete CLI examples for project, area, resource, task, capture
+- **Examples**: `./references/examples.md` — Complete CLI examples for project, area, resource, task
 
 ---
 

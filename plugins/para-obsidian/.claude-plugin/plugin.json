@@ -17,6 +17,7 @@
 	],
 	"license": "MIT",
 	"commands": [
+		"./commands/clip.md",
 		"./commands/commit.md",
 		"./commands/create.md",
 		"./commands/create-area.md",

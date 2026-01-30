@@ -23,7 +23,7 @@ Clarifying Resources vs Records vs Other note types.
 **Key question:** "Do I need to find the details of this event/transaction later?"
 
 ### Other
-**Purpose:** Everything else (captures, logs, project notes)
+**Purpose:** Everything else (clippings, logs, project notes)
 **Flow:** Varies by type
 **Fields:** Varies by type
 **Lifecycle:** Varies by type
@@ -145,7 +145,7 @@ areas:
 | **CV** | No | No | No (reference) | `cv` |
 | **Letter** | ✅ Yes | No | No (reference) | `letter` |
 | **Employment Contract** | ✅ Yes | ✅ Yes | No | `employment-contract` |
-| **Capture** | No | No | Maybe (idea) | `capture` |
+| **Clipping** (non-URL) | No | No | Maybe (idea) | `clipping` |
 
 ---
 
@@ -212,7 +212,7 @@ areas:
 - Example: `🗓️ Product Ideas Brainstorm.md`
 
 **If quick idea (<200 words, single topic):**
-- Template: `capture`
+- Template: `clipping` (with `source: "thought"`)
 - Example: `💡 App feature for notifications.md`
 
 ---

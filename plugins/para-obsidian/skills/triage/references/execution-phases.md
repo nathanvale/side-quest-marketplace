@@ -58,7 +58,7 @@ for (const task of tasks) {
 | .. | ...                            | ...           | ...          | ...      | ...  |
 | 48 | Sprint 42 Planning             | 💼 Work        | 🎯 Migration | meeting  | ✓    |
 | 49 | Quick Idea About Auth          | 💼 Work        | -            | idea     | ~    |
-| 50 | Reminder to Call Mum           | 🏡 Home        | -            | capture  | ?    |
+| 50 | Reminder to Call Mum           | 🏡 Home        | -            | clipping | ?    |
 
 Legend: ✓ = high confidence, ~ = medium, ? = low (use "3" for alternatives)
 
@@ -71,7 +71,7 @@ Legend: ✓ = high confidence, ~ = medium, ? = low (use "3" for alternatives)
 ```
 
 **Columns:**
-- **Type**: Proposed output type (video, article, meeting, idea, capture)
+- **Type**: Proposed output type (video, article, meeting, idea, clipping)
 - **Conf**: Confidence indicator - low confidence items benefit from "Deeper" (3) option
 
 **Note:** When reviewing individual items, show `categorization_hints` and `notes` to explain the reasoning.
@@ -132,7 +132,7 @@ For each proposal, check `created` and `layer1_injected` fields:
 | path | true | Resource created, Layer 1 populated | Mark task completed |
 | path | false | Resource created, Layer 1 failed | Mark completed, note in report |
 | path | null | Meeting created (no Layer 1 needed) | Mark task completed |
-| null | null | Capture (stays in inbox) | Mark task completed |
+| null | null | Non-URL clipping (stays in inbox) | Mark task completed |
 | null | - | Creation failed | Retry with create-resource/create-meeting |
 
 ### 5.2 Handle Edited Items
@@ -195,7 +195,7 @@ if (proposal.itemType === "transcription") {
   // Delete attachment inbox note — PDF/DOCX stays in Attachments/
   para_delete({ file: proposal.file, confirm: true, response_format: "json" })
 }
-// Captures stay in inbox - no deletion
+// Non-URL clippings (thoughts, conversations) stay in inbox - no deletion
 ```
 
 ### 5.4 Handle Creation Failures
@@ -203,8 +203,8 @@ if (proposal.itemType === "transcription") {
 If subagent failed to create a note (rare), fall back to coordinator creation:
 
 ```typescript
-// Only if proposal.created is null AND proposed_template !== "capture"
-if (!proposal.created && proposal.proposed_template !== "capture") {
+// Only if proposal.created is null AND source is a URL (non-URL clippings stay in inbox)
+if (!proposal.created && proposal.sourceUrl?.startsWith("http")) {
   // Use create-resource or create-meeting skill
   // This is the fallback path - subagents should handle most cases
 }
@@ -229,7 +229,7 @@ Processed 50 items:
 • 42 resources created (40 with Layer 1, 2 without)
 • 5 meetings created
 • 1 edited → re-created with changes
-• 2 captures (stayed in inbox)
+• 2 clippings (stayed in inbox)
 
 Use /para-obsidian:distill-resource to add progressive summarization.
 ```

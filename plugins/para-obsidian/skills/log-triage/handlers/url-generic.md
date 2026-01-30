@@ -2,6 +2,22 @@
 
 Process URLs that don't match specific handlers (Twitter, YouTube, etc.).
 
+## Step 0 — Discover Template Metadata
+
+After selecting a template from the mapping table below, query it for its current structure:
+
+```
+para_template_fields({ template: "<matched-template-name>", response_format: "json" })
+```
+
+Extract from response:
+- `validArgs` → which args to pass to `para_create`
+- `creation_meta.dest` → destination folder
+- `creation_meta.contentTargets` → section headings for content injection
+- `creation_meta.sections` → all body section headings
+
+Use these discovered values for note creation instead of hardcoding section names or destinations.
+
 ## URL → Clipping Type Mapping
 
 | Domain/Path Pattern | Template | Notes |
@@ -56,22 +72,26 @@ Parse URL for basic info:
 
 ## Note Creation
 
+Use discovered values from Step 0 (`creation_meta.dest` for dest, `creation_meta.contentTargets` or `creation_meta.sections` for section headings, `validArgs` for field names):
+
 ```
 para_create({
-  template: "[matched-template]",
+  template: "<matched-template>",
   title: "[Extracted Title]",
-  dest: "00 Inbox",
+  dest: "<discovered-dest>",
   content: {
-    "AI Summary": "> - Key point 1\n> - Key point 2\n> - Key point 3",
-    "Full Content": "[Content from Firecrawl, truncated to 15000 chars]"
+    "<discovered-ai-summary-section>": "> - Key point 1\n> - Key point 2\n> - Key point 3",
+    "<discovered-content-section>": "[Content from Firecrawl, truncated to 15000 chars]"
   },
   response_format: "json"
 })
 ```
 
+Use fields from `validArgs` discovered in Step 0:
+
 ```
 para_fm_set({
-  file: "00 Inbox/...",
+  file: "<discovered-dest>/...",
   set: {
     source: "https://...",
     author: "John Smith",
@@ -93,11 +113,10 @@ Parsed:
 ```markdown
 ---
 type: clipping
-clipping_type: documentation
+resource_type: documentation
 source: "https://bunnings.atlassian.net/wiki/..."
 clipped: 2026-01-06
 domain: "bunnings.atlassian.net"
-distill_status: raw
 area: "[[Career & Contracting]]"
 ---
 

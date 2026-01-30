@@ -179,13 +179,19 @@ Areas are ongoing life responsibilities (no end date). Examples:
 **What responsibility or life domain is this?**
 ```
 
-After user provides name:
+After user provides name, discover the area template's destination first:
+
+```
+para_template_fields({ template: "area", response_format: "json" })
+```
+
+Then create:
 
 ```
 para_create({
   template: "area",
   title: "[User's area name]",
-  dest: "02 Areas",
+  dest: "<discovered-dest>",
   response_format: "json"
 })
 ```
@@ -224,30 +230,46 @@ Then continue with project creation using the new area.
 | Specific feedback | Adjust and re-present OR apply and create |
 | `cancel` / `no` | Abort gracefully |
 
-### 3.3 Create Project Note
+### 3.3 Discover Template Metadata
+
+Before creating, query the project template for its current structure:
+
+```
+para_template_fields({ template: "project", response_format: "json" })
+```
+
+Extract from response:
+- `validArgs` → which args to pass (e.g., status, deadline, area field names)
+- `creation_meta.dest` → destination folder
+- `creation_meta.sections` → body section headings
+- `creation_meta.titlePrefix` → emoji prefix (auto-applied)
+
+### 3.4 Create Project Note
+
+Use discovered values from Step 3.3 (`creation_meta.dest` for dest, `creation_meta.sections` for section headings, `validArgs` for field names):
 
 ```
 para_create({
   template: "project",
   title: "[Validated title]",
-  dest: "01 Projects",
+  dest: "<discovered-dest>",
   args: {
-    "Status (planning/active/on-hold/completed)": "planning",
-    "Target completion date (YYYY-MM-DD)": "[Validated date]",
-    "Area": "[Validated area from Phase 2]"  // Note: template wraps in [[]]
+    "<discovered-status-field>": "planning",
+    "<discovered-deadline-field>": "[Validated date]",
+    "<discovered-area-field>": "[Validated area from Phase 2]"
   },
   content: {
-    "Why This Matters": "[Generated content - problem it solves, why now]",
-    "Tasks": "- [ ] [First suggested task]\n- [ ] [Second task if applicable]"
+    "<discovered-why-section>": "[Generated content - problem it solves, why now]",
+    "<discovered-tasks-section>": "- [ ] [First suggested task]\n- [ ] [Second task if applicable]"
   },
   response_format: "json"
 })
 ```
 
-### 3.4 Confirm Creation
+### 3.5 Confirm Creation
 
 ```
-Created: 🎯 [Project Title].md → 01 Projects
+Created: 🎯 [Project Title].md → [discovered-dest]
 Linked to: [[Area Name]]
 
 Would you like to:

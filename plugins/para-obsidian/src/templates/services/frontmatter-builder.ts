@@ -50,6 +50,7 @@ export function generateFrontmatter(
 	fields: readonly TemplateField[],
 	version: number,
 	syntax: TemplateSyntax = "templater",
+	options?: { skipTemplateVersion?: boolean },
 ): string {
 	const lines = ["---"];
 
@@ -59,7 +60,9 @@ export function generateFrontmatter(
 		);
 	}
 
-	lines.push(`template_version: ${version}`);
+	if (!options?.skipTemplateVersion) {
+		lines.push(`template_version: ${version}`);
+	}
 	lines.push("---");
 
 	return lines.join("\n");
@@ -135,6 +138,11 @@ function buildNativeFieldLine(field: TemplateField): string {
 	// Fields with a default value → {{Field Name:default}}
 	if (field.default && field.default !== "" && field.default !== "[]") {
 		return `${name}: "{{${displayName}:${field.default}}}"`;
+	}
+
+	// Optional fields with no default → empty value (not a prompt)
+	if (!field.required && (!field.default || field.default === "")) {
+		return `${name}: ""`;
 	}
 
 	// Required prompted fields → {{Field Name}}

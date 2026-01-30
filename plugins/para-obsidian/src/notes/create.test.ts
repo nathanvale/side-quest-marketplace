@@ -7,7 +7,7 @@ import type { ParaObsidianConfig } from "../config/index";
 import { loadConfig } from "../config/index";
 import { parseFrontmatter } from "../frontmatter/index";
 import { createTestVault, useTestVaultCleanup } from "../testing/utils";
-import { createFromTemplate, injectSections } from "./create";
+import { createFromTemplate, injectSections, resolveTemplate } from "./create";
 
 function writeTemplate(dir: string, name: string, content: string) {
 	fs.mkdirSync(dir, { recursive: true });
@@ -67,9 +67,9 @@ Body`,
 		// Template uses uppercase "Title" which matches real templates
 		writeTemplate(
 			path.join(vault, "Templates"),
-			"capture",
+			"task",
 			`---
-type: capture
+type: task
 ---
 # <% tp.system.prompt("Title") %>`,
 		);
@@ -77,16 +77,16 @@ type: capture
 
 		// Only pass title option, not args - Title should be auto-injected
 		const result = createFromTemplate(loadConfig({ cwd: vault }), {
-			template: "capture",
-			title: "My Capture Note",
+			template: "task",
+			title: "My Task Note",
 		});
 
-		expect(result.filePath).toBe("00 Inbox/My Capture Note.md");
+		expect(result.filePath).toBe("00 Inbox/My Task Note.md");
 		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
 		// Title should NOT be in frontmatter (filename IS the title)
 		expect(written).not.toMatch(/^title:/m);
 		// But title SHOULD be in H1 heading
-		expect(written).toContain("# My Capture Note");
+		expect(written).toContain("# My Task Note");
 	});
 
 	it("creates project with all required fields filled", () => {
@@ -356,10 +356,10 @@ Source: <% tp.system.prompt("Source type") %>`,
 			dest: "00 Inbox",
 		},
 		{
-			template: "capture",
+			template: "clipping",
 			title: "Quick Thought",
-			type: "capture",
-			prefix: "",
+			type: "clipping",
+			prefix: "✂️ ",
 			dest: "00 Inbox",
 		},
 	])("creates $type in default destination (PARA method)", ({
@@ -527,16 +527,16 @@ tags:
 		// This is the old pattern that should still work
 		writeTemplate(
 			path.join(vault, "Templates"),
-			"capture",
+			"task",
 			`---
-type: capture
+type: task
 ---
 # <% tp.system.prompt("Title") %>`,
 		);
 		process.env.PARA_VAULT = vault;
 
 		const result = createFromTemplate(loadConfig({ cwd: vault }), {
-			template: "capture",
+			template: "task",
 			title: "Quick Note",
 		});
 
@@ -976,6 +976,146 @@ template_version: 1
 		expect(written).toContain("# 🎯 Already Prefixed");
 		expect(written).not.toContain("🎯 🎯");
 	});
+
+	it("creates clipping note from defaults (no vault template file needed)", () => {
+		const vault = setupTest();
+		// NO template file written to vault — resolveTemplate should generate from defaults
+		process.env.PARA_VAULT = vault;
+
+		const result = createFromTemplate(loadConfig({ cwd: vault }), {
+			template: "clipping",
+			title: "Test Clipping",
+			args: {
+				source: "https://example.com",
+				clipped: "2026-01-30",
+				domain: "example.com",
+			},
+		});
+
+		expect(result.filePath).toBe("00 Inbox/✂️ Test Clipping.md");
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+
+		// Should have Dataview H1 (from bodyConfig)
+		expect(written).toContain("# `= this.file.name`");
+		// Should have preamble
+		expect(written).toContain("**Source:** `= this.source`");
+		expect(written).toContain("**Clipped:** `= this.clipped`");
+		// Should have Capture Reason section
+		expect(written).toContain("## Capture Reason");
+		// Should have Content section
+		expect(written).toContain("## Content");
+		// Should have correct frontmatter fields
+		expect(written).toContain("source: https://example.com");
+		expect(written).toContain("clipped: 2026-01-30");
+		expect(written).toContain("domain: example.com");
+		expect(written).toContain("type: clipping");
+		expect(written).toContain("template_version: 2");
+	});
+
+	it("creates project note from defaults (no vault template file needed)", () => {
+		const vault = setupTest();
+		// NO template file written to vault
+		process.env.PARA_VAULT = vault;
+
+		const result = createFromTemplate(loadConfig({ cwd: vault }), {
+			template: "project",
+			title: "New Feature",
+			args: {
+				status: "active",
+				start_date: "2026-01-30",
+				target_completion: "2026-06-30",
+				area: "[[🌱 Engineering]]",
+			},
+		});
+
+		expect(result.filePath).toBe("00 Inbox/🎯 New Feature.md");
+		const written = fs.readFileSync(path.join(vault, result.filePath), "utf8");
+
+		// Should have correct frontmatter
+		expect(written).toContain("type: project");
+		expect(written).toContain("status: active");
+		// Should have body sections from defaults
+		expect(written).toContain("## Project Overview");
+		expect(written).toContain("## Why This Matters");
+		expect(written).toContain("## Tasks");
+	});
+});
+
+describe("resolveTemplate", () => {
+	const { trackVault, getAfterEachHook } = useTestVaultCleanup();
+	afterEach(getAfterEachHook());
+
+	function setupTest(): string {
+		const vault = createTestVault();
+		trackVault(vault);
+		return vault;
+	}
+
+	it("generates template from defaults when rules exist", () => {
+		const vault = setupTest();
+		process.env.PARA_VAULT = vault;
+		const config = loadConfig({ cwd: vault });
+
+		const result = resolveTemplate(config, "clipping");
+
+		expect(result).toBeDefined();
+		expect(result?.name).toBe("clipping");
+		expect(result?.path).toBe("defaults:clipping");
+		expect(result?.version).toBe(2);
+		// Should contain native syntax (not Templater)
+		expect(result?.content).toContain("{{date:");
+		expect(result?.content).not.toContain("<% tp.");
+		// Should have Dataview H1
+		expect(result?.content).toContain("# `= this.file.name`");
+	});
+
+	it("falls back to vault file for user-created templates", () => {
+		const vault = setupTest();
+		fs.mkdirSync(path.join(vault, "Templates"), { recursive: true });
+		fs.writeFileSync(
+			path.join(vault, "Templates", "custom.md"),
+			"---\ntype: custom\n---\n# Custom",
+			"utf8",
+		);
+		process.env.PARA_VAULT = vault;
+		const config = loadConfig({ cwd: vault });
+
+		const result = resolveTemplate(config, "custom");
+
+		expect(result).toBeDefined();
+		expect(result?.name).toBe("custom");
+		expect(result?.path).not.toContain("defaults:");
+	});
+
+	it("returns undefined for completely unknown template", () => {
+		const vault = setupTest();
+		process.env.PARA_VAULT = vault;
+		const config = loadConfig({ cwd: vault });
+
+		const result = resolveTemplate(config, "nonexistent");
+
+		expect(result).toBeUndefined();
+	});
+
+	it("uses vault file when it exists (preserves customizations)", () => {
+		const vault = setupTest();
+		// Write a vault file — should take priority over defaults
+		fs.mkdirSync(path.join(vault, "Templates"), { recursive: true });
+		fs.writeFileSync(
+			path.join(vault, "Templates", "clipping.md"),
+			"---\ntype: clipping\ntemplate_version: 1\n---\n# Old clipping",
+			"utf8",
+		);
+		process.env.PARA_VAULT = vault;
+		const config = loadConfig({ cwd: vault });
+
+		const result = resolveTemplate(config, "clipping");
+
+		// Should use vault file (preserves user customizations)
+		expect(result?.version).toBe(2); // version comes from config, not file
+		expect(result?.path).not.toContain("defaults:");
+		expect(result?.content).toContain("# Old clipping");
+	});
 });
 
 describe("injectSections", () => {
@@ -1186,7 +1326,7 @@ title: Test Note
 		const vault = setupTest();
 		const templateContent = `---
 title: "<% tp.system.prompt(\\"Title\\") %>"
-type: capture
+type: clipping
 ---
 # \`= this.file.name\`
 
@@ -1229,7 +1369,7 @@ More content.
 		const vault = setupTest();
 		const templateContent = `---
 title: "<% tp.system.prompt(\\"Title\\") %>"
-type: capture
+type: clipping
 ---
 # \`= this.file.name\`
 

@@ -7,9 +7,13 @@
  * @module templates/types
  */
 
-// Re-export TemplateSection from the single source of truth (defaults.ts)
-import type { TemplateSection as TemplateSectionImport } from "../config/defaults.js";
+// Re-export TemplateSection and TemplateBodyConfig from the single source of truth (defaults.ts)
+import type {
+	TemplateBodyConfig as TemplateBodyConfigImport,
+	TemplateSection as TemplateSectionImport,
+} from "../config/defaults.js";
 export type TemplateSection = TemplateSectionImport;
+export type TemplateBodyConfig = TemplateBodyConfigImport;
 
 /**
  * Field type for frontmatter values.
@@ -58,6 +62,8 @@ export interface TemplateConfig {
 	readonly fields: readonly TemplateField[];
 	/** Body section definitions. */
 	readonly sections: readonly TemplateSection[];
+	/** Optional body configuration overrides (custom H1, preamble). */
+	readonly bodyConfig?: TemplateBodyConfig;
 }
 
 /**

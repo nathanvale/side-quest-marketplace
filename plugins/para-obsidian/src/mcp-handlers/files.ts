@@ -142,7 +142,9 @@ Filename: Title Case with spaces (e.g., "My Project Note.md")
 
 Optionally injects content into template sections (headings) in a single operation.
 
-Requires git repository with clean working tree.`,
+Requires git repository with clean working tree.
+
+For capturing URLs or text, prefer the /para-obsidian:clip skill instead of calling para_create directly. The clip skill handles title generation, content injection, and enrichment.`,
 		inputSchema: {
 			template: z
 				.string()

@@ -2,7 +2,7 @@
 name: create-meeting
 description: Create meeting notes from analyzed voice/transcription proposals. Use when triage orchestrator routes a proposal with proposed_template=meeting. Populates attendees, notes, decisions, and action items via para_create.
 user-invocable: false
-allowed-tools: mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_fm_set, mcp__plugin_para-obsidian_para-obsidian__para_rename, AskUserQuestion
+allowed-tools: mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_fm_set, mcp__plugin_para-obsidian_para-obsidian__para_rename, mcp__plugin_para-obsidian_para-obsidian__para_template_fields, AskUserQuestion
 ---
 
 # Create Meeting
@@ -47,6 +47,21 @@ You receive a proposal object from `analyze-voice` with full body content:
 Create the meeting note with populated body sections and establish bi-directional links.
 
 ## Workflow
+
+### Step 0: Discover Template Metadata
+
+Before creating the note, query the meeting template for its current structure:
+
+```
+para_template_fields({ template: "meeting", response_format: "json" })
+```
+
+Extract from response:
+- `validArgs` → which args to pass (e.g., `meeting_date`, `meeting_type`, `transcription`, `summary`, `area`, `project`)
+- `creation_meta.dest` → destination folder
+- `creation_meta.sections` → body section headings (e.g., `"Attendees"`, `"Notes"`, `"Decisions Made"`, `"Action Items"`, `"Follow-up"`)
+
+Use these discovered values throughout the workflow instead of hardcoding them.
 
 ### Step 1: Validate Area/Project
 
@@ -99,11 +114,13 @@ const followUpContent = proposal.follow_up
 
 **CRITICAL:** Use `para_create` with `content` parameter to inject body sections.
 
+Use discovered values from Step 0 (`creation_meta.dest` for dest, `creation_meta.sections` for section headings, `validArgs` for field names):
+
 ```typescript
 para_create({
   template: "meeting",
   title: proposal.proposed_title,
-  dest: "04 Archives/Meetings",  // Meeting notes go to Archives
+  dest: "<discovered-dest>",
   args: {
     meeting_date: proposal.meeting_date,
     meeting_type: proposal.meeting_type,
@@ -113,29 +130,25 @@ para_create({
     project: proposal.suggested_projects[0] || null
   },
   content: {
-    "Attendees": attendeesContent,
-    "Notes": notesContent,
-    "Decisions Made": decisionsContent,
-    "Action Items": actionItemsContent,
-    "Follow-up": followUpContent
+    // Use section headings from creation_meta.sections
+    "<discovered-attendees-section>": attendeesContent,
+    "<discovered-notes-section>": notesContent,
+    "<discovered-decisions-section>": decisionsContent,
+    "<discovered-action-items-section>": actionItemsContent,
+    "<discovered-follow-up-section>": followUpContent
   },
   response_format: "json"
 })
 ```
 
-**Arguments (frontmatter):**
+**Arguments (frontmatter):** Use fields from `validArgs` discovered in Step 0.
 - `meeting_date` — ISO format: `YYYY-MM-DDTHH:mm:ss`
 - `meeting_type` — See [meeting-types.md](references/meeting-types.md)
 - `transcription` — Note name WITHOUT path or `.md`, wrapped in `[[...]]`
 - `summary` — Concise 1-line description (max 100 chars)
 - `area` OR `project` — **One required** — Wikilink to parent
 
-**Content (body sections):**
-- `"Attendees"` — Matches `## Attendees` heading in template
-- `"Notes"` — Matches `## Notes` heading
-- `"Decisions Made"` — Matches `## Decisions Made` heading
-- `"Action Items"` — Matches `## Action Items` heading
-- `"Follow-up"` — Matches `## Follow-up` heading
+**Content (body sections):** Use section headings from `creation_meta.sections` discovered in Step 0. Match the heading text exactly as returned by `para_template_fields`.
 
 ### Step 4: Link Transcription to Meeting
 

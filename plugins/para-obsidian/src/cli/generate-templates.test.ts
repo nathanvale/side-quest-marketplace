@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import {
 	DEFAULT_FRONTMATTER_RULES,
+	DEFAULT_TEMPLATE_BODY_CONFIG,
 	DEFAULT_TEMPLATE_SECTIONS,
 	DEFAULT_TEMPLATE_VERSIONS,
 } from "../config/defaults";
@@ -87,6 +88,71 @@ describe("generateAllTemplates", () => {
 
 		const clipping = results.find((r) => r.templateName === "clipping");
 		expect(clipping?.filePath).toBe("Templates/clipping.md");
+	});
+
+	test("clipping template uses bodyConfig when provided", () => {
+		const configWithBodyConfig: ParaObsidianConfig = {
+			vault: "/tmp/test-vault",
+			frontmatterRules: DEFAULT_FRONTMATTER_RULES,
+			templateSections: DEFAULT_TEMPLATE_SECTIONS,
+			templateVersions: DEFAULT_TEMPLATE_VERSIONS,
+			templateBodyConfig: DEFAULT_TEMPLATE_BODY_CONFIG,
+		};
+
+		const results = generateAllTemplates(configWithBodyConfig, {
+			dryRun: true,
+		});
+
+		const clipping = results.find((r) => r.templateName === "clipping");
+		expect(clipping).toBeDefined();
+
+		// Clipping should have template_version (like all templates)
+		expect(clipping?.content).toContain("template_version: 2");
+
+		// Should have custom H1 and preamble
+		expect(clipping?.content).toContain("# `= this.file.name`");
+		expect(clipping?.content).toContain("**Source:** `= this.source`");
+		expect(clipping?.content).toContain("**Clipped:** `= this.clipped`");
+
+		// Should NOT have footer (Web Clipper only)
+		expect(clipping?.content).not.toContain("highlights");
+
+		// Should have Capture Reason section with Dataview inline
+		expect(clipping?.content).toContain("## Capture Reason");
+		expect(clipping?.content).toContain("`= this.capture_reason`");
+
+		// Optional fields should emit empty values
+		expect(clipping?.content).toContain('domain: ""');
+		expect(clipping?.content).toContain('resource_type: ""');
+		expect(clipping?.content).toContain('capture_reason: ""');
+	});
+
+	test("generates Web Clipper JSON for templates with bodyConfig", () => {
+		const configWithBodyConfig: ParaObsidianConfig = {
+			vault: "/tmp/test-vault",
+			frontmatterRules: DEFAULT_FRONTMATTER_RULES,
+			templateSections: DEFAULT_TEMPLATE_SECTIONS,
+			templateVersions: DEFAULT_TEMPLATE_VERSIONS,
+			templateBodyConfig: DEFAULT_TEMPLATE_BODY_CONFIG,
+		};
+
+		const results = generateAllTemplates(configWithBodyConfig, {
+			dryRun: true,
+		});
+
+		const webClipper = results.find(
+			(r) => r.templateName === "clipping (webclipper)",
+		);
+		expect(webClipper).toBeDefined();
+		expect(webClipper?.filePath).toBe("templates/webclipper/capture.json");
+
+		// Verify JSON is valid
+		const parsed = JSON.parse(webClipper?.content ?? "{}");
+		expect(parsed.schemaVersion).toBe("0.1.0");
+		expect(parsed.name).toBe("Capture");
+		expect(parsed.behavior).toBe("create");
+		expect(parsed.path).toBe("00 Inbox");
+		expect(parsed.properties.length).toBeGreaterThan(0);
 	});
 
 	test("uses config overrides instead of defaults", () => {

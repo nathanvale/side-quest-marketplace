@@ -8,6 +8,7 @@
 import { input } from "@inquirer/prompts";
 import { emphasize } from "@sidequest/core/terminal";
 import { createSpinner } from "nanospinner";
+import { DEFAULT_PARA_FOLDERS } from "../../config/defaults";
 import { cliLogger } from "../../shared/logger";
 import type {
 	BatchResult,
@@ -667,7 +668,8 @@ function formatConfirmationPreview(
 		const filename = s.source.split("/").pop() ?? s.source;
 		if (isCreateNoteSuggestion(s)) {
 			// All items go to inbox - no area/project routing
-			const noteDestination = s.suggestedDestination ?? "00 Inbox";
+			const noteDestination =
+				s.suggestedDestination ?? DEFAULT_PARA_FOLDERS.inbox!;
 
 			lines.push(`  [${idx}] ${filename}`);
 			lines.push(`       → Create note in: ${noteDestination}/`);
@@ -1060,12 +1062,12 @@ export async function runInteractiveLoop(
 								targetSuggestion.suggestedNoteType === "clipping"
 							) {
 								const extractedFields = targetSuggestion.extractedFields ?? {};
-								const distillStatus = extractedFields.distill_status as
+								const resourceType = extractedFields.resource_type as
 									| string
 									| undefined;
 
-								// Prompt if distill_status is "raw" or missing (backward compat)
-								if (distillStatus === "raw" || distillStatus === undefined) {
+								// Prompt for capture reason when not yet classified (no resource_type)
+								if (!resourceType) {
 									const captureReasonInput = await input({
 										message: "Why did you save this? (Enter to skip):",
 									});

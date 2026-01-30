@@ -6,7 +6,7 @@
  *
  * @module templates/services/section-builder
  */
-import type { TemplateSection } from "../types";
+import type { TemplateBodyConfig, TemplateSection } from "../types";
 import type { TemplateSyntax } from "./frontmatter-builder";
 
 /**
@@ -39,14 +39,22 @@ import type { TemplateSyntax } from "./frontmatter-builder";
 export function generateBody(
 	sections: readonly TemplateSection[],
 	syntax: TemplateSyntax = "templater",
+	bodyConfig?: TemplateBodyConfig,
 ): string {
 	const titleLine =
-		syntax === "native" ? "# {{title}}" : '# <% tp.system.prompt("Title") %>';
+		bodyConfig?.titleLine ??
+		(syntax === "native" ? "# {{title}}" : '# <% tp.system.prompt("Title") %>');
 
 	const lines: string[] = [
 		titleLine,
 		"", // Blank line after title
 	];
+
+	// Emit preamble (e.g., Source/Clipped metadata block) if configured
+	if (bodyConfig?.preamble) {
+		lines.push(bodyConfig.preamble);
+		lines.push(""); // Blank line after preamble
+	}
 
 	for (const section of sections) {
 		lines.push(`## ${section.heading}`);

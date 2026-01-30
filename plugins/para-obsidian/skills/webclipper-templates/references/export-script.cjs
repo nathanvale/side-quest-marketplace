@@ -3,9 +3,7 @@
  *
  * Exports the single capture.json template for Web Clipper import.
  *
- * This script replaces the previous multi-template system with a single
- * ADHD-friendly capture template. All specialized templates have been
- * archived (see archived/README.md for rationale).
+ * This script exports the single ADHD-friendly capture template.
  *
  * Usage:
  *   node export-script.cjs
@@ -48,7 +46,4 @@ console.log("1. Open Obsidian Web Clipper settings");
 console.log("2. Go to Templates section");
 console.log("3. Click Import");
 console.log("4. Select capture.json from", OUTPUT_DIR);
-console.log("\nNote: All specialized templates have been archived.");
-console.log(
-	"See archived/README.md for the ADHD-friendly simplification rationale.",
-);
+console.log("\nDone.");

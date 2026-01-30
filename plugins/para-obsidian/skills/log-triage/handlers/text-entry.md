@@ -1,6 +1,21 @@
 # Text Entry Handler
 
-Process plain text log entries and short voice memos into capture notes.
+Process plain text log entries and short voice memos into clipping notes.
+
+## Step 0 — Discover Template Metadata
+
+Before creating notes, query the clipping template for its current structure:
+
+```
+para_template_fields({ template: "clipping", response_format: "json" })
+```
+
+Extract from response:
+- `validArgs` → which args to pass to `para_create` (e.g., `source`, `clipped`)
+- `creation_meta.dest` → destination folder
+- `creation_meta.contentTargets` → section heading for content injection (e.g., `["Content"]`)
+
+Use these discovered values instead of hardcoding them.
 
 ## Detection
 
@@ -9,7 +24,7 @@ Process plain text log entries and short voice memos into capture notes.
 
 ## Entry Classification
 
-### Reminder/Task Signals → Capture with Task
+### Reminder/Task Signals → Clipping with Task
 
 Look for these patterns:
 - "remind me to..."
@@ -20,13 +35,13 @@ Look for these patterns:
 - "should probably..."
 - "have to..."
 
-Create capture note with Obsidian Tasks checkbox.
+Create clipping note with Obsidian Tasks checkbox.
 
-### Thought/Idea → Capture Note
+### Thought/Idea → Clipping Note
 
 General thoughts, ideas, observations without task signals.
 
-Create capture note with `source: thought`.
+Create clipping note with `source: thought`.
 
 ### Noise → Delete
 
@@ -40,25 +55,17 @@ Just delete from daily note, don't create a note.
 
 ```
 para_create({
-  template: "capture",
+  template: "clipping",
   title: "Take out the trash",
-  dest: "00 Inbox",
-  args: {},
+  dest: "<discovered-dest>",
+  args: {
+    source: "reminder",
+    clipped: "2026-01-06"
+  },
   content: {
-    "Capture": "- [ ] Take out the trash 🔔 2026-01-06 22:00"
+    "<discovered-content-target>": "- [ ] Take out the trash 🔔 2026-01-06 22:00"
   },
   response_format: "json"
-})
-```
-
-```
-para_fm_set({
-  file: "00 Inbox/📥 Take out the trash.md",
-  set: {
-    source: "reminder",
-    resonance: "useful",
-    urgency: "high"
-  }
 })
 ```
 
@@ -66,29 +73,21 @@ para_fm_set({
 
 ```
 para_create({
-  template: "capture",
+  template: "clipping",
   title: "Tomorrow is a new day",
-  dest: "00 Inbox",
-  args: {},
+  dest: "<discovered-dest>",
+  args: {
+    source: "thought",
+    clipped: "2026-01-06"
+  },
   content: {
-    "Capture": "Don't forget tomorrow is a new day."
+    "<discovered-content-target>": "Don't forget tomorrow is a new day."
   },
   response_format: "json"
 })
 ```
 
-```
-para_fm_set({
-  file: "00 Inbox/📥 Tomorrow is a new day.md",
-  set: {
-    source: "thought",
-    resonance: "inspiring",
-    urgency: "low"
-  }
-})
-```
-
-**CRITICAL:** The capture template uses `## Capture` heading. Always use `"Capture"` as the content key.
+**CRITICAL:** Use the content target heading discovered from `creation_meta.contentTargets[0]` in Step 0. Do not hardcode section names.
 
 ## Task Emoji Format (Obsidian Tasks)
 
@@ -106,43 +105,31 @@ Example: `- [ ] Call dentist 📅 2026-01-10`
 **Reminder:**
 ```markdown
 ---
-type: capture
-status: inbox
+type: clipping
 source: reminder
-resonance: useful
-urgency: high
+clipped: 2026-01-06
 template_version: 1
 ---
 
 # Take out the trash
 
-## Capture
+## Content
 
 - [ ] Take out the trash 🔔 2026-01-06 22:00
-
-## Why I Saved This
-
-From daily log on [[2026-01-06]]
 ```
 
 **Thought:**
 ```markdown
 ---
-type: capture
-status: inbox
+type: clipping
 source: thought
-resonance: inspiring
-urgency: low
+clipped: 2026-01-06
 template_version: 1
 ---
 
 # Tomorrow is a new day
 
-## Capture
+## Content
 
 Don't forget tomorrow is a new day.
-
-## Why I Saved This
-
-From daily log on [[2026-01-06]]
 ```

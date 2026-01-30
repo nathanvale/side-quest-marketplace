@@ -1,17 +1,35 @@
 ---
 name: clip
-description: Zero-friction inbox capture. Clips URLs as clipping notes or inline text as capture notes. No enrichment, no classification, no user prompts. Batch-capable for multiple URLs. Use when saving links for later triage, or capturing mid-conversation insights.
+description: Inbox capture that matches Web Clipper output. Clips URLs or inline text as clipping notes with LLM-generated titles. Batch-capable for multiple URLs. No classification, no area/project assignment — triage handles that.
 argument-hint: "<url1> [url2 url3 ...] or <inline text to capture>"
 user-invocable: true
 context: fork
-allowed-tools: mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_commit
+allowed-tools: mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_commit, mcp__plugin_para-obsidian_para-obsidian__para_template_fields, mcp__firecrawl__firecrawl_scrape, mcp__youtube-transcript__get_video_info
 ---
 
 # Clip
 
-Zero-friction inbox capture. Dumps URLs or text into `00 Inbox/` with no enrichment, no classification, no user prompts. Everything gets processed later by `/para-obsidian:triage`.
+Inbox capture that produces clipping notes matching Obsidian Web Clipper output — real page titles, raw fetched content, `<!-- highlights:0 -->` marker. No classification, no Layer 1 formatting, no area/project assignment. Everything gets organized later by `/para-obsidian:triage`.
 
-**Design philosophy:** ADHD-friendly capture. The moment you think "save this for later," it should be done in seconds. No decisions, no gates, no enrichment overhead. Capture now, organize later.
+**Design philosophy:** ADHD-friendly capture with Web Clipper parity. Save a link, get a real note — not a stub. Capture now, organize later.
+
+---
+
+## Step 0 — Discover Template Metadata
+
+Before processing any input, query the clipping template for its current structure:
+
+```
+para_template_fields({ template: "clipping", response_format: "json" })
+```
+
+Extract from response:
+- `validArgs` → which args to pass to `para_create` (e.g., `source`, `clipped`, `domain`)
+- `creation_meta.dest` → destination folder (e.g., `"00 Inbox"`)
+- `creation_meta.contentTargets` → which section heading accepts content injection (e.g., `["Content"]`)
+- `creation_meta.titlePrefix` → emoji prefix (e.g., `"✂️ "`)
+
+Use these discovered values throughout the skill instead of hardcoding them. If the template changes, this skill auto-adapts.
 
 ---
 
@@ -24,7 +42,7 @@ Parse `$ARGUMENTS` to determine mode:
 | Result | Mode |
 |--------|------|
 | 1+ URLs found | **URL mode** — create clipping notes |
-| No URLs found | **Inline text mode** — create capture note |
+| No URLs found | **Inline text mode** — create clipping note |
 
 **Step 2:** Deduplicate URLs before processing (URL mode only).
 
@@ -44,39 +62,76 @@ github.com/anthropics/claude-code  →  domain: "github.com"
 www.kentcdodds.com/blog/aha        →  domain: "kentcdodds.com"
 ```
 
-**Step 2 — Derive title:**
+**Step 2 — Fetch content:**
 
-Use domain as the title. If multiple URLs share the same domain in this batch, append a path slug for disambiguation:
+Select tool based on URL pattern:
+
+| URL Pattern | Tool | Extract |
+|-------------|------|---------|
+| `youtube.com`, `youtu.be` | `get_video_info` | Title only (no transcript — triage handles that) |
+| `x.com`, `twitter.com` | **Skip** (no tool available yet) | Use domain as title, empty content |
+| Everything else | `firecrawl_scrape` | `metadata.title` + `markdown` body |
+
+**YouTube URLs:**
+```
+get_video_info({ url: "<url>" })
+→ extract title from response
+→ no content — transcript fetching is triage/enrichment work
+```
+
+**General URLs (Firecrawl):**
+```
+firecrawl_scrape({
+  url: "<url>",
+  formats: ["markdown"],
+  onlyMainContent: true
+})
+→ extract metadata.title as page title
+→ extract markdown as page content
+```
+
+**X/Twitter URLs:** Skip fetching. Firecrawl is blocklisted for x.com. Use domain as title, no content. Future x-twitter plugin will handle this.
+
+**If fetch fails:** Fall back to domain as title with empty content. Never block capture on fetch failure.
+
+**Step 3 — Derive title:**
+
+Use the **fetched page title** as the note title. If fetching was skipped or failed, fall back to domain-based title:
 - Single `github.com` URL → title: `github.com`
 - Two `github.com` URLs → titles: `github.com - anthropics`, `github.com - modelcontextprotocol`
 
-Extract the slug from the first meaningful path segment (skip empty segments).
+For domain fallback, extract the slug from the first meaningful path segment (skip empty segments).
 
-**Step 3 — Create clipping note:**
+**Step 4 — Create clipping note:**
+
+Use discovered values from Step 0 (`validArgs` for args, `creation_meta.dest` for dest, `creation_meta.contentTargets[0]` for content section heading):
 
 ```
 para_create({
   template: "clipping",
-  title: "<derived-title>",
-  dest: "00 Inbox",
+  title: "<fetched-or-derived-title>",
+  dest: "<discovered-dest>",
   args: {
     source: "<full-url>",
     clipped: "<YYYY-MM-DD>",
-    clipping_type: "article"
+    domain: "<domain>"
+  },
+  content: {
+    "<discovered-content-target>": "<fetched-content>\n\n<!-- highlights:0 -->"
   },
   response_format: "json"
 })
 ```
 
-**Why `clipping`:** There is one unified clipping template. Triage reclassifies from scratch using the `source` URL — the initial `clipping_type: article` is a harmless default that gets overwritten during enrichment. The critical fields for triage detection are `type: clipping` and `source: <url>`.
+The `content` parameter injects the fetched page content into the content target section discovered from `creation_meta.contentTargets`. The `<!-- highlights:0 -->` marker matches Web Clipper output format.
 
-**DO NOT fetch page titles.** That adds latency per URL and requires enrichment tools. For a batch of 10, that's significant overhead. Triage fetches titles during enrichment. Speed wins.
+If no content was fetched (YouTube, X/Twitter, or fetch failure), omit the `content` parameter entirely.
 
-Process URLs sequentially — each `para_create` call completes before the next. Collect results for the report.
+Process URLs sequentially — each fetch + `para_create` call completes before the next. Collect results for the report.
 
 ### After all URLs created:
 
-**Step 4 — Batch commit:**
+**Step 5 — Batch commit:**
 
 ```
 para_commit({
@@ -91,40 +146,39 @@ One commit for all notes. Never commit per-note.
 
 ## Mode 2: Inline Text Capture
 
-Capture free text from the conversation into a capture note.
+Capture free text from the conversation into a clipping note.
 
 **Step 1 — Generate title:**
 
-Derive a short descriptive title from the first ~60 characters of the text. Truncate at a word boundary. If the text is under 60 characters, use the full text as the title.
+Generate a concise, descriptive title (under 60 characters) that captures the essence of the text. Use your judgment as an LLM — don't just truncate, summarize the core idea into a clear title.
 
-**Step 2 — Create capture note:**
+**Step 2 — Create clipping note:**
 
 ```
 para_create({
-  template: "capture",
-  title: "<derived-title>",
-  dest: "00 Inbox",
+  template: "clipping",
+  title: "<generated-title>",
+  dest: "<discovered-dest>",
   args: {
     source: "conversation",
-    resonance: "useful",
-    urgency: "low"
+    clipped: "<YYYY-MM-DD>"
   },
   content: {
-    "Capture": "<full-inline-text>"
+    "<discovered-content-target>": "<full-inline-text>\n\n<!-- highlights:0 -->"
   },
   response_format: "json"
 })
 ```
 
-The `content` parameter injects text into the "Capture" section of the capture template.
+The `content` parameter injects text into the content target section discovered from Step 0.
 
-**Defaults:** `source: "conversation"`, `resonance: "useful"`, `urgency: "low"`. Sensible defaults for mid-conversation captures. Triage or manual review can adjust later.
+**Defaults:** `source: "conversation"`. Zero-friction capture — no enum choices required. Triage or manual review can adjust later.
 
 **Step 3 — Commit:**
 
 ```
 para_commit({
-  message: "Capture: <title>",
+  message: "Clip: <title>",
   response_format: "json"
 })
 ```
@@ -137,22 +191,22 @@ para_commit({
 ```
 Clipped N URLs to inbox:
 
-  1. ✂️📰 github.com             ← github.com/anthropics/claude-code
-  2. ✂️📰 youtube.com            ← youtube.com/watch?v=abc123
-  3. ✂️📰 kentcdodds.com         ← kentcdodds.com/blog/aha-programming
+  1. ✂️ AHA Programming             ← kentcdodds.com/blog/aha-programming
+  2. ✂️ Claude Code                  ← github.com/anthropics/claude-code
+  3. ✂️ x.com                        ← x.com/housecor/status/123456 (no content — X not supported yet)
 
-Committed. Run /para-obsidian:triage to enrich and classify.
+Committed. Run /para-obsidian:triage to classify.
 ```
 
 **URL mode (single):**
 ```
-Clipped: ✂️📰 kentcdodds.com → 00 Inbox/✂️📰 kentcdodds.com.md
-Committed. Run /para-obsidian:triage to enrich and classify.
+Clipped: ✂️ AHA Programming → 00 Inbox/✂️ AHA Programming.md
+Committed. Run /para-obsidian:triage to classify.
 ```
 
 **Inline mode:**
 ```
-Captured: <title> → 00 Inbox/<title>.md
+Clipped: <title> → 00 Inbox/<title>.md
 Committed. Run /para-obsidian:triage to process.
 ```
 
@@ -164,24 +218,24 @@ Committed. Run /para-obsidian:triage to process.
 |----------|--------|
 | Empty arguments | Report: "Nothing to clip. Pass URLs or text to capture." |
 | Invalid URL (parse fails) | Skip that URL, report as warning, continue with remaining |
+| Content fetch fails | Fall back to domain title + empty body. Report warning, continue. |
 | `para_create` fails for one URL | Log error, continue with remaining URLs |
 | All URLs fail | Report all failures, create nothing |
 | `para_commit` fails | Report warning — notes still exist uncommitted |
 | Duplicate URL in batch | Deduplicate before processing |
 | Filename collision | `para_create` handles this automatically (appends number) |
 
-**Soft failure philosophy:** Never block on individual failures in batch mode. Create what you can, report what failed.
+**Soft failure philosophy:** Never block on individual failures in batch mode. Create what you can, report what failed. Fetch failures degrade gracefully to domain-only stubs.
 
 ---
 
 ## What This Does NOT Do
 
-- **No content fetching** — triage handles enrichment
 - **No classification** — triage determines area/project/template
+- **No Layer 1 formatting** — triage handles content distillation
 - **No user prompts** — zero gates, zero decisions
-- **No title fetching** — domain is enough for inbox items
 - **No area/project assignment** — triage handles this
-- **No `<!-- highlights:0 -->` marker** — this is not the Web Clipper
+- **No X/Twitter content** — future x-twitter plugin will handle this
 
 ---
 
@@ -191,8 +245,10 @@ Notes created by this skill are fully compatible with `/para-obsidian:triage`:
 
 | Mode | `type` field | Triage detection | Triage action |
 |------|-------------|------------------|---------------|
-| URL | `clipping` | `type === "clipping"` | Routes to `analyze-web` worker for enrichment + classification |
-| Inline text | `capture` | `type === "capture"` | Stays in inbox (captures are manual review items) |
+| URL | `clipping` | `type === "clipping"` + source is URL | Routes to `analyze-web` worker for classification |
+| Inline text | `clipping` | `type === "clipping"` + source is NOT URL | Stays in inbox (manual review items) |
+
+Clipping notes with fetched content give triage a head start — it can classify from the content already present rather than re-fetching.
 
 ---
 
@@ -202,22 +258,28 @@ Notes created by this skill are fully compatible with `/para-obsidian:triage`:
 ```
 /para-obsidian:clip https://kentcdodds.com/blog/aha-programming
 ```
-Creates: `00 Inbox/✂️📰 kentcdodds.com.md`
+Creates: `00 Inbox/✂️ AHA Programming.md` (with full article content)
 
 ### Batch URLs
 ```
-/para-obsidian:clip https://github.com/anthropics/claude-code https://youtube.com/watch?v=abc123 https://x.com/housecor/status/123456 https://kentcdodds.com/blog/aha-programming
+/para-obsidian:clip https://github.com/anthropics/claude-code https://youtube.com/watch?v=abc123 https://kentcdodds.com/blog/aha-programming
 ```
-Creates 4 notes in `00 Inbox/`, commits all at once.
+Creates 3 notes in `00 Inbox/` with fetched titles and content, commits all at once.
+
+### YouTube URL
+```
+/para-obsidian:clip https://www.youtube.com/watch?v=dQw4w9WgXcQ
+```
+Creates: `00 Inbox/✂️ <Video Title>.md` (title only, no transcript — triage fetches that)
 
 ### Inline capture (mid-conversation insight)
 ```
 /para-obsidian:clip The key insight is that Layer 1 captures raw content, Layer 2 bolds the most important 10-20%, and Layer 3 highlights the top 10% of bold passages.
 ```
-Creates: `00 Inbox/The key insight is that Layer 1 captures raw content.md`
+Creates: `00 Inbox/Progressive Summarization Layer Strategy.md` (LLM-generated title)
 
 ### Inline capture (quick thought)
 ```
 /para-obsidian:clip Check if React Server Components solve the waterfall problem for GMS checkout flow
 ```
-Creates: `00 Inbox/Check if React Server Components solve the waterfall.md`
+Creates: `00 Inbox/RSC for GMS Checkout Waterfall Problem.md` (LLM-generated title)

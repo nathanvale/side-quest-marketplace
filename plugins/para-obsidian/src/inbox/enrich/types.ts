@@ -76,16 +76,16 @@ export type ClippingType =
 
 /**
  * Result of classifying a raw web clipping.
- * Sets the clipping_type field for downstream enrichment.
+ * Sets the resource_type field for downstream enrichment.
  */
 export interface ClippingClassificationEnrichment {
-	/** Classified clipping type */
+	/** Classified clipping type — written to frontmatter as resource_type */
 	readonly clippingType: ClippingType;
 
 	/** ISO timestamp of when classification was performed */
 	readonly classifiedAt: string;
 
-	/** YouTube video ID (if clipping_type is "youtube") */
+	/** YouTube video ID (if resource_type is "youtube") */
 	readonly videoId?: string;
 }
 

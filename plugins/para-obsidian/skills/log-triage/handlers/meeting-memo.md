@@ -2,6 +2,21 @@
 
 Process voice memos (🎤) into structured meeting notes.
 
+## Step 0 — Discover Template Metadata
+
+Before creating notes, query the meeting template for its current structure:
+
+```
+para_template_fields({ template: "meeting", response_format: "json" })
+```
+
+Extract from response:
+- `validArgs` → which args to pass (e.g., `meeting_type`, `meeting_date`, `area`, `company`)
+- `creation_meta.dest` → destination folder
+- `creation_meta.sections` → body section headings (e.g., `"Attendees"`, `"Notes"`, `"Decisions Made"`, `"Action Items"`, `"Follow-up"`)
+
+Use these discovered values instead of hardcoding them.
+
 ## Detection
 
 **Pattern:** `- [time] - 🎤 [transcription]`
@@ -35,17 +50,19 @@ Before inserting, apply basic cleanup:
 
 **Step 1: Create note with extracted content**
 
+Use discovered values from Step 0 (`creation_meta.dest` for dest, `creation_meta.sections` for section headings, `validArgs` for field names):
+
 ```
 para_create({
   template: "meeting",
   title: "GMS Project Kickoff - Jackie",
-  dest: "00 Inbox",
+  dest: "<discovered-dest>",
   args: {},
   content: {
-    "Attendees": "- Jackie (Team Lead)\n- Josh Green (Tech Lead)\n- Nathan",
-    "Notes": "### Key Points\n- GMS = Gift Card Management System\n- Reseller integration with Black Hawk\n- Deadline: July",
-    "Decisions Made": "- Estimates in days, not story points\n- All-in day: Thursday",
-    "Action Items": "- [ ] Get MacBook bun number to Jackie\n- [ ] Test VPN from home\n- [ ] Look at Miro board"
+    "<discovered-attendees-section>": "- Jackie (Team Lead)\n- Josh Green (Tech Lead)\n- Nathan",
+    "<discovered-notes-section>": "### Key Points\n- GMS = Gift Card Management System\n- Reseller integration with Black Hawk\n- Deadline: July",
+    "<discovered-decisions-section>": "- Estimates in days, not story points\n- All-in day: Thursday",
+    "<discovered-action-items-section>": "- [ ] Get MacBook bun number to Jackie\n- [ ] Test VPN from home\n- [ ] Look at Miro board"
   },
   response_format: "json"
 })
@@ -53,9 +70,11 @@ para_create({
 
 **Step 2: Set frontmatter**
 
+Use fields from `validArgs` discovered in Step 0:
+
 ```
 para_fm_set({
-  file: "00 Inbox/🗣️ Note Title.md",
+  file: "<discovered-dest>/🗣️ Note Title.md",
   set: {
     meeting_type: "general",
     meeting_date: "2026-01-06",
@@ -67,12 +86,12 @@ para_fm_set({
 
 **Step 3: Append Raw Transcription**
 
-The meeting template does NOT have a Raw Transcription section. Add it after `## Follow-up`:
+The meeting template does NOT have a Raw Transcription section. Add it after the last discovered section heading:
 
 ```
 para_insert({
-  file: "00 Inbox/🗣️ Note Title.md",
-  heading: "Follow-up",
+  file: "<discovered-dest>/🗣️ Note Title.md",
+  heading: "<last-discovered-section>",
   content: "\n---\n\n## Raw Transcription\n\n> [Full cleaned transcription in blockquote format]",
   mode: "after"
 })

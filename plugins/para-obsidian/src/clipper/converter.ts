@@ -7,12 +7,19 @@
  * @module clipper/converter
  */
 
+import {
+	DEFAULT_TEMPLATE_VERSIONS,
+	type TemplateBodyConfig,
+	type TemplateSection,
+} from "../config/defaults";
 import { createCorrelationId, getSubsystemLogger } from "../shared/logger";
+import type { TemplateField } from "../templates/types";
 import type {
 	ConversionResult,
 	TemplateMetadata,
 	TemplaterVariable,
 	WebClipperProperty,
+	WebClipperPropertyType,
 	WebClipperTemplate,
 } from "./types";
 
@@ -338,7 +345,7 @@ function convertPropertyValue(prop: WebClipperProperty): string {
 }
 
 /** Current template version for converted Templater templates */
-const CURRENT_TEMPLATE_VERSION = 1;
+const CURRENT_TEMPLATE_VERSION = DEFAULT_TEMPLATE_VERSIONS.clipping ?? 2;
 
 /**
  * Sanitize a string for safe use in YAML frontmatter.
@@ -361,8 +368,8 @@ function sanitizeYamlValue(value: string): string {
 /**
  * Generate Templater frontmatter from WebClipper properties.
  *
- * Adds template_version, type: clipping, and clipping_type fields for PARA system compatibility.
- * All WebClipper templates are type: clipping with clipping_type derived from the template name.
+ * Adds template_version, type: clipping, and resource_type fields for PARA system compatibility.
+ * All WebClipper templates are type: clipping with resource_type derived from the template name.
  */
 function generateFrontmatter(
 	properties: WebClipperProperty[],
@@ -376,13 +383,13 @@ function generateFrontmatter(
 	// All WebClipper templates are type: clipping
 	lines.push("type: clipping");
 
-	// Derive clipping_type from template name using proper YAML sanitization
+	// Derive resource_type from template name using proper YAML sanitization
 	const clippingType = sanitizeYamlValue(templateName);
-	lines.push(`clipping_type: ${clippingType}`);
+	lines.push(`resource_type: ${clippingType}`);
 
 	for (const prop of properties) {
-		// Skip if property is already 'type' or 'clipping_type' (we set them above)
-		if (prop.name === "type" || prop.name === "clipping_type") {
+		// Skip if property is already 'type' or 'resource_type' (we set them above)
+		if (prop.name === "type" || prop.name === "resource_type") {
 			continue;
 		}
 
@@ -578,9 +585,9 @@ export function extractTemplateMetadata(
 		}
 	}
 
-	// Get clipping_type if present
+	// Get resource_type if present
 	const clippingType = template.properties.find(
-		(p) => p.name === "clipping_type",
+		(p) => p.name === "resource_type",
 	);
 
 	return {
@@ -589,6 +596,105 @@ export function extractTemplateMetadata(
 		sourceFormat: "webclipper",
 		variables,
 		frontmatterFields: template.properties.map((p) => p.name),
+	};
+}
+
+/** Value mapping for Web Clipper properties from defaults.ts field names. */
+const WEBCLIPPER_VALUE_MAP: Record<
+	string,
+	{ value: string; type: WebClipperPropertyType }
+> = {
+	type: { value: "clipping", type: "text" },
+	source: { value: "{{url}}", type: "text" },
+	clipped: { value: '{{time|date:"YYYY-MM-DD"}}', type: "date" },
+	domain: { value: "{{domain}}", type: "text" },
+};
+
+/**
+ * Options for generating a Web Clipper JSON template.
+ */
+export interface GenerateWebClipperJsonOptions {
+	/** Template name key from defaults.ts. */
+	readonly templateName: string;
+	/** Display name shown in Web Clipper UI. */
+	readonly displayName: string;
+	/** Template field definitions (from field-bridge). */
+	readonly fields: readonly TemplateField[];
+	/** Template body sections. */
+	readonly sections: readonly TemplateSection[];
+	/** Body configuration (titleLine, preamble, footer). */
+	readonly bodyConfig: TemplateBodyConfig;
+	/** Title prefix emoji (e.g., "✂️"). */
+	readonly titlePrefix: string;
+	/** Vault destination folder (e.g., "00 Inbox"). */
+	readonly destination: string;
+}
+
+/**
+ * Generate a Web Clipper JSON template from defaults.ts configuration.
+ *
+ * This is the REVERSE direction of webClipperToTemplater() — it creates
+ * a WebClipperTemplate from the same source of truth that generates
+ * vault templates, ensuring both outputs agree on structure and fields.
+ *
+ * @param opts - Generation options from defaults.ts config
+ * @returns WebClipperTemplate JSON object
+ */
+export function generateWebClipperJson(
+	opts: GenerateWebClipperJsonOptions,
+): WebClipperTemplate {
+	// 1. Convert fields to WebClipperProperty[]
+	const properties: WebClipperProperty[] = opts.fields.map((field) => {
+		const mapping = WEBCLIPPER_VALUE_MAP[field.name];
+		if (mapping) {
+			return { name: field.name, value: mapping.value, type: mapping.type };
+		}
+		// Array fields → multitext with empty value
+		if (field.type === "array") {
+			return { name: field.name, value: "", type: "multitext" as const };
+		}
+		// All other fields → empty text
+		return { name: field.name, value: "", type: "text" as const };
+	});
+
+	// 2. Build noteContentFormat from bodyConfig + sections
+	const contentLines: string[] = [];
+	if (opts.bodyConfig.titleLine) {
+		contentLines.push(opts.bodyConfig.titleLine);
+	}
+	contentLines.push("");
+	if (opts.bodyConfig.preamble) {
+		contentLines.push(opts.bodyConfig.preamble);
+		contentLines.push("");
+	}
+	for (const section of opts.sections) {
+		contentLines.push(`## ${section.heading}`);
+		contentLines.push("");
+		// Use section's defined content if it has one (e.g., Dataview inline field),
+		// otherwise inject Web Clipper page content variable
+		contentLines.push(section.content ?? "{{content}}");
+		contentLines.push("");
+	}
+	if (opts.bodyConfig.footer) {
+		contentLines.push(opts.bodyConfig.footer);
+	}
+	const noteContentFormat = contentLines.join("\n");
+
+	// 3. Build noteNameFormat with emoji prefix
+	// Trim the prefix since DEFAULT_TITLE_PREFIXES already includes trailing space
+	const trimmedPrefix = opts.titlePrefix.trim();
+	const prefix = trimmedPrefix ? `${trimmedPrefix} ` : "";
+	const noteNameFormat = `${prefix}{{title|safe_name|slice:0,80|trim}}`;
+
+	return {
+		schemaVersion: "0.1.0",
+		name: opts.displayName,
+		behavior: "create",
+		noteContentFormat,
+		properties,
+		triggers: [],
+		noteNameFormat,
+		path: opts.destination,
 	};
 }
 

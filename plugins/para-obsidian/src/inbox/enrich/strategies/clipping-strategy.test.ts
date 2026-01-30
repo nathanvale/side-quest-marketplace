@@ -222,10 +222,9 @@ describe("clippingClassificationStrategy.canEnrich", () => {
 		vaultPath: "/vault",
 	});
 
-	test("returns eligible for type:clipping with distill_status:raw", () => {
+	test("returns eligible for type:clipping without resource_type", () => {
 		const ctx = createContext({
 			type: "clipping",
-			distill_status: "raw",
 			source: "https://example.com",
 		});
 
@@ -236,7 +235,6 @@ describe("clippingClassificationStrategy.canEnrich", () => {
 	test("returns ineligible for non-clipping type", () => {
 		const ctx = createContext({
 			type: "bookmark",
-			distill_status: "raw",
 			source: "https://example.com",
 		});
 
@@ -245,10 +243,10 @@ describe("clippingClassificationStrategy.canEnrich", () => {
 		expect(result.reason).toContain("Not a clipping");
 	});
 
-	test("returns ineligible for already classified", () => {
+	test("returns ineligible for already classified (has resource_type)", () => {
 		const ctx = createContext({
 			type: "clipping",
-			distill_status: "classified",
+			resource_type: "article",
 			source: "https://example.com",
 		});
 
@@ -260,7 +258,6 @@ describe("clippingClassificationStrategy.canEnrich", () => {
 	test("returns ineligible for missing source URL", () => {
 		const ctx = createContext({
 			type: "clipping",
-			distill_status: "raw",
 		});
 
 		const result = clippingClassificationStrategy.canEnrich(ctx);
@@ -282,7 +279,6 @@ describe("clippingClassificationStrategy.enrich", () => {
 		},
 		frontmatter: {
 			type: "clipping",
-			distill_status: "raw",
 			source: url,
 		},
 		body,
@@ -347,10 +343,9 @@ describe("clippingClassificationStrategy.enrich", () => {
 // =============================================================================
 
 describe("applyClippingClassification", () => {
-	test("sets clipping_type and distill_status:classified", () => {
+	test("sets resource_type and classified_at", () => {
 		const frontmatter = {
 			type: "clipping",
-			distill_status: "raw",
 			source: "https://example.com",
 		};
 
@@ -361,17 +356,17 @@ describe("applyClippingClassification", () => {
 
 		const updated = applyClippingClassification(frontmatter, enrichment);
 
-		expect(updated.clipping_type).toBe("article");
-		expect(updated.distill_status).toBe("classified");
+		expect(updated.resource_type).toBe("article");
 		expect(updated.classified_at).toBe("2025-01-13T10:00:00Z");
 		expect(updated.type).toBe("clipping");
 		expect(updated.source).toBe("https://example.com");
+		// distill_status should not be set
+		expect(updated.distill_status).toBeUndefined();
 	});
 
 	test("sets video_id and transcript_status for YouTube", () => {
 		const frontmatter = {
 			type: "clipping",
-			distill_status: "raw",
 			source: "https://youtube.com/watch?v=abc12345678",
 		};
 
@@ -383,8 +378,7 @@ describe("applyClippingClassification", () => {
 
 		const updated = applyClippingClassification(frontmatter, enrichment);
 
-		expect(updated.clipping_type).toBe("youtube");
-		expect(updated.distill_status).toBe("classified");
+		expect(updated.resource_type).toBe("youtube");
 		expect(updated.video_id).toBe("abc12345678");
 		expect(updated.transcript_status).toBe("pending");
 	});
@@ -392,7 +386,6 @@ describe("applyClippingClassification", () => {
 	test("does not set video_id for non-YouTube types", () => {
 		const frontmatter = {
 			type: "clipping",
-			distill_status: "raw",
 			source: "https://github.com/user/repo",
 		};
 
@@ -403,7 +396,7 @@ describe("applyClippingClassification", () => {
 
 		const updated = applyClippingClassification(frontmatter, enrichment);
 
-		expect(updated.clipping_type).toBe("github");
+		expect(updated.resource_type).toBe("github");
 		expect(updated.video_id).toBeUndefined();
 		expect(updated.transcript_status).toBeUndefined();
 	});

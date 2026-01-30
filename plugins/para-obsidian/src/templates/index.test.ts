@@ -169,7 +169,7 @@ Body`);
 	test("detects generic 'Title' prompt key", () => {
 		const template = createTestTemplate(`---
 title: "<% tp.system.prompt("Title") %>"
-type: capture
+type: clipping
 ---
 Body`);
 
@@ -862,7 +862,7 @@ SORT meeting_date DESC
 
 ## Key Resources
 \`\`\`dataview
-TABLE clipping_type as "Type", summary as "Summary"
+TABLE resource_type as "Type", domain as "Domain"
 WHERE type = "clipping"
 \`\`\`
 

@@ -126,19 +126,19 @@ para_create({
 
 ### Meeting content parameter
 
-Meetings are the only template that uses the `content` parameter to pass structured body sections:
+Meetings are the only template that uses the `content` parameter to pass structured body sections. Discover section headings from `creation_meta.sections` via `para_template_fields`:
 
 ```
 para_create({
   template: "meeting",
   title: proposed_title,
-  args: { meeting_type, meeting_date, area, project, summary, transcription },
+  args: { ...fields from validArgs },
   content: {
-    "Attendees": attendees.map(a => `- ${a}`).join('\n'),
-    "Notes": meeting_notes.map(n => `- ${n}`).join('\n'),
-    "Decisions Made": decisions.map(d => `- ${d}`).join('\n'),
-    "Action Items": action_items.map(i => `- ${i.task}`).join('\n'),
-    "Follow-up": follow_up.map(f => `- ${f}`).join('\n')
+    "<discovered-attendees-section>": attendees.map(a => `- ${a}`).join('\n'),
+    "<discovered-notes-section>": meeting_notes.map(n => `- ${n}`).join('\n'),
+    "<discovered-decisions-section>": decisions.map(d => `- ${d}`).join('\n'),
+    "<discovered-action-items-section>": action_items.map(i => `- ${i.task}`).join('\n'),
+    "<discovered-follow-up-section>": follow_up.map(f => `- ${f}`).join('\n')
   },
   response_format: "json"
 })
@@ -146,12 +146,13 @@ para_create({
 
 ### Key field name differences by template
 
-| Template | Area field | Project field | Notes |
-|----------|-----------|---------------|-------|
-| `resource` | `areas` (plural, YAML array) | `projects` (plural, YAML array) | Also has `resource_type`, `source_format`, `distilled` |
-| `meeting` | `area` (singular) | `project` (singular) | Also has `meeting_type`, `meeting_date`, `transcription` |
-| `invoice` | `area` (singular) | `project` (singular) | Also has `provider`, `amount`, `currency`, `status` |
-| `booking` | — | `project` (singular) | Also has `booking_type`, `booking_ref`, `provider`, `cost` |
+Field names vary across templates. **Always use `validArgs` from `para_template_fields`** to discover the correct field names for each template. Key differences to be aware of:
+
+- Some templates use plural fields (`areas`, `projects`) with YAML array support
+- Others use singular fields (`area`, `project`) for single wikilinks
+- Each template has its own domain-specific fields (e.g., `meeting_type`, `resource_type`)
+
+Call `para_template_fields` per template to get the authoritative field list.
 
 ### Multi-value areas/projects (resources only)
 
@@ -201,12 +202,15 @@ para_commit({
 
 ## Layer 1 Injection
 
-After creating and committing the note, inject content into the "Layer 1: Captured Notes" section. **Only for resources** — meetings use structured body sections passed via `content` parameter.
+After creating and committing the note, inject content into the resource template's content target section. **Only for resources** — meetings use structured body sections passed via `content` parameter.
+
+Discover the target section heading from the template metadata (Step 1):
+- Use `creation_meta.contentTargets[0]` from `para_template_fields` response
 
 ```
 para_replace_section({
   file: "<created-file-path>",
-  heading: "Layer 1: Captured Notes",
+  heading: "<discovered-content-target>",  // e.g., "Layer 1: Captured Notes"
   content: "<formatted-content>",
   response_format: "json"
 })
