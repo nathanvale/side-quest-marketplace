@@ -307,43 +307,6 @@
 			"keywords": ["teams", "chat", "microsoft", "macos-automation", "scraping"]
 		},
 		{
-			"name": "nvcc",
-			"source": "./plugins/nvcc",
-			"description": "Nathan's personal Claude Code setup with productivity commands, specialized agents, and custom skills for dotfiles management and development workflows",
-			"version": "1.0.0",
-			"author": {
-				"name": "Nathan Vale"
-			},
-			"category": "productivity",
-			"keywords": [
-				"productivity",
-				"dotfiles",
-				"shell",
-				"development",
-				"automation",
-				"hyperflow",
-				"superwhisper"
-			]
-		},
-		{
-			"name": "melanie",
-			"source": "./plugins/melanie",
-			"description": "Communication and relationship assistant for Nathan & Melanie - message drafting, meme creation, research, and relationship pattern analysis",
-			"version": "1.0.0",
-			"author": {
-				"name": "Nathan Vale"
-			},
-			"category": "personal",
-			"keywords": [
-				"communication",
-				"relationship",
-				"message-drafting",
-				"meme-creation",
-				"voice-matching",
-				"personal-assistant"
-			]
-		},
-		{
 			"name": "x-api",
 			"source": "./plugins/x-api",
 			"description": "Read-only Twitter/X API v2 integration — fetch tweets, threads, timelines, search results, user profiles, and replies via MCP tools",

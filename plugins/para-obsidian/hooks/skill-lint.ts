@@ -16,7 +16,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 
 const PLUGIN_ROOT = resolve(import.meta.dirname, "..");
 

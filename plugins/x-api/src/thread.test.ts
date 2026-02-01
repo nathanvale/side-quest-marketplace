@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { buildThread, type RequestFn, type ThreadFieldParams } from "./thread";
-import type {
-	Tweet,
-	TwitterV2ListResponse,
-	TwitterV2Response,
-	User,
-} from "./types";
+import type { Tweet, User } from "./types";
 
 const fields: ThreadFieldParams = {
 	tweetFields: "author_id,conversation_id,created_at,public_metrics",

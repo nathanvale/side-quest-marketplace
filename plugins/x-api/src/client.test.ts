@@ -16,7 +16,6 @@ function mockFetch(
 ): typeof fetch {
 	let callIndex = 0;
 	const fn = async (_url: string | URL | Request, _init?: RequestInit) => {
-		// biome-ignore lint: test helper — array always has at least 1 element
 		const config = (responses[callIndex] ?? responses[responses.length - 1])!;
 		callIndex++;
 		const status = config.status ?? 200;

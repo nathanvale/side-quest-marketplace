@@ -9,7 +9,7 @@
 import { TimeoutError, withTimeout } from "@sidequest/core/concurrency";
 import { getErrorCategory } from "@sidequest/core/instrumentation";
 import { createCorrelationId } from "@sidequest/core/logging";
-import { getErrorMessage, retry } from "@sidequest/core/utils";
+import { retry } from "@sidequest/core/utils";
 import { mergeSingleTweet, mergeTweetList } from "./includes";
 import { logger } from "./logger";
 import { buildThread } from "./thread";

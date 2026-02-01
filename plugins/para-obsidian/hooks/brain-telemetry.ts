@@ -10,7 +10,7 @@
 
 import { existsSync, mkdirSync } from "node:fs";
 import { appendFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 interface TelemetryEntry {
 	timestamp: string;
