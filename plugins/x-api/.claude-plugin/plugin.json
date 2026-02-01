@@ -1,0 +1,13 @@
+{
+	"name": "x-api",
+	"description": "Read-only Twitter/X API v2 integration — fetch tweets, threads, timelines, and user profiles via MCP tools",
+	"version": "1.0.0",
+	"author": {
+		"name": "Nathan Vale",
+		"email": "hi@nathanvale.com"
+	},
+	"keywords": ["twitter", "x", "api", "tweets", "mcp", "read-only"],
+	"license": "MIT",
+	"repository": "https://github.com/nathanvale/side-quest-marketplace",
+	"mcpServers": ["./.mcp.json"]
+}

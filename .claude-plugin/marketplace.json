@@ -342,6 +342,25 @@
 				"voice-matching",
 				"personal-assistant"
 			]
+		},
+		{
+			"name": "x-api",
+			"source": "./plugins/x-api",
+			"description": "Read-only Twitter/X API v2 integration — fetch tweets, threads, timelines, search results, user profiles, and replies via MCP tools",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "productivity",
+			"keywords": [
+				"twitter",
+				"x",
+				"api",
+				"tweets",
+				"mcp",
+				"read-only",
+				"social-media"
+			]
 		}
 	]
 }
