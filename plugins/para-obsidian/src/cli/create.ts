@@ -300,6 +300,10 @@ export const handleCreate: CommandHandler = async (ctx) => {
 		typeof flags["source-text"] === "string" ? flags["source-text"] : undefined;
 	const preview = flags.preview === true || flags.preview === "true";
 	const modelFlag = typeof flags.model === "string" ? flags.model : undefined;
+	const noAutocommit =
+		flags["no-autocommit"] === true || flags["no-autocommit"] === "true";
+	const skipGuard =
+		flags["skip-guard"] === true || flags["skip-guard"] === "true";
 
 	// Validate required flags based on mode
 	if (sourceFile || sourceText) {
@@ -375,7 +379,9 @@ export const handleCreate: CommandHandler = async (ctx) => {
 	}
 	const argsForTemplate = parseKeyValuePairs(argValues);
 
-	await ensureGitGuard(config);
+	if (!skipGuard) {
+		await ensureGitGuard(config);
+	}
 
 	// Extract source_format for extraFrontmatter so applyTitlePrefix can add the emoji
 	// This enables "📚🎬 Title" pattern for resources with source_format: "video"
@@ -415,7 +421,7 @@ export const handleCreate: CommandHandler = async (ctx) => {
 		result.filePath,
 		parseAttachments(normalizeFlags(flags)),
 	);
-	if (config.autoCommit) {
+	if (config.autoCommit && !noAutocommit) {
 		await autoCommitChanges(
 			config,
 			[result.filePath, ...attachments],

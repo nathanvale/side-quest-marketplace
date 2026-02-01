@@ -24,14 +24,13 @@ Enriched content + classification (from caller)
     ↓
 1. Discover template metadata (para_template_fields)
     ↓
-2. Create note (para_create — frontmatter-only args, dest auto-resolved)
-    ↓
-3. Commit (para_commit — vault needs clean tree)
-    ↓
-4. Inject Layer 1 (para_replace_section — resources only)
-    ↓
-5. Commit again (para_commit — persist Layer 1)
+2. Create note (para_create)
+   - Resources: pass Layer 1 via `content` parameter → single call creates + injects + commits
+   - Meetings: pass structured body via `content` parameter → single call creates + injects + commits
+   - Others: frontmatter-only → auto-commits
 ```
+
+**Key optimization:** Resources and meetings both use the `content` parameter on `para_create` to inject body content in a single CLI invocation. The CLI internally calls `createFromTemplate → replaceSections → autoCommitChanges` — no separate `para_commit` or `para_replace_section` needed.
 
 ---
 
@@ -76,6 +75,10 @@ Use the para-classifier skill for determining template, resource type, source fo
 
 ### Step 1: Discover template metadata
 
+**If template fields are provided in your prompt context (e.g., during triage), skip this step — use the pre-loaded values directly.** The coordinator pre-fetches these once and passes them to all subagents.
+
+Otherwise, call:
+
 ```
 para_template_fields({
   template: proposed_template,
@@ -87,6 +90,7 @@ Response includes:
 - `creation_meta.dest` — default destination directory
 - `creation_meta.titlePrefix` — emoji prefix (auto-applied by `para_create`; do NOT add to title manually)
 - `creation_meta.sections` — body section headings (if any)
+- `creation_meta.contentTargets` — section headings for content injection (e.g., `["Layer 1: Captured Notes"]`)
 - `validArgs` — list of accepted field names for this template
 - `frontmatter_hints` — enum values, types, and constraints
 
@@ -114,19 +118,37 @@ para_create({
 
 ### Step 3: Template-specific post-create
 
-| Template | Post-create steps |
-|----------|-------------------|
-| `resource` | Commit → Inject Layer 1 → Commit |
-| `meeting` | Pass structured body via `content` parameter → Commit |
-| `invoice` | Commit (frontmatter-only) |
-| `booking` | Commit (frontmatter-only) |
-| All others | Commit |
+| Template | How | Post-create steps |
+|----------|-----|-------------------|
+| `resource` | Pass Layer 1 via `content` parameter | None — `para_create` handles inject + commit |
+| `meeting` | Pass structured body via `content` parameter | None — `para_create` handles inject + commit |
+| `invoice` | Frontmatter-only | None — auto-committed |
+| `booking` | Frontmatter-only | None — auto-committed |
+| All others | Frontmatter-only | None — auto-committed |
 
-**Only resources get Layer 1 injection.** Meetings pass structured body sections via the `content` parameter on `para_create`. All other templates are frontmatter-only.
+**Resources use the `content` parameter** just like meetings. Discover the target section heading from `creation_meta.contentTargets[0]` via `para_template_fields`, then pass it as a key in the `content` parameter. The CLI internally calls `replaceSections()` then `autoCommitChanges()` — no separate `para_commit` or `para_replace_section` calls needed.
+
+### Resource content parameter (single-call create+inject)
+
+Resources pass Layer 1 content via the `content` parameter. Discover the content target heading from `creation_meta.contentTargets[0]` via `para_template_fields` (typically `"Layer 1: Captured Notes"`):
+
+```
+para_create({
+  template: "resource",
+  title: proposed_title,
+  args: { ...fields from validArgs },
+  content: {
+    "<discovered-content-target>": formattedLayerOneContent
+  },
+  response_format: "json"
+})
+```
+
+**Why this works:** `create.ts` calls `createFromTemplate → replaceSections → autoCommitChanges` internally when `content` is provided. This replaces the old 4-step flow (create → commit → replace_section → commit) with a single tool call, saving ~3-6s per item.
 
 ### Meeting content parameter
 
-Meetings are the only template that uses the `content` parameter to pass structured body sections. Discover section headings from `creation_meta.sections` via `para_template_fields`:
+Meetings also use the `content` parameter to pass structured body sections. Discover section headings from `creation_meta.sections` via `para_template_fields`:
 
 ```
 para_create({
@@ -187,9 +209,62 @@ para_fm_set({ file, set: { areas: '["[[Area 1]]", "[[Area 2]]"]' } })
 
 ---
 
-## Commit After Creation
+## Post-Creation Verification
 
-**CRITICAL:** Immediately call `para_commit` after `para_create`. The vault requires a clean working tree for subsequent operations (Layer 1 injection).
+After creating a note, verify that critical frontmatter fields match your intended values. This catches two failure modes:
+1. **Mismatch** — you intended a value but `para_create` received wrong/empty args (self-repairable)
+2. **Missing classification** — you couldn't determine the value at all (flag for user review)
+
+### When to Verify
+
+- **ALWAYS** for resources — critical fields: `summary`, `areas`, `source_format`, `resource_type`
+- **ALWAYS** for meetings — critical fields: `summary`, `area`, `meeting_type`
+- **SKIP** for invoices/bookings — frontmatter-only, low risk → set `verification_status: "skipped"`
+
+### Verification Steps
+
+#### Step 1: Read actual frontmatter
+
+```
+para_fm_get({ file: created_path, response_format: "json" })
+```
+
+#### Step 2: Check critical fields (two checks per field)
+
+For each critical field, run both checks:
+
+**A. MISMATCH CHECK:** You intended a non-empty value but the file has empty string `""`, empty array `[]`, or `"[[null]]"`.
+→ Add to `repair_set` (will fix via `para_fm_set`)
+
+**B. EMPTY CHECK:** Both your intended value AND the file value are empty/null.
+→ Add to `verification_issues` (flag for user review)
+→ This means you couldn't classify it — the user needs to decide
+
+#### Step 3: Self-repair (if repair_set is non-empty)
+
+```
+para_fm_set({ file: created_path, set: repair_set, response_format: "json" })
+```
+
+One call, all fixes batched. For array fields (e.g., `areas`), pass JSON array strings: `'["[[Area 1]]", "[[Area 2]]"]'`.
+
+#### Step 4: Set verification status
+
+| Outcome | `verification_status` | `verification_issues` |
+|---------|----------------------|-----------------------|
+| All fields match | `"verified"` | `[]` |
+| Mismatches found AND repaired | `"repaired"` | `[]` |
+| Repair failed | `"failed"` | `["repair failed: {detail}"]` |
+| Empty fields (can't classify) | `"needs_review"` | `["missing: areas", ...]` |
+| Invoice/booking (skipped) | `"skipped"` | `[]` |
+
+Include both fields in your proposal output (TaskUpdate metadata and PROPOSAL_JSON).
+
+---
+
+## Commit After Creation (standalone callers only)
+
+**When NOT using the `content` parameter:** Call `para_commit` after `para_create` if you're creating frontmatter-only notes outside the triage pipeline (e.g., invoices, bookings).
 
 ```
 para_commit({
@@ -198,25 +273,13 @@ para_commit({
 })
 ```
 
+**When using `content` parameter:** No separate commit needed — `para_create` auto-commits after injection.
+
 ---
 
-## Layer 1 Injection
+## Layer 1 Formatting Rules
 
-After creating and committing the note, inject content into the resource template's content target section. **Only for resources** — meetings use structured body sections passed via `content` parameter.
-
-Discover the target section heading from the template metadata (Step 1):
-- Use `creation_meta.contentTargets[0]` from `para_template_fields` response
-
-```
-para_replace_section({
-  file: "<created-file-path>",
-  heading: "<discovered-content-target>",  // e.g., "Layer 1: Captured Notes"
-  content: "<formatted-content>",
-  response_format: "json"
-})
-```
-
-### Formatting Rules
+Layer 1 content injected via the `content` parameter (resources) should follow these formatting rules.
 
 Use `####` headings or deeper (never `#`, `##`, or `###` — those are reserved for note structure).
 
@@ -228,10 +291,20 @@ Use `####` headings or deeper (never `#`, `##`, or `###` — those are reserved 
 | Voice memo | Full transcription if <2k tokens, else key segments | Variable |
 | Attachment | Key passages with page references | 2-3k tokens |
 
-### After Injection
+## Legacy Layer 1 Injection (standalone callers only)
 
-Commit again to persist the Layer 1 content:
+For non-triage callers that need separate injection (e.g., `quick-create`):
 
+```
+para_replace_section({
+  file: "<created-file-path>",
+  heading: "<discovered-content-target>",
+  content: "<formatted-content>",
+  response_format: "json"
+})
+```
+
+Then commit:
 ```
 para_commit({
   message: "Add Layer 1: [title]",
@@ -245,10 +318,10 @@ para_commit({
 
 | Step | Failure | Action |
 |------|---------|--------|
-| `para_create` | Fails | Stop pipeline. Set `created: null`, `layer1_injected: null`. Report error. |
-| `para_commit` (post-create) | Fails | Continue to Layer 1. Note exists but isn't committed yet. |
-| `para_replace_section` | Fails | Keep the note. Set `layer1_injected: false`. Resource still usable. |
-| `para_commit` (post-inject) | Fails | Layer 1 exists in working tree. Note in report. |
+| `para_create` (with `content`) | Fails | Stop pipeline. Set `created: null`, `layer1_injected: null`. Report error. |
+| `para_create` (without `content`) | Fails | Stop pipeline. Set `created: null`. Report error. |
+| `para_commit` (standalone callers) | Fails | Note exists but isn't committed. Continue if possible. |
+| `para_replace_section` (standalone callers) | Fails | Keep the note. Set `layer1_injected: false`. Resource still usable. |
 
 **Soft failure philosophy:** Note creation is primary. Layer 1 injection and commit are enhancements. Don't block note creation if downstream steps fail.
 

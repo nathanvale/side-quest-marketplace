@@ -363,3 +363,14 @@ See `./references/para-philosophy.md` for deeper explanation of:
 - The "three questions" pattern
 - How projects and areas feed each other
 - Common classification mistakes
+
+---
+
+## Completion Signal
+
+After creating the project, emit a structured completion signal so the brain orchestrator can parse the outcome:
+
+- **Success:** `SKILL_RESULT:{"status":"ok","skill":"create-project","summary":"Created project: [name] in [[area]]"}`
+- **Redirected to area:** `SKILL_RESULT:{"status":"ok","skill":"create-project","summary":"Redirected to create-area"}`
+- **Cancelled:** `SKILL_RESULT:{"status":"ok","skill":"create-project","summary":"Cancelled by user"}`
+- **Error:** `SKILL_RESULT:{"status":"error","skill":"create-project","error":"[error description]"}`

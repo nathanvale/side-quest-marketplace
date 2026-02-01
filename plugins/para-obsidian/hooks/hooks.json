@@ -12,6 +12,29 @@
 					}
 				]
 			}
+		],
+		"PostToolUse": [
+			{
+				"matcher": "Skill",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/brain-telemetry.ts",
+						"timeout": 5,
+						"async": true
+					}
+				]
+			},
+			{
+				"matcher": "Write|Edit",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/skill-lint.ts",
+						"timeout": 5
+					}
+				]
+			}
 		]
 	}
 }

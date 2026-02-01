@@ -367,3 +367,13 @@ Created: 04 Archives/Bookings/[Title].md
 ```
 /para-obsidian:quick-create https://some-url.com/page --template invoice --area '[[🏠 Personal Finance]]'
 ```
+
+---
+
+## Completion Signal
+
+After the success report, emit a structured completion signal so the brain orchestrator can parse the outcome:
+
+- **Success:** `SKILL_RESULT:{"status":"ok","skill":"quick-create","summary":"Created [template]: [title]"}`
+- **Cancelled:** `SKILL_RESULT:{"status":"ok","skill":"quick-create","summary":"Cancelled by user"}`
+- **Error:** `SKILL_RESULT:{"status":"error","skill":"quick-create","error":"[error description]"}`

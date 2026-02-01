@@ -7,9 +7,8 @@ Each subagent handles BOTH enrichment AND analysis for a single inbox item. This
 **Subagent responsibilities:**
 1. Fetch full content (enrich)
 2. Analyze and create proposal
-3. Create note via para_create
-4. Inject Layer 1 content via para_replace_section
-5. Persist via TaskUpdate
+3. Create note via `para_create` with `content` parameter (creates + injects Layer 1 + commits in one call)
+4. Persist via TaskUpdate
 
 **Coordinator responsibilities:**
 1. Scan inbox, create tasks
@@ -51,9 +50,20 @@ Task({
     ### Stakeholders
     ${JSON.stringify(stakeholders, null, 2)}
 
-    **CRITICAL:** Only use areas/projects from the lists above. Never hallucinate names.
+    ## Template Fields (pre-loaded)
+    These fields were fetched by the coordinator. Do NOT call para_template_fields — use these directly.
 
-    Follow your workflow: read → enrich → analyze → create → inject Layer 1 → commit → persist → return PROPOSAL_JSON.
+    ### Resource Template
+    ${JSON.stringify(templateFields.resource, null, 2)}
+
+    ### Meeting Template (if applicable)
+    ${templateFields.meeting ? JSON.stringify(templateFields.meeting, null, 2) : "N/A — only loaded when voice memos are present"}
+
+    **CRITICAL:** Only use areas/projects from the lists above. Never hallucinate names.
+    **CRITICAL:** Use validArgs from the template fields above. Do NOT call para_template_fields.
+    **CRITICAL:** Pass no_autocommit: true and skip_guard: true to para_create. The coordinator handles the bulk commit after all items complete.
+
+    Follow your workflow: read → enrich → analyze → create (with content param for Layer 1, no_autocommit, skip_guard) → persist → return PROPOSAL_JSON.
   `
 })
 ```
@@ -134,4 +144,4 @@ This saves 50 items × 3 tool calls = 150 tool calls and ensures consistent cont
 3. **Use `triage-worker` agent** — dedicated agent with MCP tools, model set to haiku
 4. **X/Twitter is sequential** — single Chrome browser instance
 5. **Dual communication** — both TaskUpdate (persistence) AND PROPOSAL_JSON (immediate use)
-6. **Commit after creation** — call `para_commit` after `para_create` (vault needs clean tree)
+6. **Single-call creation** — use `para_create` with `content` parameter (creates + injects + commits atomically)

@@ -64,11 +64,11 @@ www.kentcdodds.com/blog/aha        →  domain: "kentcdodds.com"
 
 **Step 2 — Fetch content:**
 
-Select tool based on URL pattern:
+The clip skill should produce notes identical to what the Obsidian Web Clipper creates — including page content in the Content section. Fetch content for every URL.
 
 | URL Pattern | Tool | Extract |
 |-------------|------|---------|
-| `youtube.com`, `youtu.be` | `get_video_info` | Title only (no transcript — triage handles that) |
+| `youtube.com`, `youtu.be` | `get_video_info` + `firecrawl_scrape` | Title from video info, description + embed from Firecrawl |
 | `x.com`, `twitter.com` | **Skip** (no tool available yet) | Use domain as title, empty content |
 | Everything else | `firecrawl_scrape` | `metadata.title` + `markdown` body |
 
@@ -76,8 +76,12 @@ Select tool based on URL pattern:
 ```
 get_video_info({ url: "<url>" })
 → extract title from response
-→ no content — transcript fetching is triage/enrichment work
+
+firecrawl_scrape({ url: "<url>", formats: ["markdown"], onlyMainContent: true })
+→ extract markdown as page content (video description, chapters, links)
 ```
+
+Combine into content: video embed `![](url)` followed by the scraped description.
 
 **General URLs (Firecrawl):**
 ```
@@ -125,7 +129,7 @@ para_create({
 
 The `content` parameter injects the fetched page content into the content target section discovered from `creation_meta.contentTargets`. The `<!-- highlights:0 -->` marker matches Web Clipper output format.
 
-If no content was fetched (YouTube, X/Twitter, or fetch failure), omit the `content` parameter entirely.
+If no content was fetched (X/Twitter, or fetch failure), omit the `content` parameter entirely.
 
 Process URLs sequentially — each fetch + `para_create` call completes before the next. Collect results for the report.
 
@@ -283,3 +287,15 @@ Creates: `00 Inbox/Progressive Summarization Layer Strategy.md` (LLM-generated t
 /para-obsidian:clip Check if React Server Components solve the waterfall problem for GMS checkout flow
 ```
 Creates: `00 Inbox/RSC for GMS Checkout Waterfall Problem.md` (LLM-generated title)
+
+---
+
+## Completion Signal
+
+After reporting results, emit a structured completion signal so the brain orchestrator can parse the outcome:
+
+- **URL mode (batch):** `SKILL_RESULT:{"status":"ok","skill":"clip","summary":"Clipped N URLs to inbox"}`
+- **URL mode (partial failures):** `SKILL_RESULT:{"status":"partial","skill":"clip","clipped":N,"failed":M}`
+- **Inline mode:** `SKILL_RESULT:{"status":"ok","skill":"clip","summary":"Clipped inline text to inbox"}`
+- **All failed:** `SKILL_RESULT:{"status":"error","skill":"clip","error":"All URLs failed to clip"}`
+- **Empty args:** `SKILL_RESULT:{"status":"error","skill":"clip","error":"Nothing to clip"}`

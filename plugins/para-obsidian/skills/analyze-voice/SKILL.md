@@ -32,15 +32,11 @@ For voice memos, always set `source_format: "audio"`. For meetings, include meet
 
 ```
 para_read({ file: "[input file]", response_format: "json" })
-para_fm_get({ file: "[input file]", response_format: "json" })
 ```
 
-Extract:
-- Full transcription text
-- `recorded` date (for `meeting_date`)
-- `summary` (if present - can hint at meeting type)
-- Pre-filled `areas` or `projects` (if any)
-- Any existing metadata
+Extract frontmatter fields (`recorded`, `summary`, pre-filled `areas`/`projects`, and any existing metadata) from the YAML header in the `para_read` response. Do NOT call `para_fm_get` separately — `para_read` returns the full file including frontmatter.
+
+Also extract the full transcription text from the body.
 
 ### Step 2: Match Speakers to Stakeholders
 
@@ -118,20 +114,46 @@ Look for:
 
 **Follow-up:** Items for future discussion or preparation.
 
-### Step 6: Create Note
+### Step 6: Create Note (Single Call)
 
-**This is where content stays isolated.** Follow the triage-worker's note creation workflow (see `agents/triage-worker.md`):
-
-1. **Create note** via `para_create` with frontmatter-only args
-2. **Commit** via `para_commit` (vault needs clean working tree)
-3. **Inject Layer 1** via `para_replace_section` (resources only — meetings use structured body sections)
+**This is where content stays isolated.** Use `para_create` with the `content` parameter for both meetings and resources:
 
 **Meeting-specific:** Pass meeting body content (attendees, notes, decisions, action items, follow-up) via `content` parameter. Set `layer1_injected: null` for meetings.
 
-**Resource-specific:** Inject transcription as Layer 1 content.
+```
+para_create({
+  template: "meeting",
+  title: proposed_title,
+  args: { ...meeting fields from validArgs },
+  content: {
+    "<attendees-section>": attendeesList,
+    "<notes-section>": notesList,
+    "<decisions-section>": decisionsList,
+    "<action-items-section>": actionItemsList,
+    "<follow-up-section>": followUpList
+  },
+  response_format: "json"
+})
+```
+
+**Resource-specific:** Pass transcription as Layer 1 via `content` parameter. Set `layer1_injected: true`.
 - If transcription <2k tokens: Include full transcription
 - If transcription >2k tokens: Sample key segments with timestamps
 - Always add: `*Transcription captured. Use /distill-resource to extract key insights.*`
+
+```
+para_create({
+  template: "resource",
+  title: proposed_title,
+  args: { ...resource fields from validArgs },
+  content: {
+    "<content-target-heading>": formattedTranscription
+  },
+  response_format: "json"
+})
+```
+
+No separate `para_commit` or `para_replace_section` calls needed — the CLI handles injection and commit internally.
 
 **IMPORTANT:** Do NOT archive or delete the original transcription. Cleanup is the coordinator's responsibility (Phase 5, after user review).
 

@@ -17,6 +17,7 @@
 	],
 	"license": "MIT",
 	"commands": [
+		"./commands/brain.md",
 		"./commands/clip.md",
 		"./commands/commit.md",
 		"./commands/create.md",
@@ -34,6 +35,7 @@
 		"./commands/transcribe.md",
 		"./commands/triage.md",
 		"./commands/validate.md",
+		"./commands/stakeholder.md",
 		"./commands/webclipper.md"
 	],
 	"mcpServers": ["./.mcp.json"],
@@ -42,6 +44,9 @@
 		"./skills/analyze-attachment",
 		"./skills/analyze-voice",
 		"./skills/analyze-web",
+		"./skills/brain",
+		"./skills/clip",
+		"./skills/content-processing",
 		"./skills/create-area",
 		"./skills/create-meeting",
 		"./skills/create-project",
@@ -51,11 +56,12 @@
 		"./skills/field-suggestions",
 		"./skills/log-triage",
 		"./skills/para-classifier",
-		"./skills/content-processing",
 		"./skills/quick-create",
+		"./skills/stakeholder-manage",
 		"./skills/template-assistant",
 		"./skills/triage",
-		"./skills/clip",
+		"./skills/maintenance",
+		"./skills/reflect",
 		"./skills/webclipper-templates"
 	]
 }

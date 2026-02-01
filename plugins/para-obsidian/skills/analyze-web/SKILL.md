@@ -29,14 +29,11 @@ Return a JSON proposal per @plugins/para-obsidian/skills/triage/references/propo
 
 ```
 para_read({ file: "[input file]", response_format: "json" })
-para_fm_get({ file: "[input file]", response_format: "json" })
 ```
 
-Extract:
-- `source` (URL)
-- `domain`
-- `capture_reason` (if present)
-- Existing content
+Extract frontmatter fields (`source`, `domain`, `capture_reason`, pre-filled `areas`/`projects`) from the YAML header in the `para_read` response. Do NOT call `para_fm_get` separately — `para_read` returns the full file including frontmatter.
+
+Also extract existing body content.
 
 ### Step 2: Fetch Full Content
 
@@ -55,17 +52,29 @@ Determine:
 4. **Categorization hints**: 3 bullets for organizing (NOT deep learning - use /para-obsidian:distill-resource)
 5. **Connections**: Which areas/projects does this relate to?
 
-### Step 4: Create Resource & Inject Layer 1
+### Step 4: Create Resource & Inject Layer 1 (Single Call)
 
-**This is where content stays isolated.** Follow the triage-worker's note creation workflow (see `agents/triage-worker.md`):
+**This is where content stays isolated.** Use `para_create` with the `content` parameter to create the note AND inject Layer 1 in a single tool call:
 
-1. **Create note** via `para_create` with frontmatter-only args
-2. **Commit** via `para_commit` (vault needs clean working tree)
-3. **Inject Layer 1** via `para_replace_section` into "Layer 1: Captured Notes"
+```
+para_create({
+  template: "resource",
+  title: proposed_title,
+  args: { ...fields from validArgs },
+  content: {
+    "<content-target-heading>": formattedLayerOneContent
+  },
+  response_format: "json"
+})
+```
+
+The `content` parameter maps heading names to body content. The CLI internally creates the note, injects content into the matching section, and auto-commits — all in one invocation. No separate `para_commit` or `para_replace_section` calls needed.
+
+**Content target heading:** Use `creation_meta.contentTargets[0]` from template fields (typically `"Layer 1: Captured Notes"`). If template fields were pre-loaded in the prompt context (triage mode), use those directly.
 
 See @references/layer1-formatting.md for Layer 1 content formatting patterns (articles, YouTube, threads).
 
-**If injection fails:** Set `layer1_injected: false` and continue. The resource still exists.
+**If `para_create` fails:** Set `created: null`, `layer1_injected: null`, and continue with the proposal. The `content` parameter failure is atomic — no partial state.
 
 ### Step 5: Return Proposal
 
@@ -137,8 +146,7 @@ The coordinator receives only this ~500 byte proposal, not the 10-20k token cont
 
 | Scenario | Action |
 |----------|--------|
-| `para_create` fails | Return error, do not proceed with Layer 1 |
-| `para_replace_section` fails | Set `layer1_injected: false`, continue with proposal |
-| Content empty/unparseable | Set `layer1_injected: false`, note reason |
+| `para_create` (with `content`) fails | Set `created: null`, `layer1_injected: null`, return error proposal |
+| Content empty/unparseable | Create note without `content` parameter, set `layer1_injected: false` |
 
-**Soft failure philosophy:** Resource creation is primary. Layer 1 injection is enhancement. Don't block resource creation if Layer 1 fails.
+**Atomic creation:** When using the `content` parameter, creation and injection are a single atomic operation. If it fails, there's no partial state to clean up.

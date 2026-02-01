@@ -325,3 +325,14 @@ Common areas that cover most of life:
 | 🤝 Social | Friendships, community, networking |
 
 **Guideline:** Most people need 5-10 areas. More than 15 suggests over-categorization.
+
+---
+
+## Completion Signal
+
+After creating the area, emit a structured completion signal so the brain orchestrator can parse the outcome:
+
+- **Success:** `SKILL_RESULT:{"status":"ok","skill":"create-area","summary":"Created area: [name]"}`
+- **Redirected to project:** `SKILL_RESULT:{"status":"ok","skill":"create-area","summary":"Redirected to create-project"}`
+- **Cancelled:** `SKILL_RESULT:{"status":"ok","skill":"create-area","summary":"Cancelled by user"}`
+- **Error:** `SKILL_RESULT:{"status":"error","skill":"create-area","error":"[error description]"}`

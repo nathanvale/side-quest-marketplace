@@ -168,3 +168,14 @@ Adjust anything, or give me your summary to save?
 **External:**
 - [Progressive Summarization](https://fortelabs.com/blog/progressive-summarization-a-practical-technique-for-designing-discoverable-notes/) - Tiago Forte's original article
 - [BASB Book](https://www.buildingasecondbrain.com/book) - Full methodology
+
+---
+
+## Completion Signal
+
+After saving the distilled note, emit a structured completion signal so the brain orchestrator can parse the outcome:
+
+- **Fully distilled:** `SKILL_RESULT:{"status":"ok","skill":"distill-resource","summary":"Distilled: [title] (Layers 2-4 complete)"}`
+- **Partially distilled:** `SKILL_RESULT:{"status":"partial","skill":"distill-resource","summary":"Partial distill: [title] (skipped Layer [N])"}`
+- **No resources found:** `SKILL_RESULT:{"status":"ok","skill":"distill-resource","summary":"No undistilled resources found"}`
+- **Abandoned:** `SKILL_RESULT:{"status":"ok","skill":"distill-resource","summary":"Session abandoned by user"}`

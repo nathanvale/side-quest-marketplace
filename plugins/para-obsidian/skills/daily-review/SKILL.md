@@ -1,6 +1,7 @@
 ---
 name: daily-review
 description: Journaling partner that helps extract deeper meaning from daily logs. Use when the user wants to review their day, process logs into journal entries, or mentions "daily review".
+user-invocable: true
 allowed-tools: Read, mcp__plugin_para-obsidian_para-obsidian__para_read, mcp__plugin_para-obsidian_para-obsidian__para_list, mcp__plugin_para-obsidian_para-obsidian__para_insert, mcp__firecrawl__firecrawl_scrape, WebFetch
 ---
 
@@ -146,3 +147,13 @@ para_insert({
 - Use `mode: "after"` for Gratitude - inserts right after the heading line (before the comment/placeholder)
 - The Journal section goes BEFORE the existing Gratitude section (inserted after "End of Day" heading)
 - The template placeholder (`1. 2. 3.`) will remain below the inserted gratitudes - user can delete if desired
+
+---
+
+## Completion Signal
+
+After inserting the journal entry and gratitudes, emit a structured completion signal so the brain orchestrator can parse the outcome:
+
+- **Success:** `SKILL_RESULT:{"status":"ok","skill":"daily-review","summary":"Journal entry created for [date]"}`
+- **Partial:** `SKILL_RESULT:{"status":"partial","skill":"daily-review","summary":"Journal created but gratitudes skipped"}`
+- **No logs found:** `SKILL_RESULT:{"status":"error","skill":"daily-review","error":"No log entries found for today"}`

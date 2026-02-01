@@ -164,6 +164,18 @@ For capturing URLs or text, prefer the /para-obsidian:clip skill instead of call
 				.describe(
 					'Content to inject into template sections (heading → body mapping, e.g., {"Why This Matters": "This project addresses..."})',
 				),
+			no_autocommit: z
+				.boolean()
+				.optional()
+				.describe(
+					"Skip auto-commit after creation. Use in batch mode where coordinator commits once after all items.",
+				),
+			skip_guard: z
+				.boolean()
+				.optional()
+				.describe(
+					"Skip git clean working tree check. Use in batch mode where parallel creates write simultaneously.",
+				),
 			response_format: z
 				.enum(["markdown", "json"])
 				.optional()
@@ -184,12 +196,16 @@ For capturing URLs or text, prefer the /para-obsidian:clip skill instead of call
 				dest,
 				args: templateArgs,
 				content,
+				no_autocommit,
+				skip_guard,
 			} = args as {
 				template: string;
 				title: string;
 				dest?: string;
 				args?: Record<string, string>;
 				content?: Record<string, string>;
+				no_autocommit?: boolean;
+				skip_guard?: boolean;
 			};
 
 			// Build CLI args - MCP is thin wrapper, CLI does heavy lifting
@@ -215,6 +231,14 @@ For capturing URLs or text, prefer the /para-obsidian:clip skill instead of call
 
 			if (content) {
 				cliArgs.push("--content", JSON.stringify(content));
+			}
+
+			if (no_autocommit) {
+				cliArgs.push("--no-autocommit");
+			}
+
+			if (skip_guard) {
+				cliArgs.push("--skip-guard");
 			}
 
 			// Call CLI via subprocess

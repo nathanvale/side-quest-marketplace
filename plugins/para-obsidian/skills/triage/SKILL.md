@@ -5,7 +5,7 @@ argument-hint: "[all|clippings|voice|attachments|filename]"
 user-invocable: true
 disable-model-invocation: true
 context: fork
-allowed-tools: Task, Read, Bash, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, mcp__plugin_para-obsidian_para-obsidian__para_list, mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_delete, mcp__plugin_para-obsidian_para-obsidian__para_rename, mcp__plugin_para-obsidian_para-obsidian__para_replace_section, mcp__plugin_para-obsidian_para-obsidian__para_fm_get, mcp__plugin_para-obsidian_para-obsidian__para_fm_set, mcp__plugin_para-obsidian_para-obsidian__para_list_areas, mcp__plugin_para-obsidian_para-obsidian__para_list_projects
+allowed-tools: Task, Read, Bash, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, mcp__plugin_para-obsidian_para-obsidian__para_list, mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_delete, mcp__plugin_para-obsidian_para-obsidian__para_rename, mcp__plugin_para-obsidian_para-obsidian__para_replace_section, mcp__plugin_para-obsidian_para-obsidian__para_fm_get, mcp__plugin_para-obsidian_para-obsidian__para_fm_set, mcp__plugin_para-obsidian_para-obsidian__para_list_areas, mcp__plugin_para-obsidian_para-obsidian__para_list_projects, mcp__plugin_para-obsidian_para-obsidian__para_template_fields, mcp__plugin_para-obsidian_para-obsidian__para_commit
 ---
 
 # Triage Coordinator
@@ -58,7 +58,7 @@ Phase 1: Initialize (coordinator)
 
 Phase 2: Enrich + Analyze + Create (subagents)
 ├── Route to correct analyzer based on item type
-├── Parallel for YouTube, articles (batches of 5)
+├── Parallel for YouTube, articles (batches of 10)
 ├── Sequential for X/Twitter (single browser)
 ├── CREATE notes AND inject Layer 1 content (but DO NOT delete originals)
 └── Enriched content stays in subagent context
@@ -137,12 +137,29 @@ If yes → Skip to Phase 2 (process pending items only).
 
 ## Phase 1: Initialize
 
-### 1.1 Load Vault Context
+### 1.1 Load Vault Context (via preflight subagent)
+
+Spawn a haiku preflight subagent to gather vault context cheaply:
+
+```typescript
+Task({
+  model: "haiku",
+  subagent_type: "general-purpose",
+  description: "Triage preflight",
+  prompt: "<preflight prompt with mode=triage>"
+})
+```
+
+Use the prompt template from [../brain/references/preflight-prompt.md](../brain/references/preflight-prompt.md) with `$MODE = triage`.
+
+Parse `PREFLIGHT_JSON:{...}` from the response. Extract `areas`, `projects`, `inbox_items`, and `stakeholders`.
+
+**Fallback:** If the subagent fails, fall back to direct MCP calls:
 
 ```typescript
 para_list_areas({ response_format: "json" })
 para_list_projects({ response_format: "json" })
-para_config({ response_format: "json" })  // Get stakeholders for speaker matching
+para_config({ response_format: "json" })
 ```
 
 Extract `stakeholders` array from config (names, roles, companies for transcription speaker matching).
@@ -222,7 +239,19 @@ TaskCreate({
 
 Task IDs are auto-generated. Store mapping: `{ taskId → file }`.
 
-### 1.6 Present Summary
+### 1.6 Pre-load Template Fields
+
+Call `para_template_fields` once per unique template type (usually just `"resource"`, sometimes `"meeting"`). Pass results to subagents so they skip this call.
+
+```typescript
+// For each unique proposed template:
+para_template_fields({ template: "resource", response_format: "json" })
+// → { validArgs, creation_meta: { contentTargets, dest, titlePrefix, sections } }
+```
+
+Store the results keyed by template name. Include in every subagent prompt (see subagent-prompts.md).
+
+### 1.7 Present Summary
 
 ```
 Found 50 items in inbox:
@@ -250,7 +279,7 @@ Starting subagent processing...
 
 ### 2.1 Spawn Subagents
 
-For each batch of 5 items, spawn subagents **in a single message** for parallel execution.
+For all non-Twitter items (up to 10 per batch), spawn subagents **in a single message** for parallel execution. For inboxes >10 items, use batches of 10. Claude Code handles 7-10 parallel Task calls well for haiku subagents.
 
 **EXCEPTION:** X/Twitter items must be sequential (single Chrome browser). Process these separately after parallel items complete.
 
@@ -259,8 +288,11 @@ Use the prompt template from [subagent-prompts.md](references/subagent-prompts.m
 Pass these variables to each subagent:
 - `taskId`, `file`, `sourceUrl`, `itemType`, `sourceType`
 - `areas`, `projects`, `stakeholders` (from Phase 1)
+- `templateFields` (from Phase 1.6 — pre-loaded template metadata)
 
-Each subagent will: enrich content, analyze, create note, persist via TaskUpdate, and return `PROPOSAL_JSON:{...}`.
+**Batch mode flags:** Instruct subagents to pass `no_autocommit: true` and `skip_guard: true` to `para_create`. This allows parallel subagents to write simultaneously without git guard conflicts. The coordinator commits once after all subagents complete (Phase 5).
+
+Each subagent will: enrich content, analyze, create note (no commit), persist via TaskUpdate, and return `PROPOSAL_JSON:{...}`.
 
 ### 2.1.1 Model Selection by Item Type
 
@@ -334,13 +366,14 @@ See [execution-phases.md](references/execution-phases.md) for edit flow.
 
 ## Phase 5: Execute (After User Approval)
 
-Notes are ALREADY created by subagents. Phase 5 handles:
-1. **Check creation status** - verify `created` and `layer1_injected` fields
-2. **Apply edits** - re-create if title changed, `para_fm_set` if area/project changed
-3. **Delete/archive originals** - route by `itemType` (see table below)
-4. **Handle failures** - fall back to coordinator creation if subagent failed
-5. **Cleanup tasks** - mark completed
-6. **Report** - summary of all processed items
+Notes are ALREADY created by subagents (uncommitted in batch mode). Phase 5 handles:
+1. **Bulk commit** - `para_commit()` once to commit all notes created by subagents (batch mode)
+2. **Check creation status** - verify `created` and `layer1_injected` fields
+3. **Apply edits** - re-create if title changed, `para_fm_set` if area/project changed
+4. **Delete/archive originals** - route by `itemType` (see table below)
+5. **Handle failures** - fall back to coordinator creation if subagent failed
+6. **Cleanup tasks** - mark completed
+7. **Report** - summary of all processed items
 
 ### CRITICAL: Original Cleanup Rules
 
@@ -406,6 +439,17 @@ The `triage-worker` agent has these skills preloaded:
 |-------|---------|-----------|
 | [create-resource](../create-resource/SKILL.md) | Create resource note | Non-triage workflows |
 | [create-meeting](../create-meeting/SKILL.md) | Create meeting note | Non-triage workflows |
+
+---
+
+## Completion Signal
+
+After the final report in Phase 5, emit a structured completion signal so the brain orchestrator can parse the outcome:
+
+- **All processed:** `SKILL_RESULT:{"status":"ok","skill":"triage","summary":"Processed N items","processed":N}`
+- **Partial failures:** `SKILL_RESULT:{"status":"partial","skill":"triage","processed":N,"failed":M}`
+- **Empty inbox:** `SKILL_RESULT:{"status":"ok","skill":"triage","summary":"Inbox is empty"}`
+- **User cancelled:** `SKILL_RESULT:{"status":"ok","skill":"triage","summary":"Cancelled by user"}`
 
 ---
 

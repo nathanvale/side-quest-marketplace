@@ -50,17 +50,17 @@ for (const task of tasks) {
 ```markdown
 # Inbox Triage: 50 items
 
-| #  | Title                           | Area          | Project      | Type     | Conf |
-|----|--------------------------------|---------------|--------------|----------|------|
-| 1  | ClawdBot Setup Guide           | 🤖 AI Practice | 🎯 Clawdbot  | video    | ✓    |
-| 2  | AI Replacing Libraries         | 🤖 AI Practice | -            | video    | ✓    |
-| 3  | Pizza Moncur Restaurant        | 🏡 Home        | -            | ref      | ?    |
-| .. | ...                            | ...           | ...          | ...      | ...  |
-| 48 | Sprint 42 Planning             | 💼 Work        | 🎯 Migration | meeting  | ✓    |
-| 49 | Quick Idea About Auth          | 💼 Work        | -            | idea     | ~    |
-| 50 | Reminder to Call Mum           | 🏡 Home        | -            | clipping | ?    |
+| #  | Title                           | Area          | Project      | Type     | Conf | !  |
+|----|--------------------------------|---------------|--------------|----------|------|----|
+| 1  | ClawdBot Setup Guide           | 🤖 AI Practice | 🎯 Clawdbot  | video    | ✓    |    |
+| 2  | AI Replacing Libraries         | -              | -            | video    | ✓    | ⚠  |
+| 3  | Pizza Moncur Restaurant        | 🏡 Home        | -            | ref      | ?    |    |
+| .. | ...                            | ...           | ...          | ...      | ...  | .. |
+| 48 | Sprint 42 Planning             | 💼 Work        | 🎯 Migration | meeting  | ✓    |    |
+| 49 | Quick Idea About Auth          | 💼 Work        | -            | idea     | ~    |    |
+| 50 | Reminder to Call Mum           | 🏡 Home        | -            | clipping | ?    |    |
 
-Legend: ✓ = high confidence, ~ = medium, ? = low (use "3" for alternatives)
+Legend: ✓ = high, ~ = medium, ? = low | ⚠ = needs review (missing area/project)
 
 ## Actions
 • **A** - Accept all and execute
@@ -73,6 +73,14 @@ Legend: ✓ = high confidence, ~ = medium, ? = low (use "3" for alternatives)
 **Columns:**
 - **Type**: Proposed output type (video, article, meeting, idea, clipping)
 - **Conf**: Confidence indicator - low confidence items benefit from "Deeper" (3) option
+- **!**: Verification flag — show `⚠` when `verification_status === "needs_review"` or `verification_status === "failed"`
+
+**After the table, list verification issues for flagged items:**
+```
+⚠ Item 2: missing area, missing project
+```
+
+Flagged items should be included in the `E` (edit) suggestion so the user can fix them during Phase 4.
 
 **Note:** When reviewing individual items, show `categorization_hints` and `notes` to explain the reasoning.
 
@@ -125,15 +133,19 @@ Quick inline edits. Update task metadata with changes.
 
 ### 5.1 Check Creation Status
 
-For each proposal, check `created` and `layer1_injected` fields:
+For each proposal, check `created`, `layer1_injected`, and `verification_status` fields:
 
-| created | layer1_injected | Status | Action |
-|---------|-----------------|--------|--------|
-| path | true | Resource created, Layer 1 populated | Mark task completed |
-| path | false | Resource created, Layer 1 failed | Mark completed, note in report |
-| path | null | Meeting created (no Layer 1 needed) | Mark task completed |
-| null | null | Non-URL clipping (stays in inbox) | Mark task completed |
-| null | - | Creation failed | Retry with create-resource/create-meeting |
+| created | layer1_injected | verification | Status | Action |
+|---------|-----------------|-------------|--------|--------|
+| path | true | verified | Fully verified | Mark task completed |
+| path | true | repaired | Auto-repaired | Mark completed, note in report |
+| path | true | needs_review | Missing fields | Complete only if user filled in Phase 4 |
+| path | true | failed | Verification broken | Flag for manual review |
+| path | true | skipped | Invoice/booking | Mark task completed |
+| path | false | * | Layer 1 failed | Mark completed, note in report |
+| path | null | * | Meeting (no Layer 1) | Mark task completed |
+| null | null | * | Non-URL clipping | Mark task completed |
+| null | - | * | Creation failed | Retry with create-resource/create-meeting |
 
 ### 5.2 Handle Edited Items
 
@@ -230,6 +242,12 @@ Processed 50 items:
 • 5 meetings created
 • 1 edited → re-created with changes
 • 2 clippings (stayed in inbox)
+
+Verification:
+• 44 notes verified clean
+• 1 note auto-repaired (summary was empty)
+• 1 note reviewed by user (area was unclassifiable)
+• 1 invoice/booking skipped verification
 
 Use /para-obsidian:distill-resource to add progressive summarization.
 ```
