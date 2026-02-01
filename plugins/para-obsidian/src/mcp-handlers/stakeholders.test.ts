@@ -245,7 +245,7 @@ describe("para_stakeholder_lookup logic", () => {
 		const q = query.toLowerCase();
 		return stakeholders.filter((s) => {
 			if (s.name.toLowerCase().includes(q)) return true;
-			if (s.alias && s.alias.toLowerCase().includes(q)) return true;
+			if (s.alias?.toLowerCase().includes(q)) return true;
 			if (s.email) {
 				const prefix = s.email.split("@")[0]?.toLowerCase() ?? "";
 				if (prefix.includes(q)) return true;

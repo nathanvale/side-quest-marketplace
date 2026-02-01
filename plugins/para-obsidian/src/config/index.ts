@@ -12,7 +12,7 @@
  */
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
-import { readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
 	ensureParentDir,

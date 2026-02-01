@@ -268,7 +268,7 @@ Useful for "who is MJ?" or "find June".`,
 
 			const matches = stakeholders.filter((s) => {
 				if (s.name.toLowerCase().includes(query)) return true;
-				if (s.alias && s.alias.toLowerCase().includes(query)) return true;
+				if (s.alias?.toLowerCase().includes(query)) return true;
 				if (s.email) {
 					const prefix = s.email.split("@")[0]?.toLowerCase() ?? "";
 					if (prefix.includes(query)) return true;
