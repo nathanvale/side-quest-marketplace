@@ -235,7 +235,7 @@ After routing to a skill, offer ONE contextual coaching nudge. Not every time â€
 | URL + "make a resource" / "research this" / "create note from" | `quick-create` | The URL plus any --area/--project/--template flags |
 | URL + area/project context (explicit classification intent) | `quick-create` | The URL plus area/project as flags |
 | "create note from template" / "what template should I use" | `template-assistant` | Any template name or content type mentioned |
-| "create a meeting note" / "meeting" | `meeting` (command) | Transcription text or context |
+| "create a meeting note" / "meeting" | `create-meeting` | Transcription text or context |
 
 ### MAINTAIN â€” Keep the vault healthy
 
