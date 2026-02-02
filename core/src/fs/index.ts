@@ -798,6 +798,13 @@ export {
 	getCacheStats,
 	isCachePopulated,
 } from "./cache.js";
+// Config file detection utilities
+export {
+	type ConfigAtRootResult,
+	findNearestConfig,
+	hasConfigAtRoot,
+	type NearestConfigResult,
+} from "./config.js";
 // Path utilities
 export {
 	expandTilde,

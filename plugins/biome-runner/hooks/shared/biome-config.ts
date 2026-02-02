@@ -1,11 +1,12 @@
 /**
  * Biome configuration detection utilities.
- * Checks for biome.json/biome.jsonc to ensure hooks don't run without config.
+ * Delegates to generic config detection from @sidequest/core/fs.
  */
 
-import { exists } from "node:fs/promises";
-import { join } from "node:path";
-import { getGitRoot } from "@sidequest/core/git";
+import {
+	type ConfigAtRootResult,
+	hasConfigAtRoot,
+} from "@sidequest/core/fs";
 
 /**
  * Valid Biome configuration file names.
@@ -13,61 +14,16 @@ import { getGitRoot } from "@sidequest/core/git";
  */
 export const BIOME_CONFIG_FILES = ["biome.json", "biome.jsonc"] as const;
 
-/**
- * Result of checking for Biome configuration.
- */
-export interface BiomeConfigResult {
-	/** Whether a valid Biome config file was found */
-	found: boolean;
-	/** Path to the config file if found */
-	configPath?: string;
-	/** The git root where we searched (for error messages) */
-	searchPath?: string;
-}
+/** Result of checking for Biome configuration. */
+export type BiomeConfigResult = ConfigAtRootResult;
 
 /**
- * Check if a Biome configuration file exists in the git repository root.
- *
- * Searches for biome.json or biome.jsonc at the repository root.
- * This ensures consistent behavior - we only run Biome when the project
- * has explicitly opted in with a config file.
+ * Check if a Biome configuration file exists at the git repository root.
  *
  * @returns BiomeConfigResult with found status and paths
- *
- * @example
- * ```ts
- * const result = await hasBiomeConfig();
- * if (!result.found) {
- *   console.log(`No biome.json in ${result.searchPath}`);
- *   process.exit(0);
- * }
- * ```
  */
 export async function hasBiomeConfig(): Promise<BiomeConfigResult> {
-	const gitRoot = await getGitRoot();
-
-	// If not in a git repo, we can't reliably find the config
-	// Return not found - the git-aware checks will skip anyway
-	if (!gitRoot) {
-		return { found: false };
-	}
-
-	// Check for each possible config file
-	for (const configFile of BIOME_CONFIG_FILES) {
-		const configPath = join(gitRoot, configFile);
-		if (await exists(configPath)) {
-			return {
-				found: true,
-				configPath,
-				searchPath: gitRoot,
-			};
-		}
-	}
-
-	return {
-		found: false,
-		searchPath: gitRoot,
-	};
+	return hasConfigAtRoot(BIOME_CONFIG_FILES);
 }
 
 /**
