@@ -91,6 +91,27 @@ Based on the category, read the relevant reference files from the plugin's `refe
 
 ### 3. Diagnose
 
+**For publishing issues, check actual state before prescribing steps.** Run these commands to understand what's already done:
+
+```bash
+# Check if package already exists on npm (and at what version)
+npm view <package-name> version 2>&1
+
+# Check npm auth
+npm whoami 2>&1
+
+# Check if build output exists
+ls dist/ 2>&1
+
+# Check for existing GitHub secrets
+gh secret list --repo <owner>/<repo> 2>&1
+
+# Check package.json publishConfig
+grep -A3 publishConfig package.json
+```
+
+**Skip any step the user has already completed.** If `npm view` returns a version, the first publish is done — go straight to OIDC setup or Changesets flow. If GitHub secrets already include `NPM_TOKEN`, don't ask them to create one.
+
 Check the troubleshooting routing table first. It maps specific symptoms to causes, fixes, and the config files involved.
 
 If the issue isn't in the routing table:
@@ -136,11 +157,23 @@ Determine if the issue is:
 3. Check `references/troubleshooting.md` routing table
 4. Common causes: missing secrets, permission issues, Bun linker bug
 
-### "I can't publish to npm"
+### "I can't publish to npm" / "Help me publish"
 
-1. Ask: First publish or subsequent? OIDC or NPM_TOKEN?
-2. Load `references/publishing.md`
-3. Walk through the OIDC setup or NPM_TOKEN configuration
+1. **Check state first** — run `npm view <package> version` to see if it's already on npm
+2. If already published: skip local first publish, go to OIDC setup or Changesets
+3. If not published: walk through first publish flow
+4. Load `references/publishing.md`
+5. Check `gh secret list` to see what secrets exist before asking user to create them
+
+### Creating Changesets (Agent Mode)
+
+When running as an agent, **always** use non-interactive mode — the bare `changeset` CLI blocks on TTY input:
+
+```bash
+bun version:gen --bump <patch|minor|major> --summary "<description>"
+```
+
+Never run bare `changeset` or `bun version:gen` without flags in agent context — it will hang waiting for interactive input.
 
 ### "Tests pass locally but fail in CI"
 

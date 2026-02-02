@@ -17,8 +17,14 @@ The template uses [Changesets](https://github.com/changesets/changesets) for ver
 ### Creating a Changeset
 
 ```bash
-bun version:gen   # Interactive: select bump type + write summary
+# Interactive (human — spawns TTY prompt)
+bun version:gen
+
+# Non-interactive (agent/CI — writes file directly, no TTY needed)
+bun version:gen --bump minor --summary "Added new feature X"
 ```
+
+The `--bump` flag accepts `patch`, `minor`, or `major`. Both `--bump` and `--summary` are required for non-interactive mode; omit both to get the interactive CLI.
 
 Creates a `.changeset/<random-name>.md` file:
 
