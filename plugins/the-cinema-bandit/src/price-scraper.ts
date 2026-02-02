@@ -5,6 +5,7 @@
  * Scraping is handled by Playwright-based CLI (src/cli.ts).
  */
 
+import { parsePrice } from "@sidequest/core/formatters";
 import { pricingLogger } from "./logger.ts";
 import type { SelectorConfig } from "./selectors.ts";
 
@@ -72,20 +73,21 @@ export function formatTicketTypeName(type: string): string {
 }
 
 /**
- * Parse a price string to a number
- * Handles formats: "$27.00", "$27", "27.00", "27"
+ * Parse a price string to a number with logging
+ * Wraps core parsePrice function with application-specific logging
  */
-export function parsePrice(priceText: string): number {
-	const cleaned = priceText.replace(/[$,\s]/g, "");
-	const price = Number.parseFloat(cleaned);
-
-	if (Number.isNaN(price)) {
-		pricingLogger.error("Failed to parse price", { input: priceText, cleaned });
-		throw new Error(`Invalid price format: "${priceText}"`);
+function parsePriceWithLogging(priceText: string): number {
+	try {
+		const price = parsePrice(priceText);
+		pricingLogger.debug("Price parsed", { input: priceText, price });
+		return price;
+	} catch (error) {
+		pricingLogger.error("Failed to parse price", {
+			input: priceText,
+			error: error instanceof Error ? error.message : String(error),
+		});
+		throw error;
 	}
-
-	pricingLogger.debug("Price parsed", { input: priceText, price });
-	return price;
 }
 
 /**
@@ -159,7 +161,7 @@ export function validateScrapedPricing(data: {
 
 	// Parse and validate each ticket type price
 	const ticketTypes: TicketTypePrice[] = data.ticketTypes.map((ticketType) => {
-		const price = parsePrice(ticketType.price);
+		const price = parsePriceWithLogging(ticketType.price);
 
 		// Validation: ticket prices should be reasonable
 		if (price < 5 || price > 100) {
@@ -183,7 +185,7 @@ export function validateScrapedPricing(data: {
 		};
 	});
 
-	const bookingFeePerTicket = parsePrice(data.bookingFee);
+	const bookingFeePerTicket = parsePriceWithLogging(data.bookingFee);
 
 	// Validate booking fee
 	if (bookingFeePerTicket < 0 || bookingFeePerTicket > 10) {

@@ -4,10 +4,11 @@
  * @packageDocumentation
  */
 
+// Export core utilities (re-export for backward compatibility)
+export { formatCurrency, parsePrice } from "@sidequest/core/formatters";
 // Export calculator functions and types
 export {
 	calculatePricing,
-	formatCurrency,
 	GUEST_PRICES,
 	type PricingBreakdown,
 	type TicketCounts,
@@ -17,7 +18,6 @@ export { sendEmail } from "./gmail/index.js";
 // Export live price scraper functions and types
 export {
 	calculatePricingFromScraped,
-	parsePrice,
 	type ScrapedPricing,
 	validateScrapedPricing,
 } from "./price-scraper.js";

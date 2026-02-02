@@ -61,6 +61,7 @@ core/
 │   ├── llm/                   # LLM integration (Claude, Ollama)
 │   ├── logging/               # Structured logging with correlation IDs
 │   ├── mcp/                   # Simplified MCP server API (mcpez fork)
+│   ├── oauth/                 # OAuth 2.0 token management (provider-agnostic)
 │   ├── password/              # Password validation
 │   ├── slo/                   # SLO tracking with burn rate analysis
 │   ├── spawn/                 # Process spawning utilities
@@ -266,6 +267,66 @@ Structured logging with correlation IDs for request tracing.
 - `metrics.ts` - Performance metrics
 - `config.ts` - Logger configuration
 
+### OAuth Token Management (`src/oauth/`)
+
+Provider-agnostic OAuth 2.0 token persistence and expiry checking.
+
+**Why This Exists:**
+OAuth token management patterns (secure storage, expiry checking, atomic writes)
+were duplicated across plugins (Gmail, GitHub, etc.). This module provides generic
+utilities that work with any OAuth 2.0 provider.
+
+**Key Features:**
+- **Secure Storage**: Atomic writes with 0o600 permissions (owner read/write only)
+- **Expiry Management**: Buffer-based expiry checking to prevent mid-request failures
+- **Credential Validation**: Type-safe validation with descriptive errors
+- **Cross-Platform**: Works on macOS, Linux, and Windows
+
+**Files:**
+- `types.ts` - Generic OAuth interfaces (OAuthToken, OAuthCredentials)
+- `token-file.ts` - Token persistence, expiry checking, credential validation
+- `token-file.test.ts` - Comprehensive test suite (19 tests)
+
+**Usage:**
+```typescript
+import {
+  loadTokenFile,
+  saveTokenFile,
+  isTokenExpired,
+  validateOAuthCredentials,
+  type OAuthToken
+} from "@sidequest/core/oauth";
+
+// Load existing token
+const token = loadTokenFile("~/.config/myapp/token.json");
+
+// Check if expired (with 5 minute buffer by default)
+if (token && isTokenExpired(token)) {
+  // Refresh token using provider-specific API
+  const newToken = await refreshTokenWithProvider(token);
+  saveTokenFile("~/.config/myapp/token.json", newToken);
+}
+
+// Validate credentials before OAuth flow
+const creds = JSON.parse(fs.readFileSync("credentials.json", "utf8"));
+validateOAuthCredentials(creds); // Throws if invalid
+```
+
+**Security Features:**
+- Atomic writes via temp file → rename pattern (prevents corruption)
+- Restrictive file permissions (0o600) on token files
+- Safe directory creation with 0o700 permissions
+- No token data in logs or error messages
+
+**Not Included (Provider-Specific):**
+This module does NOT include provider-specific logic like:
+- OAuth consent flows
+- Token refresh implementations (use provider SDKs)
+- Authorization servers
+- Callback handlers
+
+Use this module for the generic parts, implement provider-specific OAuth flows separately.
+
 ### Validation Utilities (`src/validation/`)
 
 Input validation for identifiers, numbers, and names.
@@ -360,6 +421,7 @@ const result = await tracker.checkBreach("api_latency", 1100);
 | `hooks` | Plugin hook utilities |
 | `html` | HTML generation and templating |
 | `mcp-response` | MCP tool handler wrapper (reduces boilerplate by ~20 lines per tool) |
+| `oauth` | OAuth 2.0 token management (secure storage, expiry checking) |
 | `password` | Password validation rules |
 | `spawn` | Process spawning with stdio capture |
 | `streams` | Stream processing utilities |
@@ -387,6 +449,7 @@ The package.json uses subpath exports for explicit module boundaries:
     "./llm": "./src/llm/index.ts",
     "./logging": "./src/logging/index.ts",
     "./mcp": "./src/mcp/index.ts",
+    "./oauth": "./src/oauth/index.ts",
     "./password": "./src/password/index.ts",
     "./slo": "./src/slo/index.ts",
     "./spawn": "./src/spawn/index.ts",
@@ -410,6 +473,7 @@ import { callModel } from "@sidequest/core/llm";
 import { logger } from "@sidequest/core/logging";
 import { createSLOTracker } from "@sidequest/core/slo";
 import { validateClassifierId, validatePriority } from "@sidequest/core/validation";
+import { loadTokenFile, saveTokenFile, isTokenExpired } from "@sidequest/core/oauth";
 ```
 
 ---

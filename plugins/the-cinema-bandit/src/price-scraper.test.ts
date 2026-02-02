@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { findWithFallback, parsePrice } from "./price-scraper.ts";
+import { parsePrice } from "@sidequest/core/formatters";
+import { findWithFallback } from "./price-scraper.ts";
 import type { SelectorConfig } from "./selectors.ts";
 
 describe("findWithFallback", () => {

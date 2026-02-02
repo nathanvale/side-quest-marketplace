@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { calculatePricing, formatCurrency, GUEST_PRICES } from "./calculator";
+import { formatCurrency } from "@sidequest/core/formatters";
+import { calculatePricing, GUEST_PRICES } from "./calculator";
 
 describe("formatCurrency", () => {
 	test("formats whole numbers with two decimal places", () => {

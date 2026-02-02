@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { getStringFlag, parseTicketsFlag } from "./cli.ts";
-import { parseArgs } from "./utils/args.ts";
+import { getStringFlag, parseArgs } from "@sidequest/core/cli";
+import { parseTicketsFlag } from "./cli.ts";
 
 describe("parseArgs", () => {
 	test("parses spaced flags", () => {
@@ -16,8 +16,10 @@ describe("parseArgs", () => {
 	});
 
 	test("captures positional arguments", () => {
-		const result = parseArgs(["movie", "extra", "--format", "json"]);
-		expect(result.positional).toEqual(["extra"]);
+		const result = parseArgs(["movie", "extra", "arg3", "--format", "json"]);
+		expect(result.command).toBe("movie");
+		expect(result.subcommand).toBe("extra");
+		expect(result.positional).toEqual(["arg3"]);
 		expect(result.flags.format).toBe("json");
 	});
 });

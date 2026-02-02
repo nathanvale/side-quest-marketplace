@@ -311,3 +311,84 @@ export function parseCommaSeparatedList(
 		.map((s) => s.trim())
 		.filter(Boolean);
 }
+
+/**
+ * Safely retrieves a string flag value from parsed CLI flags.
+ *
+ * Handles flag values that may be strings, booleans, or arrays (from duplicate flags).
+ * Returns the first string value found, or undefined if no string value exists.
+ *
+ * @param flags - Parsed CLI flags from parseArgs()
+ * @param key - Flag name to retrieve
+ * @returns String value if found, undefined otherwise
+ *
+ * @example
+ * const flags = parseArgs(["--session-id", "116001"]).flags;
+ * getStringFlag(flags, "session-id") // → "116001"
+ *
+ * @example
+ * const flags = parseArgs(["--verbose"]).flags;
+ * getStringFlag(flags, "verbose") // → undefined (boolean flag)
+ *
+ * @example
+ * const flags = parseArgs(["--arg", "a", "--arg", "b"]).flags;
+ * getStringFlag(flags, "arg") // → "a" (first array element)
+ */
+export function getStringFlag(
+	flags: Record<string, string | boolean | (string | boolean)[]>,
+	key: string,
+): string | undefined {
+	const value = flags[key];
+	if (typeof value === "string") return value;
+	if (Array.isArray(value)) {
+		const firstString = value.find((v): v is string => typeof v === "string");
+		return firstString;
+	}
+	return undefined;
+}
+
+/**
+ * Output error message and exit with code 1.
+ *
+ * Formats error in JSON or markdown based on ResponseFormat.
+ * JSON format includes optional details object.
+ * Markdown format prints to stderr.
+ *
+ * This function never returns (calls process.exit(1)).
+ *
+ * @param format - Output format (from parseResponseFormat)
+ * @param message - Error message to display
+ * @param details - Optional additional error details (JSON only)
+ *
+ * @example
+ * import { ResponseFormat } from "@sidequest/core/mcp-response";
+ * outputError(ResponseFormat.JSON, "Missing required flag --session-id");
+ *
+ * @example
+ * outputError(
+ *   ResponseFormat.MARKDOWN,
+ *   "Invalid ticket format",
+ *   { expected: "--tickets 'ADULT:1,SENIOR:2'" }
+ * );
+ */
+export function outputError(
+	format: "json" | "markdown",
+	message: string,
+	details?: Record<string, unknown>,
+): never {
+	if (format === "json") {
+		console.log(
+			JSON.stringify({
+				success: false,
+				error: message,
+				...(details ? { details } : {}),
+			}),
+		);
+	} else {
+		console.error(`Error: ${message}`);
+		if (details) {
+			console.error(JSON.stringify(details, null, 2));
+		}
+	}
+	process.exit(1);
+}

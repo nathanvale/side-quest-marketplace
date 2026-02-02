@@ -1,9 +1,11 @@
 import { describe, expect, it } from "bun:test";
+import {
+	parseResponseFormat,
+	ResponseFormat,
+} from "@sidequest/core/mcp-response";
 import type { MovieDetailsResponse } from "../formatters.ts";
 import type { Movie, SeatMap, TicketType } from "../scraper.ts";
 import {
-	OutputFormat,
-	parseOutputFormat,
 	renderMovieDetailsMarkdown,
 	renderMoviesMarkdown,
 	renderPricingMarkdown,
@@ -12,33 +14,24 @@ import {
 	renderSessionMarkdown,
 } from "./index.ts";
 
-describe("parseOutputFormat", () => {
-	it("defaults to JSON when no value provided", () => {
-		expect(parseOutputFormat()).toBe(OutputFormat.JSON);
-		expect(parseOutputFormat(undefined)).toBe(OutputFormat.JSON);
+describe("parseResponseFormat", () => {
+	it("defaults to MARKDOWN when no value provided", () => {
+		expect(parseResponseFormat()).toBe(ResponseFormat.MARKDOWN);
+		expect(parseResponseFormat(undefined)).toBe(ResponseFormat.MARKDOWN);
 	});
 
 	it("returns MARKDOWN for 'markdown'", () => {
-		expect(parseOutputFormat("markdown")).toBe(OutputFormat.MARKDOWN);
-	});
-
-	it("returns MARKDOWN for 'md' shorthand", () => {
-		expect(parseOutputFormat("md")).toBe(OutputFormat.MARKDOWN);
-	});
-
-	it("is case insensitive", () => {
-		expect(parseOutputFormat("MARKDOWN")).toBe(OutputFormat.MARKDOWN);
-		expect(parseOutputFormat("Markdown")).toBe(OutputFormat.MARKDOWN);
-		expect(parseOutputFormat("MD")).toBe(OutputFormat.MARKDOWN);
+		expect(parseResponseFormat("markdown")).toBe(ResponseFormat.MARKDOWN);
 	});
 
 	it("returns JSON for 'json'", () => {
-		expect(parseOutputFormat("json")).toBe(OutputFormat.JSON);
+		expect(parseResponseFormat("json")).toBe(ResponseFormat.JSON);
 	});
 
-	it("returns JSON for any unknown value", () => {
-		expect(parseOutputFormat("invalid")).toBe(OutputFormat.JSON);
-		expect(parseOutputFormat("xml")).toBe(OutputFormat.JSON);
+	it("returns MARKDOWN for any unknown value", () => {
+		expect(parseResponseFormat("invalid")).toBe(ResponseFormat.MARKDOWN);
+		expect(parseResponseFormat("xml")).toBe(ResponseFormat.MARKDOWN);
+		expect(parseResponseFormat("md")).toBe(ResponseFormat.MARKDOWN);
 	});
 });
 

@@ -1,8 +1,10 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import {
 	coerceValue,
+	getStringFlag,
 	normalizeFlags,
 	normalizeFlagValue,
+	outputError,
 	parseArgOverrides,
 	parseArgs,
 	parseCommaSeparatedList,
@@ -464,5 +466,167 @@ describe("parseCommaSeparatedList", () => {
 
 	test("handles empty string", () => {
 		expect(parseCommaSeparatedList("")).toEqual([]);
+	});
+});
+
+describe("getStringFlag", () => {
+	test("returns string value directly", () => {
+		const flags = { "session-id": "116001" };
+		expect(getStringFlag(flags, "session-id")).toBe("116001");
+	});
+
+	test("returns undefined for boolean flags", () => {
+		const flags = { verbose: true };
+		expect(getStringFlag(flags, "verbose")).toBeUndefined();
+	});
+
+	test("returns first string from array (duplicate flags)", () => {
+		const flags = { arg: ["first", "second"] };
+		expect(getStringFlag(flags, "arg")).toBe("first");
+	});
+
+	test("returns first string from mixed array", () => {
+		const flags = { mixed: [true, "value", "another"] };
+		expect(getStringFlag(flags, "mixed")).toBe("value");
+	});
+
+	test("returns undefined for non-existent flag", () => {
+		const flags = { other: "value" };
+		expect(getStringFlag(flags, "missing")).toBeUndefined();
+	});
+
+	test("returns undefined for array of only booleans", () => {
+		const flags = { boolArray: [true, false, true] };
+		expect(getStringFlag(flags, "boolArray")).toBeUndefined();
+	});
+
+	test("handles empty flags object", () => {
+		expect(getStringFlag({}, "any")).toBeUndefined();
+	});
+
+	test("handles real-world cinema-bandit flag structure", () => {
+		const { flags } = parseArgs([
+			"session",
+			"--session-id",
+			"116001",
+			"--format",
+			"json",
+		]);
+		expect(getStringFlag(flags, "session-id")).toBe("116001");
+		expect(getStringFlag(flags, "format")).toBe("json");
+	});
+});
+
+describe("outputError", () => {
+	// Store original console methods and process.exit
+	const originalConsoleLog = console.log;
+	const originalConsoleError = console.error;
+	const originalExit = process.exit;
+
+	let logOutput: string[] = [];
+	let errorOutput: string[] = [];
+	let exitCode: number | undefined;
+
+	afterEach(() => {
+		// Restore original functions
+		console.log = originalConsoleLog;
+		console.error = originalConsoleError;
+		process.exit = originalExit;
+		logOutput = [];
+		errorOutput = [];
+		exitCode = undefined;
+	});
+
+	test("outputs JSON format error to stdout", () => {
+		// Mock console and exit
+		console.log = (msg: string) => {
+			logOutput.push(msg);
+		};
+		process.exit = ((code: number) => {
+			exitCode = code;
+			throw new Error("EXIT"); // Stop execution
+		}) as never;
+
+		try {
+			outputError("json", "Test error message");
+		} catch (_e) {
+			// Expected exit throw
+		}
+
+		expect(exitCode).toBe(1);
+		expect(logOutput).toHaveLength(1);
+		const parsed = JSON.parse(logOutput[0] as string);
+		expect(parsed).toEqual({
+			success: false,
+			error: "Test error message",
+		});
+	});
+
+	test("outputs JSON format error with details", () => {
+		console.log = (msg: string) => {
+			logOutput.push(msg);
+		};
+		process.exit = ((code: number) => {
+			exitCode = code;
+			throw new Error("EXIT");
+		}) as never;
+
+		try {
+			outputError("json", "Validation failed", {
+				expected: "--tickets 'ADULT:1'",
+			});
+		} catch (_e) {
+			// Expected exit throw
+		}
+
+		expect(exitCode).toBe(1);
+		const parsed = JSON.parse(logOutput[0] as string);
+		expect(parsed).toEqual({
+			success: false,
+			error: "Validation failed",
+			details: { expected: "--tickets 'ADULT:1'" },
+		});
+	});
+
+	test("outputs markdown format error to stderr", () => {
+		console.error = (msg: string) => {
+			errorOutput.push(msg);
+		};
+		process.exit = ((code: number) => {
+			exitCode = code;
+			throw new Error("EXIT");
+		}) as never;
+
+		try {
+			outputError("markdown", "Test error message");
+		} catch (_e) {
+			// Expected exit throw
+		}
+
+		expect(exitCode).toBe(1);
+		expect(errorOutput).toHaveLength(1);
+		expect(errorOutput[0]).toBe("Error: Test error message");
+	});
+
+	test("outputs markdown format error with details", () => {
+		console.error = (msg: string) => {
+			errorOutput.push(msg);
+		};
+		process.exit = ((code: number) => {
+			exitCode = code;
+			throw new Error("EXIT");
+		}) as never;
+
+		try {
+			outputError("markdown", "Validation failed", { field: "session-id" });
+		} catch (_e) {
+			// Expected exit throw
+		}
+
+		expect(exitCode).toBe(1);
+		expect(errorOutput).toHaveLength(2);
+		expect(errorOutput[0]).toBe("Error: Validation failed");
+		expect(errorOutput[1]).toContain('"field"');
+		expect(errorOutput[1]).toContain('"session-id"');
 	});
 });

@@ -44,6 +44,7 @@ export {
 
 // Export new formatter utilities
 export { formatBytes } from "./bytes.ts";
+export { formatCurrency, parsePrice } from "./currency.ts";
 export { getLanguageForExtension } from "./syntax.ts";
 export { dedupeConsecutiveLines } from "./text.ts";
 export {

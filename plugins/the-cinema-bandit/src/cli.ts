@@ -16,6 +16,11 @@
  */
 
 import { join } from "node:path";
+import { getStringFlag, outputError, parseArgs } from "@sidequest/core/cli";
+import {
+	parseResponseFormat,
+	ResponseFormat,
+} from "@sidequest/core/mcp-response";
 import {
 	formatMovieDetailsResponse,
 	formatMoviesResponse,
@@ -32,8 +37,6 @@ import {
 import { createScraperClient } from "./scraper-client.ts";
 import { generateTicketHtml, type TicketData } from "./template.ts";
 import {
-	OutputFormat,
-	parseOutputFormat,
 	renderMovieDetailsMarkdown,
 	renderMoviesMarkdown,
 	renderPricingMarkdown,
@@ -41,7 +44,6 @@ import {
 	renderSendConfirmationMarkdown,
 	renderSessionMarkdown,
 } from "./templates/index.ts";
-import { parseArgs } from "./utils/args.ts";
 
 /**
  * Example ticket data for the `ticket` command
@@ -61,17 +63,6 @@ const EXAMPLE_TICKET: TicketData = {
 		{ type: "Child", quantity: 1 },
 	],
 };
-
-/**
- * Safely retrieves a string flag value.
- */
-export function getStringFlag(
-	flags: Record<string, string | boolean>,
-	key: string,
-): string | undefined {
-	const value = flags[key];
-	return typeof value === "string" ? value : undefined;
-}
 
 /**
  * Parses ticket selections from a flag string in the format "TYPE:qty,TYPE:qty".
@@ -99,31 +90,6 @@ export function parseTicketsFlag(
 	}
 
 	return ticketSelections;
-}
-
-/**
- * Emits an error in markdown or JSON form and exits with code 1.
- */
-function outputError(
-	format: OutputFormat,
-	message: string,
-	details?: Record<string, unknown>,
-): never {
-	if (format === OutputFormat.JSON) {
-		console.log(
-			JSON.stringify({
-				success: false,
-				error: message,
-				...(details ? { details } : {}),
-			}),
-		);
-	} else {
-		console.error(`Error: ${message}`);
-		if (details) {
-			console.error(JSON.stringify(details, null, 2));
-		}
-	}
-	process.exit(1);
 }
 
 /**
@@ -347,16 +313,15 @@ async function main(): Promise<void> {
 	}
 
 	const { command, flags } = parseArgs(args);
-	const format = parseOutputFormat(
-		typeof flags.format === "string" ? flags.format : undefined,
-	);
-	const log = format === OutputFormat.JSON ? console.error : console.log;
+	const formatStr = getStringFlag(flags, "format");
+	const format = parseResponseFormat(formatStr);
+	const log = format === ResponseFormat.JSON ? console.error : console.log;
 	const dryRun = flags["dry-run"] === true || flags["dry-run"] === "true";
 
 	// Handle ticket command without session-id (no scraping needed)
 	if (command === "ticket" && !flags["session-id"]) {
 		if (dryRun) {
-			if (format === OutputFormat.MARKDOWN) {
+			if (format === ResponseFormat.MARKDOWN) {
 				log("✅ Dry run: example ticket would be generated (Star Wars 1977)");
 			} else {
 				console.log(
@@ -386,7 +351,7 @@ async function main(): Promise<void> {
 			case "movies": {
 				const result = await client.scrapeMovies();
 
-				if (format === OutputFormat.MARKDOWN) {
+				if (format === ResponseFormat.MARKDOWN) {
 					console.log(renderMoviesMarkdown(result.movies));
 				} else {
 					const response = formatMoviesResponse(
@@ -401,12 +366,15 @@ async function main(): Promise<void> {
 			case "session": {
 				const sessionId = getStringFlag(flags, "session-id");
 				if (!sessionId) {
-					outputError(format, "--session-id required for session command");
+					outputError(
+						format === ResponseFormat.JSON ? "json" : "markdown",
+						"--session-id required for session command",
+					);
 				}
 
 				const result = await client.scrapeSession(sessionId);
 
-				if (format === OutputFormat.MARKDOWN) {
+				if (format === ResponseFormat.MARKDOWN) {
 					console.log(
 						renderSessionMarkdown(result.screenNumber, result.dateTime),
 					);
@@ -426,12 +394,15 @@ async function main(): Promise<void> {
 			case "pricing": {
 				const sessionId = getStringFlag(flags, "session-id");
 				if (!sessionId) {
-					outputError(format, "--session-id required for pricing command");
+					outputError(
+						format === ResponseFormat.JSON ? "json" : "markdown",
+						"--session-id required for pricing command",
+					);
 				}
 
 				const result = await client.scrapePricing(sessionId);
 
-				if (format === OutputFormat.MARKDOWN) {
+				if (format === ResponseFormat.MARKDOWN) {
 					console.log(
 						renderPricingMarkdown(result.ticketTypes, result.bookingFee),
 					);
@@ -451,12 +422,15 @@ async function main(): Promise<void> {
 			case "seats": {
 				const sessionId = getStringFlag(flags, "session-id");
 				if (!sessionId) {
-					outputError(format, "--session-id required for seats command");
+					outputError(
+						format === ResponseFormat.JSON ? "json" : "markdown",
+						"--session-id required for seats command",
+					);
 				}
 
 				const result = await client.scrapeSeats(sessionId);
 
-				if (format === OutputFormat.MARKDOWN) {
+				if (format === ResponseFormat.MARKDOWN) {
 					console.log(renderSeatsMarkdown(result.seatMap));
 				} else {
 					// Render ASCII art seat map to stderr (doesn't interfere with JSON)
@@ -477,7 +451,10 @@ async function main(): Promise<void> {
 			case "movie": {
 				const movieUrl = getStringFlag(flags, "movie-url");
 				if (!movieUrl) {
-					outputError(format, "--movie-url required for movie command");
+					outputError(
+						format === ResponseFormat.JSON ? "json" : "markdown",
+						"--movie-url required for movie command",
+					);
 				}
 
 				const result = await client.scrapeMovie(movieUrl);
@@ -496,7 +473,7 @@ async function main(): Promise<void> {
 					result.selectorsUsed,
 				);
 
-				if (format === OutputFormat.MARKDOWN) {
+				if (format === ResponseFormat.MARKDOWN) {
 					console.log(renderMovieDetailsMarkdown(response));
 				} else {
 					console.log(JSON.stringify(response, null, 2));
@@ -528,7 +505,7 @@ async function main(): Promise<void> {
 					dryRun,
 				};
 
-				if (format === OutputFormat.MARKDOWN) {
+				if (format === ResponseFormat.MARKDOWN) {
 					log("\n✅ Generated ticket HTML with live data");
 					log(`📄 Saved to: ${outputPath ?? "(dry run - no file written)"}`);
 					log("\nOpen the file in a browser to preview the ticket.");
@@ -544,15 +521,25 @@ async function main(): Promise<void> {
 				const ticketsStr = getStringFlag(flags, "tickets");
 
 				if (!sessionId) {
-					outputError(format, "--session-id required for send command");
+					outputError(
+						format === ResponseFormat.JSON ? "json" : "markdown",
+						"--session-id required for send command",
+					);
 				}
 				if (!seats) {
-					outputError(format, "--seats required for send command");
+					outputError(
+						format === ResponseFormat.JSON ? "json" : "markdown",
+						"--seats required for send command",
+					);
 				}
 				if (!ticketsStr) {
-					outputError(format, "--tickets required for send command", {
-						example: '--tickets "ADULT:1,SENIOR:2"',
-					});
+					outputError(
+						format === ResponseFormat.JSON ? "json" : "markdown",
+						"--tickets required for send command",
+						{
+							example: '--tickets "ADULT:1,SENIOR:2"',
+						},
+					);
 				}
 
 				let ticketSelections: Array<{ type: string; quantity: number }>;
@@ -561,7 +548,10 @@ async function main(): Promise<void> {
 				} catch (error) {
 					const message =
 						error instanceof Error ? error.message : String(error);
-					outputError(format, message);
+					outputError(
+						format === ResponseFormat.JSON ? "json" : "markdown",
+						message,
+					);
 				}
 
 				// Scrape movies to find the one matching this sessionId
@@ -618,7 +608,7 @@ async function main(): Promise<void> {
 						);
 
 				// Output response
-				if (format === OutputFormat.MARKDOWN) {
+				if (format === ResponseFormat.MARKDOWN) {
 					console.log(
 						renderSendConfirmationMarkdown({
 							movieTitle: ticketData.movieTitle,
@@ -656,15 +646,25 @@ async function main(): Promise<void> {
 			}
 
 			default:
-				outputError(format, `Unknown command "${command}"`, {
-					help: "Run with --help to see available commands",
-				});
+				outputError(
+					format === ResponseFormat.JSON ? "json" : "markdown",
+					`Unknown command "${command}"`,
+					{
+						help: "Run with --help to see available commands",
+					},
+				);
 		}
 	} catch (error) {
 		if (error instanceof Error) {
-			outputError(format, `Scraping error: ${error.message}`);
+			outputError(
+				format === ResponseFormat.JSON ? "json" : "markdown",
+				`Scraping error: ${error.message}`,
+			);
 		} else {
-			outputError(format, `Scraping error: ${String(error)}`);
+			outputError(
+				format === ResponseFormat.JSON ? "json" : "markdown",
+				`Scraping error: ${String(error)}`,
+			);
 		}
 	} finally {
 		if (client) {

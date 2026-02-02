@@ -10,6 +10,7 @@
  * - Booking fee: $1.95 per ticket
  */
 
+import { formatCurrency } from "@sidequest/core/formatters";
 import type { InvoiceLine, TicketLine } from "./template.ts";
 
 /**
@@ -159,20 +160,4 @@ export function calculatePricing(counts: TicketCounts): PricingBreakdown {
 		bookingFeeAmount,
 		totalAmountNumber,
 	};
-}
-
-/**
- * Formats a number as Australian currency
- *
- * @param amount - Amount to format
- * @returns Formatted currency string with dollar sign
- *
- * @example
- * ```typescript
- * formatCurrency(42.50) // "$42.50"
- * formatCurrency(100)   // "$100.00"
- * ```
- */
-export function formatCurrency(amount: number): string {
-	return `$${amount.toFixed(2)}`;
 }
