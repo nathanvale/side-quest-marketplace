@@ -1,6 +1,6 @@
 {
 	"name": "x-api",
-	"description": "Read-only Twitter/X API v2 integration — fetch tweets, threads, timelines, and user profiles via MCP tools",
+	"description": "[EXTRACTED] Read-only Twitter/X API v2 — now published as @side-quest/x-api on npm. Use side-quest-plugins/plugins/x-api instead.",
 	"version": "1.0.0",
 	"author": {
 		"name": "Nathan Vale",
