@@ -102,9 +102,14 @@ The preferred auth method for npm. No secrets needed after initial setup.
 
 ### Fallback to NPM_TOKEN
 
-If OIDC is not configured, the publish scripts fall back to `NPM_TOKEN`:
+If OIDC is not configured, `changesets-publish.sh` falls back to `NPM_TOKEN`.
+
+**Critical:** The script writes the auth token to `NPM_CONFIG_USERCONFIG` (if set) rather than `~/.npmrc`. This is because `setup-node` with `registry-url` creates a temp `.npmrc` at `/home/runner/work/_temp/.npmrc` and sets `NPM_CONFIG_USERCONFIG` to point to it. npm reads `NPM_CONFIG_USERCONFIG` first, so writing to `~/.npmrc` has no effect — npm never sees the token.
+
 ```bash
-echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
+# Correct: write to wherever npm is actually reading from
+NPMRC="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "$NPMRC"
 ```
 
 ## Pre-release Channels
@@ -221,6 +226,20 @@ Can be used as a drop-in replacement for the publish step if Changesets' publish
 - **Fix:** Guard both with existence checks (`git rev-parse` for tags, `gh release view` for releases)
 - The pre-release path already had the tag check; stable path and `release.yml` were missing it
 - **Fixed in template** — ensure your `publish.yml` and `release.yml` use the idempotent pattern
+
+### NPM_TOKEN set but publish still fails with ENEEDAUTH or E404
+
+- `setup-node` with `registry-url` sets `NPM_CONFIG_USERCONFIG=/home/runner/work/_temp/.npmrc`
+- This temp `.npmrc` contains `${NODE_AUTH_TOKEN}` (a placeholder that resolves to nothing useful)
+- npm reads `NPM_CONFIG_USERCONFIG` first, completely ignoring `~/.npmrc`
+- So even though `changesets-publish.sh` writes the real token to `~/.npmrc`, npm never sees it
+- **Fix:** Write auth to `${NPM_CONFIG_USERCONFIG}` instead of `~/.npmrc`:
+  ```bash
+  NPMRC="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+  echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "$NPMRC"
+  ```
+- **Fixed in template** — ensure your `changesets-publish.sh` uses `NPM_CONFIG_USERCONFIG`
+- Symptoms: `npm notice Access token expired or revoked` followed by E404 or ENEEDAUTH, even with a valid `NPM_TOKEN` secret
 
 ### npm bin entry `./` prefix gotcha
 
