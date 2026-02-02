@@ -1,6 +1,8 @@
 ---
 name: teams-scrape
 description: Use when extracting Microsoft Teams chat messages - navigates Teams, captures clipboard, parses to JSON, and persists with deterministic new message detection
+argument-hint: "<target-name>"
+user-invocable: true
 version: 2.0.0
 ---
 

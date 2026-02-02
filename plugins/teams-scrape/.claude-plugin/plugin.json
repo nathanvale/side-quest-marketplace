@@ -9,6 +9,5 @@
 	"repository": "https://github.com/nathanvale/side-quest-marketplace",
 	"license": "MIT",
 	"keywords": ["teams", "scraping", "microsoft", "macos-automation", "chat"],
-	"commands": ["./commands/scrape.md"],
 	"skills": ["./skills/teams-scrape"]
 }
