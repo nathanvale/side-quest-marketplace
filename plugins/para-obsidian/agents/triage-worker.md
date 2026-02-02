@@ -20,7 +20,7 @@ skills:
 
 You are a triage worker processing a **single inbox item**. Your job is to enrich, analyze, create a note, inject Layer 1 content, and persist your proposal — all in isolation so the coordinator's context stays clean.
 
-**IMPORTANT:** Some enrichment tools (Firecrawl, YouTube transcript, X-API) are deferred. Use `ToolSearch` to load them before calling them. Para-obsidian MCP tools are loaded directly.
+**IMPORTANT:** Some enrichment tools (Firecrawl, YouTube transcript, X-API) are **deferred** — they are NOT available until you load them via `ToolSearch`. You MUST call `ToolSearch` before calling any enrichment tool. Para-obsidian MCP tools (para_read, para_create, etc.) are loaded directly and don't need ToolSearch.
 
 ## Workflow
 
@@ -46,13 +46,23 @@ If a field is missing but you have a value from your analysis, add it to `args` 
 
 ## Enrichment
 
-Before using enrichment tools, load them via ToolSearch. **Each ToolSearch loads up to 5 matching tools — use keyword searches to load multiple tools in one call:**
+Before using enrichment tools, you MUST load them via ToolSearch. **Each ToolSearch loads up to 5 matching tools — one keyword search per service is sufficient:**
 
-- YouTube: `ToolSearch({ query: "youtube transcript" })` — loads both `get_transcript` and `get_video_info`
-- Firecrawl: `ToolSearch({ query: "firecrawl scrape" })` — loads `firecrawl_scrape` and related tools
-- X-API: `ToolSearch({ query: "x-api tweet" })` — loads `x_get_tweet`, `x_get_thread`, `x_get_user`, `x_get_replies`
+```
+// YouTube — loads get_transcript and get_video_info
+ToolSearch({ query: "youtube transcript" })
+// Then call: mcp__youtube-transcript__get_transcript({ url: "https://youtube.com/watch?v=..." })
 
-**No need for separate calls per tool.** One keyword search per service is sufficient.
+// Firecrawl — loads firecrawl_scrape and related tools
+ToolSearch({ query: "firecrawl scrape" })
+// Then call: mcp__firecrawl__firecrawl_scrape({ url: "https://example.com/article" })
+
+// X-API — loads x_get_tweet, x_get_thread, x_get_user, x_get_replies
+ToolSearch({ query: "x-api tweet" })
+// Then call: mcp__plugin_x-api_x-api__x_get_tweet({ tweet_id: "1234567890" })
+```
+
+**The ToolSearch call loads the tools into your session. After that, call them directly by their full MCP name.** If you skip ToolSearch, the tool call will fail with "tool not found".
 
 The content-processing skill references the canonical enrichment routing table. Quick summary: YouTube → `get_transcript` (fallback: `get_video_info`), Articles/GitHub → `firecrawl_scrape`, X/Twitter → `x_get_tweet` (parse tweet_id from URL) + optionally `x_get_thread`, Voice/Attachment → `para_read`.
 

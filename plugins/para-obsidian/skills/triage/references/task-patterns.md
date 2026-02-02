@@ -33,7 +33,7 @@ Source: https://example.com/article`,
 })
 ```
 
-### Task Update by Subagent (Phase 3)
+### Task Update by Subagent (Phase 2)
 
 ```typescript
 TaskUpdate({
@@ -51,7 +51,7 @@ TaskUpdate({
 })
 ```
 
-### Task Completion (Phase 6)
+### Task Completion (Phase 5)
 
 ```typescript
 TaskUpdate({
@@ -72,13 +72,13 @@ TaskUpdate({
        │ Subagent calls TaskUpdate with proposal
        │
 ┌──────▼──────┐
-│ in_progress │  ← Proposal saved in metadata
+│ in_progress │  ← Note created + proposal saved in metadata (original still exists)
 └──────┬──────┘
        │
-       │ para_create executed
+       │ User approves (Phase 3) + coordinator cleans up (Phase 5)
        │
 ┌──────▼──────┐
-│  completed  │
+│  completed  │  ← Original deleted/archived
 └─────────────┘
 ```
 

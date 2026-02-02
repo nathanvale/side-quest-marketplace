@@ -66,7 +66,7 @@ Each subagent enriches its OWN item. The coordinator does NOT fetch content.
 ### Coordinator Groups Items
 
 ```typescript
-const parallelItems = [];     // YouTube, Firecrawl, X-API - spawn in batches of 5
+const parallelItems = [];     // YouTube, Firecrawl, X-API - spawn in batches of 10
 const sequentialItems = [];   // Chrome DevTools (Confluence only) - spawn one at a time
 
 for (const item of inboxItems) {

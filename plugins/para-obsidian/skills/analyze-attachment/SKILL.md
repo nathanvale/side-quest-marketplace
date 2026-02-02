@@ -1,29 +1,19 @@
 ---
 name: analyze-attachment
-description: Analyze PDF/DOCX attachments and return resource proposals. Uses para-obsidian CLI for extraction, analyzes content, returns structured proposal. Worker skill for triage orchestrator.
+description: Analyze PDF/DOCX attachments, create notes, and return lightweight proposals. Reads content via para_read, analyzes, creates note with para_create, and persists proposal. Worker skill for triage orchestrator.
 user-invocable: false
 ---
 
 # Analyze Attachment
 
-Analyze PDF or DOCX attachments and return a **proposal**. Unlike web clippings and voice memos, attachments follow a **proposal-only flow** — the triage-worker agent handles note creation after receiving the proposal.
+Analyze PDF or DOCX attachments, **create the note**, and return a lightweight proposal.
 
-## Architecture Note
-
-**Different from analyze-web/analyze-voice:** Those skills create notes AND inject Layer 1 content before returning. Attachments use CLI extraction (`para scan`) which has its own workflow, so this skill returns a proposal only. The triage-worker creates the note using the proposal fields.
-
-## Skills as Documentation
-
-This skill documents how to use the `para` CLI for attachment processing. The CLI handles:
-- PDF text extraction via `pdftotext`
-- DOCX extraction via `mammoth` + `turndown`
-- Heuristic classification (invoice, contract, CV, etc.)
-- LLM fallback for ambiguous documents
+**Key design:** Like analyze-web and analyze-voice, this skill creates the note AND returns a proposal. The full content stays in subagent context — only the proposal flows back to the coordinator.
 
 ## Input
 
 You receive:
-- `file`: Path to attachment in inbox (e.g., `00 Inbox/Attachments/document.pdf`)
+- `file`: Path to attachment inbox note (e.g., `00 Inbox/📎 document.md` — the inbox note referencing the attachment)
 - `areas`: Available areas in vault
 - `projects`: Available projects in vault
 
@@ -31,58 +21,72 @@ You receive:
 
 Return a JSON proposal per @plugins/para-obsidian/skills/triage/references/proposal-schema.md.
 
-**Key:** Use `area` (single wikilink), `project` (single wikilink or null), `resourceType` (camelCase). Include `file`, `type: "attachment"`, and `document_type` alongside the standard proposal fields.
+**Key:** Use `area` (single wikilink), `project` (single wikilink or null), `resourceType` (camelCase). Include `file`, `type: "attachment"`, `created`, `layer1_injected`, and `document_type` alongside the standard proposal fields.
 
 For attachments, always set `source_format: "document"`. Include `document_type` (invoice, contract, cv, letter, medical, report, manual) as an attachment-specific field.
 
 ## Workflow
 
-### Step 1: Check What's in Inbox
+### Step 1: Read Inbox Note
 
 ```
-para_list({ path: "00 Inbox/Attachments", response_format: "json" })
+para_read({ file: "[input file]", response_format: "json" })
 ```
 
-Look for PDFs and DOCX files.
+Extract frontmatter fields (`source`, `type`, pre-filled `areas`/`projects`) and body content from the inbox note. The inbox note typically contains extracted text from the attachment (placed there by the CLI scan step or Web Clipper).
 
-### Step 2: Use CLI for Extraction
+Do NOT call `para_fm_get` separately — `para_read` returns the full file including frontmatter.
 
-The `para scan` command handles attachment processing:
+### Step 2: Analyze Content
 
-```bash
-# Scan inbox and extract content from attachments
-para scan
-
-# Or process specific file
-para process-inbox --file "00 Inbox/Attachments/document.pdf"
-```
-
-**CLI Capabilities:**
-- Extracts text from PDFs using `pdftotext`
-- Extracts content from DOCX using `mammoth` + `turndown`
-- Runs heuristic classifiers (filename patterns, content patterns)
-- Falls back to LLM for ambiguous documents
-
-### Step 3: Read Extracted Content
-
-After `para scan`, check if a suggestion was created:
-
-```
-para_read({ file: "00 Inbox/[suggestion file]", response_format: "json" })
-```
-
-The CLI creates suggestion files with extracted content and classification.
-
-### Step 4: Analyze and Propose
-
-Based on extracted content, determine:
+Based on the extracted content in the inbox note, determine:
 1. **Document type**: Invoice, contract, CV, letter, medical, report, manual
-2. **Template**: Most attachments → `resource`, invoices → `invoice`, etc.
+2. **Template**: Most attachments → `resource`, invoices → `invoice`, bookings → `booking`
 3. **Key information**: Dates, amounts, parties, terms
+4. **Area/project**: Which vault area does this belong to?
 
-### Step 5: Return Proposal
+### Step 3: Pre-Creation Self-Check
 
-Return the JSON proposal structure.
+Before calling `para_create`, verify your `args` object includes critical fields:
+
+**If resource:**
+- [ ] `summary` — one-sentence description
+- [ ] `areas` — wikilink(s)
+- [ ] `source_format` — `"document"`
+- [ ] `resource_type` — based on document type
+
+**If invoice/booking:**
+- [ ] Template-specific fields (see proposal-schema.md)
+
+### Step 4: Create Note (Single Call)
+
+Use `para_create` with the `content` parameter to create the note AND inject key content:
+
+```
+para_create({
+  template: proposed_template,
+  title: proposed_title,
+  args: { ...fields from validArgs },
+  content: {
+    "<content-target-heading>": formattedContent
+  },
+  response_format: "json"
+})
+```
+
+**Content formatting for attachments:** Extract key passages with page references. Target 2-3k tokens. Use `####` headings for structure.
+
+**If `para_create` fails:** Set `created: null`, `layer1_injected: null`, continue with proposal.
+
+### Step 5: Verify & Repair
+
+**During triage:** Skip this step entirely. Set `verification_status: "pending_coordinator"` and `verification_issues: []`. The coordinator handles verification in Phase 2.5.
+
+**Standalone callers:** Call `para_fm_get` and verify critical fields. Repair mismatches via `para_fm_set`.
+
+### Step 6: Return Proposal
+
+Return the lightweight JSON proposal. The note is already created.
 
 ## Document Type Classification
 

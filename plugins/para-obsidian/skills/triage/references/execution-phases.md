@@ -6,10 +6,10 @@ After all subagents complete (Phase 2) and before presenting the review table (P
 
 **Why "always stamp":** Idempotent. If the worker subagent got it right, overwriting with the same value does no harm. Eliminates all conditional logic and trust issues with the worker's self-reported `verification_status`.
 
-### Field Mapping (Proposal → Frontmatter)
+### Field Mapping (Proposal camelCase → Frontmatter snake_case)
 
-| Proposal Field | Frontmatter Field | Notes |
-|---------------|-------------------|-------|
+| Proposal Field (camelCase) | Frontmatter Field (snake_case) | Notes |
+|---------------------------|--------------------------------|-------|
 | `summary` | `summary` | Direct copy |
 | (task metadata) `sourceUrl` | `source` | Use sourceUrl from task metadata, not proposal |
 | `source_format` | `source_format` | Direct copy |
@@ -34,7 +34,9 @@ For each proposal in proposals:
 
   // 1. Build stamp_set from proposal + task metadata
   stamp_set = {}
-  stamp_set.summary = proposal.summary  // Always stamp even if empty (catches haiku drops)
+  if proposal.summary is not empty:
+    stamp_set.summary = proposal.summary  // Stamp non-empty values to catch haiku drops
+  // If summary is empty in BOTH proposal AND frontmatter → flag needs_review (don't stamp empty)
 
   if proposal.proposed_template == "resource":
     stamp_set.source = task_metadata.sourceUrl  // From task, not proposal
@@ -89,7 +91,7 @@ For each proposal in proposals:
 | Case | Handling |
 |------|----------|
 | `created == null` | Skip — note wasn't created, nothing to stamp |
-| `summary == ""` in proposal | Don't stamp empty — leave existing value. Flag `needs_review` if frontmatter is also empty |
+| `summary == ""` in proposal | Don't stamp empty string — omit from stamp_set. If frontmatter `summary` is also empty after stamping, add `"missing: summary"` to verification_issues and set `needs_review` |
 | `invoice`/`booking` | Skip — set `verification_status: "skipped"` |
 | Resume flow (`in_progress` items) | Re-run Phase 2.5 on all items with `created != null`. TaskGet loop provides proposals |
 | `sourceUrl` missing from task metadata | Don't stamp `source` — omit from stamp_set |

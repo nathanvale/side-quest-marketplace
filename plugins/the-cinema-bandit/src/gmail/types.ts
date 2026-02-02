@@ -2,35 +2,30 @@
  * Gmail API integration types for the-cinema-bandit plugin.
  *
  * Defines OAuth credentials, tokens, and error types for Gmail API communication.
+ * Re-exports generic OAuth types from @sidequest/core/oauth for consistency.
  */
+
+import type { OAuthCredentials, OAuthToken } from "@sidequest/core/oauth";
 
 /**
  * OAuth 2.0 credentials from Google Cloud Console.
  *
  * Obtained by creating OAuth 2.0 Client ID (Desktop application type)
  * in Google Cloud Console with Gmail API enabled.
+ *
+ * Note: This is an alias of OAuthCredentials for Gmail-specific usage.
  */
-export interface GmailCredentials {
-	client_id: string;
-	client_secret: string;
-	redirect_uris: string[];
-	auth_uri: string;
-	token_uri: string;
-}
+export type GmailCredentials = OAuthCredentials;
 
 /**
  * OAuth access token with refresh capability.
  *
  * Stored locally after initial OAuth consent flow.
  * Automatically refreshed when expired using refresh_token.
+ *
+ * Note: This is an alias of OAuthToken for Gmail-specific usage.
  */
-export interface GmailToken {
-	access_token: string;
-	refresh_token: string;
-	scope: string;
-	token_type: string;
-	expiry_date: number; // Unix timestamp in milliseconds
-}
+export type GmailToken = OAuthToken;
 
 /**
  * Gmail authentication errors.

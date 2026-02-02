@@ -37,11 +37,19 @@ Also extract existing body content.
 
 ### Step 2: Fetch Full Content
 
-**CRITICAL: Select tool based on domain.**
+**CRITICAL: Select tool based on domain.** Use `ToolSearch` to load deferred tools before calling them.
 
-See @plugins/para-obsidian/skills/triage/references/enrichment-strategies.md for the canonical routing table and tool selection.
+| Domain | Tool | ToolSearch Query |
+|--------|------|-----------------|
+| `youtube.com` / `youtu.be` | `get_transcript` (fallback: `get_video_info`) | `"youtube transcript"` |
+| `x.com` / `twitter.com` | `x_get_tweet` (parse tweet_id from URL) | `"x-api tweet"` |
+| `github.com` / other articles | `firecrawl_scrape` | `"firecrawl scrape"` |
 
-See @plugins/para-obsidian/references/content-sourcing/url-routing.md for detailed per-domain patterns (X/Twitter, YouTube, Firecrawl).
+**X/Twitter is MANDATORY enrichment** — Web Clipper captures only stubs. Always fetch via X-API regardless of clipping content.
+
+See @plugins/para-obsidian/skills/triage/references/enrichment-strategies.md for the full routing table and constraints.
+
+See @plugins/para-obsidian/references/content-sourcing/url-routing.md for detailed per-domain patterns.
 
 ### Step 3: Analyze Content
 
@@ -89,7 +97,9 @@ See @references/layer1-formatting.md for Layer 1 content formatting patterns (ar
 
 ### Step 5: Verify & Repair
 
-Call `para_fm_get` on the created file. Compare each critical field:
+**During triage:** Skip this step entirely. Set `verification_status: "pending_coordinator"` and `verification_issues: []`. The coordinator handles verification in Phase 2.5 — it stamps and checks all critical fields from PROPOSAL_JSON.
+
+**Standalone callers (non-triage):** Call `para_fm_get` on the created file. Compare each critical field:
 
 | Field | Your intended value | File value | Action |
 |-------|-------------------|------------|--------|

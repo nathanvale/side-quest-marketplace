@@ -324,6 +324,26 @@
 				"read-only",
 				"social-media"
 			]
+		},
+		{
+			"name": "bun-starter",
+			"source": "./plugins/bun-starter",
+			"description": "Create, debug, and heal repos from nathanvale/bun-typescript-starter template. Includes scaffolding commands, diagnostic expert skill, and comprehensive reference docs for CI/CD, publishing, testing, and security.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "development",
+			"keywords": [
+				"bun",
+				"typescript",
+				"template",
+				"starter",
+				"ci-cd",
+				"changesets",
+				"npm-publish",
+				"github-actions"
+			]
 		}
 	]
 }

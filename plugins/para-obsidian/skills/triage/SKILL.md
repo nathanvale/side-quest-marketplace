@@ -63,13 +63,14 @@ Phase 2: Enrich + Analyze + Create (subagents)
 ├── CREATE notes AND inject Layer 1 content (but DO NOT delete originals)
 └── Enriched content stays in subagent context
 
-Phase 2.5: Coordinator Verification (coordinator)
+Phase 2.5: Coordinator Verification (coordinator) ← AUTOMATIC
+├── Runs automatically after ALL Phase 2 subagents complete, before Phase 3
 ├── For each proposal with created != null
 ├── para_fm_set: stamp summary + source + classification fields from proposal
 ├── para_fm_get: verify all critical fields populated
 └── Override haiku's verification_status with coordinator's assessment
 
-Phase 3: Present & Collaborate (coordinator) ← CHECKPOINT
+Phase 3: Present & Collaborate (coordinator) ← USER CHECKPOINT
 ├── Render table with all proposals
 ├── **ASK USER** - accept/edit/delete?
 └── User reviews and can modify area/project/title
@@ -92,6 +93,8 @@ Phase 5: Execute (coordinator) ← AFTER APPROVAL
 ## CRITICAL: Context Isolation
 
 **The orchestrator MUST NOT read content.** All content reading happens in subagents. Never call `para_read` from the coordinator — spawn a subagent instead.
+
+**Why this is a hard rule:** 50 inbox items × 10k average tokens = 500k tokens. This overflows the coordinator's context and causes timeouts. With isolation, the coordinator handles only ~500 bytes per item (proposals), keeping total context under 25k tokens.
 
 See [context-isolation.md](references/context-isolation.md) for rules, token math, and common mistakes.
 
@@ -123,21 +126,40 @@ If the output shows failures (e.g., `parakeet-mlx` not installed), log a warning
 ## Phase 0: Check for Resume
 
 ```typescript
-TaskList()
+const tasks = TaskList();
+const triageTasks = tasks.filter(t => t.subject.startsWith("Triage:"));
 ```
 
-Filter for tasks where `id.startsWith("triage:")`.
+### 0.1 Classify Existing Tasks
+
+```typescript
+const analyzed = triageTasks.filter(t => t.status === "in_progress");  // proposals saved
+const pending = triageTasks.filter(t => t.status === "pending");       // need processing
+const completed = triageTasks.filter(t => t.status === "completed");   // already done
+```
+
+### 0.2 Offer Resume
 
 If existing triage tasks found:
 ```
 Found existing triage session:
-• 32 analyzed (proposals saved)
-• 18 pending
+• 32 analyzed (proposals saved, notes created)
+• 18 pending (need enrichment + analysis)
+• 0 completed
 
-Resume? (y/n)
+Resume from where you left off? (y/n)
 ```
 
-If yes → Skip to Phase 2 (process pending items only).
+### 0.3 Resume Flow
+
+If yes:
+1. **Skip Phase 1** — tasks already created
+2. **Phase 2** — process ONLY `pending` tasks (spawn subagents for unprocessed items)
+3. **Phase 2.5** — re-run verification on ALL items with `created != null` (idempotent)
+4. **Phase 3** — collect proposals via TaskGet loop (not response text), present review table
+5. **Phases 4-5** — proceed normally
+
+If no → delete existing triage tasks and start fresh (Phase 1).
 
 ---
 
@@ -172,7 +194,12 @@ Extract `stakeholders` array from config (names, roles, companies for transcript
 
 ### 1.1.1 Stakeholder Bootstrap (if missing)
 
-If `config.stakeholders` is empty AND inbox contains voice memos, offer to add stakeholders.
+If `config.stakeholders` is empty AND inbox contains voice memos/transcriptions, offer to add stakeholders. Stakeholders enable speaker matching in voice memo analysis — without them, all speakers appear as "Speaker 1", "Speaker 2", and project inference is disabled.
+
+**Trigger condition:** Empty stakeholders + transcriptions in inbox.
+**Skip if:** No voice memos in inbox (stakeholders only help with transcription processing).
+**Impact of skipping:** Voice memo classification still works, but accuracy is reduced for multi-speaker scenarios and project inference is unavailable.
+
 See [stakeholder-bootstrap.md](references/stakeholder-bootstrap.md) for the interactive wizard flow (bulk paste, one-at-a-time, or skip).
 
 ### 1.2 Scan Inbox
@@ -207,6 +234,9 @@ cd ${CLAUDE_PLUGIN_ROOT} && bun src/cli.ts voice convert "<vtt-path>" --format j
 **Date handling for VTT:**
 - If `--date` flag provided in `$ARGUMENTS`, use it
 - Otherwise, prompt user: "VTT files require a meeting date. Enter date (YYYY-MM-DD):"
+- If user cancels or enters empty: skip this VTT file and continue with other items
+- If date format is invalid: re-prompt with "Invalid format. Use YYYY-MM-DD:"
+- Store date in task metadata as `vttDate` for Phase 2 subagent reference
 - Store converted transcription path for processing
 
 ### 1.4 Categorize Items
@@ -296,7 +326,7 @@ Pass these variables to each subagent:
 - `areas`, `projects`, `stakeholders` (from Phase 1)
 - `templateFields` (from Phase 1.6 — pre-loaded template metadata)
 
-**Batch mode flags:** Instruct subagents to pass `no_autocommit: true` and `skip_guard: true` to `para_create`. This allows parallel subagents to write simultaneously without git guard conflicts. The coordinator commits once after all subagents complete (Phase 5).
+**MANDATORY batch mode flags:** Instruct subagents to pass `no_autocommit: true` and `skip_guard: true` to `para_create`. These flags are **required** for parallel execution — without them, parallel subagents trigger git guard conflicts and unintended per-item commits. The coordinator bulk-commits once after all subagents complete (Phase 5).
 
 Each subagent will: enrich content, analyze, create note (no commit), persist via TaskUpdate, and return `PROPOSAL_JSON:{...}`.
 
@@ -306,9 +336,10 @@ Override the agent's default model based on content complexity:
 
 | Item Type | Model | Why |
 |-----------|-------|-----|
-| `clipping` | `haiku` (default) | Enrichment provides strong source content |
-| `transcription` | `sonnet` | Ambiguous speakers, nuanced categorization |
-| `vtt` (converted) | `sonnet` | Same as transcription |
+| `clipping` | `haiku` (default) | Enrichment provides strong structured source content (articles, videos, threads). Haiku handles well. |
+| `transcription` | `sonnet` | Transcriptions have ambiguous speakers, unclear meeting boundaries, and nuanced categorization (is this a standup or a 1on1?). Sonnet's reasoning handles this ambiguity better. |
+| `vtt` (converted) | `sonnet` | Same as transcription — multi-speaker meetings need stronger judgment |
+| `attachment` | `haiku` (default) | Document structure is usually clear (invoices, contracts have obvious patterns) |
 
 ```typescript
 // Pass model override in Task call:
@@ -420,7 +451,7 @@ Notes are ALREADY created by subagents (uncommitted in batch mode). Phase 5 hand
 | `transcription` | **Archive** via `para_rename` to `04 Archives/Transcriptions/`, then **update** resource note `source` to `[[archived note]]` via `para_fm_set` | Raw recordings have intrinsic value - NEVER delete. Resource note must link back to archived transcription |
 | `clipping` | **Delete** via `para_delete` | Content captured in resource note |
 | `attachment` | **Delete** inbox note via `para_delete` | PDF/DOCX stays in `Attachments/` |
-| `clipping` (non-URL) | **Keep** in inbox | Thought/conversation clippings are manual review items |
+| `clipping` (non-URL) | **Keep** in inbox | Thought/conversation clippings are manual review items. Detection: `sourceUrl` is empty or doesn't start with `http` |
 
 **NEVER use `para_delete` on transcriptions.** Always use `para_rename` to archive them.
 
@@ -432,19 +463,26 @@ See [execution-phases.md](references/execution-phases.md) for status matrix, cod
 
 ### Task States
 
-| State | Meaning |
-|-------|---------|
-| `pending` | Created, not yet processed |
-| `in_progress` | Subagent completed: note created, proposal saved, **original still exists** |
-| `completed` | User approved, original deleted/archived, task done |
+| State | Meaning | What exists |
+|-------|---------|-------------|
+| `pending` | Created by coordinator in Phase 1, NOT yet processed by subagent | Original inbox file only |
+| `in_progress` | Subagent completed: note created, proposal saved in metadata | New note + original inbox file (both exist) |
+| `completed` | User approved in Phase 3, original deleted/archived in Phase 5 | New note only (original cleaned up) |
+
+**State flow:** `pending` → (subagent enriches + analyzes + creates note + calls TaskUpdate) → `in_progress` → (user approves + coordinator cleans up) → `completed`
 
 ### Resume Capability
 
 If session crashes/quits:
-1. Tasks with `status: "in_progress"` have notes created + proposals saved + **originals preserved**
-2. Tasks with `status: "pending"` need full processing
-3. Run `/triage` again → detects existing tasks → offers resume
-4. Resume shows proposals for review → user approves → then cleanup happens
+1. Tasks with `status: "in_progress"` have notes created + proposals saved in metadata + **originals preserved**
+2. Tasks with `status: "pending"` need full processing (subagent never ran or crashed before TaskUpdate)
+3. Run `/triage` again → Phase 0 detects existing tasks → offers resume
+4. On resume:
+   - Skip Phase 1 (tasks already created)
+   - Phase 2 processes ONLY `pending` tasks (re-spawn subagents)
+   - Phase 2.5 re-runs on ALL items with `created != null` (idempotent — safe to re-stamp)
+   - Phase 3 collects proposals via TaskGet loop (not response text) and presents review table
+   - Phases 4-5 proceed normally
 
 ---
 
@@ -493,10 +531,11 @@ After the final report in Phase 5, emit a structured completion signal so the br
 
 | File | Content |
 |------|---------|
+| [proposal-schema.md](references/proposal-schema.md) | **Canonical proposal structure**, field names, confidence levels, TaskUpdate format |
 | [architecture.md](references/architecture.md) | Flow diagrams, design rationale |
 | [context-isolation.md](references/context-isolation.md) | Context isolation rules, common mistakes |
 | [enrichment-strategies.md](references/enrichment-strategies.md) | Tool selection by source, voice memo cases, constraints |
-| [execution-phases.md](references/execution-phases.md) | Phases 3-5 detailed implementation |
+| [execution-phases.md](references/execution-phases.md) | Phases 2.5-5 detailed implementation |
 | [subagent-prompts.md](references/subagent-prompts.md) | Analysis prompt templates |
 | [output-templates.md](references/output-templates.md) | Table format, actions |
 | [task-patterns.md](references/task-patterns.md) | TaskCreate/Update API usage |

@@ -3,12 +3,18 @@
  *
  * Handles OAuth 2.0 flow, token storage, and automatic refresh.
  * Uses atomic file writes with 0600 permissions for security.
+ * Delegates generic OAuth operations to @sidequest/core/oauth.
  */
 
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import {
+	isTokenExpired as coreIsTokenExpired,
+	loadTokenFile,
+	saveTokenFile,
+} from "@sidequest/core/oauth";
 import { spawnSyncCollect } from "@sidequest/core/spawn";
 import { google } from "googleapis";
 import { authLogger } from "../logger.ts";
@@ -218,53 +224,38 @@ export function loadCredentials(): GmailCredentials {
 /**
  * Loads existing token from disk.
  *
+ * Delegates to @sidequest/core/oauth for generic token persistence.
+ *
  * @returns Stored token if exists and valid, null otherwise
  */
 export function loadToken(): GmailToken | null {
-	if (!fs.existsSync(TOKEN_PATH)) {
-		authLogger.debug("Token file not found", { path: TOKEN_PATH });
-		return null;
-	}
-
-	try {
-		const content = fs.readFileSync(TOKEN_PATH, "utf8");
+	const token = loadTokenFile(TOKEN_PATH);
+	if (token) {
 		authLogger.debug("Token loaded from disk", { path: TOKEN_PATH });
-		return JSON.parse(content) as GmailToken;
-	} catch (error) {
-		authLogger.warn("Failed to parse token file", { path: TOKEN_PATH, error });
-		return null;
+	} else {
+		authLogger.debug("Token file not found", { path: TOKEN_PATH });
 	}
+	return token as GmailToken | null;
 }
 
 /**
  * Saves token to disk with atomic write and 0600 permissions.
  *
+ * Delegates to @sidequest/core/oauth for generic token persistence.
  * Uses temp file → rename pattern to ensure atomicity.
  * Sets restrictive permissions (0600) for security.
  *
  * @param token - Token to save
  */
 export function saveToken(token: GmailToken): void {
-	const dir = path.dirname(TOKEN_PATH);
-
-	// Ensure directory exists
-	if (!fs.existsSync(dir)) {
-		fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-		authLogger.debug("Created token directory", { path: dir });
-	}
-
-	// Atomic write: temp file → rename
-	const tempPath = `${TOKEN_PATH}.tmp`;
-	fs.writeFileSync(tempPath, JSON.stringify(token, null, 2), {
-		mode: 0o600,
-	});
-	fs.renameSync(tempPath, TOKEN_PATH);
+	saveTokenFile(TOKEN_PATH, token);
 	authLogger.debug("Token saved to disk", { path: TOKEN_PATH });
 }
 
 /**
  * Checks if a token is expired or about to expire.
  *
+ * Delegates to @sidequest/core/oauth for generic expiry checking.
  * Considers a token expired if it expires within the next 5 minutes
  * to prevent edge cases during API calls.
  *
@@ -272,9 +263,7 @@ export function saveToken(token: GmailToken): void {
  * @returns true if token is expired or about to expire
  */
 export function isTokenExpired(token: GmailToken): boolean {
-	const now = Date.now();
-	const bufferMs = 5 * 60 * 1000; // 5 minutes
-	const expired = token.expiry_date <= now + bufferMs;
+	const expired = coreIsTokenExpired(token);
 	if (expired) {
 		authLogger.debug("Token is expired or expiring soon", {
 			expiresAt: new Date(token.expiry_date).toISOString(),

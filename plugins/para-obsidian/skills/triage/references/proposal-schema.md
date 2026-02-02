@@ -12,7 +12,7 @@ interface Proposal {
   summary: string;               // 2-3 sentences capturing key value
   area: string | string[];       // Single: "[[Area]]" or multi: ["[[Area 1]]", "[[Area 2]]"]
   project: string | string[] | null; // Single: "[[Project]]", multi: ["[[P1]]", "[[P2]]"], or null
-  resourceType: string;          // article, video, thread, meeting, reference, idea
+  resourceType: string;          // article, video, thread, reference, idea, reflection, conversation, meeting
 
   // Creation fields (from note creation step)
   created: string | null;          // File path of created note, or null if failed/capture
@@ -21,6 +21,9 @@ interface Proposal {
   // Verification fields (from post-creation check)
   verification_status: "pending_coordinator" | "verified" | "repaired" | "failed" | "needs_review" | "skipped";
   verification_issues: string[];   // Empty if verified. Otherwise: ["missing: areas", "repaired: summary"]
+
+  // Error fields (when enrichment or creation fails)
+  enrichmentFailed?: boolean;    // true if enrichment failed (timeout, 404, rate limit). Item shows warning in review table.
 
   // UX fields (for review table and "Deeper" option)
   categorization_hints: string[];  // 3 key points explaining categorization
@@ -65,8 +68,8 @@ interface Proposal {
 |-------|------|------|-------|
 | Area | `area` | `string \| string[]` | Single: `"[[Area]]"` or multi: `["[[Area 1]]", "[[Area 2]]"]` |
 | Project | `project` | `string \| string[] \| null` | Single: `"[[Project]]"`, multi: `["[[P1]]", "[[P2]]"]`, or `null` |
-| Resource type | `resourceType` | `string` | camelCase, NOT `resource_type` |
-| Source format | `source_format` | `string` | snake_case (matches frontmatter convention) |
+| Resource type | `resourceType` | `string` | camelCase, NOT `resource_type`. This is the **note classification** — what kind of content this is (article, video, thread, idea, meeting, etc.). For meetings: use `"meeting"`. |
+| Source format | `source_format` | `string` | snake_case (matches frontmatter convention). This is the **input format** — how the content was captured (article, video, audio, document, thread, image). Different from `resourceType`: a voice memo (`source_format: "audio"`) may be classified as an idea (`resourceType: "idea"`) or meeting (`resourceType: "meeting"`). |
 | Verification status | `verification_status` | `string` | `"pending_coordinator"`, `"verified"`, `"repaired"`, `"failed"`, `"needs_review"`, `"skipped"` |
 | Verification issues | `verification_issues` | `string[]` | Empty if clean. Human-readable issue descriptions |
 
@@ -75,6 +78,30 @@ interface Proposal {
 **Passing to `para_create`:** The `args` parameter only accepts `Record<string, string>`. For arrays, pass as a JSON string: `JSON.stringify(["[[Area 1]]", "[[Area 2]]"])`. The `para_create` handler parses JSON array strings automatically via `tryParseJsonArray()`.
 
 **DO NOT use:** `suggested_areas` (array), `suggested_projects` (array), `resource_type` (snake_case for this field). These are legacy names from analyzer skills.
+
+### Clarification: Three "Type" Fields
+
+These three fields serve different purposes — don't confuse them:
+
+| Field | Purpose | Example Values | Notes |
+|-------|---------|----------------|-------|
+| `proposed_template` | **Output template** — which note template to create | `"resource"`, `"meeting"`, `"invoice"`, `"booking"` | Determines note structure |
+| `resourceType` | **Content classification** — what kind of content this is | `"article"`, `"video"`, `"thread"`, `"meeting"`, `"idea"`, `"reflection"` | Maps to frontmatter `resource_type` (snake_case). For meetings, use `"meeting"` |
+| `source_format` | **Input format** — how the content was captured | `"article"`, `"video"`, `"audio"`, `"document"`, `"thread"` | A voice memo (`"audio"`) can be classified as an idea or meeting |
+
+For meetings: set `proposed_template: "meeting"`, `resourceType: "meeting"`, and `meeting_type: "standup"` (or other enum value).
+
+### Naming Convention: camelCase → snake_case
+
+Proposals use **camelCase** (JavaScript convention). Frontmatter uses **snake_case** (YAML convention). The coordinator converts during Phase 2.5 stamping:
+
+| Proposal (camelCase) | Frontmatter (snake_case) |
+|---------------------|-------------------------|
+| `resourceType` | `resource_type` |
+| `source_format` | `source_format` (same) |
+| `meeting_type` | `meeting_type` (same) |
+| `area` | `area` (meetings) or `areas` (resources, plural) |
+| `project` | `project` (meetings) or `projects` (resources, plural) |
 
 ---
 

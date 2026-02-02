@@ -62,7 +62,7 @@ Task({
 
     **CRITICAL:** Only use areas/projects from the lists above. Never hallucinate names.
     **CRITICAL:** Use validArgs from the template fields above. Do NOT call para_template_fields.
-    **CRITICAL:** Pass no_autocommit: true and skip_guard: true to para_create. The coordinator handles the bulk commit after all items complete.
+    **MANDATORY:** Pass no_autocommit: true and skip_guard: true to para_create. These flags prevent git guard conflicts and per-item commits during parallel execution. The coordinator handles the bulk commit after all items complete.
 
     Follow your workflow: read → enrich → analyze → create (with content param for Layer 1, no_autocommit, skip_guard) → persist (verification_status: "pending_coordinator") → return PROPOSAL_JSON. Skip post-creation verification — the coordinator handles it in Phase 2.5.
   `
@@ -78,12 +78,12 @@ The `triage-worker` agent already knows the full workflow (enrichment routing, n
 **CRITICAL:** To run subagents in parallel, include multiple Task calls in a single message.
 
 ```typescript
-// Single message with 5 Task calls = parallel execution
+// Single message with up to 10 Task calls = parallel execution
 Task({ subagent_type: "triage-worker", description: "Process: Item 1", ... })
 Task({ subagent_type: "triage-worker", description: "Process: Item 2", ... })
 Task({ subagent_type: "triage-worker", description: "Process: Item 3", ... })
-Task({ subagent_type: "triage-worker", description: "Process: Item 4", ... })
-Task({ subagent_type: "triage-worker", description: "Process: Item 5", ... })
+// ... up to 10 per batch
+Task({ subagent_type: "triage-worker", description: "Process: Item 10", ... })
 ```
 
 **EXCEPTION:** Confluence items must be sequential (single Chrome browser instance). X/Twitter items run in parallel via stateless X-API MCP tools.

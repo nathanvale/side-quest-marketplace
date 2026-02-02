@@ -1,0 +1,20 @@
+{
+	"name": "@sidequest/bun-starter",
+	"version": "1.0.0",
+	"description": "Create, debug, and heal repos from nathanvale/bun-typescript-starter template",
+	"type": "module",
+	"scripts": {
+		"test": "echo 'No tests'",
+		"typecheck": "echo 'No typecheck'"
+	},
+	"keywords": [
+		"bun",
+		"typescript",
+		"template",
+		"starter",
+		"ci-cd",
+		"changesets"
+	],
+	"author": "Nathan Vale <hi@nathanvale.com>",
+	"license": "MIT"
+}

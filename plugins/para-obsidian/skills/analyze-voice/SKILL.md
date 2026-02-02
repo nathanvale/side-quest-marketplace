@@ -155,7 +155,13 @@ para_create({
 
 **Resource-specific:** Pass transcription as Layer 1 via `content` parameter. Set `layer1_injected: true`.
 - If transcription <2k tokens: Include full transcription
-- If transcription >2k tokens: Sample key segments with timestamps
+- If transcription >2k tokens: Sample key segments using these strategies:
+  - Include the **opening** (first 2-3 paragraphs for context)
+  - Include sections with **key insights** (look for declarative statements, "the key thing is...", "what I learned...")
+  - Include sections with **action items** or decisions
+  - Include the **closing** (last 1-2 paragraphs for conclusion)
+  - Preserve **timestamps** in sampled sections (e.g., `[03:45]`)
+  - Target 2-3k tokens total
 - Always add: `*Transcription captured. Use /distill-resource to extract key insights.*`
 
 ```
@@ -176,11 +182,9 @@ No separate `para_commit` or `para_replace_section` calls needed — the CLI han
 
 ### Step 7: Verify & Repair
 
-Call `para_fm_get` on the created file. Check the critical fields for your template (meeting or resource) using the same table from Step 5.5.
+**During triage:** Skip this step entirely. Set `verification_status: "pending_coordinator"` and `verification_issues: []`. The coordinator handles verification in Phase 2.5 — it stamps and checks all critical fields from PROPOSAL_JSON.
 
-If any MISMATCH: `para_fm_set({ file, set: { ...repairs }, response_format: "json" })`
-
-Set `verification_status`: `"verified"`, `"repaired"`, `"needs_review"`, or `"skipped"`.
+**Standalone callers (non-triage):** Call `para_fm_get` on the created file. Check the critical fields for your template (meeting or resource) using the same table from Step 5.5. If any MISMATCH: `para_fm_set({ file, set: { ...repairs }, response_format: "json" })`. Set `verification_status`: `"verified"`, `"repaired"`, `"needs_review"`, or `"skipped"`.
 
 ### Step 8: Return Proposal
 
@@ -229,9 +233,9 @@ Voice memos are the **hardest to categorize** because:
   ],
   "area": "[[🌱 Work]]",
   "project": "[[🎯 GMS - Gift Card Management System]]",
-  "resourceType": "meeting",
-  "source_format": "audio",
-  "meeting_type": "planning",
+  "resourceType": "meeting",     // For meetings: resourceType is always "meeting"
+  "source_format": "audio",      // Input was a voice memo
+  "meeting_type": "planning",    // Meeting subtype (standup, 1on1, planning, etc.)
   "meeting_date": "2024-01-22T15:45:00",
   "confidence": "medium",
   "notes": "Speaker 'JS' matched to June Xu via alias",
@@ -301,7 +305,7 @@ When the coordinator requests "deeper" analysis, return **3 different interpreta
       "interpretation": "Sprint Planning Meeting",
       "proposed_title": "Sprint 42 Planning",
       "proposed_template": "meeting",
-      "resource_type": "meeting",
+      "resourceType": "meeting",
       "meeting_type": "planning",
       "rationale": "Multiple speakers, task assignments, timeline discussion",
       "attendees": ["[[June Xu]]", "[[Mustafa Jalil]]"],
@@ -314,7 +318,7 @@ When the coordinator requests "deeper" analysis, return **3 different interpreta
       "interpretation": "Team Brainstorm",
       "proposed_title": "Migration Approach Brainstorm",
       "proposed_template": "resource",
-      "resource_type": "idea",
+      "resourceType": "idea",
       "meeting_type": null,
       "rationale": "Exploratory tone, no firm decisions, 'what if' language"
     },
@@ -323,7 +327,7 @@ When the coordinator requests "deeper" analysis, return **3 different interpreta
       "interpretation": "1:1 with Manager",
       "proposed_title": "1:1 - Career Discussion",
       "proposed_template": "meeting",
-      "resource_type": "meeting",
+      "resourceType": "meeting",
       "meeting_type": "1on1",
       "rationale": "Two speakers, personal development mentioned, confidential tone",
       "attendees": ["[[Nathan Vale]]", "Manager"],

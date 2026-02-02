@@ -43,7 +43,7 @@ Found 50 items in inbox:
 
 📋 By Enrichment:
 • 35 parallel (YouTube, Firecrawl)
-• 5 sequential (X/Twitter via Chrome)
+• 5 sequential (Confluence via Chrome)
 • 10 no enrichment needed
 
 Starting enrichment phase...

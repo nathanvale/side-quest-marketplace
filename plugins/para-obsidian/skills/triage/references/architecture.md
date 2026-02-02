@@ -39,8 +39,8 @@
 │   │    (persist) │  │    (persist) │  │    (persist) │                  │
 │   └──────────────┘  └──────────────┘  └──────────────┘                  │
 │                                                                          │
-│   • Parallel for YouTube, articles (batches of 5)                        │
-│   • Sequential for X/Twitter (single Chrome browser)                     │
+│   • Parallel for YouTube, articles, X/Twitter (batches of 10)            │
+│   • Sequential for Confluence only (single Chrome browser)               │
 │   • Enriched content stays in subagent context                           │
 │   • Coordinator context stays CLEAN                                      │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -75,10 +75,11 @@
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    PHASE 5: BATCH EXECUTE                                │
+│                    PHASE 5: CLEANUP & COMMIT                             │
 │                                                                          │
 │   Coordinator:                                                           │
-│   • Create all resources (para_create for each)                          │
+│   • Bulk commit (para_commit) — notes already created by subagents       │
+│   • Apply edits from Phase 4 (re-create or para_fm_set)                  │
 │   • Handle originals (delete clippings, archive transcriptions)          │
 │   • Mark tasks completed                                                 │
 │   • Report summary                                                       │
@@ -113,21 +114,21 @@ No back-and-forth per item. User sees complete table, decides once:
 ### 5. Efficient Execution
 Batch create all resources. No waiting between items.
 
-### 6. Batch Size: Why 5?
+### 6. Batch Size: Why 10?
 
-Subagents spawn in batches of 5 for these reasons:
+Subagents spawn in batches of 10 for these reasons:
 
 | Factor | Constraint |
 |--------|-----------|
-| **API concurrency** | Claude API handles ~5 parallel requests well |
-| **Token budget** | 5 haiku subagents × ~2k tokens = ~10k tokens/batch |
-| **Progress visibility** | User sees "Batch 1/10 complete" feedback |
-| **Error isolation** | If batch fails, only 5 items need retry |
+| **API concurrency** | Claude Code handles 7-10 parallel Task calls well for haiku subagents |
+| **Token budget** | 10 haiku subagents × ~2k tokens = ~20k tokens/batch |
+| **Progress visibility** | User sees "Batch 1/5 complete" feedback |
+| **Error isolation** | If batch fails, only 10 items need retry |
 | **Memory** | Reasonable memory footprint for parallel execution |
 
 Adjust batch size based on:
-- Smaller batches (3) for complex content requiring sonnet
-- Larger batches (10) for simple categorization with haiku
+- Smaller batches (3-5) for complex content requiring sonnet
+- 10 is the default for haiku subagents (clippings, most items)
 
 ---
 
@@ -141,13 +142,13 @@ Adjust batch size based on:
               Subagent: enrich + analyze + TaskUpdate
                            │
                     ┌──────▼──────┐
-                    │ in_progress │  ← proposal saved in metadata
-                    └──────┬──────┘
+                    │ in_progress │  ← note created + proposal saved in metadata
+                    └──────┬──────┘     (original inbox file still exists)
                            │
-              para_create executed
+              User approves (Phase 3) + coordinator cleans up (Phase 5)
                            │
                     ┌──────▼──────┐
-                    │  completed  │
+                    │  completed  │  ← original deleted/archived
                     └─────────────┘
 ```
 
@@ -236,7 +237,7 @@ If subagent can't fetch content (timeout, 404, rate limit):
 
 If entire batch fails (API error, rate limit):
 
-1. All 5 tasks remain pending
+1. All tasks in batch remain pending
 2. Wait and retry the batch
 3. Consider reducing batch size temporarily
 
