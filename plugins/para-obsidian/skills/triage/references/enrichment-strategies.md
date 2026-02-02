@@ -29,21 +29,22 @@ For detailed tool selection and patterns, see the shared content sourcing docume
 | YouTube | `youtube.com` domain | youtube-transcript MCP | ✅ Yes |
 | Public Articles | Default for clippings | Firecrawl | ✅ Yes |
 | GitHub | `github.com` domain | Firecrawl | ✅ Yes |
-| X/Twitter | `x.com` or `twitter.com` | Chrome DevTools | ❌ No |
+| X/Twitter | `x.com` or `twitter.com` | X-API MCP | ✅ Yes |
 | Confluence | `atlassian.net` domain | Chrome DevTools | ❌ No |
 | Voice Memo | `type === "transcription"` | None | N/A |
 | Attachment | PDF/DOCX | None | N/A |
 
 ---
 
-## MANDATORY: X/Twitter Requires Chrome DevTools
+## MANDATORY: X/Twitter Requires X-API Enrichment
 
 **X/Twitter clippings from Web Clipper contain ONLY a stub.** The visible content is NOT the full thread.
 
 You MUST:
-1. Use Chrome DevTools to navigate to the source URL
-2. Take a snapshot to capture the full thread
-3. Extract the actual content from the snapshot
+1. Parse the `tweet_id` from the source URL (`x.com/<user>/status/<tweet_id>`)
+2. Load X-API tools via `ToolSearch({ query: "x-api tweet" })`
+3. Fetch the tweet via `x_get_tweet({ tweet_id })` — works for any age tweet
+4. Optionally fetch thread via `x_get_thread({ tweet_id })` — replies limited to 7-day window
 
 **Never skip this step. Never analyze X/Twitter based solely on clipping file content.**
 
@@ -65,13 +66,13 @@ Each subagent enriches its OWN item. The coordinator does NOT fetch content.
 ### Coordinator Groups Items
 
 ```typescript
-const parallelItems = [];     // YouTube, Firecrawl - spawn in batches of 5
-const sequentialItems = [];   // Chrome DevTools - spawn one at a time
+const parallelItems = [];     // YouTube, Firecrawl, X-API - spawn in batches of 5
+const sequentialItems = [];   // Chrome DevTools (Confluence only) - spawn one at a time
 
 for (const item of inboxItems) {
-  if (item.sourceType === 'youtube' || item.sourceType === 'article') {
+  if (item.sourceType === 'youtube' || item.sourceType === 'article' || item.sourceType === 'twitter') {
     parallelItems.push(item);
-  } else if (item.sourceType === 'twitter' || item.sourceType === 'confluence') {
+  } else if (item.sourceType === 'confluence') {
     sequentialItems.push(item);
   } else {
     parallelItems.push(item);  // Voice/attachment - no enrichment needed
@@ -140,7 +141,8 @@ This ensures no item is silently dropped - user always has visibility into failu
 |--------|-----------|--------|
 | YouTube | ✅ Yes | Stateless API |
 | Firecrawl | ✅ Yes | Batch API |
-| Chrome DevTools | ❌ No | Single browser instance (Chrome DevTools MCP limitation) |
+| X-API (X/Twitter) | ✅ Yes | Stateless API |
+| Chrome DevTools (Confluence) | ❌ No | Single browser instance (Chrome DevTools MCP limitation) |
 
 ---
 

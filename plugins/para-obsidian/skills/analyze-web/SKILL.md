@@ -52,6 +52,17 @@ Determine:
 4. **Categorization hints**: 3 bullets for organizing (NOT deep learning - use /para-obsidian:distill-resource)
 5. **Connections**: Which areas/projects does this relate to?
 
+### Step 3.5: Pre-Creation Self-Check
+
+Before calling `para_create`, verify your `args` object includes these critical fields:
+
+- [ ] `summary` — one-sentence description of the resource
+- [ ] `areas` — wikilink(s) to vault areas
+- [ ] `source_format` — `article`, `thread`, `video`, `document`
+- [ ] `resource_type` — `article`, `tutorial`, `reference`, `thread`, `issue`, `idea`
+
+If any field is missing but you determined a value in Step 3, add it to `args` now.
+
 ### Step 4: Create Resource & Inject Layer 1 (Single Call)
 
 **This is where content stays isolated.** Use `para_create` with the `content` parameter to create the note AND inject Layer 1 in a single tool call:
@@ -76,7 +87,22 @@ See @references/layer1-formatting.md for Layer 1 content formatting patterns (ar
 
 **If `para_create` fails:** Set `created: null`, `layer1_injected: null`, and continue with the proposal. The `content` parameter failure is atomic — no partial state.
 
-### Step 5: Return Proposal
+### Step 5: Verify & Repair
+
+Call `para_fm_get` on the created file. Compare each critical field:
+
+| Field | Your intended value | File value | Action |
+|-------|-------------------|------------|--------|
+| `summary` | from Step 3 | from `para_fm_get` | MISMATCH → repair |
+| `areas` | from Step 3 | from `para_fm_get` | MISMATCH → repair |
+| `source_format` | from Step 3 | from `para_fm_get` | MISMATCH → repair |
+| `resource_type` | from Step 3 | from `para_fm_get` | MISMATCH → repair |
+
+If any MISMATCH: `para_fm_set({ file, set: { ...repairs }, response_format: "json" })`
+
+Set `verification_status`: `"verified"` (all match), `"repaired"` (fixed), `"needs_review"` (empty fields), `"skipped"` (para_create failed).
+
+### Step 6: Return Proposal
 
 Return the lightweight JSON proposal. The resource is already created with Layer 1 populated.
 
@@ -89,6 +115,8 @@ Return the lightweight JSON proposal. The resource is already created with Layer
   "summary": "...",
   "created": "03 Resources/Title.md",
   "layer1_injected": true,
+  "verification_status": "verified",
+  "verification_issues": [],
   ...
 }
 ```
@@ -138,7 +166,9 @@ The coordinator receives only this ~500 byte proposal, not the 10-20k token cont
   "confidence": "high",
   "notes": null,
   "created": "03 Resources/TypeScript 5.5 Inference Improvements.md",
-  "layer1_injected": true
+  "layer1_injected": true,
+  "verification_status": "verified",
+  "verification_issues": []
 }
 ```
 

@@ -56,7 +56,7 @@ Before creating notes, content must be enriched. See the canonical routing table
 
 @plugins/para-obsidian/skills/triage/references/enrichment-strategies.md
 
-**Quick summary:** YouTube → `get_transcript`, Articles/GitHub → `firecrawl_scrape`, X/Twitter → Chrome DevTools, Voice/Attachment → `para_read`.
+**Quick summary:** YouTube → `get_transcript`, Articles/GitHub → `firecrawl_scrape`, X/Twitter → X-API MCP (`x_get_tweet`), Voice/Attachment → `para_read`.
 
 ---
 
@@ -211,15 +211,19 @@ para_fm_set({ file, set: { areas: '["[[Area 1]]", "[[Area 2]]"]' } })
 
 ## Post-Creation Verification
 
+**During triage:** Post-creation verification is handled by the coordinator (Phase 2.5), not the worker. Workers set `verification_status: "pending_coordinator"` and skip this section. The steps below apply to standalone callers (quick-create) only.
+
 After creating a note, verify that critical frontmatter fields match your intended values. This catches two failure modes:
 1. **Mismatch** — you intended a value but `para_create` received wrong/empty args (self-repairable)
 2. **Missing classification** — you couldn't determine the value at all (flag for user review)
 
-### When to Verify
+### Critical Fields Per Template
 
-- **ALWAYS** for resources — critical fields: `summary`, `areas`, `source_format`, `resource_type`
-- **ALWAYS** for meetings — critical fields: `summary`, `area`, `meeting_type`
-- **SKIP** for invoices/bookings — frontmatter-only, low risk → set `verification_status: "skipped"`
+| Template | Fields to verify | Action |
+|----------|-----------------|--------|
+| `resource` | `summary`, `areas`, `source_format`, `resource_type` | ALWAYS verify |
+| `meeting` | `summary`, `area`, `meeting_type` | ALWAYS verify |
+| `invoice`/`booking` | — | SKIP → `verification_status: "skipped"` |
 
 ### Verification Steps
 
@@ -259,6 +263,16 @@ One call, all fixes batched. For array fields (e.g., `areas`), pass JSON array s
 | Invoice/booking (skipped) | `"skipped"` | `[]` |
 
 Include both fields in your proposal output (TaskUpdate metadata and PROPOSAL_JSON).
+
+### Worked Example: Summary Mismatch Repair
+
+Analysis determined: `summary = "How To Make Your Agent Learn And Ship While You Sleep"`
+But `para_create` args omitted `summary` (bug: value lost during arg construction).
+
+1. `para_fm_get` returns: `{ summary: "" }`
+2. MISMATCH detected: intended non-empty, file has empty
+3. `para_fm_set({ file, set: { summary: "How To Make Your Agent Learn And Ship While You Sleep" } })`
+4. `verification_status: "repaired"`, `verification_issues: ["repaired: summary"]`
 
 ---
 

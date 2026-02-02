@@ -114,6 +114,23 @@ Look for:
 
 **Follow-up:** Items for future discussion or preparation.
 
+### Step 5.5: Pre-Creation Self-Check
+
+Before calling `para_create`, verify your `args` object includes these critical fields:
+
+**If meeting:**
+- [ ] `summary` — one-sentence description
+- [ ] `area` — single wikilink
+- [ ] `meeting_type` — `standup`, `1on1`, `planning`, `retro`, `workshop`, `general`
+
+**If resource:**
+- [ ] `summary` — one-sentence description
+- [ ] `areas` — wikilink(s)
+- [ ] `source_format` — `audio`
+- [ ] `resource_type` — `idea`, `reflection`, `conversation`
+
+If any field is missing but you determined a value in Steps 3-5, add it to `args` now.
+
 ### Step 6: Create Note (Single Call)
 
 **This is where content stays isolated.** Use `para_create` with the `content` parameter for both meetings and resources:
@@ -157,7 +174,15 @@ No separate `para_commit` or `para_replace_section` calls needed — the CLI han
 
 **IMPORTANT:** Do NOT archive or delete the original transcription. Cleanup is the coordinator's responsibility (Phase 5, after user review).
 
-### Step 7: Return Proposal
+### Step 7: Verify & Repair
+
+Call `para_fm_get` on the created file. Check the critical fields for your template (meeting or resource) using the same table from Step 5.5.
+
+If any MISMATCH: `para_fm_set({ file, set: { ...repairs }, response_format: "json" })`
+
+Set `verification_status`: `"verified"`, `"repaired"`, `"needs_review"`, or `"skipped"`.
+
+### Step 8: Return Proposal
 
 Return the lightweight JSON proposal. The note is already created.
 
@@ -195,6 +220,8 @@ Voice memos are the **hardest to categorize** because:
   "summary": "Team planning session discussing priorities for Sprint 42. Focus on completing the migration project and addressing tech debt in the auth module.",
   "created": "04 Archives/Meetings/Sprint 42 Planning Session.md",
   "layer1_injected": null,
+  "verification_status": "verified",
+  "verification_issues": [],
   "categorization_hints": [
     "Migration project is highest priority",
     "Auth module tech debt blocking other work",
@@ -256,7 +283,9 @@ Voice memos are the **hardest to categorize** because:
   "meeting_type": null,
   "meeting_date": null,
   "confidence": "high",
-  "notes": "Single speaker, personal brainstorm"
+  "notes": "Single speaker, personal brainstorm",
+  "verification_status": "verified",
+  "verification_issues": []
 }
 ```
 

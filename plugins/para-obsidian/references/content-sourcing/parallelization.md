@@ -8,30 +8,33 @@ Rules for batch execution when orchestrating content enrichment across multiple 
 |-------------|------------------|--------|
 | YouTube | ✅ Yes | Stateless API |
 | Firecrawl (articles, GitHub, docs) | ✅ Yes | Batch API |
-| Chrome DevTools (X/Twitter, Confluence) | ❌ No | Single browser instance |
+| X-API (X/Twitter) | ✅ Yes | Stateless API |
+| Chrome DevTools (Confluence) | ❌ No | Single browser instance |
 
 ## Why Chrome DevTools Cannot Parallelize
 
-Chrome DevTools MCP runs a **single browser instance**:
+Chrome DevTools MCP runs a **single browser instance** (used for Confluence only):
 - One browser = one active page at a time
 - `select_page` switches context, but tools operate on selected page only
-- Authenticated sessions (Twitter, Confluence) share cookies
+- Authenticated sessions share cookies
 - Concurrent navigation would corrupt state
+
+**Note:** X/Twitter no longer uses Chrome DevTools. It uses stateless X-API MCP tools and can parallelize freely.
 
 ## Orchestration Pattern
 
 ### Step 1: Group by Capability
 
 ```typescript
-const parallelItems = [];     // YouTube, Firecrawl
-const sequentialItems = [];   // Chrome DevTools
+const parallelItems = [];     // YouTube, Firecrawl, X-API
+const sequentialItems = [];   // Chrome DevTools (Confluence only)
 
 for (const item of inboxItems) {
   const sourceType = detectSourceType(item.sourceUrl);
 
-  if (sourceType === 'youtube' || sourceType === 'article' || sourceType === 'github') {
+  if (sourceType === 'youtube' || sourceType === 'article' || sourceType === 'github' || sourceType === 'twitter') {
     parallelItems.push(item);
-  } else if (sourceType === 'twitter' || sourceType === 'confluence') {
+  } else if (sourceType === 'confluence') {
     sequentialItems.push(item);
   } else {
     parallelItems.push(item);  // Voice/attachment - no enrichment needed
@@ -54,11 +57,11 @@ Task({ prompt: `...sourceType: voice, file: ${file5}...` })
 
 ### Step 3: Spawn Sequential Subagents
 
-One at a time - wait for completion before next:
+One at a time - wait for completion before next (Confluence only):
 
 ```typescript
-for (const item of twitterItems) {
-  Task({ prompt: `...sourceType: twitter, sourceUrl: ${item.url}...` })
+for (const item of confluenceItems) {
+  Task({ prompt: `...sourceType: confluence, sourceUrl: ${item.url}...` })
   // Wait for completion
 }
 ```
@@ -123,20 +126,13 @@ mcp__firecrawl__firecrawl_scrape({ url: "https://docs.example.com/guide", format
 mcp__firecrawl__firecrawl_scrape({ url: "https://github.com/user/repo", formats: ["markdown"] })
 ```
 
-### X/Twitter (one at a time)
+### X/Twitter (parallel — stateless API)
 
 ```typescript
-// MUST be sequential - wait for each before starting next
-
-// Thread 1
-mcp__chrome-devtools__navigate_page({ url: "https://x.com/user/status/123", timeout: 30000 })
-mcp__chrome-devtools__take_snapshot({})
-// Extract content...
-
-// Thread 2 (after thread 1 completes)
-mcp__chrome-devtools__navigate_page({ url: "https://x.com/user/status/456", timeout: 30000 })
-mcp__chrome-devtools__take_snapshot({})
-// Extract content...
+// Launch simultaneously in single message — X-API tools are stateless
+mcp__plugin_x-api_x-api__x_get_tweet({ tweet_id: "123" })
+mcp__plugin_x-api_x-api__x_get_tweet({ tweet_id: "456" })
+mcp__plugin_x-api_x-api__x_get_tweet({ tweet_id: "789" })
 ```
 
 ## Recovery in Table Review

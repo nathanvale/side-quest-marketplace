@@ -1,4 +1,106 @@
-# Execution Phases (3-5) Detail
+# Execution Phases (2.5-5) Detail
+
+## Phase 2.5: Coordinator Verification (Stamp + Verify)
+
+After all subagents complete (Phase 2) and before presenting the review table (Phase 3), the coordinator unconditionally stamps critical fields from PROPOSAL_JSON into frontmatter, then verifies.
+
+**Why "always stamp":** Idempotent. If the worker subagent got it right, overwriting with the same value does no harm. Eliminates all conditional logic and trust issues with the worker's self-reported `verification_status`.
+
+### Field Mapping (Proposal → Frontmatter)
+
+| Proposal Field | Frontmatter Field | Notes |
+|---------------|-------------------|-------|
+| `summary` | `summary` | Direct copy |
+| (task metadata) `sourceUrl` | `source` | Use sourceUrl from task metadata, not proposal |
+| `source_format` | `source_format` | Direct copy |
+| `resourceType` | `resource_type` | camelCase → snake_case |
+| `area` (array) | `areas` | Resources use plural `areas`; JSON.stringify() for arrays |
+| `project` (array or null) | `projects` | Resources use plural `projects`; omit if null |
+| `area` (string) | `area` | Meetings use singular `area` |
+| `meeting_type` | `meeting_type` | Meetings only |
+
+### Verification Loop Pseudocode
+
+```
+For each proposal in proposals:
+  // Skip non-created
+  if proposal.created == null: continue
+
+  // Invoice/booking — no critical fields to verify
+  if proposal.proposed_template in ["invoice", "booking"]:
+    proposal.verification_status = "skipped"
+    proposal.verification_issues = []
+    continue
+
+  // 1. Build stamp_set from proposal + task metadata
+  stamp_set = {}
+  stamp_set.summary = proposal.summary  // Always stamp even if empty (catches haiku drops)
+
+  if proposal.proposed_template == "resource":
+    stamp_set.source = task_metadata.sourceUrl  // From task, not proposal
+    stamp_set.source_format = proposal.source_format
+    stamp_set.resource_type = proposal.resourceType  // camelCase → snake_case
+    if proposal.area is array:
+      stamp_set.areas = JSON.stringify(proposal.area)  // ["[[A1]]", "[[A2]]"] → YAML list
+    else:
+      stamp_set.areas = proposal.area  // "[[Area]]" — single string is valid (backward compat)
+    if proposal.project != null:
+      if proposal.project is array:
+        stamp_set.projects = JSON.stringify(proposal.project)
+      else:
+        stamp_set.projects = proposal.project
+
+  if proposal.proposed_template == "meeting":
+    stamp_set.area = proposal.area  // Singular for meetings
+    stamp_set.meeting_type = proposal.meeting_type
+
+  // Remove any keys with empty/null values — don't stamp emptiness
+  for key in stamp_set:
+    if stamp_set[key] is null or stamp_set[key] === "": delete stamp_set[key]
+
+  // 2. Stamp (always, even if values match — idempotent)
+  if stamp_set is not empty:
+    para_fm_set({ file: proposal.created, set: stamp_set, response_format: "json" })
+
+  // 3. Verify
+  fm = para_fm_get({ file: proposal.created, response_format: "json" })
+
+  // 4. Check critical fields (projects is optional — many items have no project)
+  critical_fields = (resource) ? ["summary", "source", "source_format", "resource_type", "areas"]
+                    : (meeting) ? ["summary", "area", "meeting_type"]
+                    : []
+
+  missing = []
+  for field in critical_fields:
+    if fm[field] is empty/null/""/[]:
+      missing.push("missing: " + field)
+
+  // 5. Set coordinator's verification_status (overrides haiku's)
+  if missing is empty:
+    proposal.verification_status = "verified"
+    proposal.verification_issues = []
+  else:
+    proposal.verification_status = "needs_review"
+    proposal.verification_issues = missing
+```
+
+### Edge Cases
+
+| Case | Handling |
+|------|----------|
+| `created == null` | Skip — note wasn't created, nothing to stamp |
+| `summary == ""` in proposal | Don't stamp empty — leave existing value. Flag `needs_review` if frontmatter is also empty |
+| `invoice`/`booking` | Skip — set `verification_status: "skipped"` |
+| Resume flow (`in_progress` items) | Re-run Phase 2.5 on all items with `created != null`. TaskGet loop provides proposals |
+| `sourceUrl` missing from task metadata | Don't stamp `source` — omit from stamp_set |
+
+### Cost
+
+- Up to 50 items × (`para_fm_set` + `para_fm_get`) = up to 100 tool calls, ~5 seconds (skips invoice/booking and items with `created == null`)
+- Workers save ~100 tool calls (no post-creation verification)
+- Net: token-neutral, reliability goes from ~50% to ~100%
+
+---
 
 ## Phase 3: Present & Collaborate
 
@@ -73,7 +175,7 @@ Legend: ✓ = high, ~ = medium, ? = low | ⚠ = needs review (missing area/proje
 **Columns:**
 - **Type**: Proposed output type (video, article, meeting, idea, clipping)
 - **Conf**: Confidence indicator - low confidence items benefit from "Deeper" (3) option
-- **!**: Verification flag — show `⚠` when `verification_status === "needs_review"` or `verification_status === "failed"`
+- **!**: Verification flag — show `⚠` when `verification_status === "needs_review"` (Phase 2.5 couldn't populate all critical fields)
 
 **After the table, list verification issues for flagged items:**
 ```
@@ -133,14 +235,14 @@ Quick inline edits. Update task metadata with changes.
 
 ### 5.1 Check Creation Status
 
-For each proposal, check `created`, `layer1_injected`, and `verification_status` fields:
+For each proposal, check `created`, `layer1_injected`, and `verification_status` fields.
+
+**Note:** By Phase 5, `verification_status` is never `"pending_coordinator"` — Phase 2.5 resolves it to `"verified"`, `"needs_review"`, or `"skipped"` before the review table is presented.
 
 | created | layer1_injected | verification | Status | Action |
 |---------|-----------------|-------------|--------|--------|
 | path | true | verified | Fully verified | Mark task completed |
-| path | true | repaired | Auto-repaired | Mark completed, note in report |
 | path | true | needs_review | Missing fields | Complete only if user filled in Phase 4 |
-| path | true | failed | Verification broken | Flag for manual review |
 | path | true | skipped | Invoice/booking | Mark task completed |
 | path | false | * | Layer 1 failed | Mark completed, note in report |
 | path | null | * | Meeting (no Layer 1) | Mark task completed |
@@ -243,11 +345,10 @@ Processed 50 items:
 • 1 edited → re-created with changes
 • 2 clippings (stayed in inbox)
 
-Verification:
-• 44 notes verified clean
-• 1 note auto-repaired (summary was empty)
-• 1 note reviewed by user (area was unclassifiable)
-• 1 invoice/booking skipped verification
+Verification (Phase 2.5):
+• 44 notes verified (all critical fields populated)
+• 2 notes flagged needs_review (missing area — user fixed in Phase 4)
+• 1 invoice/booking skipped
 
 Use /para-obsidian:distill-resource to add progressive summarization.
 ```

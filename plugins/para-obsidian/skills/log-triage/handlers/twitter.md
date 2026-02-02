@@ -22,17 +22,19 @@ Use these discovered values instead of hardcoding them.
 
 **X requires JavaScript** - Firecrawl and WebFetch cannot scrape X.com directly.
 
-### Approach 1: Chrome DevTools MCP (Preferred)
+### Approach 1: X-API MCP (Preferred)
+
+Parse tweet_id from URL (`x.com/<user>/status/<tweet_id>`), then:
 
 ```
-1. mcp__chrome-devtools__navigate_page({ url: "https://x.com/..." })
-2. mcp__chrome-devtools__take_snapshot() - Get page content
-3. mcp__chrome-devtools__evaluate_script() - Extract specific fields
+1. ToolSearch({ query: "x-api tweet" }) - Load deferred X-API tools
+2. mcp__plugin_x-api_x-api__x_get_tweet({ tweet_id: "<id>" }) - Get tweet content
+3. Optionally: mcp__plugin_x-api_x-api__x_get_thread({ tweet_id: "<id>" }) - Get thread (7-day limit on replies)
 ```
 
 ### Approach 2: URL Parsing (Fallback)
 
-If Chrome DevTools unavailable, parse URL for basic info:
+If X-API tools unavailable, parse URL for basic info:
 - Username from path: `x.com/{username}/status/{id}`
 - Tweet ID from path
 

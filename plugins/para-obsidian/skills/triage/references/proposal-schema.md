@@ -19,7 +19,7 @@ interface Proposal {
   layer1_injected: boolean | null; // true/false/null (null = not applicable)
 
   // Verification fields (from post-creation check)
-  verification_status: "verified" | "repaired" | "failed" | "needs_review" | "skipped";
+  verification_status: "pending_coordinator" | "verified" | "repaired" | "failed" | "needs_review" | "skipped";
   verification_issues: string[];   // Empty if verified. Otherwise: ["missing: areas", "repaired: summary"]
 
   // UX fields (for review table and "Deeper" option)
@@ -67,7 +67,7 @@ interface Proposal {
 | Project | `project` | `string \| string[] \| null` | Single: `"[[Project]]"`, multi: `["[[P1]]", "[[P2]]"]`, or `null` |
 | Resource type | `resourceType` | `string` | camelCase, NOT `resource_type` |
 | Source format | `source_format` | `string` | snake_case (matches frontmatter convention) |
-| Verification status | `verification_status` | `string` | `"verified"`, `"repaired"`, `"failed"`, `"needs_review"`, `"skipped"` |
+| Verification status | `verification_status` | `string` | `"pending_coordinator"`, `"verified"`, `"repaired"`, `"failed"`, `"needs_review"`, `"skipped"` |
 | Verification issues | `verification_issues` | `string[]` | Empty if clean. Human-readable issue descriptions |
 
 **Multi-value areas/projects:** When content spans multiple domains (e.g., AI + Home Server), use an array. Single values are still preferred when one area is the clear fit.
@@ -99,8 +99,8 @@ TaskUpdate({
   metadata: {
     created: "<file-path>",       // or null if failed
     layer1_injected: true,        // true/false/null
-    verification_status: "verified",  // "verified" | "repaired" | "failed" | "needs_review" | "skipped"
-    verification_issues: [],          // Empty if clean. Human-readable issue descriptions
+    verification_status: "pending_coordinator",  // Workers set this; coordinator overrides in Phase 2.5
+    verification_issues: [],          // Populated by coordinator after Phase 2.5
     proposal: {
       proposed_title,
       proposed_template,
@@ -124,5 +124,5 @@ TaskUpdate({
 Subagents return this exact format on a single line:
 
 ```
-PROPOSAL_JSON:{"taskId":"...","proposed_title":"...","proposed_template":"...","summary":"...","area":"[[...]]","project":null,"resourceType":"...","source_format":"...","confidence":"...","categorization_hints":["...","...","..."],"notes":null,"created":"...","layer1_injected":true,"file":"...","verification_status":"verified","verification_issues":[]}
+PROPOSAL_JSON:{"taskId":"...","proposed_title":"...","proposed_template":"...","summary":"...","area":"[[...]]","project":null,"resourceType":"...","source_format":"...","confidence":"...","categorization_hints":["...","...","..."],"notes":null,"created":"...","layer1_injected":true,"file":"...","verification_status":"pending_coordinator","verification_issues":[]}
 ```

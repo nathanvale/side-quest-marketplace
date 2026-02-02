@@ -12,7 +12,7 @@ See the shared content sourcing documentation for detailed patterns:
 | Domain | Tool |
 |--------|------|
 | `youtube.com`, `youtu.be` | `mcp__youtube-transcript__get_transcript` |
-| `x.com`, `twitter.com` | Chrome DevTools or ask user |
+| `x.com`, `twitter.com` | X-API MCP (`x_get_tweet`) or ask user |
 | Everything else | `mcp__firecrawl__firecrawl_scrape` |
 
 **When to Fetch:**

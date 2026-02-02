@@ -17,14 +17,14 @@ For detailed tool selection and patterns, see the shared content sourcing docume
 
 | Domain Pattern | Tool | Why | Fallback |
 |----------------|------|-----|----------|
-| `x.com`, `twitter.com` | **Chrome DevTools** | Firecrawl is BLOCKED | Ask user |
+| `x.com`, `twitter.com` | **X-API MCP** (`x_get_tweet`) | Firecrawl is BLOCKED | Ask user |
 | `youtube.com`, `youtu.be` | **YouTube Transcript MCP** | Specialized API | Use description |
 | Everything else | **Firecrawl** | General scraping | WebFetch |
 
 ### NEVER Do This
 
 - **NEVER** use Firecrawl for x.com or twitter.com URLs - it returns "website not supported"
-- **NEVER** skip Chrome DevTools and go straight to Firecrawl for Twitter
+- **NEVER** skip X-API MCP tools and go straight to Firecrawl for Twitter
 - **NEVER** assume a tool is unavailable without trying it first
 
 ---

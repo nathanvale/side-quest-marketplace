@@ -16,6 +16,7 @@ Each subagent handles BOTH enrichment AND analysis for a single inbox item. This
 3. Spawn subagents with context
 4. Present table, handle edits
 5. Execute cleanup (delete/archive originals, fallback creation if subagent failed)
+6. Verify and stamp critical frontmatter fields from proposals (Phase 2.5 — runs after all subagents complete, before presenting review table)
 
 ---
 
@@ -63,7 +64,7 @@ Task({
     **CRITICAL:** Use validArgs from the template fields above. Do NOT call para_template_fields.
     **CRITICAL:** Pass no_autocommit: true and skip_guard: true to para_create. The coordinator handles the bulk commit after all items complete.
 
-    Follow your workflow: read → enrich → analyze → create (with content param for Layer 1, no_autocommit, skip_guard) → persist → return PROPOSAL_JSON.
+    Follow your workflow: read → enrich → analyze → create (with content param for Layer 1, no_autocommit, skip_guard) → persist (verification_status: "pending_coordinator") → return PROPOSAL_JSON. Skip post-creation verification — the coordinator handles it in Phase 2.5.
   `
 })
 ```
@@ -85,7 +86,7 @@ Task({ subagent_type: "triage-worker", description: "Process: Item 4", ... })
 Task({ subagent_type: "triage-worker", description: "Process: Item 5", ... })
 ```
 
-**EXCEPTION:** X/Twitter items must be sequential (single Chrome browser instance).
+**EXCEPTION:** Confluence items must be sequential (single Chrome browser instance). X/Twitter items run in parallel via stateless X-API MCP tools.
 
 ---
 
@@ -142,6 +143,7 @@ This saves 50 items × 3 tool calls = 150 tool calls and ensures consistent cont
 1. **Subagents enrich their own content** — keeps coordinator context clean
 2. **Pass vault context from coordinator** — saves tool calls
 3. **Use `triage-worker` agent** — dedicated agent with MCP tools, model set to haiku
-4. **X/Twitter is sequential** — single Chrome browser instance
+4. **Confluence is sequential** — single Chrome browser instance. X/Twitter runs in parallel via stateless X-API MCP.
 5. **Dual communication** — both TaskUpdate (persistence) AND PROPOSAL_JSON (immediate use)
-6. **Single-call creation** — use `para_create` with `content` parameter (creates + injects + commits atomically)
+6. **Single-call creation** — use `para_create` with `content` parameter (creates + injects in one call). During triage, pass `no_autocommit: true` — the coordinator bulk-commits after all workers complete.
+7. **Coordinator verifies** — workers set `verification_status: "pending_coordinator"`. The coordinator stamps and verifies critical frontmatter fields from proposals before presenting the review table.

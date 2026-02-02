@@ -4,7 +4,7 @@ description: Create a note from any URL with automatic template routing, enrichm
 argument-hint: "<url> [--template resource|meeting|invoice|booking] [--area '[[Area]]'] [--project '[[Project]]'] [--title 'Title']"
 user-invocable: true
 context: fork
-allowed-tools: AskUserQuestion, ToolSearch, WebFetch, mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_replace_section, mcp__plugin_para-obsidian_para-obsidian__para_commit, mcp__plugin_para-obsidian_para-obsidian__para_list_areas, mcp__plugin_para-obsidian_para-obsidian__para_list_projects, mcp__plugin_para-obsidian_para-obsidian__para_fm_set, mcp__plugin_para-obsidian_para-obsidian__para_template_fields, mcp__firecrawl__firecrawl_scrape, mcp__youtube-transcript__get_video_info, mcp__youtube-transcript__get_transcript, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__take_snapshot
+allowed-tools: AskUserQuestion, ToolSearch, WebFetch, mcp__plugin_para-obsidian_para-obsidian__para_create, mcp__plugin_para-obsidian_para-obsidian__para_replace_section, mcp__plugin_para-obsidian_para-obsidian__para_commit, mcp__plugin_para-obsidian_para-obsidian__para_list_areas, mcp__plugin_para-obsidian_para-obsidian__para_list_projects, mcp__plugin_para-obsidian_para-obsidian__para_fm_set, mcp__plugin_para-obsidian_para-obsidian__para_template_fields, mcp__firecrawl__firecrawl_scrape, mcp__youtube-transcript__get_video_info, mcp__youtube-transcript__get_transcript, mcp__plugin_x-api_x-api__x_get_tweet, mcp__plugin_x-api_x-api__x_get_thread
 ---
 
 # Quick Create
@@ -63,7 +63,7 @@ Follow the enrichment routing from @../triage/references/enrichment-strategies.m
 | Domain | Tool |
 |--------|------|
 | `youtube.com`, `youtu.be` | YouTube Transcript MCP (`get_video_info` + `get_transcript`) |
-| `x.com`, `twitter.com` | Chrome DevTools (`navigate_page` + `take_snapshot`) |
+| `x.com`, `twitter.com` | X-API MCP (`x_get_tweet` + `x_get_thread`) |
 | Everything else | Firecrawl (`firecrawl_scrape`) |
 
 **Fallback chain:** If Firecrawl fails or is unavailable, use `WebFetch` as fallback.

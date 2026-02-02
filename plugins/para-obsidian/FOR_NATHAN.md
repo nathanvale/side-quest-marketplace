@@ -284,23 +284,15 @@ para_create({
 
 **Lesson:** Understand your downstream consumers. The code that writes data must know how the code that reads data expects it.
 
-### Bug #3: X/Twitter Sequential Constraint
+### Bug #3: X/Twitter Sequential Constraint (Resolved)
 
 **Symptom:** Twitter enrichment failing randomly.
 
-**Root Cause:** Chrome DevTools (our tool for scraping Twitter) uses a single browser instance. If you spawn 5 subagents that all try to navigate Chrome simultaneously, chaos ensues.
+**Root Cause:** Chrome DevTools (our old tool for scraping Twitter) used a single browser instance. Spawning 5 subagents that all navigate Chrome simultaneously caused state corruption.
 
-**Fix:** Process Twitter items sequentially, after all parallel items complete:
+**Original Fix:** Process Twitter items sequentially, after all parallel items complete.
 
-```typescript
-// First: parallel processing for YouTube, articles
-await Promise.all(parallelItems.map(item => processInSubagent(item)))
-
-// Then: sequential processing for Twitter
-for (const twitterItem of twitterItems) {
-  await processInSubagent(twitterItem)
-}
-```
+**Permanent Fix:** Migrated Twitter enrichment from Chrome DevTools to stateless X-API MCP tools (`x_get_tweet`, `x_get_thread`). These are stateless API calls with no shared browser state, so Twitter items now parallelize freely alongside YouTube and articles. The sequential constraint only remains for Confluence (which still needs Chrome DevTools for authenticated access).
 
 **Lesson:** Not everything can be parallelized. Know your resource constraints and design around them.
 

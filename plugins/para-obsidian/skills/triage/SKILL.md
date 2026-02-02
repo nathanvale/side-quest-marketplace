@@ -58,10 +58,16 @@ Phase 1: Initialize (coordinator)
 
 Phase 2: Enrich + Analyze + Create (subagents)
 ├── Route to correct analyzer based on item type
-├── Parallel for YouTube, articles (batches of 10)
-├── Sequential for X/Twitter (single browser)
+├── Parallel for YouTube, articles, X/Twitter (batches of 10)
+├── Sequential for Confluence only (single browser)
 ├── CREATE notes AND inject Layer 1 content (but DO NOT delete originals)
 └── Enriched content stays in subagent context
+
+Phase 2.5: Coordinator Verification (coordinator)
+├── For each proposal with created != null
+├── para_fm_set: stamp summary + source + classification fields from proposal
+├── para_fm_get: verify all critical fields populated
+└── Override haiku's verification_status with coordinator's assessment
 
 Phase 3: Present & Collaborate (coordinator) ← CHECKPOINT
 ├── Render table with all proposals
@@ -218,7 +224,7 @@ cd ${CLAUDE_PLUGIN_ROOT} && bun src/cli.ts voice convert "<vtt-path>" --format j
 
 See [enrichment-strategies.md](references/enrichment-strategies.md) for the canonical routing table (source detection, tool selection, parallelization constraints).
 
-**CRITICAL - X/Twitter:** Web Clipper captures only stubs. You MUST enrich via Chrome DevTools regardless of clipping content.
+**CRITICAL - X/Twitter:** Web Clipper captures only stubs. You MUST enrich via X-API MCP tools (`x_get_tweet`) regardless of clipping content.
 
 ### 1.5 Create All Tasks Upfront
 
@@ -263,7 +269,7 @@ Found 50 items in inbox:
 
 📋 By Enrichment:
 • 35 parallel (YouTube, articles)
-• 5 sequential (X/Twitter)
+• 5 X/Twitter (parallel via X-API)
 • 10 no enrichment needed
 
 Starting subagent processing...
@@ -279,9 +285,9 @@ Starting subagent processing...
 
 ### 2.1 Spawn Subagents
 
-For all non-Twitter items (up to 10 per batch), spawn subagents **in a single message** for parallel execution. For inboxes >10 items, use batches of 10. Claude Code handles 7-10 parallel Task calls well for haiku subagents.
+For all items (up to 10 per batch), spawn subagents **in a single message** for parallel execution. For inboxes >10 items, use batches of 10. Claude Code handles 7-10 parallel Task calls well for haiku subagents.
 
-**EXCEPTION:** X/Twitter items must be sequential (single Chrome browser). Process these separately after parallel items complete.
+**EXCEPTION:** Confluence items must be sequential (single Chrome browser). Process these separately after parallel items complete.
 
 Use the prompt template from [subagent-prompts.md](references/subagent-prompts.md).
 
@@ -314,21 +320,23 @@ Task({
 })
 ```
 
-### 2.2 Handle X/Twitter Separately
+### 2.2 Handle Confluence Separately
 
-X/Twitter requires Chrome DevTools (single browser instance). Process sequentially AFTER parallel items:
+Confluence requires Chrome DevTools (single browser instance). Process sequentially AFTER parallel items:
 
 ```typescript
-// After all parallel subagents complete, process Twitter items one at a time
-for (const twitterItem of twitterItems) {
+// After all parallel subagents complete, process Confluence items one at a time
+for (const confluenceItem of confluenceItems) {
   Task({
     subagent_type: "triage-worker",
-    description: "Process: Twitter Thread",
-    prompt: `... same prompt with sourceType: "twitter" ...`
+    description: "Process: Confluence Page",
+    prompt: `... same prompt with sourceType: "confluence" ...`
   })
   // Wait for completion before next
 }
 ```
+
+**Note:** X/Twitter items are now processed in the parallel batch (Section 2.1) using stateless X-API MCP tools.
 
 Proposal collection happens in Phase 3. Subagents return `PROPOSAL_JSON:{...}` in response text.
 
@@ -343,6 +351,34 @@ Subagents may fail during enrichment (timeouts, 404s, rate limits) or return inv
 - User can Retry (R), Delete (D), or Skip (S) failed items
 
 See [architecture.md#error-handling](references/architecture.md) for detailed error flows and recovery patterns.
+
+---
+
+## Phase 2.5: Coordinator Verification
+
+**Rationale:** Haiku triage-workers generate correct values in PROPOSAL_JSON but drop fields ~50% of the time when constructing `para_create` args. Haiku also falsely reports `verification_status: "verified"` when fields are empty. The coordinator has authoritative values from PROPOSAL_JSON and stamps them unconditionally — idempotent (if haiku got it right, overwriting with the same value does no harm).
+
+**This replaces trust in haiku's `verification_status`.** Workers now set `verification_status: "pending_coordinator"` and skip post-creation verification.
+
+### Stamp Set by Template
+
+| Template | Fields Stamped | Source |
+|----------|---------------|--------|
+| `resource` | `summary`, `source`, `source_format`, `resource_type`, `areas`, `projects` | proposal + task metadata (sourceUrl) |
+| `meeting` | `summary`, `area`, `meeting_type` | proposal |
+| `invoice`/`booking` | (skip) | N/A |
+
+### Verification Loop
+
+For each proposal where `created != null` and template not in `[invoice, booking]`:
+
+1. **Build stamp_set** from PROPOSAL_JSON fields + task metadata (`sourceUrl` for `source` field)
+2. **`para_fm_set`** — stamp all critical fields unconditionally
+3. **`para_fm_get`** — read back frontmatter to verify
+4. **Check critical fields** — if all populated → `"verified"`, if any still empty → `"needs_review"`
+5. **Override** haiku's `verification_status` with the coordinator's assessment
+
+See [execution-phases.md](references/execution-phases.md) for full pseudocode and field mapping.
 
 ---
 

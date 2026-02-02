@@ -22,7 +22,7 @@ Consumer skills embed these references in subagent prompts via `@reference` synt
 |------|---------|
 | `url-routing.md` | Domain detection → tool selection (single source of truth) |
 | `youtube.md` | YouTube Transcript MCP patterns and error handling |
-| `x-twitter.md` | Chrome DevTools navigation + user-assisted fallback |
+| `x-twitter.md` | X-API MCP tools + user-assisted fallback |
 | `firecrawl.md` | General web scraping for articles, GitHub, docs |
 | `parallelization.md` | Batch execution rules, sequential constraints |
 

@@ -17,7 +17,7 @@ Firecrawl works for most public web content:
 - News sites
 - Product pages
 
-**NOT supported:** x.com, twitter.com (use Chrome DevTools instead)
+**NOT supported:** x.com, twitter.com (use X-API MCP tools instead — see x-twitter.md)
 
 ## Standard Pattern
 
