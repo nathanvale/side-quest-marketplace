@@ -95,7 +95,7 @@ export async function validateMcpToolNaming(
 
 			// Validate each tool name
 			for (const match of allToolMatches) {
-				const toolName = match[1]; // The actual tool name (e.g., "mcp__plugin_git_git-intelligence__get_recent_commits")
+				const toolName = match[1]; // The actual tool name (e.g., "mcp__plugin_kit_kit__kit_index_find")
 
 				// Skip if toolName is undefined (shouldn't happen with our regex, but TypeScript requires the check)
 				if (!toolName) {

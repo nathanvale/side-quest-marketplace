@@ -100,13 +100,13 @@ mcp__plugin_my-plugin_my-server__my_tool
 
 - **64-character limit**: Final tool names cannot exceed 64 characters (API constraint)
 - **Double-prefixing bug**: If you write `mcp__my-plugin_my-server__my_tool` in source, Claude Code adds another prefix, exceeding the limit
-- **Correct pattern**: Short names like `git_get_status`, `tsc_check`, `copy`
+- **Correct pattern**: Short names like `tsc_check`, `copy`, `kit_index_find`
 
 ### Examples
 
 | Plugin | Short Name (Source) | Final Name (Registered) |
 |--------|---------------------|-------------------------|
-| git | `git_get_recent_commits` | `mcp__plugin_git_git-intelligence__git_get_recent_commits` |
+| atuin | `atuin_search_history` | `mcp__plugin_atuin_atuin__atuin_search_history` |
 | kit | `kit_index_find` | `mcp__plugin_kit_kit__kit_index_find` |
 | clipboard | `copy` | `mcp__plugin_clipboard_clipboard__copy` |
 

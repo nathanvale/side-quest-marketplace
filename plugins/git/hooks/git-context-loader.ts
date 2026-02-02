@@ -4,7 +4,7 @@
  * Git Context Loader Hook
  *
  * SessionStart hook that loads git context at the beginning of a session.
- * Outputs recent commits, status, and open issues for Claude's awareness.
+ * Outputs recent commits, status, and a skill nudge for Claude's awareness.
  */
 
 import type { SessionStartHookInput } from "@anthropic-ai/claude-agent-sdk";
@@ -17,7 +17,6 @@ interface GitContext {
 		untracked: number;
 	};
 	recentCommits: string[];
-	openIssues?: string[];
 }
 
 async function exec(
@@ -74,7 +73,6 @@ async function getGitContext(cwd: string): Promise<GitContext | null> {
 		return null;
 	}
 
-	// Get status and branch in one go
 	const { stdout: statusOut } = await exec(
 		"git status --porcelain -b 2>/dev/null",
 		cwd,
@@ -82,7 +80,6 @@ async function getGitContext(cwd: string): Promise<GitContext | null> {
 
 	const { branch, status } = parseGitStatus(statusOut);
 
-	// Get recent commits
 	const { stdout: commitsOut } = await exec(
 		'git log --oneline -5 --format="%h %s (%ar)" 2>/dev/null',
 		cwd,
@@ -91,31 +88,15 @@ async function getGitContext(cwd: string): Promise<GitContext | null> {
 		.split("\n")
 		.filter((line) => line.trim() !== "");
 
-	const context: GitContext = {
+	return {
 		branch: branch || "(detached)",
 		status,
 		recentCommits,
 	};
-
-	// Check for open issues if gh is available and authenticated
-	const { exitCode: ghAuthCheck } = await exec("gh auth status", cwd);
-	if (ghAuthCheck === 0) {
-		const { stdout: issuesOut, exitCode: issuesCode } = await exec(
-			"gh issue list --limit 3 --state open 2>/dev/null",
-			cwd,
-		);
-		if (issuesCode === 0 && issuesOut.trim()) {
-			context.openIssues = issuesOut
-				.split("\n")
-				.filter((line) => line.trim() !== "");
-		}
-	}
-
-	return context;
 }
 
 function formatContext(context: GitContext): string {
-	const { branch, status, recentCommits, openIssues } = context;
+	const { branch, status, recentCommits } = context;
 
 	let output = "Git Context:\n";
 	output += `  Branch: ${branch}\n`;
@@ -123,19 +104,15 @@ function formatContext(context: GitContext): string {
 	output += "\nRecent commits:\n";
 
 	if (recentCommits.length > 0) {
-		recentCommits.forEach((commit) => {
+		for (const commit of recentCommits) {
 			output += `  ${commit}\n`;
-		});
+		}
 	} else {
 		output += "  (no commits yet)\n";
 	}
 
-	if (openIssues && openIssues.length > 0) {
-		output += "\nOpen issues (top 3):\n";
-		openIssues.forEach((issue) => {
-			output += `  ${issue}\n`;
-		});
-	}
+	output +=
+		"\nGit workflow: /git:commit, /git:squash, /git:checkpoint — git-expert skill active";
 
 	return output;
 }
@@ -146,7 +123,7 @@ function formatSystemMessage(context: GitContext): string {
 	const changesStr = totalChanges > 0 ? `, ${totalChanges} changes` : "";
 	const lastCommit =
 		recentCommits[0]?.split(" ").slice(1).join(" ") || "no commits";
-	return `Git: ${branch}${changesStr} | Last: ${lastCommit}`;
+	return `Git: ${branch}${changesStr} | Last: ${lastCommit} | /git:commit /git:squash /git:checkpoint`;
 }
 
 interface HookOutput {
@@ -159,23 +136,34 @@ interface HookOutput {
 
 // Main execution
 if (import.meta.main) {
-	const input = (await Bun.stdin.json()) as SessionStartHookInput;
-	const { cwd, source } = input;
-
-	// Only run on startup, not on resume/clear/compact
-	if (source === "startup") {
-		const context = await getGitContext(cwd);
-
-		if (context) {
-			const output: HookOutput = {
-				systemMessage: formatSystemMessage(context),
-				hookSpecificOutput: {
-					hookEventName: "SessionStart",
-					additionalContext: formatContext(context),
-				},
-			};
-			console.log(JSON.stringify(output));
+	try {
+		let input: SessionStartHookInput;
+		try {
+			input = (await Bun.stdin.json()) as SessionStartHookInput;
+		} catch {
+			// stdin parse failed — exit gracefully
+			process.exit(0);
 		}
+
+		const { cwd, source } = input;
+
+		// Only run on startup, not on resume/clear/compact
+		if (source === "startup") {
+			const context = await getGitContext(cwd);
+
+			if (context) {
+				const output: HookOutput = {
+					systemMessage: formatSystemMessage(context),
+					hookSpecificOutput: {
+						hookEventName: "SessionStart",
+						additionalContext: formatContext(context),
+					},
+				};
+				console.log(JSON.stringify(output));
+			}
+		}
+	} catch {
+		// Top-level catch — never crash the hook
 	}
 
 	process.exit(0);

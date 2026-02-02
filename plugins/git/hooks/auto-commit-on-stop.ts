@@ -74,12 +74,13 @@ async function getGitStatus(cwd: string): Promise<GitStatus | null> {
 		stderr: "pipe",
 	});
 
+	// Read stdout before awaiting exit to avoid race condition
+	const output = await new Response(proc.stdout).text();
 	const exitCode = await proc.exited;
 	if (exitCode !== 0) {
 		return null; // Not a git repo or git error
 	}
 
-	const output = await new Response(proc.stdout).text();
 	return parseGitStatus(output);
 }
 
@@ -148,8 +149,8 @@ async function createAutoCommit(
 	message: string,
 ): Promise<boolean> {
 	try {
-		// Stage all changes (including untracked)
-		const addProc = Bun.spawn(["git", "add", "-A"], {
+		// Stage tracked changes only (avoid staging secrets/new files)
+		const addProc = Bun.spawn(["git", "add", "-u"], {
 			cwd,
 			stdout: "pipe",
 			stderr: "pipe",
@@ -160,12 +161,15 @@ async function createAutoCommit(
 			return false;
 		}
 
-		// Create commit
-		const commitProc = Bun.spawn(["git", "commit", "-m", message], {
-			cwd,
-			stdout: "pipe",
-			stderr: "pipe",
-		});
+		// Create commit with --no-verify to bypass pre-commit hooks for WIP
+		const commitProc = Bun.spawn(
+			["git", "commit", "--no-verify", "-m", message],
+			{
+				cwd,
+				stdout: "pipe",
+				stderr: "pipe",
+			},
+		);
 
 		const commitExitCode = await commitProc.exited;
 		return commitExitCode === 0;
@@ -186,37 +190,50 @@ function printUserNotification(commitMessage: string): void {
 
 // Main execution
 if (import.meta.main) {
-	const input = (await Bun.stdin.json()) as StopHookInput;
+	try {
+		let input: StopHookInput;
+		try {
+			input = (await Bun.stdin.json()) as StopHookInput;
+		} catch {
+			process.exit(0);
+		}
 
-	// CRITICAL: Check stop_hook_active FIRST to prevent infinite loops
-	if (input.stop_hook_active) {
-		process.exit(0);
-	}
+		// CRITICAL: Check stop_hook_active FIRST to prevent infinite loops
+		if (input.stop_hook_active) {
+			process.exit(0);
+		}
 
-	const status = await getGitStatus(input.cwd);
+		const status = await getGitStatus(input.cwd);
 
-	// Not a git repo or git error - allow stop
-	if (status === null) {
-		process.exit(0);
-	}
+		// Not a git repo or git error - allow stop
+		if (status === null) {
+			process.exit(0);
+		}
 
-	// Clean working tree - allow stop
-	if (status.staged === 0 && status.modified === 0 && status.untracked === 0) {
-		process.exit(0);
-	}
+		// Clean working tree - allow stop
+		if (
+			status.staged === 0 &&
+			status.modified === 0 &&
+			status.untracked === 0
+		) {
+			process.exit(0);
+		}
 
-	// Has changes - create WIP commit
-	const lastPrompt = await getLastUserPrompt(input.transcript_path);
-	const commitMessage = generateCommitMessage(lastPrompt);
-	const success = await createAutoCommit(input.cwd, commitMessage);
+		// Has changes - create WIP commit
+		const lastPrompt = await getLastUserPrompt(input.transcript_path);
+		const commitMessage = generateCommitMessage(lastPrompt);
+		const success = await createAutoCommit(input.cwd, commitMessage);
 
-	if (success) {
-		printUserNotification(commitMessage);
-	} else {
-		// Failed to commit - log warning but don't block stop
-		console.error(
-			"Warning: Failed to create WIP commit. Changes remain uncommitted.",
-		);
+		if (success) {
+			printUserNotification(commitMessage);
+		} else {
+			// Failed to commit - log warning but don't block stop
+			console.error(
+				"Warning: Failed to create WIP commit. Changes remain uncommitted.",
+			);
+		}
+	} catch {
+		// Top-level catch — never crash the hook
 	}
 
 	// Always exit 0 to allow stop

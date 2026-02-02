@@ -271,7 +271,7 @@ This command has boolean frontmatter values.
 		it("should handle complex allowed-tools values", async () => {
 			const commandContent = `---
 description: Git commit command
-allowed-tools: Bash(git add:*), Bash(git commit:*), mcp__plugin_git_git-intelligence__get_recent_commits
+allowed-tools: Bash(git add:*), Bash(git commit:*), Bash(git log:*)
 ---
 
 # Git Commit
@@ -384,7 +384,7 @@ This command uses Bash with git restrictions.
 		it("should pass for MCP tool names with underscores and hyphens", async () => {
 			const commandContent = `---
 description: MCP command
-allowed-tools: mcp__plugin_git_git-intelligence__get_recent_commits
+allowed-tools: mcp__plugin_kit_kit__kit_index_find
 ---
 
 # MCP Command
@@ -571,7 +571,7 @@ This command has multiple invalid tool names.
 			const commandContent = `---
 description: Create well-formatted commits using Conventional Commits specification
 model: claude-sonnet-4-5-20250929
-allowed-tools: Bash(git add:*), Bash(git commit:*), mcp__plugin_git_git-intelligence__get_recent_commits
+allowed-tools: Bash(git add:*), Bash(git commit:*), Bash(git log:*)
 ---
 
 # Smart Commit

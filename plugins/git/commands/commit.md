@@ -1,9 +1,8 @@
 ---
 description: Create well-formatted commits using Conventional Commits specification
+model: claude-sonnet-4-5-20250929
+allowed-tools: Bash(git status:*), Bash(git add:*), Bash(git diff:*), Bash(git log:*), Bash(git commit:*)
+argument-hint: [description]
 ---
 
-# Smart Commit
-
-Use the **smart-commit** skill to analyze staged changes and create a well-formatted commit following Conventional Commits specification.
-
-If no changes are staged, check `git status` first and stage appropriate files before committing.
+Use the **git-expert** skill to create a conventional commit. $ARGUMENTS

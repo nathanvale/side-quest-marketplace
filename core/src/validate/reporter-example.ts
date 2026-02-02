@@ -25,11 +25,11 @@ const exampleResult: ValidationResult = {
 		{
 			ruleId: "mcp/tool-naming",
 			message:
-				'Tool "getCommits" should be "mcp__plugin_git_git-intelligence__get_commits"',
+				'Tool "searchHistory" should be "mcp__plugin_atuin_atuin__search_history"',
 			severity: "warning",
 			file: "src/index.ts",
 			line: 45,
-			suggestion: 'Rename to "mcp__plugin_git_git-intelligence__get_commits"',
+			suggestion: 'Rename to "mcp__plugin_atuin_atuin__search_history"',
 		},
 		{
 			ruleId: "mcp/tool-naming",

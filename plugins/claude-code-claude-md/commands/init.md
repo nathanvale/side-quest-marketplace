@@ -1,7 +1,7 @@
 ---
 description: Smart CLAUDE.md initialization with CI mode for automated updates
 model: claude-sonnet-4-5-20250929
-allowed-tools: Read, Write, Glob, LS, Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(git:*), AskUserQuestion, mcp__kit__(...), mcp__git-intelligence__(...), mcp__bun-runner__(...)
+allowed-tools: Read, Write, Glob, LS, Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(git:*), AskUserQuestion, mcp__kit__(...), mcp__bun-runner__(...)
 argument-hint: [--ci] [--update] [path]
 ---
 
@@ -145,13 +145,13 @@ Extract: Top-level folders, depth-2 structure
 ### 1.3 Git Intelligence
 
 ```
-Tool: mcp__git_git-intelligence__git_get_recent_commits (limit: 20)
+Tool: Bash(git log:*)
 Extract:
 - Commit message format (conventional? descriptive?)
 - Active contributors
 - Recent areas of change
 
-Tool: mcp__git_git-intelligence__git_get_branch_info
+Tool: Bash(git branch:*)
 Extract:
 - Branch naming pattern
 - Default branch name
@@ -484,15 +484,11 @@ At start, check which tools are available:
 ```typescript
 // Check for enhanced capabilities
 const hasKit = toolExists("kit_file_tree");
-const hasGit = toolExists("mcp__git_git-intelligence__git_get_recent_commits");
 const hasBunRunner = toolExists("bun_lintCheck");
 
 // Adjust discovery strategy
 if (!hasKit) {
   // Fallback to LS + Glob for structure
-}
-if (!hasGit) {
-  // Skip commit style detection, ask instead
 }
 ```
 
@@ -505,7 +501,7 @@ User: /init
 
 Claude: 🔍 Analyzing project...
 
-[Runs kit_file_tree, reads package.json, mcp__git_git-intelligence__git_get_recent_commits]
+[Runs kit_file_tree, reads package.json, git log via Bash]
 
 ## Discovery Complete
 
@@ -554,8 +550,6 @@ If MCP tools unavailable:
 | `kit_file_tree` | `ls -la` + `find . -type d -maxdepth 2` |
 | `kit_symbols` | Skip, rely on file structure |
 | `kit_grep` | `grep -r` via Bash |
-| `mcp__git_git-intelligence__git_get_recent_commits` | `git log --oneline -20` via Bash |
-| `mcp__git_git-intelligence__git_get_branch_info` | `git branch -a` via Bash |
 
 The command should work (with reduced intelligence) even without MCP tools.
 
@@ -744,7 +738,7 @@ $ claude --print "/init --ci --update"
 [init] Detecting project context...
 [init]   ├─ kit_file_tree: 23 directories
 [init]   ├─ package.json: 8 scripts
-[init]   ├─ mcp__git_git-intelligence__git_get_recent_commits: conventional commits
+[init]   ├─ git log: conventional commits
 [init]   └─ tsconfig.json: strict mode
 [init] Comparing with existing...
 [init] Changes detected:

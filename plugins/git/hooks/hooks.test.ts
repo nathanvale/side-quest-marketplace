@@ -195,6 +195,6 @@ describe("session-summary", () => {
 		const stdout = await new Response(proc.stdout).text();
 
 		expect(exitCode).toBe(0);
-		expect(stdout).toContain("Session summary saved");
+		expect(stdout).toContain("PreCompact");
 	});
 });

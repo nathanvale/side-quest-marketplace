@@ -3,7 +3,7 @@ name: Historical Context Reviewer
 description: Git history analysis to learn from past issues, patterns, and architectural decisions
 model: Claude Sonnet 4
 tools:
-  ['edit/editFiles', 'search', 'runCommands', 'GitKraken/*', 'git-intelligence/*', 'usages', 'problems', 'fetch']
+  ['edit/editFiles', 'search', 'runCommands', 'GitKraken/*', 'usages', 'problems', 'fetch']
 handoffs:
   - label: Apply Historical Lesson
     agent: agent

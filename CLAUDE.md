@@ -17,7 +17,7 @@
 - **NEVER** create circular dependencies between plugins
 
 **MCP Server Conventions:**
-- Tool names: Use **short names only** in source code (e.g., `my_tool`, `git_get_status`)
+- Tool names: Use **short names only** in source code (e.g., `my_tool`, `tsc_check`)
 - Claude Code auto-prefixes with `mcp__plugin_<plugin>_<server>__` — never include this in source
 - **64-char limit**: Final tool names cannot exceed 64 characters (API constraint)
 - **ALWAYS** include `response_format` parameter: `"markdown"` (default) or `"json"`
@@ -187,7 +187,6 @@ The marketplace provides 70+ MCP tools across plugins.
 
 ### Other MCP Tools
 
-Git (7 tools) → Commits, status, branches, diff, file history (always JSON format)
 Atuin (4 tools) → Bash history search, insights, context filtering (always JSON format)
 Bun Runner (3 tools) → Test execution, file tests, coverage (always JSON format)
 Biome Runner (3 tools) → Lint check/fix, format check (always JSON format)
@@ -253,7 +252,7 @@ Full guide: @./TROUBLESHOOTING.md
 ## Key Plugins
 
 Kit: Intelligent code search (text/semantic/AST), 25 tools, requires Kit CLI
-Git: Intelligence & workflow automation, 7 tools, hooks, slash commands
+Git: Intelligence & workflow automation, 5 hooks, 6 slash commands, git-expert skill
 Bun/Biome/TSC Runners: Test/lint/type-check integration with hooks
 Para-Brain/Para-Obsidian: Obsidian PARA method integration
 
