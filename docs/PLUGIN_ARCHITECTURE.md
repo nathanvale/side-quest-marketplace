@@ -29,9 +29,9 @@ mcp__plugin_<plugin>_<server>__my_tool
 **Why:** Final tool names have a 64-character limit. Using full prefixes in source causes double-prefixing and API errors.
 
 **Examples:**
-- `git_get_recent_commits` → `mcp__plugin_git_git-intelligence__git_get_recent_commits`
 - `kit_index_find` → `mcp__plugin_kit_kit__kit_index_find`
 - `tsc_check` → `mcp__plugin_tsc-runner_tsc-runner__tsc_check`
+- `copy` → `mcp__plugin_clipboard_clipboard__copy`
 
 ### Required Parameters
 

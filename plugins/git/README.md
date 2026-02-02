@@ -1,69 +1,64 @@
 # Git Intelligence Plugin for Claude Code
 
-Provides intelligent git context, history exploration, and smart commit capabilities for Claude Code sessions.
+Provides intelligent git context, history exploration, smart commit capabilities, and safety guardrails for Claude Code sessions.
 
 ## Features
 
-### MCP Server: git-intelligence
+### Hooks (5 lifecycle events)
 
-Seven tools for efficient git queries:
-- `get_recent_commits` - Recent commit history with details
-- `search_commits` - Search by message or code changes (-S style)
-- `get_file_history` - File-specific commit history (follows renames)
-- `get_status` - Current repository state (staged, modified, untracked)
-- `get_branch_info` - Current branch, tracking status, local/remote branches
-- `get_diff_summary` - Summary of uncommitted changes vs reference
-- `get_stash_list` - List stashed changes for recovery
-
-### Hooks
-
-**SessionStart** - Automatically loads git context:
+**SessionStart** - Loads git context:
 - Current branch and status
 - Last 5 commits
-- Open GitHub issues (if gh CLI available)
+- Skill nudge for /git:commit, /git:squash, /git:checkpoint
 
-**PreCompact** - Saves session summary before context compaction:
-- Commits made during session
-- Current uncommitted changes
-- Helps maintain continuity across context windows
+**PreToolUse** - Git safety guard:
+- Blocks destructive commands (force push, hard reset, clean -f, checkout ., branch -D)
+- Returns deny decision with explanation
 
-**Stop** - Auto-commit check before session ends:
-- Detects staged changes that should be committed
-- Blocks session end and prompts Claude to use `/git:commit`
-- Includes loop prevention via `stop_hook_active` flag
-- Only triggers on staged changes (respects user intent)
-- Auto-commits uncommitted changes as WIP when session stops (prevents lost work)
+**PostToolUse** - Command logger:
+- Appends Bash commands to ~/.claude/logs/git-command-log.jsonl
+- Fire-and-forget audit trail
+
+**PreCompact** - Cortex pattern:
+- Extracts decisions, error fixes, learnings, preferences from transcript
+- Appends to ~/.claude/cortex/{repo-name}.jsonl
+- Saves git state summary (append, not overwrite)
+
+**Stop** - Auto-commit check:
+- Creates WIP checkpoint for uncommitted tracked changes
+- Uses --no-verify to bypass pre-commit hooks
+- Uses git add -u (tracked files only, avoids staging secrets)
 
 ### Slash Commands
 
+All commands are thin wrappers that delegate to the git-expert skill:
+
 - `/git:commit` - Smart commits with Conventional Commits format
-- `/git:create-pr` - Create pull requests with proper formatting
+- `/git:squash` - Squash WIP commits into one conventional commit
 - `/git:checkpoint` - Quick WIP checkpoint commits
-- `/git:session-log` - Show session git activity
+- `/git:create-pr` - Create pull requests with proper formatting
 - `/git:history [query]` - Interactive history exploration
+- `/git:session-log` - Show session git activity
 
 ### Skill: git-expert
 
-Claude autonomously uses git context when you ask:
-- "What did we change recently?"
-- "Who wrote this code?"
-- "Commit my changes"
-- "What happened to the auth module?"
-- "Save my work before I try this"
+Unified skill covering all git workflows. Claude auto-activates for git tasks:
+- "Commit my changes" → Conventional commit workflow
+- "Squash these WIP commits" → Merge-base + reset --soft
+- "What changed recently?" → History exploration
+- "Create a PR" → Push + gh pr create
+- "Set up a worktree" → Worktree management
 
 ## Prerequisites
 
 - Git installed and configured
-- Node.js 18+ (for MCP server)
-- Optional: GitHub CLI (`gh`) for issue integration
+- Optional: GitHub CLI (`gh`) for PR creation and issue integration
 
 ## Installation
 
 ```bash
 /plugin install git@nathan-vale-claude-code
 ```
-
-Dependencies are automatically installed on first session start.
 
 ## Commit Format
 
@@ -87,26 +82,19 @@ Uses [Conventional Commits](https://www.conventionalcommits.org/) specification:
 | chore | Maintenance tasks |
 | revert | Revert changes |
 
-## Configuration
-
-### Debug Mode
-
-Enable debug logging:
-```bash
-export CLAUDE_GIT_DEBUG=1
-```
-
-### Session Summary Location
-
-Session summaries are saved to `~/.claude/session-summaries/{repo-name}.md` to avoid polluting your repository.
-
 ## Usage Examples
 
 ### Smart Commits
 ```
 /git:commit
 ```
-Claude will analyze changes, suggest appropriate type/scope, and create a well-formatted commit.
+Claude analyzes changes, suggests type/scope, and creates a well-formatted commit.
+
+### Squash WIP Commits
+```
+/git:squash
+```
+Combines WIP commits on a feature branch into one clean conventional commit.
 
 ### Quick Checkpoints
 ```

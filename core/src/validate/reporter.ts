@@ -22,7 +22,7 @@ import type { ValidationIssue, ValidationResult } from "./types.ts";
  *
  * WARNINGS (2):
  *   src/index.ts:45 [mcp/tool-naming]
- *     Tool "getCommits" should be "mcp__plugin_git_git-intelligence__get_commits"
+ *     Tool "searchHistory" should be "mcp__plugin_atuin_atuin__search_history"
  *
  * 1 error, 2 warnings
  *

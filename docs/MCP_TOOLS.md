@@ -24,7 +24,6 @@ All MCP tool calls MUST include `response_format: "json"` — saves 40-60% token
 
 | Plugin | Tools | Use For |
 |--------|-------|---------|
-| **Git** | `git_get_recent_commits`, `git_search_commits`, `git_get_status` | History, status |
 | **Bun** | `bun_runTests`, `bun_testFile`, `bun_testCoverage` | Testing |
 | **Biome** | `biome_lintCheck`, `biome_lintFix`, `biome_formatCheck` | Linting |
 | **TSC** | `tsc_check` | Type checking |

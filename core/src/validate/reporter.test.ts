@@ -21,12 +21,11 @@ describe("reporter", () => {
 					{
 						ruleId: "mcp/tool-naming",
 						message:
-							'Tool "getCommits" should be "mcp__plugin_git_git-intelligence__get_commits"',
+							'Tool "searchHistory" should be "mcp__plugin_atuin_atuin__search_history"',
 						severity: "warning",
 						file: "src/index.ts",
 						line: 45,
-						suggestion:
-							'Rename to "mcp__plugin_git_git-intelligence__get_commits"',
+						suggestion: 'Rename to "mcp__plugin_atuin_atuin__search_history"',
 					},
 					{
 						ruleId: "mcp/tool-naming",
@@ -53,7 +52,7 @@ describe("reporter", () => {
 			expect(output).toContain("1 error, 2 warnings");
 			expect(output).toContain("Validation FAILED (errors block commit)");
 			expect(output).toContain(
-				'Suggestion: Rename to "mcp__plugin_git_git-intelligence__get_commits"',
+				'Suggestion: Rename to "mcp__plugin_atuin_atuin__search_history"',
 			);
 		});
 

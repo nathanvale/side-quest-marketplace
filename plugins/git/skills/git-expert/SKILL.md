@@ -1,63 +1,78 @@
 ---
 name: git-expert
-description: Git history exploration and repository analysis. Use when users ask about git history ("what changed", "when did we add"), want to understand past changes, need to search commits, ask about branches, or want to explore the codebase evolution.
+description: Git workflow expert — conventional commits, history exploration, worktree management, PR creation, squash, and safety. Activates for any git-related task including committing, branching, history, and repository analysis.
+allowed-tools:
+  - Bash(git *:*)
+  - Bash(gh *:*)
+  - Read
+  - Glob
+  - Grep
 ---
 
-# Git Expert Skill
+# Git Expert
 
-Git history exploration and repository analysis.
+Unified git workflow skill. Routes to the right procedure based on what the user needs.
 
-## Capabilities
+## Routing
 
-### History Analysis
-- Search commit messages and code changes
-- Trace file history to understand evolution
-- Find when specific code was introduced or removed
-- Identify who made changes and why
+| User wants... | Reference | Key commands |
+|---------------|-----------|-------------|
+| Create a commit | [WORKFLOWS.md](WORKFLOWS.md) § Commit + [CONVENTIONS.md](CONVENTIONS.md) + [EXAMPLES.md](EXAMPLES.md) | `git status`, `git diff`, `git add`, `git commit` |
+| Quick checkpoint | [WORKFLOWS.md](WORKFLOWS.md) § Checkpoint | `git add -u`, `git commit --no-verify` |
+| Squash WIP commits | [WORKFLOWS.md](WORKFLOWS.md) § Squash | `git merge-base`, `git reset --soft`, `git commit` |
+| Explore history | Decision tree below | `git log`, `git blame`, `git show`, `git diff` |
+| Create PR | [WORKFLOWS.md](WORKFLOWS.md) § PR | `git push -u`, `gh pr create` |
+| Session activity | [WORKFLOWS.md](WORKFLOWS.md) § Session Log | `git log --since="1 hour ago"` |
+| Manage worktrees | [WORKTREE.md](WORKTREE.md) | CLI at `src/worktree/cli.ts` |
+| Compare branches | Decision tree below | `git log main..HEAD`, `git diff main...HEAD` |
 
-### Repository Exploration
-- Branch information and comparisons
-- Diff analysis between commits/branches
-- Blame to find who changed specific lines
+## History Exploration Decision Tree
 
-### Session Awareness
-- Track what was done during the current session
-- Show uncommitted work status
+| Question | Git commands |
+|----------|-------------|
+| "What changed recently?" | `git log --oneline -10`, `git status --porcelain -b`, `git diff --stat` |
+| "What changed in \<area\>?" | `git log --oneline -10 -- <path>`, `git log --all --grep="<area>"` |
+| "When did we add/change X?" | `git log --all --grep="<X>"`, `git log -S "<X>"`, `git log -G "<X>"` |
+| "Who changed this?" | `git blame <file>`, `git log --follow -- <file>` |
+| "Compare branches" | `git log --oneline main..HEAD`, `git diff main...HEAD --stat` |
+| "Show specific commit" | `git show <hash> --stat`, `git show <hash>` |
+| "What branches exist?" | `git branch -a`, `git branch --show-current` |
+| "What did we do this session?" | `git log --oneline --since="1 hour ago"`, `git status` |
 
-## Tools Available
+## Safety Rules
 
-Use the git-intelligence MCP server tools:
-- `get_recent_commits` - Recent commit history
-- `search_commits` - Search by message or code
-- `get_status` - Current repository state
-- `get_diff_summary` - Summary of changes
-- `get_file_history` - History of a specific file
-- `get_branch_info` - Branch information
+These are non-negotiable:
 
-For additional queries, use Bash:
-- `git log --oneline -10 -- <filepath>` - File-specific history
-- `git branch -a` - All branches
-- `git blame <filepath>` - Line-by-line attribution
-- `git show <commit>` - Commit details
-- `git diff <ref1>..<ref2>` - Compare refs
+- **NEVER** force push (`git push --force` / `-f`)
+- **NEVER** `git reset --hard` without explicit user confirmation
+- **NEVER** `git clean -f` without explicit user confirmation
+- **NEVER** `git checkout .` or `git restore .` without user confirmation
+- **NEVER** commit secrets (`.env`, credentials, API keys)
+- **NEVER** use `git add .` or `git add -A` — always stage specific files
+- **NEVER** skip hooks (`--no-verify`) except for WIP/checkpoint commits
+- **ALWAYS** verify on feature branch before squash (abort if `main`)
+- **ALWAYS** use HEREDOC format for multi-line commit messages
+- **ASK** user if commit scope or message is unclear
+- **SPLIT** large changes into atomic commits
 
-## Example Interactions
+## Commit Format
 
-**User**: "What changed in the auth module recently?"
-- Use `search_commits` with query "auth" or `git log --oneline -10 -- src/auth/`
+```
+<type>(<scope>): <subject>
+```
 
-**User**: "When did we add the login feature?"
-- Use `search_commits` with query "login" and `search_code: false`
+See [CONVENTIONS.md](CONVENTIONS.md) for full spec and [EXAMPLES.md](EXAMPLES.md) for examples.
 
-**User**: "Who changed this file?"
-- Use `git blame <filepath>` or `get_file_history`
-
-**User**: "What branches exist?"
-- Use `get_branch_info` or `git branch -a`
-
-**User**: "What did we do this session?"
-- Use `get_recent_commits` and `get_status` to summarize activity
-
-## For Committing Changes
-
-Use the **smart-commit** skill for creating commits. This skill focuses on history exploration only.
+| Type | Use for |
+|------|---------|
+| feat | New feature |
+| fix | Bug fix |
+| docs | Documentation only |
+| refactor | Code change (no feature/fix) |
+| test | Adding/updating tests |
+| chore | Maintenance |
+| perf | Performance |
+| style | Formatting |
+| build | Build system |
+| ci | CI/CD |
+| revert | Revert changes |

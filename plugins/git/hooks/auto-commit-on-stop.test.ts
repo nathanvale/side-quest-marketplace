@@ -259,10 +259,17 @@ describe("createAutoCommit", () => {
 		await rm(tempDir, { recursive: true, force: true });
 	});
 
-	test("creates commit with staged and unstaged changes", async () => {
-		// Create files
+	test("creates commit with modified tracked files", async () => {
+		// Create and commit initial files (must be tracked for git add -u)
 		await writeFile(join(tempDir, "file1.txt"), "content 1");
 		await writeFile(join(tempDir, "file2.txt"), "content 2");
+		await Bun.spawn(["git", "add", "-A"], { cwd: tempDir }).exited;
+		await Bun.spawn(["git", "commit", "-m", "initial"], { cwd: tempDir })
+			.exited;
+
+		// Modify tracked files
+		await writeFile(join(tempDir, "file1.txt"), "modified 1");
+		await writeFile(join(tempDir, "file2.txt"), "modified 2");
 
 		const message = generateCommitMessage("test changes");
 		const result = await createAutoCommit(tempDir, message);
@@ -298,11 +305,10 @@ describe("createAutoCommit", () => {
 		expect(result).toBe(false);
 	});
 
-	test("stages all files including untracked", async () => {
+	test("stages tracked files only (not untracked)", async () => {
 		await writeFile(join(tempDir, "tracked.txt"), "tracked");
-		await writeFile(join(tempDir, "untracked.txt"), "untracked");
 
-		// Only stage one file initially
+		// Stage and commit initial file
 		await Bun.spawn(["git", "add", "tracked.txt"], { cwd: tempDir }).exited;
 		await Bun.spawn(["git", "commit", "-m", "initial"], { cwd: tempDir })
 			.exited;
@@ -311,19 +317,19 @@ describe("createAutoCommit", () => {
 		await writeFile(join(tempDir, "tracked.txt"), "modified");
 		await writeFile(join(tempDir, "new-untracked.txt"), "new");
 
-		const message = generateCommitMessage("stage all");
+		const message = generateCommitMessage("stage tracked");
 		const result = await createAutoCommit(tempDir, message);
 
 		expect(result).toBe(true);
 
-		// Verify both files were committed
+		// Verify only tracked file was committed (git add -u skips untracked)
 		const proc = Bun.spawn(["git", "show", "--name-only", "--format="], {
 			cwd: tempDir,
 			stdout: "pipe",
 		});
 		const output = await new Response(proc.stdout).text();
 		expect(output).toContain("tracked.txt");
-		expect(output).toContain("new-untracked.txt");
+		expect(output).not.toContain("new-untracked.txt");
 	});
 });
 

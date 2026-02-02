@@ -43,7 +43,7 @@ Model Context Protocol is a standardized way for Claude (and other LLMs) to inte
 ### Tool
 
 A function Claude can call. Has:
-- **name**: Unique identifier (e.g., `mcp__git_git-intelligence__get_recent_commits`)
+- **name**: Unique identifier (e.g., `mcp__plugin_kit_kit__kit_index_find`)
 - **description**: What it does
 - **inputSchema**: Parameters (JSON Schema)
 - **annotations**: Metadata (readOnly, destructive, etc.)
@@ -106,8 +106,8 @@ mcp__<plugin-name>_<server-name>__<tool_name>
 **Examples:**
 
 ```
-mcp__git_git-intelligence__get_recent_commits
-mcp__kit_kit__grep
+mcp__kit_kit__kit_grep
+mcp__atuin_atuin__atuin_search_history
 mcp__biome-runner_biome-runner__lint_check
 mcp__clipboard_clipboard__copy
 ```
@@ -361,9 +361,9 @@ Claude asks: "Please execute this tool"
   "id": 2,
   "method": "tools/call",
   "params": {
-    "name": "mcp__git_git-intelligence__get_recent_commits",
+    "name": "mcp__atuin_atuin__atuin_search_history",
     "arguments": {
-      "limit": 10,
+      "query": "git commit",
       "response_format": "json"
     }
   }
@@ -479,10 +479,10 @@ const format = args.response_format || "markdown";
 
 ```typescript
 // ✓ Good: Clear and specific
-"mcp__git_git-intelligence__get_recent_commits"
+"mcp__kit_kit__kit_index_find"
 
 // ✗ Bad: Too generic
-"mcp__git_git-intelligence__get"
+"mcp__kit_kit__find"
 ```
 
 ### 2. Error Messages

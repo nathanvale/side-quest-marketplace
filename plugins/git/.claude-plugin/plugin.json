@@ -1,6 +1,6 @@
 {
 	"name": "git",
-	"description": "Git intelligence for Claude Code - session context, commit history, smart commits with Conventional Commits. Includes MCP server, SessionStart/PreCompact/Stop hooks (auto-commit check), and slash commands.",
+	"description": "Git intelligence for Claude Code - session context, commit history, smart commits with Conventional Commits. Includes 5 lifecycle hooks (SessionStart/PreToolUse/PostToolUse/PreCompact/Stop) and slash commands.",
 	"version": "1.0.0",
 	"author": {
 		"name": "Nathan Vale",
@@ -12,19 +12,18 @@
 		"commits",
 		"history",
 		"conventional-commits",
-		"mcp",
 		"session",
 		"worktree",
-		"tmux"
+		"safety"
 	],
 	"license": "MIT",
-	"skills": ["./skills/git-expert", "./skills/worktree"],
+	"skills": ["./skills/git-expert"],
 	"commands": [
 		"./commands/checkpoint.md",
 		"./commands/commit.md",
 		"./commands/create-pr.md",
 		"./commands/history.md",
-		"./commands/session-log.md"
-	],
-	"mcpServers": ["./.mcp.json"]
+		"./commands/session-log.md",
+		"./commands/squash.md"
+	]
 }

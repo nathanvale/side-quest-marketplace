@@ -1,5 +1,5 @@
 {
-	"description": "Git intelligence hooks for session context, summaries, and auto-commit",
+	"description": "Git intelligence hooks: context, safety, logging, cortex, auto-commit",
 	"hooks": {
 		"SessionStart": [
 			{
@@ -8,7 +8,31 @@
 					{
 						"type": "command",
 						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/git-context-loader.ts",
-						"timeout": 10
+						"timeout": 15
+					}
+				]
+			}
+		],
+		"PreToolUse": [
+			{
+				"matcher": "Bash",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/git-safety.ts",
+						"timeout": 5
+					}
+				]
+			}
+		],
+		"PostToolUse": [
+			{
+				"matcher": "Bash",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/command-logger.ts",
+						"timeout": 5
 					}
 				]
 			}
@@ -19,7 +43,7 @@
 					{
 						"type": "command",
 						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/session-summary.ts",
-						"timeout": 5
+						"timeout": 15
 					}
 				]
 			}
@@ -30,7 +54,7 @@
 					{
 						"type": "command",
 						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/auto-commit-on-stop.ts",
-						"timeout": 5
+						"timeout": 10
 					}
 				]
 			}
