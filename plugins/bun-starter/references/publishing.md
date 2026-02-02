@@ -167,6 +167,133 @@ bun run pack:dry          # Inspect tarball contents
 - `access: "public"` — Required for scoped packages
 - `provenance: true` — Generates SLSA provenance attestation
 
+## Claude Desktop Extension (.mcpb)
+
+If your package includes an MCP server, you can distribute it as a Desktop Extension — a `.mcpb` bundle that users double-click to install in Claude Desktop.
+
+### Setup
+
+1. **Create `manifest.json`** in the repo root:
+
+```json
+{
+  "manifest_version": "0.2",
+  "name": "@scope/my-package",
+  "version": "0.1.0",
+  "description": "What the MCP server does",
+  "author": {
+    "name": "Your Name",
+    "url": "https://github.com/username"
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "./dist/mcp/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/mcp/index.js"],
+      "env": {
+        "API_KEY": "${user_config.api_key}"
+      }
+    }
+  },
+  "user_config": {
+    "api_key": {
+      "type": "string",
+      "title": "API Key",
+      "description": "Your API key. Get one at https://example.com",
+      "sensitive": true,
+      "required": true
+    }
+  },
+  "license": "MIT"
+}
+```
+
+Key fields:
+- `server.entry_point` — path to the compiled MCP server entry (must work with Node.js)
+- `server.mcp_config.env` — env vars passed to the server, referencing `${user_config.*}`
+- `user_config` — declares fields the user must provide on install. `sensitive: true` stores values in the OS keychain
+
+2. **Create a pack script** (`scripts/pack-desktop-extension.sh`):
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+STAGE_DIR=".mcpb-stage"
+OUTPUT="my-package.mcpb"
+
+# Sync manifest version from package.json
+VERSION=$(node -p "require('./package.json').version")
+node -e "
+  const fs = require('fs');
+  const m = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
+  m.version = '${VERSION}';
+  fs.writeFileSync('manifest.json', JSON.stringify(m, null, '\t') + '\n');
+"
+
+bun run build
+
+rm -rf "$STAGE_DIR"
+mkdir -p "$STAGE_DIR"
+cp manifest.json package.json "$STAGE_DIR/"
+cp -r dist "$STAGE_DIR/"
+
+cd "$STAGE_DIR"
+npm install --omit=dev --ignore-scripts 2>&1 | tail -1
+cd ..
+
+rm -f "$OUTPUT"
+npx @anthropic-ai/mcpb pack "$STAGE_DIR" "$OUTPUT"
+rm -rf "$STAGE_DIR"
+```
+
+3. **Add to `.gitignore`:**
+
+```
+.mcpb-stage/
+*.mcpb
+```
+
+4. **Add script to `package.json`:**
+
+```json
+{
+  "scripts": {
+    "pack:desktop": "bash scripts/pack-desktop-extension.sh"
+  }
+}
+```
+
+5. **Auto-attach to GitHub Releases** — add to `publish.yml` after the release creation step:
+
+```yaml
+- name: Attach Desktop Extension to release
+  if: steps.intent.outputs.value == 'auto' && steps.changesets.outputs.published == 'true'
+  run: |
+    VERSION=$(node -p "require('./package.json').version")
+    TAG="v${VERSION}"
+    bun run pack:desktop
+    gh release upload "${TAG}" my-package.mcpb --clobber
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+### Validation
+
+```bash
+npx @anthropic-ai/mcpb validate manifest.json   # Validate manifest schema
+bun run pack:desktop                              # Build bundle
+npx @anthropic-ai/mcpb info my-package.mcpb      # Inspect bundle
+```
+
+### Key considerations
+
+- The MCP server must run under **Node.js** (not Bun) — Desktop Extensions use `node` as the runtime
+- The pack script stages only `dist/`, `package.json`, `manifest.json`, and production `node_modules` — keeping the bundle small
+- The version sync step ensures `manifest.json` stays in sync with `package.json` across releases
+- Unsigned extensions show as "Disabled" by default — users must enable them in Claude Desktop settings
+
 ## Alternative: npm-publish-tool v2.0.0
 
 [`npm-publish-tool`](https://github.com/nicolo-ribaudo/npm-publish-tool) v2.0.0 is an OIDC-aware alternative to `changeset publish`. It provides:
