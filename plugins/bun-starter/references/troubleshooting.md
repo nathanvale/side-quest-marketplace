@@ -97,6 +97,17 @@ ls -la .husky/
 TF_BUILD=true bun test --recursive
 ```
 
+### Monorepo Issues
+
+| Symptom | Cause | Fix | Config File |
+|---------|-------|-----|-------------|
+| "No packages matched the filter" | Wrong `--filter` position in bun command | Use `bun run --filter '*' build` not `bun --filter '*' run build` | `package.json` scripts |
+| npm auto-corrects bin field on publish | String bin format with scoped name | Use object format: `"bin": { "short-name": "./dist/index.js" }` | `package.json` |
+| Changeset generates for wrong package | Hardcoded `imessage-timeline` in template script | Use dynamic package discovery (see `monorepo.md`) | `.github/scripts/changeset-generate-if-missing.sh` |
+| Package 404 right after publish | npm CDN propagation delay | Wait 2-5 min, verify via dist-tags endpoint | n/a |
+| First scoped publish fails with OIDC | Package must exist before OIDC works | First publish locally: `npm publish --access public --no-provenance` | n/a |
+| Per-package releases not created | Template creates single release | Use `publishedPackages` JSON iteration (see `monorepo.md`) | `.github/workflows/publish.yml` |
+
 ## When to Use `/bun-starter:fix`
 
 Use the fix command when:

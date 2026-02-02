@@ -70,6 +70,7 @@ Determine which category the issue falls into:
 | **Security** | CodeQL, OSV, dependency review, SBOM, vulnerability |
 | **Setup** | template, setup script, placeholders, gh repo create |
 | **Sync** | upstream, template sync, cherry-pick, downstream |
+| **Monorepo** | workspace, packages, filter, monorepo, multi-package |
 
 ### 2. Load Reference Context
 
@@ -85,6 +86,7 @@ Based on the category, read the relevant reference files from the plugin's `refe
 | Security | [security.md](../../references/security.md) |
 | Setup | [setup-script.md](../../references/setup-script.md), [architecture.md](../../references/architecture.md) |
 | Sync | [downstream-sync.md](../../references/downstream-sync.md) |
+| Monorepo | [monorepo.md](../../references/monorepo.md), [ci-cd-pipelines.md](../../references/ci-cd-pipelines.md), [publishing.md](../../references/publishing.md) |
 | Browser automation | [chrome-devtools-workflows.md](../../references/chrome-devtools-workflows.md) _(only when DevTools mode is active)_ |
 
 **Always** also load [troubleshooting.md](../../references/troubleshooting.md) â€” it contains the master routing table.
@@ -185,6 +187,14 @@ Never run bare `changeset` or `bun version:gen` without flags in agent context â
 
 1. Load `references/publishing.md`
 2. Walk through pre-mode entry, versioning, publishing, and exit
+
+### "How do I convert to a monorepo?"
+
+1. Load `references/monorepo.md`
+2. Walk through conversion: root package.json, packages/ structure, changesets config
+3. Critical: Bun filter syntax is `bun run --filter '*' build` (--filter after `run`)
+4. Update CI workflows for workspace commands
+5. Reference `nathanvale/side-quest-runners` as working example
 
 ### "How do I sync template updates?"
 
