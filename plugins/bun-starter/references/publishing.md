@@ -208,3 +208,23 @@ Can be used as a drop-in replacement for the publish step if Changesets' publish
 
 - Ensure `pre.json` exists in `.changeset/` when in pre-mode
 - Use `bun run pre:exit` before publishing stable releases
+
+### Stable publish produces empty package (no dist/)
+
+- `changesets-publish.sh` must run `bun run build` before `bun run release`
+- Without this, `changeset publish` ships whatever is in `dist/` (often nothing)
+- **Fixed in template** — ensure your `changesets-publish.sh` includes the build step
+
+### GitHub release creation fails on workflow re-run
+
+- `git tag` and `gh release create` are not idempotent — they fail if the tag/release already exists
+- **Fix:** Guard both with existence checks (`git rev-parse` for tags, `gh release view` for releases)
+- The pre-release path already had the tag check; stable path and `release.yml` were missing it
+- **Fixed in template** — ensure your `publish.yml` and `release.yml` use the idempotent pattern
+
+### npm bin entry `./` prefix gotcha
+
+- When using `"bin": { "my-cli": "./dist/cli.js" }` the `./` prefix is required
+- Without `./`, npm may fail to resolve the binary on some platforms
+- `publint` does not currently flag this — it's an undocumented footgun
+- Always use `"./dist/cli.js"` not `"dist/cli.js"` in bin entries

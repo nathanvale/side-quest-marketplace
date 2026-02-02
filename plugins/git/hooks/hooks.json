@@ -23,6 +23,26 @@
 						"timeout": 5
 					}
 				]
+			},
+			{
+				"matcher": "Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/git-safety.ts",
+						"timeout": 5
+					}
+				]
+			},
+			{
+				"matcher": "Edit",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/git-safety.ts",
+						"timeout": 5
+					}
+				]
 			}
 		],
 		"PostToolUse": [

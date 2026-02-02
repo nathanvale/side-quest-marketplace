@@ -10,6 +10,22 @@
 
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 
+/** Protected file patterns — blocks Write/Edit to sensitive files */
+const PROTECTED_FILE_PATTERNS: { pattern: RegExp; reason: string }[] = [
+	{
+		pattern: /\.env($|\.)/,
+		reason: ".env files may contain secrets.",
+	},
+	{
+		pattern: /credentials/,
+		reason: "Credential files should not be modified by agents.",
+	},
+	{
+		pattern: /\.git\//,
+		reason: "Direct .git directory modifications are dangerous.",
+	},
+];
+
 /** Destructive patterns that should be blocked */
 const BLOCKED_PATTERNS: { pattern: RegExp; reason: string }[] = [
 	{
@@ -54,6 +70,21 @@ export function checkCommand(command: string): {
 	return { blocked: false };
 }
 
+/**
+ * Check if a file path matches any protected pattern
+ */
+export function checkFileEdit(filePath: string): {
+	blocked: boolean;
+	reason?: string;
+} {
+	for (const { pattern, reason } of PROTECTED_FILE_PATTERNS) {
+		if (pattern.test(filePath)) {
+			return { blocked: true, reason };
+		}
+	}
+	return { blocked: false };
+}
+
 // Main execution
 if (import.meta.main) {
 	try {
@@ -64,12 +95,34 @@ if (import.meta.main) {
 			process.exit(0);
 		}
 
-		// Only check Bash tool
+		const toolInput = input.tool_input as Record<string, unknown> | undefined;
+
+		// Check Write/Edit tools against protected file patterns
+		if (input.tool_name === "Write" || input.tool_name === "Edit") {
+			const filePath = toolInput?.file_path;
+			if (typeof filePath !== "string") {
+				process.exit(0);
+			}
+			const fileResult = checkFileEdit(filePath);
+			if (fileResult.blocked) {
+				const output = {
+					hookSpecificOutput: {
+						hookEventName: "PreToolUse",
+						permissionDecision: "deny",
+						reason: fileResult.reason,
+					},
+				};
+				console.log(JSON.stringify(output));
+				process.exit(2);
+			}
+			process.exit(0);
+		}
+
+		// Only check Bash tool for destructive git commands
 		if (input.tool_name !== "Bash") {
 			process.exit(0);
 		}
 
-		const toolInput = input.tool_input as Record<string, unknown> | undefined;
 		const command = toolInput?.command;
 		if (typeof command !== "string") {
 			process.exit(0);

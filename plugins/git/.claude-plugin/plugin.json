@@ -14,15 +14,21 @@
 		"conventional-commits",
 		"session",
 		"worktree",
-		"safety"
+		"safety",
+		"pr-review",
+		"changelog",
+		"compare"
 	],
 	"license": "MIT",
 	"skills": ["./skills/git-expert"],
 	"commands": [
+		"./commands/changelog.md",
 		"./commands/checkpoint.md",
 		"./commands/commit.md",
+		"./commands/compare.md",
 		"./commands/create-pr.md",
 		"./commands/history.md",
+		"./commands/review-pr.md",
 		"./commands/session-log.md",
 		"./commands/squash.md"
 	]

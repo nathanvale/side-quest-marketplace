@@ -24,7 +24,9 @@ Unified git workflow skill. Routes to the right procedure based on what the user
 | Create PR | [WORKFLOWS.md](WORKFLOWS.md) § PR | `git push -u`, `gh pr create` |
 | Session activity | [WORKFLOWS.md](WORKFLOWS.md) § Session Log | `git log --since="1 hour ago"` |
 | Manage worktrees | [WORKTREE.md](WORKTREE.md) | CLI at `src/worktree/cli.ts` |
-| Compare branches | Decision tree below | `git log main..HEAD`, `git diff main...HEAD` |
+| Review a PR | [WORKFLOWS.md](WORKFLOWS.md) § Review PR | `gh pr view`, `gh pr diff`, `gh api` |
+| Generate changelog | [WORKFLOWS.md](WORKFLOWS.md) § Changelog | `git log`, `git tag`, `git describe` |
+| Compare branches | [WORKFLOWS.md](WORKFLOWS.md) § Compare | `git merge-base`, `git diff`, `git log` |
 
 ## History Exploration Decision Tree
 
@@ -38,6 +40,9 @@ Unified git workflow skill. Routes to the right procedure based on what the user
 | "Show specific commit" | `git show <hash> --stat`, `git show <hash>` |
 | "What branches exist?" | `git branch -a`, `git branch --show-current` |
 | "What did we do this session?" | `git log --oneline --since="1 hour ago"`, `git status` |
+| "Review this PR" | `gh pr view <PR>`, `gh pr diff <PR>`, `gh api .../pulls/<PR>/comments` |
+| "Generate changelog" | `git describe --tags --abbrev=0`, `git log <tag>..HEAD --oneline` |
+| "Compare these branches" | `git merge-base <base> HEAD`, `git diff <base>...HEAD --stat` |
 
 ## Safety Rules
 

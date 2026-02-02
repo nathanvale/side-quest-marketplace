@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { checkCommand } from "./git-safety";
+import { checkCommand, checkFileEdit } from "./git-safety";
 
 describe("checkCommand", () => {
 	test("blocks git push --force", () => {
@@ -82,6 +82,67 @@ describe("checkCommand", () => {
 
 	test("allows git restore specific file", () => {
 		const result = checkCommand("git restore src/index.ts");
+		expect(result.blocked).toBe(false);
+	});
+});
+
+describe("checkFileEdit", () => {
+	test("blocks .env file", () => {
+		const result = checkFileEdit("/project/.env");
+		expect(result.blocked).toBe(true);
+		expect(result.reason).toContain(".env");
+	});
+
+	test("blocks .env.local file", () => {
+		const result = checkFileEdit("/project/.env.local");
+		expect(result.blocked).toBe(true);
+		expect(result.reason).toContain(".env");
+	});
+
+	test("blocks .env.production file", () => {
+		const result = checkFileEdit("/project/.env.production");
+		expect(result.blocked).toBe(true);
+	});
+
+	test("blocks credentials file", () => {
+		const result = checkFileEdit("/home/user/credentials.json");
+		expect(result.blocked).toBe(true);
+		expect(result.reason).toContain("Credential");
+	});
+
+	test("blocks credentials directory file", () => {
+		const result = checkFileEdit("/project/credentials/api-key.txt");
+		expect(result.blocked).toBe(true);
+	});
+
+	test("blocks .git/ directory files", () => {
+		const result = checkFileEdit("/project/.git/config");
+		expect(result.blocked).toBe(true);
+		expect(result.reason).toContain(".git");
+	});
+
+	test("blocks .git/hooks/ files", () => {
+		const result = checkFileEdit("/project/.git/hooks/pre-commit");
+		expect(result.blocked).toBe(true);
+	});
+
+	test("allows regular source files", () => {
+		const result = checkFileEdit("/project/src/index.ts");
+		expect(result.blocked).toBe(false);
+	});
+
+	test("allows package.json", () => {
+		const result = checkFileEdit("/project/package.json");
+		expect(result.blocked).toBe(false);
+	});
+
+	test("allows .gitignore (not inside .git/)", () => {
+		const result = checkFileEdit("/project/.gitignore");
+		expect(result.blocked).toBe(false);
+	});
+
+	test("allows README.md", () => {
+		const result = checkFileEdit("/project/README.md");
 		expect(result.blocked).toBe(false);
 	});
 });

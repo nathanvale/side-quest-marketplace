@@ -15,6 +15,7 @@ Provides intelligent git context, history exploration, smart commit capabilities
 
 **PreToolUse** - Git safety guard:
 - Blocks destructive commands (force push, hard reset, clean -f, checkout ., branch -D)
+- Blocks Write/Edit to protected files (.env, credentials, .git/ directory)
 - Returns deny decision with explanation
 
 **PostToolUse** - Command logger:
@@ -39,6 +40,9 @@ All commands are thin wrappers that delegate to the git-expert skill:
 - `/git:squash` - Squash WIP commits into one conventional commit
 - `/git:checkpoint` - Quick WIP checkpoint commits
 - `/git:create-pr` - Create pull requests with proper formatting
+- `/git:review-pr <number>` - Review a GitHub pull request with inline comments
+- `/git:changelog [version]` - Generate changelog from conventional commits
+- `/git:compare [branch]` - Compare branches with AI summary
 - `/git:history [query]` - Interactive history exploration
 - `/git:session-log` - Show session git activity
 
@@ -49,6 +53,9 @@ Unified skill covering all git workflows. Claude auto-activates for git tasks:
 - "Squash these WIP commits" → Merge-base + reset --soft
 - "What changed recently?" → History exploration
 - "Create a PR" → Push + gh pr create
+- "Review this PR" → Batched review with inline comments
+- "Generate a changelog" → Keep a Changelog from conventional commits
+- "Compare branches" → Diff summary with AI analysis
 - "Set up a worktree" → Worktree management
 
 ## Prerequisites
@@ -119,6 +126,26 @@ Shows commits made and current changes during this session.
 /git:create-pr
 ```
 Analyzes all commits on the branch and creates a PR with proper formatting.
+
+### Review a Pull Request
+```
+/git:review-pr 42
+```
+Fetches PR diff, reviews for bugs/issues, presents findings, and posts a batched review on approval.
+
+### Generate Changelog
+```
+/git:changelog
+/git:changelog 2.1.0
+```
+Groups conventional commits into Keep a Changelog format. Suggests version bump if not specified.
+
+### Compare Branches
+```
+/git:compare
+/git:compare feature/auth
+```
+Shows commit summary, file impact, and AI analysis of differences between current branch and target.
 
 ## License
 

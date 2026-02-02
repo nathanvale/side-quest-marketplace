@@ -46,7 +46,11 @@ Master routing table for diagnosing issues in repos created from `nathanvale/bun
 | OIDC auth fails | Not configured after first publish | Configure at `npmjs.com/package/<pkg>/access` (Trusted Publisher section) | npm settings |
 | OIDC auth fails (2) | npm version too old | Ensure Node 24+ (npm 11.6+) in CI | `.nvmrc` |
 | Version PR not appearing | No pending changesets | Create changeset: `bun version:gen` | `.changeset/` |
+| Version PR not appearing (2) | Workflow lacks write permissions | Enable "Read and write permissions" + "Allow PRs" in Settings → Actions → General | GitHub repo settings |
 | Pre-release leaking to stable | Still in pre-mode | Run `bun run pre:exit` | `.changeset/pre.json` |
+| Stable publish produces empty package | Missing `bun run build` before publish | Add `bun run build` before `bun run release` in `changesets-publish.sh` | `.github/scripts/changesets-publish.sh` |
+| `gh release create` fails on re-run | Tag or release already exists | Guard with `git rev-parse` and `gh release view` checks | `.github/workflows/publish.yml` |
+| `npm warn publish "bin[name]" script name was invalid and removed` | `./` prefix in bin path | Run `npm pkg fix` or remove `./` prefix: use `"dist/cli.js"` not `"./dist/cli.js"` | `package.json` |
 | `bunfig.toml` registry conflict | Bun setup writes registry | Delete registry line from bunfig.toml | `bunfig.toml` |
 | Publish skips (pre-mode active) | Script detects pre.json | Exit pre-mode or use `publish:pre` | `.changeset/pre.json` |
 
@@ -69,6 +73,7 @@ Master routing table for diagnosing issues in repos created from `nathanvale/bun
 | `gh` commands fail | Not authenticated | Run `gh auth login` | n/a |
 | Branch protection fails | Main branch doesn't exist | Push code first, then configure | `scripts/setup.ts` |
 | Placeholders not replaced | Setup didn't complete | Re-run setup or manually replace `{{...}}` in files | `package.json`, `.changeset/config.json` |
+| Changesets can't create version PRs | Workflow permissions not configured | Enable "Read and write permissions" + "Allow PRs" in repo Settings → Actions → General | GitHub repo settings |
 
 ## Quick Diagnostic Commands
 

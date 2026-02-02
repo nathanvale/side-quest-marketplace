@@ -79,3 +79,74 @@ Show what happened during this session.
 2. **Current status**: `git status --porcelain -b`
 3. **Diff summary**: `git diff --stat HEAD~5..HEAD` (adjust range as needed)
 4. **Present** as a clear summary with commits, changes, and uncommitted work
+
+## Review PR
+
+Review a GitHub pull request with inline comments.
+
+1. **Parse PR identifier**: Extract owner/repo/number from argument (number or URL)
+2. **Fetch PR metadata**: `gh pr view <PR> --json title,body,author,state,baseRefName,headRefName,url,additions,deletions`
+3. **Skip if not reviewable**: Abort if state is closed, merged, or draft — inform user
+4. **Fetch annotated diff**: `gh pr diff <PR>` — pipe through awk to add line number annotations for accurate inline comment placement
+5. **Fetch existing comments**: `gh api repos/{owner}/{repo}/pulls/{number}/comments` and `gh api repos/{owner}/{repo}/issues/{number}/comments` — avoid duplicating feedback
+6. **Review the diff** — focus on:
+   - Bugs and logic errors
+   - Missing error handling
+   - API contract changes
+   - Test coverage gaps
+   - Naming inconsistencies
+   - Security concerns
+7. **Present findings** to user with `file:line` references — ask for approval before posting
+8. **On approval**, create batched pending review: `gh api repos/{owner}/{repo}/pulls/{number}/reviews -X POST` with all comments in a single review
+9. **Submit review** with appropriate event: `APPROVE`, `REQUEST_CHANGES`, or `COMMENT`
+
+**Key rules:**
+- Draft → Show → Approve → Post (never post without user approval)
+- Batch all comments into one review (no scattered notifications)
+- Include `file:line` references for every finding
+
+## Changelog
+
+Generate a changelog from conventional commits.
+
+1. **Find last tag**: `git describe --tags --abbrev=0 2>/dev/null` (use all commits if no tags exist)
+2. **Get commits since tag**: `git log <tag>..HEAD --oneline --no-merges`
+3. **Parse conventional commit types** from subjects (feat, fix, refactor, etc.)
+4. **Group into Keep a Changelog sections**:
+   - `feat` → **Added**
+   - `fix` → **Fixed**
+   - `refactor`, `perf` → **Changed**
+   - `revert` → **Removed**
+   - `docs`, `style`, `test`, `build`, `ci`, `chore` → **Other** (or omit if minor)
+5. **Determine version**: If `[version]` argument provided, use it; otherwise suggest next version based on commit types:
+   - Any `BREAKING CHANGE` → major bump
+   - Any `feat` → minor bump
+   - Only `fix`/other → patch bump
+6. **Format as Keep a Changelog**:
+   ```markdown
+   ## [version] - YYYY-MM-DD
+
+   ### Added
+   - Description (commit-hash)
+
+   ### Fixed
+   - Description (commit-hash)
+   ```
+7. **Present to user** for approval
+8. **On approval**, prepend to CHANGELOG.md (create if missing)
+9. **Optionally stage** the file: `git add CHANGELOG.md`
+
+## Compare
+
+Compare current branch against another branch with AI summary.
+
+1. **Determine branches**: Current branch vs `[branch]` argument (default: `main`)
+2. **Find merge-base**: `git merge-base <base> HEAD`
+3. **Show commit summary**: `git log --oneline <base>..HEAD`
+4. **Show file impact**: `git diff <base>...HEAD --stat`
+5. **Show detailed diff** for most-changed files: `git diff <base>...HEAD` (filter to top files by change magnitude)
+6. **Present AI summary**:
+   - What changed (high-level intent across all commits)
+   - Files affected with change magnitude
+   - Any potential conflicts or risks
+   - Ready to merge? (clean diff, tests referenced, etc.)
