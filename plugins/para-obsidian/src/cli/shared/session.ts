@@ -34,7 +34,7 @@
  * @module session
  */
 
-import { color, emphasize } from "@sidequest/core/terminal";
+import { color, emphasize } from "@side-quest/core/terminal";
 import { createCorrelationId } from "../../shared/logger.js";
 
 /**

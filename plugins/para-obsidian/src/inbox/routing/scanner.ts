@@ -8,7 +8,7 @@
  */
 
 import { join, isAbsolute as pathIsAbsolute } from "node:path";
-import { readTextFile } from "@sidequest/core/fs";
+import { readTextFile } from "@side-quest/core/fs";
 import { parseFrontmatter } from "../../frontmatter/parse";
 import { createCorrelationId, routingLogger } from "../../shared/logger";
 import { resolveDestination } from "./resolver";
@@ -75,7 +75,7 @@ export async function scanForRoutableNotes(
 	}
 
 	// Find all markdown files in inbox
-	const { globFiles } = await import("@sidequest/core/glob");
+	const { globFiles } = await import("@side-quest/core/glob");
 	const files = await globFiles("**/*.md", inboxPath);
 
 	if (routingLogger) {

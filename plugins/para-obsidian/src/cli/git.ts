@@ -6,7 +6,7 @@
  * @module cli/git
  */
 
-import { color } from "@sidequest/core/terminal";
+import { color } from "@side-quest/core/terminal";
 import {
 	assertGitRepo,
 	autoCommitChanges,

@@ -9,7 +9,7 @@
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { spawnAndCollect } from "@sidequest/core/spawn";
+import { spawnAndCollect } from "@side-quest/core/spawn";
 import type { InboxEngineConfig } from "../../types";
 import { createInboxEngine } from "../engine";
 import { createTestLLMClient } from "../llm/client";

@@ -7,7 +7,7 @@
  * @module worktree/delete
  */
 
-import { spawnAndCollect } from "@sidequest/core/spawn";
+import { spawnAndCollect } from "@side-quest/core/spawn";
 import { loadOrDetectConfig } from "./config.js";
 import type { DeleteResult } from "./types.js";
 

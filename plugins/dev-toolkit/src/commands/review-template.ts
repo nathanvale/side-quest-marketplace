@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import type { OutputFormat } from "@sidequest/core/formatters";
-import { color } from "@sidequest/core/formatters";
+import type { OutputFormat } from "@side-quest/core/formatters";
+import { color } from "@side-quest/core/formatters";
 
 /**
  * Review a CLI template against the Bun CLI standard

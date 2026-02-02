@@ -10,7 +10,7 @@
  * @module rewrite-links
  */
 import path from "node:path";
-import { readTextFileSync, writeTextFileSync } from "@sidequest/core/fs";
+import { readTextFileSync, writeTextFileSync } from "@side-quest/core/fs";
 
 import { parseFrontmatter, serializeFrontmatter } from "../frontmatter/index";
 import { listMarkdownFiles } from "./shared";

@@ -1,6 +1,6 @@
-# @sidequest/core/mcp API Reference
+# @side-quest/core/mcp API Reference
 
-Complete API reference for `@sidequest/core/mcp`, the Side Quest MCP toolkit with built-in observability.
+Complete API reference for `@side-quest/core/mcp`, the Side Quest MCP toolkit with built-in observability.
 
 ---
 
@@ -8,7 +8,7 @@ Complete API reference for `@sidequest/core/mcp`, the Side Quest MCP toolkit wit
 
 ```bash
 # In a Side Quest plugin
-bun add @sidequest/core
+bun add @side-quest/core
 ```
 
 ---
@@ -31,13 +31,13 @@ import {
   // Observability
   log,
   createCorrelationId,
-} from "@sidequest/core/mcp";
+} from "@side-quest/core/mcp";
 ```
 
 ### CLI Wrapper Imports (for tools that wrap external CLIs)
 
 ```typescript
-import { buildEnhancedPath, spawnSyncCollect } from "@sidequest/core/spawn";
+import { buildEnhancedPath, spawnSyncCollect } from "@side-quest/core/spawn";
 
 // buildEnhancedPath() - Returns PATH with uv, Homebrew, and common tool directories
 // spawnSyncCollect() - Executes command and collects stdout/stderr
@@ -112,7 +112,7 @@ import {
   startServer,
   tool,
   z,
-} from "@sidequest/core/mcp";
+} from "@side-quest/core/mcp";
 
 tool(
   "search",
@@ -189,10 +189,10 @@ startServer("my-plugin", {
 
 ### Zod Schema
 
-Use the re-exported `z` from `@sidequest/core/mcp`:
+Use the re-exported `z` from `@side-quest/core/mcp`:
 
 ```typescript
-import { z } from "@sidequest/core/mcp";
+import { z } from "@side-quest/core/mcp";
 
 const searchSchema = z.object({
   // Required string
@@ -282,7 +282,7 @@ annotations: {
 The `log` object provides methods for each log level:
 
 ```typescript
-import { log } from "@sidequest/core/mcp";
+import { log } from "@side-quest/core/mcp";
 
 // Log with subsystem (second argument)
 log.debug({ cid, details: "..." }, "search");
@@ -296,7 +296,7 @@ log.error({ cid, error: "..." }, "search");
 Generate unique IDs for request tracing:
 
 ```typescript
-import { createCorrelationId } from "@sidequest/core/mcp";
+import { createCorrelationId } from "@side-quest/core/mcp";
 
 const cid = createCorrelationId();  // e.g., "abc123"
 ```
@@ -571,7 +571,7 @@ log.info({ cid, ... }, "api");
 
 ---
 
-## CLI Wrapper Module (@sidequest/core/spawn)
+## CLI Wrapper Module (@side-quest/core/spawn)
 
 For MCP tools that wrap external CLI programs:
 
@@ -580,7 +580,7 @@ For MCP tools that wrap external CLI programs:
 Returns an enhanced PATH that includes common tool locations:
 
 ```typescript
-import { buildEnhancedPath } from "@sidequest/core/spawn";
+import { buildEnhancedPath } from "@side-quest/core/spawn";
 
 const enhancedPath = buildEnhancedPath();
 // Includes: ~/.local/bin (uv), /opt/homebrew/bin, standard PATH
@@ -591,7 +591,7 @@ const enhancedPath = buildEnhancedPath();
 Executes a command and collects stdout/stderr:
 
 ```typescript
-import { spawnSyncCollect } from "@sidequest/core/spawn";
+import { spawnSyncCollect } from "@side-quest/core/spawn";
 
 const result = spawnSyncCollect(
   ["bun", "run", "script.ts", "--arg", value],
@@ -606,8 +606,8 @@ const result = spawnSyncCollect(
 ### Complete CLI Wrapper Example (from Kit)
 
 ```typescript
-import { createCorrelationId, log, tool, z } from "@sidequest/core/mcp";
-import { buildEnhancedPath, spawnSyncCollect } from "@sidequest/core/spawn";
+import { createCorrelationId, log, tool, z } from "@side-quest/core/mcp";
+import { buildEnhancedPath, spawnSyncCollect } from "@side-quest/core/spawn";
 
 tool("my_cli_wrapper", {
   description: "Wraps external CLI tool",
@@ -645,7 +645,7 @@ tool("my_cli_wrapper", {
 
 ## Summary
 
-`@sidequest/core/mcp` provides:
+`@side-quest/core/mcp` provides:
 
 - **startServer()** - Start MCP server with observability
 - **tool()** - Register tools with schemas and handlers
@@ -653,15 +653,15 @@ tool("my_cli_wrapper", {
 - **log** - Hierarchical logging with subsystems
 - **createCorrelationId()** - Request tracing
 
-`@sidequest/core/spawn` provides:
+`@side-quest/core/spawn` provides:
 
 - **buildEnhancedPath()** - Enhanced PATH for CLI discovery
 - **spawnSyncCollect()** - Execute CLI and collect output
 
 **Key patterns:**
 
-1. Import from `@sidequest/core/mcp` for MCP functionality
-2. Import from `@sidequest/core/spawn` for CLI wrappers
+1. Import from `@side-quest/core/mcp` for MCP functionality
+2. Import from `@side-quest/core/spawn` for CLI wrappers
 3. Use correlation IDs for request tracing
 4. Log with subsystems for hierarchical filtering
 5. Support both markdown and JSON response formats

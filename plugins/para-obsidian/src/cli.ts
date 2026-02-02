@@ -7,12 +7,12 @@
  * Mirrors Kit CLI style: subcommands with minimal flags, JSON/MD output.
  */
 
-import { parseArgs } from "@sidequest/core/cli";
+import { parseArgs } from "@side-quest/core/cli";
 import {
 	color,
 	OutputFormat,
 	parseOutputFormat,
-} from "@sidequest/core/terminal";
+} from "@side-quest/core/terminal";
 import {
 	handleCleanBrokenLinks,
 	handleClipper,

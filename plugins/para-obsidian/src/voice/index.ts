@@ -14,7 +14,7 @@ export {
 	parseVtt,
 	type VttCue,
 	type VttParseResult,
-} from "@sidequest/core/vtt";
+} from "@side-quest/core/vtt";
 // Re-export generic utilities from voice-memo
 export {
 	checkFfmpeg,

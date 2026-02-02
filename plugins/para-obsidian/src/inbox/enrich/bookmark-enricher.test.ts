@@ -5,7 +5,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { RateLimiter } from "@sidequest/core/concurrency";
+import { RateLimiter } from "@side-quest/core/concurrency";
 import {
 	enrichBookmarkWithFirecrawl,
 	extractDomain,

@@ -17,4 +17,4 @@
 export {
 	validatePath,
 	validatePathOrDefault,
-} from "@sidequest/core/validation";
+} from "@side-quest/core/validation";

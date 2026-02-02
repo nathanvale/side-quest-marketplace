@@ -1,4 +1,4 @@
-import { readTextFile, sha256, writeTextFile } from "@sidequest/core/fs";
+import { readTextFile, sha256, writeTextFile } from "@side-quest/core/fs";
 import type { Manifest, ManifestEntry } from "./types";
 
 export class ManifestManager {

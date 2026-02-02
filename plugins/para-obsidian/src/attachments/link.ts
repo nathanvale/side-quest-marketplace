@@ -21,7 +21,7 @@ import {
 	readDir,
 	readTextFileSync,
 	writeTextFileSync,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 
 import { parseFrontmatter, serializeFrontmatter } from "../frontmatter/index";
 import { resolveVaultPath } from "../shared/fs";

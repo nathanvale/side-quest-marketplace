@@ -6,8 +6,8 @@
  * @module cli/create
  */
 
-import { parseKeyValuePairs } from "@sidequest/core/cli";
-import { emphasize } from "@sidequest/core/terminal";
+import { parseKeyValuePairs } from "@side-quest/core/cli";
+import { emphasize } from "@side-quest/core/terminal";
 import { DEFAULT_AVAILABLE_MODELS, DEFAULT_MODEL } from "../config/defaults";
 import type { ParaObsidianConfig } from "../config/index";
 import { updateFrontmatterFile } from "../frontmatter/index";

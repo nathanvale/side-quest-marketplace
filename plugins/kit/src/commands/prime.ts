@@ -6,11 +6,11 @@
  */
 
 import { join, resolve } from "node:path";
-import { getFileAgeHours, getFileSizeMB } from "@sidequest/core/fs";
+import { getFileAgeHours, getFileSizeMB } from "@side-quest/core/fs";
 import {
 	ensureCommandAvailable,
 	spawnWithTimeout,
-} from "@sidequest/core/spawn";
+} from "@side-quest/core/spawn";
 import { color, OutputFormat } from "../formatters/output";
 
 interface IndexStats {

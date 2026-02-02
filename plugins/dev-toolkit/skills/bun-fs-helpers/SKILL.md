@@ -1,11 +1,11 @@
 ---
 name: bun-fs-helpers
-description: Pure Bun-native filesystem utilities from @sidequest/core/fs. Use when you need command-injection-safe filesystem operations, prefer Bun over node:fs, or want token-efficient fs helpers. All functions use Bun.spawn, Bun.file(), or Bun.write() - no node:fs dependencies.
+description: Pure Bun-native filesystem utilities from @side-quest/core/fs. Use when you need command-injection-safe filesystem operations, prefer Bun over node:fs, or want token-efficient fs helpers. All functions use Bun.spawn, Bun.file(), or Bun.write() - no node:fs dependencies.
 ---
 
 # Bun Filesystem Helpers
 
-Pure Bun-native filesystem utilities from `@sidequest/core/fs` - zero node:fs dependencies, command-injection safe.
+Pure Bun-native filesystem utilities from `@side-quest/core/fs` - zero node:fs dependencies, command-injection safe.
 
 ## When to Use
 
@@ -19,7 +19,7 @@ Pure Bun-native filesystem utilities from `@sidequest/core/fs` - zero node:fs de
 ### File Existence
 
 ```typescript
-import { pathExists, pathExistsSync } from "@sidequest/core/fs";
+import { pathExists, pathExistsSync } from "@side-quest/core/fs";
 
 // Async
 if (await pathExists("/path/to/file")) { }
@@ -33,7 +33,7 @@ if (pathExistsSync("/path/to/file")) { }
 ### Reading Files
 
 ```typescript
-import { readTextFile, readTextFileSync, readJsonFile, readJsonFileSync } from "@sidequest/core/fs";
+import { readTextFile, readTextFileSync, readJsonFile, readJsonFileSync } from "@side-quest/core/fs";
 
 // Async text
 const content = await readTextFile("/path/to/file.txt");
@@ -53,7 +53,7 @@ const data = readJsonFileSync<MyType>("/path/to/data.json");
 ### Writing Files
 
 ```typescript
-import { writeTextFile, writeTextFileSync, writeJsonFile, writeJsonFileSync } from "@sidequest/core/fs";
+import { writeTextFile, writeTextFileSync, writeJsonFile, writeJsonFileSync } from "@side-quest/core/fs";
 
 // Async text
 await writeTextFile("/path/to/file.txt", "content");
@@ -73,7 +73,7 @@ writeJsonFileSync("/path/to/data.json", { foo: "bar" }, 2);
 ### Directory Operations
 
 ```typescript
-import { ensureDir, ensureDirSync, readDir, readDirAsync } from "@sidequest/core/fs";
+import { ensureDir, ensureDirSync, readDir, readDirAsync } from "@side-quest/core/fs";
 
 // Create directory (recursive)
 await ensureDir("/path/to/nested/dir");
@@ -89,7 +89,7 @@ const files = await readDirAsync("/path/to/dir");  // Async
 ### File Operations
 
 ```typescript
-import { copyFile, moveFile, rename, unlink, unlinkSync } from "@sidequest/core/fs";
+import { copyFile, moveFile, rename, unlink, unlinkSync } from "@side-quest/core/fs";
 
 // Copy file
 await copyFile("/source.txt", "/dest.txt");
@@ -110,7 +110,7 @@ unlinkSync("/path/to/file.txt");
 ### File Stats
 
 ```typescript
-import { stat } from "@sidequest/core/fs";
+import { stat } from "@side-quest/core/fs";
 
 const stats = await stat("/path/to/file.txt");
 console.log(stats.size);      // File size in bytes
@@ -124,7 +124,7 @@ console.log(stats.mtimeMs);   // Last modified timestamp
 ### Hashing
 
 ```typescript
-import { sha256, sha256File, fastHash } from "@sidequest/core/fs";
+import { sha256, sha256File, fastHash } from "@side-quest/core/fs";
 
 // Hash string
 const hash = sha256("content");  // Hex string (64 chars)
@@ -141,7 +141,7 @@ const hash = fastHash("content");  // bigint or number
 ### Deep Equality
 
 ```typescript
-import { deepEquals } from "@sidequest/core/fs";
+import { deepEquals } from "@side-quest/core/fs";
 
 const equal = deepEquals(obj1, obj2);           // Loose mode
 const equal = deepEquals(obj1, obj2, true);     // Strict mode
@@ -173,8 +173,8 @@ mkdirSync("/path", { recursive: true });
 readFileSync("/path", "utf8");
 writeFileSync("/path", "content", "utf8");
 
-// After (@sidequest/core/fs)
-import { pathExistsSync, ensureDirSync, readTextFileSync, writeTextFileSync } from "@sidequest/core/fs";
+// After (@side-quest/core/fs)
+import { pathExistsSync, ensureDirSync, readTextFileSync, writeTextFileSync } from "@side-quest/core/fs";
 
 pathExistsSync("/path");
 ensureDirSync("/path");
@@ -200,7 +200,7 @@ writeTextFileSync("/path", "content");
 ### Atomic File Updates
 
 ```typescript
-import { pathExistsSync, writeTextFileSync, rename } from "@sidequest/core/fs";
+import { pathExistsSync, writeTextFileSync, rename } from "@side-quest/core/fs";
 
 // Write to temp file, then atomically rename
 const tempPath = `${targetPath}.tmp`;
@@ -211,7 +211,7 @@ await rename(tempPath, targetPath);  // POSIX guarantees atomicity
 ### Safe File Modification with TOCTOU Protection
 
 ```typescript
-import { stat, readTextFileSync, writeTextFileSync } from "@sidequest/core/fs";
+import { stat, readTextFileSync, writeTextFileSync } from "@side-quest/core/fs";
 
 // Get pre-modification stats
 const preStat = await stat(filePath);
@@ -232,7 +232,7 @@ writeTextFileSync(filePath, modified);
 ### Idempotent Processing with Content Hashing
 
 ```typescript
-import { sha256File, pathExistsSync } from "@sidequest/core/fs";
+import { sha256File, pathExistsSync } from "@side-quest/core/fs";
 
 const hash = await sha256File(sourceFile);
 const processedMarker = `.processed/${hash}`;

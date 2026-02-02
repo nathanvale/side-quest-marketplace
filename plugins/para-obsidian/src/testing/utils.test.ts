@@ -5,7 +5,7 @@
  */
 import { afterEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { pathExistsSync } from "@sidequest/core/fs";
+import { pathExistsSync } from "@side-quest/core/fs";
 import {
 	createTestContext,
 	createTestSuggestion,

@@ -15,8 +15,8 @@
  * - 2: Blocking error (any type errors found, shown to Claude for follow-up)
  */
 
-import { hasChangedFiles, isWorkspaceProject } from "@sidequest/core/git";
-import { spawnWithTimeout } from "@sidequest/core/spawn";
+import { hasChangedFiles, isWorkspaceProject } from "@side-quest/core/git";
+import { spawnWithTimeout } from "@side-quest/core/spawn";
 import { TSC_SUPPORTED_EXTENSIONS } from "./shared/constants";
 import { createCorrelationId, initLogger, tscLogger } from "./shared/logger";
 import { hasTscConfig, logMissingTscConfigHint } from "./shared/tsc-config";

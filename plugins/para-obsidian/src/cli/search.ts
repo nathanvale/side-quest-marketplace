@@ -6,7 +6,7 @@
  * @module cli/search
  */
 
-import { emphasize } from "@sidequest/core/terminal";
+import { emphasize } from "@side-quest/core/terminal";
 import { filterByFrontmatter, searchText } from "../search/index";
 import { buildIndex, loadIndex, saveIndex } from "../search/indexer";
 import { semanticSearch } from "../search/semantic";

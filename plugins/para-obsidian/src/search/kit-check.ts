@@ -7,7 +7,7 @@
  *
  * @module kit-check
  */
-import { spawnAndCollect } from "@sidequest/core/spawn";
+import { spawnAndCollect } from "@side-quest/core/spawn";
 
 /**
  * Result of checking Kit installation status.

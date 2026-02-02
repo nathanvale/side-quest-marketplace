@@ -9,9 +9,9 @@
  */
 
 import { basename, dirname } from "node:path";
-import { pathExistsSync } from "@sidequest/core/fs";
-import { formatMarkdown } from "@sidequest/core/validate/reporter";
-import { validatePlugin } from "@sidequest/core/validate/runner";
+import { pathExistsSync } from "@side-quest/core/fs";
+import { formatMarkdown } from "@sidequest/marketplace-core/validate/reporter";
+import { validatePlugin } from "@sidequest/marketplace-core/validate/runner";
 
 // --- Types ---
 

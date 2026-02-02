@@ -14,7 +14,7 @@ import {
 	pathExistsSync,
 	readTextFileSync,
 	writeTextFileSyncAtomic,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 
 /**
  * Metadata about a processed voice memo.

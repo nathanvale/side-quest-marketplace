@@ -4,7 +4,7 @@
  * @module cli/frontmatter/migrate
  */
 
-import { emphasize } from "@sidequest/core/terminal";
+import { emphasize } from "@side-quest/core/terminal";
 import {
 	migrateAllTemplateVersions,
 	migrateTemplateVersion,

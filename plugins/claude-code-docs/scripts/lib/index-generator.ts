@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { writeTextFile } from "@sidequest/core/fs";
+import { writeTextFile } from "@side-quest/core/fs";
 import type { ManifestEntry } from "./types";
 
 export class IndexGenerator {

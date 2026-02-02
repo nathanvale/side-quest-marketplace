@@ -4,8 +4,8 @@
  * Response formatters for MCP tool output in markdown and JSON formats.
  */
 
-import { formatBytes } from "@sidequest/core/formatters";
-import { capitalize, truncate } from "@sidequest/core/utils";
+import { formatBytes } from "@side-quest/core/formatters";
+import { capitalize, truncate } from "@side-quest/core/utils";
 import type { ASTSearchResult } from "./ast/types.js";
 import type {
 	ErrorResult,

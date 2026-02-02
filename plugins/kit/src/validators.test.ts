@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { expandTilde, normalizePath } from "@sidequest/core/fs";
+import { expandTilde, normalizePath } from "@side-quest/core/fs";
 import {
 	isRegexSafe,
 	isValidGlob,
 	validateGlob,
 	validateRegex,
-} from "@sidequest/core/validation";
+} from "@side-quest/core/validation";
 import {
 	validateAstSearchInputs,
 	validateFileContentInputs,

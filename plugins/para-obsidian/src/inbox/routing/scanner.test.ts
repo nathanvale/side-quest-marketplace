@@ -53,7 +53,7 @@ const mockGlobFiles = async (
 	return findMdFiles(cwd);
 };
 
-mock.module("@sidequest/core/glob", () => ({
+mock.module("@side-quest/core/glob", () => ({
 	globFiles: mockGlobFiles,
 }));
 

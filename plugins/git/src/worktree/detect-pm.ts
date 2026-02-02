@@ -8,7 +8,7 @@
  */
 
 import path from "node:path";
-import { pathExistsSync } from "@sidequest/core/fs";
+import { pathExistsSync } from "@side-quest/core/fs";
 
 /** Lockfile-to-install-command mapping, ordered by priority. */
 const LOCKFILE_MAP: ReadonlyArray<readonly [string, string]> = [

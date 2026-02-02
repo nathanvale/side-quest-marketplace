@@ -6,7 +6,7 @@
  * @module teams-scrape/parser
  */
 
-import { sha256 } from "@sidequest/core/hash";
+import { sha256 } from "@side-quest/core/hash";
 import type { TeamsMessage } from "./types.js";
 
 /**

@@ -12,7 +12,7 @@
  * @module cli/config
  */
 
-import { emphasize } from "@sidequest/core/terminal";
+import { emphasize } from "@side-quest/core/terminal";
 import { listTemplateVersions } from "../config/index";
 import { listAreas } from "../search/indexer";
 import { getTemplate, getTemplateFields } from "../templates/index";

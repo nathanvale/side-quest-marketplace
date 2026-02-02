@@ -15,7 +15,7 @@ import {
 	Transaction as CoreTransaction,
 	type TransactionResult as CoreTransactionResult,
 	executeTransaction as coreExecuteTransaction,
-} from "@sidequest/core/concurrency";
+} from "@side-quest/core/concurrency";
 import { observe } from "./instrumentation.js";
 import { txLogger } from "./logger.js";
 

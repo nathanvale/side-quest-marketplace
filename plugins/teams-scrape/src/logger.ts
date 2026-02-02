@@ -6,7 +6,7 @@
  * @module teams-scrape/logger
  */
 
-import { createPluginLogger } from "@sidequest/core/logging";
+import { createPluginLogger } from "@side-quest/core/logging";
 
 /**
  * Plugin logger configuration with subsystems for different components.

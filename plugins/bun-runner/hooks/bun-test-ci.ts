@@ -13,7 +13,7 @@
  * Output: Aggregated test results sent to stderr for Claude to see
  */
 
-import { getChangedFiles } from "@sidequest/core/git";
+import { getChangedFiles } from "@side-quest/core/git";
 import { TEST_FILE_EXTENSIONS } from "./shared/constants.js";
 import {
 	createCorrelationId,

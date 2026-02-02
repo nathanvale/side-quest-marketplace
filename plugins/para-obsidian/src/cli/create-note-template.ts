@@ -8,7 +8,7 @@
  */
 import path from "node:path";
 import { confirm } from "@inquirer/prompts";
-import { pathExists, writeTextFile } from "@sidequest/core/fs";
+import { pathExists, writeTextFile } from "@side-quest/core/fs";
 import type { ParaObsidianConfig } from "../config";
 import { generateTemplate } from "../templates/generator";
 import { validateTemplate } from "../templates/validator";

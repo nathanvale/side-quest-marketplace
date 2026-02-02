@@ -11,7 +11,7 @@
 import {
 	parseFrontmatter as coreParseFrontmatter,
 	serializeFrontmatter as coreSerializeFrontmatter,
-} from "@sidequest/core/obsidian";
+} from "@sidequest/marketplace-core/obsidian";
 
 import type { FrontmatterParseResult } from "./types";
 

@@ -7,7 +7,7 @@
  * Aggregates all logged durationMs values from ~/.claude/logs/*.jsonl
  */
 
-import { getGlobalMetricsCollector } from "@sidequest/core/logging";
+import { getGlobalMetricsCollector } from "@side-quest/core/logging";
 
 async function main() {
 	const collector = getGlobalMetricsCollector();

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { OutputFormat } from "@sidequest/core/formatters";
-import { color } from "@sidequest/core/formatters";
+import type { OutputFormat } from "@side-quest/core/formatters";
+import { color } from "@side-quest/core/formatters";
 
 /**
  * Create a new CLI template with all Bun CLI patterns
@@ -137,12 +137,12 @@ function generateCliTemplate(name: string): string {
  * Follows the Bun CLI standard: supports --flag value, --flag=value, --flag formats.
  */
 
-import { parseArgs } from "@sidequest/core/cli";
+import { parseArgs } from "@side-quest/core/cli";
 import {
 	color,
 	OutputFormat,
 	parseOutputFormat,
-} from "@sidequest/core/formatters";
+} from "@side-quest/core/formatters";
 
 /**
  * Print CLI usage information
@@ -231,7 +231,7 @@ main();
  */
 function generateTestTemplate(): string {
 	return `import { describe, expect, test } from "bun:test";
-import { parseArgs } from "@sidequest/core/cli";
+import { parseArgs } from "@side-quest/core/cli";
 
 describe("CLI argument parsing", () => {
 	test("parses commands", () => {

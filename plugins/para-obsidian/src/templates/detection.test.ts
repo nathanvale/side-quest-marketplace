@@ -4,7 +4,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { writeTextFile } from "@sidequest/core/fs";
+import { writeTextFile } from "@side-quest/core/fs";
 import { createTestVault, useTestVaultCleanup } from "../testing/utils";
 import { detectTemplate } from "./detection";
 

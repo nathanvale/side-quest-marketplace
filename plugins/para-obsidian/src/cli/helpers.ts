@@ -6,7 +6,7 @@
  * @module cli-helpers
  */
 
-import { parseArgOverrides as coreParseArgOverrides } from "@sidequest/core/cli";
+import { parseArgOverrides as coreParseArgOverrides } from "@side-quest/core/cli";
 
 /**
  * Parse --arg flags into key=value overrides.

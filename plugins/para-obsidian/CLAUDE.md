@@ -263,7 +263,7 @@ para-obsidian/
    - Debug tooling: `src/debug-llm.ts` for testing LLM classification chain
 
 2. **MCP Server** (`mcp/index.ts`)
-   - 20+ tools via `@sidequest/core/mcp`
+   - 20+ tools via `@side-quest/core/mcp`
    - Tool modules register via side-effect imports
    - Tool naming: `mcp__para-obsidian_para-obsidian__<tool_name>`
 

@@ -13,8 +13,11 @@
  * Output: Test results sent to stderr for Claude to see
  */
 
-import { isFileInRepo } from "@sidequest/core/git";
-import { extractFilePaths, parseHookInput } from "@sidequest/core/hooks";
+import { isFileInRepo } from "@side-quest/core/git";
+import {
+	extractFilePaths,
+	parseHookInput,
+} from "@sidequest/marketplace-core/hooks";
 import { TEST_FILE_EXTENSIONS } from "./shared/constants.js";
 import {
 	createCorrelationId,

@@ -4,7 +4,7 @@ import {
 	pathExistsSync,
 	readJsonFileSync,
 	writeJsonFileSync,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 
 const CLAUDE_CONFIG_PATH = join(homedir(), ".claude.json");
 

@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { access, constants } from "node:fs/promises";
 import { join } from "node:path";
-import { pathExists, readTextFile } from "@sidequest/core/fs";
+import { pathExists, readTextFile } from "@side-quest/core/fs";
 import { createTestVault, useTestVaultCleanup } from "../testing/utils";
 import { createTemplate } from "./create";
 

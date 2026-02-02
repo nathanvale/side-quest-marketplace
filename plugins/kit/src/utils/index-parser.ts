@@ -6,7 +6,7 @@
  */
 
 import { dirname, join, resolve } from "node:path";
-import { findUpSync, pathExistsSync } from "@sidequest/core/fs";
+import { findUpSync, pathExistsSync } from "@side-quest/core/fs";
 
 /**
  * Symbol definition from Kit CLI index

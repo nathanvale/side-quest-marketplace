@@ -4,7 +4,7 @@ import {
 	createTempDir,
 	pathExistsSync,
 	removeDirSync,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 import {
 	// Logger
 	createCorrelationId,

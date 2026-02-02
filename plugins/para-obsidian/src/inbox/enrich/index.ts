@@ -10,7 +10,7 @@
  */
 
 // Re-export RateLimiter from core for convenience
-export { RateLimiter } from "@sidequest/core/concurrency";
+export { RateLimiter } from "@side-quest/core/concurrency";
 // Core enrichment functions
 export {
 	enrichBookmarkWithFirecrawl,

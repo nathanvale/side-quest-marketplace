@@ -7,7 +7,7 @@
  * @module worktree/list
  */
 
-import { spawnAndCollect } from "@sidequest/core/spawn";
+import { spawnAndCollect } from "@side-quest/core/spawn";
 import type { WorktreeInfo } from "./types.js";
 
 /**

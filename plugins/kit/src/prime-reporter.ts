@@ -7,11 +7,11 @@
  * using Bun's built-in color support for ADHD-friendly output.
  */
 
-import { getFileAgeHours, getFileSizeMB } from "@sidequest/core/fs";
+import { getFileAgeHours, getFileSizeMB } from "@side-quest/core/fs";
 import {
 	ensureCommandAvailable,
 	spawnWithTimeout,
-} from "@sidequest/core/spawn";
+} from "@side-quest/core/spawn";
 
 // ANSI color codes for terminal output
 const colors = {

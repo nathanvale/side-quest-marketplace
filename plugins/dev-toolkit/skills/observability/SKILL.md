@@ -1,12 +1,12 @@
 ---
 name: observability
-description: Best practices for structured logging, correlation IDs, performance metrics, and debugging in Bun applications using @sidequest/core/logging and LogTape. Use when implementing logging, setting up observability, debugging production issues, tracking performance metrics, adding correlation IDs, configuring subsystem loggers, or working with JSONL log analysis. Covers plugin logger factory, hierarchical categories, log levels, metrics collection, and operational debugging workflows.
+description: Best practices for structured logging, correlation IDs, performance metrics, and debugging in Bun applications using @side-quest/core/logging and LogTape. Use when implementing logging, setting up observability, debugging production issues, tracking performance metrics, adding correlation IDs, configuring subsystem loggers, or working with JSONL log analysis. Covers plugin logger factory, hierarchical categories, log levels, metrics collection, and operational debugging workflows.
 allowed-tools: Read, Grep, Glob
 ---
 
 # Observability
 
-Production-grade logging, metrics, and debugging patterns using @sidequest/core/logging (LogTape + JSONL).
+Production-grade logging, metrics, and debugging patterns using @side-quest/core/logging (LogTape + JSONL).
 
 ## Quick Navigation
 
@@ -59,7 +59,7 @@ Production-grade logging, metrics, and debugging patterns using @sidequest/core/
 **Purpose:** Link related log entries across subsystems for request tracing.
 
 ```typescript
-import { createCorrelationId } from "@sidequest/core/logging";
+import { createCorrelationId } from "@side-quest/core/logging";
 
 const cid = createCorrelationId(); // "a1b2c3d4" (8 chars)
 
@@ -78,14 +78,14 @@ executeLogger.info`Note created cid=${cid}`;
 
 ### Factory Pattern
 
-**ALWAYS use `createPluginLogger()` from `@sidequest/core/logging`:**
+**ALWAYS use `createPluginLogger()` from `@side-quest/core/logging`:**
 
 ```typescript
 // plugins/my-plugin/src/logger.ts
 import {
   createCorrelationId,
   createPluginLogger,
-} from "@sidequest/core/logging";
+} from "@side-quest/core/logging";
 
 const {
   initLogger,
@@ -459,7 +459,7 @@ grep 'cid=a1b2c3d4' ~/.claude/logs/my-plugin.jsonl | \
 **`MetricsCollector`** aggregates durationMs from logs automatically:
 
 ```typescript
-import { MetricsCollector } from "@sidequest/core/logging";
+import { MetricsCollector } from "@side-quest/core/logging";
 
 // In Stop hook or session end
 const collector = new MetricsCollector();
@@ -777,12 +777,12 @@ plugins/my-plugin/
 ### Key Imports
 
 ```typescript
-// Always import from @sidequest/core/logging
+// Always import from @side-quest/core/logging
 import {
   createCorrelationId,
   createPluginLogger,
   MetricsCollector,
-} from "@sidequest/core/logging";
+} from "@side-quest/core/logging";
 ```
 
 ### Checklist: Adding Logging to a Plugin

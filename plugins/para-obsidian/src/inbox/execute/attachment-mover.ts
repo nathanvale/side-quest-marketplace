@@ -15,7 +15,7 @@ import {
 	ensureDirSync,
 	pathExistsSync,
 	unlink,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 import type { executeLogger } from "../../shared/logger";
 import {
 	generateSmartAttachmentName,

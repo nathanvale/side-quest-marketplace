@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { formatCurrency } from "@sidequest/core/formatters";
+import { formatCurrency } from "@side-quest/core/formatters";
 import { calculatePricing, GUEST_PRICES } from "./calculator";
 
 describe("formatCurrency", () => {

@@ -11,13 +11,13 @@
  * Requires X_BEARER_TOKEN environment variable.
  */
 
-import { startServer, tool, z } from "@sidequest/core/mcp";
+import { startServer, tool, z } from "@side-quest/core/mcp";
 import {
 	createLoggerAdapter,
 	type ResponseFormat,
 	setMcpLogger,
 	wrapToolHandler,
-} from "@sidequest/core/mcp-response";
+} from "@side-quest/core/mcp-response";
 import { createXApiClient } from "../src/client";
 import {
 	formatReplies,

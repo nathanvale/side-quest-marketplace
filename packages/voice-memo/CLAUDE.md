@@ -207,8 +207,8 @@ dedupeConsecutiveLines(text: string): string
 ## Dependencies
 
 **Runtime:**
-- `@sidequest/core` - Shared utilities (workspace dependency)
-  - `@sidequest/core/formatters` - Text deduplication
+- `@side-quest/core` - Shared utilities (workspace dependency)
+  - `@side-quest/core/formatters` - Text deduplication
 
 **External Tools (optional):**
 - `parakeet-mlx` - Fast local transcription (preferred)
@@ -262,6 +262,6 @@ export { formatLogEntry, formatWikilinkLogEntry } from "./formatter.js";
 
 - Inherits TypeScript config from monorepo root
 - Inherits Biome config from monorepo root
-- Uses `workspace:*` protocol for `@sidequest/core`
+- Uses `workspace:*` protocol for `@side-quest/core`
 - No direct dependencies on para-obsidian (fully decoupled)
 - No LLM dependencies - pure audio transcription

@@ -1,6 +1,6 @@
 ---
 description: Squash WIP commits into one conventional commit
-model: claude-sonnet-4-5-20250929
+model: sonnet
 allowed-tools: Bash(git log:*), Bash(git diff:*), Bash(git status:*), Bash(git reset:*), Bash(git add:*), Bash(git commit:*), Bash(git merge-base:*), Bash(git branch:*)
 argument-hint: [target-branch]
 ---

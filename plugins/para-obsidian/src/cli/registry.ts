@@ -9,7 +9,7 @@
  */
 
 import { confirm } from "@inquirer/prompts";
-import { color, emphasize } from "@sidequest/core/terminal";
+import { color, emphasize } from "@side-quest/core/terminal";
 import { createRegistry } from "../inbox/registry/processed-registry";
 import type { CommandContext, CommandResult } from "./types";
 

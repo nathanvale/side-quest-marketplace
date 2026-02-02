@@ -1,11 +1,11 @@
 ---
 name: mcp-development
-description: Build production-grade MCP (Model Context Protocol) servers with observability, correlation ID tracing, and dual logging. Use when creating new MCP servers, adding tools to existing servers, implementing file logging, debugging MCP issues, wrapping CLI tools with spawnSyncCollect, or following Side Quest marketplace patterns. Covers @sidequest/core/mcp declarative API, @sidequest/core/spawn CLI wrapper patterns, Zod schemas, Bun runtime, and 9 gold standard patterns validated across Kit plugin (18 tools). Includes error handling, response format switching, MCP annotations, and graceful degradation.
+description: Build production-grade MCP (Model Context Protocol) servers with observability, correlation ID tracing, and dual logging. Use when creating new MCP servers, adding tools to existing servers, implementing file logging, debugging MCP issues, wrapping CLI tools with spawnSyncCollect, or following Side Quest marketplace patterns. Covers @side-quest/core/mcp declarative API, @side-quest/core/spawn CLI wrapper patterns, Zod schemas, Bun runtime, and 9 gold standard patterns validated across Kit plugin (18 tools). Includes error handling, response format switching, MCP annotations, and graceful degradation.
 ---
 
 # MCP Development Skill
 
-Build production-grade MCP servers using `@sidequest/core/mcp` and Bun.
+Build production-grade MCP servers using `@side-quest/core/mcp` and Bun.
 
 ---
 
@@ -20,7 +20,7 @@ Create `mcp/index.ts`:
 
 ```typescript
 #!/usr/bin/env bun
-import { createCorrelationId, log, startServer, tool, z } from "@sidequest/core/mcp";
+import { createCorrelationId, log, startServer, tool, z } from "@side-quest/core/mcp";
 
 tool("hello", {
   description: "A simple greeting tool",
@@ -175,7 +175,7 @@ startServer("my-plugin", {
 For tools wrapping external CLIs:
 
 ```typescript
-import { buildEnhancedPath, spawnSyncCollect } from "@sidequest/core/spawn";
+import { buildEnhancedPath, spawnSyncCollect } from "@side-quest/core/spawn";
 
 const result = spawnSyncCollect(
   ["bun", "run", `${pluginRoot}/src/cli.ts`, "search", query],
@@ -292,7 +292,7 @@ describe("my-server", () => {
 - @./references/kit-case-study.md — Kit's 18-tool production implementation
 
 **API:**
-- @./references/core-mcp-api.md — `@sidequest/core/mcp` + `@sidequest/core/spawn`
+- @./references/core-mcp-api.md — `@side-quest/core/mcp` + `@side-quest/core/spawn`
 - @./references/error-handling.md — Error taxonomy and recovery strategies
 - @./references/mcp-protocol.md — MCP protocol and marketplace conventions
 
@@ -304,7 +304,7 @@ describe("my-server", () => {
 
 ## Summary
 
-1. **Import:** `tool`, `startServer`, `log`, `createCorrelationId`, `z` from `@sidequest/core/mcp`
+1. **Import:** `tool`, `startServer`, `log`, `createCorrelationId`, `z` from `@side-quest/core/mcp`
 2. **Register:** Tools with Zod schemas and annotations
 3. **Log:** With subsystems — `log.info(data, "subsystem")`
 4. **Trace:** Correlation IDs on every log entry

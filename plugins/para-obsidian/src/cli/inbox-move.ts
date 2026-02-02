@@ -9,8 +9,8 @@
 
 import { join } from "node:path";
 import { confirm } from "@inquirer/prompts";
-import { isDirectorySync } from "@sidequest/core/fs";
-import { emphasize } from "@sidequest/core/terminal";
+import { isDirectorySync } from "@side-quest/core/fs";
+import { emphasize } from "@side-quest/core/terminal";
 import type { RoutingContext } from "../inbox/routing";
 import { moveNote, scanForRoutableNotes } from "../inbox/routing";
 import {

@@ -16,16 +16,16 @@
  * - JSONL file logging (for post-mortem debugging)
  */
 
-import { formatBytes } from "@sidequest/core/formatters";
+import { formatBytes } from "@side-quest/core/formatters";
 import {
 	createCorrelationId,
 	log,
 	startServer,
 	tool,
 	z,
-} from "@sidequest/core/mcp";
-import { wrapToolHandler } from "@sidequest/core/mcp-response";
-import { buildEnhancedPath, spawnSyncCollect } from "@sidequest/core/spawn";
+} from "@side-quest/core/mcp";
+import { wrapToolHandler } from "@side-quest/core/mcp-response";
+import { buildEnhancedPath, spawnSyncCollect } from "@side-quest/core/spawn";
 import {
 	executeAstSearch,
 	executeIndexFind,

@@ -12,7 +12,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { color } from "@sidequest/core/terminal";
+import { color } from "@side-quest/core/terminal";
 import { generateWebClipperJson } from "../clipper/converter";
 import type { ParaObsidianConfig } from "../config/index";
 import { generateTemplate } from "../templates/generator";

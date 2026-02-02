@@ -9,8 +9,8 @@ import {
 	pathExistsSync,
 	readTextFileSync,
 	writeTextFileSync,
-} from "@sidequest/core/fs";
-import { emphasize } from "@sidequest/core/terminal";
+} from "@side-quest/core/fs";
+import { emphasize } from "@side-quest/core/terminal";
 import {
 	applyVersionPlan,
 	planTemplateVersionBump,

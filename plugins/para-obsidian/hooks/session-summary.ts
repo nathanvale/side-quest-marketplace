@@ -8,7 +8,7 @@
  * durationMs from log entries. Also checks SLO breaches.
  */
 
-import { MetricsCollector } from "@sidequest/core/logging";
+import { MetricsCollector } from "@side-quest/core/logging";
 import {
 	checkSLOBreach,
 	recordSLOEvent,

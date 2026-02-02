@@ -6,13 +6,13 @@
 
 import { randomUUID } from "node:crypto";
 import { getLogger } from "@logtape/logtape";
-import { parseKeyValuePairs } from "@sidequest/core/cli";
-import { tool, z } from "@sidequest/core/mcp";
+import { parseKeyValuePairs } from "@side-quest/core/cli";
+import { tool, z } from "@side-quest/core/mcp";
 import {
 	createLoggerAdapter,
 	ResponseFormat,
 	wrapToolHandler,
-} from "@sidequest/core/mcp-response";
+} from "@side-quest/core/mcp-response";
 import { parseDirs } from "../../mcp/utils";
 import { loadConfig } from "../config/index";
 import {

@@ -6,7 +6,7 @@
  *
  * @module links/shared
  */
-import { globFilesSync } from "@sidequest/core/glob";
+import { globFilesSync } from "@side-quest/core/glob";
 
 /**
  * Recursively lists all Markdown files in a directory.

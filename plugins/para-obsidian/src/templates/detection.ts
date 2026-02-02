@@ -9,7 +9,7 @@
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { pathExists } from "@sidequest/core/fs";
+import { pathExists } from "@side-quest/core/fs";
 import type { TemplateDetectionResult } from "../inbox/classify/classifiers/types";
 
 /**

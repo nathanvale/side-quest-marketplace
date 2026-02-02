@@ -19,7 +19,7 @@ import {
 	log,
 	setLogFile,
 	setMcpLogger,
-} from "@sidequest/core/mcp-response";
+} from "@side-quest/core/mcp-response";
 import { getLogFile, mcpLogger } from "../src/shared/logger";
 import type { LogEntry } from "./utils";
 import { initMcpLogger } from "./utils";

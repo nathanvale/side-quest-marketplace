@@ -13,7 +13,7 @@
 
 import { tmpdir } from "node:os";
 import { basename, isAbsolute, join } from "node:path";
-import { pathExistsSync } from "@sidequest/core/fs";
+import { pathExistsSync } from "@side-quest/core/fs";
 
 /**
  * Result of transcription operation.

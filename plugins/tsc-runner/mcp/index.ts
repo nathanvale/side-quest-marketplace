@@ -11,10 +11,10 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { startServer, tool, z } from "@sidequest/core/mcp";
-import { ResponseFormat, wrapToolHandler } from "@sidequest/core/mcp-response";
-import { spawnWithTimeout } from "@sidequest/core/spawn";
-import { validatePathOrDefault } from "@sidequest/core/validation";
+import { startServer, tool, z } from "@side-quest/core/mcp";
+import { ResponseFormat, wrapToolHandler } from "@side-quest/core/mcp-response";
+import { spawnWithTimeout } from "@side-quest/core/spawn";
+import { validatePathOrDefault } from "@side-quest/core/validation";
 import {
 	createCorrelationId,
 	initLogger,

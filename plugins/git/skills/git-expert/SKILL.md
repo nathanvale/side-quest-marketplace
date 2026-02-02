@@ -60,6 +60,20 @@ These are non-negotiable:
 - **ASK** user if commit scope or message is unclear
 - **SPLIT** large changes into atomic commits
 
+## Lifecycle Hooks
+
+This plugin runs 5 hooks that fire automatically — you don't invoke them, but be aware of their effects:
+
+| Hook | Event | What It Does |
+|------|-------|--------------|
+| `session-start` | SessionStart | Loads git context (branch, recent commits, status) |
+| `pre-commit-guard` | PreToolUse | Blocks `git commit` if validation hasn't passed |
+| `post-commit-lint` | PostToolUse | Runs lint/typecheck after commits |
+| `pre-compact` | PreCompact | Saves session git summary before context compaction |
+| `stop` | Stop | Logs session activity on exit |
+
+If a hook blocks an action, fix the underlying issue (e.g., run `bun run validate`) rather than bypassing hooks.
+
 ## Commit Format
 
 ```

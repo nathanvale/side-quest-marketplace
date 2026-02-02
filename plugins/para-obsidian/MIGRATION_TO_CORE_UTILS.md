@@ -11,9 +11,9 @@
 **Status:** ✅ **Already Well-Migrated + Security Enhancement Added**
 
 Para-obsidian is exemplary in its use of `@sidequest/core` utilities. The plugin was found to be already using:
-- ✅ MCP response helpers (`@sidequest/core/mcp-response`)
-- ✅ CLI utilities (`@sidequest/core/cli`)
-- ✅ File system utilities (`@sidequest/core/fs`)
+- ✅ MCP response helpers (`@side-quest/core/mcp-response`)
+- ✅ CLI utilities (`@side-quest/core/cli`)
+- ✅ File system utilities (`@side-quest/core/fs`)
 - ✅ Validation utilities (`@sidequest/core/validation`) - partial
 
 **Security Gap Found and Fixed:** User-provided regex patterns in search operations were not validated, creating a potential ReDoS vulnerability. This has been addressed.
@@ -29,14 +29,14 @@ Para-obsidian is exemplary in its use of `@sidequest/core` utilities. The plugin
 Para-obsidian already extensively uses core MCP response utilities:
 
 ```typescript
-// Re-exports from @sidequest/core/mcp-response (lines 55-61)
+// Re-exports from @side-quest/core/mcp-response (lines 55-61)
 export {
 	formatError,
 	parseResponseFormat,
 	ResponseFormat,
 	respondError,
 	respondText,
-} from "@sidequest/core/mcp-response";
+} from "@side-quest/core/mcp-response";
 ```
 
 **Usage across codebase:**
@@ -55,7 +55,7 @@ export {
 
 Already using:
 ```typescript
-import { parseDirs, parseKeyValuePairs } from "@sidequest/core/cli";
+import { parseDirs, parseKeyValuePairs } from "@side-quest/core/cli";
 ```
 
 **Usage:**
@@ -77,13 +77,13 @@ import {
 	sanitizePattern as coreSanitizePattern,
 	validateFilePath as coreValidateFilePath,
 	validatePathSafety as coreValidatePathSafety,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 ```
 
 Plus extensive use of:
-- `readTextFile`, `writeTextFile` from `@sidequest/core/fs`
+- `readTextFile`, `writeTextFile` from `@side-quest/core/fs`
 - `globFiles` from `@sidequest/core/glob`
-- `pathExistsSync` from `@sidequest/core/fs`
+- `pathExistsSync` from `@side-quest/core/fs`
 
 **Security features already in place:**
 - Path traversal prevention via `validatePathSafety`
@@ -391,4 +391,4 @@ Consider adding a security section to `para-obsidian/CLAUDE.md`:
 - Core Validation Module: `@sidequest/core/validation`
 - Pattern Validation Implementation: `core/src/validation/patterns.ts`
 - Para-Obsidian Security Guide: `plugins/para-obsidian/docs/SECURITY.md`
-- MCP Response Helpers: `@sidequest/core/mcp-response`
+- MCP Response Helpers: `@side-quest/core/mcp-response`

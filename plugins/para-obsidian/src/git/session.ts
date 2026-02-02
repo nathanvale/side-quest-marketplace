@@ -90,7 +90,7 @@ function generateSessionId(): string {
  * Gets the git repository root for a given directory.
  */
 async function getGitRoot(dir: string): Promise<string | null> {
-	const { spawnAndCollect } = await import("@sidequest/core/spawn");
+	const { spawnAndCollect } = await import("@side-quest/core/spawn");
 	const { stdout, exitCode } = await spawnAndCollect(
 		["git", "rev-parse", "--show-toplevel"],
 		{ cwd: dir },

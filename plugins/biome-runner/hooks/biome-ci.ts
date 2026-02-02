@@ -12,8 +12,8 @@
  * - 2: Blocking error (lint/format errors found, shown to Claude for follow-up)
  */
 
-import { getChangedFiles } from "@sidequest/core/git";
-import { spawnAndCollect } from "@sidequest/core/spawn";
+import { getChangedFiles } from "@side-quest/core/git";
+import { spawnAndCollect } from "@side-quest/core/spawn";
 import { parseBiomeOutput } from "../mcp/index";
 import { hasBiomeConfig, logMissingConfigHint } from "./shared/biome-config";
 import { BIOME_SUPPORTED_EXTENSIONS } from "./shared/constants";

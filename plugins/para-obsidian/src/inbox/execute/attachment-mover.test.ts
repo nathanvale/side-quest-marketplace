@@ -11,12 +11,12 @@ await setupTestLogging();
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { pathExistsSync } from "@sidequest/core/fs";
+import { pathExistsSync } from "@side-quest/core/fs";
 import {
 	cleanupTestDir,
 	createTempDir,
 	writeTestFile,
-} from "@sidequest/core/testing";
+} from "@side-quest/core/testing";
 import { executeLogger } from "../../shared/logger";
 import type { CreateNoteSuggestion } from "../types";
 import { createSuggestionId } from "../types";

@@ -5,7 +5,7 @@
  * Re-exports generic OAuth types from @sidequest/core/oauth for consistency.
  */
 
-import type { OAuthCredentials, OAuthToken } from "@sidequest/core/oauth";
+import type { OAuthCredentials, OAuthToken } from "@side-quest/core/oauth";
 
 /**
  * OAuth 2.0 credentials from Google Cloud Console.

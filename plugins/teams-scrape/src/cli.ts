@@ -8,8 +8,8 @@
  * @module teams-scrape/cli
  */
 
-import { observe } from "@sidequest/core/instrumentation";
-import { getErrorMessage } from "@sidequest/core/utils";
+import { observe } from "@side-quest/core/instrumentation";
+import { getErrorMessage } from "@side-quest/core/utils";
 import { cliLogger, createCorrelationId, initLogger } from "./logger.js";
 import { parseTeamsClipboard } from "./parser.js";
 import { listStoredChats, loadStoredChat, mergeAndSave } from "./storage.js";

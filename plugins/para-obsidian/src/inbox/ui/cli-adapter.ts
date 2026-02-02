@@ -6,7 +6,7 @@
  */
 
 import { input } from "@inquirer/prompts";
-import { emphasize } from "@sidequest/core/terminal";
+import { emphasize } from "@side-quest/core/terminal";
 import { createSpinner } from "nanospinner";
 import { DEFAULT_PARA_FOLDERS } from "../../config/defaults";
 import { cliLogger } from "../../shared/logger";

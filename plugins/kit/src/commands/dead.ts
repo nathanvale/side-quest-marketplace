@@ -6,11 +6,11 @@
  */
 
 import { join } from "node:path";
-import { createTempDir, removeDirSync } from "@sidequest/core/fs";
+import { createTempDir, removeDirSync } from "@side-quest/core/fs";
 import {
 	ensureCommandAvailable,
 	spawnWithTimeout,
-} from "@sidequest/core/spawn";
+} from "@side-quest/core/spawn";
 import { color, OutputFormat } from "../formatters/output";
 import {
 	getExportedSymbols,

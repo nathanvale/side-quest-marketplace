@@ -1,6 +1,6 @@
 ---
 description: Generate changelog from conventional commits
-model: claude-sonnet-4-5-20250929
+model: sonnet
 allowed-tools: Bash(git log:*), Bash(git tag:*), Bash(git diff:*), Bash(git describe:*), Read, Write
 argument-hint: [version]
 ---

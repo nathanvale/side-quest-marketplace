@@ -5,7 +5,7 @@
  * Scraping is handled by Playwright-based CLI (src/cli.ts).
  */
 
-import { parsePrice } from "@sidequest/core/formatters";
+import { parsePrice } from "@side-quest/core/formatters";
 import { pricingLogger } from "./logger.ts";
 import type { SelectorConfig } from "./selectors.ts";
 

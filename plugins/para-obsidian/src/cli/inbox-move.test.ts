@@ -16,7 +16,7 @@ import {
 	mock,
 	test,
 } from "bun:test";
-import { OutputFormat } from "@sidequest/core/terminal";
+import { OutputFormat } from "@side-quest/core/terminal";
 import { loadConfig } from "../config/index";
 import {
 	createTestVault,
@@ -88,7 +88,7 @@ const mockGlobFiles = async (
 	}
 };
 
-mock.module("@sidequest/core/glob", () => ({
+mock.module("@side-quest/core/glob", () => ({
 	globFiles: mockGlobFiles,
 }));
 

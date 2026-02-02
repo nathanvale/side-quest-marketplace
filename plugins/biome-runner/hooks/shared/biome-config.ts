@@ -3,7 +3,7 @@
  * Delegates to generic config detection from @sidequest/core/fs.
  */
 
-import { type ConfigAtRootResult, hasConfigAtRoot } from "@sidequest/core/fs";
+import { type ConfigAtRootResult, hasConfigAtRoot } from "@side-quest/core/fs";
 
 /**
  * Valid Biome configuration file names.

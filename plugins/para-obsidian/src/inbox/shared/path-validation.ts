@@ -10,7 +10,7 @@
  */
 
 import { resolve } from "node:path";
-import { validateFilenameForSubprocess as coreValidateFilename } from "@sidequest/core/fs";
+import { validateFilenameForSubprocess as coreValidateFilename } from "@side-quest/core/fs";
 
 /**
  * Validates that a file path is safe for inbox processing.

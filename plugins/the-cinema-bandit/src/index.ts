@@ -5,7 +5,7 @@
  */
 
 // Export core utilities (re-export for backward compatibility)
-export { formatCurrency, parsePrice } from "@sidequest/core/formatters";
+export { formatCurrency, parsePrice } from "@side-quest/core/formatters";
 // Export calculator functions and types
 export {
 	calculatePricing,

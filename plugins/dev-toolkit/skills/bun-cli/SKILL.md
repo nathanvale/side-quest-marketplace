@@ -32,7 +32,7 @@ Build powerful, production-grade CLI tools with Bun. Master argument parsing, ou
 ```typescript
 #!/usr/bin/env bun
 
-import { color } from "@sidequest/core/formatters";
+import { color } from "@side-quest/core/formatters";
 
 function printUsage(): void {
   console.log(color("cyan", "My CLI Tool v1.0"));
@@ -122,7 +122,7 @@ For detailed patterns and edge cases, see [bun-cli-patterns.md § Argument Parsi
 Always support **both markdown (human) and JSON (machine)** formats.
 
 ```typescript
-import { OutputFormat, parseOutputFormat } from "@sidequest/core/formatters";
+import { OutputFormat, parseOutputFormat } from "@side-quest/core/formatters";
 
 type Result = { title: string; items: string[] };
 

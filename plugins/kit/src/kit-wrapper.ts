@@ -6,17 +6,17 @@
  */
 
 import { join } from "node:path";
-import { TimeoutError, withTimeout } from "@sidequest/core/concurrency";
+import { TimeoutError, withTimeout } from "@side-quest/core/concurrency";
 import {
 	ensureCacheDir,
 	isCachePopulated,
 	withTempJsonFileSync,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 import {
 	buildEnhancedPath,
 	ensureCommandAvailable,
 	spawnSyncCollect,
-} from "@sidequest/core/spawn";
+} from "@side-quest/core/spawn";
 
 import {
 	AST_SEARCH_TIMEOUT,

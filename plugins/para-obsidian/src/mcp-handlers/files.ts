@@ -14,12 +14,12 @@
 
 import { randomUUID } from "node:crypto";
 import { getLogger } from "@logtape/logtape";
-import { tool, z } from "@sidequest/core/mcp";
+import { tool, z } from "@side-quest/core/mcp";
 import {
 	createLoggerAdapter,
 	ResponseFormat,
 	wrapToolHandler,
-} from "@sidequest/core/mcp-response";
+} from "@side-quest/core/mcp-response";
 import { loadConfig } from "../config/index";
 import { renameWithLinkRewrite } from "../links/index";
 import { deleteFile } from "../notes/delete";

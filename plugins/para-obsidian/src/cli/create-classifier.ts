@@ -8,7 +8,7 @@
  */
 import path from "node:path";
 import { confirm, input, select } from "@inquirer/prompts";
-import { pathExists, readTextFile } from "@sidequest/core/fs";
+import { pathExists, readTextFile } from "@side-quest/core/fs";
 import type { ParaObsidianConfig } from "../config";
 import { generateClassifierCode } from "../inbox/classify/classifiers/generator";
 import {

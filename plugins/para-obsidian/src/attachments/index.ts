@@ -16,7 +16,7 @@ import {
 	pathExistsSync,
 	readDir,
 	readTextFileSync,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 
 import { parseFrontmatter } from "../frontmatter/index";
 import { resolveVaultPath } from "../shared/fs";

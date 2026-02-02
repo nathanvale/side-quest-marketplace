@@ -8,8 +8,8 @@
  */
 
 import path from "node:path";
-import { pathExistsSync } from "@sidequest/core/fs";
-import { spawnAndCollect } from "@sidequest/core/spawn";
+import { pathExistsSync } from "@side-quest/core/fs";
+import { spawnAndCollect } from "@side-quest/core/spawn";
 import { loadOrDetectConfig } from "./config.js";
 import { copyWorktreeFiles } from "./copy-files.js";
 import type { CreateResult } from "./types.js";

@@ -14,7 +14,7 @@ import {
 	ensureDirSync,
 	pathExistsSync,
 	writeTextFileSync,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 import { serializeFrontmatter } from "../frontmatter/parse.js";
 import { callLLMWithMetadata } from "../inbox/core/llm/client.js";
 import { createCorrelationId, voiceLogger } from "../shared/logger.js";

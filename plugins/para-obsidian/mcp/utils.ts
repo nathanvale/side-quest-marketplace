@@ -7,7 +7,7 @@
  * @module mcp/utils
  */
 
-import { coerceValue as coreCoerceValue } from "@sidequest/core/cli";
+import { coerceValue as coreCoerceValue } from "@side-quest/core/cli";
 import {
 	getLogFile as coreGetLogFile,
 	log as coreLog,
@@ -15,7 +15,7 @@ import {
 	setMcpLogger as coreSetMcpLogger,
 	withLogFile as coreWithLogFile,
 	type LogEntry,
-} from "@sidequest/core/mcp-response";
+} from "@side-quest/core/mcp-response";
 import type { ParaObsidianConfig } from "../src/config";
 import {
 	createCorrelationId,
@@ -58,15 +58,15 @@ export {
 	ResponseFormat,
 	respondError,
 	respondText,
-} from "@sidequest/core/mcp-response";
+} from "@side-quest/core/mcp-response";
 
 // Import ResponseFormat for use in local functions
-import type { ResponseFormat } from "@sidequest/core/mcp-response";
+import type { ResponseFormat } from "@side-quest/core/mcp-response";
 
 /**
  * Append log file path to response text.
  *
- * @deprecated Use the core version via `import { withLogFile } from "@sidequest/core/mcp-response"`.
+ * @deprecated Use the core version via `import { withLogFile } from "@side-quest/core/mcp-response"`.
  * This wrapper is kept for backwards compatibility.
  */
 export function withLogFile(text: string, format: ResponseFormat): string {
@@ -81,7 +81,7 @@ export function withLogFile(text: string, format: ResponseFormat): string {
 export {
 	parseDirs,
 	parseKeyValuePairs,
-} from "@sidequest/core/cli";
+} from "@side-quest/core/cli";
 
 /**
  * Coerce string value to appropriate JavaScript type.

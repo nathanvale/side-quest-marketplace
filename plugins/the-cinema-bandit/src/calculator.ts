@@ -10,7 +10,7 @@
  * - Booking fee: $1.95 per ticket
  */
 
-import { formatCurrency } from "@sidequest/core/formatters";
+import { formatCurrency } from "@side-quest/core/formatters";
 import type { InvoiceLine, TicketLine } from "./template.ts";
 
 /**

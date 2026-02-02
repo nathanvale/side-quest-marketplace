@@ -1,5 +1,5 @@
 import { isAbsolute, relative, resolve } from "node:path";
-import { sha256, writeTextFile } from "@sidequest/core/fs";
+import { sha256, writeTextFile } from "@side-quest/core/fs";
 import { MarkdownConverter } from "./markdown-converter";
 
 export class DocumentProcessor {

@@ -7,8 +7,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
-import { spawnAndCollect } from "@sidequest/core/spawn";
-import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
+import { spawnAndCollect } from "@side-quest/core/spawn";
+import { cleanupTestDir, createTempDir } from "@side-quest/core/testing";
 import type { ParaObsidianConfig } from "../config";
 
 // ============================================================================

@@ -17,7 +17,7 @@ import {
 	readTextFileSync,
 	validatePathSafety,
 	writeTextFileSync,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 import { DEFAULT_PARA_FOLDERS } from "../../../config/defaults";
 import { loadConfig } from "../../../config/index";
 import {

@@ -27,7 +27,7 @@ if (!process.env.MCPEZ_AUTO_START) {
 	process.env.MCPEZ_AUTO_START = "false";
 }
 
-import { startServer } from "@sidequest/core/mcp";
+import { startServer } from "@side-quest/core/mcp";
 import { initMcpLogger } from "./utils";
 
 // Import tool modules (side-effect: registers tools)

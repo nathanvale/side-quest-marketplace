@@ -12,9 +12,12 @@
  * @module search
  */
 import path from "node:path";
-import { pathExistsSync, readTextFile } from "@sidequest/core/fs";
-import { globFiles } from "@sidequest/core/glob";
-import { ensureCommandAvailable, spawnAndCollect } from "@sidequest/core/spawn";
+import { pathExistsSync, readTextFile } from "@side-quest/core/fs";
+import { globFiles } from "@side-quest/core/glob";
+import {
+	ensureCommandAvailable,
+	spawnAndCollect,
+} from "@side-quest/core/spawn";
 import { parse } from "yaml";
 
 import type { ParaObsidianConfig } from "../config/index";

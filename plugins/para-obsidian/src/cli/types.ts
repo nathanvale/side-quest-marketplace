@@ -7,7 +7,7 @@
  * @module cli/types
  */
 
-import type { OutputFormat } from "@sidequest/core/terminal";
+import type { OutputFormat } from "@side-quest/core/terminal";
 import type { ParaObsidianConfig } from "../config/index";
 
 /**

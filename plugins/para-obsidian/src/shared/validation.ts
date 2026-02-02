@@ -11,7 +11,7 @@ import {
 	sanitizePattern as coreSanitizePattern,
 	validateFilePath as coreValidateFilePath,
 	validatePathSafety as coreValidatePathSafety,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 
 // Re-export validation functions from @sidequest/core/validation
 export {
@@ -24,7 +24,7 @@ export {
 	validateRegex,
 	validateTemplateName,
 	validateWeight,
-} from "@sidequest/core/validation";
+} from "@side-quest/core/validation";
 
 /**
  * Sanitize pattern string (prevent ReDoS)

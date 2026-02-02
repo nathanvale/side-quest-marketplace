@@ -14,18 +14,18 @@
 import {
 	createCorrelationId,
 	createPluginLogger,
-} from "@sidequest/core/logging";
-import { startServer, tool, z } from "@sidequest/core/mcp";
+} from "@side-quest/core/logging";
+import { startServer, tool, z } from "@side-quest/core/mcp";
 import {
 	createLoggerAdapter,
 	ResponseFormat,
 	wrapToolHandler,
-} from "@sidequest/core/mcp-response";
-import { spawnWithTimeout } from "@sidequest/core/spawn";
+} from "@side-quest/core/mcp-response";
+import { spawnWithTimeout } from "@side-quest/core/spawn";
 import {
 	validatePath,
 	validateShellSafePattern,
-} from "@sidequest/core/validation";
+} from "@side-quest/core/validation";
 import {
 	parseBunTestOutput,
 	type TestFailure,

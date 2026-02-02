@@ -9,4 +9,4 @@
 export {
 	stripWikilinks,
 	stripWikilinksOrValue,
-} from "@sidequest/core/obsidian";
+} from "@sidequest/marketplace-core/obsidian";

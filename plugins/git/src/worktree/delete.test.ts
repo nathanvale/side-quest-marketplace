@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
-import { spawnAndCollect } from "@sidequest/core/spawn";
+import { spawnAndCollect } from "@side-quest/core/spawn";
 import { CONFIG_FILENAME } from "./config.js";
 import { checkBeforeDelete, deleteWorktree } from "./delete.js";
 

@@ -11,8 +11,8 @@
  * - 2: Blocking error (type errors found, shown to Claude)
  */
 
-import { isFileInRepo } from "@sidequest/core/git";
-import { spawnWithTimeout } from "@sidequest/core/spawn";
+import { isFileInRepo } from "@side-quest/core/git";
+import { spawnWithTimeout } from "@side-quest/core/spawn";
 import { TSC_SUPPORTED_EXTENSIONS } from "./shared/constants";
 import { createCorrelationId, initLogger, tscLogger } from "./shared/logger";
 import { findNearestTsConfig } from "./shared/tsc-config";

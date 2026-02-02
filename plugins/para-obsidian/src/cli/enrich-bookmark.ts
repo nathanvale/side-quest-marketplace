@@ -14,7 +14,7 @@
 
 import { basename, join } from "node:path";
 import { confirm } from "@inquirer/prompts";
-import { color, emphasize } from "@sidequest/core/terminal";
+import { color, emphasize } from "@side-quest/core/terminal";
 import { glob } from "glob";
 import { createSpinner } from "nanospinner";
 import { parseFrontmatter, serializeFrontmatter } from "../frontmatter";

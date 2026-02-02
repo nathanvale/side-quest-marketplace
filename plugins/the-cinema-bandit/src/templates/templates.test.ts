@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
 	parseResponseFormat,
 	ResponseFormat,
-} from "@sidequest/core/mcp-response";
+} from "@side-quest/core/mcp-response";
 import type { MovieDetailsResponse } from "../formatters.ts";
 import type { Movie, SeatMap, TicketType } from "../scraper.ts";
 import {

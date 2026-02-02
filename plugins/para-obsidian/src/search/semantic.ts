@@ -11,8 +11,8 @@
  *
  * @module semantic
  */
-import { spawnAndCollect } from "@sidequest/core/spawn";
-import { getErrorMessage } from "@sidequest/core/utils";
+import { spawnAndCollect } from "@side-quest/core/spawn";
+import { getErrorMessage } from "@side-quest/core/utils";
 import type { ParaObsidianConfig } from "../config/index";
 import { resolveVaultPath } from "../shared/fs";
 import { observe } from "../shared/instrumentation.js";

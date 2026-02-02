@@ -9,9 +9,9 @@
 
 import { join } from "node:path";
 import { confirm } from "@inquirer/prompts";
-import { readTextFile } from "@sidequest/core/fs";
-import { globFiles } from "@sidequest/core/glob";
-import { emphasize } from "@sidequest/core/terminal";
+import { readTextFile } from "@side-quest/core/fs";
+import { globFiles } from "@side-quest/core/glob";
+import { emphasize } from "@side-quest/core/terminal";
 import { DEFAULT_PARA_FOLDERS } from "../config/defaults";
 import { parseFrontmatter } from "../frontmatter/parse";
 import {

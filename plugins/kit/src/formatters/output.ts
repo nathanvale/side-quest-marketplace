@@ -6,4 +6,4 @@ export {
 	colors,
 	OutputFormat,
 	parseOutputFormat,
-} from "@sidequest/core/formatters";
+} from "@side-quest/core/formatters";

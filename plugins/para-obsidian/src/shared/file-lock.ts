@@ -16,7 +16,7 @@ import { join } from "node:path";
 import {
 	cleanupStaleLocks as coreCleanupStaleLocks,
 	withFileLock as coreWithFileLock,
-} from "@sidequest/core/concurrency";
+} from "@side-quest/core/concurrency";
 import { observe } from "./instrumentation.js";
 import { lockLogger } from "./logger.js";
 

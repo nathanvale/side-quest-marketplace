@@ -10,8 +10,9 @@
 	"dependencies": {
 		"@inquirer/prompts": "^8.0.2",
 		"@modelcontextprotocol/sdk": "^1.25.1",
-		"@sidequest/core": "workspace:*",
+		"@side-quest/core": "^0.1.1",
 		"@sidequest/firecrawl": "workspace:*",
+		"@sidequest/marketplace-core": "workspace:*",
 		"@sidequest/voice-memo": "workspace:*",
 		"@types/turndown": "^5.0.6",
 		"date-fns": "^4.1.0",

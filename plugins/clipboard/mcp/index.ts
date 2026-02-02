@@ -12,8 +12,8 @@
 import {
 	createCorrelationId,
 	createPluginLogger,
-} from "@sidequest/core/logging";
-import { startServer, tool, z } from "@sidequest/core/mcp";
+} from "@side-quest/core/logging";
+import { startServer, tool, z } from "@side-quest/core/mcp";
 
 // Initialize logger
 const { initLogger, getSubsystemLogger } = createPluginLogger({

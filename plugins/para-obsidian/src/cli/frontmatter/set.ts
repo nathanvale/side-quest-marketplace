@@ -4,8 +4,8 @@
  * @module cli/frontmatter/set
  */
 
-import { coerceValue, parseKeyValuePairs } from "@sidequest/core/cli";
-import { emphasize } from "@sidequest/core/terminal";
+import { coerceValue, parseKeyValuePairs } from "@side-quest/core/cli";
+import { emphasize } from "@side-quest/core/terminal";
 import {
 	updateFrontmatterFile,
 	validateFrontmatter,

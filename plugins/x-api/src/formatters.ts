@@ -5,7 +5,7 @@
  * tool response type. Used by the MCP handler layer.
  */
 
-import { ResponseFormat } from "@sidequest/core/mcp-response";
+import { ResponseFormat } from "@side-quest/core/mcp-response";
 import type {
 	EnrichedTweet,
 	RepliesResult,

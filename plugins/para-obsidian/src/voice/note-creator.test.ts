@@ -4,8 +4,8 @@
 
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { join } from "node:path";
-import { pathExistsSync, readTextFileSync } from "@sidequest/core/fs";
-import { createTempDir } from "@sidequest/core/testing";
+import { pathExistsSync, readTextFileSync } from "@side-quest/core/fs";
+import { createTempDir } from "@side-quest/core/testing";
 
 // Mock the LLM client before importing the module
 mock.module("../inbox/core/llm/client.js", () => ({

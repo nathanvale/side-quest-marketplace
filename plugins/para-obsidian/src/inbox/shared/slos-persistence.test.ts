@@ -7,7 +7,7 @@ import {
 	stat,
 	unlink,
 	writeTextFile,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 import { useTestVaultCleanup } from "../../testing/utils";
 import {
 	ensureEventsLoaded,

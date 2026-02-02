@@ -20,7 +20,7 @@
  * ```
  */
 
-import { createPluginLogger } from "@sidequest/core/logging";
+import { createPluginLogger } from "@side-quest/core/logging";
 
 export const {
 	initLogger,

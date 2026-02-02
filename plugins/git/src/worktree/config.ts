@@ -12,7 +12,7 @@ import {
 	pathExistsSync,
 	readJsonFileSync,
 	writeJsonFileSyncAtomic,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 import { detectInstallCommand } from "./detect-pm.js";
 import type { WorktreeConfig } from "./types.js";
 

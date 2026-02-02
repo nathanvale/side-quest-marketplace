@@ -10,7 +10,7 @@
 import {
 	type ErrorCategory as CoreErrorCategory,
 	StructuredError,
-} from "@sidequest/core/errors";
+} from "@side-quest/core/errors";
 import type { ErrorCategory, ErrorCode, ErrorContext } from "../types";
 
 // =============================================================================
@@ -255,7 +255,7 @@ export class InboxError extends StructuredError {
 	override toJSON(): {
 		name: string;
 		message: string;
-		category: import("@sidequest/core/errors").ErrorCategory;
+		category: import("@side-quest/core/errors").ErrorCategory;
 		code: string;
 		recoverable: boolean;
 		context: Record<string, unknown>;

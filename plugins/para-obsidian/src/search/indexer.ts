@@ -17,8 +17,8 @@ import {
 	pathExistsSync,
 	readTextFileSync,
 	writeJsonFileSync,
-} from "@sidequest/core/fs";
-import { globFilesSync } from "@sidequest/core/glob";
+} from "@side-quest/core/fs";
+import { globFilesSync } from "@side-quest/core/glob";
 
 import type { ParaObsidianConfig } from "../config/index";
 import { parseFrontmatter } from "../frontmatter/index";

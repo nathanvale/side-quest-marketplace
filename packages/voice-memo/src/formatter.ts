@@ -7,10 +7,10 @@
  * @module voice-memo/formatter
  */
 
-import { formatTime12Hour } from "@sidequest/core/formatters";
+import { formatTime12Hour } from "@side-quest/core/formatters";
 
 // Re-export dedupeConsecutiveLines from core for convenience
-export { dedupeConsecutiveLines } from "@sidequest/core/formatters";
+export { dedupeConsecutiveLines } from "@side-quest/core/formatters";
 
 /**
  * Format timestamp in 12-hour time format.
@@ -25,11 +25,11 @@ export { dedupeConsecutiveLines } from "@sidequest/core/formatters";
  *
  * @param date - Date object to format
  * @returns Formatted time string
- * @deprecated Use formatTime12Hour from @sidequest/core/formatters instead
+ * @deprecated Use formatTime12Hour from @side-quest/core/formatters instead
  */
 export function formatTimestamp(date: Date): string {
 	return formatTime12Hour(date);
 }
 
 // Re-export formatFilenameTime from core for backward compatibility
-export { formatFilenameTime } from "@sidequest/core/formatters";
+export { formatFilenameTime } from "@side-quest/core/formatters";

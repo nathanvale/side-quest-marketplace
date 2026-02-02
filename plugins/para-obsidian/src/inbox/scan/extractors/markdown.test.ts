@@ -9,7 +9,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { createTempDir } from "@sidequest/core/testing";
+import { createTempDir } from "@side-quest/core/testing";
 import { useTestVaultCleanup } from "../../../testing/utils";
 import type { MarkdownExtractionMetadata } from "./markdown";
 import {

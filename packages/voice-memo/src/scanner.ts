@@ -9,7 +9,7 @@
 
 import { lstatSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { pathExistsSync } from "@sidequest/core/fs";
+import { pathExistsSync } from "@side-quest/core/fs";
 
 /**
  * Parsed timestamp components from voice memo filename.

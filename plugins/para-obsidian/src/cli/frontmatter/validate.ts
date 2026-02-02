@@ -4,7 +4,7 @@
  * @module cli/frontmatter/validate
  */
 
-import { emphasize } from "@sidequest/core/terminal";
+import { emphasize } from "@side-quest/core/terminal";
 import {
 	validateFrontmatterBulk,
 	validateFrontmatterFile,

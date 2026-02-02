@@ -10,7 +10,7 @@
 
 import { randomUUID } from "node:crypto";
 import { readFile, rename, unlink, writeFile } from "node:fs/promises";
-import { ensureParentDir } from "@sidequest/core/fs";
+import { ensureParentDir } from "@side-quest/core/fs";
 import { observe } from "./instrumentation.js";
 import { fsLogger } from "./logger.js";
 

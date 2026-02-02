@@ -11,15 +11,15 @@
  * Uses native Bun.spawn() for better performance over Node.js child_process.
  */
 
-import { startServer, tool, z } from "@sidequest/core/mcp";
+import { startServer, tool, z } from "@side-quest/core/mcp";
 import {
 	createLoggerAdapter,
 	type Logger,
 	ResponseFormat,
 	wrapToolHandler,
-} from "@sidequest/core/mcp-response";
-import { spawnAndCollect } from "@sidequest/core/spawn";
-import { validatePathOrDefault } from "@sidequest/core/validation";
+} from "@side-quest/core/mcp-response";
+import { spawnAndCollect } from "@side-quest/core/spawn";
+import { validatePathOrDefault } from "@side-quest/core/validation";
 import { createCorrelationId, mcpLogger } from "../hooks/shared/logger";
 
 // --- Types ---

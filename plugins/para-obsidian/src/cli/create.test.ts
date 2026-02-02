@@ -9,7 +9,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
-import { OutputFormat } from "@sidequest/core/terminal";
+import { OutputFormat } from "@side-quest/core/terminal";
 import {
 	createTestVault,
 	initGitRepo,

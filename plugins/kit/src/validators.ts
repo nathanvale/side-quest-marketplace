@@ -4,12 +4,12 @@
  * Input validation and security utilities for safe Kit CLI operations.
  */
 
-import { normalizePath, pathExistsSync, statSync } from "@sidequest/core/fs";
+import { normalizePath, pathExistsSync, statSync } from "@side-quest/core/fs";
 import {
 	validateGlob,
 	validateInteger,
 	validateRegex,
-} from "@sidequest/core/validation";
+} from "@side-quest/core/validation";
 import { getDefaultKitPath } from "./types.js";
 
 // ============================================================================

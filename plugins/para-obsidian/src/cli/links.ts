@@ -14,9 +14,9 @@
  */
 
 import path from "node:path";
-import { pathExistsSync, readTextFileSync } from "@sidequest/core/fs";
-import { emphasize } from "@sidequest/core/terminal";
-import { getErrorMessage } from "@sidequest/core/utils";
+import { pathExistsSync, readTextFileSync } from "@side-quest/core/fs";
+import { emphasize } from "@side-quest/core/terminal";
+import { getErrorMessage } from "@side-quest/core/utils";
 import { linkAttachmentsToNotes } from "../attachments/link";
 import {
 	autoCommitChanges,

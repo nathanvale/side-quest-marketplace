@@ -12,12 +12,12 @@ import {
 	test,
 } from "bun:test";
 import { join } from "node:path";
-import { OutputFormat } from "@sidequest/core/terminal";
+import { OutputFormat } from "@side-quest/core/terminal";
 import {
 	cleanupTestDir,
 	createTempDir,
 	writeTestFile,
-} from "@sidequest/core/testing";
+} from "@side-quest/core/testing";
 import type { ParaObsidianConfig } from "../config/index";
 import * as insertModule from "../notes/insert";
 import * as logger from "../shared/logger";

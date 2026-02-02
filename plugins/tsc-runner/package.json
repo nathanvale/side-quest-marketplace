@@ -7,8 +7,9 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
+		"@side-quest/core": "^0.1.1",
 		"@sidequest/bun-runner": "workspace:*",
-		"@sidequest/core": "workspace:*"
+		"@sidequest/marketplace-core": "workspace:*"
 	},
 	"devDependencies": {
 		"@types/bun": "latest"

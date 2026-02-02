@@ -7,7 +7,7 @@
  */
 
 import { join } from "node:path";
-import { isDirectorySync } from "@sidequest/core/fs";
+import { isDirectorySync } from "@side-quest/core/fs";
 import { DEFAULT_PARA_FOLDERS } from "../../config/defaults";
 
 // Well-known folder paths from DEFAULT_PARA_FOLDERS (compile-time safe constants)

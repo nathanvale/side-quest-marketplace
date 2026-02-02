@@ -5,9 +5,9 @@
  */
 
 import path from "node:path";
-import { readTextFileSync, writeTextFileSync } from "@sidequest/core/fs";
-import { globFilesSync } from "@sidequest/core/glob";
-import { getErrorMessage } from "@sidequest/core/utils";
+import { readTextFileSync, writeTextFileSync } from "@side-quest/core/fs";
+import { globFilesSync } from "@side-quest/core/glob";
+import { getErrorMessage } from "@side-quest/core/utils";
 
 import type { ParaObsidianConfig } from "../config/index";
 import { resolveVaultPath } from "../shared/fs";

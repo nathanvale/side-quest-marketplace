@@ -14,8 +14,8 @@ import {
 	isTokenExpired as coreIsTokenExpired,
 	loadTokenFile,
 	saveTokenFile,
-} from "@sidequest/core/oauth";
-import { spawnSyncCollect } from "@sidequest/core/spawn";
+} from "@side-quest/core/oauth";
+import { spawnSyncCollect } from "@side-quest/core/spawn";
 import { google } from "googleapis";
 import { authLogger } from "../logger.ts";
 import { validateCredentials } from "./credentials";

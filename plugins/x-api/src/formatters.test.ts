@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ResponseFormat } from "@sidequest/core/mcp-response";
+import { ResponseFormat } from "@side-quest/core/mcp-response";
 import {
 	formatReplies,
 	formatSearch,

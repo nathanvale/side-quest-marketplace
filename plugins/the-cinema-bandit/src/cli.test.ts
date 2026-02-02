@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { getStringFlag, parseArgs } from "@sidequest/core/cli";
+import { getStringFlag, parseArgs } from "@side-quest/core/cli";
 import { parseTicketsFlag } from "./cli.ts";
 
 describe("parseArgs", () => {

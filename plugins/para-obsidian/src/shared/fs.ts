@@ -20,7 +20,7 @@ import {
 	readTextFileSync,
 	// Import sandbox utilities from core
 	resolveSandboxedPath,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 
 /**
  * Represents a resolved path within the vault.

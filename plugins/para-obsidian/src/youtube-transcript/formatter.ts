@@ -6,7 +6,7 @@
  * @module youtube-transcript/formatter
  */
 
-import { formatDuration } from "@sidequest/core/formatters";
+import { formatDuration } from "@side-quest/core/formatters";
 import type { TranscriptSegment } from "./types";
 import { DEFAULT_FORMAT_OPTIONS } from "./types";
 

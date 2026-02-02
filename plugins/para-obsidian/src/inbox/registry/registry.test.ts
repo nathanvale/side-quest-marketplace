@@ -7,6 +7,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { createTempDir } from "@side-quest/core/testing";
 import { useTestVaultCleanup } from "../../testing/utils";
 import {
 	type ProcessedItem,
@@ -100,7 +101,6 @@ describe("inbox/registry", () => {
 
 	// Helper to create and track a test directory
 	function createTestDir(): string {
-		const { createTempDir } = require("@sidequest/core/testing");
 		const dir = createTempDir("inbox-registry-test-");
 		trackVault(dir);
 		return dir;

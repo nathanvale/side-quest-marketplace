@@ -8,9 +8,9 @@
  */
 
 import path from "node:path";
-import { pathExistsSync, writeTextFileSync } from "@sidequest/core/fs";
-import { color } from "@sidequest/core/terminal";
-import { getErrorMessage } from "@sidequest/core/utils";
+import { pathExistsSync, writeTextFileSync } from "@side-quest/core/fs";
+import { color } from "@side-quest/core/terminal";
+import { getErrorMessage } from "@side-quest/core/utils";
 import { buildIndex } from "../search/indexer";
 import type { CommandContext, CommandResult } from "./types";
 

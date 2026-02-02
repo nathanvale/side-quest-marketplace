@@ -53,7 +53,7 @@ Development skills for building CLI tools with Bun, runtime workflows, and devel
 
 #### 3. **Bun Filesystem Helpers**
 - **SKILL.md:** `skills/bun-fs-helpers/SKILL.md`
-- **Content:** Pure Bun-native filesystem utilities from @sidequest/core/fs
+- **Content:** Pure Bun-native filesystem utilities from @side-quest/core/fs
 - **Covers:**
   - File existence checks (pathExists, pathExistsSync)
   - Reading/writing files (text and JSON, async and sync)
@@ -113,7 +113,7 @@ Development skills for building CLI tools with Bun, runtime workflows, and devel
 - **SKILL.md:** `skills/observability/SKILL.md`
 - **Content:** Structured logging, correlation IDs, performance metrics, debugging workflows
 - **Covers:**
-  - Plugin logger factory pattern (@sidequest/core/logging)
+  - Plugin logger factory pattern (@side-quest/core/logging)
   - Hierarchical subsystem loggers (plugin → subsystem → submodule)
   - Correlation ID patterns for request tracing
   - Log levels best practices (DEBUG/INFO/WARN/ERROR)
@@ -213,7 +213,7 @@ Each skill responds to natural language patterns:
 **Bun Filesystem Helpers triggers:**
 - "bun fs"
 - "filesystem helpers"
-- "@sidequest/core/fs"
+- "@side-quest/core/fs"
 - "command injection safe"
 - "node:fs alternative"
 - "bun-native filesystem"
@@ -249,7 +249,7 @@ Each skill responds to natural language patterns:
 - "debugging"
 - "logtape"
 - "jsonl"
-- "@sidequest/core/logging"
+- "@side-quest/core/logging"
 
 ---
 
@@ -362,7 +362,7 @@ All skills follow:
 ### Changelog
 
 - **v1.3.0** (2025-12-11) — Added Observability skill
-  - Added: Observability skill documenting @sidequest/core/logging
+  - Added: Observability skill documenting @side-quest/core/logging
   - Content: Structured logging, correlation IDs, performance metrics, debugging
   - Covers: LogTape, JSONL, hierarchical loggers, MetricsCollector
   - Real-world examples: para-obsidian, cinema-bandit, kit logging patterns
@@ -373,7 +373,7 @@ All skills follow:
   - Architecture: Engine/interface separation, suggestion-based processing
   - Includes: Implementation checklist, 246 test coverage, error taxonomy
 - **v1.1.0** (2025-12-11) — Added Bun Filesystem Helpers
-  - Added: Bun FS Helpers skill documenting @sidequest/core/fs
+  - Added: Bun FS Helpers skill documenting @side-quest/core/fs
   - Content: Pure Bun-native filesystem utilities (zero node:fs)
   - Security: Command injection safe, TOCTOU protection patterns
   - Migration: Complete guide from node:fs to Bun-native

@@ -118,8 +118,8 @@ import {
   startServer,
   tool,
   z,
-} from "@sidequest/core/mcp";
-import { buildEnhancedPath, spawnSyncCollect } from "@sidequest/core/spawn";
+} from "@side-quest/core/mcp";
+import { buildEnhancedPath, spawnSyncCollect } from "@side-quest/core/spawn";
 
 tool(
   "kit_grep",  // SHORT name - Claude Code adds prefix
@@ -470,7 +470,7 @@ Kit uses structured logging with correlation IDs across all operations.
 import {
   createCorrelationId,
   createPluginLogger
-} from "@sidequest/core/logging";
+} from "@side-quest/core/logging";
 
 const {
   rootLogger,

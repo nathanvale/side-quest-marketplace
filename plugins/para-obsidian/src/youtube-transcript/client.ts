@@ -7,8 +7,8 @@
  * @module youtube-transcript/client
  */
 
-import { unescapeHtml } from "@sidequest/core/html";
-import { getErrorMessage, retry, safeJsonParse } from "@sidequest/core/utils";
+import { unescapeHtml } from "@side-quest/core/html";
+import { getErrorMessage, retry, safeJsonParse } from "@side-quest/core/utils";
 import {
 	NoTranscriptFound,
 	TranscriptsDisabled,

@@ -16,11 +16,11 @@
  */
 
 import { join } from "node:path";
-import { getStringFlag, outputError, parseArgs } from "@sidequest/core/cli";
+import { getStringFlag, outputError, parseArgs } from "@side-quest/core/cli";
 import {
 	parseResponseFormat,
 	ResponseFormat,
-} from "@sidequest/core/mcp-response";
+} from "@side-quest/core/mcp-response";
 import {
 	formatMovieDetailsResponse,
 	formatMoviesResponse,

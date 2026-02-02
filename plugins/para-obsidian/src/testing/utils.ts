@@ -29,7 +29,7 @@ import {
 	setupTestDir,
 	testFileExists,
 	writeTestFile,
-} from "@sidequest/core/testing";
+} from "@side-quest/core/testing";
 
 /**
  * Create a temporary vault directory for testing
@@ -460,4 +460,4 @@ export {
 	setupTestDir,
 	testFileExists,
 	writeTestFile,
-} from "@sidequest/core/testing";
+} from "@side-quest/core/testing";

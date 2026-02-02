@@ -4,7 +4,7 @@
  * @module frontmatter/update
  */
 
-import { writeTextFileSync } from "@sidequest/core/fs";
+import { writeTextFileSync } from "@side-quest/core/fs";
 
 import type { ParaObsidianConfig } from "../config/index";
 import { resolveVaultPath } from "../shared/fs";

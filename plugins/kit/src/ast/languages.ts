@@ -6,7 +6,7 @@
  */
 
 import { createRequire } from "node:module";
-import { ResourcePool } from "@sidequest/core/concurrency";
+import { ResourcePool } from "@side-quest/core/concurrency";
 import { Language, type Node, Parser } from "web-tree-sitter";
 import { getAstLogger } from "../logger.js";
 

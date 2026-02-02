@@ -1,6 +1,8 @@
-# Core
+# Marketplace Core
 
-**Shared utilities library for SideQuest marketplace plugins** - Type-safe, well-tested foundation modules for plugin development.
+**Internal marketplace utilities for SideQuest plugins** - Specialized modules for plugin development, validation, and LLM integration.
+
+**Note:** This package (`@sidequest/marketplace-core`) contains marketplace-specific utilities. For general-purpose utilities (fs, glob, terminal, etc.), use `@side-quest/core` published on npm.
 
 ---
 
@@ -25,13 +27,28 @@
 
 ## Quick Reference
 
-**Type:** Internal workspace package | **Package Name:** `@sidequest/core`
+**Type:** Internal workspace package | **Package Name:** `@sidequest/marketplace-core`
 **Language:** TypeScript (strict mode) | **Runtime:** Bun | **Test Framework:** Bun test
+
+## Published vs Marketplace-Specific
+
+**Published on npm as `@side-quest/core`:**
+- cli, compression, concurrency, errors, formatters
+- fs, geo, git, glob, hash, html
+- instrumentation, logging, mcp, mcp-response
+- oauth, password, slo, spawn, streams
+- terminal, testing, utils, validation, vtt
+
+**Marketplace-specific in `@sidequest/marketplace-core`:**
+- hooks - Plugin hook utilities
+- llm - LLM integration (Claude, Ollama)
+- obsidian - Obsidian-specific utilities
+- validate/* - Plugin validation engine
 
 ### Directory Structure
 
 ```
-core/
+core/  (@sidequest/marketplace-core)
 ├── src/
 │   ├── validate/              # Plugin validation engine (12 validators)
 │   │   ├── validators/        # Individual validator modules
@@ -49,26 +66,15 @@ core/
 │   │   ├── reporter.ts        # Formats validation results
 │   │   ├── runner.ts          # Orchestrates validation runs
 │   │   └── types.ts           # Validation type definitions
-│   ├── cli/                   # CLI argument parsing utilities
-│   ├── compression/           # Gzip compression helpers
-│   ├── formatters/            # Terminal output formatters
-│   ├── fs/                    # File system utilities
-│   ├── git/                   # Git operations
-│   ├── glob/                  # File pattern matching
-│   ├── hash/                  # File hashing utilities
-│   ├── hooks/                 # Plugin hook utilities
-│   ├── html/                  # HTML generation utilities
-│   ├── llm/                   # LLM integration (Claude, Ollama)
-│   ├── logging/               # Structured logging with correlation IDs
-│   ├── mcp/                   # Simplified MCP server API (mcpez fork)
-│   ├── oauth/                 # OAuth 2.0 token management (provider-agnostic)
-│   ├── password/              # Password validation
-│   ├── slo/                   # SLO tracking with burn rate analysis
-│   ├── spawn/                 # Process spawning utilities
-│   ├── streams/               # Stream processing utilities
-│   ├── terminal/              # Terminal utilities (colors, formatting)
-│   ├── utils/                 # General utilities
-│   └── validation/            # Input validation (identifiers, numbers, names)
+│   ├── hooks/                 # Plugin hook utilities (marketplace-specific)
+│   ├── llm/                   # LLM integration - Claude, Ollama (marketplace-specific)
+│   └── obsidian/              # Obsidian utilities (marketplace-specific)
+│
+│   # Published modules (use @side-quest/core instead):
+│   # cli, compression, concurrency, errors, formatters,
+│   # fs, geo, git, glob, hash, html, instrumentation,
+│   # logging, mcp, mcp-response, oauth, password, slo,
+│   # spawn, streams, terminal, testing, utils, validation, vtt
 ├── package.json               # Package metadata with subpath exports
 └── tsconfig.json              # TypeScript configuration (extends root)
 ```
@@ -85,7 +91,9 @@ bun test <path>          # Run specific test file or directory
 
 ---
 
-## Key Modules
+## Marketplace-Specific Modules
+
+This package contains modules that are specific to the SideQuest marketplace infrastructure. For general-purpose utilities, use `@side-quest/core` published on npm.
 
 ### Validation System (`src/validate/`)
 
@@ -113,7 +121,7 @@ The validation engine ensures plugin quality across the marketplace.
 
 **Usage Pattern:**
 ```typescript
-import { validateHooksJson } from "@sidequest/core/validate/validators";
+import { validateHooksJson } from "@sidequest/marketplace-core/validate/validators";
 
 const issues = await validateHooksJson("/path/to/plugin/hooks/hooks.json");
 if (issues.length > 0) {
@@ -121,342 +129,88 @@ if (issues.length > 0) {
 }
 ```
 
-### MCP Server Utilities (`src/mcp/`)
+### Plugin Hooks (`src/hooks/`)
 
-Simplified MCP server API forked from mcpez by John Lindquist.
+Utilities for plugin lifecycle hooks (SessionStart, PreToolUse, PostToolUse, Stop).
 
-**Why This Exists:**
-The official `@modelcontextprotocol/sdk` is powerful but verbose. This module provides a declarative, function-based API with 90% less boilerplate.
-
-**Key Features:**
-- Function-based tool/resource/prompt registration
-- Automatic transport setup (stdio)
-- Type-safe Zod schema integration
-- Error handling patterns
-- Response format helpers
-
-**Before (official SDK - ~40 lines):**
+**Usage:**
 ```typescript
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-
-const server = new McpServer({ name: "my-server", version: "1.0.0" });
-server.registerTool(/* ... */);
-const transport = new StdioServerTransport();
-await server.connect(transport);
+import { hookTypes } from "@sidequest/marketplace-core/hooks";
 ```
-
-**After (this module - ~5 lines):**
-```typescript
-import { tool, z } from "@sidequest/core/mcp";
-
-tool("greet", {
-  description: "Greet someone",
-  inputSchema: { name: z.string() },
-}, async ({ name }) => ({ content: [{ type: "text", text: `Hello ${name}!` }] }));
-```
-
-### MCP Response Utilities (`src/mcp-response/`)
-
-High-level wrapper for MCP tool handlers that reduces boilerplate from ~25 lines to ~5 lines per tool.
-
-**Why This Exists:**
-Even with the simplified `@sidequest/core/mcp` API, tool handlers still need ~25 lines of repetitive code for correlation IDs, logging, error handling, and response formatting. The `wrapToolHandler` function automates all of this.
-
-**Key Features:**
-- Automatic correlation ID generation for request tracing
-- Automatic request/response logging with timing
-- Automatic error handling with categorization (transient, permanent, configuration, unknown)
-- Automatic response format parsing (JSON or Markdown)
-- Supports both data handlers (automatic formatting) and formatted handlers (custom formatting)
-- Custom log context support (sessionCid, userId, etc.)
-
-**Before (low-level API - ~25 lines per tool):**
-```typescript
-import { tool, z } from "@sidequest/core/mcp";
-import { parseResponseFormat, respondText, respondError, ResponseFormat } from "@sidequest/core/mcp-response";
-
-tool("para_config", {
-  inputSchema: { response_format: z.enum(["markdown", "json"]).optional() }
-}, async (args) => {
-  const cid = createCorrelationId();
-  const startTime = Date.now();
-  log({ cid, tool: "para_config", event: "request" });
-
-  try {
-    const config = loadConfig();
-    const format = parseResponseFormat(args.response_format);
-
-    log({ cid, tool: "para_config", event: "response", success: true, durationMs: Date.now() - startTime });
-
-    return respondText(format, JSON.stringify(config));
-  } catch (error) {
-    log({ cid, tool: "para_config", durationMs: Date.now() - startTime, success: false, error });
-    return respondError(format, error);
-  }
-});
-```
-
-**After (wrapToolHandler - ~5 lines per tool):**
-```typescript
-import { tool, z } from "@sidequest/core/mcp";
-import { wrapToolHandler } from "@sidequest/core/mcp-response";
-
-tool("para_config", {
-  inputSchema: { response_format: z.enum(["markdown", "json"]).optional() }
-}, wrapToolHandler(
-  async (args, format) => {
-    const config = loadConfig();
-    return config; // Wrapper handles formatting
-  },
-  { toolName: "para_config", logger: myLogger, createCid: () => randomUUID() }
-));
-```
-
-**Error Categorization:**
-The wrapper automatically categorizes errors for better observability:
-- **Transient** (NETWORK_ERROR) - ECONNREFUSED, ENOTFOUND, ETIMEDOUT, fetch failed
-- **Permanent** (NOT_FOUND, VALIDATION) - File not found, validation failures
-- **Configuration** (PERMISSION) - EACCES, EPERM, unauthorized
-- **Unknown** (UNKNOWN_ERROR) - Everything else
 
 ### LLM Integration (`src/llm/`)
 
 Utilities for calling LLMs (Claude headless CLI, Ollama API) with structured extraction.
 
-**Key Capabilities:**
-- Model routing (Claude vs Ollama)
-- Prompt building with constraints
-- Response parsing
-- Field-level constraints for deterministic extraction
-- Vault context integration
+### Obsidian Utilities (`src/obsidian/`)
 
-**Modules:**
-- `model-router.ts` - Route calls to Claude/Ollama
-- `prompt-builder.ts` - Build structured prompts
-- `constraints.ts` - Field constraints for extraction
-- `response-parser.ts` - Parse LLM responses
-- `types.ts` - Shared types
+Obsidian-specific utilities for working with wiki links and markdown.
 
 **Usage:**
 ```typescript
-import { callModel, buildStructuredPrompt } from "@sidequest/core/llm";
+import { stripWikilinks, stripWikilinksOrValue } from "@sidequest/marketplace-core/obsidian";
 
-const prompt = buildStructuredPrompt({
-  objective: "Extract metadata",
-  constraints: { /* ... */ },
-  examples: [/* ... */]
-});
-
-const result = await callModel(prompt, { model: "claude-sonnet-4" });
+const cleaned = stripWikilinks("Text with [[wikilink]]");
+// Returns: "Text with "
 ```
 
-### Logging System (`src/logging/`)
+---
 
-Structured logging with correlation IDs for request tracing.
+## Removed Modules (Now in @side-quest/core)
 
-**Features:**
-- LogTape-based logging (file + console)
-- Correlation ID tracking across async operations
-- Performance metrics collection
-- Configurable log levels
+The following modules have been published to npm as `@side-quest/core` and should be imported from there:
 
-**Files:**
-- `factory.ts` - Logger creation
-- `correlation.ts` - Correlation ID management
-- `metrics.ts` - Performance metrics
-- `config.ts` - Logger configuration
+**MCP & Response Utilities:**
+- `@side-quest/core/mcp` - Simplified MCP server API
+- `@side-quest/core/mcp-response` - Tool handler wrapper (reduces boilerplate)
 
-### OAuth Token Management (`src/oauth/`)
+**Logging & Instrumentation:**
+- `@side-quest/core/logging` - Structured logging with correlation IDs
+- `@side-quest/core/instrumentation` - Performance metrics, timing wrappers
 
-Provider-agnostic OAuth 2.0 token persistence and expiry checking.
+**File Operations:**
+- `@side-quest/core/fs` - File system utilities
+- `@side-quest/core/glob` - Pattern matching
+- `@side-quest/core/git` - Git operations
 
-**Why This Exists:**
-OAuth token management patterns (secure storage, expiry checking, atomic writes)
-were duplicated across plugins (Gmail, GitHub, etc.). This module provides generic
-utilities that work with any OAuth 2.0 provider.
+**Process & Concurrency:**
+- `@side-quest/core/spawn` - Process spawning
+- `@side-quest/core/concurrency` - File locking, transactions
 
-**Key Features:**
-- **Secure Storage**: Atomic writes with 0o600 permissions (owner read/write only)
-- **Expiry Management**: Buffer-based expiry checking to prevent mid-request failures
-- **Credential Validation**: Type-safe validation with descriptive errors
-- **Cross-Platform**: Works on macOS, Linux, and Windows
+**Validation & Security:**
+- `@side-quest/core/validation` - Input validation
+- `@side-quest/core/oauth` - OAuth 2.0 token management
+- `@side-quest/core/password` - Password validation
 
-**Files:**
-- `types.ts` - Generic OAuth interfaces (OAuthToken, OAuthCredentials)
-- `token-file.ts` - Token persistence, expiry checking, credential validation
-- `token-file.test.ts` - Comprehensive test suite (19 tests)
+**CLI & Terminal:**
+- `@side-quest/core/cli` - Argument parsing
+- `@side-quest/core/terminal` - Terminal formatting
+- `@side-quest/core/formatters` - Output formatters
 
-**Usage:**
-```typescript
-import {
-  loadTokenFile,
-  saveTokenFile,
-  isTokenExpired,
-  validateOAuthCredentials,
-  type OAuthToken
-} from "@sidequest/core/oauth";
-
-// Load existing token
-const token = loadTokenFile("~/.config/myapp/token.json");
-
-// Check if expired (with 5 minute buffer by default)
-if (token && isTokenExpired(token)) {
-  // Refresh token using provider-specific API
-  const newToken = await refreshTokenWithProvider(token);
-  saveTokenFile("~/.config/myapp/token.json", newToken);
-}
-
-// Validate credentials before OAuth flow
-const creds = JSON.parse(fs.readFileSync("credentials.json", "utf8"));
-validateOAuthCredentials(creds); // Throws if invalid
-```
-
-**Security Features:**
-- Atomic writes via temp file → rename pattern (prevents corruption)
-- Restrictive file permissions (0o600) on token files
-- Safe directory creation with 0o700 permissions
-- No token data in logs or error messages
-
-**Not Included (Provider-Specific):**
-This module does NOT include provider-specific logic like:
-- OAuth consent flows
-- Token refresh implementations (use provider SDKs)
-- Authorization servers
-- Callback handlers
-
-Use this module for the generic parts, implement provider-specific OAuth flows separately.
-
-### Validation Utilities (`src/validation/`)
-
-Input validation for identifiers, numbers, and names.
-
-**Why This Exists:**
-Common validation patterns (kebab-case IDs, priority ranges, area names) were
-duplicated across plugins. This module consolidates them with comprehensive
-tests and security hardening.
-
-**Modules:**
-- `identifiers.ts` - Kebab-case and camelCase validation (validateClassifierId, validateFieldName, validateTemplateName)
-- `numbers.ts` - Bounded numeric ranges (validatePriority 0-100, validateWeight 0.0-1.0)
-- `names.ts` - Human-readable names (validateAreaName, validateDisplayName)
-
-**Usage:**
-```typescript
-import { validateClassifierId, validatePriority } from "@sidequest/core/validation";
-
-const id = validateClassifierId('medical-bill'); // ✅ OK
-validateClassifierId('Medical-Bill'); // ❌ Error: must be kebab-case
-
-const priority = validatePriority(75); // ✅ OK
-validatePriority(150); // ❌ Error: must be 0-100
-```
-
-### Terminal Utilities (`src/terminal/`)
-
-Terminal output formatting with color support.
-
-**Capabilities:**
-- Color formatting (success, error, warning, info)
-- Progress indicators
-- Box drawing
-- ANSI escape sequences
-
-### File System (`src/fs/`)
-
-Enhanced file system operations with safety checks.
-
-**Features:**
-- Safe read/write with error handling
-- Directory creation with parents
-- File existence checks
-- Glob pattern matching (via `src/glob/`)
-
-### SLO Tracking (`src/slo/`)
-
-Service Level Objective tracking with error budgets and burn rate analysis.
-
-**Features:**
-- Event recording (violations and successes)
-- Burn rate calculation (error budget consumption)
-- Breach detection
-- Persistent JSONL storage with rotation
-- Circuit breaker for write failures
-
-**Files:**
-- `types.ts` - SLO types and definitions
-- `tracker.ts` - Main SLO tracking logic
-- `persistence.ts` - JSONL-based event storage
-
-**Usage:**
-```typescript
-import { createSLOTracker } from "@sidequest/core/slo";
-
-const tracker = createSLOTracker({
-  definitions: {
-    api_latency: {
-      name: "API Latency",
-      target: 0.95,
-      threshold: 1000,
-      unit: "ms",
-      window: "24h",
-      errorBudget: 0.05
-    }
-  }
-});
-
-tracker.recordEvent("api_latency", false, 850);
-const result = await tracker.checkBreach("api_latency", 1100);
-```
-
-### Other Utilities
-
-| Module | Purpose |
-|--------|---------|
-| `cli` | CLI argument parsing and validation |
-| `compression` | Gzip compression/decompression |
-| `formatters` | Output formatting utilities |
-| `git` | Git operations (status, commit, etc.) |
-| `hash` | File hashing (MD5, SHA) |
-| `hooks` | Plugin hook utilities |
-| `html` | HTML generation and templating |
-| `mcp-response` | MCP tool handler wrapper (reduces boilerplate by ~20 lines per tool) |
-| `oauth` | OAuth 2.0 token management (secure storage, expiry checking) |
-| `password` | Password validation rules |
-| `spawn` | Process spawning with stdio capture |
-| `streams` | Stream processing utilities |
-| `utils` | General-purpose utilities |
-| `validation` | Input validation (identifiers, numbers, names) |
+**Other:**
+- `@side-quest/core/utils` - General utilities
+- `@side-quest/core/testing` - Test fixtures
+- `@side-quest/core/slo` - SLO tracking
+- `@side-quest/core/hash` - File hashing
+- `@side-quest/core/html` - HTML generation
+- `@side-quest/core/compression` - Gzip utilities
+- `@side-quest/core/streams` - Stream processing
+- `@side-quest/core/errors` - Error utilities
+- `@side-quest/core/geo` - Geographic utilities
+- `@side-quest/core/vtt` - VTT/subtitle utilities
 
 ---
 
 ## Package Exports
 
-The package.json uses subpath exports for explicit module boundaries:
+The package.json uses subpath exports for marketplace-specific modules:
 
 ```json
 {
   "exports": {
-    "./cli": "./src/cli/index.ts",
-    "./compression": "./src/compression/index.ts",
-    "./formatters": "./src/formatters/index.ts",
-    "./fs": "./src/fs/index.ts",
-    "./git": "./src/git/index.ts",
-    "./glob": "./src/glob/index.ts",
-    "./hash": "./src/hash/index.ts",
     "./hooks": "./src/hooks/index.ts",
-    "./html": "./src/html/index.ts",
     "./llm": "./src/llm/index.ts",
-    "./logging": "./src/logging/index.ts",
-    "./mcp": "./src/mcp/index.ts",
-    "./oauth": "./src/oauth/index.ts",
-    "./password": "./src/password/index.ts",
-    "./slo": "./src/slo/index.ts",
-    "./spawn": "./src/spawn/index.ts",
-    "./streams": "./src/streams/index.ts",
-    "./terminal": "./src/terminal/index.ts",
-    "./utils": "./src/utils/index.ts",
-    "./validation": "./src/validation/index.ts",
+    "./obsidian": "./src/obsidian/index.ts",
     "./validate/types": "./src/validate/types.ts",
     "./validate/runner": "./src/validate/runner.ts",
     "./validate/reporter": "./src/validate/reporter.ts",
@@ -467,13 +221,17 @@ The package.json uses subpath exports for explicit module boundaries:
 
 **Usage in plugins:**
 ```typescript
-import { validateHooksJson } from "@sidequest/core/validate/validators";
-import { tool, z } from "@sidequest/core/mcp";
-import { callModel } from "@sidequest/core/llm";
-import { logger } from "@sidequest/core/logging";
-import { createSLOTracker } from "@sidequest/core/slo";
-import { validateClassifierId, validatePriority } from "@sidequest/core/validation";
-import { loadTokenFile, saveTokenFile, isTokenExpired } from "@sidequest/core/oauth";
+// Marketplace-specific utilities
+import { validateHooksJson } from "@sidequest/marketplace-core/validate/validators";
+import { callModel } from "@sidequest/marketplace-core/llm";
+import { stripWikilinks } from "@sidequest/marketplace-core/obsidian";
+
+// General utilities (from published package)
+import { tool, z } from "@side-quest/core/mcp";
+import { logger } from "@side-quest/core/logging";
+import { createSLOTracker } from "@side-quest/core/slo";
+import { validateClassifierId, validatePriority } from "@side-quest/core/validation";
+import { loadTokenFile, saveTokenFile, isTokenExpired } from "@side-quest/core/oauth";
 ```
 
 ---
@@ -623,7 +381,7 @@ try {
 ### Logging with Correlation
 
 ```typescript
-import { logger, withCorrelationId } from "@sidequest/core/logging";
+import { logger, withCorrelationId } from "@side-quest/core/logging";
 
 await withCorrelationId(async () => {
   logger.info("Starting operation");
@@ -635,7 +393,7 @@ await withCorrelationId(async () => {
 ### MCP Tool Registration
 
 ```typescript
-import { tool, z } from "@sidequest/core/mcp";
+import { tool, z } from "@side-quest/core/mcp";
 
 tool("my_tool", {
   description: "What this tool does",
@@ -715,12 +473,19 @@ From PROJECT_INDEX.json:
 
 ## Getting Started
 
-**Using core utilities in a plugin:**
+**Using marketplace-core utilities in a plugin:**
 
-1. Add dependency: `"@sidequest/core": "workspace:*"` in plugin package.json
-2. Import from subpaths: `import { tool } from "@sidequest/core/mcp"`
+1. Add dependency: `"@sidequest/marketplace-core": "workspace:*"` in plugin package.json
+2. Import from subpaths: `import { callModel } from "@sidequest/marketplace-core/llm"`
 3. Run from root: `bun install`
 4. Use utilities: See module documentation above
+
+**Using published core utilities:**
+
+1. Add dependency: `"@side-quest/core": "^x.x.x"` in plugin package.json
+2. Import from subpaths: `import { tool } from "@side-quest/core/mcp"`
+3. Run from root: `bun install`
+4. Reference: See npm package documentation
 
 **Contributing to core:**
 

@@ -7,8 +7,8 @@
  * @module cli/voice-server
  */
 
-import { pathExistsSync } from "@sidequest/core/fs";
-import { emphasize } from "@sidequest/core/terminal";
+import { pathExistsSync } from "@side-quest/core/fs";
+import { emphasize } from "@side-quest/core/terminal";
 import type { ParaObsidianConfig } from "../config/index";
 import { initLogger, voiceLogger } from "../shared/logger";
 import { createVoiceMemoNote } from "../voice";

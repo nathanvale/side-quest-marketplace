@@ -12,7 +12,7 @@ import {
 	readTextFile,
 	stat,
 	writeTextFileAtomic,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 
 /** SLO event with all fields for persistence */
 interface SLOEvent {

@@ -102,7 +102,7 @@ const proc = Bun.spawn(["pdftotext", filePath, "-"]);
 **Check file before AND after operations to detect tampering.**
 
 ```typescript
-import { stat } from "@sidequest/core/fs";
+import { stat } from "@side-quest/core/fs";
 
 // Pre-check
 const preStats = await stat(filePath);
@@ -124,7 +124,7 @@ if (postStats.mtimeMs !== preStats.mtimeMs) {
 **Write to temp file, then atomically rename.**
 
 ```typescript
-import { rename } from "@sidequest/core/fs";
+import { rename } from "@side-quest/core/fs";
 
 // Write to temp file
 await Bun.write(tempPath, JSON.stringify(registry));
@@ -777,7 +777,7 @@ import {
   rename,
   sha256File,
   stat,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 
 // Atomic update
 const tempPath = `${targetPath}.tmp`;
@@ -853,7 +853,7 @@ function createInboxEngine(options: { vaultPath: string }): InboxEngine {
 
 ```typescript
 import { buildInboxPrompt, parseDetectionResponse } from "./llm-detection";
-import { callLLM } from "@sidequest/core/llm";
+import { callLLM } from "@sidequest/marketplace-core/llm";
 
 async function detectDocumentType(
   content: string,
@@ -905,7 +905,7 @@ src/inbox/
 
 - `p-limit` - Controlled concurrency
 - `nanospinner` - Progress indicators for CLI
-- `@sidequest/core/fs` - Atomic write utilities (ensureDirSync, moveFile, readTextFileSync)
+- `@side-quest/core/fs` - Atomic write utilities (ensureDirSync, moveFile, readTextFileSync)
 - `@sidequest/core/glob` - File globbing utilities (globFilesSync)
 - `pdftotext` - External CLI (brew install poppler)
 - `crypto.subtle` - SHA256 hashing (Bun native)

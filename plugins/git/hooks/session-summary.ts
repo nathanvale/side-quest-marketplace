@@ -274,6 +274,12 @@ if (import.meta.main) {
 		// Output additionalContext to influence what Claude preserves
 		const contextParts: string[] = [];
 		contextParts.push(`Git state at compaction:\n${gitState}`);
+		contextParts.push(
+			"\nGit workflow: /git:commit, /git:squash, /git:checkpoint",
+		);
+		contextParts.push(
+			"git-expert skill handles: commits, PRs, history, worktrees, changelog, branch compare, squash, safety guards",
+		);
 
 		if (cortexEntries.length > 0) {
 			contextParts.push(

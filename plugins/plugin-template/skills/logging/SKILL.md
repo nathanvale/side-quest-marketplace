@@ -1,11 +1,11 @@
 ---
 name: logging
-description: Guide for implementing structured logging in SideQuest plugins using @sidequest/core. Use when adding logging to new plugins, debugging existing plugins, or setting up log analysis.
+description: Guide for implementing structured logging in SideQuest plugins using @side-quest/core. Use when adding logging to new plugins, debugging existing plugins, or setting up log analysis.
 ---
 
 # Plugin Logging Guide
 
-Implement structured, JSONL logging in SideQuest plugins using the `@sidequest/core/logging` factory.
+Implement structured, JSONL logging in SideQuest plugins using the `@side-quest/core/logging` factory.
 
 ## When to Use This Skill
 
@@ -23,7 +23,7 @@ Implement structured, JSONL logging in SideQuest plugins using the `@sidequest/c
 // package.json
 {
   "dependencies": {
-    "@sidequest/core": "workspace:*"
+    "@side-quest/core": "workspace:*"
   }
 }
 ```
@@ -32,7 +32,7 @@ Implement structured, JSONL logging in SideQuest plugins using the `@sidequest/c
 
 ```typescript
 // src/logger.ts
-import { createPluginLogger } from "@sidequest/core/logging";
+import { createPluginLogger } from "@side-quest/core/logging";
 
 export const {
   initLogger,
@@ -92,7 +92,7 @@ async function scrape(url: string, cid: string) {
 ## Checklist: Adding Logging to a Plugin
 
 ### Setup Phase
-- [ ] Add `@sidequest/core: workspace:*` to dependencies
+- [ ] Add `@side-quest/core: workspace:*` to dependencies
 - [ ] Create `src/logger.ts` with plugin name and subsystems
 - [ ] Export subsystem-specific loggers
 
@@ -233,7 +233,7 @@ async function handleTool(args: ToolArgs) {
 
 ```typescript
 // src/logger.ts
-import { createPluginLogger } from "@sidequest/core/logging";
+import { createPluginLogger } from "@side-quest/core/logging";
 
 export const {
   initLogger,

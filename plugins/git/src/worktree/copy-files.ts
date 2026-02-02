@@ -18,8 +18,8 @@ import {
 	ensureParentDirSync,
 	pathExistsSync,
 	walkDirectory,
-} from "@sidequest/core/fs";
-import { globFilesSync, matchGlob } from "@sidequest/core/glob";
+} from "@side-quest/core/fs";
+import { globFilesSync, matchGlob } from "@side-quest/core/glob";
 
 /**
  * Copy files from source to destination based on glob patterns.

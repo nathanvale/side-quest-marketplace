@@ -6,10 +6,10 @@
  * rate limit header warnings.
  */
 
-import { TimeoutError, withTimeout } from "@sidequest/core/concurrency";
-import { getErrorCategory } from "@sidequest/core/instrumentation";
-import { createCorrelationId } from "@sidequest/core/logging";
-import { retry } from "@sidequest/core/utils";
+import { TimeoutError, withTimeout } from "@side-quest/core/concurrency";
+import { getErrorCategory } from "@side-quest/core/instrumentation";
+import { createCorrelationId } from "@side-quest/core/logging";
+import { retry } from "@side-quest/core/utils";
 import { mergeSingleTweet, mergeTweetList } from "./includes";
 import { logger } from "./logger";
 import { buildThread } from "./thread";

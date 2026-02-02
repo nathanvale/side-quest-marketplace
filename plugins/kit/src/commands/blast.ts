@@ -9,7 +9,7 @@ import {
 	buildEnhancedPath,
 	ensureCommandAvailable,
 	spawnWithTimeout,
-} from "@sidequest/core/spawn";
+} from "@side-quest/core/spawn";
 import { color, OutputFormat } from "../formatters/output";
 import { loadProjectIndex } from "../utils/index-parser";
 

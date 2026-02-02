@@ -4,8 +4,8 @@
  * Provides pre-configured SLO definitions for inbox processing operations.
  */
 
-import type { SLODefinition } from "@sidequest/core/slo";
-import { createSLOTracker } from "@sidequest/core/slo";
+import type { SLODefinition } from "@side-quest/core/slo";
+import { createSLOTracker } from "@side-quest/core/slo";
 
 /**
  * Predefined SLO definitions for inbox processing.
@@ -156,4 +156,4 @@ export type {
 	SLODefinition,
 	SLOUnit,
 	SLOWindow,
-} from "@sidequest/core/slo";
+} from "@side-quest/core/slo";

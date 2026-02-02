@@ -13,8 +13,8 @@ import {
 	pathExistsSync,
 	readTextFileSync,
 	writeTextFileSync,
-} from "@sidequest/core/fs";
-import { spawnSyncCollect } from "@sidequest/core/spawn";
+} from "@side-quest/core/fs";
+import { spawnSyncCollect } from "@side-quest/core/spawn";
 
 import type { ParaObsidianConfig } from "../config/index";
 import { resolveVaultPath } from "../shared/fs";

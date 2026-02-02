@@ -16,6 +16,6 @@
 		"@types/bun": "latest"
 	},
 	"dependencies": {
-		"@sidequest/core": "workspace:*"
+		"@side-quest/core": "^0.1.1"
 	}
 }

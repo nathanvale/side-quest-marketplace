@@ -9,7 +9,7 @@
  * @module inbox/execute/attachment-linker
  */
 
-import { readTextFileSync, writeTextFileSync } from "@sidequest/core/fs";
+import { readTextFileSync, writeTextFileSync } from "@side-quest/core/fs";
 import { loadConfig } from "../../config/index";
 import { injectSections } from "../../notes/create";
 import { resolveVaultPath } from "../../shared/fs";

@@ -29,7 +29,7 @@ import {
 	createCorrelationId as coreCreateCorrelationId,
 	createPluginLogger,
 	type LogLevel,
-} from "@sidequest/core/logging";
+} from "@side-quest/core/logging";
 
 // =============================================================================
 // Configuration

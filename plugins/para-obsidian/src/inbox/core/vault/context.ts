@@ -9,8 +9,8 @@
 
 import { readdirSync } from "node:fs";
 import { basename, join } from "node:path";
-import { pathExistsSync } from "@sidequest/core/fs";
-import { globFilesSync } from "@sidequest/core/glob";
+import { pathExistsSync } from "@side-quest/core/fs";
+import { globFilesSync } from "@side-quest/core/glob";
 import { DEFAULT_PARA_FOLDERS } from "../../../config/defaults";
 
 /**

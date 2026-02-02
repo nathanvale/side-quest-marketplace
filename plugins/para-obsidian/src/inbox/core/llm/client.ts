@@ -19,7 +19,7 @@ import { llmLogger } from "../../../shared/logger";
 import type { OperationContext } from "../../shared/context";
 
 // Lazy-loaded LLM module to avoid circular dependencies at module load time
-let llmModule: typeof import("@sidequest/core/llm") | null = null;
+let llmModule: typeof import("@sidequest/marketplace-core/llm") | null = null;
 
 /** Default fallback model when Claude fails */
 const DEFAULT_FALLBACK_MODEL = "qwen2.5:14b";
@@ -65,7 +65,7 @@ async function resolveTimeout(
 ): Promise<number> {
 	// Lazy load to get getDefaultTimeoutMs
 	if (!llmModule) {
-		llmModule = await import("@sidequest/core/llm");
+		llmModule = await import("@sidequest/marketplace-core/llm");
 	}
 	const { getDefaultTimeoutMs } = llmModule;
 
@@ -185,7 +185,7 @@ export async function callLLMWithMetadata(
 ): Promise<LLMCallResult> {
 	// Lazy load once, then reuse cached module
 	if (!llmModule) {
-		llmModule = await import("@sidequest/core/llm");
+		llmModule = await import("@sidequest/marketplace-core/llm");
 	}
 	const { callModel } = llmModule;
 

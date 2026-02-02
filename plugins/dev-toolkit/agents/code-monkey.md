@@ -93,12 +93,12 @@ bun_runTests({ response_format: "json" })  # Verify ALL tests pass
 
 | Module | Use For |
 |--------|---------|
-| `@sidequest/core/fs` | File operations: `readTextFile`, `writeTextFile`, `pathExists`, `ensureDir`, `findUpSync` |
+| `@side-quest/core/fs` | File operations: `readTextFile`, `writeTextFile`, `pathExists`, `ensureDir`, `findUpSync` |
 | `@sidequest/core/glob` | Pattern matching: `globFiles`, `matchGlob`, `filterGlob` |
-| `@sidequest/core/testing` | Test fixtures: `createTempDir`, `writeTestFile`, `setupTestDir`, `cleanupTestDir` |
-| `@sidequest/core/mcp` | MCP servers: `tool`, `resource`, `startServer`, `z` |
-| `@sidequest/core/spawn` | Process execution: `spawnAndCollect`, `spawnWithTimeout`, `commandExists` |
-| `@sidequest/core/utils` | General utilities: `uuid`, `retry`, `debounce`, `deepEquals`, `safeJsonParse` |
+| `@side-quest/core/testing` | Test fixtures: `createTempDir`, `writeTestFile`, `setupTestDir`, `cleanupTestDir` |
+| `@side-quest/core/mcp` | MCP servers: `tool`, `resource`, `startServer`, `z` |
+| `@side-quest/core/spawn` | Process execution: `spawnAndCollect`, `spawnWithTimeout`, `commandExists` |
+| `@side-quest/core/utils` | General utilities: `uuid`, `retry`, `debounce`, `deepEquals`, `safeJsonParse` |
 | `@sidequest/core/terminal` | CLI output: `red`, `green`, `bold`, `table`, `spinner` |
 
 ---
@@ -109,7 +109,7 @@ bun_runTests({ response_format: "json" })  # Verify ALL tests pass
 
 ```typescript
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { createTempDir, writeTestFile, cleanupTestDir } from "@sidequest/core/testing";
+import { createTempDir, writeTestFile, cleanupTestDir } from "@side-quest/core/testing";
 
 describe("Feature", () => {
   let tempDir: string;

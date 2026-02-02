@@ -5,8 +5,8 @@
 import { afterEach, describe, expect, onTestFinished, test } from "bun:test";
 import { existsSync, unlinkSync } from "node:fs";
 import path from "node:path";
-import { readTextFileSync } from "@sidequest/core/fs";
-import { OutputFormat } from "@sidequest/core/terminal";
+import { readTextFileSync } from "@side-quest/core/fs";
+import { OutputFormat } from "@side-quest/core/terminal";
 import { loadConfig } from "../config/index";
 import { setupTestVault, useTestVaultCleanup } from "../testing/utils";
 import { handleExportBookmarks } from "./export-bookmarks";

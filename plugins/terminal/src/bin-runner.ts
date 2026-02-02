@@ -7,8 +7,8 @@
 
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { pathExistsSync } from "@sidequest/core/fs";
-import { spawnSyncCollect } from "@sidequest/core/spawn";
+import { pathExistsSync } from "@side-quest/core/fs";
+import { spawnSyncCollect } from "@side-quest/core/spawn";
 
 /**
  * Logger interface compatible with LogTape loggers.

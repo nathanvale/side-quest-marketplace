@@ -8,7 +8,7 @@ import {
 	findNearestConfig,
 	hasConfigAtRoot,
 	type NearestConfigResult,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 
 /**
  * Valid TypeScript configuration file names.

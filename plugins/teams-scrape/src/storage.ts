@@ -8,16 +8,16 @@
 
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { withFileLock } from "@sidequest/core/concurrency";
+import { withFileLock } from "@side-quest/core/concurrency";
 import {
 	ensureDir,
 	pathExists,
 	readDirAsync,
 	readJsonFile,
 	writeJsonFileAtomic,
-} from "@sidequest/core/fs";
-import { observe } from "@sidequest/core/instrumentation";
-import { kebabCase } from "@sidequest/core/utils";
+} from "@side-quest/core/fs";
+import { observe } from "@side-quest/core/instrumentation";
+import { kebabCase } from "@side-quest/core/utils";
 import { storageLogger } from "./logger.js";
 import type {
 	ListResult,

@@ -16,7 +16,7 @@
 import {
 	createCorrelationId,
 	createPluginLogger,
-} from "@sidequest/core/logging";
+} from "@side-quest/core/logging";
 
 const {
 	initLogger,

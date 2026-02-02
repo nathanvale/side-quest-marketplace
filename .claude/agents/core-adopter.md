@@ -137,11 +137,11 @@ You are a core adoption specialist that identifies where plugins can use `@sideq
 ├── SLOPersistence                       # JSONL event persistence
 └── types: SLODefinition, SLOEvent, SLOBreachResult  # SLO types
 
-@sidequest/core/obsidian
+@sidequest/marketplace-core/obsidian
 ├── stripWikilinks                       # Remove [[wikilink]] syntax
 └── stripWikilinksOrValue                # Strip or return original if no links
 
-@sidequest/core/formatters
+@side-quest/core/formatters
 ├── formatBytes                          # Format bytes to human-readable (B, KB, MB, GB)
 ├── getLanguageForExtension              # Map file extension to syntax highlighting language
 └── (re-exports from terminal)           # Colors, formatting

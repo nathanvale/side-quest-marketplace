@@ -20,7 +20,7 @@ Analysis of the Para Obsidian CLI implementation against the marketplace-wide Bu
 
 **Recent Upgrades (✅ Completed):**
 - Extracted `parseArgs`, `parseKeyValuePairs`, `coerceValue` to `src/utils/args.ts`
-- Replaced `node:fs` with `@sidequest/core/fs` utilities throughout
+- Replaced `node:fs` with `@side-quest/core/fs` utilities throughout
 - Fixed usage output coloring to skip empty lines
 - Added 29 argument parsing edge case tests (now 80 total tests)
 
@@ -45,7 +45,7 @@ import {
 	emphasize,
 	OutputFormat,
 	parseOutputFormat,
-} from "@sidequest/core/formatters";
+} from "@side-quest/core/formatters";
 ```
 
 **Status: PERFECT**
@@ -194,7 +194,7 @@ import {
 	emphasize,
 	OutputFormat,
 	parseOutputFormat,
-} from "@sidequest/core/formatters";
+} from "@side-quest/core/formatters";
 
 // Not importing node:fs directly - good!
 // Using validated paths throughout
@@ -212,7 +212,7 @@ fs.existsSync(path);
 fs.readFileSync(path, "utf-8");
 
 // Better: core/fs
-import { pathExistsSync, readTextFileSync } from "@sidequest/core/fs";
+import { pathExistsSync, readTextFileSync } from "@side-quest/core/fs";
 pathExistsSync(path);
 readTextFileSync(path);
 ```
@@ -414,7 +414,7 @@ In CLAUDE.md:
 		"check": "biome check --write ."
 	},
 	"dependencies": {
-		"@sidequest/core": "workspace:*",
+		"@side-quest/core": "workspace:*",
 		"yaml": "^2.6.0"
 	}
 }
@@ -447,7 +447,7 @@ In CLAUDE.md:
 
 ### High Priority (All Done)
 1. ✅ **Extract parseArgs to utils/args.ts** — Completed with coerceValue and parseKeyValuePairs
-2. ✅ **Use core/fs utilities** — Replaced all node:fs imports with @sidequest/core/fs
+2. ✅ **Use core/fs utilities** — Replaced all node:fs imports with @side-quest/core/fs
 3. ✅ **Add more CLI parsing tests** — Added 29 comprehensive edge case tests (80 total)
 
 ### Low Priority (Completed)
@@ -480,13 +480,13 @@ import { coerceValue, parseArgs, parseKeyValuePairs } from "./utils/args";
 
 3. ✅ Replaced node:fs with core utilities:
 ```typescript
-import { pathExistsSync, readTextFileSync, writeTextFileSync, readJsonFileSync, writeJsonFileSync } from "@sidequest/core/fs";
+import { pathExistsSync, readTextFileSync, writeTextFileSync, readJsonFileSync, writeJsonFileSync } from "@side-quest/core/fs";
 ```
 
-**Now in @sidequest/core:** ✅ Moved to core package
+**Now in @side-quest/core:** ✅ Moved to core package
 ```typescript
 // Import from core (available for all CLI plugins)
-import { parseArgs, parseKeyValuePairs, coerceValue } from "@sidequest/core/cli";
+import { parseArgs, parseKeyValuePairs, coerceValue } from "@side-quest/core/cli";
 ```
 
 This enables CLI scaffolding templates to reference these utilities for new CLI plugins, ensuring consistent argument parsing across the marketplace.

@@ -9,7 +9,7 @@
 
 import { mkdirSync, realpathSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
-import { moveFile, pathExistsSync } from "@sidequest/core/fs";
+import { moveFile, pathExistsSync } from "@side-quest/core/fs";
 import { createCorrelationId, routingLogger } from "../../shared/logger";
 import type { RoutingContext } from "./scanner";
 import type { RoutingCandidate, RoutingResult } from "./types";

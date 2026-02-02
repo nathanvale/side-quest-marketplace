@@ -11,7 +11,7 @@
 
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
-import { processInParallelChunks } from "@sidequest/core/concurrency";
+import { processInParallelChunks } from "@side-quest/core/concurrency";
 import { getAstLogger } from "../logger.js";
 import { getDefaultKitPath } from "../types.js";
 import type { SyntaxNode } from "./languages.js";

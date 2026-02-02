@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
-import { cleanupTestDir, createTempDir } from "@sidequest/core/testing";
+import { cleanupTestDir, createTempDir } from "@side-quest/core/testing";
 import type { Stakeholder } from "./index";
 
 // ============================================================================

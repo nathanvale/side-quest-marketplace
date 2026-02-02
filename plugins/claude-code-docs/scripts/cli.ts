@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { join } from "node:path";
-import { ensureDir, pathExists } from "@sidequest/core/fs";
+import { ensureDir, pathExists } from "@side-quest/core/fs";
 import { ClaudeDocsFetcher } from "./fetcher";
 
 // Output to plugin's docs directory

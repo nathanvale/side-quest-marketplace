@@ -13,7 +13,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { spawnAndCollect } from "@sidequest/core/spawn";
+import { spawnAndCollect } from "@side-quest/core/spawn";
 import { discoverAttachments } from "../attachments/index";
 import type { ParaObsidianConfig } from "../config/index";
 import { getManagedFolders, isInManagedFolder } from "../shared/folders.js";
@@ -23,7 +23,7 @@ import { gitLogger } from "../shared/logger.js";
 import { assertGitRepo, getUncommittedFiles } from "./guard-wrapper.js";
 
 // Re-export from core for backward compatibility
-export { unescapeGitPath } from "@sidequest/core/git";
+export { unescapeGitPath } from "@side-quest/core/git";
 // Re-export folder utilities
 export { getManagedFolders, isInManagedFolder } from "../shared/folders.js";
 // Re-export guard functions from wrapper (instrumented core implementations)

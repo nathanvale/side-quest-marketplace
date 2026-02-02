@@ -42,7 +42,7 @@ import {
 	observeHistogram,
 	runWithContext,
 	type TraceContext,
-} from "@sidequest/core/instrumentation";
+} from "@side-quest/core/instrumentation";
 import { createCorrelationId, type SUBSYSTEMS } from "./logger.js";
 
 /**
@@ -421,4 +421,4 @@ export {
 	type MetricLabels,
 	observeHistogram,
 	resetMetrics,
-} from "@sidequest/core/instrumentation";
+} from "@side-quest/core/instrumentation";

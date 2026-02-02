@@ -8,7 +8,7 @@
  * @module llm/model-router
  */
 
-import { spawnWithTimeout } from "../spawn/index.js";
+import { spawnWithTimeout } from "@side-quest/core/spawn";
 
 /** Claude model identifiers */
 export type ClaudeModel = "sonnet" | "haiku";

@@ -19,8 +19,8 @@ import {
 	pathExistsSync,
 	readTextFileSync,
 	validateConfigPath,
-} from "@sidequest/core/fs";
-import { getErrorMessage } from "@sidequest/core/utils";
+} from "@side-quest/core/fs";
+import { getErrorMessage } from "@side-quest/core/utils";
 import type { InboxConverter } from "../inbox";
 import {
 	DEFAULT_CONVERTERS as DEFAULT_INBOX_CONVERTERS,

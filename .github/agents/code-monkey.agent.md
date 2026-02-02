@@ -23,7 +23,7 @@ You are an implementation agent for the SideQuest marketplace. Write code, valid
 
 ## CRITICAL RULES
 
-1. **ALWAYS check `@sidequest/core/*` first** — Use core utilities before writing bespoke code
+1. **ALWAYS check `@side-quest/core/*` first** — Use core utilities before writing bespoke code
 2. **Only build bespoke if core doesn't have it** — If you need something core lacks, implement it
 3. **ALWAYS run validation** after implementation: typecheck → lint fix → run tests
 4. **ALWAYS write JSDoc** on exported functions
@@ -33,11 +33,11 @@ You are an implementation agent for the SideQuest marketplace. Write code, valid
 
 ## Core Package Reference
 
-**16 modules available.** Import: `import { func } from "@sidequest/core/<module>"`
+**16 modules available.** Import: `import { func } from "@side-quest/core/<module>"`
 
 ### File & Directory Operations
 
-**`@sidequest/core/fs`** — USE THIS, not `node:fs`
+**`@side-quest/core/fs`** — USE THIS, not `node:fs`
 
 | Function | Purpose |
 |----------|---------|
@@ -51,7 +51,7 @@ You are an implementation agent for the SideQuest marketplace. Write code, valid
 | `findUpSync`, `findProjectRoot` | Find files up tree |
 | `createTempDir`, `withTempDir` | Temp directories |
 
-**`@sidequest/core/glob`** — File pattern matching
+**`@side-quest/core/glob`** — File pattern matching
 
 | Function | Purpose |
 |----------|---------|
@@ -60,7 +60,7 @@ You are an implementation agent for the SideQuest marketplace. Write code, valid
 
 ### Testing
 
-**`@sidequest/core/testing`** — USE THIS for test fixtures
+**`@side-quest/core/testing`** — USE THIS for test fixtures
 
 | Function | Purpose |
 |----------|---------|
@@ -73,7 +73,7 @@ You are an implementation agent for the SideQuest marketplace. Write code, valid
 
 ### MCP Server
 
-**`@sidequest/core/mcp`** — Simplified MCP API (USE THIS for MCP servers)
+**`@side-quest/core/mcp`** — Simplified MCP API (USE THIS for MCP servers)
 
 | Function | Purpose |
 |----------|---------|
@@ -85,7 +85,7 @@ You are an implementation agent for the SideQuest marketplace. Write code, valid
 
 ### Process Execution
 
-**`@sidequest/core/spawn`** — USE THIS, not `Bun.spawn` directly
+**`@side-quest/core/spawn`** — USE THIS, not `Bun.spawn` directly
 
 | Function | Purpose |
 |----------|---------|
@@ -96,7 +96,7 @@ You are an implementation agent for the SideQuest marketplace. Write code, valid
 
 ### Utilities
 
-**`@sidequest/core/utils`** — General utilities
+**`@side-quest/core/utils`** — General utilities
 
 | Function | Purpose |
 |----------|---------|
@@ -112,7 +112,7 @@ You are an implementation agent for the SideQuest marketplace. Write code, valid
 
 ### Terminal & CLI
 
-**`@sidequest/core/terminal`** — CLI output formatting
+**`@side-quest/core/terminal`** — CLI output formatting
 
 | Function | Purpose |
 |----------|---------|
@@ -129,7 +129,7 @@ You are an implementation agent for the SideQuest marketplace. Write code, valid
 
 ```typescript
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { createTempDir, writeTestFile, cleanupTestDir } from "@sidequest/core/testing";
+import { createTempDir, writeTestFile, cleanupTestDir } from "@side-quest/core/testing";
 
 describe("Feature", () => {
   let tempDir: string;
@@ -146,7 +146,7 @@ describe("Feature", () => {
 ### MCP Tool Pattern
 
 ```typescript
-import { tool, startServer, z } from "@sidequest/core/mcp";
+import { tool, startServer, z } from "@side-quest/core/mcp";
 
 tool("my_tool", {
   description: "What this tool does",

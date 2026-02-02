@@ -1,6 +1,6 @@
 ---
 description: Review a GitHub pull request
-model: claude-sonnet-4-5-20250929
+model: sonnet
 allowed-tools: Bash(gh *:*), Bash(git *:*), Bash(jq *:*), Read, Grep
 argument-hint: <pr-number-or-url>
 ---

@@ -45,7 +45,7 @@ plugin/
  * Output formats: markdown (default) for humans, JSON for machines.
  */
 
-import { parseOutputFormat, type OutputFormat } from "@sidequest/core/formatters";
+import { parseOutputFormat, type OutputFormat } from "@side-quest/core/formatters";
 ```
 
 **Rules:**
@@ -131,7 +131,7 @@ function printUsage(): void {
 ```
 
 **Rules:**
-- ✅ Use cyan color for headers (from @sidequest/core/formatters)
+- ✅ Use cyan color for headers (from @side-quest/core/formatters)
 - ✅ Structure: Usage → Options → Examples
 - ✅ Keep under 30 lines (fit in terminal)
 - ✅ Show command variations clearly
@@ -253,7 +253,7 @@ import {
   emphasize,
   parseOutputFormat,
   type OutputFormat,
-} from "@sidequest/core/formatters";
+} from "@side-quest/core/formatters";
 
 interface FormattedOutput {
   markdown: string;
@@ -280,7 +280,7 @@ function formatOutput(result: unknown, format: OutputFormat): string {
 ### Color Palette
 
 ```typescript
-// From @sidequest/core/formatters
+// From @side-quest/core/formatters
 color("cyan", "Header")      // Information, CLI banners
 color("green", "Success")    // Successful operations
 color("yellow", "Warning")   // Warnings, dry-run
@@ -443,14 +443,14 @@ import {
   writeJsonFileSync,
   readTextFile,
   writeTextFile,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 
 // Don't use Node.js fs directly in new code
 // ❌ import { readFileSync } from "node:fs";
 ```
 
 **Rules:**
-- ✅ Use @sidequest/core/fs for file operations
+- ✅ Use @side-quest/core/fs for file operations
 - ✅ Use sync versions in CLI (faster feedback)
 - ✅ Validate paths (vault-scoped if applicable)
 - ✅ Error on missing files early
@@ -571,7 +571,7 @@ switch (command) {
 
 - [ ] Bin entry pointing to cli.ts
 - [ ] Scripts: typecheck, test, check
-- [ ] @sidequest/core in dependencies (if using formatters/fs)
+- [ ] @side-quest/core in dependencies (if using formatters/fs)
 
 ### CI/CD
 
@@ -625,7 +625,7 @@ If updating existing CLI to match this standard:
 1. **Extract parseArgs** → Move to utils/args.ts
 2. **Standardize usage** → Use printUsage() with color
 3. **Add output formatting** → Support --format md|json
-4. **Use core/formatters** → Import from @sidequest/core
+4. **Use core/formatters** → Import from @side-quest/core
 5. **Use core/fs** → Replace node:fs with core/fs
 6. **Add tests** → Test parsing and commands
 7. **Document** → Update CLAUDE.md CLI section

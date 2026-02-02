@@ -9,7 +9,7 @@ import {
 	type ErrorPattern,
 	isTimeoutOutput,
 	PluginError,
-} from "@sidequest/core/instrumentation";
+} from "@side-quest/core/instrumentation";
 
 // ============================================================================
 // Error Types

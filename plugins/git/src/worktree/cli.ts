@@ -10,9 +10,9 @@
  * @module worktree/cli
  */
 
-import { parseArgs } from "@sidequest/core/cli";
-import { getGitRoot } from "@sidequest/core/git";
-import { getErrorMessage } from "@sidequest/core/utils";
+import { parseArgs } from "@side-quest/core/cli";
+import { getGitRoot } from "@side-quest/core/git";
+import { getErrorMessage } from "@side-quest/core/utils";
 import { loadOrDetectConfig, writeConfig } from "./config.js";
 import { createWorktree } from "./create.js";
 import { checkBeforeDelete, deleteWorktree } from "./delete.js";

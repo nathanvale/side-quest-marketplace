@@ -5,7 +5,7 @@
  */
 
 import { join } from "node:path";
-import { readTextFileSync } from "@sidequest/core/fs";
+import { readTextFileSync } from "@side-quest/core/fs";
 import { formatTicketTypeName } from "./price-scraper.ts";
 
 /**

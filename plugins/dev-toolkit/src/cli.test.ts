@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseArgs } from "@sidequest/core/cli";
+import { parseArgs } from "@side-quest/core/cli";
 
 describe("dev-toolkit CLI argument parsing", () => {
 	test("parses create-template command", () => {

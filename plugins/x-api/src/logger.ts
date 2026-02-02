@@ -5,7 +5,7 @@
  * Output: ~/.claude/logs/x-api.jsonl (auto-rotated by core)
  */
 
-import { createPluginLogger } from "@sidequest/core/logging";
+import { createPluginLogger } from "@side-quest/core/logging";
 
 const { initLogger, getSubsystemLogger, createCorrelationId } =
 	createPluginLogger({

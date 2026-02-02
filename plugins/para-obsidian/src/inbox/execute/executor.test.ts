@@ -15,7 +15,7 @@ import {
 	cleanupTestDir,
 	createTempDir,
 	writeTestFile,
-} from "@sidequest/core/testing";
+} from "@side-quest/core/testing";
 import { executeLogger } from "../../shared/logger";
 import { createRegistry } from "../registry";
 import type { CreateNoteSuggestion } from "../types";

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
-import { ensureDirSync, writeTextFileSync } from "@sidequest/core/fs";
+import { ensureDirSync, writeTextFileSync } from "@side-quest/core/fs";
 import { spawn } from "bun";
 
 import { loadConfig } from "../../config/index";

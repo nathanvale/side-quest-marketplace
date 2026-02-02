@@ -6,7 +6,7 @@
  * @module cli/notes
  */
 
-import { emphasize } from "@sidequest/core/terminal";
+import { emphasize } from "@side-quest/core/terminal";
 import { autoCommitChanges, ensureGitGuard } from "../git/index";
 import { deleteFile } from "../notes/delete";
 import { listDir, readFile } from "../shared/fs";

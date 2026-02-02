@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createTempDir } from "@sidequest/core/testing";
+import { createTempDir } from "@side-quest/core/testing";
 import { useTestVaultCleanup } from "../testing/utils";
 import {
 	atomicWriteFile,

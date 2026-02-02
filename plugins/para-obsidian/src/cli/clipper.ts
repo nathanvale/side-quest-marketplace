@@ -7,7 +7,7 @@
  * @module cli/clipper
  */
 
-import { bold, cyan, emphasize } from "@sidequest/core/terminal";
+import { bold, cyan, emphasize } from "@side-quest/core/terminal";
 import {
 	exportAllToTemplater,
 	exportToTemplater,

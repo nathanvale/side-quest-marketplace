@@ -8,8 +8,8 @@
  */
 
 import { basename, join } from "node:path";
-import { pathExistsSync, readDir } from "@sidequest/core/fs";
-import { captureResourceMetrics } from "@sidequest/core/instrumentation";
+import { pathExistsSync, readDir } from "@side-quest/core/fs";
+import { captureResourceMetrics } from "@side-quest/core/instrumentation";
 import pLimit from "p-limit";
 import {
 	DEFAULT_DESTINATIONS,

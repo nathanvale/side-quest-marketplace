@@ -8,7 +8,7 @@ import {
 } from "bun:test";
 import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { ensureDir } from "@sidequest/core/fs";
+import { ensureDir } from "@side-quest/core/fs";
 import * as storageModule from "./storage.js";
 import type { StoredChat, TeamsMessage } from "./types.js";
 

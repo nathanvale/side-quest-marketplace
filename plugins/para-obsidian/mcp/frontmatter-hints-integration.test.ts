@@ -9,7 +9,7 @@ import {
 	cleanupTestDir,
 	createTempDir,
 	writeTestFile,
-} from "@sidequest/core/testing";
+} from "@side-quest/core/testing";
 import type { ParaObsidianConfig } from "../src/config";
 import { loadConfig } from "../src/config";
 import { readFrontmatterFile, updateFrontmatterFile } from "../src/frontmatter";

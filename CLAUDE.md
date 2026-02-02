@@ -11,8 +11,10 @@
 - Pre-commit hook runs `bun run validate:quick` automatically - fix failures immediately
 - CI pipeline runs full `bun run validate` - fails on any issue
 
-**Workspace Dependencies:**
-- **ALWAYS** use workspace protocol: `"dependency": "workspace:*"` for cross-plugin deps
+**Dependencies:**
+- **Published core:** Use `"@side-quest/core": "^0.1.1"` for shared utilities (npm package)
+- **Marketplace core:** Use `"@sidequest/marketplace-core": "workspace:*"` for hooks, llm, obsidian, validate only
+- **Cross-plugin deps:** Use `"dependency": "workspace:*"` for other workspace packages
 - **ALWAYS** run `bun install` from root after adding dependencies
 - **NEVER** create circular dependencies between plugins
 
@@ -59,8 +61,9 @@ side-quest-marketplace/
 │   ├── the-cinema-bandit/     # Movie ticket price scraper [EXPERIMENTAL]
 │   ├── tsc-runner/            # TypeScript type checking integration
 │   └── validate-plugin/       # Plugin validation hooks
-├── core/                      # Shared validation & utilities
-│   └── src/validate/          # Plugin validation engine (12 validators)
+├── core/                      # @sidequest/marketplace-core (workspace)
+│   └── src/                   # Unpublished modules: hooks, llm, obsidian, validate
+│       └── validate/          # Plugin validation engine (12 validators)
 ├── .claude-plugin/            # Marketplace metadata (plugin.json)
 ├── biome.json                 # Biome linting & formatting config (root)
 ├── commitlint.config.js       # Conventional commits enforcement
@@ -115,6 +118,8 @@ Plugin-specific → `bun --filter <plugin> test` | `claude plugin validate plugi
 - Node.js v24.11.1 (compatibility, see .nvmrc)
 - Biome 2.3.7 (linting/formatting, recommended rules, noNonNullAssertion: off)
 - Commitlint + Husky 9.1.7 (git hooks, conventional commits)
+- `@side-quest/core` (npm) — shared utilities (fs, mcp, logging, spawn, terminal, etc.)
+- `@sidequest/marketplace-core` (workspace) — marketplace-specific: hooks, llm, obsidian, validate
 
 **Plugin Architecture:** MCP servers, slash commands, skills, hooks (SessionStart, PreToolUse, PostToolUse, Stop)
 
@@ -151,10 +156,13 @@ Full workflow guide: @./docs/GIT_WORKFLOW.md
 **Add dependencies:**
 ```bash
 cd plugins/my-plugin && bun add <package>  # Plugin dependency
+cd plugins/my-plugin && bun add @side-quest/core  # Core utilities (npm)
 bun add -D <package>                       # Root dev dependency
 bun install                                 # After adding deps (from root)
 ```
 
+**Core utilities:** Use `"@side-quest/core": "^0.1.1"` — published on npm
+**Marketplace-only modules:** Use `"@sidequest/marketplace-core": "workspace:*"` — hooks, llm, obsidian, validate
 **Cross-plugin deps:** Use `"dependency": "workspace:*"` in package.json
 
 **Create plugin:** `/plugin-template:create my-plugin`
@@ -275,7 +283,7 @@ Full overview: @./docs/PLUGINS_OVERVIEW.md
 - **Strict validation:** Pre-commit hooks prevent broken plugins
 - **MCP naming convention:** Prevents tool name collisions
 - **Kit integration:** PROJECT_INDEX.json enables token-efficient queries
-- **Workspace protocol:** `workspace:*` ensures plugins use local versions
+- **Core split:** `@side-quest/core` (npm) for utilities, `@sidequest/marketplace-core` (workspace) for unpublished modules
 - **Temporary scratch:** Use `.test-scratch/` for experiments
 
 ---

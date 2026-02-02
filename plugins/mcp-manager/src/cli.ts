@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { join } from "node:path";
-import { pathExistsSync, readJsonFileSync } from "@sidequest/core/fs";
+import { pathExistsSync, readJsonFileSync } from "@side-quest/core/fs";
 import {
 	type ProjectConfig,
 	readClaudeConfig,

@@ -12,7 +12,7 @@ import {
 	pathExistsSync,
 	readTextFileSync,
 	writeTextFileSync,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 
 import type { ParaObsidianConfig } from "../config/index";
 import { resolveVaultPath } from "../shared/fs";

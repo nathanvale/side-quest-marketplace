@@ -210,7 +210,7 @@ plugins/kit/
 
 ## Pattern 8: Dual Logging (MCP Protocol + File)
 
-`log.info()` from `@sidequest/core/mcp` automatically logs to both:
+`log.info()` from `@side-quest/core/mcp` automatically logs to both:
 1. MCP protocol (visible in Claude Desktop inspector)
 2. File (`~/.claude/logs/<plugin>.jsonl`)
 

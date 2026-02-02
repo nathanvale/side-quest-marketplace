@@ -1004,7 +1004,7 @@ Changed from LLM-first to heuristics-first for performance and cost:
 ## Dependencies
 
 **Runtime:**
-- `@sidequest/core/fs` - Filesystem utilities
+- `@side-quest/core/fs` - Filesystem utilities
 - `p-limit` - Concurrency control
 - `@inquirer/prompts` - Interactive CLI
 - `yaml` - Frontmatter parsing

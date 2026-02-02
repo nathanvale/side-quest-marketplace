@@ -11,7 +11,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { pathExistsSync, readTextFileSync } from "@sidequest/core/fs";
+import { pathExistsSync, readTextFileSync } from "@side-quest/core/fs";
 
 import { parseFrontmatter } from "../frontmatter/index";
 import { resolveVaultPath, walkDirectory } from "../shared/fs";

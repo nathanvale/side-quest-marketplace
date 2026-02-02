@@ -8,7 +8,7 @@
  */
 
 import { dirname, join } from "node:path";
-import { sleepSync } from "@sidequest/core/utils";
+import { sleepSync } from "@side-quest/core/utils";
 import { executeLogger } from "../../../shared/logger";
 import type { createRegistry } from "../../registry/processed-registry";
 

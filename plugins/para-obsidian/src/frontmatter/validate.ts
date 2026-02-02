@@ -5,8 +5,8 @@
  */
 
 import path from "node:path";
-import { globFilesSync } from "@sidequest/core/glob";
-import { getErrorMessage } from "@sidequest/core/utils";
+import { globFilesSync } from "@side-quest/core/glob";
+import { getErrorMessage } from "@side-quest/core/utils";
 
 import type {
 	FieldRule,

@@ -15,7 +15,7 @@ import {
 	callModel,
 	type LLMModel,
 	parseOllamaResponse,
-} from "@sidequest/core/llm";
+} from "@sidequest/marketplace-core/llm";
 import type { FrontmatterRules, ParaObsidianConfig } from "../config/index";
 import {
 	readFrontmatterFile,

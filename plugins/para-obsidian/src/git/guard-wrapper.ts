@@ -12,7 +12,7 @@ import {
 	ensureGitGuard as coreEnsureGitGuard,
 	getUncommittedFiles as coreGetUncommittedFiles,
 	gitStatus as coreGitStatus,
-} from "@sidequest/core/git";
+} from "@side-quest/core/git";
 import type { ParaObsidianConfig } from "../config/index.js";
 import { getManagedFolders } from "../shared/folders.js";
 import { observe } from "../shared/instrumentation.js";

@@ -11,4 +11,4 @@ export {
 	validatePath,
 	validatePathOrDefault,
 	validateShellSafePattern as validatePattern,
-} from "@sidequest/core/validation";
+} from "@side-quest/core/validation";

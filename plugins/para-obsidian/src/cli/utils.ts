@@ -13,11 +13,11 @@ import {
 	parseArgOverrides as coreParseArgOverrides,
 	parseDirs as coreParseDirs,
 	parseCommaSeparatedList,
-} from "@sidequest/core/cli";
+} from "@side-quest/core/cli";
 import {
 	matchesDir as coreMatchesDir,
 	normalizePathFragment as coreNormalizePathFragment,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 import { discoverAttachments } from "../attachments/index";
 import type { ParaObsidianConfig } from "../config/index";
 import type { NormalizedFlags, RawFlags } from "./types";

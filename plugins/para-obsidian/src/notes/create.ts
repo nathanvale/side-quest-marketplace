@@ -17,8 +17,8 @@
  * @module create
  */
 import path from "node:path";
-import { ensureDirSync, writeTextFileSync } from "@sidequest/core/fs";
-import { getErrorMessage } from "@sidequest/core/utils";
+import { ensureDirSync, writeTextFileSync } from "@side-quest/core/fs";
+import { getErrorMessage } from "@side-quest/core/utils";
 import type { ParaObsidianConfig } from "../config/index";
 import {
 	filterFieldsForWrite,

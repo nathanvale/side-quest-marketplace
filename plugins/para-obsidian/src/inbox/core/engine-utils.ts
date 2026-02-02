@@ -8,8 +8,8 @@
  */
 
 import { basename, extname } from "node:path";
-import { formatDateWithSpaces } from "@sidequest/core/formatters";
-import { pathExistsSync } from "@sidequest/core/fs";
+import { formatDateWithSpaces } from "@side-quest/core/formatters";
+import { pathExistsSync } from "@side-quest/core/fs";
 
 /**
  * Extract first 4 characters of a hash as a short ID.

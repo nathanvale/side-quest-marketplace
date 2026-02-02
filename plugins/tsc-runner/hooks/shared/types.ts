@@ -10,7 +10,7 @@ export {
 	extractFilePaths,
 	type HookInput,
 	parseHookInput,
-} from "@sidequest/core/hooks";
+} from "@sidequest/marketplace-core/hooks";
 
 /**
  * Parsed TypeScript compiler error.

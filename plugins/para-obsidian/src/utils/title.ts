@@ -7,7 +7,7 @@
  * @module utils/title
  */
 
-import { applyTitlePrefix as applyTitlePrefixCore } from "@sidequest/core/obsidian";
+import { applyTitlePrefix as applyTitlePrefixCore } from "@sidequest/marketplace-core/obsidian";
 import {
 	DEFAULT_TITLE_PREFIXES,
 	SOURCE_FORMAT_EMOJIS,

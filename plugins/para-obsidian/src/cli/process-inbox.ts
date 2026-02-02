@@ -3,8 +3,8 @@
  */
 
 import { confirm } from "@inquirer/prompts";
-import { MetricsCollector } from "@sidequest/core/logging";
-import { color, emphasize } from "@sidequest/core/terminal";
+import { MetricsCollector } from "@side-quest/core/logging";
+import { color, emphasize } from "@side-quest/core/terminal";
 import { createSpinner } from "nanospinner";
 import { DEFAULT_MODEL } from "../config/defaults";
 import type { BatchResult, InboxSuggestion } from "../inbox";

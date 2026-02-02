@@ -7,7 +7,7 @@
 import {
 	ensureCommandAvailable,
 	spawnWithTimeout,
-} from "@sidequest/core/spawn";
+} from "@side-quest/core/spawn";
 import { color, OutputFormat } from "../formatters/output";
 
 /**

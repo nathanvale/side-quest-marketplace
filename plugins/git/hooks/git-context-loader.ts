@@ -111,8 +111,9 @@ function formatContext(context: GitContext): string {
 		output += "  (no commits yet)\n";
 	}
 
+	output += "\nGit workflow: /git:commit, /git:squash, /git:checkpoint";
 	output +=
-		"\nGit workflow: /git:commit, /git:squash, /git:checkpoint — git-expert skill active";
+		"\ngit-expert skill handles: commits, PRs, history, worktrees, changelog, branch compare, squash, safety guards";
 
 	return output;
 }

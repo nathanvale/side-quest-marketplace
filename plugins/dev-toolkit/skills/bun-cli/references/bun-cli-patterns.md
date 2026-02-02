@@ -62,7 +62,7 @@ plugin/
  * Output formats: markdown (default) for humans, JSON for machines.
  */
 
-import { parseOutputFormat, type OutputFormat } from "@sidequest/core/formatters";
+import { parseOutputFormat, type OutputFormat } from "@side-quest/core/formatters";
 ```
 
 **Rules:**
@@ -148,7 +148,7 @@ function printUsage(): void {
 ```
 
 **Rules:**
-- ✅ Use cyan color for headers (from @sidequest/core/formatters)
+- ✅ Use cyan color for headers (from @side-quest/core/formatters)
 - ✅ Structure: Usage → Options → Examples
 - ✅ Keep under 30 lines (fit in terminal)
 - ✅ Show command variations clearly
@@ -208,7 +208,7 @@ main();
 
 ---
 
-## Argument Utilities (`@sidequest/core/cli`)
+## Argument Utilities (`@side-quest/core/cli`)
 
 All CLI argument parsing utilities are now centralized in the core package for reuse across all marketplace plugins:
 
@@ -218,7 +218,7 @@ import {
   parseArgs,
   parseKeyValuePairs,
   coerceValue,
-} from "@sidequest/core/cli";
+} from "@side-quest/core/cli";
 
 /**
  * Parse key=value pairs into object
@@ -264,7 +264,7 @@ export function coerceValue(raw: string): unknown
 ```
 
 **Rules:**
-- ✅ Import from @sidequest/core/cli (not local utils/)
+- ✅ Import from @side-quest/core/cli (not local utils/)
 - ✅ Available to all CLI plugins in marketplace
 - ✅ Handles edge cases (empty, malformed)
 - ✅ Type coercion for JSON output
@@ -283,7 +283,7 @@ import {
   emphasize,
   parseOutputFormat,
   type OutputFormat,
-} from "@sidequest/core/formatters";
+} from "@side-quest/core/formatters";
 
 interface FormattedOutput {
   markdown: string;
@@ -310,7 +310,7 @@ function formatOutput(result: unknown, format: OutputFormat): string {
 ### Color Palette
 
 ```typescript
-// From @sidequest/core/formatters
+// From @side-quest/core/formatters
 color("cyan", "Header")      // Information, CLI banners
 color("green", "Success")    // Successful operations
 color("yellow", "Warning")   // Warnings, dry-run
@@ -406,7 +406,7 @@ function loadConfig() {
 ```typescript
 // src/cli.test.ts
 import { describe, it, expect } from "bun:test";
-import { parseArgs } from "@sidequest/core/cli";
+import { parseArgs } from "@side-quest/core/cli";
 
 describe("CLI argument parsing", () => {
   it("should parse flags with values", () => {
@@ -473,14 +473,14 @@ import {
   writeJsonFileSync,
   readTextFile,
   writeTextFile,
-} from "@sidequest/core/fs";
+} from "@side-quest/core/fs";
 
 // Don't use Node.js fs directly in new code
 // ❌ import { readFileSync } from "node:fs";
 ```
 
 **Rules:**
-- ✅ Use @sidequest/core/fs for file operations
+- ✅ Use @side-quest/core/fs for file operations
 - ✅ Use sync versions in CLI (faster feedback)
 - ✅ Validate paths (vault-scoped if applicable)
 - ✅ Error on missing files early
@@ -700,8 +700,8 @@ If updating existing CLI to match this standard:
 - ✅ 80+ comprehensive tests covering CLI edge cases
 
 **Recent Upgrades (✅ Completed):**
-- Moved `parseArgs`, `parseKeyValuePairs`, `coerceValue` to `@sidequest/core/cli` (marketplace-wide)
-- Replaced `node:fs` with `@sidequest/core/fs` utilities throughout
+- Moved `parseArgs`, `parseKeyValuePairs`, `coerceValue` to `@side-quest/core/cli` (marketplace-wide)
+- Replaced `node:fs` with `@side-quest/core/fs` utilities throughout
 - Fixed usage output coloring to skip empty lines
 - Added 29 argument parsing edge case tests (now 80 total tests)
 - Now available for all marketplace CLI plugins to import and reuse
@@ -725,7 +725,7 @@ import {
 	emphasize,
 	OutputFormat,
 	parseOutputFormat,
-} from "@sidequest/core/formatters";
+} from "@side-quest/core/formatters";
 ```
 
 **Status: PERFECT**
@@ -761,10 +761,10 @@ This is the **reference implementation** that other plugins should copy.
 - ✅ Type coercion for JSON output
 - ✅ Edge case handling (empty, malformed)
 
-**Now In Core:** These utilities have been moved to `@sidequest/core/cli` so all marketplace CLI plugins can import and reuse them.
+**Now In Core:** These utilities have been moved to `@side-quest/core/cli` so all marketplace CLI plugins can import and reuse them.
 
 ```typescript
-import { parseArgs, parseKeyValuePairs, coerceValue } from "@sidequest/core/cli";
+import { parseArgs, parseKeyValuePairs, coerceValue } from "@side-quest/core/cli";
 ```
 
 This ensures consistent argument parsing across all marketplace tools.
@@ -855,7 +855,7 @@ This ensures consistent argument parsing across all marketplace tools.
 ### Recommendations (Status Updates)
 
 **High Priority (✅ COMPLETED)**
-1. ✅ **Move parseArgs to @sidequest/core/cli** — Now available for all marketplace plugins
+1. ✅ **Move parseArgs to @side-quest/core/cli** — Now available for all marketplace plugins
 2. ✅ **Use core/fs utilities** — Completed, using core/fs throughout
 3. ✅ **Add more CLI parsing tests** — Completed, 29 edge case tests added (80 total)
 
@@ -874,14 +874,14 @@ This ensures consistent argument parsing across all marketplace tools.
 **Para Obsidian CLI is the 10/10 reference implementation** for this marketplace:
 
 **Exemplary Patterns:**
-- ✅ Elegant argument parsing with three flag formats (now in @sidequest/core/cli)
+- ✅ Elegant argument parsing with three flag formats (now in @side-quest/core/cli)
 - ✅ Advanced features (subcommands, dry-run, auto-discover, git integration)
 - ✅ Excellent UX (colored output, comprehensive help, real examples)
 - ✅ Comprehensive test coverage (80 tests covering edge cases)
 - ✅ Clean integration with core utilities (formatters, fs)
 
 **Use Para Obsidian as the template for:**
-- **Argument parsing:** Import utilities from `@sidequest/core/cli`
+- **Argument parsing:** Import utilities from `@side-quest/core/cli`
 - Usage output structure with colored headers
 - Output formatting (markdown default + JSON)
 - Error handling with contextual messages
@@ -891,7 +891,7 @@ This ensures consistent argument parsing across all marketplace tools.
 **Marketplace-Wide Benefit:**
 Utilities now available in core package for all CLI plugins:
 ```typescript
-import { parseArgs, parseKeyValuePairs, coerceValue } from "@sidequest/core/cli";
+import { parseArgs, parseKeyValuePairs, coerceValue } from "@side-quest/core/cli";
 ```
 
 **This is production-grade CLI tooling for Bun.** Perfect score achieved through systematic improvements, comprehensive testing, and centralized utilities for consistency across the marketplace.

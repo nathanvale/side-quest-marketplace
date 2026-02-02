@@ -10,7 +10,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { color, emphasize } from "@sidequest/core/terminal";
+import { color, emphasize } from "@side-quest/core/terminal";
 import { glob } from "glob";
 import type { ParaObsidianConfig } from "../config/index";
 import { parseFrontmatter, serializeFrontmatter } from "../frontmatter/index";

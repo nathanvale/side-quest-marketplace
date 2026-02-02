@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, test } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
-import { writeTestFile } from "@sidequest/core/testing";
+import { writeTestFile } from "@side-quest/core/testing";
 import type { ParaObsidianConfig } from "../../config/index";
 import { createTestVault, useTestVaultCleanup } from "../../testing/utils";
 import {

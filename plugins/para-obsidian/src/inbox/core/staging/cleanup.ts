@@ -13,8 +13,8 @@ import {
 	pathExistsSync,
 	readDir,
 	readTextFileSync,
-} from "@sidequest/core/fs";
-import { sleepSync } from "@sidequest/core/utils";
+} from "@side-quest/core/fs";
+import { sleepSync } from "@side-quest/core/utils";
 import { loadConfig } from "../../../config/index";
 import { parseFrontmatter } from "../../../frontmatter/parse";
 import { inboxLogger } from "../../../shared/logger";

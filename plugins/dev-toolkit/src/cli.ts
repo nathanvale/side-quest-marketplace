@@ -9,8 +9,8 @@
  * - Output formats: markdown (default) for humans, JSON for machines
  */
 
-import { parseArgs } from "@sidequest/core/cli";
-import { color, parseOutputFormat } from "@sidequest/core/formatters";
+import { parseArgs } from "@side-quest/core/cli";
+import { color, parseOutputFormat } from "@side-quest/core/formatters";
 import { createTemplateCommand } from "./commands/create-template";
 import { reviewTemplateCommand } from "./commands/review-template";
 
