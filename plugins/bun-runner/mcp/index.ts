@@ -21,11 +21,11 @@ import {
 	ResponseFormat,
 	wrapToolHandler,
 } from "@sidequest/core/mcp-response";
+import { spawnWithTimeout } from "@sidequest/core/spawn";
 import {
 	validatePath,
 	validateShellSafePattern,
 } from "@sidequest/core/validation";
-import { spawn } from "bun";
 import {
 	parseBunTestOutput,
 	type TestFailure,
@@ -139,8 +139,7 @@ function parseBunTestOutputImpl(output: string): TestSummary {
 // --- Helpers ---
 
 /**
- * Run Bun tests and parse output using native Bun.spawn()
- * Uses AbortController for timeout instead of spawn's buggy timeout option
+ * Run Bun tests and parse output using spawnWithTimeout from core
  *
  * Uses `bun test` directly - Bun natively handles workspace test discovery,
  * searching all packages for matching test files. The previous `--filter '*'`
@@ -152,30 +151,14 @@ async function runBunTests(pattern?: string): Promise<TestSummary> {
 	const cmd = pattern ? ["bun", "test", pattern] : ["bun", "test"];
 	const TIMEOUT_MS = 30000;
 
-	// Use AbortController for timeout - Bun's timeout option is buggy
-	// (sets killed=true and truncates stdout even when process completes normally)
-	const controller = new AbortController();
-	const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-	const proc = spawn({
+	const { stdout, stderr, exitCode, timedOut } = await spawnWithTimeout(
 		cmd,
-		env: { ...process.env, CI: "true" },
-		stdout: "pipe",
-		stderr: "pipe",
-		signal: controller.signal,
-	});
+		TIMEOUT_MS,
+		{ env: { CI: "true" } },
+	);
 
-	// IMPORTANT: Consume streams in parallel with waiting for exit.
-	// Reading after proc.exited resolves can miss output (race condition).
-	const [stdout, stderr, exitCode] = await Promise.all([
-		new Response(proc.stdout).text(),
-		new Response(proc.stderr).text(),
-		proc.exited,
-	]);
-	clearTimeout(timeoutId);
-
-	// Check for timeout via AbortController
-	if (controller.signal.aborted) {
+	// Check for timeout
+	if (timedOut) {
 		return {
 			passed: 0,
 			failed: 1,
@@ -211,8 +194,7 @@ async function runBunTests(pattern?: string): Promise<TestSummary> {
 }
 
 /**
- * Run Bun tests with coverage and parse output
- * Uses AbortController for timeout instead of spawn's buggy timeout option
+ * Run Bun tests with coverage and parse output using spawnWithTimeout from core
  *
  * Uses `bun test --coverage` directly - Bun handles workspace discovery natively.
  */
@@ -223,31 +205,16 @@ async function runBunTestCoverage(): Promise<{
 	const TIMEOUT_MS = 60000;
 	const cmd = ["bun", "test", "--coverage"];
 
-	// Use AbortController for timeout - Bun's timeout option is buggy
-	const controller = new AbortController();
-	const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-	const proc = spawn({
+	const { stdout, stderr, exitCode, timedOut } = await spawnWithTimeout(
 		cmd,
-		env: { ...process.env, CI: "true" },
-		stdout: "pipe",
-		stderr: "pipe",
-		signal: controller.signal,
-	});
-
-	// IMPORTANT: Consume streams in parallel with waiting for exit.
-	// Reading after proc.exited resolves can miss output (race condition).
-	const [stdout, stderr, exitCode] = await Promise.all([
-		new Response(proc.stdout).text(),
-		new Response(proc.stderr).text(),
-		proc.exited,
-	]);
-	clearTimeout(timeoutId);
+		TIMEOUT_MS,
+		{ env: { CI: "true" } },
+	);
 
 	const output = `${stdout}\n${stderr}`;
 
-	// Check for timeout via AbortController
-	if (controller.signal.aborted) {
+	// Check for timeout
+	if (timedOut) {
 		return {
 			summary: {
 				passed: 0,
