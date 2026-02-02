@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type CortexEntry, extractFromTranscript } from "./session-summary";
+import { extractFromTranscript } from "./session-summary";
 
 describe("extractFromTranscript", () => {
 	function makeTranscript(
