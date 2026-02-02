@@ -34,35 +34,35 @@
 		{
 			"name": "bun-runner",
 			"source": "./plugins/bun-runner",
-			"description": "Smart test runner and linter MCP server. Run tests and lint with structured, token-efficient output. Filters out passing tests and verbose logs, focusing agents on failures.",
+			"description": "[EXTRACTED] Smart test runner MCP server — now published as @side-quest/bun-runner on npm. Use side-quest-plugins repo instead.",
 			"version": "1.0.0",
 			"author": {
 				"name": "Nathan Vale"
 			},
 			"category": "testing",
-			"keywords": ["testing", "linting", "biome", "bun", "mcp"]
+			"keywords": ["testing", "bun", "mcp", "extracted"]
 		},
 		{
 			"name": "tsc-runner",
 			"source": "./plugins/tsc-runner",
-			"description": "TypeScript type checking hooks for Claude Code",
+			"description": "[EXTRACTED] TypeScript type checking — now published as @side-quest/tsc-runner on npm. Use side-quest-plugins repo instead.",
 			"version": "1.0.0",
 			"author": {
 				"name": "Nathan Vale"
 			},
 			"category": "development",
-			"keywords": ["typescript", "tsc", "type-checking"]
+			"keywords": ["typescript", "tsc", "type-checking", "extracted"]
 		},
 		{
 			"name": "biome-runner",
 			"source": "./plugins/biome-runner",
-			"description": "Biome linter and formatter with auto-fix hooks",
+			"description": "[EXTRACTED] Biome linter & formatter — now published as @side-quest/biome-runner on npm. Use side-quest-plugins repo instead.",
 			"version": "1.0.0",
 			"author": {
 				"name": "Nathan Vale"
 			},
 			"category": "development",
-			"keywords": ["biome", "linting", "formatting"]
+			"keywords": ["biome", "linting", "formatting", "extracted"]
 		},
 		{
 			"name": "validate-plugin",
