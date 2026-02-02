@@ -53,9 +53,10 @@ Quick WIP save — no ceremony.
 1. **Ensure all changes committed**: `git status --porcelain -b`
 2. **Check current branch**: `git branch --show-current`
 3. **Review all commits**: `git log --oneline main..HEAD`
-4. **Review total diff**: `git diff main...HEAD --stat`
-5. **Push**: `git push -u origin $(git branch --show-current)`
-6. **Create PR**:
+4. **Squash WIP commits**: If any commits match `WIP:` or `wip:`, run the Squash workflow first — PRs should have clean conventional commits, not WIP history
+5. **Review total diff**: `git diff main...HEAD --stat`
+6. **Push**: `git push -u origin $(git branch --show-current)`
+7. **Create PR**:
    ```bash
    gh pr create --title "<type>(<scope>): <subject>" --body "$(cat <<'EOF'
    ## Summary
@@ -68,7 +69,7 @@ Quick WIP save — no ceremony.
    EOF
    )"
    ```
-7. **Return the PR URL** to the user
+8. **Return the PR URL** to the user
 
 ## Session Log
 
