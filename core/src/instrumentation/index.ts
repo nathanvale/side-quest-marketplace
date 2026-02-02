@@ -55,7 +55,13 @@ export {
 	type ErrorCode,
 	getErrorCategory,
 } from "./error-category.js";
-
+// Error pattern detection for subprocess output
+export {
+	detectErrorFromOutput,
+	type ErrorPattern,
+	isCommandNotFoundOutput,
+	isTimeoutOutput,
+} from "./error-patterns.js";
 // Metrics
 export {
 	type CounterData,
@@ -82,7 +88,6 @@ export {
 	observeSyncWithContext,
 	observeWithContext,
 } from "./observe.js";
-
 // Resource metrics (memory, heap, RSS)
 export {
 	type CaptureResourceMetricsOptions,
@@ -92,3 +97,5 @@ export {
 	type ResourceMetrics,
 	type ResourceMetricsLogger,
 } from "./resource-metrics.js";
+// Typed error base class
+export { PluginError } from "./typed-error.js";

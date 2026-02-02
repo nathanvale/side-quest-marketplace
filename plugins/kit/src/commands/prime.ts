@@ -5,8 +5,8 @@
  * Supports dual output formats (markdown with colors, or JSON).
  */
 
-import { existsSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { getFileAgeHours, getFileSizeMB } from "@sidequest/core/fs";
 import {
 	ensureCommandAvailable,
 	spawnWithTimeout,
@@ -58,28 +58,6 @@ async function getTargetDir(customPath?: string): Promise<string> {
 	}
 
 	return process.cwd();
-}
-
-/**
- * Check if index exists and return its age in hours
- */
-function getIndexAge(indexPath: string): number | null {
-	if (!existsSync(indexPath)) {
-		return null;
-	}
-
-	const stats = statSync(indexPath);
-	const ageMs = Date.now() - stats.mtimeMs;
-	return ageMs / (1000 * 60 * 60); // Convert to hours
-}
-
-/**
- * Get human-readable file size
- */
-function getFileSize(indexPath: string): string {
-	const stats = statSync(indexPath);
-	const mb = stats.size / (1024 * 1024);
-	return `${mb.toFixed(2)} MB`;
 }
 
 /**
@@ -140,14 +118,14 @@ async function reportExistingMarkdown(
 	targetDir: string,
 ): Promise<void> {
 	const stats = await parseIndexStats(indexPath);
-	const size = getFileSize(indexPath);
+	const size = getFileSizeMB(indexPath);
 
 	console.log(color("cyan", "\n📊 PROJECT_INDEX.json exists\n"));
 	console.log(color("dim", `Location: ${targetDir}`));
 	console.log(color("dim", `Age: ${ageHours.toFixed(1)} hours`));
 	console.log(color("dim", `Files: ${stats.files}`));
 	console.log(color("dim", `Symbols: ${stats.symbols}`));
-	console.log(color("dim", `Size: ${size}`));
+	console.log(color("dim", `Size: ${size} MB`));
 	console.log(
 		color(
 			"yellow",
@@ -165,7 +143,7 @@ async function reportExistingJSON(
 	targetDir: string,
 ): Promise<void> {
 	const stats = await parseIndexStats(indexPath);
-	const size = getFileSize(indexPath);
+	const sizeMB = getFileSizeMB(indexPath);
 
 	console.log(
 		JSON.stringify(
@@ -175,7 +153,7 @@ async function reportExistingJSON(
 				ageHours: Number.parseFloat(ageHours.toFixed(1)),
 				files: stats.files,
 				symbols: stats.symbols,
-				size,
+				size: `${sizeMB} MB`,
 				message: "Index is less than 24 hours old. Use --force to regenerate.",
 			},
 			null,
@@ -193,7 +171,7 @@ async function reportSuccessMarkdown(
 	targetDir: string,
 ): Promise<void> {
 	const stats = await parseIndexStats(indexPath);
-	const size = getFileSize(indexPath);
+	const sizeMB = getFileSizeMB(indexPath);
 
 	console.log(
 		color("green", "\n✅ PROJECT_INDEX.json generated successfully\n"),
@@ -207,7 +185,9 @@ async function reportSuccessMarkdown(
 	console.log(
 		`  ${color("dim", "•")} Symbols extracted: ${color("blue", stats.symbols.toString())}`,
 	);
-	console.log(`  ${color("dim", "•")} Index size: ${color("blue", size)}`);
+	console.log(
+		`  ${color("dim", "•")} Index size: ${color("blue", `${sizeMB} MB`)}`,
+	);
 	console.log(
 		`  ${color("dim", "•")} Time taken: ${color("blue", `${durationSec.toFixed(1)}s`)}`,
 	);
@@ -236,7 +216,7 @@ async function reportSuccessJSON(
 	targetDir: string,
 ): Promise<void> {
 	const stats = await parseIndexStats(indexPath);
-	const size = getFileSize(indexPath);
+	const sizeMB = getFileSizeMB(indexPath);
 
 	console.log(
 		JSON.stringify(
@@ -247,7 +227,7 @@ async function reportSuccessJSON(
 					files: stats.files,
 					symbols: stats.symbols,
 					hasTree: stats.hasTree,
-					size,
+					size: `${sizeMB} MB`,
 					durationSec: Number.parseFloat(durationSec.toFixed(1)),
 				},
 			},
@@ -274,10 +254,10 @@ export async function executePrime(
 		const targetDir = await getTargetDir(customPath);
 		const indexPath = join(targetDir, INDEX_FILE);
 
-		const ageHours = getIndexAge(indexPath);
+		const ageHours = getFileAgeHours(indexPath);
 
 		// Check if index exists and is fresh
-		if (ageHours !== null && ageHours < MAX_AGE_HOURS && !force) {
+		if (ageHours !== null && ageHours <= MAX_AGE_HOURS && !force) {
 			if (format === OutputFormat.JSON) {
 				await reportExistingJSON(ageHours, indexPath, targetDir);
 			} else {

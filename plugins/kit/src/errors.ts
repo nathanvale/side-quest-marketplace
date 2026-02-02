@@ -4,6 +4,13 @@
  * Comprehensive error handling with clear recovery instructions.
  */
 
+import {
+	detectErrorFromOutput as coreDetectErrorFromOutput,
+	type ErrorPattern,
+	isTimeoutOutput,
+	PluginError,
+} from "@sidequest/core/instrumentation";
+
 // ============================================================================
 // Error Types
 // ============================================================================
@@ -88,54 +95,16 @@ export const ERROR_MESSAGES: Record<
 
 /**
  * Custom error class for Kit operations.
+ *
+ * Extends PluginError to provide Kit-specific error handling with:
+ * - Typed error classification (KitErrorType enum)
+ * - User-friendly messages with recovery hints
+ * - Structured JSON serialization for MCP responses
  */
-export class KitError extends Error {
-	constructor(
-		public readonly type: KitErrorType,
-		public readonly details?: string,
-		public readonly stderr?: string,
-	) {
+export class KitError extends PluginError<KitErrorType> {
+	constructor(type: KitErrorType, details?: string, stderr?: string) {
 		const errorInfo = ERROR_MESSAGES[type];
-		const detailsStr = details ? `: ${details}` : "";
-		super(`${errorInfo.message}${detailsStr}`);
-		this.name = "KitError";
-	}
-
-	/**
-	 * Get user-facing recovery hint.
-	 */
-	get hint(): string {
-		return ERROR_MESSAGES[this.type].hint;
-	}
-
-	/**
-	 * Format error for user display.
-	 */
-	toUserMessage(): string {
-		const lines = [`Error: ${this.message}`, "", `Hint: ${this.hint}`];
-
-		if (this.stderr) {
-			lines.push("", "Details:", this.stderr);
-		}
-
-		return lines.join("\n");
-	}
-
-	/**
-	 * Format error for JSON output.
-	 */
-	toJSON(): {
-		error: string;
-		type: KitErrorType;
-		hint: string;
-		details?: string;
-	} {
-		return {
-			error: this.message,
-			type: this.type,
-			hint: this.hint,
-			...(this.details && { details: this.details }),
-		};
+		super("KitError", type, errorInfo.message, errorInfo.hint, details, stderr);
 	}
 }
 
@@ -174,23 +143,56 @@ export function isSemanticUnavailableError(stderr: string): boolean {
 
 /**
  * Check if an error indicates a timeout occurred.
+ *
+ * Re-exports the core utility for backward compatibility.
+ *
  * @param stderr - Standard error output
  */
-export function isTimeoutError(stderr: string): boolean {
-	const lowerStderr = stderr.toLowerCase();
-	return (
-		lowerStderr.includes("timeout") ||
-		lowerStderr.includes("timed out") ||
-		lowerStderr.includes("etimedout")
-	);
-}
+export const isTimeoutError = isTimeoutOutput;
 
 // ============================================================================
 // Error Detection Helpers
 // ============================================================================
 
 /**
+ * Kit-specific error patterns for subprocess output detection.
+ *
+ * These patterns are tested in order by detectErrorType().
+ */
+const KIT_ERROR_PATTERNS: ErrorPattern<KitErrorType>[] = [
+	// Semantic search unavailable (must be first - most specific)
+	{
+		type: KitErrorType.SemanticNotAvailable,
+		patterns: [
+			"sentence-transformers",
+			"chromadb",
+			"semantic search",
+			"vector index",
+			"embedding",
+		],
+	},
+	// Path errors
+	{
+		type: KitErrorType.InvalidPath,
+		patterns: ["no such file", "not found", "does not exist"],
+	},
+	// Timeout errors
+	{
+		type: KitErrorType.Timeout,
+		patterns: ["timeout", "timed out", "etimedout"],
+	},
+	// Too many results
+	{
+		type: KitErrorType.TooManyResults,
+		patterns: ["too many", "limit"],
+	},
+];
+
+/**
  * Detect error type from Kit stderr output.
+ *
+ * Uses the generic core pattern matcher with Kit-specific patterns.
+ *
  * @param stderr - Standard error output from Kit
  * @param _exitCode - Exit code from Kit process (currently unused)
  */
@@ -198,34 +200,11 @@ export function detectErrorType(
 	stderr: string,
 	_exitCode: number,
 ): KitErrorType {
-	const lowerStderr = stderr.toLowerCase();
-
-	// Check for semantic search unavailable
-	if (isSemanticUnavailableError(stderr)) {
-		return KitErrorType.SemanticNotAvailable;
-	}
-
-	// Check for path errors
-	if (
-		lowerStderr.includes("no such file") ||
-		lowerStderr.includes("not found") ||
-		lowerStderr.includes("does not exist")
-	) {
-		return KitErrorType.InvalidPath;
-	}
-
-	// Check for timeout
-	if (lowerStderr.includes("timeout") || lowerStderr.includes("timed out")) {
-		return KitErrorType.Timeout;
-	}
-
-	// Check for too many results
-	if (lowerStderr.includes("too many") || lowerStderr.includes("limit")) {
-		return KitErrorType.TooManyResults;
-	}
-
-	// Default to generic command failure
-	return KitErrorType.KitCommandFailed;
+	return coreDetectErrorFromOutput(
+		stderr,
+		KIT_ERROR_PATTERNS,
+		KitErrorType.KitCommandFailed, // Default
+	);
 }
 
 /**

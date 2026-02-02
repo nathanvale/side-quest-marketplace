@@ -4,8 +4,7 @@
  * Input validation and security utilities for safe Kit CLI operations.
  */
 
-import { existsSync, statSync } from "node:fs";
-import { normalizePath } from "@sidequest/core/fs";
+import { normalizePath, pathExistsSync, statSync } from "@sidequest/core/fs";
 import {
 	validateGlob,
 	validateInteger,
@@ -74,7 +73,7 @@ export function validatePath(
 	}
 
 	// Existence check
-	if (mustExist && !existsSync(normalizedPath)) {
+	if (mustExist && !pathExistsSync(normalizedPath)) {
 		return { valid: false, error: `Path does not exist: ${normalizedPath}` };
 	}
 

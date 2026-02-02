@@ -792,6 +792,12 @@ export {
 	restoreFromBackup,
 	safeReadJSON,
 } from "./backup.js";
+// Cache directory utilities
+export {
+	ensureCacheDir,
+	getCacheStats,
+	isCachePopulated,
+} from "./cache.js";
 // Path utilities
 export {
 	expandTilde,
@@ -812,6 +818,12 @@ export {
 	validateConfigPath,
 	validateFilenameForSubprocess,
 } from "./sandbox.js";
+// File statistics utilities
+export {
+	getFileAgeHours,
+	getFileSizeMB,
+	isFileStale,
+} from "./stats.js";
 // Directory walking utilities
 export {
 	type FileVisitor,

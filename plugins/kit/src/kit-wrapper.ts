@@ -5,9 +5,13 @@
  * Uses Bun.spawnSync via shared helpers for synchronous execution to fit MCP tool patterns.
  */
 
-import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { withTempJsonFileSync } from "@sidequest/core/fs";
+import { TimeoutError, withTimeout } from "@sidequest/core/concurrency";
+import {
+	ensureCacheDir,
+	isCachePopulated,
+	withTempJsonFileSync,
+} from "@sidequest/core/fs";
 import {
 	buildEnhancedPath,
 	ensureCommandAvailable,
@@ -15,6 +19,7 @@ import {
 } from "@sidequest/core/spawn";
 
 import {
+	AST_SEARCH_TIMEOUT,
 	ASTSearcher,
 	type ASTSearchOptions,
 	type ASTSearchResult,
@@ -995,9 +1000,6 @@ export function executeKitCommit(
 // AST Search Execution (tree-sitter powered)
 // ============================================================================
 
-/** Default timeout for AST search operations (ms) */
-const AST_SEARCH_TIMEOUT = 60000;
-
 /**
  * Execute AST-based code search using tree-sitter.
  *
@@ -1027,18 +1029,12 @@ export async function executeAstSearch(
 	try {
 		const searcher = new ASTSearcher(path);
 
-		// Use Promise.race with timeout
-		const timeoutPromise = new Promise<never>((_, reject) => {
-			setTimeout(
-				() => reject(new Error("AST search timed out")),
-				AST_SEARCH_TIMEOUT,
-			);
-		});
-
-		const result = await Promise.race([
+		// Use core timeout utility
+		const result = await withTimeout(
 			searcher.searchPattern(options),
-			timeoutPromise,
-		]);
+			AST_SEARCH_TIMEOUT,
+			"AST search timed out",
+		);
 
 		astLogger.info("AST search completed", {
 			cid,
@@ -1050,7 +1046,12 @@ export async function executeAstSearch(
 		return result;
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "Unknown error";
-		astLogger.error("AST search failed", { cid, error: message });
+		const timeoutInfo =
+			error instanceof TimeoutError ? ` after ${error.timeoutMs}ms` : "";
+		astLogger.error("AST search failed", {
+			cid,
+			error: message + timeoutInfo,
+		});
 		return new KitError(KitErrorType.KitCommandFailed, message).toJSON();
 	}
 }
@@ -1194,14 +1195,7 @@ function globToRegex(pattern: string): RegExp {
  * @returns Path to the persist directory for this repo's vector index
  */
 export function getSemanticCacheDir(repoPath: string): string {
-	const cacheDir = join(repoPath, ".kit", "vector_db");
-
-	// Ensure directory exists
-	if (!existsSync(cacheDir)) {
-		mkdirSync(cacheDir, { recursive: true });
-	}
-
-	return cacheDir;
+	return ensureCacheDir(repoPath, "vector_db");
 }
 
 /**
@@ -1211,18 +1205,5 @@ export function getSemanticCacheDir(repoPath: string): string {
  */
 export function isSemanticIndexBuilt(repoPath: string): boolean {
 	const cacheDir = join(repoPath, ".kit", "vector_db");
-
-	// If cache directory doesn't exist, index hasn't been built
-	if (!existsSync(cacheDir)) {
-		return false;
-	}
-
-	// Check if there are files in the cache directory (indicating a built index)
-	// Kit creates metadata and index files when building
-	try {
-		const files = require("node:fs").readdirSync(cacheDir);
-		return files.length > 0;
-	} catch {
-		return false;
-	}
+	return isCachePopulated(cacheDir);
 }

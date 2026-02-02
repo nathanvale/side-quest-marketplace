@@ -7,7 +7,7 @@
  * using Bun's built-in color support for ADHD-friendly output.
  */
 
-import { existsSync, statSync } from "node:fs";
+import { getFileAgeHours, getFileSizeMB } from "@sidequest/core/fs";
 import {
 	ensureCommandAvailable,
 	spawnWithTimeout,
@@ -41,28 +41,6 @@ interface ReportOptions {
 
 const INDEX_FILE = "PROJECT_INDEX.json";
 const MAX_AGE_HOURS = 24;
-
-/**
- * Check if index exists and return its age in hours
- */
-function getIndexAge(): number | null {
-	if (!existsSync(INDEX_FILE)) {
-		return null;
-	}
-
-	const stats = statSync(INDEX_FILE);
-	const ageMs = Date.now() - stats.mtimeMs;
-	return ageMs / (1000 * 60 * 60); // Convert to hours
-}
-
-/**
- * Get human-readable file size
- */
-function getFileSize(): string {
-	const stats = statSync(INDEX_FILE);
-	const mb = stats.size / (1024 * 1024);
-	return `${mb.toFixed(2)} MB`;
-}
 
 /**
  * Parse index stats from PROJECT_INDEX.json
@@ -116,13 +94,13 @@ async function generateIndex(): Promise<{ durationSec: number }> {
  */
 async function reportExisting(ageHours: number): Promise<void> {
 	const stats = await parseIndexStats();
-	const size = getFileSize();
+	const sizeMB = getFileSizeMB(INDEX_FILE);
 
 	console.log(color("cyan", "\n📊 PROJECT_INDEX.json exists\n"));
 	console.log(color("dim", `Age: ${ageHours.toFixed(1)} hours`));
 	console.log(color("dim", `Files: ${stats.files}`));
 	console.log(color("dim", `Symbols: ${stats.symbols}`));
-	console.log(color("dim", `Size: ${size}`));
+	console.log(color("dim", `Size: ${sizeMB} MB`));
 }
 
 /**
@@ -130,7 +108,7 @@ async function reportExisting(ageHours: number): Promise<void> {
  */
 async function reportSuccess(durationSec: number): Promise<void> {
 	const stats = await parseIndexStats();
-	const size = getFileSize();
+	const sizeMB = getFileSizeMB(INDEX_FILE);
 
 	console.log(
 		color("green", "\n✅ PROJECT_INDEX.json generated successfully\n"),
@@ -143,7 +121,9 @@ async function reportSuccess(durationSec: number): Promise<void> {
 	console.log(
 		`  ${color("dim", "•")} Symbols extracted: ${color("blue", stats.symbols.toString())}`,
 	);
-	console.log(`  ${color("dim", "•")} Index size: ${color("blue", size)}`);
+	console.log(
+		`  ${color("dim", "•")} Index size: ${color("blue", `${sizeMB} MB`)}`,
+	);
 	console.log(
 		`  ${color("dim", "•")} Time taken: ${color("blue", `${durationSec.toFixed(1)}s`)}`,
 	);
@@ -173,10 +153,10 @@ async function main() {
 	};
 
 	try {
-		const ageHours = getIndexAge();
+		const ageHours = getFileAgeHours(INDEX_FILE);
 
 		// Check if index exists and is fresh
-		if (ageHours !== null && ageHours < MAX_AGE_HOURS && !options.force) {
+		if (ageHours !== null && ageHours <= MAX_AGE_HOURS && !options.force) {
 			await reportExisting(ageHours);
 			console.log(
 				color(

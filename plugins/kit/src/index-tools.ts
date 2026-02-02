@@ -197,8 +197,8 @@ export async function executeIndexOverview(
 // Prime Tool - Generate/refresh index
 // ============================================================================
 
-import { existsSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { getFileAgeHours, getFileSizeMB } from "@sidequest/core/fs";
 import {
 	ensureCommandAvailable,
 	spawnWithTimeout,
@@ -281,30 +281,25 @@ export async function executeIndexPrime(
 		const indexPath = join(targetDir, INDEX_FILE);
 
 		// Check if index exists and is fresh
-		if (existsSync(indexPath)) {
-			const stats = statSync(indexPath);
-			const ageMs = Date.now() - stats.mtimeMs;
-			const ageHours = ageMs / (1000 * 60 * 60);
+		const ageHours = getFileAgeHours(indexPath);
+		if (ageHours !== null && ageHours <= MAX_AGE_HOURS && !force) {
+			const index = await loadProjectIndex(indexPath);
+			const symbolCount = Object.values(index.symbols).reduce(
+				(sum, symbols) => sum + symbols.length,
+				0,
+			);
+			const sizeMB = getFileSizeMB(indexPath);
 
-			if (ageHours < MAX_AGE_HOURS && !force) {
-				const index = await loadProjectIndex(indexPath);
-				const symbolCount = Object.values(index.symbols).reduce(
-					(sum, symbols) => sum + symbols.length,
-					0,
-				);
-				const mb = stats.size / (1024 * 1024);
-
-				return {
-					status: "exists",
-					location: targetDir,
-					ageHours: Number.parseFloat(ageHours.toFixed(1)),
-					files: Object.keys(index.symbols).length,
-					symbols: symbolCount,
-					size: `${mb.toFixed(2)} MB`,
-					message:
-						"Index is less than 24 hours old. Use force=true to regenerate.",
-				};
-			}
+			return {
+				status: "exists",
+				location: targetDir,
+				ageHours: Number.parseFloat(ageHours.toFixed(1)),
+				files: Object.keys(index.symbols).length,
+				symbols: symbolCount,
+				size: `${sizeMB} MB`,
+				message:
+					"Index is less than 24 hours old. Use force=true to regenerate.",
+			};
 		}
 
 		// Generate new index
@@ -336,15 +331,14 @@ export async function executeIndexPrime(
 			(sum, symbols) => sum + symbols.length,
 			0,
 		);
-		const fileStats = statSync(indexPath);
-		const mb = fileStats.size / (1024 * 1024);
+		const sizeMB = getFileSizeMB(indexPath);
 
 		return {
 			success: true,
 			location: targetDir,
 			files: Object.keys(index.symbols).length,
 			symbols: symbolCount,
-			size: `${mb.toFixed(2)} MB`,
+			size: `${sizeMB} MB`,
 			durationSec: Number.parseFloat(durationSec.toFixed(1)),
 		};
 	} catch (error) {

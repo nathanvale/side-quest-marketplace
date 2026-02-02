@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
+import {
+	createTempDir,
+	pathExistsSync,
+	removeDirSync,
+} from "@sidequest/core/fs";
 import {
 	// Logger
 	createCorrelationId,
@@ -90,39 +93,39 @@ describe("types", () => {
 		});
 
 		test("getSemanticCacheDir returns per-repo cache path", () => {
-			const tmpDir = mkdtempSync(join(tmpdir(), "kit-test-"));
+			const tmpDir = createTempDir("kit-test-");
 			try {
 				const cacheDir = getSemanticCacheDir(tmpDir);
 				// Should be under <repo>/.kit/vector_db/
 				expect(cacheDir).toBe(join(tmpDir, ".kit", "vector_db"));
 				// Directory should exist
-				expect(existsSync(cacheDir)).toBe(true);
+				expect(pathExistsSync(cacheDir)).toBe(true);
 			} finally {
-				rmSync(tmpDir, { recursive: true, force: true });
+				removeDirSync(tmpDir, { force: true });
 			}
 		});
 
 		test("getSemanticCacheDir is deterministic for same path", () => {
-			const tmpDir = mkdtempSync(join(tmpdir(), "kit-test-"));
+			const tmpDir = createTempDir("kit-test-");
 			try {
 				const dir1 = getSemanticCacheDir(tmpDir);
 				const dir2 = getSemanticCacheDir(tmpDir);
 				expect(dir1).toBe(dir2);
 			} finally {
-				rmSync(tmpDir, { recursive: true, force: true });
+				removeDirSync(tmpDir, { force: true });
 			}
 		});
 
 		test("getSemanticCacheDir differs for different paths", () => {
-			const tmpDir1 = mkdtempSync(join(tmpdir(), "kit-test-"));
-			const tmpDir2 = mkdtempSync(join(tmpdir(), "kit-test-"));
+			const tmpDir1 = createTempDir("kit-test-");
+			const tmpDir2 = createTempDir("kit-test-");
 			try {
 				const dir1 = getSemanticCacheDir(tmpDir1);
 				const dir2 = getSemanticCacheDir(tmpDir2);
 				expect(dir1).not.toBe(dir2);
 			} finally {
-				rmSync(tmpDir1, { recursive: true, force: true });
-				rmSync(tmpDir2, { recursive: true, force: true });
+				removeDirSync(tmpDir1, { force: true });
+				removeDirSync(tmpDir2, { force: true });
 			}
 		});
 

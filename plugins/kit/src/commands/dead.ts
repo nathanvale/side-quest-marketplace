@@ -5,9 +5,8 @@
  * no call sites (only definitions, no references).
  */
 
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createTempDir, removeDirSync } from "@sidequest/core/fs";
 import {
 	ensureCommandAvailable,
 	spawnWithTimeout,
@@ -54,7 +53,7 @@ async function findUsages(
 
 	try {
 		// Create temp file for output
-		tempDir = mkdtempSync(join(tmpdir(), "kit-dead-"));
+		tempDir = createTempDir("kit-dead-");
 		const outputFile = join(tempDir, "usages.json");
 		const kitCmd = ensureCommandAvailable("kit");
 
@@ -80,7 +79,7 @@ async function findUsages(
 		// Clean up temp directory
 		if (tempDir) {
 			try {
-				rmSync(tempDir, { recursive: true, force: true });
+				removeDirSync(tempDir, { force: true });
 			} catch {
 				// Ignore cleanup errors
 			}
