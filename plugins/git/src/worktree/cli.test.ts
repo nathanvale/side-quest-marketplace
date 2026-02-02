@@ -46,7 +46,15 @@ describe("worktree CLI", () => {
 
 	test("create: creates a worktree and outputs JSON", async () => {
 		const result = await spawnAndCollect(
-			["bun", "run", CLI_PATH, "create", "feat/cli-test", "--no-install"],
+			[
+				"bun",
+				"run",
+				CLI_PATH,
+				"create",
+				"feat/cli-test",
+				"--no-install",
+				"--no-fetch",
+			],
 			{ cwd: tmpDir },
 		);
 
@@ -59,7 +67,15 @@ describe("worktree CLI", () => {
 	test("list: lists worktrees as JSON", async () => {
 		// Create a worktree first
 		await spawnAndCollect(
-			["bun", "run", CLI_PATH, "create", "feat/list-test", "--no-install"],
+			[
+				"bun",
+				"run",
+				CLI_PATH,
+				"create",
+				"feat/list-test",
+				"--no-install",
+				"--no-fetch",
+			],
 			{ cwd: tmpDir },
 		);
 
@@ -88,7 +104,15 @@ describe("worktree CLI", () => {
 
 	test("delete: removes a worktree", async () => {
 		await spawnAndCollect(
-			["bun", "run", CLI_PATH, "create", "feat/delete-test", "--no-install"],
+			[
+				"bun",
+				"run",
+				CLI_PATH,
+				"create",
+				"feat/delete-test",
+				"--no-install",
+				"--no-fetch",
+			],
 			{ cwd: tmpDir },
 		);
 
@@ -104,7 +128,15 @@ describe("worktree CLI", () => {
 
 	test("check: shows pre-deletion status", async () => {
 		await spawnAndCollect(
-			["bun", "run", CLI_PATH, "create", "feat/check-test", "--no-install"],
+			[
+				"bun",
+				"run",
+				CLI_PATH,
+				"create",
+				"feat/check-test",
+				"--no-install",
+				"--no-fetch",
+			],
 			{ cwd: tmpDir },
 		);
 

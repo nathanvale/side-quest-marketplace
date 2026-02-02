@@ -14,7 +14,7 @@ describe("createWorktree", () => {
 		gitRoot = tmpDir;
 
 		// Initialize a git repo with an initial commit
-		await spawnAndCollect(["git", "init"], { cwd: gitRoot });
+		await spawnAndCollect(["git", "init", "-b", "main"], { cwd: gitRoot });
 		await spawnAndCollect(["git", "config", "user.email", "test@test.com"], {
 			cwd: gitRoot,
 		});
@@ -35,6 +35,7 @@ describe("createWorktree", () => {
 	test("creates a worktree with a new branch", async () => {
 		const result = await createWorktree(gitRoot, "feat/test-feature", {
 			noInstall: true,
+			noFetch: true,
 		});
 
 		expect(result.branch).toBe("feat/test-feature");
@@ -50,11 +51,9 @@ describe("createWorktree", () => {
 	});
 
 	test("copies configured files to the new worktree", async () => {
-		// Create files to copy
 		fs.writeFileSync(path.join(gitRoot, ".env"), "SECRET=abc");
 		fs.writeFileSync(path.join(gitRoot, ".nvmrc"), "20");
 
-		// Write config
 		const config = {
 			directory: ".worktrees",
 			copy: [".env", ".nvmrc"],
@@ -70,6 +69,7 @@ describe("createWorktree", () => {
 
 		const result = await createWorktree(gitRoot, "feat/with-files", {
 			noInstall: true,
+			noFetch: true,
 		});
 
 		expect(result.filesCopied).toBe(2);
@@ -86,6 +86,7 @@ describe("createWorktree", () => {
 
 		const result = await createWorktree(gitRoot, "feat/auto-detect", {
 			noInstall: true,
+			noFetch: true,
 		});
 
 		expect(result.configAutoDetected).toBe(true);
@@ -93,19 +94,95 @@ describe("createWorktree", () => {
 	});
 
 	test("throws when worktree already exists", async () => {
-		await createWorktree(gitRoot, "feat/existing", { noInstall: true });
+		await createWorktree(gitRoot, "feat/existing", {
+			noInstall: true,
+			noFetch: true,
+		});
 
 		expect(
-			createWorktree(gitRoot, "feat/existing", { noInstall: true }),
+			createWorktree(gitRoot, "feat/existing", {
+				noInstall: true,
+				noFetch: true,
+			}),
 		).rejects.toThrow("Worktree already exists");
 	});
 
 	test("sanitizes branch name for directory", async () => {
 		const result = await createWorktree(gitRoot, "feat/nested/branch", {
 			noInstall: true,
+			noFetch: true,
 		});
 
-		// Directory uses hyphens instead of slashes
 		expect(path.basename(result.path)).toBe("feat-nested-branch");
+	});
+
+	test("bases new branch off origin/main when remote exists", async () => {
+		// Set up a "remote" by creating a bare repo and adding it as origin
+		const bareDir = fs.mkdtempSync(
+			path.join(import.meta.dir, ".test-scratch-bare-"),
+		);
+		await spawnAndCollect(["git", "clone", "--bare", gitRoot, bareDir]);
+		await spawnAndCollect(["git", "remote", "add", "origin", bareDir], {
+			cwd: gitRoot,
+		});
+		await spawnAndCollect(["git", "fetch", "origin"], { cwd: gitRoot });
+
+		// Add a commit to origin/main that local main doesn't have
+		// by pushing a change through a temp clone
+		const tempClone = fs.mkdtempSync(
+			path.join(import.meta.dir, ".test-scratch-clone-"),
+		);
+		await spawnAndCollect(["git", "clone", bareDir, tempClone]);
+		await spawnAndCollect(["git", "config", "user.email", "test@test.com"], {
+			cwd: tempClone,
+		});
+		await spawnAndCollect(["git", "config", "user.name", "Test"], {
+			cwd: tempClone,
+		});
+		fs.writeFileSync(path.join(tempClone, "remote-only.txt"), "from remote");
+		await spawnAndCollect(["git", "add", "."], { cwd: tempClone });
+		await spawnAndCollect(["git", "commit", "-m", "remote commit"], {
+			cwd: tempClone,
+		});
+		await spawnAndCollect(["git", "push"], { cwd: tempClone });
+
+		// Fetch so gitRoot has the updated origin/main
+		await spawnAndCollect(["git", "fetch", "origin"], { cwd: gitRoot });
+
+		// Create worktree -- should be based on origin/main (which has remote-only.txt)
+		const result = await createWorktree(gitRoot, "feat/from-remote", {
+			noInstall: true,
+			noFetch: true, // We already fetched manually
+		});
+
+		// The worktree should contain the remote-only file
+		expect(fs.existsSync(path.join(result.path, "remote-only.txt"))).toBe(true);
+
+		// Clean up extra temp dirs
+		fs.rmSync(bareDir, { recursive: true, force: true });
+		fs.rmSync(tempClone, { recursive: true, force: true });
+	});
+
+	test("uses existing local branch when it exists", async () => {
+		// Create a local branch with a specific file
+		await spawnAndCollect(["git", "checkout", "-b", "feat/existing-local"], {
+			cwd: gitRoot,
+		});
+		fs.writeFileSync(path.join(gitRoot, "local-branch.txt"), "local");
+		await spawnAndCollect(["git", "add", "."], { cwd: gitRoot });
+		await spawnAndCollect(["git", "commit", "-m", "local branch commit"], {
+			cwd: gitRoot,
+		});
+		await spawnAndCollect(["git", "checkout", "main"], { cwd: gitRoot });
+
+		const result = await createWorktree(gitRoot, "feat/existing-local", {
+			noInstall: true,
+			noFetch: true,
+		});
+
+		// Should use the existing local branch (which has local-branch.txt)
+		expect(fs.existsSync(path.join(result.path, "local-branch.txt"))).toBe(
+			true,
+		);
 	});
 });

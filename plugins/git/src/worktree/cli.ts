@@ -50,8 +50,10 @@ async function main(): Promise<void> {
 				fail("Usage: worktree create <branch-name> [--no-install]");
 			}
 			const noInstall = flags["no-install"] === true;
+			const noFetch = flags["no-fetch"] === true;
 			const result = await createWorktree(gitRoot, branchName, {
 				noInstall,
+				noFetch,
 			});
 			output(result);
 			break;
