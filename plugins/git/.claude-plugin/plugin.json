@@ -18,15 +18,13 @@
 		"tmux"
 	],
 	"license": "MIT",
-	"skills": ["./skills/git-expert"],
+	"skills": ["./skills/git-expert", "./skills/worktree"],
 	"commands": [
 		"./commands/checkpoint.md",
 		"./commands/commit.md",
 		"./commands/create-pr.md",
 		"./commands/history.md",
-		"./commands/session-log.md",
-		"./commands/worktree.md",
-		"./commands/worktree-delete.md"
+		"./commands/session-log.md"
 	],
 	"mcpServers": ["./.mcp.json"]
 }

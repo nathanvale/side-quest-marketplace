@@ -1,5 +1,5 @@
 {
 	"extends": "../../tsconfig.json",
-	"include": ["mcp-servers/**/*.ts", "hooks/**/*.ts"],
+	"include": ["mcp-servers/**/*.ts", "hooks/**/*.ts", "src/**/*.ts"],
 	"exclude": ["**/node_modules/**"]
 }
