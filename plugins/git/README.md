@@ -1,4 +1,6 @@
-# Git Intelligence Plugin for Claude Code
+# Git Plugin for Claude Code
+
+> **v2.0.0** — Lean skills-based architecture (no MCP server)
 
 Provides intelligent git context, history exploration, smart commit capabilities, and safety guardrails for Claude Code sessions.
 
@@ -56,9 +58,7 @@ Unified skill covering all git workflows. Claude auto-activates for git tasks:
 
 ## Installation
 
-```bash
-/plugin install git@nathan-vale-claude-code
-```
+Part of the [SideQuest Marketplace](https://github.com/nathanvale/side-quest-marketplace). Installed automatically when the marketplace is active.
 
 ## Commit Format
 
