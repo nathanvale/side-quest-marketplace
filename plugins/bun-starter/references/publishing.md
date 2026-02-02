@@ -71,9 +71,9 @@ The preferred auth method for npm. No secrets needed after initial setup.
 1. Go to `https://www.npmjs.com/package/<package-name>/access`
 2. Find the **"Trusted Publisher"** section under Publishing Access
 3. Click the **GitHub Actions** button
-4. Fill in:
-   - **Organization or user**: your GitHub username (e.g., `nathanvale`)
-   - **Repository**: the repo name (e.g., `side-quest-core`)
+4. Fill in the **GitHub repository** details (not npm — this tells npm which GitHub repo is authorized to publish):
+   - **Organization or user**: your **GitHub** username or org (e.g., `nathanvale`)
+   - **Repository**: the **GitHub** repo name (e.g., `side-quest-core` — not the npm package name)
    - **Workflow filename**: `publish.yml`
 5. Click **"Set up connection"**
 6. Optionally enable **"Require two-factor authentication and disallow tokens (recommended)"**

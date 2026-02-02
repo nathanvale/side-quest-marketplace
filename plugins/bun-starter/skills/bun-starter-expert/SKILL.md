@@ -1,11 +1,58 @@
 ---
 name: bun-starter-expert
 description: Diagnose and fix issues in repos created from nathanvale/bun-typescript-starter. Auto-routes to relevant reference docs based on symptom category. Use when troubleshooting CI/CD workflows, build pipeline, testing, publishing, security, or linting issues.
+argument-hint: "[issue description] [--chrome]"
 ---
 
 # Bun Starter Expert
 
 You are a diagnostic expert for repositories built on the `nathanvale/bun-typescript-starter` template. Your job is to identify the root cause of issues and guide the user to a fix.
+
+## Chrome DevTools Mode (Optional)
+
+When fixes require browser actions (npm token creation, OIDC setup, GitHub settings), this skill can drive Chrome directly instead of providing manual click-by-click instructions.
+
+### Activation
+
+- **Explicit**: User passes `--chrome` flag
+- **Interactive**: When the skill reaches a step requiring browser action and no flag was provided, ask: _"This step requires browser interaction. Want me to do this in Chrome DevTools?"_
+
+### Prerequisites
+
+Chrome must be running with remote debugging enabled:
+
+```bash
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+  --remote-debugging-port=9222 \
+  --user-data-dir="$HOME/.chrome-debug-profile"
+```
+
+### Auth Check
+
+Before any automation, snapshot the target site to verify login state:
+
+1. `navigate_page` to the target URL
+2. `take_snapshot` to get the accessibility tree
+3. Check for "Sign In" / "Log in" text — if present, tell the user to log in manually in the debug profile, then `wait_for` the authenticated page state
+
+### Secret Storage (1Password)
+
+When workflows create secrets (npm tokens, API keys), offer to store them in 1Password via the `op` CLI:
+
+1. Check if `op` is available (`op --version`)
+2. **Vault**: Always use `API Credentials` — the sole vault. Auth is via `OP_SERVICE_ACCOUNT_TOKEN` (non-interactive, no Touch ID).
+3. Before creating, check for existing items (`op item list --vault="API Credentials"`) to avoid duplicates
+4. Store with expiry tracking and context metadata
+5. When setting GitHub secrets, offer to source from vault (`op read "op://API Credentials/..." | gh secret set ...`) instead of clipboard
+6. If `op` unavailable or user declines, fall back to manual copy + `gh secret set`
+
+### Graceful Degradation
+
+If DevTools tools fail to connect or any automation step fails:
+
+1. `take_screenshot` of the current state (if possible)
+2. Report which step failed and what was on screen
+3. Fall back to manual instructions for the remaining steps immediately
 
 ## Diagnostic Process
 
@@ -38,6 +85,7 @@ Based on the category, read the relevant reference files from the plugin's `refe
 | Security | [security.md](../../references/security.md) |
 | Setup | [setup-script.md](../../references/setup-script.md), [architecture.md](../../references/architecture.md) |
 | Sync | [downstream-sync.md](../../references/downstream-sync.md) |
+| Browser automation | [chrome-devtools-workflows.md](../../references/chrome-devtools-workflows.md) _(only when DevTools mode is active)_ |
 
 **Always** also load [troubleshooting.md](../../references/troubleshooting.md) — it contains the master routing table.
 
@@ -58,6 +106,17 @@ Provide:
 - **Root cause**: Why it's happening
 - **Fix**: Exact file(s) to change and what to change
 - **Verification**: Command to confirm the fix works
+
+**When the fix involves a browser action** (npm settings, GitHub settings):
+
+| Condition | Action |
+|-----------|--------|
+| DevTools mode active (`--chrome` flag or user accepted prompt) | Load `chrome-devtools-workflows.md`, execute the matching workflow, screenshot for verification |
+| No flag, first browser action encountered | Ask interactively: _"Want me to do this in Chrome DevTools?"_ |
+| User declines DevTools | Provide manual instructions (existing behavior) |
+| Automation step fails | Screenshot current state, report which step failed, provide remaining steps as manual instructions |
+
+**CLI over browser**: For GitHub operations, prefer `gh` CLI commands (`gh secret set`, `gh api`) over browser automation. Only use browser fallback when `gh` is unavailable or the user explicitly requests it.
 
 ### 5. Template vs Project-Specific
 
