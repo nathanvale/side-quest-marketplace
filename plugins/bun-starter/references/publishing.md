@@ -58,9 +58,10 @@ The preferred auth method for npm. No secrets needed after initial setup.
    - Note: write tokens expire in 90 days max (npm policy since late 2025)
 2. **For scoped packages** (`@org/name`), do the first publish locally:
    ```bash
-   npm publish --access public
+   npm publish --access public --no-provenance
    ```
    Why: npm requires the package to exist before CI tokens (granular or OIDC) can publish to it. A brand new scoped package returns E404 until the first publish registers it.
+   Note: `--no-provenance` is required for local publishes — provenance attestation only works in CI (GitHub Actions OIDC). Without this flag you'll get `Automatic provenance generation not supported for provider: null`.
 3. Add token as a repository secret for CI: `gh secret set NPM_TOKEN --repo <owner>/<repo>`
 4. CI handles subsequent publishes via Changesets (version PR → merge → auto-publish)
 5. After successful publish, configure OIDC trusted publishing (see steps below)

@@ -40,7 +40,8 @@ Master routing table for diagnosing issues in repos created from `nathanvale/bun
 | Symptom | Cause | Fix | Config File |
 |---------|-------|-----|-------------|
 | 403 Forbidden on npm publish | Missing access config | Add `publishConfig.access: "public"` | `package.json` |
-| E404 on first publish (any token) | Scoped package never published | Run `npm publish --access public` locally first, then CI can handle subsequent publishes | `package.json` |
+| E404 on first publish (any token) | Scoped package never published | Run `npm publish --access public --no-provenance` locally first, then CI handles subsequent publishes | `package.json` |
+| "provenance generation not supported for provider: null" | `--provenance` used outside CI | Add `--no-provenance` flag — provenance only works in GitHub Actions OIDC | n/a |
 | "Access token expired or revoked" | Classic tokens revoked (Dec 2025) | Create granular token at `npmjs.com/settings/<user>/tokens/granular-access-tokens/new` | npm settings |
 | OIDC auth fails | Not configured after first publish | Configure at `npmjs.com/package/<pkg>/settings` (Trusted Publisher section) | npm settings |
 | OIDC auth fails (2) | npm version too old | Ensure Node 24+ (npm 11.6+) in CI | `.nvmrc` |

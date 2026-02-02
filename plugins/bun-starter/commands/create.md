@@ -161,8 +161,9 @@ Show the user:
    #    - Scope to package/org, Read+Write, check "Bypass 2FA" for CI
 
    # 2. For scoped packages (@org/name), do the first publish locally:
-   npm publish --access public
+   npm publish --access public --no-provenance
    #    npm needs the package to exist before CI tokens can publish to it.
+   #    --no-provenance required locally (provenance only works in GitHub Actions)
 
    # 3. Set NPM_TOKEN secret for CI publishes
    gh secret set NPM_TOKEN --repo <owner>/<repo>
