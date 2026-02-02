@@ -7,7 +7,29 @@
  * @module shared/errors
  */
 
+import {
+	type ErrorCategory as CoreErrorCategory,
+	StructuredError,
+} from "@sidequest/core/errors";
 import type { ErrorCategory, ErrorCode, ErrorContext } from "../types";
+
+// =============================================================================
+// Error Category Mapping
+// =============================================================================
+
+/**
+ * Map inbox-specific error categories to core error categories.
+ */
+const CATEGORY_TO_CORE: Record<ErrorCategory, CoreErrorCategory> = {
+	dependency: "CONFIGURATION", // External tool/service configuration
+	extraction: "INTERNAL", // Failed to read/parse file
+	detection: "INTERNAL", // LLM classification failure
+	validation: "VALIDATION", // Data validation
+	execution: "INTERNAL", // Failed to execute operation
+	registry: "INTERNAL", // Registry I/O failure
+	user: "VALIDATION", // Invalid user input
+	system: "UNKNOWN", // Unexpected error
+};
 
 // =============================================================================
 // Error Metadata Mapping
@@ -182,13 +204,26 @@ const ERROR_METADATA: Record<ErrorCode, ErrorMetadata> = {
 
 /**
  * Structured error for inbox processing operations.
- * Includes error code, category, and context for debugging.
+ *
+ * Extends the core StructuredError with inbox-specific error codes and categories.
+ * The inbox category is preserved for backward compatibility, while the core
+ * category is used for generic error handling.
  */
-export class InboxError extends Error {
-	public readonly code: ErrorCode;
-	public readonly category: ErrorCategory;
-	public readonly recoverable: boolean;
-	public readonly context: ErrorContext;
+export class InboxError extends StructuredError {
+	/**
+	 * Inbox-specific error code (e.g., "DEP_PDFTOTEXT_MISSING").
+	 */
+	public override readonly code: ErrorCode;
+
+	/**
+	 * Inbox-specific error category for domain-specific handling.
+	 */
+	public readonly inboxCategory: ErrorCategory;
+
+	/**
+	 * Inbox-specific error context with required cid field.
+	 */
+	public override readonly context: ErrorContext;
 
 	constructor(
 		message: string,
@@ -197,11 +232,13 @@ export class InboxError extends Error {
 		recoverable: boolean,
 		context: ErrorContext,
 	) {
-		super(message);
+		// Map inbox category to core category
+		const coreCategory = CATEGORY_TO_CORE[category];
+
+		super(message, coreCategory, code, recoverable, context);
 		this.name = "InboxError";
 		this.code = code;
-		this.category = category;
-		this.recoverable = recoverable;
+		this.inboxCategory = category;
 		this.context = context;
 
 		// Capture stack trace for V8 engines
@@ -212,16 +249,28 @@ export class InboxError extends Error {
 
 	/**
 	 * Convert to plain object for serialization/logging.
+	 *
+	 * Preserves the inbox-specific category for backward compatibility.
 	 */
-	toJSON(): object {
+	override toJSON(): {
+		name: string;
+		message: string;
+		category: import("@sidequest/core/errors").ErrorCategory;
+		code: string;
+		recoverable: boolean;
+		context: Record<string, unknown>;
+		stack?: string;
+		cause?: {
+			name: string;
+			message: string;
+			stack?: string;
+		};
+		inboxCategory: ErrorCategory;
+	} {
+		const base = super.toJSON();
 		return {
-			name: this.name,
-			message: this.message,
-			code: this.code,
-			category: this.category,
-			recoverable: this.recoverable,
-			context: this.context,
-			stack: this.stack,
+			...base,
+			inboxCategory: this.inboxCategory,
 		};
 	}
 }

@@ -8,6 +8,7 @@
 		"./concurrency": "./src/concurrency/index.ts",
 		"./geo": "./src/geo/index.ts",
 		"./compression": "./src/compression/index.ts",
+		"./errors": "./src/errors/index.ts",
 		"./formatters": "./src/formatters/index.ts",
 		"./fs": "./src/fs/index.ts",
 		"./git": "./src/git/index.ts",
@@ -20,6 +21,7 @@
 		"./logging": "./src/logging/index.ts",
 		"./mcp": "./src/mcp/index.ts",
 		"./mcp-response": "./src/mcp-response/index.ts",
+		"./oauth": "./src/oauth/index.ts",
 		"./obsidian": "./src/obsidian/index.ts",
 		"./password": "./src/password/index.ts",
 		"./slo": "./src/slo/index.ts",
@@ -43,6 +45,7 @@
 		"@logtape/file": "^0.12.0",
 		"@logtape/logtape": "^0.12.0",
 		"@modelcontextprotocol/sdk": "^1.20.0",
+		"yaml": "^2.7.0",
 		"zod": "^3.23.8"
 	},
 	"devDependencies": {

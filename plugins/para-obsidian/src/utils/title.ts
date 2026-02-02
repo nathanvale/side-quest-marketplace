@@ -7,6 +7,7 @@
  * @module utils/title
  */
 
+import { applyTitlePrefix as applyTitlePrefixCore } from "@sidequest/core/obsidian";
 import {
 	DEFAULT_TITLE_PREFIXES,
 	SOURCE_FORMAT_EMOJIS,
@@ -47,32 +48,23 @@ export function applyTitlePrefix(
 	config: ParaObsidianConfig,
 	frontmatter?: Record<string, unknown>,
 ): string {
-	// Get prefix from config or defaults
-	const basePrefix =
-		config.titlePrefixes?.[template] ?? DEFAULT_TITLE_PREFIXES[template];
+	// Merge config prefixes with defaults (filter out undefined values)
+	const prefixMap = Object.fromEntries(
+		Object.entries({
+			...DEFAULT_TITLE_PREFIXES,
+			...(config.titlePrefixes ?? {}),
+		}).filter(([, value]) => value !== undefined),
+	) as Record<string, string>;
 
-	if (!basePrefix) return title; // No prefix configured for this template
-
-	// Check if title already starts with the prefix (case-insensitive)
-	const titleLower = title.toLowerCase();
-	const basePrefixLower = basePrefix.toLowerCase();
-
-	if (titleLower.startsWith(basePrefixLower)) {
-		return title; // Already has prefix, don't duplicate
-	}
-
-	// For resources, add source_format emoji if available
-	let prefix = basePrefix;
-	if (template === "resource" && frontmatter?.source_format) {
-		const formatEmoji =
-			SOURCE_FORMAT_EMOJIS[frontmatter.source_format as string];
-		if (formatEmoji) {
-			// Add format emoji after base emoji (trim space from base first)
-			prefix = `${basePrefix.trim()}${formatEmoji} `;
-		}
-	}
-
-	// Apply prefix (add space if prefix doesn't end with one)
-	const separator = prefix.endsWith(" ") ? "" : " ";
-	return `${prefix}${separator}${title}`;
+	// Use core utility with para-obsidian-specific configuration
+	// Only "resource" template uses source_format emoji mapping
+	return applyTitlePrefixCore(
+		title,
+		template,
+		prefixMap,
+		frontmatter,
+		SOURCE_FORMAT_EMOJIS,
+		"source_format",
+		["resource"],
+	);
 }
