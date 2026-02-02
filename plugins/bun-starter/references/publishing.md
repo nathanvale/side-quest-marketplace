@@ -52,19 +52,35 @@ The preferred auth method for npm. No secrets needed after initial setup.
 
 **First publish** (OIDC not yet configured):
 1. Create a **granular access token** at `https://www.npmjs.com/settings/<username>/tokens/granular-access-tokens/new`
-   - Scope to the package or org (e.g., `@sidequest`)
+   - Scope to the package or org (e.g., `@side-quest`)
    - Grant **Read and Write** permissions
    - Check **"Bypass 2FA"** (required for CI/CD)
    - Note: write tokens expire in 90 days max (npm policy since late 2025)
-2. Add as a repository secret: `gh secret set NPM_TOKEN --repo <owner>/<repo>`
-3. Merge a version PR to trigger publish
-4. After successful publish, configure OIDC at `https://www.npmjs.com/package/YOUR_PACKAGE/access`
-5. Remove `NPM_TOKEN` secret (no longer needed — OIDC handles auth)
+2. **For scoped packages** (`@org/name`), do the first publish locally:
+   ```bash
+   npm publish --access public
+   ```
+   Why: npm requires the package to exist before CI tokens (granular or OIDC) can publish to it. A brand new scoped package returns E404 until the first publish registers it.
+3. Add token as a repository secret for CI: `gh secret set NPM_TOKEN --repo <owner>/<repo>`
+4. CI handles subsequent publishes via Changesets (version PR → merge → auto-publish)
+5. After successful publish, configure OIDC trusted publishing (see steps below)
+6. Remove `NPM_TOKEN` secret (no longer needed — OIDC handles auth)
 
-**Token management URLs:**
+**Configure OIDC trusted publishing** (after first publish):
+1. Go to `https://www.npmjs.com/package/<package-name>/settings`
+2. Find the **"Trusted Publisher"** section under Publishing Access
+3. Click the **GitHub Actions** button
+4. Fill in:
+   - **Organization or user**: your GitHub username (e.g., `nathanvale`)
+   - **Repository**: the repo name (e.g., `side-quest-core`)
+   - **Workflow filename**: `publish.yml`
+5. Click **"Set up connection"**
+6. Optionally enable **"Require two-factor authentication and disallow tokens (recommended)"**
+
+**Key URLs:**
 - Token list: `https://www.npmjs.com/settings/~/tokens`
 - Create granular token: `https://www.npmjs.com/settings/<username>/tokens/granular-access-tokens/new`
-- Package access/OIDC config: `https://www.npmjs.com/package/<package-name>/access`
+- Package settings (OIDC config): `https://www.npmjs.com/package/<package-name>/settings`
 
 **Requirements:**
 - npm 11.6+ (provided by Node 24 setup in CI)
@@ -162,7 +178,7 @@ Can be used as a drop-in replacement for the publish step if Changesets' publish
 
 - OIDC trusted publishing requires the package to **already exist on npm**
 - First publish must use `NPM_TOKEN` — OIDC cannot work until the package is registered
-- After first publish, configure OIDC at `https://www.npmjs.com/package/<package-name>/access`
+- After first publish, configure OIDC at `https://www.npmjs.com/package/<package-name>/settings`
 
 ### "Access token expired or revoked"
 

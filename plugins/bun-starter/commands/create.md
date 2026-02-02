@@ -160,12 +160,17 @@ Show the user:
    #    https://www.npmjs.com/settings/<username>/tokens/granular-access-tokens/new
    #    - Scope to package/org, Read+Write, check "Bypass 2FA" for CI
 
-   # 2. Set NPM_TOKEN secret for first publish
+   # 2. For scoped packages (@org/name), do the first publish locally:
+   npm publish --access public
+   #    npm needs the package to exist before CI tokens can publish to it.
+
+   # 3. Set NPM_TOKEN secret for CI publishes
    gh secret set NPM_TOKEN --repo <owner>/<repo>
 
-   # 3. After first publish succeeds, configure OIDC trusted publishing at:
-   #    https://www.npmjs.com/package/<package-name>/access
-   #    Then remove NPM_TOKEN (no longer needed)
+   # 4. After first publish succeeds, configure OIDC trusted publishing at:
+   #    https://www.npmjs.com/package/<package-name>/settings
+   #    → Trusted Publisher → GitHub Actions → set repo + workflow
+   #    Then remove NPM_TOKEN (no longer needed — OIDC handles auth)
    ```
 
 2. **Start developing**:
