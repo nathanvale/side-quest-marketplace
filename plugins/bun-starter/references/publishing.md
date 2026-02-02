@@ -51,15 +51,31 @@ The preferred auth method for npm. No secrets needed after initial setup.
 ### Setup
 
 **First publish** (OIDC not yet configured):
-1. Add `NPM_TOKEN` as a repository secret
-2. Merge a version PR to trigger publish
-3. After successful publish, configure OIDC at `https://www.npmjs.com/package/YOUR_PACKAGE/access`
-4. Remove `NPM_TOKEN` secret (no longer needed)
+1. Create a **granular access token** at `https://www.npmjs.com/settings/<username>/tokens/granular-access-tokens/new`
+   - Scope to the package or org (e.g., `@sidequest`)
+   - Grant **Read and Write** permissions
+   - Check **"Bypass 2FA"** (required for CI/CD)
+   - Note: write tokens expire in 90 days max (npm policy since late 2025)
+2. Add as a repository secret: `gh secret set NPM_TOKEN --repo <owner>/<repo>`
+3. Merge a version PR to trigger publish
+4. After successful publish, configure OIDC at `https://www.npmjs.com/package/YOUR_PACKAGE/access`
+5. Remove `NPM_TOKEN` secret (no longer needed — OIDC handles auth)
+
+**Token management URLs:**
+- Token list: `https://www.npmjs.com/settings/~/tokens`
+- Create granular token: `https://www.npmjs.com/settings/<username>/tokens/granular-access-tokens/new`
+- Package access/OIDC config: `https://www.npmjs.com/package/<package-name>/access`
 
 **Requirements:**
 - npm 11.6+ (provided by Node 24 setup in CI)
 - `id-token: write` permission in workflow
 - `publishConfig.provenance: true` in package.json
+
+**npm token policy (as of Dec 2025):**
+- Classic tokens have been permanently revoked — only granular tokens work
+- Write-enabled granular tokens: 90-day max expiry, 2FA enforced by default
+- Read-only tokens: up to 1-year expiry
+- Use "Bypass 2FA" option for CI/CD workflows
 
 ### Fallback to NPM_TOKEN
 
@@ -138,7 +154,21 @@ Can be used as a drop-in replacement for the publish step if Changesets' publish
 
 - Scoped packages require `publishConfig.access: "public"` (already configured)
 - Ensure `NPM_TOKEN` secret is set for first publish
-- Token must have "publish" permission on npmjs.com
+- Token must be a **granular access token** with Read and Write permissions
+- Create at: `https://www.npmjs.com/settings/<username>/tokens/granular-access-tokens/new`
+- Classic tokens no longer work (revoked Dec 2025)
+
+### "E404 Not Found" on first publish with OIDC
+
+- OIDC trusted publishing requires the package to **already exist on npm**
+- First publish must use `NPM_TOKEN` — OIDC cannot work until the package is registered
+- After first publish, configure OIDC at `https://www.npmjs.com/package/<package-name>/access`
+
+### "Access token expired or revoked"
+
+- Classic npm tokens were permanently revoked in Dec 2025
+- Create a new **granular access token** at `https://www.npmjs.com/settings/<username>/tokens/granular-access-tokens/new`
+- Write tokens now expire in 90 days max — set a calendar reminder to rotate
 
 ### OIDC publish fails with "No matching package found"
 

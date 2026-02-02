@@ -156,12 +156,16 @@ Show the user:
 
 1. **NPM publishing setup** (first time):
    ```bash
-   # Set NPM_TOKEN secret for first publish
+   # 1. Create a granular access token at:
+   #    https://www.npmjs.com/settings/<username>/tokens/granular-access-tokens/new
+   #    - Scope to package/org, Read+Write, check "Bypass 2FA" for CI
+
+   # 2. Set NPM_TOKEN secret for first publish
    gh secret set NPM_TOKEN --repo <owner>/<repo>
 
-   # After first publish, configure OIDC trusted publishing at:
-   # https://www.npmjs.com/package/<package-name>/access
-   # Then remove NPM_TOKEN (no longer needed)
+   # 3. After first publish succeeds, configure OIDC trusted publishing at:
+   #    https://www.npmjs.com/package/<package-name>/access
+   #    Then remove NPM_TOKEN (no longer needed)
    ```
 
 2. **Start developing**:

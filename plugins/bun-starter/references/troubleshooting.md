@@ -40,7 +40,9 @@ Master routing table for diagnosing issues in repos created from `nathanvale/bun
 | Symptom | Cause | Fix | Config File |
 |---------|-------|-----|-------------|
 | 403 Forbidden on npm publish | Missing access config | Add `publishConfig.access: "public"` | `package.json` |
-| OIDC auth fails | Not configured after first publish | Configure at npmjs.com/package/.../access | npm settings |
+| E404 on first publish (OIDC) | OIDC needs package to exist | Use `NPM_TOKEN` for first publish, then configure OIDC | npm settings |
+| "Access token expired or revoked" | Classic tokens revoked (Dec 2025) | Create granular token at `npmjs.com/settings/<user>/tokens/granular-access-tokens/new` | npm settings |
+| OIDC auth fails | Not configured after first publish | Configure at `npmjs.com/package/<pkg>/access` | npm settings |
 | OIDC auth fails (2) | npm version too old | Ensure Node 24+ (npm 11.6+) in CI | `.nvmrc` |
 | Version PR not appearing | No pending changesets | Create changeset: `bun version:gen` | `.changeset/` |
 | Pre-release leaking to stable | Still in pre-mode | Run `bun run pre:exit` | `.changeset/pre.json` |
