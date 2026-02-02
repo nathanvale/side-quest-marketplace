@@ -169,7 +169,7 @@ Show the user:
    gh secret set NPM_TOKEN --repo <owner>/<repo>
 
    # 4. After first publish succeeds, configure OIDC trusted publishing at:
-   #    https://www.npmjs.com/package/<package-name>/settings
+   #    https://www.npmjs.com/package/<package-name>/access
    #    → Trusted Publisher → GitHub Actions → set repo + workflow
    #    Then remove NPM_TOKEN (no longer needed — OIDC handles auth)
    ```

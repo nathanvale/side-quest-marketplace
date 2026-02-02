@@ -68,7 +68,7 @@ The preferred auth method for npm. No secrets needed after initial setup.
 6. Remove `NPM_TOKEN` secret (no longer needed — OIDC handles auth)
 
 **Configure OIDC trusted publishing** (after first publish):
-1. Go to `https://www.npmjs.com/package/<package-name>/settings`
+1. Go to `https://www.npmjs.com/package/<package-name>/access`
 2. Find the **"Trusted Publisher"** section under Publishing Access
 3. Click the **GitHub Actions** button
 4. Fill in:
@@ -81,7 +81,7 @@ The preferred auth method for npm. No secrets needed after initial setup.
 **Key URLs:**
 - Token list: `https://www.npmjs.com/settings/~/tokens`
 - Create granular token: `https://www.npmjs.com/settings/<username>/tokens/granular-access-tokens/new`
-- Package settings (OIDC config): `https://www.npmjs.com/package/<package-name>/settings`
+- Package access (OIDC/Trusted Publisher): `https://www.npmjs.com/package/<package-name>/access`
 
 **Requirements:**
 - npm 11.6+ (provided by Node 24 setup in CI)
@@ -179,7 +179,7 @@ Can be used as a drop-in replacement for the publish step if Changesets' publish
 
 - OIDC trusted publishing requires the package to **already exist on npm**
 - First publish must use `NPM_TOKEN` — OIDC cannot work until the package is registered
-- After first publish, configure OIDC at `https://www.npmjs.com/package/<package-name>/settings`
+- After first publish, configure OIDC at `https://www.npmjs.com/package/<package-name>/access`
 
 ### "Access token expired or revoked"
 
