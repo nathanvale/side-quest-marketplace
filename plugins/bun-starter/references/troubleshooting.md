@@ -64,6 +64,10 @@ Master routing table for diagnosing issues in repos created from `nathanvale/bun
 | Auto-merge fails on version PR | Needs elevated permissions | Configure 1Password + GitHub App | `version-packages-auto-merge.yml` |
 | CodeQL timeout | Analysis too slow | Increase timeout or exclude dirs | `codeql.yml` |
 | SBOM not generated | anchore/sbom-action issue | Check action version is pinned to valid SHA | `release.yml` |
+| `Cannot find module '@scope/pkg/subpath'` in CI | Cleanup step deletes `node_modules/.bun` | Remove `node_modules/.bun` from `rm -rf` in cleanup steps | `publish.yml`, `pr-quality.yml` |
+| `changesets/action` fails with "Have you forgotten to install?" | Bun's `.bun/` symlink layout invisible to Node.js `require()` | Use `npm install --prefix .npm-changesets` + `NODE_PATH` | `publish.yml` |
+| `.npm-changesets/` files appear in version PR | Prefix directory not gitignored | Add `.npm-changesets/` to `.gitignore` | `.gitignore` |
+| `npm install --no-save` crashes with "Cannot read properties of null" | npm can't parse Bun's node_modules layout | Use `npm install --prefix` instead of `--no-save` | `publish.yml` |
 
 ### Setup Issues
 

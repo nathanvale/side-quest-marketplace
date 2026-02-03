@@ -251,6 +251,36 @@ npm publish --access public --no-provenance
 
 After first publish, configure OIDC trusted publishing at npmjs.com for CI automation.
 
+## Bun + Node.js Module Resolution
+
+When using `changesets/action` in a Bun-managed repo, the action's bundled Node.js runtime cannot resolve packages installed by Bun. This is because Bun uses a `.bun/` symlink layout inside `node_modules/` that Node.js `require()` cannot traverse.
+
+### The Problem
+
+1. `changesets/action` internally does `require("@changesets/cli")` using Node.js
+2. Bun installs packages into `node_modules/.bun/` with symlinks — Node.js can't follow these
+3. `npm install --no-save @changesets/cli` fails because npm can't parse Bun's `node_modules` layout
+4. Result: "Have you forgotten to install and build your dependencies?" error
+
+### The Solution
+
+Install changesets into a separate prefix directory and export `NODE_PATH`:
+
+```yaml
+- name: Ensure changesets CLI is Node-resolvable
+  run: |
+    npm install --prefix .npm-changesets @changesets/cli @changesets/changelog-github
+    echo "NODE_PATH=$(pwd)/.npm-changesets/node_modules" >> "$GITHUB_ENV"
+```
+
+This keeps Bun's layout intact while giving Node.js a clean resolution path.
+
+### Related Requirements
+
+- **Never delete `node_modules/.bun`** — Bun uses this directory for package resolution (symlinks, subpath exports). Removing it breaks `@scope/pkg/subpath` imports.
+- **Add `.npm-changesets/` to `.gitignore`** — The changesets action runs `git add .` when creating version PRs, which picks up the prefix directory if not ignored.
+- **Don't use `@*` cleanup patterns** — The `find . -name '@*'` pattern deletes ALL scoped directories, including legitimate ones like `@changesets/`. Only clean `*@@@*` suffixed artifacts (actual Bun linker bugs).
+
 ## Known Gotchas
 
 | Issue | Cause | Fix |

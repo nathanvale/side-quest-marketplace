@@ -81,6 +81,10 @@ The preferred auth method for npm. No secrets needed after initial setup.
    - **Organization or user**: your **GitHub** username or org (e.g., `nathanvale`)
    - **Repository**: the **GitHub** repo name (e.g., `side-quest-core` — not the npm package name)
    - **Workflow filename**: `publish.yml`
+   **IMPORTANT — exact field values:**
+   - **Organization or user**: Your GitHub username only (e.g., `nathanvale`), NOT `nathanvale/repo-name`
+   - **Repository**: Repo name only (e.g., `side-quest-runners`), NOT the full path or npm package name
+   - **Workflow filename**: `publish.yml` (just the filename, not the full path)
 5. Click **"Set up connection"**
 6. Optionally enable **"Require two-factor authentication and disallow tokens (recommended)"**
 
