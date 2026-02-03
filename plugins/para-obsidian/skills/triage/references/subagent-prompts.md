@@ -28,7 +28,7 @@ Use the `triage-worker` agent (defined in `agents/triage-worker.md`). The agent 
 
 ```typescript
 Task({
-  subagent_type: "triage-worker",
+  subagent_type: "para-obsidian:triage-worker",
   model: itemType === "transcription" ? "sonnet" : undefined,
   description: "Process: ${title}",
   prompt: `
@@ -79,11 +79,11 @@ The `triage-worker` agent already knows the full workflow (enrichment routing, n
 
 ```typescript
 // Single message with up to 10 Task calls = parallel execution
-Task({ subagent_type: "triage-worker", description: "Process: Item 1", ... })
-Task({ subagent_type: "triage-worker", description: "Process: Item 2", ... })
-Task({ subagent_type: "triage-worker", description: "Process: Item 3", ... })
+Task({ subagent_type: "para-obsidian:triage-worker", description: "Process: Item 1", ... })
+Task({ subagent_type: "para-obsidian:triage-worker", description: "Process: Item 2", ... })
+Task({ subagent_type: "para-obsidian:triage-worker", description: "Process: Item 3", ... })
 // ... up to 10 per batch
-Task({ subagent_type: "triage-worker", description: "Process: Item 10", ... })
+Task({ subagent_type: "para-obsidian:triage-worker", description: "Process: Item 10", ... })
 ```
 
 **EXCEPTION:** Confluence items must be sequential (single Chrome browser instance). X/Twitter items run in parallel via stateless X-API MCP tools.
@@ -147,3 +147,4 @@ This saves 50 items × 3 tool calls = 150 tool calls and ensures consistent cont
 5. **Dual communication** — both TaskUpdate (persistence) AND PROPOSAL_JSON (immediate use)
 6. **Single-call creation** — use `para_create` with `content` parameter (creates + injects in one call). During triage, pass `no_autocommit: true` — the coordinator bulk-commits after all workers complete.
 7. **Coordinator verifies** — workers set `verification_status: "pending_coordinator"`. The coordinator stamps and verifies critical frontmatter fields from proposals before presenting the review table.
+8. **Phase 2.5 uses `skip_guard: true`** — coordinator passes `skip_guard: true` to `para_fm_set` during batch stamping. This prevents git guard conflicts between sequential stamps. A single `para_commit()` runs after all stamps complete.

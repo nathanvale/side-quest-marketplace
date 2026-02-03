@@ -344,7 +344,7 @@ Override the agent's default model based on content complexity:
 ```typescript
 // Pass model override in Task call:
 Task({
-  subagent_type: "triage-worker",
+  subagent_type: "para-obsidian:triage-worker",
   model: itemType === "transcription" ? "sonnet" : undefined,  // undefined = use agent default (haiku)
   description: "Process: ...",
   prompt: `...`
@@ -404,10 +404,11 @@ See [architecture.md#error-handling](references/architecture.md) for detailed er
 For each proposal where `created != null` and template not in `[invoice, booking]`:
 
 1. **Build stamp_set** from PROPOSAL_JSON fields + task metadata (`sourceUrl` for `source` field)
-2. **`para_fm_set`** — stamp all critical fields unconditionally
-3. **`para_fm_get`** — read back frontmatter to verify
+2. **`para_fm_set`** with `skip_guard: true` — stamp all critical fields unconditionally (no git guard conflicts during batch)
+3. **Verify from `fm_set` response** — use `result.attributes.after` to check fields (no separate `para_fm_get` needed)
 4. **Check critical fields** — if all populated → `"verified"`, if any still empty → `"needs_review"`
 5. **Override** haiku's `verification_status` with the coordinator's assessment
+6. **After loop:** single `para_commit()` to commit all stamped changes
 
 See [execution-phases.md](references/execution-phases.md) for full pseudocode and field mapping.
 

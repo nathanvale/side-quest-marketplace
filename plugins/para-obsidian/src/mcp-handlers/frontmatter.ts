@@ -164,7 +164,7 @@ Validates changes against type rules before writing.
 
 Supports dry-run mode to preview changes.
 
-Requires git repository with clean working tree (unless dry-run).`,
+Requires git repository with clean working tree (unless dry-run or skip_guard).`,
 		inputSchema: {
 			file: z.string().describe('File path (e.g., "Projects/My Note.md")'),
 			set: z
@@ -179,6 +179,12 @@ Requires git repository with clean working tree (unless dry-run).`,
 				.boolean()
 				.optional()
 				.describe("Preview changes without writing (default: false)"),
+			skip_guard: z
+				.boolean()
+				.optional()
+				.describe(
+					"Skip git guard check (for batch operations, default: false)",
+				),
 			response_format: z
 				.enum(["markdown", "json"])
 				.optional()
@@ -193,11 +199,12 @@ Requires git repository with clean working tree (unless dry-run).`,
 	},
 	wrapToolHandler(
 		async (args, format) => {
-			const { file, set, unset, dry_run } = args as {
+			const { file, set, unset, dry_run, skip_guard } = args as {
 				file: string;
 				set?: Record<string, string>;
 				unset?: string[];
 				dry_run?: boolean;
+				skip_guard?: boolean;
 			};
 			const config = loadConfig();
 			const dryRun = dry_run ?? false;
@@ -214,8 +221,8 @@ Requires git repository with clean working tree (unless dry-run).`,
 				}
 			}
 
-			// Ensure git is clean before writing (unless dry-run)
-			if (!dryRun) {
+			// Ensure git is clean before writing (unless dry-run or skip_guard)
+			if (!dryRun && !skip_guard) {
 				await ensureGitGuard(config);
 			}
 

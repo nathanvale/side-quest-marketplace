@@ -61,11 +61,12 @@ For each proposal in proposals:
     if stamp_set[key] is null or stamp_set[key] === "": delete stamp_set[key]
 
   // 2. Stamp (always, even if values match — idempotent)
+  //    skip_guard: true prevents git guard conflicts during batch stamping
   if stamp_set is not empty:
-    para_fm_set({ file: proposal.created, set: stamp_set, response_format: "json" })
+    result = para_fm_set({ file: proposal.created, set: stamp_set, skip_guard: true, response_format: "json" })
 
-  // 3. Verify
-  fm = para_fm_get({ file: proposal.created, response_format: "json" })
+  // 3. Verify using result.attributes.after from fm_set response (no separate fm_get needed)
+  fm = result.attributes.after  // fm_set returns the post-write frontmatter
 
   // 4. Check critical fields (projects is optional — many items have no project)
   critical_fields = (resource) ? ["summary", "source", "source_format", "resource_type", "areas"]
@@ -98,9 +99,11 @@ For each proposal in proposals:
 
 ### Cost
 
-- Up to 50 items × (`para_fm_set` + `para_fm_get`) = up to 100 tool calls, ~5 seconds (skips invoice/booking and items with `created == null`)
+- Up to 50 items × `para_fm_set` (with `skip_guard: true`) = up to 50 tool calls + 1 `para_commit` after loop
+- No separate `para_fm_get` needed — `fm_set` response includes post-write frontmatter
+- No per-item git commits — `skip_guard` bypasses the git guard, coordinator bulk-commits once
 - Workers save ~100 tool calls (no post-creation verification)
-- Net: token-neutral, reliability goes from ~50% to ~100%
+- Net: ~50% fewer Phase 2.5 tool calls, reliability goes from ~50% to ~100%
 
 ---
 
