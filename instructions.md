@@ -40,8 +40,6 @@
 side-quest-marketplace/
 ├── plugins/                    # 20+ Claude Code plugins (workspace packages)
 │   ├── atuin/                 # Bash history search via Atuin MCP
-│   ├── biome-runner/          # Biome linting & formatting integration
-│   ├── bun-runner/            # Test runner integration (Bun native)
 │   ├── claude-code-claude-md/ # CLAUDE.md initialization & management
 │   ├── claude-code-docs/      # Claude Code documentation lookup
 │   ├── clipboard/             # System clipboard integration
@@ -55,7 +53,6 @@ side-quest-marketplace/
 │   ├── scraper-toolkit/       # Playwright-based web scraping
 │   ├── terminal/              # Terminal utilities (say, downloads, quarantine)
 │   ├── the-cinema-bandit/     # Movie ticket price scraper [EXPERIMENTAL]
-│   ├── tsc-runner/            # TypeScript type checking integration
 │   └── validate-plugin/       # Plugin validation hooks
 ├── core/                      # Shared validation & utilities
 │   └── src/validate/          # Plugin validation engine (12 validators)

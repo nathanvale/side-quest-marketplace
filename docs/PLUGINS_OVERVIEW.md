@@ -6,9 +6,16 @@
 |--------|---------|--------------|
 | **kit** | Code search (text, AST, semantic) | MCP tools — see @./MCP_TOOLS.md |
 | **git** | Git intelligence & workflow | `/git:commit`, `/git:create-pr`, `/git:history` |
-| **bun-runner** | Test execution | MCP: `bun_runTests`, `bun_testFile` |
-| **biome-runner** | Lint & format | MCP: `biome_lintCheck`, `biome_lintFix` |
-| **tsc-runner** | TypeScript checking | MCP: `tsc_check` |
+
+## Extracted Plugins (npm)
+
+These plugins have been extracted to `side-quest-plugins` repo and published on npm:
+
+| Package | Purpose | Install |
+|---------|---------|---------|
+| `@side-quest/bun-runner` | Test execution | `npm i @side-quest/bun-runner` |
+| `@side-quest/biome-runner` | Lint & format | `npm i @side-quest/biome-runner` |
+| `@side-quest/tsc-runner` | TypeScript checking | `npm i @side-quest/tsc-runner` |
 
 ## Utility Plugins
 

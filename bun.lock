@@ -50,28 +50,9 @@
         "@types/bun": "latest",
       },
     },
-    "plugins/biome-runner": {
-      "name": "@sidequest/biome-runner",
-      "version": "1.0.0",
-      "dependencies": {
-        "@side-quest/core": "^0.1.1",
-        "@sidequest/marketplace-core": "workspace:*",
-      },
-      "devDependencies": {
-        "@types/bun": "latest",
-      },
-    },
     "plugins/bookmarks": {
       "name": "@sidequest/bookmarks",
       "version": "1.0.0",
-    },
-    "plugins/bun-runner": {
-      "name": "@sidequest/bun-runner",
-      "version": "1.0.0",
-      "dependencies": {
-        "@side-quest/core": "^0.1.1",
-        "@sidequest/marketplace-core": "workspace:*",
-      },
     },
     "plugins/bun-starter": {
       "name": "@sidequest/bun-starter",
@@ -240,18 +221,6 @@
         "@types/bun": "latest",
       },
     },
-    "plugins/tsc-runner": {
-      "name": "@sidequest/tsc-runner",
-      "version": "1.0.0",
-      "dependencies": {
-        "@side-quest/core": "^0.1.1",
-        "@sidequest/bun-runner": "workspace:*",
-        "@sidequest/marketplace-core": "workspace:*",
-      },
-      "devDependencies": {
-        "@types/bun": "latest",
-      },
-    },
     "plugins/validate-plugin": {
       "name": "@sidequest/validate-plugin",
       "version": "1.0.0",
@@ -410,11 +379,7 @@
 
     "@sidequest/atuin": ["@sidequest/atuin@workspace:plugins/atuin"],
 
-    "@sidequest/biome-runner": ["@sidequest/biome-runner@workspace:plugins/biome-runner"],
-
     "@sidequest/bookmarks": ["@sidequest/bookmarks@workspace:plugins/bookmarks"],
-
-    "@sidequest/bun-runner": ["@sidequest/bun-runner@workspace:plugins/bun-runner"],
 
     "@sidequest/bun-starter": ["@sidequest/bun-starter@workspace:plugins/bun-starter"],
 
@@ -449,8 +414,6 @@
     "@sidequest/terminal": ["@sidequest/terminal@workspace:plugins/terminal"],
 
     "@sidequest/the-cinema-bandit": ["@sidequest/the-cinema-bandit@workspace:plugins/the-cinema-bandit"],
-
-    "@sidequest/tsc-runner": ["@sidequest/tsc-runner@workspace:plugins/tsc-runner"],
 
     "@sidequest/validate-plugin": ["@sidequest/validate-plugin@workspace:plugins/validate-plugin"],
 

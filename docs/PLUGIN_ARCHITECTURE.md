@@ -30,8 +30,8 @@ mcp__plugin_<plugin>_<server>__my_tool
 
 **Examples:**
 - `kit_index_find` → `mcp__plugin_kit_kit__kit_index_find`
-- `tsc_check` → `mcp__plugin_tsc-runner_tsc-runner__tsc_check`
 - `copy` → `mcp__plugin_clipboard_clipboard__copy`
+- `para_read` → `mcp__plugin_para-obsidian_para-obsidian__para_read`
 
 ### Required Parameters
 
@@ -79,4 +79,4 @@ claude plugin validate plugins/my-plugin  # Single plugin
 ## Reference
 
 - Full guide: @../PLUGIN_DEV_GUIDE.md
-- Example plugins: `plugins/git`, `plugins/kit`, `plugins/bun-runner`
+- Example plugins: `plugins/git`, `plugins/kit`, `plugins/para-obsidian`

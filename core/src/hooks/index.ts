@@ -1,5 +1,5 @@
 /**
- * Shared types for bun-runner hooks.
+ * Shared types and utilities for Claude Code hooks.
  */
 
 /**

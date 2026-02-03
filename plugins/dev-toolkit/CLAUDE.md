@@ -286,8 +286,8 @@ Unified pattern across marketplace CLIs:
 
 - **para-obsidian** — CLI reference implementation (9/10 score)
 - **git** — Conventional commits and automation
-- **bun-runner** — Test runner integration
-- **biome-runner** — Linting and formatting
+- **@side-quest/bun-runner** — Test runner integration (npm: side-quest-plugins)
+- **@side-quest/biome-runner** — Linting and formatting (npm: side-quest-plugins)
 
 ### Related Resources
 

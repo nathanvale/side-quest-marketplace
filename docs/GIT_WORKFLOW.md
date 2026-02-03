@@ -4,7 +4,7 @@
 
 `<type>(<scope>): <subject>`
 
-**Scopes:** Plugin name (`git`, `kit`, `bun-runner`) or `root`
+**Scopes:** Plugin name (`git`, `kit`, `para-obsidian`) or `root`
 **Types:** feat | fix | docs | style | refactor | perf | test | build | ci | chore | revert
 **Rules:** Header max 100 chars, subject required
 

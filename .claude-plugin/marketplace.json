@@ -32,39 +32,6 @@
 			"keywords": ["git", "commits", "version-control", "conventional-commits"]
 		},
 		{
-			"name": "bun-runner",
-			"source": "./plugins/bun-runner",
-			"description": "[EXTRACTED] Smart test runner MCP server — now published as @side-quest/bun-runner on npm. Use side-quest-plugins repo instead.",
-			"version": "1.0.0",
-			"author": {
-				"name": "Nathan Vale"
-			},
-			"category": "testing",
-			"keywords": ["testing", "bun", "mcp", "extracted"]
-		},
-		{
-			"name": "tsc-runner",
-			"source": "./plugins/tsc-runner",
-			"description": "[EXTRACTED] TypeScript type checking — now published as @side-quest/tsc-runner on npm. Use side-quest-plugins repo instead.",
-			"version": "1.0.0",
-			"author": {
-				"name": "Nathan Vale"
-			},
-			"category": "development",
-			"keywords": ["typescript", "tsc", "type-checking", "extracted"]
-		},
-		{
-			"name": "biome-runner",
-			"source": "./plugins/biome-runner",
-			"description": "[EXTRACTED] Biome linter & formatter — now published as @side-quest/biome-runner on npm. Use side-quest-plugins repo instead.",
-			"version": "1.0.0",
-			"author": {
-				"name": "Nathan Vale"
-			},
-			"category": "development",
-			"keywords": ["biome", "linting", "formatting", "extracted"]
-		},
-		{
 			"name": "validate-plugin",
 			"source": "./plugins/validate-plugin",
 			"description": "Automatically validates plugin files after edits. Catches invalid marketplace.json, plugin.json, and hooks.json before they cause problems.",
