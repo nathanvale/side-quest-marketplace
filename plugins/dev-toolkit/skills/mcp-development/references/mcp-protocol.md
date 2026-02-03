@@ -108,7 +108,7 @@ mcp__<plugin-name>_<server-name>__<tool_name>
 ```
 mcp__kit_kit__kit_grep
 mcp__atuin_atuin__atuin_search_history
-mcp__biome-runner_biome-runner__lint_check
+biome_lintCheck
 mcp__clipboard_clipboard__copy
 ```
 

@@ -7,15 +7,32 @@
 | **kit** | Code search (text, AST, semantic) | MCP tools — see @./MCP_TOOLS.md |
 | **git** | Git intelligence & workflow | `/git:commit`, `/git:create-pr`, `/git:history` |
 
-## Extracted Plugins (npm)
+## Extracted Runners (Two-Repo Architecture)
 
-These plugins have been extracted to `side-quest-plugins` repo and published on npm:
+The runner MCP servers are split across two repos:
 
-| Package | Purpose | Install |
-|---------|---------|---------|
-| `@side-quest/bun-runner` | Test execution | `npm i @side-quest/bun-runner` |
-| `@side-quest/biome-runner` | Lint & format | `npm i @side-quest/biome-runner` |
-| `@side-quest/tsc-runner` | TypeScript checking | `npm i @side-quest/tsc-runner` |
+### MCP Server Code → `side-quest-runners`
+
+Published npm packages containing the actual MCP tool implementations:
+
+| Package | Purpose | Tools |
+|---------|---------|-------|
+| `@side-quest/bun-runner` | Test execution | `bun_runTests`, `bun_testFile`, `bun_testCoverage` |
+| `@side-quest/biome-runner` | Lint & format | `biome_lintCheck`, `biome_lintFix`, `biome_formatCheck` |
+| `@side-quest/tsc-runner` | TypeScript checking | `tsc_check` |
+
+### Claude Code Plugins → `side-quest-plugins`
+
+Plugin wrappers that configure and extend the MCP servers:
+
+| Plugin | Contains |
+|--------|----------|
+| `bun-runner` | `.mcp.json` (points to npm package), PostToolUse hooks |
+| `biome-runner` | `.mcp.json`, hooks for auto-lint on file changes |
+| `tsc-runner` | `.mcp.json`, hooks for type checking |
+| `x-api` | Full MCP server + plugin (Twitter/X API) |
+
+**Setup:** Install the plugin from `side-quest-plugins` — it references the npm package via `bunx @side-quest/<runner>`.
 
 ## Utility Plugins
 

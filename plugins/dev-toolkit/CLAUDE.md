@@ -286,8 +286,14 @@ Unified pattern across marketplace CLIs:
 
 - **para-obsidian** — CLI reference implementation (9/10 score)
 - **git** — Conventional commits and automation
-- **@side-quest/bun-runner** — Test runner integration (npm: side-quest-plugins)
-- **@side-quest/biome-runner** — Linting and formatting (npm: side-quest-plugins)
+
+### Runner MCP Servers (Two-Repo Architecture)
+
+| npm Package (side-quest-runners) | Plugin Wrapper (side-quest-plugins) |
+|----------------------------------|-------------------------------------|
+| `@side-quest/bun-runner` | `bun-runner` (.mcp.json + hooks) |
+| `@side-quest/biome-runner` | `biome-runner` (.mcp.json + hooks) |
+| `@side-quest/tsc-runner` | `tsc-runner` (.mcp.json + hooks) |
 
 ### Related Resources
 
