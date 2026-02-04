@@ -292,47 +292,6 @@
 				"social-media",
 				"extracted"
 			]
-		},
-		{
-			"name": "bun-starter",
-			"source": "./plugins/bun-starter",
-			"description": "Create, debug, and heal repos from nathanvale/bun-typescript-starter template. Includes scaffolding commands, diagnostic expert skill, and comprehensive reference docs for CI/CD, publishing, testing, and security.",
-			"version": "1.0.0",
-			"author": {
-				"name": "Nathan Vale"
-			},
-			"category": "development",
-			"keywords": [
-				"bun",
-				"typescript",
-				"template",
-				"starter",
-				"ci-cd",
-				"changesets",
-				"npm-publish",
-				"github-actions"
-			]
-		},
-		{
-			"name": "macos-settings",
-			"source": "./plugins/macos-settings",
-			"description": "Expert guidance for configuring macOS settings via CLI (pmset, defaults, scutil, caffeinate). Supports Sequoia (15.x) and Tahoe (26.x) with preset profiles for server, desktop-dev, minimal, and presentation modes.",
-			"version": "1.0.0",
-			"author": {
-				"name": "Nathan Vale"
-			},
-			"category": "system",
-			"keywords": [
-				"macos",
-				"pmset",
-				"defaults",
-				"system-preferences",
-				"server",
-				"desktop",
-				"energy",
-				"sequoia",
-				"tahoe"
-			]
 		}
 	]
 }
