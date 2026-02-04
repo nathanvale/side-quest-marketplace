@@ -1,0 +1,8 @@
+{
+	"name": "macos-settings",
+	"version": "1.0.0",
+	"description": "Expert guidance for configuring macOS settings via CLI (pmset, defaults, scutil). Covers Sequoia (15.x) and Tahoe (26.x) with presets, gotchas, and script generation.",
+	"author": {
+		"name": "Nathan Vale"
+	}
+}

@@ -312,6 +312,27 @@
 				"npm-publish",
 				"github-actions"
 			]
+		},
+		{
+			"name": "macos-settings",
+			"source": "./plugins/macos-settings",
+			"description": "Expert guidance for configuring macOS settings via CLI (pmset, defaults, scutil, caffeinate). Supports Sequoia (15.x) and Tahoe (26.x) with preset profiles for server, desktop-dev, minimal, and presentation modes.",
+			"version": "1.0.0",
+			"author": {
+				"name": "Nathan Vale"
+			},
+			"category": "system",
+			"keywords": [
+				"macos",
+				"pmset",
+				"defaults",
+				"system-preferences",
+				"server",
+				"desktop",
+				"energy",
+				"sequoia",
+				"tahoe"
+			]
 		}
 	]
 }
