@@ -112,6 +112,9 @@ defaults write com.apple.dock tilesize -int 16
 # Show only open applications (no pinned apps)
 defaults write com.apple.dock static-only -bool true
 
+# Clear all default pinned apps (clean slate)
+defaults write com.apple.dock persistent-apps -array
+
 # Don't show recent apps
 defaults write com.apple.dock show-recents -bool false
 
