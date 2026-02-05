@@ -1,6 +1,7 @@
 ---
 description: Discover all URLs on a website
-argument-hint: <url> [--limit N]
+argument-hint: <url> [--limit N] [--search "filter"]
+allowed-tools: Bash
 ---
 
 # Firecrawl Map
@@ -11,11 +12,11 @@ Map URLs on the website: `$ARGUMENTS`
 
 1. Parse the arguments:
    - First argument is the base URL to map
-   - Optional `--limit N` flag (default: 100)
+   - Key flags: `--limit`, `--search`, `--sitemap`, `--include-subdomains`
 
-2. Run the CLI command:
+2. Run the command:
    ```bash
-   cd /Users/nathanvale/code/side-quest-marketplace/plugins/firecrawl && bun run src/cli.ts map $ARGUMENTS
+   npx firecrawl map $ARGUMENTS
    ```
 
 3. Present the discovered URLs to the user
@@ -25,11 +26,23 @@ Map URLs on the website: `$ARGUMENTS`
 ```
 /firecrawl:map https://docs.example.com
 /firecrawl:map https://example.com --limit 50
+/firecrawl:map https://docs.example.com --search "API reference"
+/firecrawl:map https://example.com --sitemap only --json
 ```
+
+## Key Flags
+
+- `--limit <n>` - Maximum URLs to discover
+- `--search <query>` - Filter/rank URLs by relevance
+- `--sitemap <mode>` - `include`, `skip`, or `only`
+- `--include-subdomains` - Include subdomain URLs
+- `--json` - JSON output
+- `-o <path>` - Save to file
+
+For full flag reference, see `skills/firecrawl/references/map-reference.md`
 
 ## Notes
 
-- Returns up to 50 URLs in output (configurable via --limit)
-- Includes page titles when available
-- Useful for understanding site structure before scraping specific pages
-- Requires FIRECRAWL_API_KEY environment variable
+- Great for understanding site structure before crawling
+- Costs 1 credit per call regardless of URLs found
+- Requires FIRECRAWL_API_KEY or `firecrawl login`

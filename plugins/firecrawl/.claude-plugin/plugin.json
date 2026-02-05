@@ -1,19 +1,29 @@
 {
 	"name": "firecrawl",
-	"description": "Firecrawl plugin for web scraping, search, and data extraction using Firecrawl API. Use when users need to fetch web content, discover URLs on sites, search the web, or extract structured data from pages.",
-	"version": "1.0.0",
+	"description": "Web scraping, site crawling, search, structured data extraction, and AI-powered research via Firecrawl CLI. Six commands wrapping the official firecrawl-cli.",
+	"version": "2.0.0",
 	"author": {
 		"name": "Nathan Vale",
 		"email": "hi@nathanvale.com"
 	},
-	"keywords": ["firecrawl"],
+	"keywords": [
+		"firecrawl",
+		"web-scraping",
+		"crawling",
+		"search",
+		"extraction",
+		"agent",
+		"web"
+	],
 	"license": "MIT",
 	"repository": "https://github.com/nathanvale/side-quest-marketplace",
 	"commands": [
-		"./commands/extract.md",
-		"./commands/map.md",
 		"./commands/scrape.md",
-		"./commands/search.md"
+		"./commands/search.md",
+		"./commands/map.md",
+		"./commands/crawl.md",
+		"./commands/extract.md",
+		"./commands/agent.md"
 	],
 	"skills": ["./skills/firecrawl"]
 }

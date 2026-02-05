@@ -123,13 +123,21 @@
 		{
 			"name": "firecrawl",
 			"source": "./plugins/firecrawl",
-			"description": "Firecrawl plugin for Claude Code",
-			"version": "1.0.0",
+			"description": "Web scraping, site crawling, search, structured data extraction, and AI-powered research via Firecrawl CLI. Six commands: scrape, search, map, crawl, extract, agent.",
+			"version": "2.0.0",
 			"author": {
 				"name": "Nathan Vale"
 			},
 			"category": "development",
-			"keywords": ["firecrawl"]
+			"keywords": [
+				"firecrawl",
+				"web-scraping",
+				"crawling",
+				"search",
+				"extraction",
+				"agent",
+				"web"
+			]
 		},
 		{
 			"name": "mcp-manager",

@@ -1,20 +1,16 @@
 {
 	"name": "@sidequest/firecrawl",
-	"version": "1.0.0",
+	"version": "2.0.0",
 	"private": true,
-	"description": "Firecrawl plugin for Claude Code",
+	"description": "Web scraping, crawling, search, and AI-powered extraction via Firecrawl CLI",
 	"type": "module",
 	"exports": {
 		"./client": "./src/client.ts",
 		"./types": "./src/types.ts"
 	},
 	"scripts": {
-		"test": "bun test --recursive",
-		"typecheck": "tsc --noEmit",
-		"format": "biome format --write .",
-		"format:check": "biome format .",
-		"lint": "biome lint .",
-		"check": "biome check --write ."
+		"test": "echo 'No tests - thin CLI wrapper'",
+		"typecheck": "echo 'No typecheck - library-only TypeScript retained for para-obsidian'"
 	},
 	"devDependencies": {
 		"@types/bun": "latest"

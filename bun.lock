@@ -54,10 +54,6 @@
       "name": "@sidequest/bookmarks",
       "version": "1.0.0",
     },
-    "plugins/bun-starter": {
-      "name": "@sidequest/bun-starter",
-      "version": "1.0.0",
-    },
     "plugins/claude-code-claude-md": {
       "name": "claude-code-claude-md",
       "version": "1.0.0",
@@ -102,7 +98,7 @@
     },
     "plugins/firecrawl": {
       "name": "@sidequest/firecrawl",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "devDependencies": {
         "@types/bun": "latest",
       },
@@ -380,8 +376,6 @@
     "@sidequest/atuin": ["@sidequest/atuin@workspace:plugins/atuin"],
 
     "@sidequest/bookmarks": ["@sidequest/bookmarks@workspace:plugins/bookmarks"],
-
-    "@sidequest/bun-starter": ["@sidequest/bun-starter@workspace:plugins/bun-starter"],
 
     "@sidequest/claude-code": ["@sidequest/claude-code@workspace:plugins/claude-code-docs"],
 
