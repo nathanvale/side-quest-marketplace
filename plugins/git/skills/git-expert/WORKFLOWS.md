@@ -4,6 +4,9 @@ Step-by-step procedures for common git operations.
 
 ## Commit (Conventional Commits)
 
+0. **Check branch**: `git branch --show-current` -- if on `main` or `master`, create a feature branch first:
+   - `git checkout -b <type>/<description>` (e.g., `feat/add-auth`, `fix/null-response`)
+   - Then proceed with the commit workflow below
 1. **Check status**: `git status --porcelain -b`
 2. **Review changes**: `git diff --staged` (if staged) or `git diff` (if unstaged)
 3. **Stage if needed**: `git add <specific-files>` — never blind `git add .` or `git add -A`

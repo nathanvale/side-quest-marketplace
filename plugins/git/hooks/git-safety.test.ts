@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { checkCommand, checkFileEdit } from "./git-safety";
+import {
+	checkCommand,
+	checkFileEdit,
+	getCurrentBranch,
+	isCommitCommand,
+} from "./git-safety";
 
 describe("checkCommand", () => {
 	test("blocks git push --force", () => {
@@ -144,5 +149,75 @@ describe("checkFileEdit", () => {
 	test("allows README.md", () => {
 		const result = checkFileEdit("/project/README.md");
 		expect(result.blocked).toBe(false);
+	});
+});
+
+describe("isCommitCommand", () => {
+	test("detects git commit -m as commit, not WIP", () => {
+		const result = isCommitCommand('git commit -m "feat: add feature"');
+		expect(result.isCommit).toBe(true);
+		expect(result.isWip).toBe(false);
+	});
+
+	test("detects git commit --no-verify as commit + WIP", () => {
+		const result = isCommitCommand('git commit --no-verify -m "wip"');
+		expect(result.isCommit).toBe(true);
+		expect(result.isWip).toBe(true);
+	});
+
+	test("does NOT match git commit-tree", () => {
+		const result = isCommitCommand("git commit-tree abc123");
+		expect(result.isCommit).toBe(false);
+	});
+
+	test("does NOT match echo 'git commit'", () => {
+		const result = isCommitCommand("echo 'git commit'");
+		expect(result.isCommit).toBe(false);
+	});
+
+	test("matches git commit --amend", () => {
+		const result = isCommitCommand("git commit --amend");
+		expect(result.isCommit).toBe(true);
+		expect(result.isWip).toBe(false);
+	});
+
+	test("matches commit inside chained commands", () => {
+		const result = isCommitCommand('git add . && git commit -m "test"');
+		expect(result.isCommit).toBe(true);
+		expect(result.isWip).toBe(false);
+	});
+
+	test("detects --no-verify anywhere in command", () => {
+		const result = isCommitCommand(
+			'git add -u && git commit --no-verify -m "wip: checkpoint"',
+		);
+		expect(result.isCommit).toBe(true);
+		expect(result.isWip).toBe(true);
+	});
+
+	test("matches bare git commit with no args", () => {
+		const result = isCommitCommand("git commit");
+		expect(result.isCommit).toBe(true);
+		expect(result.isWip).toBe(false);
+	});
+});
+
+describe("getCurrentBranch", () => {
+	test("returns a string in a git repo directory", async () => {
+		const branch = await getCurrentBranch();
+		expect(typeof branch).toBe("string");
+		expect(branch!.length).toBeGreaterThan(0);
+	});
+
+	test("returns null for /tmp (not a git repo)", async () => {
+		// Save and restore cwd to avoid side effects
+		const original = process.cwd();
+		process.chdir("/tmp");
+		try {
+			const branch = await getCurrentBranch();
+			expect(branch).toBeNull();
+		} finally {
+			process.chdir(original);
+		}
 	});
 });

@@ -55,6 +55,7 @@ These are non-negotiable:
 - **NEVER** commit secrets (`.env`, credentials, API keys)
 - **NEVER** use `git add .` or `git add -A` — always stage specific files
 - **NEVER** skip hooks (`--no-verify`) except for WIP/checkpoint commits
+- **ALWAYS** check branch before committing -- if on `main`/`master`, create a feature branch first
 - **ALWAYS** verify on feature branch before squash (abort if `main`)
 - **ALWAYS** use HEREDOC format for multi-line commit messages
 - **ASK** user if commit scope or message is unclear

@@ -8,9 +8,16 @@
  * Matcher: Bash only.
  */
 
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import type {
+	PreToolUseHookInput,
+	PreToolUseHookSpecificOutput,
+} from "@anthropic-ai/claude-agent-sdk";
+import { spawnAndCollect } from "@side-quest/core/spawn";
 
-/** Protected file patterns — blocks Write/Edit to sensitive files */
+/** Branches where direct commits are blocked (WIP checkpoints still allowed) */
+const PROTECTED_BRANCHES = ["main", "master"];
+
+/** Protected file patterns -- blocks Write/Edit to sensitive files */
 const PROTECTED_FILE_PATTERNS: { pattern: RegExp; reason: string }[] = [
 	{
 		pattern: /\.env($|\.)/,
@@ -85,6 +92,45 @@ export function checkFileEdit(filePath: string): {
 	return { blocked: false };
 }
 
+/**
+ * Detect `git commit` commands and whether they're WIP (--no-verify).
+ * Does NOT match `git commit-tree` or quoted/echoed strings.
+ */
+export function isCommitCommand(command: string): {
+	isCommit: boolean;
+	isWip: boolean;
+} {
+	// Match `git commit` but not `git commit-tree` etc.
+	// Must appear as a command (not inside quotes at the start)
+	const commitPattern = /(?:^|&&\s*|;\s*)git\s+commit(?:\s|$)/;
+	const isCommit = commitPattern.test(command);
+
+	if (!isCommit) {
+		return { isCommit: false, isWip: false };
+	}
+
+	const isWip = command.includes("--no-verify");
+	return { isCommit: true, isWip };
+}
+
+/**
+ * Get the current git branch name.
+ * Returns null for detached HEAD, non-repo directories, or errors.
+ * Never throws -- returns null on any failure.
+ */
+export async function getCurrentBranch(): Promise<string | null> {
+	try {
+		const result = await spawnAndCollect(["git", "branch", "--show-current"]);
+		if (result.exitCode !== 0) {
+			return null;
+		}
+		const branch = result.stdout.trim();
+		return branch || null;
+	} catch {
+		return null;
+	}
+}
+
 // Main execution
 if (import.meta.main) {
 	try {
@@ -105,14 +151,12 @@ if (import.meta.main) {
 			}
 			const fileResult = checkFileEdit(filePath);
 			if (fileResult.blocked) {
-				const output = {
-					hookSpecificOutput: {
-						hookEventName: "PreToolUse",
-						permissionDecision: "deny",
-						reason: fileResult.reason,
-					},
+				const hookSpecificOutput: PreToolUseHookSpecificOutput = {
+					hookEventName: "PreToolUse",
+					permissionDecision: "deny",
+					permissionDecisionReason: fileResult.reason,
 				};
-				console.log(JSON.stringify(output));
+				console.log(JSON.stringify({ hookSpecificOutput }));
 				process.exit(2);
 			}
 			process.exit(0);
@@ -131,18 +175,39 @@ if (import.meta.main) {
 		const result = checkCommand(command);
 
 		if (result.blocked) {
-			const output = {
-				hookSpecificOutput: {
-					hookEventName: "PreToolUse",
-					permissionDecision: "deny",
-					reason: result.reason,
-				},
+			const hookSpecificOutput: PreToolUseHookSpecificOutput = {
+				hookEventName: "PreToolUse",
+				permissionDecision: "deny",
+				permissionDecisionReason: result.reason,
 			};
-			console.log(JSON.stringify(output));
+			console.log(JSON.stringify({ hookSpecificOutput }));
 			process.exit(2);
 		}
+
+		// Block non-WIP commits on protected branches (main/master)
+		const commitCheck = isCommitCommand(command);
+		if (commitCheck.isCommit && !commitCheck.isWip) {
+			const branch = await getCurrentBranch();
+			if (branch && PROTECTED_BRANCHES.includes(branch)) {
+				const hookSpecificOutput: PreToolUseHookSpecificOutput = {
+					hookEventName: "PreToolUse",
+					permissionDecision: "deny",
+					permissionDecisionReason: [
+						`BLOCKED: Cannot commit directly to ${branch}.`,
+						"",
+						"Create a feature branch first:",
+						"  git checkout -b <type>/<description>",
+						"",
+						"Then commit on the new branch.",
+						"WIP checkpoints (--no-verify) are still allowed as a safety net.",
+					].join("\n"),
+				};
+				console.log(JSON.stringify({ hookSpecificOutput }));
+				process.exit(2);
+			}
+		}
 	} catch {
-		// Top-level catch — never crash the hook
+		// Top-level catch -- never crash the hook
 	}
 
 	// Allow through
