@@ -21,17 +21,6 @@
 			"keywords": ["shell", "history", "atuin", "bash"]
 		},
 		{
-			"name": "git",
-			"source": "./plugins/git",
-			"description": "Git intelligence for Claude Code - session context, commit history, smart commits with Conventional Commits. Includes 5 lifecycle hooks (SessionStart/PreToolUse/PostToolUse/PreCompact/Stop) and slash commands.",
-			"version": "1.0.0",
-			"author": {
-				"name": "Nathan Vale"
-			},
-			"category": "git",
-			"keywords": ["git", "commits", "version-control", "conventional-commits"]
-		},
-		{
 			"name": "validate-plugin",
 			"source": "./plugins/validate-plugin",
 			"description": "Automatically validates plugin files after edits. Catches invalid marketplace.json, plugin.json, and hooks.json before they cause problems.",

@@ -34,13 +34,13 @@ describe("findPluginRoot", () => {
 		/\/plugins\/validate-plugin\/hooks$/,
 		"",
 	);
-	const GIT_PLUGIN_ROOT = `${MARKETPLACE_ROOT}/plugins/git`;
+	const ATUIN_PLUGIN_ROOT = `${MARKETPLACE_ROOT}/plugins/atuin`;
 
 	test("finds root for file in .claude-plugin/", () => {
 		const result = findPluginRoot(
-			`${GIT_PLUGIN_ROOT}/.claude-plugin/plugin.json`,
+			`${ATUIN_PLUGIN_ROOT}/.claude-plugin/plugin.json`,
 		);
-		expect(result).toBe(GIT_PLUGIN_ROOT);
+		expect(result).toBe(ATUIN_PLUGIN_ROOT);
 	});
 
 	test("finds root for marketplace.json in .claude-plugin/", () => {
@@ -51,8 +51,8 @@ describe("findPluginRoot", () => {
 	});
 
 	test("finds root for hooks.json in hooks/ subdirectory", () => {
-		const result = findPluginRoot(`${GIT_PLUGIN_ROOT}/hooks/hooks.json`);
-		expect(result).toBe(GIT_PLUGIN_ROOT);
+		const result = findPluginRoot(`${ATUIN_PLUGIN_ROOT}/hooks/hooks.json`);
+		expect(result).toBe(ATUIN_PLUGIN_ROOT);
 	});
 
 	test("returns null for file with no plugin root", () => {
@@ -63,14 +63,14 @@ describe("findPluginRoot", () => {
 	test("returns null for non-plugin file", () => {
 		// findPluginRoot still searches for plugin root even for non-plugin filenames
 		// The isPluginFile check happens before calling findPluginRoot
-		const result = findPluginRoot(`${GIT_PLUGIN_ROOT}/package.json`);
+		const result = findPluginRoot(`${ATUIN_PLUGIN_ROOT}/package.json`);
 		expect(result).toBeNull();
 	});
 });
 
 describe("processHook", () => {
 	const MARKETPLACE_ROOT = "/Users/nathanvale/code/side-quest-marketplace";
-	const GIT_PLUGIN_ROOT = `${MARKETPLACE_ROOT}/plugins/git`;
+	const ATUIN_PLUGIN_ROOT = `${MARKETPLACE_ROOT}/plugins/atuin`;
 
 	test("passes through when no file_path", async () => {
 		const result = await processHook({});
@@ -92,7 +92,7 @@ describe("processHook", () => {
 	test("passes through for TypeScript files", async () => {
 		const result = await processHook({
 			tool_input: {
-				file_path: `${GIT_PLUGIN_ROOT}/hooks/git-context-loader.ts`,
+				file_path: `${ATUIN_PLUGIN_ROOT}/hooks/atuin-post-tool.sh`,
 			},
 		});
 		expect(result.status).toBe("pass");
@@ -107,24 +107,20 @@ describe("processHook", () => {
 		expect(result.status).toBe("pass");
 	});
 
-	test("validates plugin.json (git plugin may have MCP validation issues)", async () => {
+	test("validates plugin.json for atuin plugin", async () => {
 		const result = await processHook({
 			tool_input: {
-				file_path: `${GIT_PLUGIN_ROOT}/.claude-plugin/plugin.json`,
+				file_path: `${ATUIN_PLUGIN_ROOT}/.claude-plugin/plugin.json`,
 			},
 		});
-		// Git plugin uses mcpez which has different tool naming, so may fail MCP tool naming validation
-		// Just verify it runs without crashing
 		expect(result).toHaveProperty("status");
 		expect(["pass", "fail"]).toContain(result.status);
 	});
 
-	test("validates hooks.json (git plugin may have MCP validation issues)", async () => {
+	test("validates hooks.json for atuin plugin", async () => {
 		const result = await processHook({
-			tool_input: { file_path: `${GIT_PLUGIN_ROOT}/hooks/hooks.json` },
+			tool_input: { file_path: `${ATUIN_PLUGIN_ROOT}/hooks/hooks.json` },
 		});
-		// Git plugin uses mcpez which has different tool naming, so may fail MCP tool naming validation
-		// Just verify it runs without crashing
 		expect(result).toHaveProperty("status");
 		expect(["pass", "fail"]).toContain(result.status);
 	});

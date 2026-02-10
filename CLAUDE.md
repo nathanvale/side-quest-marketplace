@@ -48,7 +48,6 @@ side-quest-marketplace/
 │   ├── claude-code-docs/      # Claude Code documentation lookup
 │   ├── clipboard/             # System clipboard integration
 │   ├── firecrawl/             # Web scraping via Firecrawl API
-│   ├── git/                   # Git intelligence (MCP + hooks + skills)
 │   ├── kit/                   # Kit CLI integration (25+ MCP tools)
 │   ├── mcp-manager/           # MCP server management commands
 │   ├── para-brain/            # Obsidian PARA method integration
@@ -85,7 +84,7 @@ Test → `bun_runTests` | Test file → `bun_testFile` | Coverage → `bun_testC
 Typecheck → `tsc_check` | Lint check → `biome_lintCheck` | Lint fix → `biome_lintFix`
 Format check → `biome_formatCheck` | Index codebase → `/kit:prime`
 
-**Git workflow:**
+**Git workflow (provided by side-quest-plugins):**
 AI commit → `/git:commit` | Create PR → `/git:create-pr` | Search history → `/git:history`
 
 **Direct bash (when MCP not needed):**
@@ -138,7 +137,7 @@ Plugin-specific → `bun --filter <plugin> test` | `claude plugin validate plugi
 **Format:** `<type>(<scope>): <subject>`
 
 Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
-Scopes: Plugin name (`git`, `atuin`, `kit`) or `root` for workspace-level
+Scopes: Plugin name (`atuin`, `kit`, `para-obsidian`) or `root` for workspace-level
 Rules: Header max 100 chars, subject required, body/footer unlimited
 
 **Hooks:** Pre-commit (runs `bun run validate`), Commit-msg (validates format)
@@ -237,8 +236,8 @@ From PROJECT_INDEX.json (auto-generated, update via `kit_index_prime`):
 
 1. **Make changes:** Work in plugin directory, write tests first (TDD) alongside code
 2. **Validate locally:** `bun typecheck && bun test && bun run check && bun run validate`
-3. **Commit:** `git add . && git commit -m "feat(my-plugin): add feature"` (or use `/git:commit`)
-4. **Push & PR:** `git push origin main && /git:create-pr`
+3. **Commit:** `git add . && git commit -m "feat(my-plugin): add feature"`
+4. **Push & PR:** `git push origin main`
 
 ---
 
@@ -257,7 +256,6 @@ Full guide: @./TROUBLESHOOTING.md
 ## Key Plugins
 
 Kit: Intelligent code search (text/semantic/AST), 25 tools, requires Kit CLI
-Git: Intelligence & workflow automation, 5 hooks, 6 slash commands, git-expert skill
 Bun/Biome/TSC Runners: Test/lint/type-check integration with hooks
 Para-Brain/Para-Obsidian: Obsidian PARA method integration
 

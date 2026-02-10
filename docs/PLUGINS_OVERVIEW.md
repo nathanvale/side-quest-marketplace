@@ -4,10 +4,20 @@
 
 | Plugin | Purpose | Key Commands |
 |--------|---------|--------------|
-| **kit** | Code search (text, AST, semantic) | MCP tools — see @./MCP_TOOLS.md |
-| **git** | Git intelligence & workflow | `/git:commit`, `/git:create-pr`, `/git:history` |
+| **kit** | Code search (text, AST, semantic) | MCP tools -- see @./MCP_TOOLS.md |
 
-## Extracted Runners (Two-Repo Architecture)
+## Extracted Plugins (Two-Repo Architecture)
+
+Extracted plugins live in separate repos following a two-repo pattern:
+
+### Git Plugin --> `side-quest-git` + `side-quest-plugins`
+
+| Repo | Purpose |
+|------|---------|
+| `side-quest-git` (npm: `@side-quest/git`) | Reusable git utilities library |
+| `side-quest-plugins/plugins/git/` | Plugin wrapper with hooks, commands, skills |
+
+### Runners
 
 The runner MCP servers are split across two repos:
 
