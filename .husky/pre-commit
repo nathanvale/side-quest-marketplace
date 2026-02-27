@@ -1,0 +1,15 @@
+# Run fast, local formatting and linting on changed files
+bun run lint-staged
+
+# If workflow files are staged, and actionlint is available, run quick lint.
+if git diff --name-only --cached | grep -qE '^\.github/workflows/'; then
+	if command -v actionlint >/dev/null 2>&1; then
+		echo "actionlint: detected workflow changes; running lint (non-blocking)..."
+		if ! bun run lint:workflows; then
+			echo "actionlint reported issues. This is a heads-up only; commit not blocked."
+			echo "Tip: brew install shellcheck to see inline shell suggestions locally."
+		fi
+	else
+		echo "actionlint not found. Hint: brew install actionlint (or run 'bun run lint:workflows' manually)."
+	fi
+fi

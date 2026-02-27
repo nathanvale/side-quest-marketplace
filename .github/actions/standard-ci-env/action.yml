@@ -1,0 +1,11 @@
+name: Standard CI Env
+description: Export consistent environment variables used across workflows for determinism and reporting
+
+runs:
+  using: composite
+  steps:
+    - name: Export standard env
+      shell: bash
+      run: |
+        echo "TZ=UTC" >> $GITHUB_ENV
+        echo "TF_BUILD=true" >> $GITHUB_ENV

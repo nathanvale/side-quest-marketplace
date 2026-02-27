@@ -1,0 +1,38 @@
+name: Commitlint
+on:
+  pull_request:
+    types: [opened, synchronize, edited, reopened]
+  push:
+    branches: [main]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+    if: >-
+      ${{ github.actor != 'dependabot[bot]' &&
+          github.actor != 'github-actions[bot]' &&
+          github.actor != 'renovate[bot]' }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # Shallow clone is sufficient; action uses event context to determine range
+          fetch-depth: 2
+      - name: Standard env
+        uses: ./.github/actions/standard-ci-env
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Lint commit messages
+        uses: wagoid/commitlint-github-action@b948419dd99f3fd78a6548d48f94e3df7f6bf3ed # v6.2.1
+        with:
+          configFile: commitlint.config.mjs

@@ -1,0 +1,60 @@
+name: Alpha Snapshot Release
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Daily at 02:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  id-token: write
+  actions: read
+
+jobs:
+  snapshot-alpha:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: alpha-snapshot-${{ github.ref }}
+      # Prevent mid-publish cancellation to avoid inconsistent npm state
+      cancel-in-progress: false
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Check pre-mode active
+        id: pre
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f .changeset/pre.json ]; then
+            echo "active=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "active=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Skip when pre-mode is not active
+        if: steps.pre.outputs.active == 'false'
+        run: echo "Pre-mode not active; skipping alpha snapshot." && exit 0
+      - name: Standard CI Env
+        uses: ./.github/actions/standard-ci-env
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+      - name: Setup Node for npm publish
+        if: steps.pre.outputs.active == 'true'
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: '24'  # Node 24 includes npm 11.6+ (required for OIDC trusted publishing)
+          registry-url: 'https://registry.npmjs.org/'
+      - name: Install dependencies
+        if: steps.pre.outputs.active == 'true'
+        run: bun install --frozen-lockfile
+      - name: Alpha snapshot version + publish
+        if: steps.pre.outputs.active == 'true'
+        shell: bash
+        run: ./.github/scripts/alpha-snapshot-publish.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,0 +1,39 @@
+name: Setup Bun with cache
+description: Setup Bun runtime with global cache for fast CI builds
+
+inputs:
+  bun-version:
+    description: Bun version to install (uses .bun-version file by default)
+    required: false
+    default: ''
+  registry-url:
+    description: Optional registry URL for authenticated npm operations
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+      with:
+        bun-version: ${{ inputs.bun-version }}
+        bun-version-file: .bun-version
+        registry-url: ${{ inputs.registry-url }}
+
+    - name: Get Bun cache directory
+      id: bun-cache
+      shell: bash
+      run: |
+        echo "BUN_INSTALL_CACHE_DIR=$(bun pm cache)" >> $GITHUB_ENV
+        echo "cache-dir=$(bun pm cache)" >> $GITHUB_OUTPUT
+
+    - name: Cache Bun dependencies
+      uses: actions/cache@0c907a75c2c80ebcb7f088228285e798b750cf8f # v4.2.1
+      with:
+        path: |
+          ~/.bun/install/cache
+          ${{ steps.bun-cache.outputs.cache-dir }}
+        key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+        restore-keys: |
+          bun-${{ runner.os }}-

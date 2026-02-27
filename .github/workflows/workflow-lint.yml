@@ -1,0 +1,41 @@
+name: Workflow Lint
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install actionlint
+        run: |
+          bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          pwd >> "$GITHUB_PATH"
+
+      - name: Run actionlint
+        run: actionlint -color -oneline .github/workflows/*.yml
+
+      - name: Validate workflow schema (basic)
+        shell: bash
+        run: ./.github/scripts/validate-workflow-schema.sh .github/workflows/*.yml

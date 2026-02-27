@@ -1,0 +1,243 @@
+name: PR quality
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel in-flight runs for the same branch/PR to save minutes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Standard env
+        uses: ./.github/actions/standard-ci-env
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: ESLint
+        run: bun run lint
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Standard env
+        uses: ./.github/actions/standard-ci-env
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: TSC typecheck
+        run: bun run typecheck
+
+  test:
+    name: Tests + Coverage
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    timeout-minutes: 15
+    outputs:
+      coverage_lines: ${{ steps.cov.outputs.coverage_lines }}
+      coverage_branches: ${{ steps.cov.outputs.coverage_branches }}
+      coverage_functions: ${{ steps.cov.outputs.coverage_functions }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Standard env
+        uses: ./.github/actions/standard-ci-env
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Clean Bun linker artifacts
+        run: |
+          # Bun 1.3.x hoisted linker creates rogue package folders in project root
+          # These contain tests that pollute bun test results
+          # See: https://github.com/oven-sh/bun/issues/23615
+
+          # Count packages outside node_modules (excluding known project dirs)
+          KNOWN_DIRS="src|tests|docs|website|scripts|examples|.git|.github|.changeset|.vscode|dist|coverage|node_modules"
+          ROGUE_COUNT=$(find . -maxdepth 1 -type d ! -name '.' | grep -Evc "^\./($KNOWN_DIRS)$" || echo 0)
+          echo "Before cleanup: $ROGUE_COUNT rogue folders found in project root"
+
+          # Delete all top-level directories containing @@@* anywhere
+          find . -maxdepth 1 -type d -name '*@@@*' -exec rm -rf {} + 2>/dev/null || true
+
+          # Delete any remaining package-like folders (name@version pattern)
+          find . -maxdepth 1 -type d -regex '.*/[a-z].*@[0-9].*' -exec rm -rf {} + 2>/dev/null || true
+
+          rm -rf node_modules/.old_modules* 2>/dev/null || true
+
+          # Verify cleanup
+          REMAINING=$(find . -maxdepth 1 -type d ! -name '.' | grep -Evc "^\./($KNOWN_DIRS)$" || echo 0)
+          echo "After cleanup: $REMAINING folders remaining"
+          if [ "$REMAINING" -gt 0 ]; then
+            echo "Remaining rogue folders:"
+            find . -maxdepth 1 -type d ! -name '.' | grep -Ev "^\./($KNOWN_DIRS)$" || true
+          fi
+
+      - name: Run tests (Bun)
+        run: bun run test:ci
+
+      - name: Annotate tests (JUnit)
+        if: always()
+        uses: dorny/test-reporter@v2
+        with:
+          name: Bun Test Results
+          path: ./test-results/junit.xml
+          reporter: java-junit
+          fail-on-error: 'false'
+          fail-on-empty: 'false'
+
+      - name: Upload JUnit test results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: junit
+          path: ./test-results/junit.xml
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload coverage report (HTML + lcov)
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: coverage
+          path: ./test-results/coverage
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Append coverage summary to job summary
+        if: always()
+        run: |
+          node ./.github/scripts/coverage-metrics.mjs summary >> "$GITHUB_STEP_SUMMARY" || echo "No coverage found to summarize" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Compute coverage metrics for gate
+        id: cov
+        if: always()
+        shell: bash
+        run: node ./.github/scripts/coverage-metrics.mjs outputs >> "$GITHUB_OUTPUT"
+
+      - name: Comment coverage summary on PR
+        if: github.event_name == 'pull_request'
+        uses: ./.github/actions/coverage-comment
+        with:
+          lcov-path: ./test-results/coverage/lcov.info
+          min-lines: '80'
+          min-branches: '80'
+          min-functions: '80'
+
+  quality:
+    name: Repo quality (delta since main)
+    runs-on: ubuntu-latest
+    needs: [test]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - name: Fetch base ref (main)
+        run: |
+          git fetch --no-tags --prune --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+
+      - name: Standard env
+        uses: ./.github/actions/standard-ci-env
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Quality Check (since origin/main)
+        run: bun run quality-check:ci
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  lint-scripts:
+    name: Lint Shell Scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Lint shell scripts
+        run: shellcheck .github/scripts/*.sh
+
+  gate:
+    name: All checks passed
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test, quality, lint-scripts]
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Check all jobs
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" || "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more required jobs failed or were cancelled"
+            echo
+            echo "Results:"
+            echo "  Lint: ${{ needs.lint.result }}"
+            echo "  Typecheck: ${{ needs.typecheck.result }}"
+            echo "  Tests + Coverage: ${{ needs.test.result }}"
+            echo "  Repo quality: ${{ needs.quality.result }}"
+            echo "  Lint Shell Scripts: ${{ needs.lint-scripts.result }}"
+            exit 1
+          fi
+          echo "All prerequisite PR quality jobs succeeded."
+      - name: PR summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## All checks summary"
+            echo
+            echo "| Check | Status |"
+            echo "|---|---|"
+            echo "| Lint | ${{ needs.lint.result }} |"
+            echo "| Typecheck | ${{ needs.typecheck.result }} |"
+            echo "| Tests + Coverage | ${{ needs.test.result }} |"
+            echo "| Repo quality (delta since main) | ${{ needs.quality.result }} |"
+            echo "| Lint Shell Scripts | ${{ needs.lint-scripts.result }} |"
+            echo
+            echo "### Coverage"
+            echo
+            echo "- Lines: ${{ needs.test.outputs.coverage_lines }}%"
+            echo "- Branches: ${{ needs.test.outputs.coverage_branches }}%"
+            echo "- Functions: ${{ needs.test.outputs.coverage_functions }}%"
+          } >> "$GITHUB_STEP_SUMMARY"

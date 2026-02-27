@@ -1,0 +1,62 @@
+# Build outputs
+dist/
+coverage/
+*.lcov
+
+# Dependencies
+node_modules/
+.npm-changesets/
+# Bun linker artifacts (hoisted mode creates these in project root)
+# See: https://github.com/oven-sh/bun/issues/23615
+*@@@*/
+.bun/
+
+# TypeScript
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+.logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Diagnostic reports
+report.*.json
+
+# Caches & tooling
+.cache/
+.eslintcache
+.parcel-cache/g
+.pack/
+
+# OS
+.DS_Store
+
+# Claude Code local memory
+CLAUDE.local.md
+
+# Husky local state (branch protection verified marker)
+.husky/.protection-verified
+
+# Test artifacts
+test-results/
+.vitest/
+
+#Obsidian vault
+.vault/
+.valut-id
+
+# Docusaurus
+website/.docusaurus/
+website/.cache-loader/
+website/build/
+website/node_modules/

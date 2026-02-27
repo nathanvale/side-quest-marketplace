@@ -1,0 +1,77 @@
+name: Changesets Pre-Mode Toggle
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'enter or exit'
+        required: true
+        default: 'enter'
+      channel:
+        description: 'beta | rc | next'
+        required: true
+        default: 'beta'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  toggle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        # Shallow clone is sufficient for pre-mode branch toggle
+        with:
+          fetch-depth: 1
+      - name: Standard CI Env
+        uses: ./.github/actions/standard-ci-env
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Configure Git
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+      - name: Create pre-mode toggle branch
+        id: prep
+        env:
+          ACTION: ${{ inputs.action }}
+          CHANNEL: ${{ inputs.channel }}
+          RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: ./.github/scripts/pre-mode-toggle.sh
+      - name: Open PR to toggle pre-mode
+        if: steps.prep.outcome == 'success'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          HEAD_REF: ${{ steps.prep.outputs.BRANCH }}
+          ACTION: ${{ inputs.action }}
+          CHANNEL: ${{ inputs.channel }}
+        with:
+          script: |
+            const title = `chore(pre): ${process.env.ACTION} ${process.env.CHANNEL} channel`
+            const body = 'Automated Changesets pre-mode toggle PR.'
+            const { data: pr } = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: process.env.HEAD_REF,
+              base: 'main',
+              title,
+              body,
+              maintainer_can_modify: true,
+            })
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              labels: ['release:pre-toggle']
+            })
+            core.info(`Opened PR #${pr.number} for pre-mode toggle`)

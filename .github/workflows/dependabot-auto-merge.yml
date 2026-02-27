@@ -1,0 +1,55 @@
+name: Dependabot Auto-Merge
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  auto-merge:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require auto-mergeable label
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        id: labels
+        with:
+          script: |
+            const labels = (context.payload.pull_request.labels || []).map(l => l.name)
+            const allowed = ['dev-dependencies', 'github_actions']
+            const hasAllowed = labels.some(l => allowed.includes(l))
+            if (!hasAllowed) {
+              core.setFailed(`PR labels [${labels.join(', ')}] do not include any of: ${allowed.join(', ')}`)
+            }
+      - name: Check changed files are safe to auto-merge
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        id: diff
+        with:
+          script: |
+            const pr = context.payload.pull_request
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              per_page: 100,
+            })
+            const filenames = files.map(f => f.filename)
+            const allowed = [
+              'package.json',
+              'pnpm-lock.yaml',
+              'package-lock.json',
+              'yarn.lock',
+              'bun.lock',
+            ]
+            const isGHA = filenames.every(f => f.startsWith('.github/'))
+            const isDeps = filenames.every(f => allowed.includes(f))
+            if (!isGHA && !isDeps) {
+              core.setFailed('PR touches files outside dependency manifests and .github/')
+            }
+      - name: Enable auto-merge for minor/patch dependency updates
+        if: steps.diff.outcome == 'success' && steps.labels.outcome == 'success'
+        uses: fastify/github-action-merge-dependabot@1b2ed42db8f9d81a46bac83adedfc03eb5149dff # v3.11.2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          target: minor

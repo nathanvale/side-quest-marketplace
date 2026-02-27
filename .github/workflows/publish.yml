@@ -1,0 +1,329 @@
+# Consolidated Publish Workflow
+#
+# Capabilities:
+# - Auto-publish from main (stable releases via changesets)
+# - Manual version bumps for pre-releases (next, beta, rc)
+# - Manual publish for pre-releases
+# - Canary snapshot publishing
+#
+# Intent modes:
+# - auto: Standard changesets flow (open PR or publish on main)
+# - version: Create pre-release version bump PR
+# - publish: Publish pre-release to npm
+# - snapshot: Create canary snapshot release
+#
+# Publishing uses OIDC trusted publishing (npm 11.6+ / Node 24+).
+# First publish requires NPM_TOKEN secret. After that, configure
+# trusted publisher at npmjs.com → package Settings.
+
+name: Publish
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      intent:
+        description: 'auto | version | publish | snapshot'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - version
+          - publish
+          - snapshot
+      channel:
+        description: 'Pre-release channel (next, beta, rc)'
+        required: false
+        default: 'next'
+        type: choice
+        options:
+          - next
+          - beta
+          - rc
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+  actions: read
+
+jobs:
+  publish:
+    name: Publish Package
+    runs-on: ubuntu-latest
+    concurrency:
+      group: publish-${{ github.ref }}
+      cancel-in-progress: true
+    timeout-minutes: 30
+    steps:
+      # ============================================================
+      # Common Setup Steps (always run)
+      # ============================================================
+
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Standard CI Env
+        uses: ./.github/actions/standard-ci-env
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Setup Node for npm publish
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: '24' # Node 24 includes npm 11.6+ (required for OIDC trusted publishing)
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Ensure changesets CLI is Node-resolvable
+        run: |
+          # The changesets/action uses Node.js require() internally.
+          # Bun's module layout uses .bun/ symlinks that the action's bundled JS
+          # runtime cannot resolve. npm install --no-save also fails because npm
+          # can't parse Bun's node_modules layout.
+          # Solution: install into a separate prefix and add to NODE_PATH.
+          npm install --prefix .npm-changesets @changesets/cli @changesets/changelog-github
+          echo "NODE_PATH=$(pwd)/.npm-changesets/node_modules" >> "$GITHUB_ENV"
+
+      - name: Fix conflicting registry in bunfig.toml
+        run: |
+          # Setup Bun creates bunfig.toml with registry, which conflicts with Setup Node's registry.
+          # Remove the registry line instead of deleting the file to preserve other bun settings.
+          if [ -f bunfig.toml ]; then
+            grep -v '^registry' bunfig.toml > bunfig.toml.tmp || true
+            mv bunfig.toml.tmp bunfig.toml
+          fi
+
+      - name: Clean Bun linker artifacts
+        run: |
+          # Bun 1.3.x hoisted linker leaks packages to project root
+          # Delete @@@* suffixed folders, scoped packages (@*), and versioned packages
+          find . -maxdepth 1 -type d -name '*@@@*' -exec rm -rf {} + 2>/dev/null || true
+          find . -maxdepth 1 -type d -regex '.*/[a-z].*@[0-9].*' -exec rm -rf {} + 2>/dev/null || true
+          rm -rf node_modules/.old_modules* 2>/dev/null || true
+
+      - name: Disable git hooks for CI commits
+        run: git config --global core.hooksPath /dev/null
+
+      - name: Publish readiness check
+        run: |
+          echo "npm version: $(npm --version)"
+          if [ -z "${NPM_TOKEN:-}" ]; then
+            echo "::notice::No NPM_TOKEN; will use OIDC trusted publishing if configured."
+            echo "::notice::First publish requires NPM_TOKEN. After that, configure trusted publisher at npmjs.com → package Settings."
+          else
+            echo "::notice::NPM_TOKEN detected; using token auth (fallback mode)."
+          fi
+
+      # ============================================================
+      # GitHub App Token (bypasses anti-recursion)
+      # ============================================================
+      # GITHUB_TOKEN commits don't trigger workflows (GitHub anti-recursion).
+      # The changesets action pushes to changeset-release/main which must
+      # trigger version-packages-auto-merge.yml. Using a GitHub App token
+      # ensures those pushes fire pull_request_target events.
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2.2.1
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      # ============================================================
+      # Intent Computation
+      # ============================================================
+
+      - name: Compute effective intent
+        id: intent
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "value=auto" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ inputs.intent }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ============================================================
+      # Pre-release Validation
+      # ============================================================
+
+      - name: Validate pre-mode state
+        if: steps.intent.outputs.value == 'version' || steps.intent.outputs.value == 'publish'
+        run: |
+          if [ ! -f .changeset/pre.json ]; then
+            echo "::error::Not in pre-release mode. Run 'Changesets Pre-Mode Toggle' workflow first."
+            exit 1
+          fi
+          echo "Pre-mode active, proceeding with ${{ steps.intent.outputs.value }}"
+
+      # ============================================================
+      # Intent: auto (Changesets action - stable releases)
+      # ============================================================
+
+      - name: Changesets - open PR or publish
+        if: steps.intent.outputs.value == 'auto'
+        id: changesets
+        uses: changesets/action@c48e67d110a68bc90ccf1098e9646092baacaa87 # v1.6.0
+        with:
+          # Guard publish to avoid failing main when NPM_TOKEN isn't configured
+          publish: bash .github/scripts/changesets-publish.sh
+          title: 'chore: version packages'
+          commit: 'chore: version packages'
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          HUSKY: 0
+
+      - name: Create GitHub Release (stable)
+        if: steps.intent.outputs.value == 'auto' && steps.changesets.outputs.published == 'true'
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}"
+          echo "Creating GitHub release for ${TAG}"
+          # Create and push the tag if it doesn't already exist (idempotent for re-runs)
+          if ! git rev-parse "${TAG}" >/dev/null 2>&1; then
+            git tag "${TAG}"
+            git push origin "${TAG}"
+          else
+            echo "Tag ${TAG} already exists, skipping tag creation"
+          fi
+          # Create the release if it doesn't already exist (idempotent for re-runs)
+          if ! gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release create "${TAG}" \
+              --title "${TAG}" \
+              --notes-file CHANGELOG.md \
+              --verify-tag
+          else
+            echo "Release ${TAG} already exists, skipping release creation"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      # ============================================================
+      # Build & Git Config (for version/publish/snapshot)
+      # ============================================================
+
+      - name: Build
+        if: steps.intent.outputs.value == 'version' || steps.intent.outputs.value == 'publish' || steps.intent.outputs.value == 'snapshot'
+        run: bun run build
+
+      - name: Configure Git
+        if: steps.intent.outputs.value == 'version' || steps.intent.outputs.value == 'publish'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
+      # ============================================================
+      # Intent: version (Pre-release version bump)
+      # ============================================================
+
+      - name: Version prerelease
+        if: steps.intent.outputs.value == 'version'
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          HUSKY: '0'
+        run: |
+          bun run version:pre
+          # Format changeset files (changesets generates with spaces, biome wants tabs)
+          bunx biome format --write .changeset/ || true
+          # Reset any action-generated files that shouldn't be committed
+          git checkout -- bunfig.toml 2>/dev/null || true
+          # Check if there are changes to commit
+          if git diff --staged --quiet && git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          # Create PR since main is protected
+          BRANCH="release/${{ inputs.channel }}-$(date +%Y%m%d%H%M%S)"
+          git checkout -b "$BRANCH"
+          git add .
+          git commit -m "chore(prerelease): version bump on ${{ inputs.channel }} channel"
+          git push origin "$BRANCH"
+          # Create PR with auto-merge
+          PR_URL=$(gh pr create \
+            --title "chore(prerelease): version bump on ${{ inputs.channel }} channel" \
+            --body "Automated prerelease version bump for the ${{ inputs.channel }} channel." \
+            --base main)
+          echo "Created PR: $PR_URL"
+          gh pr merge "$PR_URL" --auto --squash
+
+      # ============================================================
+      # npm Auth Configuration (for publish/snapshot)
+      # ============================================================
+
+      - name: Configure npm auth for publish
+        if: steps.intent.outputs.value == 'publish' || steps.intent.outputs.value == 'snapshot'
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # npm 11.6+ (Node 24) auto-detects OIDC from GitHub Actions (id-token: write permission).
+          # When trusted publishing is configured on npmjs.com, no NPM_TOKEN is needed.
+          # We keep NPM_TOKEN as fallback for bootstrap (first publish) or if OIDC isn't configured.
+          echo "npm version: $(npm --version)"
+          if [ -n "${NPM_TOKEN:-}" ]; then
+            echo "::notice::NPM_TOKEN detected; using token auth (fallback mode)."
+            cat <<'EOF' > ~/.npmrc
+          //registry.npmjs.org/:_authToken=${NPM_TOKEN}
+          registry=https://registry.npmjs.org
+          always-auth=true
+          EOF
+          else
+            echo "::notice::No NPM_TOKEN; relying on OIDC trusted publishing."
+            echo "::notice::Ensure trusted publisher is configured at: npmjs.com → package Settings → Trusted Publisher"
+          fi
+
+      # ============================================================
+      # Intent: publish (Pre-release publish)
+      # ============================================================
+
+      - name: Publish prerelease
+        if: steps.intent.outputs.value == 'publish'
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: bun run publish:pre
+
+      - name: Create GitHub Release (Prerelease)
+        if: steps.intent.outputs.value == 'publish'
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          HUSKY: '0'
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}"
+          echo "Creating GitHub prerelease for ${TAG}"
+          # Create tag if it doesn't exist (idempotent for re-runs)
+          if ! git rev-parse "${TAG}" >/dev/null 2>&1; then
+            git tag "${TAG}"
+            git push origin "${TAG}"
+          fi
+          # Create release if it doesn't exist (idempotent for re-runs)
+          if ! gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release create "${TAG}" \
+              --title "${TAG}" \
+              --notes "Prerelease version published to npm with tag: ${{ inputs.channel }}" \
+              --prerelease
+          else
+            echo "Release ${TAG} already exists, skipping release creation"
+          fi
+
+      # ============================================================
+      # Intent: snapshot (Canary snapshot)
+      # ============================================================
+
+      - name: Canary snapshot publish
+        if: steps.intent.outputs.value == 'snapshot'
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: bun run release:snapshot:canary

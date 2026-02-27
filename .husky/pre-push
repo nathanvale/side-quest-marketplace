@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Block direct pushes to protected branches. Use PRs instead.
+current_branch=$(git rev-parse --abbrev-ref HEAD)
+if [ "$current_branch" = "main" ] || [ "$current_branch" = "master" ]; then
+  echo "Push to protected branch '$current_branch' is blocked."
+  echo "Create a feature branch and open a PR."
+  echo "Override (not recommended): ALLOW_PUSH_PROTECTED=1 git push"
+  if [ "${ALLOW_PUSH_PROTECTED:-}" != "1" ]; then
+    exit 1
+  fi
+fi
+
+# Remind users to enable branch protection (one-time, non-blocking).
+# Once verified, creates a marker file so it never checks again.
+MARKER=".husky/.protection-verified"
+if [ ! -f "$MARKER" ] && command -v gh >/dev/null 2>&1; then
+  repo=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null || true)
+  if [ -n "$repo" ]; then
+    # Capture HTTP status to distinguish "not enabled" (404) from "no permission" (403).
+    http_status=$(gh api "repos/$repo/branches/main/protection" \
+      --silent --include 2>/dev/null \
+      | head -1 | awk '{print $2}') || true
+    case "${http_status:-}" in
+      200)
+        # Protection is enabled -- mark as verified.
+        mkdir -p .husky
+        touch "$MARKER"
+        ;;
+      404)
+        # Protection genuinely not configured.
+        echo ""
+        echo "WARNING: Branch protection is not enabled on main."
+        echo "Run 'bun run setup:protect' to enable it."
+        echo ""
+        ;;
+      403)
+        # User lacks admin access -- can't determine status, skip silently.
+        ;;
+      *)
+        # Network error or unexpected status -- skip silently.
+        ;;
+    esac
+  fi
+fi

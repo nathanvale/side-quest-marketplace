@@ -1,0 +1,121 @@
+name: 'Coverage Comment'
+description: 'Post or update a PR comment with coverage summary and threshold status'
+inputs:
+  lcov-path:
+    description: 'Path to lcov.info file'
+    required: true
+  min-lines:
+    description: 'Minimum lines coverage % threshold'
+    required: true
+  min-branches:
+    description: 'Minimum branches coverage % threshold'
+    required: true
+  min-functions:
+    description: 'Minimum functions coverage % threshold'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Build coverage summary
+      id: build
+      shell: bash
+      env:
+        LCOV_PATH: ${{ inputs.lcov-path }}
+        MIN_LINES: ${{ inputs.min-lines }}
+        MIN_BRANCHES: ${{ inputs.min-branches }}
+        MIN_FUNCTIONS: ${{ inputs.min-functions }}
+      run: |
+        if [ ! -f "$LCOV_PATH" ]; then
+          echo "lcov not found at $LCOV_PATH" >&2
+          echo "found=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        node -e "
+        const fs=require('fs');
+        const path=process.env.LCOV_PATH;
+        const txt=fs.readFileSync(path,'utf8');
+        const recs=txt.split('end_of_record');
+        const perFile=[];
+        const total={lines:{found:0,hit:0},branches:{found:0,hit:0},functions:{found:0,hit:0}};
+        for(const rec of recs){
+          if(!/SF:/.test(rec)) continue;
+          const file=(rec.match(/SF:(.*)/)||[])[1]?.trim();
+          const lf=+(rec.match(/LF:(\d+)/)||[])[1]||0;
+          const lh=+(rec.match(/LH:(\d+)/)||[])[1]||0;
+          const brf=+(rec.match(/BRF:(\d+)/)||[])[1]||0;
+          const brh=+(rec.match(/BRH:(\d+)/)||[])[1]||0;
+          const fnf=+(rec.match(/FNF:(\d+)/)||[])[1]||0;
+          const fnh=+(rec.match(/FNH:(\d+)/)||[])[1]||0;
+          total.lines.found+=lf; total.lines.hit+=lh;
+          total.branches.found+=brf; total.branches.hit+=brh;
+          total.functions.found+=fnf; total.functions.hit+=fnh;
+          const pct=(hit,found)=>found? (hit/found*100):0;
+          perFile.push({file,lines:{pct:pct(lh,lf)},branches:{pct:pct(brh,brf)},functions:{pct:pct(fnh,fnf)}});
+        }
+        const pct=(hit,found)=>found? (hit/found*100):0;
+        const totals={
+          lines: { pct: pct(total.lines.hit,total.lines.found), c: total.lines.hit, t: total.lines.found },
+          branches: { pct: pct(total.branches.hit,total.branches.found), c: total.branches.hit, t: total.branches.found },
+          functions: { pct: pct(total.functions.hit,total.functions.found), c: total.functions.hit, t: total.functions.found },
+        };
+        const th={ lines:+process.env.MIN_LINES, branches:+process.env.MIN_BRANCHES, functions:+process.env.MIN_FUNCTIONS };
+        const breaches=perFile.filter(f=> (isFinite(f.lines.pct)&&f.lines.pct<th.lines) || (isFinite(f.branches.pct)&&f.branches.pct<th.branches) || (isFinite(f.functions.pct)&&f.functions.pct<th.functions));
+        const fmtPct=x=> (isFinite(x)? x.toFixed(2):'0.00');
+        const header='<!-- coverage-report:sticky -->';
+        let md=header+'\n';
+        md+=`## Coverage Summary\\n\\n`;
+        md+=`| Metric | % | Covered / Total | Threshold |\\n|---|---|---|---|\\n`;
+        md+=`| Lines | ${fmtPct(totals.lines.pct)} | ${totals.lines.c} / ${totals.lines.t} | ${th.lines}% |\\n`;
+        md+=`| Branches | ${fmtPct(totals.branches.pct)} | ${totals.branches.c} / ${totals.branches.t} | ${th.branches}% |\\n`;
+        md+=`| Functions | ${fmtPct(totals.functions.pct)} | ${totals.functions.c} / ${totals.functions.t} | ${th.functions}% |\\n`;
+        if (breaches.length){
+          md+=`\n### Files below threshold\\n`;
+          md+=`| File | Lines % | Branches % | Functions % |\\n|---|---:|---:|---:|\\n`;
+          for(const b of breaches.slice(0,100)){
+            md+=`| ${b.file} | ${fmtPct(b.lines.pct)} | ${fmtPct(b.branches.pct)} | ${fmtPct(b.functions.pct)} |\\n`;
+          }
+          if (breaches.length>100){ md+=`\n…and ${breaches.length-100} more files.` }
+        }
+        fs.writeFileSync('coverage-comment.md',md);
+        const overallBreach=(fmtPct(totals.lines.pct)<th.lines)||(fmtPct(totals.branches.pct)<th.branches)||(fmtPct(totals.functions.pct)<th.functions);
+        fs.writeFileSync('coverage-comment.status', overallBreach? 'breach':'ok');
+        ";
+        echo "found=true" >> $GITHUB_OUTPUT
+
+    - name: Post sticky PR comment
+      if: ${{ steps.build.outputs.found == 'true' }}
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+      with:
+        script: |
+          if (context.eventName !== 'pull_request') {
+            core.info('Not a pull_request event; skipping comment')
+            return
+          }
+          const fs = require('fs')
+          const body = fs.readFileSync('coverage-comment.md','utf8')
+          const marker = '<!-- coverage-report:sticky -->'
+          const pr = context.payload.pull_request.number
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: pr,
+            per_page: 100
+          })
+          const existing = comments.find(c => c.body && c.body.includes(marker))
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body
+            })
+            core.info(`Updated coverage comment #${existing.id}`)
+          } else {
+            const created = await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr,
+              body
+            })
+            core.info(`Created coverage comment #${created.data.id}`)
+          }

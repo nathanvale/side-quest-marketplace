@@ -1,0 +1,60 @@
+name: Auto-merge Version Packages PR
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened, labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  enable-automerge:
+    if: |
+      github.event.pull_request.title == 'chore: version packages' &&
+      contains(github.event.pull_request.user.login, 'github-actions')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          egress-policy: audit
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2.2.1
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Enable PR auto-merge (squash)
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const pr = context.payload.pull_request
+            const res = await github.graphql(`
+              mutation($prId: ID!) {
+                enablePullRequestAutoMerge(input: { pullRequestId: $prId, mergeMethod: SQUASH }) { clientMutationId }
+              }
+            `, { prId: pr.node_id })
+            core.info('Auto-merge enabled for Version Packages PR')
+
+      # GITHUB_TOKEN PRs don't trigger workflows (GitHub anti-recursion).
+      # Dispatch pr-quality.yml using the App token so the required "All
+      # checks passed" gate job runs and branch protection is satisfied.
+      - name: Trigger PR quality checks on version branch
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const branch = context.payload.pull_request.head.ref
+            core.info(`Dispatching PR quality workflow on ${branch}`)
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'pr-quality.yml',
+              ref: branch,
+            })
+            core.info('PR quality workflow dispatched')
