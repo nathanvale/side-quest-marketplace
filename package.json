@@ -1,10 +1,10 @@
 {
-	"name": "{{PACKAGE_NAME}}",
+	"name": "@nathanvale/my-agent-cortex",
 	"version": "0.0.0",
-	"description": "{{DESCRIPTION}}",
+	"description": "Agent-native knowledge system",
 	"author": {
-		"name": "{{AUTHOR}}",
-		"url": "https://github.com/{{GITHUB_USER}}"
+		"name": "Nathan Vale",
+		"url": "https://github.com/nathanvale"
 	},
 	"license": "MIT",
 	"type": "module",
@@ -25,12 +25,12 @@
 	],
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/{{GITHUB_USER}}/{{REPO_NAME}}.git"
+		"url": "git+https://github.com/nathanvale/my-agent-cortex.git"
 	},
 	"bugs": {
-		"url": "https://github.com/{{GITHUB_USER}}/{{REPO_NAME}}/issues"
+		"url": "https://github.com/nathanvale/my-agent-cortex/issues"
 	},
-	"homepage": "https://github.com/{{GITHUB_USER}}/{{REPO_NAME}}#readme",
+	"homepage": "https://github.com/nathanvale/my-agent-cortex#readme",
 	"keywords": [
 		"typescript",
 		"bun",
@@ -70,7 +70,6 @@
 		"release": "changeset publish --provenance",
 		"release:snapshot:canary": "changeset version --snapshot canary && changeset publish --tag canary",
 		"security:audit": "npm audit",
-		"setup": "bun scripts/setup.ts",
 		"setup:protect": "bun scripts/setup-protect.ts",
 		"test": "bun test --recursive",
 		"test:ci": "TF_BUILD=true bun test --recursive",

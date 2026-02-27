@@ -4,7 +4,7 @@
 	"baseBranch": "main",
 	"changelog": [
 		"@changesets/changelog-github",
-		{ "repo": "{{GITHUB_USER}}/{{REPO_NAME}}" }
+		{ "repo": "nathanvale/my-agent-cortex" }
 	],
 	"commit": false,
 	"packages": ["."],
