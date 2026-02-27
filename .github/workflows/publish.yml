@@ -173,7 +173,7 @@ jobs:
       - name: Changesets - open PR or publish
         if: steps.intent.outputs.value == 'auto'
         id: changesets
-        uses: changesets/action@c48e67d110a68bc90ccf1098e9646092baacaa87 # v1.6.0
+        uses: changesets/action@6a0a831ff30acef54f2c6aa1cbbc1096b066edaf # v1.7.0
         with:
           # Guard publish to avoid failing main when NPM_TOKEN isn't configured
           publish: bash .github/scripts/changesets-publish.sh
