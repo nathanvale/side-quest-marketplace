@@ -1,6 +1,6 @@
 {
 	"$schema": "https://code.claude.com/docs/en/plugin-marketplaces",
-	"name": "cortex",
+	"name": "side-quest-marketplace",
 	"version": "0.1.0",
 	"description": "Agent-native knowledge system with research, brainstorm, and knowledge capture skills",
 	"owner": {
