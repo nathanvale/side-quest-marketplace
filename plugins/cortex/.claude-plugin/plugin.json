@@ -1,0 +1,29 @@
+{
+	"name": "cortex",
+	"description": "Agent-native knowledge system. Research topics and capture findings as structured markdown documents with YAML frontmatter",
+	"version": "0.2.0",
+	"author": {
+		"name": "Nathan Vale"
+	},
+	"repository": "https://github.com/nathanvale/my-agent-cortex",
+	"keywords": [
+		"knowledge",
+		"research",
+		"second-brain",
+		"frontmatter",
+		"cortex"
+	],
+	"license": "MIT",
+	"skills": [
+		"./skills/cortex-frontmatter",
+		"./skills/research",
+		"./skills/brainstorm",
+		"./skills/visualize"
+	],
+	"commands": [
+		"./commands/research.md",
+		"./commands/add.md",
+		"./commands/brainstorm.md",
+		"./commands/visualize.md"
+	]
+}
