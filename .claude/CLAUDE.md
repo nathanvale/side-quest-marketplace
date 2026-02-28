@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A Claude Code plugin marketplace -- a monorepo containing the `cortex` plugin, an agent-native knowledge system with research, brainstorm, and knowledge capture skills. Each plugin lives under `plugins/<name>/` and is registered in `.claude-plugin/marketplace.json`.
+A Claude Code plugin marketplace -- a monorepo containing the `cortex-engineering` plugin, an agent-native knowledge system with research, brainstorm, and knowledge capture skills. Each plugin lives under `plugins/<name>/` and is registered in `.claude-plugin/marketplace.json`.
 
 ## Commands
 

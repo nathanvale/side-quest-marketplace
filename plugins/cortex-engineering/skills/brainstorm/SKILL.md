@@ -1,6 +1,6 @@
 ---
 name: brainstorming-with-cortex
-description: Runs brainstorming sessions that build on existing Cortex knowledge. Checks for prior research and brainstorms before exploring. Delegates to cortex-frontmatter skill for doc structure. Use when the user wants to brainstorm, explore ideas, or think through an approach.
+description: Runs brainstorming sessions that build on existing Cortex knowledge. Checks for prior research and brainstorms before exploring. Delegates to cortex-engineering-frontmatter skill for doc structure. Use when the user wants to brainstorm, explore ideas, or think through an approach.
 allowed-tools:
   - Bash(cortex *:*)
   - Read
@@ -51,7 +51,7 @@ grep -rl "<topic>" ./docs/ 2>/dev/null
 
 **If nothing found:**
 - Note it: "No prior cortex knowledge on this. We're starting from scratch."
-- Consider suggesting `/cortex:research` first if the topic is complex
+- Consider suggesting `/cortex-engineering:research` first if the topic is complex
 
 ### 3. Run the brainstorm
 
@@ -72,7 +72,7 @@ Structure the brainstorm around:
 
 ### 4. Synthesize and write
 
-Delegate to the **cortex-frontmatter** skill for correct doc structure:
+Delegate to the **cortex-engineering-frontmatter** skill for correct doc structure:
 
 - Use the `brainstorm` doc type
 - Fill in all sections: Context, Questions, Approaches, Decision, Next Steps
@@ -87,8 +87,8 @@ Delegate to the **cortex-frontmatter** skill for correct doc structure:
 Tell the user:
 - Where the brainstorm was saved
 - Summary of the decision/direction (or "no decision yet")
-- Suggest next step: "When you're ready to plan implementation, run `/cortex:plan`" (future) or "Need more data? Run `/cortex:research <specific-gap>`"
-- Suggest: "Want a diagram of this? Run `/cortex:visualize <saved-path>`"
+- Suggest next step: "When you're ready to plan implementation, run `/cortex-engineering:plan`" (future) or "Need more data? Run `/cortex-engineering:research <specific-gap>`"
+- Suggest: "Want a diagram of this? Run `/cortex-engineering:visualize <saved-path>`"
 
 ## Example Frontmatter
 

@@ -9,8 +9,8 @@
 	},
 	"plugins": [
 		{
-			"name": "cortex",
-			"source": "./plugins/cortex",
+			"name": "cortex-engineering",
+			"source": "./plugins/cortex-engineering",
 			"description": "Research, brainstorm, and capture knowledge with YAML frontmatter and agent tooling",
 			"category": "productivity",
 			"tags": ["knowledge", "research", "brainstorm", "frontmatter"]

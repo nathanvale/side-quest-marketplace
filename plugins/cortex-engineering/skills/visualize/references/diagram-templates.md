@@ -77,7 +77,7 @@ sequenceDiagram
     participant Skill
     participant MCP as MCP Server
 
-    User->>Skill: /cortex:visualize
+    User->>Skill: /cortex-engineering:visualize
     Skill->>Skill: Detect context
     Skill->>MCP: create_workflow_diagram
     MCP-->>Skill: Mermaid source

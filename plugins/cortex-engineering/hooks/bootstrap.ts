@@ -117,7 +117,7 @@ function resolveConfigDir(): string {
 		// XDG spec requires an absolute path
 		if (!xdg.startsWith('/')) {
 			process.stderr.write(
-				`[cortex] XDG_CONFIG_HOME is not absolute ("${xdg}"), using default\n`,
+				`[cortex-engineering] XDG_CONFIG_HOME is not absolute ("${xdg}"), using default\n`,
 			)
 			return resolve(homedir(), '.config', 'cortex')
 		}
@@ -165,7 +165,7 @@ function bootstrap(): void {
 		// If we can't read a file we just created, something is very
 		// wrong -- but still fall back gracefully.
 		process.stderr.write(
-			`[cortex] Could not read ${configPath}, using default docs path\n`,
+			`[cortex-engineering] Could not read ${configPath}, using default docs path\n`,
 		)
 	}
 
@@ -176,7 +176,7 @@ function bootstrap(): void {
 		configMalformed = true
 		// stderr for diagnostics
 		process.stderr.write(
-			'[cortex] Invalid docs_path in config.yaml, using default\n',
+			'[cortex-engineering] Invalid docs_path in config.yaml, using default\n',
 		)
 		resolvedDocsPath = resolve(expandTilde(DEFAULT_DOCS_PATH))
 	}
@@ -193,7 +193,7 @@ function bootstrap(): void {
 	// Backtick-wrapped key-value format survives compaction better
 	// than prose.
 	const lines: string[] = [
-		'## Cortex Global Docs',
+		'## Cortex Engineering Global Docs',
 		'',
 		`**CORTEX_DOCS_PATH:** \`${resolvedDocsPath}\``,
 		`**CORTEX_CONFIG:** \`${configPath}\``,
