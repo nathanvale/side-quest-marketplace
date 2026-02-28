@@ -18,7 +18,8 @@
 		"./skills/cortex-frontmatter",
 		"./skills/research",
 		"./skills/brainstorm",
-		"./skills/visualize"
+		"./skills/visualize",
+		"./skills/creating-skills-and-commands"
 	],
 	"commands": [
 		"./commands/research.md",
