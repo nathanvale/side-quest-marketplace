@@ -87,24 +87,38 @@ Always report what succeeded and what failed.
 
 ### 7. Save
 
-Save all outputs to `docs/diagrams/`:
+Save all outputs to a folder per diagram inside `docs/diagrams/`:
 
 ```
 docs/diagrams/
-  YYYY-MM-DD-<topic>.md    # Mermaid source with frontmatter
-  YYYY-MM-DD-<topic>.svg   # Screen viewing
-  YYYY-MM-DD-<topic>.pdf   # A3/A2 printing
+  YYYY-MM-DD-<topic>/
+    index.md               # Mermaid source with frontmatter
+    diagram.svg            # Screen viewing
+    diagram.pdf            # A3/A2 printing
 ```
 
-If a file with the same name exists, ask the user: overwrite or create a versioned copy (`-v2`, `-v3`).
+The folder name is the identifier (date + topic). Filenames inside are fixed (`index.md`, `diagram.svg`, `diagram.pdf`) so agents can glob with `docs/diagrams/**/diagram.svg` or find the source with `docs/diagrams/**/index.md`.
+
+If a folder with the same name exists, ask the user: overwrite or create a versioned copy (`-v2`, `-v3`).
 
 Delegate to the **cortex-frontmatter** skill for correct doc structure. Use the `diagram` doc type with `source` field linking back to the origin document.
 
-### 8. Confirm
+### 8. Confirm and open
 
 Tell the user:
 - File paths for all saved outputs (source, SVG, PDF)
 - Suggest printing: "Print the PDF at A3 or A2 for your wall."
+
+Then offer to open the output using `AskUserQuestion`:
+
+| Option | Action |
+|--------|--------|
+| Open diagram | `open <folder>/diagram.svg` (default app, usually browser) |
+| Open in Preview | `open -a "Preview" <folder>/diagram.pdf` (for print preview) |
+| Open folder | `open <folder>` (Finder, for manual file management) |
+| Skip | Do nothing |
+
+Use macOS `open` command -- zero dependencies, respects user defaults.
 
 ## Example Frontmatter
 

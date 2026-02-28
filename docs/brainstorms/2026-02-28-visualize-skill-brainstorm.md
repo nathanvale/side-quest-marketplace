@@ -3,7 +3,7 @@ created: 2026-02-28
 title: Visualize Skill - Diagrams for Wall Printing
 type: brainstorm
 tags: [cortex, mermaid, diagrams, adhd, visual-learning]
-project: my-agent-cortex
+project: cortex-plugin
 status: draft
 ---
 

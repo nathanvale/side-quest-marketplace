@@ -5,9 +5,6 @@ type: research
 tags: [second-brain, context-engineering, mcp, hooks, skills]
 project: my-agent-dojo
 status: final
-source_url: "https://www.iwoszapar.com/context-engineering"
-author: "Iwo Szapar"
-published_date: 2026-02-01
 ---
 
 ## Summary
@@ -143,6 +140,7 @@ Example workflow cards with quality scores:
 
 ## Sources
 
+- [Iwo Szapar](https://www.iwoszapar.com/context-engineering) -- published 2026-02-01
 - [Context Engineering for Knowledge Workers (Landing Page)](https://www.iwoszapar.com/context-engineering)
 - AI Maturity Index research - Co-founded with Harvard researchers, validated by analyzing 420,000 data points on AI adoption, acquired by ISG in January 2026
 

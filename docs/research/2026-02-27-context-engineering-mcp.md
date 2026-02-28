@@ -5,9 +5,6 @@ type: research
 tags: [context-engineering, mcp, agents]
 project: my-agent-dojo
 status: final
-source_url: "https://www.iwoszapar.com/p/context-engineering-mcp"
-author: "Iwo Szapar"
-published_date: 2026-02-11
 ---
 
 ## Summary
@@ -112,6 +109,7 @@ If Google Calendar MCP returns an authentication error, keep that in context so 
 
 ## Sources
 
+- [Iwo Szapar](https://www.iwoszapar.com/p/context-engineering-mcp) -- published 2026-02-11
 - [Context Engineering with MCP (Original Article)](https://www.iwoszapar.com/p/context-engineering-mcp)
 - Anthropic engineering team definition of context engineering (cited, not directly linked)
 - Robomotion team MCP description (cited as "interface contract between an AI model and the external world")

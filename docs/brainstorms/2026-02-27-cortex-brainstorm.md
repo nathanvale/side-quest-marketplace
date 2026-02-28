@@ -1,6 +1,10 @@
 ---
-date: 2026-02-27
-topic: cortex-second-brain
+created: 2026-02-27
+title: "Cortex -- Agent-Native Knowledge System"
+type: brainstorm
+tags: [cortex, knowledge-system, mcp, architecture, agent-native]
+project: cortex-plugin
+status: draft
 ---
 
 # Cortex -- Agent-Native Knowledge System

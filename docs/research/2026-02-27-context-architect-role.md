@@ -5,9 +5,6 @@ type: research
 tags: [context-engineering]
 project: my-agent-dojo
 status: final
-source_url: "https://www.iwoszapar.com/p/context-architect-ai-skill-2026"
-author: "Iwo Szapar"
-published_date: 2026-02-01
 ---
 
 ## Summary
@@ -94,6 +91,7 @@ Gartner predicts 40% of enterprise applications will embed AI agents by end of 2
 
 ## Sources
 
+- [Iwo Szapar](https://www.iwoszapar.com/p/context-architect-ai-skill-2026) -- published 2026-02-01
 - [From Prompt Engineer to Context Architect (Original Article)](https://www.iwoszapar.com/p/context-architect-ai-skill-2026)
 - [Stack Overflow 2025 Developer Survey](https://survey.stackoverflow.co/2025/ai)
 - [LangChain 2025 State of Agent Engineering Report](https://www.langchain.com/state-of-agent-engineering) - 1,340 professionals surveyed

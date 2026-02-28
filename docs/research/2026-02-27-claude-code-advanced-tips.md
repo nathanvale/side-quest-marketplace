@@ -5,9 +5,6 @@ type: research
 tags: [claude-code, skills, hooks, agents, memory]
 project: my-agent-dojo
 status: final
-source_url: "https://www.iwoszapar.com/p/claude-code-advanced-tips-engineers-2026"
-author: "Iwo Szapar"
-published_date: 2026-01-30
 ---
 
 ## Summary
@@ -201,6 +198,7 @@ Plus UserPromptSubmit hook loads relevant skills BEFORE starting.
 
 ## Sources
 
+- [Iwo Szapar](https://www.iwoszapar.com/p/claude-code-advanced-tips-engineers-2026) -- published 2026-01-30
 - [Claude Code Advanced Tips (Original Article)](https://www.iwoszapar.com/p/claude-code-advanced-tips-engineers-2026)
 
 ## Open Questions

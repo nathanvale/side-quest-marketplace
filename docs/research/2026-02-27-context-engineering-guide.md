@@ -5,9 +5,6 @@ type: research
 tags: [context-engineering, progressive-disclosure, hooks, memory, mcp]
 project: my-agent-dojo
 status: final
-source_url: "https://www.iwoszapar.com/resources/context-engineering/access"
-author: "Iwo Szapar"
-published_date: 2026-02-01
 ---
 
 ## Summary
@@ -109,6 +106,7 @@ Example hook (auto-track every email send in CRM):
 
 ## Sources
 
+- [Iwo Szapar](https://www.iwoszapar.com/resources/context-engineering/access) -- published 2026-02-01
 - [The Context Engineering Guide (Full Access)](https://www.iwoszapar.com/resources/context-engineering/access)
 - [Context Engineering Landing Page](https://www.iwoszapar.com/context-engineering) (contains 5-layer detail and hook examples)
 - Gloaguen et al. research on AI-generated context files (cited in article, specific paper not linked)

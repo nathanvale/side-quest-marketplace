@@ -5,9 +5,6 @@ type: research
 tags: [second-brain, mcp, context-engineering, agents]
 project: my-agent-dojo
 status: final
-source_url: "https://www.iwoszapar.com/p/second-brain-mcp"
-author: "Iwo Szapar"
-published_date: 2026-02-10
 ---
 
 ## Summary
@@ -135,6 +132,7 @@ No competitor combines all three layers (persistent context + agents + cross-too
 
 ## Sources
 
+- [Iwo Szapar](https://www.iwoszapar.com/p/second-brain-mcp) -- published 2026-02-10
 - [Your Second Brain Is Blind Without MCP (Original Article)](https://www.iwoszapar.com/p/second-brain-mcp)
 - Gartner prediction: 40% of enterprise applications will include task-specific AI agents by end of 2026
 
