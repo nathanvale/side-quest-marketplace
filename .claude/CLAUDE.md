@@ -1,172 +1,120 @@
-# bun-typescript-starter
+# CLAUDE.md
 
-A production-ready TypeScript/Bun project template with CI/CD, linting, testing, and publishing infrastructure.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Stack:** TypeScript, Bun, Biome, Vitest, Changesets
+## What This Is
 
----
+A Claude Code plugin marketplace -- a monorepo containing the `cortex` plugin, an agent-native knowledge system with research, brainstorm, and knowledge capture skills. Each plugin lives under `plugins/<name>/` and is registered in `.claude-plugin/marketplace.json`.
 
-## Quick Start
-
-```bash
-# After "Use this template" on GitHub
-bun run setup    # Interactive configuration
-bun install      # Install dependencies (if not done by setup)
-bun dev          # Watch mode development
-bun test         # Run tests
-bun run build    # Build for production
-```
-
----
-
-## Key Commands
+## Commands
 
 ```bash
-# Development
-bun dev                  # Watch mode
-bun build                # Build TypeScript to dist/
-
-# Quality
-bun run check            # Biome lint + format (write mode)
-bun typecheck            # TypeScript type checking
-bun run validate         # Full quality check (lint + types + build + test)
-
-# Testing
-bun test                 # Run all tests
-bun test --coverage      # With coverage report
-
-# Releases
-bun version:gen          # Create changeset
+bun run check              # Biome lint + format (write mode)
+bun run typecheck          # TypeScript type checking (tsc --noEmit)
+bun run validate:marketplace  # Marketplace structure validation
+bun run validate           # Full gate: check + typecheck + marketplace validation
+bun run lint               # Biome lint only (no auto-fix)
+bun run lint:fix           # Biome lint with auto-fix
+bun run format             # Biome format with write
+bun run format:check       # Biome format check only
 ```
 
----
+Always run `bun run validate` before pushing.
 
-## Code Conventions
+## Architecture
 
-| Area | Convention |
-|------|------------|
-| Files | kebab-case (`my-util.ts`) |
-| Functions | camelCase (`doSomething`) |
-| Types | PascalCase (`MyType`) |
-| Exports | Named only (no defaults) |
-| Formatting | Biome (tabs, single quotes, 80-char) |
+### Plugin Anatomy
 
----
-
-## Git Workflow
-
-**Branch pattern:** `type/description` (e.g., `feat/add-feature`, `fix/bug-fix`)
-
-**Commit format:** Conventional Commits (enforced by commitlint)
+Every plugin requires this minimum structure:
 
 ```
-feat(scope): add new feature
-fix(scope): fix bug
-chore(deps): update dependencies
+plugins/<name>/
+  .claude-plugin/
+    plugin.json        # Manifest (name, version, commands, skills, agents)
+  README.md            # Required
 ```
 
-**Before pushing:** Always run `bun run validate`
+Optional components:
 
----
+- `commands/*.md` -- slash commands (YAML frontmatter + markdown body)
+- `skills/<skill-name>/SKILL.md` -- auto-activated skills (YAML frontmatter + markdown)
+- `skills/<skill-name>/references/` -- conditional context loaded by flag/mode/tool detection
+- `agents/*.md` -- sub-agent definitions for multi-agent plugins
+- `hooks/hooks.json` -- lifecycle hook config (SessionStart, PreToolUse, PostToolUse, PreCompact, Stop)
+- `hooks/*.ts` -- TypeScript hook implementations (run via `bun run`)
 
-## Template Development Workflow
+### Marketplace Registry
 
-When dogfooding this template (testing it in a real project), use this workflow to push fixes back upstream.
+`.claude-plugin/marketplace.json` is the source of truth for available plugins. Each entry needs:
 
-### Setup (one-time)
-
-```bash
-# Create a new repo from template via GitHub UI
-# Clone it locally
-git clone git@github.com:youruser/your-new-project.git
-cd your-new-project
-
-# Add template as upstream remote
-git remote add template git@github.com:nathanvale/bun-typescript-starter.git
+```json
+{
+  "name": "my-plugin",
+  "source": "./plugins/my-plugin",
+  "description": "What it does in one sentence",
+  "category": "development|productivity|security|learning",
+  "tags": ["relevant", "tags"]
+}
 ```
 
-### Pushing Fixes Upstream
+The validation script (`scripts/validate-marketplace.ts`) enforces:
+- Kebab-case names matching the source directory basename
+- Source paths resolve to a directory containing `.claude-plugin/plugin.json`
+- No duplicate names
+- Valid category enum
+- Version bump enforcement on PRs (minor for additions, major for removals, patch for metadata changes)
 
-When you find an issue in the template while using it:
+### Plugin Manifest
 
-```bash
-# 1. Fix the issue in your dogfood project
-# 2. Commit the fix
-git add .
-git commit -m "fix: description of the fix"
+`.claude-plugin/plugin.json` inside each plugin:
 
-# 3. Push to your project's origin (optional, for your project)
-git push origin main
-
-# 4. Push to template upstream
-git push template HEAD:main
+```json
+{
+  "name": "my-plugin",
+  "description": "One sentence, present tense, no trailing period",
+  "version": "1.0.0",
+  "author": { "name": "Nathan Vale" },
+  "keywords": ["search", "terms"],
+  "license": "MIT",
+  "commands": ["./commands/my-command.md"],
+  "skills": ["./skills/my-skill"],
+  "agents": ["./agents/my-agent.md"]
+}
 ```
 
-### Pulling Template Updates
+All paths are relative to the plugin root and validated by `claude plugin validate .`.
 
-```bash
-# Fetch latest from template
-git fetch template
+### Progressive Disclosure Pattern
 
-# Merge template changes into your project
-git merge template/main --allow-unrelated-histories
+Skills use a references/ subdirectory for conditional context loading. The main SKILL.md is always loaded (~2,000 tokens). References are loaded only when relevant flags, modes, or tools are detected. This keeps default token cost low.
+
+### Hook Config
+
+`hooks/hooks.json` maps lifecycle events to commands:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "bun run \"${CLAUDE_PLUGIN_ROOT}/hooks/my-hook.ts\"", "timeout": 5 }] }]
+  }
+}
 ```
 
----
+Available events: `SessionStart`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PreCompact`, `Stop`
 
-## Publishing
+## Conventions
 
-This template uses **OIDC Trusted Publishing** for npm releases.
+- **Files:** kebab-case (`my-plugin.ts`)
+- **Functions:** camelCase
+- **Types:** PascalCase
+- **Exports:** named only (no defaults)
+- **Formatting:** Biome -- tabs, single quotes, 80-char line width
+- **Single biome.json at root** -- NEVER create nested configs
+- **Commits:** Conventional Commits (`feat(scope): subject`)
+- **Branches:** `type/description` (e.g., `feat/add-cortex`)
+- **Hook TypeScript:** always include a self-destruct timer as the first executable line for safety
 
-### First Publish (requires NPM_TOKEN)
+## Key References
 
-1. Add `NPM_TOKEN` secret to GitHub repo settings
-2. Create a changeset: `bun version:gen`
-3. Push to main, merge the "Version Packages" PR
-
-### After First Publish (OIDC)
-
-1. Configure trusted publisher at: https://www.npmjs.com/package/YOUR_PACKAGE/access
-2. Remove `NPM_TOKEN` secret (no longer needed)
-3. Future publishes authenticate via GitHub OIDC
-
----
-
-## CI/CD Workflows
-
-| Workflow | Trigger | Purpose |
-|----------|---------|---------|
-| `pr-quality.yml` | PR | Lint, types, tests |
-| `publish.yml` | Push to main | Version & publish |
-| `autogenerate-changeset.yml` | PR | Auto-generate changeset if missing |
-| `commitlint.yml` | PR | Validate commit messages |
-| `security.yml` | Schedule/PR | CodeQL + Trivy scans |
-
-**GitHub App:** [Changeset Bot](https://github.com/apps/changeset-bot) — comments on PRs with changeset status (install per-repo)
-
----
-
-## Customization
-
-After running `bun run setup`:
-
-1. **Add source files** in `src/`
-2. **Add tests** alongside source (`*.test.ts`)
-3. **Update exports** in `bunup.config.ts`
-4. **Configure path aliases** in `tsconfig.json` if needed
-
----
-
-## Special Rules
-
-### ALWAYS
-
-1. Run `bun run validate` before pushing
-2. Create changesets for user-facing changes
-3. Use named exports (no defaults)
-
-### NEVER
-
-1. Push directly to main (pre-push hook blocks)
-2. Skip validation before commits
-3. Use destructive git commands (`reset --hard`, `push --force`)
+- `scripts/validate-marketplace.ts` -- marketplace validation logic
+- `scripts/validate-marketplace.test.ts` -- marketplace validation tests

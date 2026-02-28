@@ -1,0 +1,7 @@
+sources:
+  - path: ./docs
+    scope: global
+  - path: ~/code/*/docs
+    scope: project
+
+viewer: open -a "Marked 2"

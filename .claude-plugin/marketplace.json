@@ -1,0 +1,19 @@
+{
+	"$schema": "https://code.claude.com/docs/en/plugin-marketplaces",
+	"name": "cortex",
+	"version": "0.1.0",
+	"description": "Agent-native knowledge system with research, brainstorm, and knowledge capture skills",
+	"owner": {
+		"name": "Nathan Vale",
+		"email": "hi@nathanvale.com"
+	},
+	"plugins": [
+		{
+			"name": "cortex",
+			"source": "./plugins/cortex",
+			"description": "Research, brainstorm, and capture knowledge with YAML frontmatter and agent tooling",
+			"category": "productivity",
+			"tags": ["knowledge", "research", "brainstorm", "frontmatter"]
+		}
+	]
+}

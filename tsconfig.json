@@ -1,23 +1,9 @@
 {
+	"extends": "./tsconfig.base.json",
 	"compilerOptions": {
 		"baseUrl": ".",
-		"declaration": true,
-		"declarationMap": true,
-		"outDir": "dist",
-		"rootDir": "./src",
-		"sourceMap": true,
-		"noEmit": false,
-		"allowImportingTsExtensions": false,
-		"module": "ESNext"
+		"noEmit": true
 	},
-	"exclude": [
-		"node_modules",
-		"dist",
-		"**/*.test.ts",
-		"**/*.spec.ts",
-		"**/__tests__/**",
-		"__tests__"
-	],
-	"extends": "./tsconfig.base.json",
-	"include": ["src/**/*.ts"]
+	"include": ["src/**/*.ts", "scripts/**/*.ts", "plugins/**/*.ts"],
+	"exclude": ["node_modules", "dist"]
 }
