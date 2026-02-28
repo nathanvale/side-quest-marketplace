@@ -1,9 +1,8 @@
 ---
 title: Cortex Stage 0 -- Dogfood MVP
-type: feat
-status: active
-date: 2026-02-27
-origin: docs/brainstorms/2026-02-27-cortex-brainstorm.md
+type: plan
+status: draft
+created: 2026-02-27
 ---
 
 # Cortex Stage 0 -- Dogfood MVP
@@ -11,6 +10,8 @@ origin: docs/brainstorms/2026-02-27-cortex-brainstorm.md
 ## Context
 
 Nathan is building Cortex, an agent-native knowledge system that replaces Obsidian with plain markdown files, YAML frontmatter, and agent tooling. The full vision spans 9 stages from personal dogfood to enterprise intent engineering platform (see brainstorm: `docs/brainstorms/2026-02-27-cortex-brainstorm.md` in my-agent-dojo).
+
+> Origin: `docs/brainstorms/2026-02-27-cortex-brainstorm.md`
 
 Stage 0 is the smallest possible MVP: `my-agent-cortex` -- a single repo that serves as its own Claude Code marketplace (with a cortex plugin providing research skills), a knowledge store, and a CLI tool. The goal is Nathan using it daily with 10+ docs.
 

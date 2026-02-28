@@ -1,9 +1,8 @@
 ---
 title: "Add Visualize Skill to Cortex Plugin"
-type: feat
-status: completed
-date: 2026-02-28
-origin: docs/brainstorms/2026-02-28-visualize-skill-brainstorm.md
+type: plan
+status: final
+created: 2026-02-28
 ---
 
 # Add Visualize Skill to Cortex Plugin
@@ -14,7 +13,7 @@ Add a `visualize` skill to the cortex plugin that generates Mermaid diagrams fro
 
 The skill uses the `@lepion/mcp-server-mermaid` MCP server for rendering and export. It integrates with the existing cortex workflow by auto-suggesting a diagram after brainstorms and research (default yes, one click to skip).
 
-(See brainstorm: `docs/brainstorms/2026-02-28-visualize-skill-brainstorm.md`)
+> Origin: `docs/brainstorms/2026-02-28-visualize-skill-brainstorm.md`
 
 ## Problem Statement / Motivation
 
