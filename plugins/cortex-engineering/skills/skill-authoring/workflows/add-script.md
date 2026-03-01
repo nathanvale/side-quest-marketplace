@@ -1,18 +1,19 @@
 # Workflow: Add a Script to a Skill
 
-<required_reading>
-**Read these reference files NOW:**
-1. references/using-scripts.md
-</required_reading>
+## Context
 
-<process>
-## Step 1: Identify the Skill
+Read before proceeding:
+- [Using scripts](references/using-scripts.md) - script patterns and conventions
+
+## Process
+
+### Step 1: Identify the Skill
 
 Ask (if not already provided):
 - Which skill needs a script?
 - What operation should the script perform?
 
-## Step 2: Analyze Script Need
+### Step 2: Analyze Script Need
 
 Confirm this is a good script candidate:
 - [ ] Same code runs across multiple invocations
@@ -21,13 +22,13 @@ Confirm this is a good script candidate:
 
 If not a good fit, suggest alternatives (inline code in workflow, reference examples).
 
-## Step 3: Create Scripts Directory
+### Step 3: Create Scripts Directory
 
 ```bash
 mkdir -p ~/.claude/skills/{skill-name}/scripts
 ```
 
-## Step 4: Design Script
+### Step 4: Design Script
 
 Gather requirements:
 - What inputs does the script need?
@@ -40,7 +41,7 @@ Choose language:
 - **python** - Data processing, API calls, complex logic
 - **node/ts** - JavaScript ecosystem, async operations
 
-## Step 5: Write Script File
+### Step 5: Write Script File
 
 Create `scripts/{script-name}.{ext}` with:
 - Purpose comment at top
@@ -55,39 +56,34 @@ For bash scripts:
 set -euo pipefail
 ```
 
-## Step 6: Make Executable (if bash)
+### Step 6: Make Executable (if bash)
 
 ```bash
 chmod +x ~/.claude/skills/{skill-name}/scripts/{script-name}.sh
 ```
 
-## Step 7: Update Workflow to Use Script
+### Step 7: Update Workflow to Use Script
 
-Find the workflow that needs this operation. Add:
-```xml
-<process>
-...
-N. Run `scripts/{script-name}.sh [arguments]`
-N+1. Verify operation succeeded
-...
-</process>
+Find the workflow that needs this operation. Add a step:
+```markdown
+### Step N: Run Script
+
+Run `scripts/{script-name}.sh [arguments]` and verify the operation succeeded.
 ```
 
-## Step 8: Test
+### Step 8: Test
 
 Invoke the skill workflow and verify:
 - Script runs at the right step
 - Inputs are passed correctly
 - Errors are handled gracefully
 - Output matches expectations
-</process>
 
-<success_criteria>
-Script is complete when:
+## Success Criteria
+
 - [ ] scripts/ directory exists
 - [ ] Script file has proper structure (comments, validation, error handling)
 - [ ] Script is executable (if bash)
 - [ ] At least one workflow references the script
 - [ ] No hardcoded secrets or credentials
 - [ ] Tested with real invocation
-</success_criteria>

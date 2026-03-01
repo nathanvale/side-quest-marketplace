@@ -1,73 +1,68 @@
+<!--
+  WHAT: [one-sentence purpose]
+  WHY:  [when Claude should load this skill]
+  EXAMPLE: /[skill-name] [typical usage]
+-->
 ---
-name: {{SKILL_NAME}}
-description: {{What it does}} Use when {{trigger conditions}}.
+name: [skill-name]
+description: [What it does] Use when [trigger conditions].
 ---
 
-<essential_principles>
-## {{Core Concept}}
+# [Skill Name]
 
-{{Principles that ALWAYS apply, regardless of which workflow runs}}
+## Core Principles
 
-### 1. {{First principle}}
-{{Explanation}}
+### [Core Concept]
 
-### 2. {{Second principle}}
-{{Explanation}}
+[Principles that ALWAYS apply, regardless of which workflow runs]
 
-### 3. {{Third principle}}
-{{Explanation}}
-</essential_principles>
+1. **[First principle]** - [Explanation]
+2. **[Second principle]** - [Explanation]
+3. **[Third principle]** - [Explanation]
 
-<intake>
-**Ask the user:**
+## Intake
 
 What would you like to do?
-1. {{First option}}
-2. {{Second option}}
-3. {{Third option}}
+
+1. [First option]
+2. [Second option]
+3. [Third option]
 
 **Wait for response before proceeding.**
-</intake>
 
-<routing>
+## Routing
+
 | Response | Workflow |
 |----------|----------|
-| 1, "{{keywords}}" | `workflows/{{first-workflow}}.md` |
-| 2, "{{keywords}}" | `workflows/{{second-workflow}}.md` |
-| 3, "{{keywords}}" | `workflows/{{third-workflow}}.md` |
+| 1, "[keywords]" | [workflows/[first-workflow].md](workflows/[first-workflow].md) |
+| 2, "[keywords]" | [workflows/[second-workflow].md](workflows/[second-workflow].md) |
+| 3, "[keywords]" | [workflows/[third-workflow].md](workflows/[third-workflow].md) |
 
 **After reading the workflow, follow it exactly.**
-</routing>
 
-<quick_reference>
-## {{Skill Name}} Quick Reference
+## Quick Reference
 
-{{Brief reference information always useful to have visible}}
-</quick_reference>
+[Brief reference information always useful to have visible]
 
-<reference_index>
 ## Domain Knowledge
 
 All in `references/`:
-- {{reference-1.md}} - {{purpose}}
-- {{reference-2.md}} - {{purpose}}
-</reference_index>
+- [reference-1.md](references/reference-1.md) - [purpose]
+- [reference-2.md](references/reference-2.md) - [purpose]
 
-<workflows_index>
 ## Workflows
 
 All in `workflows/`:
 
 | Workflow | Purpose |
 |----------|---------|
-| {{first-workflow}}.md | {{purpose}} |
-| {{second-workflow}}.md | {{purpose}} |
-| {{third-workflow}}.md | {{purpose}} |
-</workflows_index>
+| [first-workflow].md | [purpose] |
+| [second-workflow].md | [purpose] |
+| [third-workflow].md | [purpose] |
 
-<success_criteria>
-A well-executed {{skill name}}:
-- {{First criterion}}
-- {{Second criterion}}
-- {{Third criterion}}
-</success_criteria>
+## Quality Criteria
+
+A well-executed [skill name]:
+- [First criterion]
+- [Second criterion]
+- [Third criterion]

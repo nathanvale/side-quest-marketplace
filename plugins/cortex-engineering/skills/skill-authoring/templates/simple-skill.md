@@ -1,33 +1,37 @@
+<!--
+  WHAT: [one-sentence purpose]
+  WHY:  [when Claude should load this skill]
+  EXAMPLE: /[skill-name] [typical usage]
+-->
 ---
-name: {{SKILL_NAME}}
-description: {{What it does}} Use when {{trigger conditions}}.
+name: [skill-name]
+description: [What it does] Use when [trigger conditions].
 ---
 
-<objective>
-{{Clear statement of what this skill accomplishes}}
-</objective>
+# [Skill Name]
 
-<quick_start>
-{{Immediate actionable guidance - what Claude should do first}}
-</quick_start>
+[Clear statement of what this skill accomplishes]
 
-<process>
-## Step 1: {{First action}}
+## Quick Start
 
-{{Instructions for step 1}}
+[Immediate actionable guidance - what Claude should do first]
 
-## Step 2: {{Second action}}
+## Process
 
-{{Instructions for step 2}}
+### Step 1: [First action]
 
-## Step 3: {{Third action}}
+[Instructions for step 1]
 
-{{Instructions for step 3}}
-</process>
+### Step 2: [Second action]
 
-<success_criteria>
-{{Skill name}} is complete when:
-- [ ] {{First success criterion}}
-- [ ] {{Second success criterion}}
-- [ ] {{Third success criterion}}
-</success_criteria>
+[Instructions for step 2]
+
+### Step 3: [Third action]
+
+[Instructions for step 3]
+
+## Done When
+
+- [ ] [First success criterion]
+- [ ] [Second success criterion]
+- [ ] [Third success criterion]

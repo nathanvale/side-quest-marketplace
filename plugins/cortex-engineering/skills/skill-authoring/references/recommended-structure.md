@@ -2,7 +2,6 @@
 
 The optimal structure for complex skills separates routing, workflows, and knowledge.
 
-<structure>
 ```
 skill-name/
 ├── SKILL.md              # Router + essential principles (unavoidable)
@@ -15,9 +14,7 @@ skill-name/
     ├── reference-b.md
     └── ...
 ```
-</structure>
 
-<why_this_works>
 ## Problems This Solves
 
 **Problem 1: Context gets skipped**
@@ -26,7 +23,7 @@ When important principles are in a separate file, Claude may not read them.
 
 **Problem 2: Wrong context loaded**
 A "build" task loads debugging references. A "debug" task loads build references.
-**Solution:** Intake question determines intent → routes to specific workflow → workflow specifies which references to read.
+**Solution:** Intake question determines intent -> routes to specific workflow -> workflow specifies which references to read.
 
 **Problem 3: Monolithic skills are overwhelming**
 500+ lines of mixed content makes it hard to find relevant parts.
@@ -35,9 +32,7 @@ A "build" task loads debugging references. A "debug" task loads build references
 **Problem 4: Procedures mixed with knowledge**
 "How to do X" mixed with "What X means" creates confusion.
 **Solution:** Workflows are procedures (steps). References are knowledge (patterns, examples).
-</why_this_works>
 
-<skill_md_template>
 ## SKILL.md Template
 
 ```markdown
@@ -46,20 +41,17 @@ name: skill-name
 description: What it does and when to use it.
 ---
 
-<essential_principles>
-## How This Skill Works
+# Skill Name
 
-[Inline principles that apply to ALL workflows. Cannot be skipped.]
+## Core Principles
 
 ### Principle 1: [Name]
-[Brief explanation]
+[Brief explanation - inline principles that apply to ALL workflows]
 
 ### Principle 2: [Name]
 [Brief explanation]
-</essential_principles>
 
-<intake>
-**Ask the user:**
+## Intake
 
 What would you like to do?
 1. [Option A]
@@ -68,69 +60,62 @@ What would you like to do?
 4. Something else
 
 **Wait for response before proceeding.**
-</intake>
 
-<routing>
+## Routing
+
 | Response | Workflow |
 |----------|----------|
-| 1, "keyword", "keyword" | `workflows/option-a.md` |
-| 2, "keyword", "keyword" | `workflows/option-b.md` |
-| 3, "keyword", "keyword" | `workflows/option-c.md` |
+| 1, "keyword" | [workflows/option-a.md](workflows/option-a.md) |
+| 2, "keyword" | [workflows/option-b.md](workflows/option-b.md) |
+| 3, "keyword" | [workflows/option-c.md](workflows/option-c.md) |
 | 4, other | Clarify, then select |
 
 **After reading the workflow, follow it exactly.**
-</routing>
 
-<reference_index>
-All domain knowledge in `references/`:
+## Domain Knowledge
 
-**Category A:** file-a.md, file-b.md
-**Category B:** file-c.md, file-d.md
-</reference_index>
+All in `references/`:
+- [reference-a.md](references/reference-a.md) - purpose
+- [reference-b.md](references/reference-b.md) - purpose
 
-<workflows_index>
+## Workflows
+
 | Workflow | Purpose |
 |----------|---------|
 | option-a.md | [What it does] |
 | option-b.md | [What it does] |
 | option-c.md | [What it does] |
-</workflows_index>
 ```
-</skill_md_template>
 
-<workflow_template>
 ## Workflow Template
 
 ```markdown
 # Workflow: [Name]
 
-<required_reading>
-**Read these reference files NOW:**
-1. references/relevant-file.md
-2. references/another-file.md
-</required_reading>
+## Context
 
-<process>
-## Step 1: [Name]
+Read before proceeding:
+- [relevant-file.md](references/relevant-file.md) - purpose
+- [another-file.md](references/another-file.md) - purpose
+
+## Process
+
+### Step 1: [Name]
 [What to do]
 
-## Step 2: [Name]
+### Step 2: [Name]
 [What to do]
 
-## Step 3: [Name]
+### Step 3: [Name]
 [What to do]
-</process>
 
-<success_criteria>
-This workflow is complete when:
+## Success Criteria
+
 - [ ] Criterion 1
 - [ ] Criterion 2
 - [ ] Criterion 3
-</success_criteria>
 ```
-</workflow_template>
 
-<when_to_use_this_pattern>
 ## When to Use This Pattern
 
 **Use router + workflows + references when:**
@@ -144,9 +129,7 @@ This workflow is complete when:
 - Small reference set
 - Under 200 lines total
 - No essential principles to enforce
-</when_to_use_this_pattern>
 
-<key_insight>
 ## The Key Insight
 
 **SKILL.md is always loaded. Use this guarantee.**
@@ -165,4 +148,3 @@ Put reusable knowledge in references/:
 - Patterns and examples
 - Technical details
 - Domain expertise
-</key_insight>

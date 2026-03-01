@@ -1,6 +1,7 @@
 ---
 name: skill-authoring
 description: Expert guidance for creating Claude Code skills and slash commands. Use when authoring new skills, improving existing skills, creating commands, or understanding skill structure and best practices.
+user-invocable: false
 ---
 
 # Creating Skills & Commands
@@ -159,21 +160,37 @@ Keep references **one level deep** from SKILL.md. Avoid nested chains.
 
 Each component type has a natural part of speech. Consistency within a type creates a predictable mental model.
 
-| Component | Part of Speech | Examples |
-|-----------|---------------|---------|
-| Skill (action) | Verb or verb-phrase | `research`, `deploy-staging` |
-| Skill (knowledge) | Noun or noun-compound | `api-conventions`, `frontmatter` |
-| Command | Verb (imperative) | `deploy`, `fix-issue` |
-| Agent | Role-noun | `debugger`, `code-reviewer` |
+| Component | Case | Part of Speech | Examples |
+|-----------|------|---------------|---------|
+| Plugin | kebab-case | Noun/noun-compound | `cortex-engineering`, `git-workflow` |
+| Skill (action) | kebab-case | Verb or verb-phrase | `research`, `deploy-staging` |
+| Skill (knowledge) | kebab-case | Noun or noun-compound | `api-conventions`, `frontmatter` |
+| Command | kebab-case | Verb (imperative) | `deploy`, `fix-issue` |
+| Agent | kebab-case | Role-noun | `debugger`, `code-reviewer` |
 
-Key rules:
-- **Never repeat the plugin name** in component names -- the namespace handles scope
-- **User-invoked skills**: optimize for human recall (verb-noun, memorable, typable)
+### The Five Rules of Naming
+
+1. **Never repeat the plugin name** in component names -- the namespace handles scope
+2. **Match skill names to command counterparts** -- if `/research` delegates to a skill, name the skill `research`
+3. **Use the description for AI routing, not the name** -- name is for humans, description is for Claude
+4. **Maintain part-of-speech consistency within a type** -- commands are verbs, agents are role-nouns, knowledge skills are nouns
+5. **Treat published names as API contracts** -- renaming is a semver-major change
+
+Invocation control changes strategy:
+- **User-invoked skills/commands**: optimize for human recall (verb-noun, memorable, typable)
 - **Auto-triggered skills**: description matters more than name
 - **Keep `name` matching directory name** for predictability
-- **Treat published names as API contracts** -- renaming is a semver-major change
 
-For the full naming taxonomy, anti-patterns, and agent naming rules, see the [naming-conventions](../naming-conventions/SKILL.md) skill.
+### Name Anti-Patterns
+
+| Anti-Pattern | Why It Fails | Fix |
+|-------------|-------------|-----|
+| Overly generic: `check`, `process` | Too broad, fails recall and discovery | Add domain context: `spam-check` |
+| Plugin name repeated: `cortex:cortex-research` | Namespace stuttering | Drop prefix: `cortex:research` |
+| Too long: `code-review-and-security-analysis-agent` | Untypable | 1-3 words max |
+| Ambiguous siblings: `update` vs `upgrade` | Users can't remember which is which | Use distinct verbs |
+
+For advanced naming topics (agent naming, namespace strategy, budget constraints), invoke the naming-conventions skill.
 
 ### Writing Effective Descriptions
 
@@ -194,7 +211,7 @@ Tips:
 - Max 1024 characters, but match length to competition -- unique skills need less, contested domains need more
 - Use "pushy" language: "Make sure to use this skill whenever..." outperforms passive phrasing
 
-For the full description-writing guide (activation rates, length strategy, templates), see [naming-conventions/references/description-writing.md](../naming-conventions/references/description-writing.md).
+For the full description-writing guide (activation rates, length strategy, pushy pattern, WHEN NOT clauses), see [description-writing.md](references/description-writing.md).
 
 ### Argument Hints
 
@@ -206,107 +223,25 @@ argument-hint: <issue-number>
 argument-hint: <file> [format]
 ```
 
-For detailed conventions, see [naming-conventions/references/argument-hints.md](../naming-conventions/references/argument-hints.md).
+For detailed conventions, see [argument-hints.md](references/argument-hints.md).
 
 ## What Would You Like To Do?
 
-1. **Create new skill** - Build from scratch
-2. **Create new command** - Build a slash command
-3. **Audit existing skill** - Check against best practices
-4. **Add component** - Add workflow/reference/example
-5. **Get guidance** - Understand skill design
+1. **[Create new skill](workflows/create-new-skill.md)** - Build a skill or command from scratch
+2. **[Audit existing skill](workflows/audit-skill.md)** - Check against best practices with scored report
+3. **Add component** - Add to an existing skill:
+   - a. **[Reference](workflows/add-reference.md)** - Conditional context file
+   - b. **[Workflow](workflows/add-workflow.md)** - Step-by-step procedure
+   - c. **[Template](workflows/add-template.md)** - Reusable boilerplate
+   - d. **[Script](workflows/add-script.md)** - Executable hook or helper
+4. **[Get guidance](workflows/get-guidance.md)** - Understand whether/how to build something
 
-## Creating a New Skill or Command
+**Routing keywords:** `create` -> 1, `audit` -> 2, `add reference` -> 3a, `add workflow` -> 3b, `add template` -> 3c, `add script` -> 3d, `guidance` -> 4
 
-### Step 1: Choose Type
+If arguments match a keyword or menu item, read the corresponding workflow and begin.
+Otherwise, reply with a number or describe what you need.
 
-Ask: Is this a manual workflow (deploy, commit, triage) or background knowledge (conventions, patterns)?
-
-- **Manual workflow** → command with `disable-model-invocation: true`
-- **Background knowledge** → skill without `disable-model-invocation`
-- **Complex with supporting files** → skill directory
-
-### Step 2: Choose a Name
-
-Follow the naming taxonomy: commands use imperative verbs (`deploy`, `fix-issue`), action skills use verb-phrases (`research`, `deploy-staging`), knowledge skills use nouns (`api-conventions`, `frontmatter`). See [Naming & Descriptions](#naming--descriptions) above.
-
-### Step 3: Create the File
-
-**Command:**
-```markdown
----
-name: my-command
-description: What this command does
-argument-hint: [expected arguments]
-disable-model-invocation: true
-allowed-tools: Bash(gh *), Read
----
-
-# Command Title
-
-## Workflow
-
-### Step 1: Gather Context
-...
-
-### Step 2: Execute
-...
-
-## Success Criteria
-- [ ] Expected outcome 1
-- [ ] Expected outcome 2
-```
-
-**Skill:**
-```markdown
----
-name: my-skill
-description: What it does. Use when [trigger conditions].
----
-
-# Skill Title
-
-## Quick Start
-[Immediate actionable example]
-
-## Instructions
-[Core guidance]
-
-## Examples
-[Concrete input/output pairs]
-```
-
-### Step 4: Add Reference Files (If Needed)
-
-Link from SKILL.md to detailed content:
-```markdown
-For API reference, see [reference.md](reference.md).
-For form filling guide, see [forms.md](forms.md).
-```
-
-### Step 5: Test With Real Usage
-
-1. Test with actual tasks, not test scenarios
-2. Invoke directly with `/skill-name` to verify
-3. Check auto-triggering by asking something that matches the description
-4. Refine based on real behavior
-
-## Audit Checklist
-
-- [ ] Name follows naming taxonomy (verbs for commands, nouns for knowledge skills)
-- [ ] Name does not repeat plugin name (namespace handles scope)
-- [ ] `name` field matches directory name
-- [ ] Valid YAML frontmatter (name + description)
-- [ ] Description follows WHAT + WHEN pattern with trigger keywords
-- [ ] Description written in third person
-- [ ] `argument-hint` uses POSIX brackets, under 30 chars
-- [ ] Uses standard markdown headings (not XML tags)
-- [ ] SKILL.md under 500 lines
-- [ ] `disable-model-invocation: true` if it has side effects
-- [ ] `allowed-tools` set if specific tools needed
-- [ ] References one level deep, properly linked
-- [ ] Examples are concrete, not abstract
-- [ ] Tested with real usage
+$ARGUMENTS
 
 ## Anti-Patterns to Avoid
 
@@ -322,10 +257,9 @@ For form filling guide, see [forms.md](forms.md).
 For detailed guidance, see:
 - [official-spec.md](references/official-spec.md) - Official skill specification
 - [best-practices.md](references/best-practices.md) - Skill authoring best practices
-- [naming-conventions](../naming-conventions/SKILL.md) - Full naming taxonomy, anti-patterns, and hierarchy rules
-- [description-writing.md](../naming-conventions/references/description-writing.md) - WHAT+WHEN+WHEN NOT pattern, activation rates, length strategy
-- [argument-hints.md](../naming-conventions/references/argument-hints.md) - POSIX conventions and examples
-- [budget-strategy.md](../naming-conventions/references/budget-strategy.md) - Context budget allocation and skill count limits
+- [description-writing.md](references/description-writing.md) - WHAT+WHEN+WHEN NOT pattern, activation rates, length strategy
+- [argument-hints.md](references/argument-hints.md) - POSIX conventions and examples
+- For advanced topics (budget strategy, activation rate data, agent naming), invoke the naming-conventions skill
 
 ## Sources
 
