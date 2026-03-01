@@ -3,7 +3,7 @@ created: 2026-02-27
 title: "Claude Code Advanced Tips: 6 Months of Hardcore Engineering Use [2026]"
 type: research
 tags: [claude-code, skills, hooks, agents, memory]
-project: my-agent-dojo
+project: cortex-engineering
 status: final
 ---
 

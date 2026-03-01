@@ -24,9 +24,9 @@ Brainstorm an idea, building on existing Cortex knowledge. Checks for prior rese
 
 ## Skills
 
-- **cortex-engineering-frontmatter** -- Knows the frontmatter contract for all doc types. Other skills delegate to this for correct doc structure.
-- **producing-research-documents** -- Workflow skill for research. Checks cortex first, dispatches research, synthesizes findings.
-- **brainstorming-with-cortex** -- Workflow skill for brainstorming. Builds on existing knowledge, runs collaborative brainstorm sessions.
+- **frontmatter** -- Knows the frontmatter contract for all doc types. Other skills delegate to this for correct doc structure.
+- **research** -- Workflow skill for research. Checks cortex first, dispatches research, synthesizes findings.
+- **brainstorm** -- Workflow skill for brainstorming. Builds on existing knowledge, runs collaborative brainstorm sessions.
 
 ## CLI
 

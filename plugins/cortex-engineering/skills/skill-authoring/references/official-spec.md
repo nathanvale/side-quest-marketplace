@@ -84,13 +84,15 @@ Plugin skills use a `plugin-name:skill-name` namespace, so they cannot conflict 
 
 ## Dynamic Context Injection
 
-The `` !`command` `` syntax runs shell commands before content is sent to Claude:
+The bang-backtick syntax (exclamation mark immediately followed by a backtick-wrapped command) runs shell commands before content is sent to Claude:
 
 ```markdown
 ## Context
-- Current branch: !`git branch --show-current`
-- PR diff: !`gh pr diff`
+- Current branch: (bang-backtick: git branch --show-current)
+- PR diff: (bang-backtick: gh pr diff)
 ```
+
+In actual usage, write `!` immediately followed by the command in backticks (e.g., `!` + `` `git branch --show-current` ``).
 
 Commands execute immediately and their output replaces the placeholder. Claude only sees the final result.
 

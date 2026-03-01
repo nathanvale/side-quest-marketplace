@@ -3,7 +3,7 @@ created: 2026-02-27
 title: "From Prompt Engineer to Context Architect: The Job Nobody Trained You For"
 type: research
 tags: [context-engineering]
-project: my-agent-dojo
+project: cortex-engineering
 status: final
 ---
 

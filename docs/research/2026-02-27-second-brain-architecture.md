@@ -3,7 +3,7 @@ created: 2026-02-27
 title: "Context Engineering for Knowledge Workers: The Second Brain Architecture"
 type: research
 tags: [second-brain, context-engineering, mcp, hooks, skills]
-project: my-agent-dojo
+project: cortex-engineering
 status: final
 ---
 

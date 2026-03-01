@@ -3,7 +3,7 @@ created: 2026-02-27
 title: "Context Engineering with MCP: A Practitioner's Guide to the Model Context Protocol"
 type: research
 tags: [context-engineering, mcp, agents]
-project: my-agent-dojo
+project: cortex-engineering
 status: final
 ---
 

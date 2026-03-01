@@ -1,6 +1,6 @@
 ---
-name: brainstorming-with-cortex
-description: Runs brainstorming sessions that build on existing Cortex knowledge. Checks for prior research and brainstorms before exploring. Delegates to cortex-engineering-frontmatter skill for doc structure. Use when the user wants to brainstorm, explore ideas, or think through an approach.
+name: brainstorm
+description: Brainstorm ideas building on existing Cortex knowledge. Use when the user wants to brainstorm, explore ideas, or think through an approach.
 allowed-tools:
   - Bash(cortex *:*)
   - Read
@@ -72,7 +72,7 @@ Structure the brainstorm around:
 
 ### 4. Synthesize and write
 
-Delegate to the **cortex-engineering-frontmatter** skill for correct doc structure:
+Delegate to the **frontmatter** skill for correct doc structure:
 
 - Use the `brainstorm` doc type
 - Fill in all sections: Context, Questions, Approaches, Decision, Next Steps

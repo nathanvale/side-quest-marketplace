@@ -1,6 +1,6 @@
 ---
-name: creating-skills-and-commands
-description: Expert guidance for creating Claude Code skills and slash commands. Use when working with SKILL.md files, authoring new skills, improving existing skills, creating slash commands, or understanding skill structure and best practices.
+name: skill-authoring
+description: Expert guidance for creating Claude Code skills and slash commands. Use when authoring new skills, improving existing skills, creating commands, or understanding skill structure and best practices.
 ---
 
 # Creating Skills & Commands
@@ -97,7 +97,11 @@ Access individual args: `$ARGUMENTS[0]` or shorthand `$0`, `$1`, `$2`.
 
 ### Dynamic Context Injection
 
-The `` !`command` `` syntax runs shell commands before content is sent to Claude:
+The `!` + backtick-wrapped command syntax runs shell commands before content is sent to Claude. For example, writing `!` followed by a command in backticks (like `gh pr diff`) will execute that command and inject the output.
+
+**Example skill using dynamic context:**
+
+The PR diff and changed files lines below would use the bang-backtick syntax to call `gh pr diff` and `gh pr diff --name-only` respectively, injecting the output before Claude sees the content.
 
 ```yaml
 ---
@@ -108,8 +112,8 @@ agent: Explore
 ---
 
 ## Context
-- PR diff: !`gh pr diff`
-- Changed files: !`gh pr diff --name-only`
+- PR diff: (use bang-backtick with: gh pr diff)
+- Changed files: (use bang-backtick with: gh pr diff --name-only)
 
 Summarize this pull request...
 ```
@@ -149,9 +153,31 @@ Link from SKILL.md: `For API details, see [reference.md](reference.md).`
 
 Keep references **one level deep** from SKILL.md. Avoid nested chains.
 
-## Effective Descriptions
+## Naming & Descriptions
 
-The description enables skill discovery. Include both **what** it does and **when** to use it.
+### Choosing a Name
+
+Each component type has a natural part of speech. Consistency within a type creates a predictable mental model.
+
+| Component | Part of Speech | Examples |
+|-----------|---------------|---------|
+| Skill (action) | Verb or verb-phrase | `research`, `deploy-staging` |
+| Skill (knowledge) | Noun or noun-compound | `api-conventions`, `frontmatter` |
+| Command | Verb (imperative) | `deploy`, `fix-issue` |
+| Agent | Role-noun | `debugger`, `code-reviewer` |
+
+Key rules:
+- **Never repeat the plugin name** in component names -- the namespace handles scope
+- **User-invoked skills**: optimize for human recall (verb-noun, memorable, typable)
+- **Auto-triggered skills**: description matters more than name
+- **Keep `name` matching directory name** for predictability
+- **Treat published names as API contracts** -- renaming is a semver-major change
+
+For the full naming taxonomy, anti-patterns, and agent naming rules, see the [naming-conventions](../naming-conventions/SKILL.md) skill.
+
+### Writing Effective Descriptions
+
+The description enables skill discovery. Follow the **WHAT + WHEN + WHEN NOT** pattern. Always write in **third person** -- descriptions are injected into the system prompt.
 
 **Good:**
 ```yaml
@@ -162,6 +188,25 @@ description: Extract text and tables from PDF files, fill forms, merge documents
 ```yaml
 description: Helps with documents
 ```
+
+Tips:
+- Front-load capabilities, include file extensions (`.pdf`, `.xlsx`), user synonyms ("deck" for presentations), and action verbs
+- Max 1024 characters, but match length to competition -- unique skills need less, contested domains need more
+- Use "pushy" language: "Make sure to use this skill whenever..." outperforms passive phrasing
+
+For the full description-writing guide (activation rates, length strategy, templates), see [naming-conventions/references/description-writing.md](../naming-conventions/references/description-writing.md).
+
+### Argument Hints
+
+Use POSIX bracket conventions: `<required>`, `[optional]`, `{a|b}` for choices. Keep under 30 characters.
+
+```yaml
+argument-hint: <topic>
+argument-hint: <issue-number>
+argument-hint: <file> [format]
+```
+
+For detailed conventions, see [naming-conventions/references/argument-hints.md](../naming-conventions/references/argument-hints.md).
 
 ## What Would You Like To Do?
 
@@ -181,7 +226,11 @@ Ask: Is this a manual workflow (deploy, commit, triage) or background knowledge 
 - **Background knowledge** → skill without `disable-model-invocation`
 - **Complex with supporting files** → skill directory
 
-### Step 2: Create the File
+### Step 2: Choose a Name
+
+Follow the naming taxonomy: commands use imperative verbs (`deploy`, `fix-issue`), action skills use verb-phrases (`research`, `deploy-staging`), knowledge skills use nouns (`api-conventions`, `frontmatter`). See [Naming & Descriptions](#naming--descriptions) above.
+
+### Step 3: Create the File
 
 **Command:**
 ```markdown
@@ -227,7 +276,7 @@ description: What it does. Use when [trigger conditions].
 [Concrete input/output pairs]
 ```
 
-### Step 3: Add Reference Files (If Needed)
+### Step 4: Add Reference Files (If Needed)
 
 Link from SKILL.md to detailed content:
 ```markdown
@@ -235,7 +284,7 @@ For API reference, see [reference.md](reference.md).
 For form filling guide, see [forms.md](forms.md).
 ```
 
-### Step 4: Test With Real Usage
+### Step 5: Test With Real Usage
 
 1. Test with actual tasks, not test scenarios
 2. Invoke directly with `/skill-name` to verify
@@ -244,8 +293,13 @@ For form filling guide, see [forms.md](forms.md).
 
 ## Audit Checklist
 
+- [ ] Name follows naming taxonomy (verbs for commands, nouns for knowledge skills)
+- [ ] Name does not repeat plugin name (namespace handles scope)
+- [ ] `name` field matches directory name
 - [ ] Valid YAML frontmatter (name + description)
-- [ ] Description includes trigger keywords and is specific
+- [ ] Description follows WHAT + WHEN pattern with trigger keywords
+- [ ] Description written in third person
+- [ ] `argument-hint` uses POSIX brackets, under 30 chars
 - [ ] Uses standard markdown headings (not XML tags)
 - [ ] SKILL.md under 500 lines
 - [ ] `disable-model-invocation: true` if it has side effects
@@ -268,6 +322,10 @@ For form filling guide, see [forms.md](forms.md).
 For detailed guidance, see:
 - [official-spec.md](references/official-spec.md) - Official skill specification
 - [best-practices.md](references/best-practices.md) - Skill authoring best practices
+- [naming-conventions](../naming-conventions/SKILL.md) - Full naming taxonomy, anti-patterns, and hierarchy rules
+- [description-writing.md](../naming-conventions/references/description-writing.md) - WHAT+WHEN+WHEN NOT pattern, activation rates, length strategy
+- [argument-hints.md](../naming-conventions/references/argument-hints.md) - POSIX conventions and examples
+- [budget-strategy.md](../naming-conventions/references/budget-strategy.md) - Context budget allocation and skill count limits
 
 ## Sources
 

@@ -27,7 +27,7 @@ Ask the user to confirm:
 
 ### 3. Synthesize
 
-Use the **cortex-engineering-frontmatter** skill to create a properly structured document:
+Use the **frontmatter** skill to create a properly structured document:
 - Use the `research` doc type (or `decision`/`meeting` if more appropriate)
 - Organize conversation findings into the correct section structure
 - Include all sources and links mentioned in the conversation

@@ -3,7 +3,7 @@ created: 2026-03-01
 title: "Tiled Printing for Large Diagrams"
 type: research
 tags: [printing, tiling, poster, diagrams, svg, pdf, macos]
-project: cortex
+project: cortex-engineering
 status: draft
 ---
 

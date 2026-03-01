@@ -3,7 +3,7 @@ created: 2026-02-27
 title: "The Context Engineering Guide"
 type: research
 tags: [context-engineering, progressive-disclosure, hooks, memory, mcp]
-project: my-agent-dojo
+project: cortex-engineering
 status: final
 ---
 

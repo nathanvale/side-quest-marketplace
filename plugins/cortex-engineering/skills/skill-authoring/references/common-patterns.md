@@ -357,10 +357,12 @@ See scripts/validate.py for validation
 ❌ **BAD** - These execute during skill load:
 ```xml
 <examples>
-Load current status with: !`git status`
+Load current status with: (bang-backtick: git status)
 Review dependencies in: @package.json
 </examples>
 ```
+
+Note: The BAD example above uses the `!` + backtick syntax which the loader would execute.
 
 ✅ **GOOD** - Add space to prevent execution:
 ```xml

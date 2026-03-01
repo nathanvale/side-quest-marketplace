@@ -1,8 +1,11 @@
 ---
-name: visualize-cortex-knowledge
-description: Generates Mermaid diagrams from Cortex documents and exports to print-ready SVG/PDF for A3/A2 wall printing. Auto-detects diagram type from source context. Uses @lepion/mcp-server-mermaid MCP tools. Use when the user wants to visualize, diagram, or create a visual summary of knowledge.
+description: Generates Mermaid diagrams from any document, topic, or concept. Use when someone wants to visualize, diagram, or map out anything.
+argument-hint: "<path, topic, or concept>"
+disable-model-invocation: true
 allowed-tools:
-  - Bash(cortex *:*)
+  - Bash(bunx *)
+  - Bash(open *)
+  - Bash(mkdir *)
   - Read
   - Glob
   - Grep
@@ -10,125 +13,130 @@ allowed-tools:
   - Task
 ---
 
-# Visualize Skill
+# Visualize
 
-You generate Mermaid diagrams from Cortex documents and export them as print-ready SVG/PDF. Diagrams are living visual summaries that evolve alongside the knowledge base -- not throwaway artifacts.
+Generate Mermaid diagrams from any document, topic, or concept. Export as print-ready SVG/PDF.
+
+**Companion skill:** The **mermaid-diagrams** skill provides Mermaid syntax, styling patterns, the locked visual identity, and print optimization knowledge. It loads automatically. This skill handles the workflow.
 
 ## Workflow
 
-### 1. Determine context
+### 1. Determine source
 
-Resolve the source document:
+Resolve from `$ARGUMENTS`:
 
-1. If invoked with a path/filename argument (`$ARGUMENTS`), use that
-2. If no argument, check the conversation for the most recently created cortex doc
-3. If still nothing, ask the user what to visualize
+1. Try as a file path first. If it exists, read it.
+2. If not a file, treat as a topic string.
+3. No argument: check conversation for the most recent Cortex doc, then ask the user.
 
-Read the source document to understand its content and type.
+**Re-render shortcut:** If the source is an existing diagram (`type: diagram` with a `source` field in frontmatter), read the existing `.mmd` file and skip to step 4 (export).
 
-### 2. Confirm and auto-detect type
+### 2. Auto-detect and confirm
 
-Auto-detect the diagram type from the source doc's `type` frontmatter field:
+Auto-detect diagram type from content (see type detection table in the mermaid-diagrams skill's default-theme reference). Present confirmation with paper size as a numbered list:
 
-| Source Type | Default Diagram | Rationale |
-|-------------|----------------|-----------|
-| `brainstorm` | Mind map | Shows how topics and approaches connect |
-| `research` | Mind map | Visualizes findings and relationships |
-| `plan` | Architecture (C4) | Shows system structure |
-| `decision` | Flowchart | Shows decision flow and consequences |
-| Standalone / unknown | Ask user | No signal to auto-detect |
+> "I'll generate a **mind map** for **YAML Frontmatter Research**."
+> 1. A4 landscape (desk/home printer)
+> 2. A3 landscape (wall poster)
+> 3. Change diagram type
 
-Confirm with the user before generating:
-
-> "I'll generate a **[type]** diagram for **[title]**. Continue? (Y/n, or specify a different type)"
+Default: 1 (A4). If user picks 3, ask: "What type of diagram would you prefer?" Do not re-suggest the same type.
 
 ### 3. Generate Mermaid
 
-**Check MCP availability first.** If `@lepion/mcp-server-mermaid` tools are not available, show:
+Write Mermaid source directly. Rules:
 
-> "The visualize skill requires the @lepion/mcp-server-mermaid MCP server. Install it in your Claude Code MCP settings to enable diagram generation."
+- Include the semantic classDef block from the mermaid-diagrams skill (except mind maps -- use node shapes only)
+- NO `%%{init:}%%` directives (config file handles theme)
+- NO `click`, `callback`, or `href` directives (security)
+- If source content exceeds 15 nodes: summarize into key concepts first
 
-In degraded mode (no MCP), generate the Mermaid source manually and save it -- the user can render it later.
+**Checkpoint:** Save `index.md` (with frontmatter via the **cortex-engineering-frontmatter** skill) and `diagram.mmd` BEFORE attempting export.
 
-**MCP tool selection:**
+### 4. Export
 
-| MCP Tool | When to use |
-|----------|------------|
-| `create_workflow_diagram` | Text-based docs: brainstorms, research, plans, standalone descriptions |
-| `generate_diagram_from_code` | Source references specific codebase files AND diagram type is architecture |
+Run mmdc with the locked theme config. Use the paper size from step 2:
 
-Reference [diagram-templates.md](references/diagram-templates.md) for Mermaid syntax patterns per diagram type.
+| Paper | `-w` | `-H` |
+|-------|------|------|
+| A4 landscape | 3508 | 2480 |
+| A3 landscape | 4961 | 3508 |
 
-### 4. Validate
+```bash
+# SVG (primary)
+bunx --bun @mermaid-js/mermaid-cli mmdc -i diagram.mmd -o diagram.svg \
+  -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/default-theme.json" \
+  -b white -w <WIDTH> -H <HEIGHT>
 
-Run `validate_diagram_syntax` on the generated Mermaid.
-
-**On failure:**
-1. Retry generation once with a modified prompt
-2. If still invalid, save the Mermaid source with `status: invalid` in frontmatter
-3. Report the validation error to the user
-
-### 5. Optionally improve
-
-For complex diagrams (more than ~10 nodes), run `suggest_diagram_improvements` to refine layout and clarity. Skip for simple diagrams.
-
-### 6. Export
-
-Run `export_diagram_formats` to produce SVG + PDF.
-
-Reference [print-guide.md](references/print-guide.md) for theme and sizing guidance.
-
-**Fallback chain:**
-1. SVG + PDF both succeed -- save both
-2. PDF fails -- save SVG only, report the issue
-3. Both fail -- save Mermaid source only, report the issue
-
-Always report what succeeded and what failed.
-
-### 7. Save
-
-Save all outputs to a folder per diagram inside `docs/diagrams/`:
-
-```
-docs/diagrams/
-  YYYY-MM-DD-<topic>/
-    index.md               # Mermaid source with frontmatter
-    diagram.svg            # Screen viewing
-    diagram.pdf            # A3/A2 printing
+# PDF (secondary)
+bunx --bun @mermaid-js/mermaid-cli mmdc -i diagram.mmd -o diagram.pdf \
+  -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/default-theme.json" \
+  -b white -w <WIDTH> -H <HEIGHT> --pdfFit
 ```
 
-The folder name is the identifier (date + topic). Filenames inside are fixed (`index.md`, `diagram.svg`, `diagram.pdf`) so agents can glob with `docs/diagrams/**/diagram.svg` or find the source with `docs/diagrams/**/index.md`.
+Fallback chain: SVG + PDF -> SVG only -> .mmd source only. Always report what succeeded.
 
-If a folder with the same name exists, ask the user: overwrite or create a versioned copy (`-v2`, `-v3`).
+**On syntax error:** Retry generation once with the error message as context. If still invalid, save .mmd source only and report the error.
 
-Delegate to the **cortex-engineering-frontmatter** skill for correct doc structure. Use the `diagram` doc type with `source` field linking back to the origin document.
+**If `bunx --bun` fails:** Drop the `--bun` flag (Puppeteer has native Node.js dependencies that Bun may not resolve).
 
-### 8. Confirm and open
+**First-run note:** mmdc downloads Chromium (~150MB) on first use. If this fails, try system Chrome fallback. See the mermaid-diagrams skill's default-theme reference for troubleshooting.
 
-Tell the user:
-- File paths for all saved outputs (source, SVG, PDF)
-- Suggest printing: "Print the PDF at A3 or A2 for your wall."
+### 5. Save
 
-Then offer to open the output using `AskUserQuestion`:
+Save to `docs/diagrams/YYYY-MM-DD-<topic-slug>/`:
 
-| Option | Action |
-|--------|--------|
-| Open diagram | `open <folder>/diagram.svg` (default app, usually browser) |
-| Open in Preview | `open -a "Preview" <folder>/diagram.pdf` (for print preview) |
-| Open folder | `open <folder>` (Finder, for manual file management) |
-| Skip | Do nothing |
+- `index.md` -- Mermaid source with frontmatter (via **cortex-engineering-frontmatter** skill)
+- `diagram.mmd` -- raw Mermaid source (for re-rendering)
+- `diagram.svg` -- screen/print viewing
+- `diagram.pdf` -- direct printing
 
-Use macOS `open` command -- zero dependencies, respects user defaults.
+**Topic slug:** lowercase, a-z/0-9/hyphens only, max 80 chars. Strip special characters, collapse whitespace to hyphens, trim leading/trailing hyphens. NEVER interpolate raw user input into shell commands -- sanitize the slug first, then use it in `mkdir -p`.
+
+**Collision:** if folder exists, ask the user:
+
+> 1. Overwrite existing
+> 2. Create versioned copy (-v2, -v3)
+
+Create `docs/diagrams/` with `mkdir -p` if needed.
+
+**What goes where:** `diagram.mmd` contains the full Mermaid source INCLUDING classDef lines. The `-c` config file provides theme variables (colors, fonts, spacing) -- separate from classDef. `index.md` embeds the same Mermaid in a fenced code block alongside YAML frontmatter.
+
+### 6. Report and open
+
+Report all file paths. Mention the chosen paper size ("Print the PDF at A4/A3"). Offer to open:
+
+> 1. Open diagram (SVG in browser)
+> 2. Open in Preview (PDF for print preview)
+> 3. Open folder (Finder)
+> 4. Skip
+
+Use macOS `open` command.
+
+Say: "Diagram saved to `docs/diagrams/YYYY-MM-DD-<topic>/`".
+
+## Examples
+
+```
+# File path argument (Cortex doc)
+/cortex-engineering:visualize docs/research/2026-03-01-mermaid-theming.md
+
+# Topic string (no file)
+/cortex-engineering:visualize plugin loading architecture
+
+# No argument (uses conversation context)
+/cortex-engineering:visualize
+```
 
 ## Example Frontmatter
 
 ```yaml
 ---
-created: 2026-02-28
-title: "Visualize Skill Architecture"
+created: 2026-03-01
+title: "Plugin Architecture Diagram"
 type: diagram
 tags: [architecture, cortex, mermaid]
-project: my-agent-cortex
+project: side-quest-marketplace
 status: draft
 source: docs/brainstorms/2026-02-28-visualize-skill-brainstorm.md
 ---
@@ -139,5 +147,5 @@ source: docs/brainstorms/2026-02-28-visualize-skill-brainstorm.md
 - **Visual context is instant** -- diagrams on the wall mean zero cognitive ramp-up
 - **Knowledge compounds** -- diagrams evolve alongside research and brainstorms
 - **Graceful degradation** -- always save the Mermaid source, even if export fails
-- **Confirm before generating** -- ask the user, don't assume the diagram type
-- **Follow cortex patterns** -- delegate to cortex-engineering-frontmatter for doc structure
+- **Confirm before generating** -- always ask, never auto-invoke
+- **Locked visual identity** -- one theme, one palette, zero styling decisions
