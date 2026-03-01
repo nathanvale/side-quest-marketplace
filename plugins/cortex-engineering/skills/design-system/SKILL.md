@@ -1,6 +1,6 @@
 ---
 name: design-system
-description: Design system foundations for visual artifacts -- 8px grid spacing, typography scales, color contrast, border weights, vertical rhythm, and colorblind-safe palettes. Use when creating or modifying diagram theme configs, styling presets, SVG exports, or any visual design decisions. Provides concrete token values that snap to an 8px baseline grid.
+description: Design system foundations for visual artifacts -- 8px grid spacing, typography scales, color contrast, border weights, vertical rhythm, and colorblind-safe palettes. Use when creating or styling any visual artifact -- diagrams, charts, presentations, documents, or exports. Provides concrete token values that snap to an 8px baseline grid.
 user-invocable: false
 ---
 

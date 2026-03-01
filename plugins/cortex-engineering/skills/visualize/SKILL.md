@@ -80,7 +80,7 @@ Write Mermaid source directly. Rules:
 - Keep labels to 1-2 short lines using `<br/>` (not backtick syntax). Move verbose detail to edge labels or index.md.
 - For subgraphs with multiline titles: add an invisible spacer node (see mermaid-diagrams skill's config-engineering reference)
 
-**Checkpoint:** Save `index.md` (with frontmatter via the **frontmatter** skill) and `diagram.mmd` BEFORE attempting export.
+**Checkpoint:** Save `index.md` (with frontmatter via the **frontmatter** skill) and `<type>.mmd` BEFORE attempting export.
 
 ### 4. Export
 
@@ -99,12 +99,12 @@ Run mmdc with the preset's theme config. Use the paper size from step 2:
 
 ```bash
 # SVG (primary)
-bunx @mermaid-js/mermaid-cli -i diagram.mmd -o diagram.svg \
+bunx @mermaid-js/mermaid-cli -i <type>.mmd -o <type>.svg \
   -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/<PRESET>-theme.json" \
   -b white -w <WIDTH> -H <HEIGHT>
 
 # PDF (secondary)
-bunx @mermaid-js/mermaid-cli -i diagram.mmd -o diagram.pdf \
+bunx @mermaid-js/mermaid-cli -i <type>.mmd -o <type>.pdf \
   -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/<PRESET>-theme.json" \
   -b white -w <WIDTH> -H <HEIGHT> --pdfFit
 ```
@@ -124,9 +124,34 @@ Fallback chain: SVG + PDF -> SVG only -> .mmd source only. Always report what su
 Save to `docs/diagrams/YYYY-MM-DD-<topic-slug>/`:
 
 - `index.md` -- Mermaid source with frontmatter (via **frontmatter** skill)
-- `diagram.mmd` -- raw Mermaid source (for re-rendering)
-- `diagram.svg` -- screen/print viewing
-- `diagram.pdf` -- direct printing
+- `<type>.mmd` -- raw Mermaid source (for re-rendering)
+- `<type>.svg` -- screen/print viewing
+- `<type>.pdf` -- direct printing
+
+**Type-to-slug mapping** -- resolve `<type>` from the Mermaid diagram keyword:
+
+| Mermaid type | File slug |
+|---|---|
+| flowchart / graph | `flowchart` |
+| sequence | `sequence` |
+| class | `class` |
+| state | `state` |
+| erDiagram | `er` |
+| gantt | `gantt` |
+| pie | `pie` |
+| mindmap | `mindmap` |
+| timeline | `timeline` |
+| architecture | `architecture` |
+| block | `block` |
+| quadrant | `quadrant` |
+| sankey | `sankey` |
+| xychart | `xychart` |
+| gitGraph | `git` |
+| C4Context | `c4` |
+| kanban | `kanban` |
+| packet | `packet` |
+| requirement | `requirement` |
+| radar | `radar` |
 
 **Topic slug:** lowercase, a-z/0-9/hyphens only, max 80 chars. Strip special characters, collapse whitespace to hyphens, trim leading/trailing hyphens. NEVER interpolate raw user input into shell commands -- sanitize the slug first, then use it in `mkdir -p`.
 
@@ -135,9 +160,11 @@ Save to `docs/diagrams/YYYY-MM-DD-<topic-slug>/`:
 > 1. Overwrite existing
 > 2. Create versioned copy (-v2, -v3)
 
+**Note:** Multiple diagram types can coexist in the same directory without collision (e.g. `class.mmd` and `er.mmd` in the same folder). Only prompt for collision when the same type slug already exists.
+
 Create `docs/diagrams/` with `mkdir -p` if needed.
 
-**What goes where:** `diagram.mmd` contains the full Mermaid source INCLUDING classDef lines. The `-c` config file provides theme variables (colors, fonts, spacing) -- separate from classDef. `index.md` embeds the same Mermaid in a fenced code block alongside YAML frontmatter.
+**What goes where:** `<type>.mmd` contains the full Mermaid source INCLUDING classDef lines. The `-c` config file provides theme variables (colors, fonts, spacing) -- separate from classDef. `index.md` embeds the same Mermaid in a fenced code block alongside YAML frontmatter.
 
 ### 6. Report and open
 
@@ -181,7 +208,7 @@ source: docs/brainstorms/2026-02-28-visualize-skill-brainstorm.md
 
 ## Success Criteria
 
-- [ ] Mermaid source saved as `diagram.mmd` (always, even if export fails)
+- [ ] Mermaid source saved as `<type>.mmd` (always, even if export fails)
 - [ ] `index.md` saved with valid YAML frontmatter
 - [ ] SVG and/or PDF exported successfully (or fallback reported)
 - [ ] All files saved to `docs/diagrams/YYYY-MM-DD-<topic-slug>/`
