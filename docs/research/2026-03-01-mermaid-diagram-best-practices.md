@@ -3,7 +3,7 @@ created: 2026-03-01
 title: "Mermaid Diagram Visual Best Practices"
 type: research
 tags: [mermaid, diagrams, visualization, print, svg, theming, elk, architecture]
-project: cortex
+project: cortex-engineering
 status: draft
 ---
 

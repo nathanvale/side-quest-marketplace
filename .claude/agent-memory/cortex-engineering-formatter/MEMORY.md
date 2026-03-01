@@ -2,7 +2,7 @@
 
 ## Cortex Frontmatter Contract
 
-Source of truth: `plugins/cortex-engineering/skills/cortex-engineering-frontmatter/SKILL.md`
+Source of truth: `plugins/cortex-engineering/skills/frontmatter/SKILL.md`
 
 ### Standard research doc frontmatter (base fields only)
 

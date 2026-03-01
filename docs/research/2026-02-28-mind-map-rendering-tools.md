@@ -3,7 +3,7 @@ created: 2026-02-28
 title: "Beautiful Mind Map Rendering Tools"
 type: research
 tags: [mermaid, markmap, mind-map, pdf-export, visualisation, plantuml, graphviz]
-project: side-quest-marketplace
+project: cortex-engineering
 status: draft
 ---
 

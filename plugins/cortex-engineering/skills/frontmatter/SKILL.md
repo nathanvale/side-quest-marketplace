@@ -1,5 +1,5 @@
 ---
-name: cortex-engineering-frontmatter
+name: frontmatter
 description: Knows the frontmatter contract for all Cortex knowledge systems. Routes to the correct base fields + system-specific extras when writing docs. Other skills delegate to this skill for doc creation.
 ---
 

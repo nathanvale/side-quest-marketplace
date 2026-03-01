@@ -5,4 +5,4 @@ allowed-tools: Bash(cortex *:*), Read, Glob, Grep, Write, WebSearch, WebFetch, T
 argument-hint: "<topic>"
 ---
 
-Use the **producing-research-documents** skill to research a topic and save findings to the Cortex knowledge system. $ARGUMENTS
+Use the **research** skill to research a topic and save findings to the Cortex knowledge system. $ARGUMENTS

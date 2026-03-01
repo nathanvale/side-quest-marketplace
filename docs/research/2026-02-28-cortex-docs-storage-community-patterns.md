@@ -2,8 +2,8 @@
 created: 2026-02-28
 title: "Community Patterns for Docs Storage and Version Control"
 type: research
-tags: [cortex, version-control, xdg, dotfiles, obsidian, pkm, claude-code-plugins, hooks]
-project: cortex-plugin
+tags: [cortex-engineering, version-control, xdg, dotfiles, obsidian, pkm, claude-code-plugins, hooks]
+project: cortex-engineering
 status: draft
 ---
 

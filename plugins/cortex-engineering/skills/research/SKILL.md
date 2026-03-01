@@ -1,6 +1,6 @@
 ---
-name: producing-research-documents
-description: Produces structured research documents with YAML frontmatter into the Cortex knowledge system. Checks existing cortex knowledge before going external. Delegates to cortex-engineering-frontmatter skill for doc structure. Use when the user asks to research a topic, investigate something, or create a research note.
+name: research
+description: Research topics and save structured findings to the Cortex knowledge system. Use when the user asks to research a topic, investigate something, or create a research note.
 allowed-tools:
   - Bash(cortex *:*)
   - Read
@@ -69,7 +69,7 @@ Use available tools based on the topic:
 
 ### 4. Synthesize and write
 
-Delegate to the **cortex-engineering-frontmatter** skill for correct doc structure:
+Delegate to the **frontmatter** skill for correct doc structure:
 
 - Use the `research` doc type
 - Fill in all sections: Summary, Key Findings, Details, Sources, Open Questions

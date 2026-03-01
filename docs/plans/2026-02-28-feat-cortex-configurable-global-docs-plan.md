@@ -5,7 +5,7 @@ deepened-round-2: 2026-02-28
 title: "Configurable Global Docs Storage with SessionStart Bootstrap"
 type: plan
 tags: [cortex, config, xdg, hooks, session-start, global-docs]
-project: cortex
+project: cortex-engineering
 status: draft
 ---
 
@@ -360,6 +360,7 @@ Benchmarked on M4 Pro with Bun 1.3.9:
 - `context.md` at docs root for accumulated agent knowledge (future)
 - File count summary in hook output (future)
 - SubagentStart hook for automatic context injection (future)
+- `theme` field in config.yaml (future: lets users select a Mermaid theme config file for the visualize skill. Default: `default-theme.json` from the mermaid-diagrams skill. Custom themes would be JSON files in the same format, stored at a user-specified path. Prerequisite: this plan's config infrastructure must land first.)
 
 ## Verification
 

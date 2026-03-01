@@ -87,23 +87,20 @@ Skills act as additions to models. Test with Haiku, Sonnet, and Opus.
 
 ## Naming Conventions
 
-Use **gerund form** (verb + -ing) for Skill names:
+Match the name's part of speech to the component type:
 
-**Good:**
-- `processing-pdfs`
-- `analyzing-spreadsheets`
-- `managing-databases`
-- `testing-code`
-- `writing-documentation`
-
-**Acceptable alternatives:**
-- Noun phrases: `pdf-processing`, `spreadsheet-analysis`
-- Action-oriented: `process-pdfs`, `analyze-spreadsheets`
+- **Action skills/commands**: verb or verb-phrase (`research`, `fix-issue`, `deploy-staging`)
+- **Knowledge skills**: noun or noun-compound (`api-conventions`, `frontmatter`, `naming-conventions`)
+- **Agents**: role-noun (`debugger`, `code-reviewer`, `formatter`)
 
 **Avoid:**
 - Vague: `helper`, `utils`, `tools`
 - Generic: `documents`, `data`, `files`
 - Reserved: `anthropic-*`, `claude-*`
+- Plugin name repeated in component name (namespace handles scope)
+- Gerund form (`processing-pdfs`) -- use verb-noun (`process-pdfs`) or noun-noun (`pdf-processing`) instead
+
+For the full naming taxonomy, see the [naming-conventions](../naming-conventions/SKILL.md) skill.
 
 ## Writing Effective Descriptions
 

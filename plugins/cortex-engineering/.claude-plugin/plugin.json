@@ -1,7 +1,7 @@
 {
 	"name": "cortex-engineering",
 	"description": "Agent-native knowledge system. Research topics and capture findings as structured markdown documents with YAML frontmatter",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"author": {
 		"name": "Nathan Vale"
 	},
@@ -15,11 +15,13 @@
 	],
 	"license": "MIT",
 	"skills": [
-		"./skills/cortex-engineering-frontmatter",
+		"./skills/frontmatter",
 		"./skills/research",
 		"./skills/brainstorm",
 		"./skills/visualize",
-		"./skills/creating-skills-and-commands"
+		"./skills/skill-authoring",
+		"./skills/mermaid-diagrams",
+		"./skills/naming-conventions"
 	],
 	"commands": [
 		"./commands/research.md",

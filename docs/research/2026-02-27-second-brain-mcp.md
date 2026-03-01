@@ -3,7 +3,7 @@ created: 2026-02-27
 title: "Your Second Brain Is Blind Without MCP: How Model Context Protocol Turns AI Memory Into AI Action"
 type: research
 tags: [second-brain, mcp, context-engineering, agents]
-project: my-agent-dojo
+project: cortex-engineering
 status: final
 ---
 
