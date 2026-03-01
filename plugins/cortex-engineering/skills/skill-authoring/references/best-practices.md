@@ -100,7 +100,7 @@ Match the name's part of speech to the component type:
 - Plugin name repeated in component name (namespace handles scope)
 - Gerund form (`processing-pdfs`) -- use verb-noun (`process-pdfs`) or noun-noun (`pdf-processing`) instead
 
-For the full naming taxonomy, see the [naming-conventions](../naming-conventions/SKILL.md) skill.
+For the full naming taxonomy and anti-patterns, see the naming section in the main SKILL.md.
 
 ## Writing Effective Descriptions
 

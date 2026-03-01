@@ -160,21 +160,37 @@ Keep references **one level deep** from SKILL.md. Avoid nested chains.
 
 Each component type has a natural part of speech. Consistency within a type creates a predictable mental model.
 
-| Component | Part of Speech | Examples |
-|-----------|---------------|---------|
-| Skill (action) | Verb or verb-phrase | `research`, `deploy-staging` |
-| Skill (knowledge) | Noun or noun-compound | `api-conventions`, `frontmatter` |
-| Command | Verb (imperative) | `deploy`, `fix-issue` |
-| Agent | Role-noun | `debugger`, `code-reviewer` |
+| Component | Case | Part of Speech | Examples |
+|-----------|------|---------------|---------|
+| Plugin | kebab-case | Noun/noun-compound | `cortex-engineering`, `git-workflow` |
+| Skill (action) | kebab-case | Verb or verb-phrase | `research`, `deploy-staging` |
+| Skill (knowledge) | kebab-case | Noun or noun-compound | `api-conventions`, `frontmatter` |
+| Command | kebab-case | Verb (imperative) | `deploy`, `fix-issue` |
+| Agent | kebab-case | Role-noun | `debugger`, `code-reviewer` |
 
-Key rules:
-- **Never repeat the plugin name** in component names -- the namespace handles scope
-- **User-invoked skills**: optimize for human recall (verb-noun, memorable, typable)
+### The Five Rules of Naming
+
+1. **Never repeat the plugin name** in component names -- the namespace handles scope
+2. **Match skill names to command counterparts** -- if `/research` delegates to a skill, name the skill `research`
+3. **Use the description for AI routing, not the name** -- name is for humans, description is for Claude
+4. **Maintain part-of-speech consistency within a type** -- commands are verbs, agents are role-nouns, knowledge skills are nouns
+5. **Treat published names as API contracts** -- renaming is a semver-major change
+
+Invocation control changes strategy:
+- **User-invoked skills/commands**: optimize for human recall (verb-noun, memorable, typable)
 - **Auto-triggered skills**: description matters more than name
 - **Keep `name` matching directory name** for predictability
-- **Treat published names as API contracts** -- renaming is a semver-major change
 
-For the full naming taxonomy, anti-patterns, and agent naming rules, see the [naming-conventions](../naming-conventions/SKILL.md) skill.
+### Name Anti-Patterns
+
+| Anti-Pattern | Why It Fails | Fix |
+|-------------|-------------|-----|
+| Overly generic: `check`, `process` | Too broad, fails recall and discovery | Add domain context: `spam-check` |
+| Plugin name repeated: `cortex:cortex-research` | Namespace stuttering | Drop prefix: `cortex:research` |
+| Too long: `code-review-and-security-analysis-agent` | Untypable | 1-3 words max |
+| Ambiguous siblings: `update` vs `upgrade` | Users can't remember which is which | Use distinct verbs |
+
+For advanced naming topics (agent naming, namespace strategy, budget constraints), see the [naming-conventions](../naming-conventions/SKILL.md) skill.
 
 ### Writing Effective Descriptions
 
@@ -195,7 +211,7 @@ Tips:
 - Max 1024 characters, but match length to competition -- unique skills need less, contested domains need more
 - Use "pushy" language: "Make sure to use this skill whenever..." outperforms passive phrasing
 
-For the full description-writing guide (activation rates, length strategy, templates), see [naming-conventions/references/description-writing.md](../naming-conventions/references/description-writing.md).
+For the full description-writing guide (activation rates, length strategy, pushy pattern, WHEN NOT clauses), see [description-writing.md](references/description-writing.md).
 
 ### Argument Hints
 
@@ -207,7 +223,7 @@ argument-hint: <issue-number>
 argument-hint: <file> [format]
 ```
 
-For detailed conventions, see [naming-conventions/references/argument-hints.md](../naming-conventions/references/argument-hints.md).
+For detailed conventions, see [argument-hints.md](references/argument-hints.md).
 
 ## What Would You Like To Do?
 
@@ -241,10 +257,9 @@ $ARGUMENTS
 For detailed guidance, see:
 - [official-spec.md](references/official-spec.md) - Official skill specification
 - [best-practices.md](references/best-practices.md) - Skill authoring best practices
-- [naming-conventions](../naming-conventions/SKILL.md) - Full naming taxonomy, anti-patterns, and hierarchy rules
-- [description-writing.md](../naming-conventions/references/description-writing.md) - WHAT+WHEN+WHEN NOT pattern, activation rates, length strategy
-- [argument-hints.md](../naming-conventions/references/argument-hints.md) - POSIX conventions and examples
-- [budget-strategy.md](../naming-conventions/references/budget-strategy.md) - Context budget allocation and skill count limits
+- [description-writing.md](references/description-writing.md) - WHAT+WHEN+WHEN NOT pattern, activation rates, length strategy
+- [argument-hints.md](references/argument-hints.md) - POSIX conventions and examples
+- For advanced topics (budget strategy, activation rate data, agent naming), see the [naming-conventions](../naming-conventions/SKILL.md) skill
 
 ## Sources
 
