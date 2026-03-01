@@ -1,4 +1,5 @@
 ---
+name: visualize
 description: Generates Mermaid diagrams from any document, topic, or concept. Use when someone wants to visualize, diagram, or map out anything.
 argument-hint: "<path, topic, or concept>"
 disable-model-invocation: true
@@ -10,14 +11,21 @@ allowed-tools:
   - Glob
   - Grep
   - Write
-  - Task
 ---
 
 # Visualize
 
 Generate Mermaid diagrams from any document, topic, or concept. Export as print-ready SVG/PDF.
 
-**Companion skill:** The **mermaid-diagrams** skill provides Mermaid syntax, styling patterns, the locked visual identity, and print optimization knowledge. It loads automatically. This skill handles the workflow.
+**Companion skill:** The **mermaid-diagrams** skill is auto-loaded background knowledge. Do NOT pre-read its SKILL.md or references directory -- consult them only when you need specific information (classDef blocks in step 3, export commands in step 4). This skill handles the workflow; mermaid-diagrams provides the craft on demand.
+
+## Quick Start
+
+```
+/cortex-engineering:visualize docs/research/2026-03-01-some-topic.md
+```
+
+Provide a file path, topic string, or invoke with no argument to use conversation context. The skill auto-detects diagram type, generates Mermaid, and exports to SVG/PDF.
 
 ## Workflow
 
@@ -33,52 +41,81 @@ Resolve from `$ARGUMENTS`:
 
 ### 2. Auto-detect and confirm
 
-Auto-detect diagram type from content (see type detection table in the mermaid-diagrams skill's default-theme reference). Present confirmation with paper size as a numbered list:
+Auto-detect diagram type from content (see type detection table in the mermaid-diagrams skill's default-theme reference). Present fast-path confirmation:
 
 > "I'll generate a **mind map** for **YAML Frontmatter Research**."
-> 1. A4 landscape (desk/home printer)
+> Defaults: A4, Classic style.
+>
+> 1. Go (use defaults)
 > 2. A3 landscape (wall poster)
-> 3. Change diagram type
+> 3. Change style (Sketch / Blueprint)
+> 4. Change diagram type
 
-Default: 1 (A4). If user picks 3, ask: "What type of diagram would you prefer?" Do not re-suggest the same type.
+**Follow-up flows (one decision at a time):**
+
+If user picks **1** (Go): Use defaults (A4, Classic), proceed to step 3.
+
+If user picks **2** (A3): Set paper to A3, proceed to step 3.
+
+If user picks **3** (Change style): Show preset sub-prompt:
+
+> 1. Classic - bold colors, clean lines (default)
+> 2. Sketch - hand-drawn, warm tones (flowcharts + state only)
+> 3. Blueprint - monochrome, compact ELK layout (flowcharts + state only)
+
+After preset selection, proceed to step 3. If diagram type is NOT flowchart/state and user picked Sketch or Blueprint, show one-line note:
+
+> "Note: hand-drawn/ELK only affects flowcharts and state diagrams. Your [type] will use [preset] colors with classic rendering."
+
+If user picks **4** (Change diagram type): Show current auto-detected type and ask what to change it to. After selection, proceed to step 3 (do NOT loop back to step 2).
 
 ### 3. Generate Mermaid
 
 Write Mermaid source directly. Rules:
 
-- Include the semantic classDef block from the mermaid-diagrams skill (except mind maps -- use node shapes only)
+- Include the classDef block matching the chosen preset from the mermaid-diagrams skill's default-theme reference (Classic: semantic, Sketch: muted, Blueprint: monochrome). Except mind maps -- use node shapes only.
 - NO `%%{init:}%%` directives (config file handles theme)
 - NO `click`, `callback`, or `href` directives (security)
 - If source content exceeds 15 nodes: summarize into key concepts first
+- Keep labels to 1-2 short lines using `<br/>` (not backtick syntax). Move verbose detail to edge labels or index.md.
+- For subgraphs with multiline titles: add an invisible spacer node (see mermaid-diagrams skill's config-engineering reference)
 
-**Checkpoint:** Save `index.md` (with frontmatter via the **cortex-engineering-frontmatter** skill) and `diagram.mmd` BEFORE attempting export.
+**Checkpoint:** Save `index.md` (with frontmatter via the **frontmatter** skill) and `diagram.mmd` BEFORE attempting export.
 
 ### 4. Export
 
-Run mmdc with the locked theme config. Use the paper size from step 2:
+Run mmdc with the preset's theme config. Use the paper size from step 2:
 
 | Paper | `-w` | `-H` |
 |-------|------|------|
 | A4 landscape | 3508 | 2480 |
 | A3 landscape | 4961 | 3508 |
 
+| Preset | Config file |
+|--------|-------------|
+| Classic (default) | `default-theme.json` |
+| Sketch | `sketch-theme.json` |
+| Blueprint | `blueprint-theme.json` |
+
 ```bash
 # SVG (primary)
-bunx --bun @mermaid-js/mermaid-cli mmdc -i diagram.mmd -o diagram.svg \
-  -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/default-theme.json" \
+bunx @mermaid-js/mermaid-cli -i diagram.mmd -o diagram.svg \
+  -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/<PRESET>-theme.json" \
   -b white -w <WIDTH> -H <HEIGHT>
 
 # PDF (secondary)
-bunx --bun @mermaid-js/mermaid-cli mmdc -i diagram.mmd -o diagram.pdf \
-  -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/default-theme.json" \
+bunx @mermaid-js/mermaid-cli -i diagram.mmd -o diagram.pdf \
+  -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/<PRESET>-theme.json" \
   -b white -w <WIDTH> -H <HEIGHT> --pdfFit
 ```
+
+Where `<PRESET>` is `default`, `sketch`, or `blueprint` based on the user's choice in step 2.
 
 Fallback chain: SVG + PDF -> SVG only -> .mmd source only. Always report what succeeded.
 
 **On syntax error:** Retry generation once with the error message as context. If still invalid, save .mmd source only and report the error.
 
-**If `bunx --bun` fails:** Drop the `--bun` flag (Puppeteer has native Node.js dependencies that Bun may not resolve).
+**If `bunx` fails:** Try `npx -p @mermaid-js/mermaid-cli mmdc` instead (Puppeteer has native Node.js dependencies that Bun may not resolve).
 
 **First-run note:** mmdc downloads Chromium (~150MB) on first use. If this fails, try system Chrome fallback. See the mermaid-diagrams skill's default-theme reference for troubleshooting.
 
@@ -86,7 +123,7 @@ Fallback chain: SVG + PDF -> SVG only -> .mmd source only. Always report what su
 
 Save to `docs/diagrams/YYYY-MM-DD-<topic-slug>/`:
 
-- `index.md` -- Mermaid source with frontmatter (via **cortex-engineering-frontmatter** skill)
+- `index.md` -- Mermaid source with frontmatter (via **frontmatter** skill)
 - `diagram.mmd` -- raw Mermaid source (for re-rendering)
 - `diagram.svg` -- screen/print viewing
 - `diagram.pdf` -- direct printing
@@ -142,10 +179,18 @@ source: docs/brainstorms/2026-02-28-visualize-skill-brainstorm.md
 ---
 ```
 
+## Success Criteria
+
+- [ ] Mermaid source saved as `diagram.mmd` (always, even if export fails)
+- [ ] `index.md` saved with valid YAML frontmatter
+- [ ] SVG and/or PDF exported successfully (or fallback reported)
+- [ ] All files saved to `docs/diagrams/YYYY-MM-DD-<topic-slug>/`
+- [ ] User informed of file paths and print paper size
+
 ## Key Principles
 
 - **Visual context is instant** -- diagrams on the wall mean zero cognitive ramp-up
 - **Knowledge compounds** -- diagrams evolve alongside research and brainstorms
 - **Graceful degradation** -- always save the Mermaid source, even if export fails
 - **Confirm before generating** -- always ask, never auto-invoke
-- **Locked visual identity** -- one theme, one palette, zero styling decisions
+- **Curated visual identity** -- three presets, zero manual styling decisions

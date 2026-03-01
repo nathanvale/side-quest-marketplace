@@ -1,0 +1,59 @@
+{
+	"look": "classic",
+	"layout": "elk",
+	"theme": "base",
+	"elk": {
+		"mergeEdges": true,
+		"nodePlacementStrategy": "NETWORK_SIMPLEX"
+	},
+	"themeVariables": {
+		"primaryColor": "#FFFFFF",
+		"primaryTextColor": "#000000",
+		"primaryBorderColor": "#333333",
+		"secondaryColor": "#F0F0F0",
+		"secondaryTextColor": "#000000",
+		"secondaryBorderColor": "#555555",
+		"tertiaryColor": "#E0E0E0",
+		"tertiaryTextColor": "#000000",
+		"tertiaryBorderColor": "#777777",
+		"lineColor": "#333333",
+		"textColor": "#000000",
+		"background": "#FFFFFF",
+		"noteBkgColor": "#F5F5F5",
+		"noteTextColor": "#000000",
+		"noteBorderColor": "#777777",
+		"edgeLabelBackground": "#FFFFFF00",
+		"clusterBkg": "#F8F8F8",
+		"clusterBorder": "#555555",
+		"errorBkgColor": "#F0F0F0",
+		"errorTextColor": "#000000",
+		"fontFamily": "Inter, Helvetica, Arial, sans-serif",
+		"fontSize": "16px"
+	},
+	"themeCSS": ".edgeLabel .label span { color: #000000; } .edgeLabel .label { background-color: transparent; } .labelBkg { background-color: transparent !important; } .cluster-label .nodeLabel { font-weight: 700; font-size: 18px; } g.label.name span { font-weight: 700; font-size: 18px; } .sectionTitle { font-weight: 700; font-size: 18px; } text.actor > tspan { font-weight: 700; font-size: 18px; }",
+	"flowchart": {
+		"curve": "linear",
+		"nodeSpacing": 48,
+		"rankSpacing": 48,
+		"padding": 16,
+		"diagramPadding": 32,
+		"htmlLabels": true,
+		"useMaxWidth": false,
+		"wrappingWidth": 192
+	},
+	"sequence": {
+		"height": 96,
+		"width": 200,
+		"boxMargin": 16,
+		"boxTextMargin": 16,
+		"labelBoxWidth": 72,
+		"labelBoxHeight": 32,
+		"noteMargin": 24,
+		"diagramMarginY": 24,
+		"useMaxWidth": false
+	},
+	"mindmap": {
+		"useMaxWidth": false,
+		"padding": 16
+	}
+}

@@ -1,0 +1,61 @@
+---
+created: 2026-03-01
+title: "Mermaid Styling 2.0 Plan"
+type: diagram
+tags: [cortex, mermaid, styling, themes, plan]
+project: cortex-engineering
+status: draft
+source: docs/plans/2026-03-01-feat-mermaid-styling-2-plan.md
+---
+
+# Mermaid Styling 2.0 Plan
+
+Implementation phases for the curated theme preset system -- config files, visualize skill updates, mermaid-diagrams skill docs, and verification.
+
+```mermaid
+flowchart TD
+    classDef primary fill:#0072B2,stroke:#005a8c,color:#fff,stroke-width:2px
+    classDef info fill:#56B4E9,stroke:#2A8ABF,color:#000,stroke-width:2px
+    classDef success fill:#009E73,stroke:#006B4F,color:#fff,stroke-width:2px
+    classDef warning fill:#E69F00,stroke:#B37A00,color:#000,stroke-width:2px
+    classDef highlight fill:#F0E442,stroke:#8A8200,color:#000,stroke-width:3px
+    classDef accent fill:#CC79A7,stroke:#A35E85,color:#000,stroke-width:2px
+
+    subgraph "Phase 1: Config Files"
+        A[Update default-theme.json<br/>Add look + layout fields]:::primary
+        B[Create sketch-theme.json<br/>handDrawn + muted palette]:::primary
+        C[Create blueprint-theme.json<br/>ELK + monochrome]:::primary
+        D[Fix highlight stroke<br/>WCAG 3:1 contrast]:::warning
+    end
+
+    subgraph "Phase 2: Visualize Skill"
+        E[Fast-path confirmation<br/>A4 + Classic defaults]:::info
+        F[Preset sub-prompt<br/>Classic / Sketch / Blueprint]:::info
+        G[Preset-aware export<br/>mmdc -c preset-theme.json]:::info
+    end
+
+    subgraph "Phase 3: Mermaid-Diagrams Skill"
+        H[Document 3 presets<br/>in default-theme.md]:::accent
+        I[classDef blocks<br/>per preset]:::accent
+        J[Update SKILL.md<br/>curated identity language]:::accent
+    end
+
+    subgraph "Phase 4-5: Ship"
+        K[Bump plugin version]:::success
+        L{Verify exports<br/>3 presets}:::warning
+        M[bun run validate]:::success
+    end
+
+    A --> E
+    B --> E
+    C --> E
+    D --> A
+    E --> F
+    F --> G
+    G --> H
+    H --> I
+    I --> J
+    J --> K
+    K --> L
+    L -->|Pass| M
+```

@@ -8,7 +8,40 @@ user-invocable: false
 
 Background knowledge for producing clean, readable, print-ready Mermaid diagrams. This skill provides the craft -- the **visualize** skill provides the workflow.
 
-**Locked visual identity:** All diagrams use the [default-theme.json](references/default-theme.json) config and semantic classDef block. See [default-theme.md](references/default-theme.md) for the full specification.
+**Curated visual identity:** All diagrams use one of three preset configs. Each preset pairs a theme, look mode, and layout engine. See [default-theme.md](references/default-theme.md) for the full specification.
+
+## Quick Start
+
+Minimal correct diagram (Classic preset, the default):
+
+```
+flowchart LR
+    classDef primary fill:#0072B2,color:#fff,stroke:#005a8c,stroke-width:2px
+    classDef success fill:#009E73,color:#fff,stroke:#006B4F,stroke-width:2px
+    classDef warning fill:#E69F00,color:#000,stroke:#B37A00,stroke-width:2px
+
+    A[Input]:::primary --> B{Valid?}:::warning
+    B -->|Yes| C[Process]:::primary
+    B -->|No| D[Error]:::warning
+    C --> E[Done]:::success
+```
+
+Export with Classic preset (default):
+
+```bash
+bunx @mermaid-js/mermaid-cli -i input.mmd -o output.svg \
+  -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/default-theme.json" \
+  -b white
+```
+
+## Core Principles
+
+Non-negotiable rules for every diagram:
+
+1. **Max 15 nodes** per diagram. Split into multiple diagrams if larger.
+2. **Max 3 shapes** per diagram. More shapes become visual noise.
+3. **Use `classDef`, not inline styles.** Keeps diagrams consistent and maintainable.
+4. **Use a preset config via `-c` flag** for all visualize-skill output. Never put `%%{init:}%%` directives in generated diagrams -- the config file handles theming. Three presets: `default-theme.json` (Classic), `sketch-theme.json` (Sketch), `blueprint-theme.json` (Blueprint).
 
 ## Diagram Type Selection
 
@@ -47,6 +80,8 @@ Pick the right diagram for the job. Default to the simplest type that communicat
 - Max 15 nodes per diagram. Split into multiple diagrams if larger.
 - Max 3-5 main branches for mind maps.
 - Keep node labels under 30 characters. Use abbreviations + a legend if needed.
+- Prefer `<br/>` over backtick markdown-string syntax for line breaks -- backtick labels cause dagre layout cramping with 10+ nodes.
+- Max 2 lines per node label. Move detail to edge labels, legends, or index.md.
 - One concept per node. Never combine two ideas.
 
 ### 2. Direction matters
@@ -174,17 +209,17 @@ These minimums ensure readability at 1-2 meters viewing distance on A3/A2 paper:
 Set via init directive:
 
 ```
-%%{init: {'theme': 'neutral', 'themeVariables': {'fontSize': '16px'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '16px'}}}%%
 ```
 
 ## Export with mmdc CLI
 
-The `@mermaid-js/mermaid-cli` (`mmdc`) is the primary export path. Use with `-c default-theme.json` for the locked visual identity. The MCP server's `export_diagram_formats` produces placeholder files -- do not use it for export.
+The `@mermaid-js/mermaid-cli` (`mmdc`) is the primary export path. Use with `-c <preset>-theme.json` for the curated visual identity. The MCP server's `export_diagram_formats` produces placeholder files -- do not use it for export.
 
 ### Basic export
 
 ```bash
-bunx --bun @mermaid-js/mermaid-cli mmdc -i input.mmd -o output.svg \
+bunx @mermaid-js/mermaid-cli -i input.mmd -o output.svg \
   -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/default-theme.json" \
   -b white
 ```
@@ -206,22 +241,36 @@ bunx --bun @mermaid-js/mermaid-cli mmdc -i input.mmd -o output.svg \
 
 ```bash
 # A4 landscape SVG (default)
-bunx --bun @mermaid-js/mermaid-cli mmdc -i input.mmd -o diagram.svg \
+bunx @mermaid-js/mermaid-cli -i input.mmd -o diagram.svg \
   -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/default-theme.json" \
   -b white -w 3508 -H 2480
 
 # A3 landscape SVG (wall poster)
-bunx --bun @mermaid-js/mermaid-cli mmdc -i input.mmd -o diagram.svg \
+bunx @mermaid-js/mermaid-cli -i input.mmd -o diagram.svg \
   -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/default-theme.json" \
   -b white -w 4961 -H 3508
 
 # PDF for direct printing (add --pdfFit)
-bunx --bun @mermaid-js/mermaid-cli mmdc -i input.mmd -o diagram.pdf \
+bunx @mermaid-js/mermaid-cli -i input.mmd -o diagram.pdf \
   -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/default-theme.json" \
   -b white -w 3508 -H 2480 --pdfFit
 ```
 
 A4 landscape = 3508 x 2480px at 300 DPI. A3 landscape = 4961 x 3508px.
+
+## Quality Checklist
+
+Verify before finalizing any diagram:
+
+- [ ] Max 15 nodes
+- [ ] Labels under 30 characters
+- [ ] Node labels max 2 lines, using `<br/>` (not backtick syntax)
+- [ ] Max 3 different shapes
+- [ ] All non-obvious edges labeled
+- [ ] Subgraph nesting max 2 levels
+- [ ] Font size >= 14pt for nodes
+- [ ] Color + shape together (not color alone)
+- [ ] No `%%{init:}%%` in visualize-skill output
 
 ## Anti-Patterns
 
@@ -237,12 +286,20 @@ A4 landscape = 3508 x 2480px at 300 DPI. A3 landscape = 4961 x 3508px.
 | `default` theme for print | Use `neutral` -- saves ink, better contrast |
 | Inline styles on every node | Use `classDef` for consistent, reusable styles |
 | Giant node labels | 30 chars max, use abbreviations + legend |
+| Backtick markdown-string labels | `<br/>` for line breaks (dagre calculates width correctly) |
+
+## Done When
+
+The diagram is complete when every item in the Quality Checklist above passes and the exported file (SVG/PDF/PNG) renders correctly at the target paper size.
 
 ## Reference Files
 
 For comprehensive details, see:
-- [default-theme.md](references/default-theme.md) - Locked visual identity, classDef block, type detection, export commands
-- [default-theme.json](references/default-theme.json) - mmdc config file (pass via `-c`)
+- [default-theme.md](references/default-theme.md) - Curated visual identity, preset classDef blocks, type detection, export commands
+- [default-theme.json](references/default-theme.json) - Classic preset config (pass via `-c`)
+- [sketch-theme.json](references/sketch-theme.json) - Sketch preset config (hand-drawn, warm tones)
+- [blueprint-theme.json](references/blueprint-theme.json) - Blueprint preset config (monochrome, ELK layout)
 - [syntax-reference.md](references/syntax-reference.md) - Full syntax for all diagram types
 - [styling-patterns.md](references/styling-patterns.md) - Themes, classDef, custom variables
 - [print-optimization.md](references/print-optimization.md) - Paper sizes, mmdc CLI, export recipes
+- [config-engineering.md](references/config-engineering.md) - Config tuning, layout workarounds, known Mermaid bugs

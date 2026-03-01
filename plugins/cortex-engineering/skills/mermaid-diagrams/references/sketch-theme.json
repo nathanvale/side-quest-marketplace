@@ -1,0 +1,57 @@
+{
+	"look": "handDrawn",
+	"handDrawnSeed": 42,
+	"layout": "dagre",
+	"theme": "base",
+	"themeVariables": {
+		"primaryColor": "#C4A882",
+		"primaryTextColor": "#333333",
+		"primaryBorderColor": "#8B7355",
+		"secondaryColor": "#A3B5CD",
+		"secondaryTextColor": "#333333",
+		"secondaryBorderColor": "#6B7F99",
+		"tertiaryColor": "#D4B896",
+		"tertiaryTextColor": "#333333",
+		"tertiaryBorderColor": "#9A7E5A",
+		"lineColor": "#5C4A3A",
+		"textColor": "#333333",
+		"background": "#FFFDF5",
+		"noteBkgColor": "#F5E6A0",
+		"noteTextColor": "#333333",
+		"noteBorderColor": "#A89640",
+		"edgeLabelBackground": "#FFFDF500",
+		"clusterBkg": "#F5F0E0",
+		"clusterBorder": "#8B7355",
+		"errorBkgColor": "#D4836A",
+		"errorTextColor": "#333333",
+		"fontFamily": "Inter, Helvetica, Arial, sans-serif",
+		"fontSize": "16px"
+	},
+	"themeCSS": ".edgeLabel .label span { color: #333333; } .edgeLabel .label { background-color: transparent; } .labelBkg { background-color: transparent !important; } .cluster-label .nodeLabel { font-weight: 700; font-size: 18px; } [class^='section-'] span, [class*=' section-'] span { color: #333333 !important; } g.label.name span { font-weight: 700; font-size: 18px; } .sectionTitle { font-weight: 700; font-size: 18px; } text.actor > tspan { font-weight: 700; font-size: 18px; }",
+	"flowchart": {
+		"curve": "basis",
+		"nodeSpacing": 64,
+		"rankSpacing": 64,
+		"padding": 16,
+		"subGraphTitleMargin": { "top": 24, "bottom": 24 },
+		"diagramPadding": 32,
+		"htmlLabels": true,
+		"useMaxWidth": false,
+		"wrappingWidth": 192
+	},
+	"sequence": {
+		"height": 96,
+		"width": 200,
+		"boxMargin": 16,
+		"boxTextMargin": 16,
+		"labelBoxWidth": 72,
+		"labelBoxHeight": 32,
+		"noteMargin": 24,
+		"diagramMarginY": 24,
+		"useMaxWidth": false
+	},
+	"mindmap": {
+		"useMaxWidth": false,
+		"padding": 16
+	}
+}
