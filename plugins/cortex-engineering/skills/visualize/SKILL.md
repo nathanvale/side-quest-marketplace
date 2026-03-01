@@ -37,7 +37,9 @@ Resolve from `$ARGUMENTS`:
 2. If not a file, treat as a topic string.
 3. No argument: check conversation for the most recent Cortex doc, then ask the user.
 
-**Re-render shortcut:** If the source is an existing diagram (`type: diagram` with a `source` field in frontmatter), read the existing `.mmd` file and skip to step 4 (export).
+**Re-render shortcut:** If the source is an existing diagram directory (index.md with `type: diagram` in frontmatter):
+- If directory contains exactly one `.mmd` file: read it and skip to step 4 (export)
+- If directory contains multiple `.mmd` files: list them and ask which to re-render
 
 ### 2. Auto-detect and confirm
 
@@ -80,7 +82,7 @@ Write Mermaid source directly. Rules:
 - Keep labels to 1-2 short lines using `<br/>` (not backtick syntax). Move verbose detail to edge labels or index.md.
 - For subgraphs with multiline titles: add an invisible spacer node (see mermaid-diagrams skill's config-engineering reference)
 
-**Checkpoint:** Save `index.md` (with frontmatter via the **frontmatter** skill) and `<type>.mmd` BEFORE attempting export.
+**Checkpoint:** Save `<type>.mmd` BEFORE attempting export. Save `index.md` using the detection logic in step 5 (first-write or append mode). Use the **frontmatter** skill for correct YAML frontmatter.
 
 ### 4. Export
 
@@ -129,43 +131,68 @@ Save to `docs/diagrams/YYYY-MM-DD-<topic-slug>/`:
 - `<type>.svg` -- screen/print viewing
 - `<type>.pdf` -- direct printing
 
-**Type-to-slug mapping** -- resolve `<type>` from the Mermaid diagram keyword:
+**Type-to-slug-to-label mapping** -- resolve `<type>` file slug and `## <Label>` section heading from the Mermaid diagram keyword:
 
-| Mermaid type | File slug |
-|---|---|
-| flowchart / graph | `flowchart` |
-| sequence | `sequence` |
-| class | `class` |
-| state | `state` |
-| erDiagram | `er` |
-| gantt | `gantt` |
-| pie | `pie` |
-| mindmap | `mindmap` |
-| timeline | `timeline` |
-| architecture | `architecture` |
-| block | `block` |
-| quadrant | `quadrant` |
-| sankey | `sankey` |
-| xychart | `xychart` |
-| gitGraph | `git` |
-| C4Context | `c4` |
-| kanban | `kanban` |
-| packet | `packet` |
-| requirement | `requirement` |
-| radar | `radar` |
+| Mermaid type | File slug | Section heading label |
+|---|---|---|
+| flowchart / graph | `flowchart` | Flowchart |
+| sequence | `sequence` | Sequence Diagram |
+| class | `class` | Class Diagram |
+| state | `state` | State Diagram |
+| erDiagram | `er` | Entity-Relationship Diagram |
+| gantt | `gantt` | Gantt Chart |
+| pie | `pie` | Pie Chart |
+| mindmap | `mindmap` | Mind Map |
+| timeline | `timeline` | Timeline |
+| architecture | `architecture` | Architecture Diagram |
+| block | `block` | Block Diagram |
+| quadrant | `quadrant` | Quadrant Chart |
+| sankey | `sankey` | Sankey Diagram |
+| xychart | `xychart` | XY Chart |
+| gitGraph | `git` | Git Graph |
+| C4Context | `c4` | C4 Context Diagram |
+| kanban | `kanban` | Kanban Board |
+| packet | `packet` | Packet Diagram |
+| requirement | `requirement` | Requirement Diagram |
+| radar | `radar` | Radar Chart |
+
+**Label fallback:** If the Mermaid type is not in the table, derive the label by Title Casing the file slug (e.g. `waterfall` -> `## Waterfall`).
 
 **Topic slug:** lowercase, a-z/0-9/hyphens only, max 80 chars. Strip special characters, collapse whitespace to hyphens, trim leading/trailing hyphens. NEVER interpolate raw user input into shell commands -- sanitize the slug first, then use it in `mkdir -p`.
-
-**Collision:** if folder exists, ask the user:
-
-> 1. Overwrite existing
-> 2. Create versioned copy (-v2, -v3)
-
-**Note:** Multiple diagram types can coexist in the same directory without collision (e.g. `class.mmd` and `er.mmd` in the same folder). Only prompt for collision when the same type slug already exists.
 
 Create `docs/diagrams/` with `mkdir -p` if needed.
 
 **What goes where:** `<type>.mmd` contains the full Mermaid source INCLUDING classDef lines. The `-c` config file provides theme variables (colors, fonts, spacing) -- separate from classDef. `index.md` embeds the same Mermaid in a fenced code block alongside YAML frontmatter.
+
+#### index.md write protocol
+
+Every `index.md` for `type: diagram` uses `## <Label>` section headings from the first write. Each section contains exactly: the fenced mermaid code block and an `**Export:** <preset> theme, <paper> size.` line. A section spans from its `## ` heading to the next `## ` heading or EOF.
+
+**Detection logic** -- before writing index.md:
+
+1. Check if `index.md` exists in the target directory
+2. If no: **FIRST WRITE** -- create with uniform `## <Label>` section structure
+3. If yes: read frontmatter
+   - If frontmatter has `type: diagram`: **APPEND MODE**
+     - Check if a `## <Label>` heading matching this type already exists
+     - If yes: REPLACE that section's content (fenced block + export note)
+     - If no: append new `## <Label>` section after last diagram section
+     - Add source to `source:` list if not already present
+     - Set `updated:` date
+   - Otherwise: confirm overwrite with user, then first-write
+
+#### Collision handling
+
+Multiple diagram types coexist in the same directory without collision (e.g. `class.mmd` and `er.mmd`). Only prompt for collision when the **same type slug** already exists:
+
+> 1. Overwrite existing
+> 2. Create versioned copy (-v2, -v3)
+
+When "Overwrite existing" is chosen for a same-type collision:
+- Replace the `<type>.mmd` file with new Mermaid source
+- Replace the `<type>.svg` and `<type>.pdf` with new exports
+- Find and replace the matching `## <Label>` section in index.md (fenced block + export note)
+- If the section doesn't exist in index.md, append it
 
 ### 6. Report and open
 
@@ -203,7 +230,8 @@ type: diagram
 tags: [architecture, cortex, mermaid]
 project: side-quest-marketplace
 status: draft
-source: docs/brainstorms/2026-02-28-visualize-skill-brainstorm.md
+source:
+  - docs/brainstorms/2026-02-28-visualize-skill-brainstorm.md
 ---
 ```
 
