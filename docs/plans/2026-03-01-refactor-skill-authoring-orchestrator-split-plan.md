@@ -1,7 +1,7 @@
 ---
 title: "refactor: Unify skill-authoring with workflows + thin command entry point"
 type: refactor
-status: active
+status: completed
 date: 2026-03-01
 origin: docs/research/2026-03-01-skill-architecture-knowledge-workflow-patterns.md
 ---
@@ -438,22 +438,22 @@ A well-executed [skill name]:
 
 ## Acceptance Criteria
 
-- [ ] `skill-authoring` has `user-invocable: false` in frontmatter
-- [ ] `skill-authoring/SKILL.md` has numbered menu with explicit markdown links to workflow files (no keyword dispatch table)
-- [ ] SKILL.md stays under 500 lines
-- [ ] All workflow files use markdown headings, not XML tags
-- [ ] All workflow files use plain text numbered lists, not AskUserQuestion
-- [ ] Workflows have Context sections using relative links within the skill
-- [ ] `audit-skill.md` accepts skill name/path via `$ARGUMENTS` to skip interactive discovery
-- [ ] Validation rules in workflows flipped from "XML good" to "markdown good" (create-new-skill Step 8, audit-skill line 57)
-- [ ] `templates/simple-skill.md` and `templates/router-skill.md` converted to markdown + `[brackets]`
-- [ ] `references/common-patterns.md` thoroughly updated -- all XML-as-good examples converted
-- [ ] `references/recommended-structure.md` converted from XML to markdown
-- [ ] `create-domain-expertise-skill.md`, `verify-skill.md`, `upgrade-to-router.md` deleted
-- [ ] References to `use-xml-tags.md` removed from all workflows
-- [ ] `commands/create-skill.md` exists with `disable-model-invocation: true` and description following WHAT+WHEN pattern
-- [ ] Plugin manifest updated with `"./commands/create-skill.md"` in commands array
-- [ ] `bun run validate` passes
+- [x] `skill-authoring` has `user-invocable: false` in frontmatter
+- [x] `skill-authoring/SKILL.md` has numbered menu with explicit markdown links to workflow files (no keyword dispatch table)
+- [x] SKILL.md stays under 500 lines
+- [x] All workflow files use markdown headings, not XML tags
+- [x] All workflow files use plain text numbered lists, not AskUserQuestion
+- [x] Workflows have Context sections using relative links within the skill
+- [x] `audit-skill.md` accepts skill name/path via `$ARGUMENTS` to skip interactive discovery
+- [x] Validation rules in workflows flipped from "XML good" to "markdown good" (create-new-skill Step 8, audit-skill line 57)
+- [x] `templates/simple-skill.md` and `templates/router-skill.md` converted to markdown + `[brackets]`
+- [x] `references/common-patterns.md` thoroughly updated -- all XML-as-good examples converted
+- [x] `references/recommended-structure.md` converted from XML to markdown
+- [x] `create-domain-expertise-skill.md`, `verify-skill.md`, `upgrade-to-router.md` deleted
+- [x] References to `use-xml-tags.md` removed from all workflows
+- [x] `commands/create-skill.md` exists with `disable-model-invocation: true` and description following WHAT+WHEN pattern
+- [x] Plugin manifest updated with `"./commands/create-skill.md"` in commands array
+- [x] `bun run validate` passes
 
 ## Success Metrics
 
