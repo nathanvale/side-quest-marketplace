@@ -190,7 +190,7 @@ Invocation control changes strategy:
 | Too long: `code-review-and-security-analysis-agent` | Untypable | 1-3 words max |
 | Ambiguous siblings: `update` vs `upgrade` | Users can't remember which is which | Use distinct verbs |
 
-For advanced naming topics (agent naming, namespace strategy, budget constraints), see the [naming-conventions](../naming-conventions/SKILL.md) skill.
+For advanced naming topics (agent naming, namespace strategy, budget constraints), invoke the naming-conventions skill.
 
 ### Writing Effective Descriptions
 
@@ -259,7 +259,7 @@ For detailed guidance, see:
 - [best-practices.md](references/best-practices.md) - Skill authoring best practices
 - [description-writing.md](references/description-writing.md) - WHAT+WHEN+WHEN NOT pattern, activation rates, length strategy
 - [argument-hints.md](references/argument-hints.md) - POSIX conventions and examples
-- For advanced topics (budget strategy, activation rate data, agent naming), see the [naming-conventions](../naming-conventions/SKILL.md) skill
+- For advanced topics (budget strategy, activation rate data, agent naming), invoke the naming-conventions skill
 
 ## Sources
 
