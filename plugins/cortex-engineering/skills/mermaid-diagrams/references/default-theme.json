@@ -1,4 +1,6 @@
 {
+	"look": "classic",
+	"layout": "dagre",
 	"theme": "base",
 	"themeVariables": {
 		"primaryColor": "#0072B2",
@@ -15,27 +17,40 @@
 		"background": "#FFFFFF",
 		"noteBkgColor": "#F0E442",
 		"noteTextColor": "#333333",
-		"noteBorderColor": "#C4B800",
-		"edgeLabelBackground": "#FFFFFF",
+		"noteBorderColor": "#8A8200",
+		"edgeLabelBackground": "#FFFFFF00",
 		"clusterBkg": "#F5F5F5",
 		"clusterBorder": "#666666",
 		"errorBkgColor": "#D55E00",
 		"errorTextColor": "#FFFFFF",
-		"fontFamily": "Helvetica, Arial, sans-serif",
+		"fontFamily": "Inter, Helvetica, Arial, sans-serif",
 		"fontSize": "16px"
 	},
+	"themeCSS": ".edgeLabel .label span { color: #333333; } .edgeLabel .label { background-color: transparent; } .labelBkg { background-color: transparent !important; } .cluster-label .nodeLabel { font-weight: 700; font-size: 18px; } [class^='section-'] span, [class*=' section-'] span { color: #ffffff !important; } .label.attribute-type span, .label.attribute-name span, .label.attribute-comment span, .label.attribute-keys span { color: #333333 !important; } g.label.name span { font-weight: 700; font-size: 18px; } .sectionTitle { font-weight: 700; font-size: 18px; } text.actor > tspan { font-weight: 700; font-size: 18px; }",
 	"flowchart": {
 		"curve": "basis",
-		"nodeSpacing": 60,
-		"rankSpacing": 60,
-		"padding": 20,
-		"diagramPadding": 30,
+		"nodeSpacing": 64,
+		"rankSpacing": 64,
+		"padding": 16,
+		"subGraphTitleMargin": { "top": 24, "bottom": 24 },
+		"diagramPadding": 32,
 		"htmlLabels": true,
 		"useMaxWidth": false,
-		"wrappingWidth": 200
+		"wrappingWidth": 192
+	},
+	"sequence": {
+		"height": 96,
+		"width": 200,
+		"boxMargin": 16,
+		"boxTextMargin": 16,
+		"labelBoxWidth": 72,
+		"labelBoxHeight": 32,
+		"noteMargin": 24,
+		"diagramMarginY": 24,
+		"useMaxWidth": false
 	},
 	"mindmap": {
 		"useMaxWidth": false,
-		"padding": 20
+		"padding": 16
 	}
 }

@@ -7,5 +7,5 @@ allowed-tools: Read, Write, Edit, Glob, Bash(mkdir *), Bash(ls *), Bash(chmod *)
 ---
 
 Use the **skill-authoring** skill to guide skill creation, auditing, or improvement.
-Valid modes: create, audit, add, guidance. Pass a mode followed by details.
-$ARGUMENTS
+
+create $ARGUMENTS

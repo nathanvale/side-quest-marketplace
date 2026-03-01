@@ -160,21 +160,24 @@ What this decision means going forward.
 
 ### `diagram`
 
+Diagram docs use `## <Label>` section headings for each diagram type (e.g. `## Flowchart`, `## Mind Map`, `## Entity-Relationship Diagram`). Each section contains the Mermaid source in a fenced code block followed by an `**Export:** <preset> theme, <paper> size.` line. This structure is uniform from the first write, so appending a second diagram type never requires restructuring.
+
 ```markdown
-## Source
-Link to the brainstorm/research/plan that this diagram visualizes.
+## Flowchart
 
-## Diagram
-The Mermaid source in a fenced code block.
+```mermaid
+flowchart TD
+    ...
+```
 
-## Export Notes
-Theme used, paper size, any rendering notes.
+**Export:** Classic theme, A4 landscape.
 ```
 
 Additional frontmatter field for diagram docs:
 
 ```yaml
-source: docs/brainstorms/YYYY-MM-DD-<topic>.md  # path to the origin document
+source:                                          # always a YAML list, even for single sources
+  - docs/brainstorms/YYYY-MM-DD-<topic>.md       # path(s) to origin document(s)
 ```
 
 ## File Naming Convention

@@ -39,7 +39,7 @@ flowchart TD
 Best for: Custom palettes with `themeVariables`. This is the only modifiable theme.
 - Blank slate -- all colors come from `themeVariables`
 - Used by `default-theme.json` with the Wong colorblind-safe palette
-- **Required for the visualize skill's locked visual identity**
+- **Required for the visualize skill's curated visual identity** (all 3 presets use `base`)
 
 **Important:** The `neutral` theme silently ignores `themeVariables` (GitHub #4264). If you need custom colors, you must use `base`.
 
@@ -71,10 +71,6 @@ Best for: Nature/environmental themes, organic topics.
 - Green primary palette
 - Earthy tones
 
-### base
-
-Best for: Full custom styling. Blank slate -- every color comes from your `themeVariables`.
-
 ## classDef and Class Assignment
 
 Define reusable style classes, then apply them to nodes. This is the preferred approach over inline styles.
@@ -87,7 +83,7 @@ classDef info fill:#56B4E9,color:#000,stroke:#2A8ABF,stroke-width:2px
 classDef success fill:#009E73,color:#fff,stroke:#006B4F,stroke-width:2px
 classDef warning fill:#E69F00,color:#000,stroke:#B37A00,stroke-width:2px
 classDef danger fill:#D55E00,color:#fff,stroke:#A34800,stroke-width:2px
-classDef highlight fill:#F0E442,color:#000,stroke:#C4B800,stroke-width:3px
+classDef highlight fill:#F0E442,color:#000,stroke:#8A8200,stroke-width:3px
 classDef accent fill:#CC79A7,color:#000,stroke:#A35E85,stroke-width:2px
 ```
 
@@ -135,7 +131,7 @@ Based on the Wong palette (Nature Methods, 2011) -- the standard for colorblind-
 | Error | `#D55E00` | Yes | `#fff` | `#a64900` | Failures, error states |
 | Info | `#56B4E9` | Yes | `#000` | `#3a8abf` | Notes, information |
 | Neutral | `#666666` | Yes | `#fff` | `#444444` | Inactive, disabled |
-| Highlight | `#F0E442` | Yes | `#000` | `#c4b800` | Emphasis, callouts |
+| Highlight | `#F0E442` | Yes | `#000` | `#8a8200` | Emphasis, callouts |
 | Tertiary | `#CC79A7` | Yes | `#000` | `#a35d85` | Tertiary accent |
 
 ### Light fills (for backgrounds/subgraphs)
@@ -157,7 +153,7 @@ classDef info fill:#56B4E9,stroke:#2A8ABF,color:#000,stroke-width:2px
 classDef success fill:#009E73,stroke:#006B4F,color:#fff,stroke-width:2px
 classDef warning fill:#E69F00,stroke:#B37A00,color:#000,stroke-width:2px
 classDef danger fill:#D55E00,stroke:#A34800,color:#fff,stroke-width:2px
-classDef highlight fill:#F0E442,stroke:#C4B800,color:#000,stroke-width:3px
+classDef highlight fill:#F0E442,stroke:#8A8200,color:#000,stroke-width:3px
 classDef accent fill:#CC79A7,stroke:#A35E85,color:#000,stroke-width:2px
 ```
 
@@ -210,6 +206,8 @@ mindmap
 ```
 
 ## Consistent Style Patterns
+
+**Note:** The patterns below use `%%{init:}%%` directives for standalone use (e.g., quick sketches, documentation, or non-visualize contexts). When using the **visualize skill**, omit the init directive and pass the selected preset config (`default-theme.json`, `sketch-theme.json`, or `blueprint-theme.json`) via the `-c` flag instead.
 
 ### Pattern: Status flow
 

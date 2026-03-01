@@ -57,7 +57,7 @@ bun add -g @mermaid-js/mermaid-cli
 ### A4 landscape SVG (default)
 
 ```bash
-bunx --bun @mermaid-js/mermaid-cli mmdc \
+bunx @mermaid-js/mermaid-cli \
   -i diagram.mmd \
   -o diagram.svg \
   -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/default-theme.json" \
@@ -69,7 +69,7 @@ bunx --bun @mermaid-js/mermaid-cli mmdc \
 ### A3 landscape SVG (wall poster)
 
 ```bash
-bunx --bun @mermaid-js/mermaid-cli mmdc \
+bunx @mermaid-js/mermaid-cli \
   -i diagram.mmd \
   -o diagram.svg \
   -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/default-theme.json" \
@@ -81,7 +81,7 @@ bunx --bun @mermaid-js/mermaid-cli mmdc \
 ### PDF (for direct printing)
 
 ```bash
-bunx --bun @mermaid-js/mermaid-cli mmdc \
+bunx @mermaid-js/mermaid-cli \
   -i diagram.mmd \
   -o diagram.pdf \
   -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/default-theme.json" \
@@ -95,8 +95,10 @@ bunx --bun @mermaid-js/mermaid-cli mmdc \
 
 ### A2 portrait SVG (complex diagrams)
 
+**Standalone recipe** -- uses `-t neutral` directly (no preset config). For visualize-skill output, replace `-t neutral` with `-c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/<PRESET>-theme.json"`.
+
 ```bash
-bunx --bun @mermaid-js/mermaid-cli mmdc \
+bunx @mermaid-js/mermaid-cli \
   -i diagram.mmd \
   -o diagram.svg \
   -t neutral \
@@ -108,8 +110,10 @@ bunx --bun @mermaid-js/mermaid-cli mmdc \
 
 ### High-res PNG (for embedding in documents)
 
+**Standalone recipe** -- uses `-t neutral` directly (no preset config). For visualize-skill output, replace `-t neutral` with `-c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/<PRESET>-theme.json"`.
+
 ```bash
-bunx --bun @mermaid-js/mermaid-cli mmdc \
+bunx @mermaid-js/mermaid-cli \
   -i diagram.mmd \
   -o diagram.png \
   -t neutral \
@@ -118,21 +122,29 @@ bunx --bun @mermaid-js/mermaid-cli mmdc \
   --scale 3
 ```
 
-### With config file
+### With preset config file
 
-The visualize skill uses [default-theme.json](default-theme.json) for the locked visual identity. Pass it via `-c`:
+The visualize skill uses a preset config for the curated visual identity. Pass via `-c` (replace `<PRESET>` with `default`, `sketch`, or `blueprint`):
 
 ```bash
-bunx --bun @mermaid-js/mermaid-cli mmdc \
+bunx @mermaid-js/mermaid-cli \
   -i diagram.mmd \
   -o diagram.svg \
-  -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/default-theme.json" \
+  -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/<PRESET>-theme.json" \
   -b white \
   -w 3508 \
   -H 2480
 ```
 
 See [default-theme.md](default-theme.md) for the full config specification.
+
+## Preset-Specific Print Notes
+
+**Classic** (default): Standard export commands above. Wong palette prints well on both color laser and inkjet.
+
+**Sketch**: `handDrawnSeed: 42` ensures reproducible output across renders. Hand-drawn borders are vector paths that survive rasterization at 300 DPI. Laser printing produces better results than inkjet for the fine stroke details.
+
+**Blueprint**: ELK layout with `mergeEdges: true` produces tighter output that fits more nodes per page. May need A3 for 15+ node diagrams. Straight edges (`curve: linear`) print cleaner than curved at small sizes.
 
 ## mmdc Flag Reference
 
