@@ -1,24 +1,22 @@
 # Workflow: Create a New Skill
 
-<required_reading>
-**Read these reference files NOW:**
-1. references/recommended-structure.md
-2. references/skill-structure.md
-3. references/core-principles.md
-4. references/use-xml-tags.md
-</required_reading>
+## Context
 
-<process>
-## Step 1: Adaptive Requirements Gathering
+Read before proceeding:
+- [Recommended structure](references/recommended-structure.md) - directory layout
+- [Skill structure](references/skill-structure.md) - SKILL.md body format
+- [Core principles](references/core-principles.md) - design philosophy
+
+## Process
+
+### Step 1: Adaptive Requirements Gathering
 
 **If user provided context** (e.g., "build a skill for X"):
-→ Analyze what's stated, what can be inferred, what's unclear
-→ Skip to asking about genuine gaps only
+- Analyze what's stated, what can be inferred, what's unclear
+- Skip to asking about genuine gaps only
 
 **If user just invoked skill without context:**
-→ Ask what they want to build
-
-### Using AskUserQuestion
+- Ask what they want to build
 
 Ask 2-4 domain-specific questions based on actual gaps. Each question should:
 - Have specific options with descriptions
@@ -30,22 +28,17 @@ Example questions:
 - "Should this also handle [related thing] or stay focused on [core thing]?"
 - "What should the user see when successful?"
 
-### Decision Gate
+After initial questions, present options:
 
-After initial questions, ask:
-"Ready to proceed with building, or would you like me to ask more questions?"
-
-Options:
 1. **Proceed to building** - I have enough context
 2. **Ask more questions** - There are more details to clarify
 3. **Let me add details** - I want to provide additional context
 
-## Step 2: Research Trigger (If External API)
+### Step 2: Research Trigger (If External API)
 
-**When external service detected**, ask using AskUserQuestion:
+**When external service detected**, ask:
 "This involves [service name] API. Would you like me to research current endpoints and patterns before building?"
 
-Options:
 1. **Yes, research first** - Fetch current documentation for accurate implementation
 2. **No, proceed with general patterns** - Use common patterns without specific API research
 
@@ -55,13 +48,13 @@ If research requested:
 - Focus on 2024-2026 sources
 - Store findings for use in content generation
 
-## Step 3: Decide Structure
+### Step 3: Decide Structure
 
 **Simple skill (single workflow, <200 lines):**
-→ Single SKILL.md file with all content
+- Single SKILL.md file with all content
 
 **Complex skill (multiple workflows OR domain knowledge):**
-→ Router pattern:
+- Router pattern:
 ```
 skill-name/
 ├── SKILL.md (router + principles)
@@ -85,9 +78,9 @@ Factors favoring router pattern:
 - Same code runs across invocations (deploy, setup, API calls)
 - Operations are error-prone when rewritten each time
 
-See references/recommended-structure.md for templates.
+See [recommended-structure.md](references/recommended-structure.md) for templates.
 
-## Step 4: Create Directory
+### Step 4: Create Directory
 
 ```bash
 mkdir -p ~/.claude/skills/{skill-name}
@@ -99,59 +92,66 @@ mkdir -p ~/.claude/skills/{skill-name}/templates  # for output structures
 mkdir -p ~/.claude/skills/{skill-name}/scripts    # for reusable code
 ```
 
-## Step 5: Write SKILL.md
+### Step 5: Write SKILL.md
 
 **Simple skill:** Write complete skill file with:
 - YAML frontmatter (name, description)
-- `<objective>`
-- `<quick_start>`
-- Content sections with pure XML
-- `<success_criteria>`
+- Objective paragraph under the heading
+- Quick Start section
+- Content sections with markdown headings
+- Done When checklist
 
 **Complex skill:** Write router with:
 - YAML frontmatter
-- `<essential_principles>` (inline, unavoidable)
-- `<intake>` (question to ask user)
-- `<routing>` (maps answers to workflows)
-- `<reference_index>` and `<workflows_index>`
+- Core Principles section (inline, unavoidable)
+- Intake section (question to ask user)
+- Routing table (maps answers to workflows)
+- Domain Knowledge and Workflows sections
 
-## Step 6: Write Workflows (if complex)
+### Step 6: Write Workflows (if complex)
 
 For each workflow:
-```xml
-<required_reading>
-Which references to load for this workflow
-</required_reading>
+```markdown
+# Workflow: [Workflow Name]
 
-<process>
-Step-by-step procedure
-</process>
+## Context
 
-<success_criteria>
-How to know this workflow is done
-</success_criteria>
+Read before proceeding:
+- [reference-name.md](references/reference-name.md) - purpose
+
+## Process
+
+### Step 1: [First Step]
+[What to do]
+
+### Step 2: [Second Step]
+[What to do]
+
+## Success Criteria
+
+- [ ] Criterion 1
+- [ ] Criterion 2
 ```
 
-## Step 7: Write References (if needed)
+### Step 7: Write References (if needed)
 
 Domain knowledge that:
 - Multiple workflows might need
 - Doesn't change based on workflow
 - Contains patterns, examples, technical details
 
-## Step 8: Validate Structure
+### Step 8: Validate Structure
 
 Check:
 - [ ] YAML frontmatter valid
 - [ ] Name matches directory (lowercase-with-hyphens)
 - [ ] Description says what it does AND when to use it (third person)
-- [ ] No markdown headings (#) in body - use XML tags
-- [ ] Required tags present: objective, quick_start, success_criteria
+- [ ] Uses markdown headings for structure (not XML tags)
+- [ ] Required sections present: Quick Start, Success Criteria
 - [ ] All referenced files exist
 - [ ] SKILL.md under 500 lines
-- [ ] XML tags properly closed
 
-## Step 9: Create Slash Command
+### Step 9: Create Slash Command
 
 ```bash
 cat > ~/.claude/commands/{skill-name}.md << 'EOF'
@@ -165,7 +165,7 @@ Invoke the {skill-name} skill for: $ARGUMENTS
 EOF
 ```
 
-## Step 10: Test
+### Step 10: Test
 
 Invoke the skill and observe:
 - Does it ask the right intake question?
@@ -174,18 +174,16 @@ Invoke the skill and observe:
 - Does output match expectations?
 
 Iterate based on real usage, not assumptions.
-</process>
 
-<success_criteria>
-Skill is complete when:
+## Success Criteria
+
 - [ ] Requirements gathered with appropriate questions
 - [ ] API research done if external service involved
 - [ ] Directory structure correct
 - [ ] SKILL.md has valid frontmatter
 - [ ] Essential principles inline (if complex skill)
 - [ ] Intake question routes to correct workflow
-- [ ] All workflows have required_reading + process + success_criteria
+- [ ] All workflows have Context + Process + Success Criteria
 - [ ] References contain reusable domain knowledge
 - [ ] Slash command exists and works
 - [ ] Tested with real invocation
-</success_criteria>
