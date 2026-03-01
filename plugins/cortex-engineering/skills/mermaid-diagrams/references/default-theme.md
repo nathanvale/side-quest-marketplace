@@ -175,13 +175,15 @@ bunx @mermaid-js/mermaid-cli -i diagram.mmd -o diagram.svg \
   -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/<PRESET>-theme.json" \
   -b white -w <WIDTH> -H <HEIGHT>
 
-# PDF (secondary)
+# PDF (secondary -- requires --cssFile for correct text colors)
 bunx @mermaid-js/mermaid-cli -i diagram.mmd -o diagram.pdf \
   -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/<PRESET>-theme.json" \
+  --cssFile "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/pdf-print-fix.css" \
   -b white -w <WIDTH> -H <HEIGHT> --pdfFit
 ```
 
 **Flag notes:**
+- `--cssFile` is **required for PDF** -- without it, Puppeteer's print media mode converts white/colored text to grey. The `pdf-print-fix.css` file sets `-webkit-print-color-adjust: exact` to preserve colors. See [mermaid-cli #656](https://github.com/mermaid-js/mermaid-cli/issues/656) and [puppeteer #2685](https://github.com/puppeteer/puppeteer/issues/2685).
 - `--scale` / `-s` only affects PNG (Puppeteer `deviceScaleFactor`). Omit for SVG/PDF.
 - `--pdfFit` (camelCase, short: `-f`) auto-sizes the PDF page to diagram content.
 - `-b white` sets background for SVG only. PDF background comes from Chrome's rendering.

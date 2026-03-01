@@ -355,3 +355,4 @@ Lessons learned from iterative rendering and DevTools inspection. These are non-
 |--------|--------|
 | `bunx @mermaid-js/mermaid-cli` -- no `mmdc` subcommand | The package exposes the CLI directly. Use `bunx @mermaid-js/mermaid-cli -i input.mmd -o output.svg`, NOT `bunx @mermaid-js/mermaid-cli mmdc -i ...`. Do NOT use `--bun` flag -- Puppeteer requires Node.js native modules that Bun cannot resolve. |
 | Background color flag is `-b`, not `--background` | Short flag only: `-b white` or `-b transparent` |
+| PDF text colors render as grey without `--cssFile` | Puppeteer's print media mode strips white/light text colors ([mermaid-cli #656](https://github.com/mermaid-js/mermaid-cli/issues/656), [puppeteer #2685](https://github.com/puppeteer/puppeteer/issues/2685)). Fix: `--cssFile "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/pdf-print-fix.css"` which sets `-webkit-print-color-adjust: exact`. **Always include this flag for PDF exports.** |

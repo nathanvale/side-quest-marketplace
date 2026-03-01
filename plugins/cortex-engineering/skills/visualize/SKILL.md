@@ -103,9 +103,10 @@ bunx @mermaid-js/mermaid-cli -i <type>.mmd -o <type>.svg \
   -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/<PRESET>-theme.json" \
   -b white -w <WIDTH> -H <HEIGHT>
 
-# PDF (secondary)
+# PDF (secondary -- requires --cssFile for correct text colors)
 bunx @mermaid-js/mermaid-cli -i <type>.mmd -o <type>.pdf \
   -c "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/<PRESET>-theme.json" \
+  --cssFile "$CLAUDE_PLUGIN_ROOT/skills/mermaid-diagrams/references/pdf-print-fix.css" \
   -b white -w <WIDTH> -H <HEIGHT> --pdfFit
 ```
 
