@@ -220,7 +220,9 @@ For detailed conventions, see [naming-conventions/references/argument-hints.md](
    - d. **[Script](workflows/add-script.md)** - Executable hook or helper
 4. **[Get guidance](workflows/get-guidance.md)** - Understand whether/how to build something
 
-If arguments match one of these, read the corresponding workflow and begin.
+**Routing keywords:** `create` -> 1, `audit` -> 2, `add reference` -> 3a, `add workflow` -> 3b, `add template` -> 3c, `add script` -> 3d, `guidance` -> 4
+
+If arguments match a keyword or menu item, read the corresponding workflow and begin.
 Otherwise, reply with a number or describe what you need.
 
 $ARGUMENTS

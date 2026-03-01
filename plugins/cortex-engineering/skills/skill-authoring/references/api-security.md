@@ -138,7 +138,6 @@ All API calls use profile syntax:
 ```
 
 **Profile persists for session:** Once selected, use same profile for subsequent operations unless user explicitly changes it.
-```
 
 ## API Pattern Guidelines
 
