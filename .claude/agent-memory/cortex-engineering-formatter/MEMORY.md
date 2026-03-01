@@ -1,8 +1,8 @@
-# Cortex Formatter Agent Memory
+# Cortex Engineering Formatter Agent Memory
 
 ## Cortex Frontmatter Contract
 
-Source of truth: `plugins/cortex/skills/cortex-frontmatter/SKILL.md`
+Source of truth: `plugins/cortex-engineering/skills/cortex-engineering-frontmatter/SKILL.md`
 
 ### Standard research doc frontmatter (base fields only)
 

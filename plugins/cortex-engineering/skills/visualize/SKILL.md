@@ -101,7 +101,7 @@ The folder name is the identifier (date + topic). Filenames inside are fixed (`i
 
 If a folder with the same name exists, ask the user: overwrite or create a versioned copy (`-v2`, `-v3`).
 
-Delegate to the **cortex-frontmatter** skill for correct doc structure. Use the `diagram` doc type with `source` field linking back to the origin document.
+Delegate to the **cortex-engineering-frontmatter** skill for correct doc structure. Use the `diagram` doc type with `source` field linking back to the origin document.
 
 ### 8. Confirm and open
 
@@ -140,4 +140,4 @@ source: docs/brainstorms/2026-02-28-visualize-skill-brainstorm.md
 - **Knowledge compounds** -- diagrams evolve alongside research and brainstorms
 - **Graceful degradation** -- always save the Mermaid source, even if export fails
 - **Confirm before generating** -- ask the user, don't assume the diagram type
-- **Follow cortex patterns** -- delegate to cortex-frontmatter for doc structure
+- **Follow cortex patterns** -- delegate to cortex-engineering-frontmatter for doc structure

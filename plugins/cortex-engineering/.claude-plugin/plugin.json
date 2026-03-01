@@ -1,5 +1,5 @@
 {
-	"name": "cortex",
+	"name": "cortex-engineering",
 	"description": "Agent-native knowledge system. Research topics and capture findings as structured markdown documents with YAML frontmatter",
 	"version": "0.2.0",
 	"author": {
@@ -11,11 +11,11 @@
 		"research",
 		"second-brain",
 		"frontmatter",
-		"cortex"
+		"cortex-engineering"
 	],
 	"license": "MIT",
 	"skills": [
-		"./skills/cortex-frontmatter",
+		"./skills/cortex-engineering-frontmatter",
 		"./skills/research",
 		"./skills/brainstorm",
 		"./skills/visualize",

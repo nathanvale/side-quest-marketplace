@@ -1,6 +1,6 @@
 ---
-name: cortex-formatter
-description: "Use this agent when you need to clean up, standardize, or fix YAML frontmatter and document formatting in markdown files within the plugin marketplace - particularly for SKILL.md, command files, and agent definitions. This agent understands the Cortex formatter skill conventions and applies them consistently.\\n\\nExamples:\\n\\n- user: \"The frontmatter in the brainstorm skill looks messy, can you clean it up?\"\\n  assistant: \"I'll use the cortex-formatter agent to clean up the frontmatter in that skill file.\"\\n  (Launch the cortex-formatter agent via the Agent tool to inspect and fix the SKILL.md frontmatter)\\n\\n- user: \"I just added three new command files, make sure they're formatted correctly\"\\n  assistant: \"Let me use the cortex-formatter agent to review and standardize the frontmatter and document structure across those new command files.\"\\n  (Launch the cortex-formatter agent via the Agent tool to process the new command files)\\n\\n- user: \"Something's wrong with the validator - it says description is '1 chars'\"\\n  assistant: \"That's likely a YAML block scalar issue in the frontmatter. Let me launch the cortex-formatter agent to diagnose and fix it.\"\\n  (Launch the cortex-formatter agent via the Agent tool to find and fix the YAML frontmatter issue)\\n\\n- After writing or modifying a SKILL.md, command .md, or agent .md file:\\n  assistant: \"I've created the new skill file. Let me run the cortex-formatter agent to make sure the frontmatter and document structure are clean and valid.\"\\n  (Proactively launch the cortex-formatter agent via the Agent tool to validate the newly created file)"
+name: cortex-engineering-formatter
+description: "Use this agent when you need to clean up, standardize, or fix YAML frontmatter and document formatting in markdown files within the plugin marketplace - particularly for SKILL.md, command files, and agent definitions. This agent understands the Cortex formatter skill conventions and applies them consistently.\\n\\nExamples:\\n\\n- user: \"The frontmatter in the brainstorm skill looks messy, can you clean it up?\"\\n  assistant: \"I'll use the cortex-engineering-formatter agent to clean up the frontmatter in that skill file.\"\\n  (Launch the cortex-engineering-formatter agent via the Agent tool to inspect and fix the SKILL.md frontmatter)\\n\\n- user: \"I just added three new command files, make sure they're formatted correctly\"\\n  assistant: \"Let me use the cortex-engineering-formatter agent to review and standardize the frontmatter and document structure across those new command files.\"\\n  (Launch the cortex-engineering-formatter agent via the Agent tool to process the new command files)\\n\\n- user: \"Something's wrong with the validator - it says description is '1 chars'\"\\n  assistant: \"That's likely a YAML block scalar issue in the frontmatter. Let me launch the cortex-engineering-formatter agent to diagnose and fix it.\"\\n  (Launch the cortex-engineering-formatter agent via the Agent tool to find and fix the YAML frontmatter issue)\\n\\n- After writing or modifying a SKILL.md, command .md, or agent .md file:\\n  assistant: \"I've created the new skill file. Let me run the cortex-engineering-formatter agent to make sure the frontmatter and document structure are clean and valid.\"\\n  (Proactively launch the cortex-engineering-formatter agent via the Agent tool to validate the newly created file)"
 model: sonnet
 memory: project
 ---
@@ -121,7 +121,7 @@ Examples of what to record:
 
 # Persistent Agent Memory
 
-You have a persistent Persistent Agent Memory directory at `/Users/nathanvale/code/side-quest-marketplace/.claude/agent-memory/cortex-formatter/`. Its contents persist across conversations.
+You have a persistent Persistent Agent Memory directory at `/Users/nathanvale/code/side-quest-marketplace/.claude/agent-memory/cortex-engineering-formatter/`. Its contents persist across conversations.
 
 As you work, consult your memory files to build on previous experience. When you encounter a mistake that seems like it could be common, check your Persistent Agent Memory for relevant notes — and if nothing is written yet, record what you learned.
 
@@ -154,7 +154,7 @@ Explicit user requests:
 When looking for past context:
 1. Search topic files in your memory directory:
 ```
-Grep with pattern="<search term>" path="/Users/nathanvale/code/side-quest-marketplace/.claude/agent-memory/cortex-formatter/" glob="*.md"
+Grep with pattern="<search term>" path="/Users/nathanvale/code/side-quest-marketplace/.claude/agent-memory/cortex-engineering-formatter/" glob="*.md"
 ```
 2. Session transcript logs (last resort — large files, slow):
 ```

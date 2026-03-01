@@ -1,6 +1,6 @@
 ---
 name: producing-research-documents
-description: Produces structured research documents with YAML frontmatter into the Cortex knowledge system. Checks existing cortex knowledge before going external. Delegates to cortex-frontmatter skill for doc structure. Use when the user asks to research a topic, investigate something, or create a research note.
+description: Produces structured research documents with YAML frontmatter into the Cortex knowledge system. Checks existing cortex knowledge before going external. Delegates to cortex-engineering-frontmatter skill for doc structure. Use when the user asks to research a topic, investigate something, or create a research note.
 allowed-tools:
   - Bash(cortex *:*)
   - Read
@@ -69,7 +69,7 @@ Use available tools based on the topic:
 
 ### 4. Synthesize and write
 
-Delegate to the **cortex-frontmatter** skill for correct doc structure:
+Delegate to the **cortex-engineering-frontmatter** skill for correct doc structure:
 
 - Use the `research` doc type
 - Fill in all sections: Summary, Key Findings, Details, Sources, Open Questions
@@ -85,8 +85,8 @@ Tell the user:
 - Where the doc was saved
 - Brief summary of what was found
 - Any open questions worth pursuing
-- Suggest: "Run `/cortex:brainstorm` if you want to explore approaches based on this research."
-- Suggest: "Want a visual summary? Run `/cortex:visualize <saved-path>`"
+- Suggest: "Run `/cortex-engineering:brainstorm` if you want to explore approaches based on this research."
+- Suggest: "Want a visual summary? Run `/cortex-engineering:visualize <saved-path>`"
 
 ## Example Frontmatter
 
