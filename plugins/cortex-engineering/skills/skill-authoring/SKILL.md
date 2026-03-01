@@ -1,6 +1,7 @@
 ---
 name: skill-authoring
 description: Expert guidance for creating Claude Code skills and slash commands. Use when authoring new skills, improving existing skills, creating commands, or understanding skill structure and best practices.
+user-invocable: false
 ---
 
 # Creating Skills & Commands
@@ -210,103 +211,19 @@ For detailed conventions, see [naming-conventions/references/argument-hints.md](
 
 ## What Would You Like To Do?
 
-1. **Create new skill** - Build from scratch
-2. **Create new command** - Build a slash command
-3. **Audit existing skill** - Check against best practices
-4. **Add component** - Add workflow/reference/example
-5. **Get guidance** - Understand skill design
+1. **[Create new skill](workflows/create-new-skill.md)** - Build a skill or command from scratch
+2. **[Audit existing skill](workflows/audit-skill.md)** - Check against best practices with scored report
+3. **Add component** - Add to an existing skill:
+   - a. **[Reference](workflows/add-reference.md)** - Conditional context file
+   - b. **[Workflow](workflows/add-workflow.md)** - Step-by-step procedure
+   - c. **[Template](workflows/add-template.md)** - Reusable boilerplate
+   - d. **[Script](workflows/add-script.md)** - Executable hook or helper
+4. **[Get guidance](workflows/get-guidance.md)** - Understand whether/how to build something
 
-## Creating a New Skill or Command
+If arguments match one of these, read the corresponding workflow and begin.
+Otherwise, reply with a number or describe what you need.
 
-### Step 1: Choose Type
-
-Ask: Is this a manual workflow (deploy, commit, triage) or background knowledge (conventions, patterns)?
-
-- **Manual workflow** → command with `disable-model-invocation: true`
-- **Background knowledge** → skill without `disable-model-invocation`
-- **Complex with supporting files** → skill directory
-
-### Step 2: Choose a Name
-
-Follow the naming taxonomy: commands use imperative verbs (`deploy`, `fix-issue`), action skills use verb-phrases (`research`, `deploy-staging`), knowledge skills use nouns (`api-conventions`, `frontmatter`). See [Naming & Descriptions](#naming--descriptions) above.
-
-### Step 3: Create the File
-
-**Command:**
-```markdown
----
-name: my-command
-description: What this command does
-argument-hint: [expected arguments]
-disable-model-invocation: true
-allowed-tools: Bash(gh *), Read
----
-
-# Command Title
-
-## Workflow
-
-### Step 1: Gather Context
-...
-
-### Step 2: Execute
-...
-
-## Success Criteria
-- [ ] Expected outcome 1
-- [ ] Expected outcome 2
-```
-
-**Skill:**
-```markdown
----
-name: my-skill
-description: What it does. Use when [trigger conditions].
----
-
-# Skill Title
-
-## Quick Start
-[Immediate actionable example]
-
-## Instructions
-[Core guidance]
-
-## Examples
-[Concrete input/output pairs]
-```
-
-### Step 4: Add Reference Files (If Needed)
-
-Link from SKILL.md to detailed content:
-```markdown
-For API reference, see [reference.md](reference.md).
-For form filling guide, see [forms.md](forms.md).
-```
-
-### Step 5: Test With Real Usage
-
-1. Test with actual tasks, not test scenarios
-2. Invoke directly with `/skill-name` to verify
-3. Check auto-triggering by asking something that matches the description
-4. Refine based on real behavior
-
-## Audit Checklist
-
-- [ ] Name follows naming taxonomy (verbs for commands, nouns for knowledge skills)
-- [ ] Name does not repeat plugin name (namespace handles scope)
-- [ ] `name` field matches directory name
-- [ ] Valid YAML frontmatter (name + description)
-- [ ] Description follows WHAT + WHEN pattern with trigger keywords
-- [ ] Description written in third person
-- [ ] `argument-hint` uses POSIX brackets, under 30 chars
-- [ ] Uses standard markdown headings (not XML tags)
-- [ ] SKILL.md under 500 lines
-- [ ] `disable-model-invocation: true` if it has side effects
-- [ ] `allowed-tools` set if specific tools needed
-- [ ] References one level deep, properly linked
-- [ ] Examples are concrete, not abstract
-- [ ] Tested with real usage
+$ARGUMENTS
 
 ## Anti-Patterns to Avoid
 
