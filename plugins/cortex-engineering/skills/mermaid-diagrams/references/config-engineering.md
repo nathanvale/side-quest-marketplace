@@ -353,5 +353,5 @@ Lessons learned from iterative rendering and DevTools inspection. These are non-
 
 | Gotcha | Detail |
 |--------|--------|
-| `bunx --bun @mermaid-js/mermaid-cli` -- no `mmdc` subcommand | The package exposes the CLI directly. Use `bunx --bun @mermaid-js/mermaid-cli -i input.mmd -o output.svg`, NOT `bunx --bun @mermaid-js/mermaid-cli mmdc -i ...` |
+| `bunx @mermaid-js/mermaid-cli` -- no `mmdc` subcommand | The package exposes the CLI directly. Use `bunx @mermaid-js/mermaid-cli -i input.mmd -o output.svg`, NOT `bunx @mermaid-js/mermaid-cli mmdc -i ...`. Do NOT use `--bun` flag -- Puppeteer requires Node.js native modules that Bun cannot resolve. |
 | Background color flag is `-b`, not `--background` | Short flag only: `-b white` or `-b transparent` |
