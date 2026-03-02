@@ -423,10 +423,107 @@ export function extractCommandHead(segment: string): string | null {
 	return null
 }
 
+/**
+ * Expands ANSI-C escape sequences within a `$'...'` string body.
+ * Handles: \xHH (hex), \0NNN (octal), \n, \t, \r, \\, \', \", \a, \b, \f, \v
+ */
+function expandAnsiCEscapes(body: string): string {
+	let result = ''
+	let i = 0
+	while (i < body.length) {
+		if (body[i] === '\\' && i + 1 < body.length) {
+			const next = body[i + 1]!
+			switch (next) {
+				case 'n':
+					result += '\n'
+					i += 2
+					break
+				case 't':
+					result += '\t'
+					i += 2
+					break
+				case 'r':
+					result += '\r'
+					i += 2
+					break
+				case 'a':
+					result += '\x07'
+					i += 2
+					break
+				case 'b':
+					result += '\b'
+					i += 2
+					break
+				case 'f':
+					result += '\f'
+					i += 2
+					break
+				case 'v':
+					result += '\v'
+					i += 2
+					break
+				case '\\':
+					result += '\\'
+					i += 2
+					break
+				case "'":
+					result += "'"
+					i += 2
+					break
+				case '"':
+					result += '"'
+					i += 2
+					break
+				case 'x': {
+					const hex = body.slice(i + 2, i + 4)
+					if (/^[0-9a-fA-F]{2}$/.test(hex)) {
+						result += String.fromCharCode(Number.parseInt(hex, 16))
+						i += 4
+					} else {
+						result += body[i]
+						i++
+					}
+					break
+				}
+				case '0':
+				case '1':
+				case '2':
+				case '3':
+				case '4':
+				case '5':
+				case '6':
+				case '7': {
+					// Octal: \0NNN or \NNN (1-3 octal digits starting from next char)
+					const octStart = i + 1
+					const octSlice = body.slice(octStart, octStart + 4)
+					const match = octSlice.match(/^([0-7]{1,4})/)
+					if (match) {
+						// Bash limits to 3 octal digits for \0NNN, or the leading digit + 2 more
+						const digits = match[1]!.slice(0, next === '0' ? 4 : 3)
+						result += String.fromCharCode(Number.parseInt(digits, 8) & 0xff)
+						i += 1 + digits.length
+					} else {
+						result += body[i]
+						i++
+					}
+					break
+				}
+				default:
+					result += body[i]
+					i++
+			}
+		} else {
+			result += body[i]
+			i++
+		}
+	}
+	return result
+}
+
 /** Removes surrounding single, double, or ANSI-C ($'...') quotes from a word. */
 function unquoteWord(word: string): string {
 	if (word.length >= 3 && word.startsWith("$'") && word.endsWith("'")) {
-		return word.slice(2, -1)
+		return expandAnsiCEscapes(word.slice(2, -1))
 	}
 	if (word.length >= 2 && word.startsWith("'") && word.endsWith("'")) {
 		return word.slice(1, -1)
@@ -518,6 +615,13 @@ export function splitShellWords(segment: string): string[] {
 				current = ''
 			}
 			i++
+			continue
+		}
+
+		// Backslash escape outside quotes: consume next char as literal
+		if (!inSingle && ch === '\\' && i + 1 < segment.length) {
+			current += segment[i + 1]
+			i += 2
 			continue
 		}
 

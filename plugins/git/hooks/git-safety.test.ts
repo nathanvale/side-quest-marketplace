@@ -580,9 +580,38 @@ describe('issue 4b: ANSI-C quoting does not bypass safety checks', () => {
 		["git push $'--force'"],
 		["git clean $'-f'"],
 		["git clean $'-fd'"],
+		// ANSI-C hex/octal escape expansion
+		["git reset $'--ha\\x72d'"], // \x72 = 'r' -> --hard
+		["git push $'--fo\\x72ce'"], // \x72 = 'r' -> --force
+		["git reset $'--ha\\162d'"], // octal \162 = 'r' -> --hard
+		["git clean $'-\\x66d'"], // \x66 = 'f' -> -fd
 	])('blocks: %s', (command) => {
 		const result = checkCommand(command)
 		expect(result.blocked).toBe(true)
+	})
+})
+
+// ---------------------------------------------------------------------------
+// Issue 055: backslash-escaped flags must not bypass safety checks
+// ---------------------------------------------------------------------------
+describe('issue 055: backslash escapes do not bypass safety checks', () => {
+	test.each([
+		['git reset \\--hard'],
+		['git push \\--force origin main'],
+		['git clean \\-f'],
+		['git clean \\-fd'],
+		['git checkout \\-- .'],
+	])('blocks: %s', (command) => {
+		const result = checkCommand(command)
+		expect(result.blocked).toBe(true)
+	})
+
+	test.each([
+		['git commit -m "escaped \\n newline"'],
+		['git log --oneline'],
+	])('allows: %s', (command) => {
+		const result = checkCommand(command)
+		expect(result.blocked).toBe(false)
 	})
 })
 
