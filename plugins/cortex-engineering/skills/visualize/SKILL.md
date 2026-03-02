@@ -8,7 +8,7 @@ allowed-tools:
   - Bash(node *)
   - Bash(open *)
   - Bash(mkdir *)
-  - Bash(rm *.html)
+  - Bash(rm mindmap.html)
   - Read
   - Glob
   - Grep
