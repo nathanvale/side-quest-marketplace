@@ -1,5 +1,5 @@
 ---
-status: pending
+status: wont_fix
 priority: p3
 issue_id: "010"
 tags: [code-review, simplicity, yagni]
