@@ -38,12 +38,42 @@ async function getRepoIdentity(
 	cwd: string,
 ): Promise<{ repoName: string; gitRoot: string }> {
 	if (!cachedIdentity) {
-		// Use cwd-derived identity to avoid expensive git subprocesses per hook invocation.
-		const gitRoot = cwd
+		const gitRoot = (await resolveRepoRoot(cwd)) || cwd
 		const repoName = getRepoKeyFromGitRoot(gitRoot)
 		cachedIdentity = { repoName, gitRoot }
 	}
 	return cachedIdentity
+}
+
+async function runGit(
+	args: string[],
+	cwd: string,
+): Promise<{ stdout: string; exitCode: number }> {
+	const proc = Bun.spawn(['git', ...args], {
+		cwd,
+		stdout: 'pipe',
+		stderr: 'ignore',
+	})
+	const stdout = await new Response(proc.stdout).text()
+	const exitCode = await proc.exited
+	return { stdout: stdout.trim(), exitCode }
+}
+
+async function resolveRepoRoot(cwd: string): Promise<string | null> {
+	const commonDirResult = await runGit(
+		['rev-parse', '--path-format=absolute', '--git-common-dir'],
+		cwd,
+	)
+	if (commonDirResult.exitCode !== 0 || commonDirResult.stdout.length === 0) {
+		return null
+	}
+
+	const normalized = commonDirResult.stdout.replace(/\\/g, '/')
+	const match = normalized.match(/^(.*)\/\.git(?:\/.*)?$/)
+	if (match?.[1]) {
+		return match[1]
+	}
+	return null
 }
 
 function hashGitRoot(gitRoot: string): string {

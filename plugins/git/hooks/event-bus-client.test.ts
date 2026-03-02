@@ -4,6 +4,20 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { _resetCaches, getRepoKeyFromGitRoot, postEvent } from './event-bus-client'
 
+async function getRepoRootForTest(cwd: string): Promise<string> {
+	const proc = Bun.spawn(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'], {
+		cwd,
+		stdout: 'pipe',
+		stderr: 'ignore',
+	})
+	const stdout = (await new Response(proc.stdout).text()).trim()
+	const exitCode = await proc.exited
+	if (exitCode !== 0 || stdout.length === 0) return cwd
+	const normalized = stdout.replace(/\\/g, '/')
+	const match = normalized.match(/^(.*)\/\.git(?:\/.*)?$/)
+	return match?.[1] || cwd
+}
+
 /**
  * Helper to create a temp HOME directory with the expected port file path.
  * Returns the temp HOME path and cleanup function.
@@ -12,7 +26,8 @@ async function createPortFileSetup(portContent: string): Promise<{
 	tempHome: string
 	cleanup: () => void
 }> {
-	const repoName = getRepoKeyFromGitRoot(process.cwd())
+	const repoRoot = await getRepoRootForTest(process.cwd())
+	const repoName = getRepoKeyFromGitRoot(repoRoot)
 	const tempHome = join(
 		tmpdir(),
 		`event-bus-test-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -168,7 +183,8 @@ describe('event-bus-client', () => {
 			return new Response('ok', { status: 200 })
 		}) as unknown as typeof fetch
 
-		const repoName = getRepoKeyFromGitRoot(process.cwd())
+		const repoRoot = await getRepoRootForTest(process.cwd())
+		const repoName = getRepoKeyFromGitRoot(repoRoot)
 		const portDir = join(tempHome, '.cache', 'side-quest-git', repoName)
 		mkdirSync(portDir, { recursive: true })
 		writeFileSync(join(portDir, 'events.port'), '43127')
@@ -188,7 +204,8 @@ describe('event-bus-client', () => {
 			return new Response('ok', { status: 200 })
 		}) as unknown as typeof fetch
 
-		const repoName = getRepoKeyFromGitRoot(process.cwd())
+		const repoRoot = await getRepoRootForTest(process.cwd())
+		const repoName = getRepoKeyFromGitRoot(repoRoot)
 		const tempHome = join(
 			tmpdir(),
 			`event-bus-global-fallback-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -214,5 +231,31 @@ describe('event-bus-client', () => {
 		expect(a).not.toBe(b)
 		expect(a.startsWith('app-')).toBe(true)
 		expect(b.startsWith('app-')).toBe(true)
+	})
+
+	test('nested cwd resolves to repo-root key for per-repo port lookup', async () => {
+		let requestSent = false
+		globalThis.fetch = (async () => {
+			requestSent = true
+			return new Response('ok', { status: 200 })
+		}) as unknown as typeof fetch
+
+		const tempHome = join(
+			tmpdir(),
+			`event-bus-nested-cwd-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+		)
+		const repoRoot = await getRepoRootForTest(process.cwd())
+		const repoName = getRepoKeyFromGitRoot(repoRoot)
+		const repoDir = join(tempHome, '.cache', 'side-quest-git', repoName)
+		mkdirSync(repoDir, { recursive: true })
+		writeFileSync(join(repoDir, 'events.port'), '43129')
+		process.env.HOME = tempHome
+
+		await postEvent(join(process.cwd(), 'plugins', 'git'), 'session.started', {
+			scope: 'nested-cwd',
+		})
+
+		expect(requestSent).toBe(true)
+		rmSync(tempHome, { recursive: true, force: true })
 	})
 })
