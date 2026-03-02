@@ -8,6 +8,8 @@ user-invocable: false
 
 Background knowledge for producing clean, readable, print-ready Mermaid diagrams. This skill provides the craft -- the **visualize** skill provides the workflow.
 
+**Scope:** Mermaid is the engine for all non-mind-map diagram types. Mind maps auto-route to Markmap via the visualize skill. Users can override to Mermaid for mind maps if they prefer themed presets over Markmap's visual quality.
+
 **Curated visual identity:** All diagrams use one of three preset configs. Each preset pairs a theme, look mode, and layout engine. See [default-theme.md](references/default-theme.md) for the full specification.
 
 ## Quick Start
