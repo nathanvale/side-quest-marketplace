@@ -160,7 +160,7 @@ What this decision means going forward.
 
 ### `diagram`
 
-Diagram docs use `## <Label>` section headings for each diagram type (e.g. `## Flowchart`, `## Mind Map`, `## Entity-Relationship Diagram`). Each section contains the Mermaid source in a fenced code block followed by an `**Export:** <preset> theme, <paper> size.` line. This structure is uniform from the first write, so appending a second diagram type never requires restructuring.
+Diagram docs use `## <Label>` section headings for each diagram type (e.g. `## Flowchart`, `## Mind Map`, `## Entity-Relationship Diagram`). Each section contains the diagram source in a fenced code block followed by an `**Export:**` annotation line. The code block language tag depends on the engine: `mermaid` for Mermaid diagrams, `markmap` for Markmap mind maps. This structure is uniform from the first write, so appending a second diagram type never requires restructuring.
 
 ```markdown
 ## Flowchart
@@ -173,12 +173,27 @@ flowchart TD
 **Export:** Classic theme, A4 landscape.
 ```
 
-Additional frontmatter field for diagram docs:
+```markdown
+## Mind Map
+
+```markmap
+# Topic
+## Branch 1
+## Branch 2
+```
+
+**Export:** Markmap engine, A4 landscape.
+```
+
+Additional frontmatter fields for diagram docs:
 
 ```yaml
+engine: markmap                                  # optional -- mermaid (default) | markmap
 source:                                          # always a YAML list, even for single sources
   - docs/brainstorms/YYYY-MM-DD-<topic>.md       # path(s) to origin document(s)
 ```
+
+The `engine` field is only needed when using a non-default engine (currently only Markmap for mind maps). Omit for Mermaid diagrams.
 
 ## File Naming Convention
 

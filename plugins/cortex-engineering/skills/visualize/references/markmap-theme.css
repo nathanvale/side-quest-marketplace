@@ -1,0 +1,110 @@
+/*
+ * Cortex Engineering -- Markmap Classic Theme
+ *
+ * Aligns markmap output with the design-system skill tokens:
+ *   - Font: Inter, Helvetica, Arial, sans-serif
+ *   - Spacing: 8px grid
+ *   - Colors: Okabe-Ito colorblind-safe palette
+ *   - Background: white (print-ready)
+ *   - WCAG AA contrast on all text
+ *
+ * Markmap DOM structure:
+ *   g.markmap-node[data-depth="N"]
+ *     > line (branch connector)
+ *     > circle (fold indicator)
+ *     > foreignObject.markmap-foreign
+ *       > div > div (text content)
+ */
+
+/* ── Background ───────────────────────────────────────── */
+body,
+html {
+	margin: 0;
+	padding: 0;
+	background: #ffffff;
+}
+
+/* ── Typography base ──────────────────────────────────── */
+.markmap {
+	font-family: Inter, Helvetica, Arial, sans-serif;
+}
+
+.markmap foreignObject div {
+	font-family: Inter, Helvetica, Arial, sans-serif !important;
+	color: #000000 !important;
+}
+
+/* ── Typographic scale by depth ───────────────────────── */
+
+/* Depth 1: Root node -- Display (24px / 32px / 700) */
+[data-depth="1"] foreignObject div {
+	font-size: 24px !important;
+	line-height: 32px !important;
+	font-weight: 700 !important;
+}
+
+/* Depth 2: Primary branches -- Heading (20px / 28px / 600) */
+[data-depth="2"] foreignObject div {
+	font-size: 20px !important;
+	line-height: 28px !important;
+	font-weight: 600 !important;
+}
+
+/* Depth 3: Secondary branches -- Large (18px / 24px / 500) */
+[data-depth="3"] foreignObject div {
+	font-size: 18px !important;
+	line-height: 24px !important;
+	font-weight: 500 !important;
+}
+
+/* Depth 4+: Leaf nodes -- Base (16px / 24px / 400) */
+[data-depth="4"] foreignObject div,
+[data-depth="5"] foreignObject div,
+[data-depth="6"] foreignObject div {
+	font-size: 16px !important;
+	line-height: 24px !important;
+	font-weight: 400 !important;
+}
+
+/* ── Code spans inside nodes ──────────────────────────── */
+.markmap code {
+	font-size: 14px !important;
+	background: #f0f0f0 !important;
+	color: #333333 !important;
+	padding: 2px 6px !important;
+	border-radius: 4px !important;
+	font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace !important;
+}
+
+/* ── Branch lines -- consistent 2px stroke ────────────── */
+.markmap-link {
+	stroke-width: 2px !important;
+}
+
+/* Connector line under each node label */
+.markmap-node > line {
+	stroke-width: 2px !important;
+}
+
+/* ── Node circles -- visible, filled with branch color ── */
+.markmap-node circle {
+	stroke-width: 1.5px !important;
+	r: 4px;
+}
+
+/* ── Print: force color rendering ─────────────────────── */
+@media print {
+	body,
+	html {
+		background: #ffffff !important;
+		-webkit-print-color-adjust: exact !important;
+		print-color-adjust: exact !important;
+	}
+
+	.markmap-link,
+	.markmap-node circle,
+	.markmap-node line {
+		-webkit-print-color-adjust: exact !important;
+		print-color-adjust: exact !important;
+	}
+}
