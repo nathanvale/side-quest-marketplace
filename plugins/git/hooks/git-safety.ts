@@ -525,6 +525,69 @@ export function isCommitCommand(
 	return { isCommit: true, hasNoVerify, hasWipMessage }
 }
 
+/**
+ * Detects git subcommands that can create a commit and therefore must be
+ * blocked on protected branches.
+ */
+export function hasProtectedBranchCommitAction(
+	command: string,
+	preParsedSegments?: string[],
+): boolean {
+	const segments = preParsedSegments ?? splitShellSegments(command).segments
+
+	for (const segment of segments) {
+		const parsed = parseGitInvocation(segment)
+		if (!parsed) continue
+
+		const { subcommand, args } = parsed
+		if (subcommand === 'commit') return true
+
+		if (subcommand === 'cherry-pick' || subcommand === 'revert') {
+			const noCommit =
+				hasLongFlag(args, '--no-commit') || hasShortFlag(args, 'n')
+			if (!noCommit) return true
+		}
+
+		if (subcommand === 'merge') {
+			const createsCommit =
+				(hasLongFlag(args, '--no-ff') || hasLongFlag(args, '--commit')) &&
+				!hasLongFlag(args, '--squash')
+			if (createsCommit) return true
+		}
+	}
+
+	return false
+}
+
+/**
+ * Detects lease-style force pushes that can target the current upstream branch
+ * implicitly (i.e., no explicit refspec provided).
+ */
+export function hasImplicitProtectedBranchForceLeasePush(
+	command: string,
+	preParsedSegments?: string[],
+): boolean {
+	const segments = preParsedSegments ?? splitShellSegments(command).segments
+
+	for (const segment of segments) {
+		const parsed = parseGitInvocation(segment)
+		if (!parsed || parsed.subcommand !== 'push') continue
+
+		const args = parsed.args
+		const hasForceWithLease =
+			hasLongFlag(args, '--force-with-lease') ||
+			args.some((a) => a.startsWith('--force-with-lease='))
+		const hasForceIfIncludes = hasLongFlag(args, '--force-if-includes')
+		if (!hasForceWithLease && !hasForceIfIncludes) continue
+
+		const nonFlagArgs = args.filter((a) => !a.startsWith('-'))
+		const explicitRefspecs = nonFlagArgs.length > 1 ? nonFlagArgs.slice(1) : []
+		if (explicitRefspecs.length === 0) return true
+	}
+
+	return false
+}
+
 /** Emits a deny decision, posts a best-effort event, and exits with code 2. */
 async function denyAndExit(
 	reason: string,
@@ -633,27 +696,48 @@ if (import.meta.main) {
 		}
 
 		const commitCheck = isCommitCommand(command, commandResult.segments)
+		const hasCommitAction = hasProtectedBranchCommitAction(
+			command,
+			commandResult.segments,
+		)
+		const hasImplicitForceLeasePush = hasImplicitProtectedBranchForceLeasePush(
+			command,
+			commandResult.segments,
+		)
+
+		if (hasCommitAction || hasImplicitForceLeasePush) {
+			const branch = await getCurrentBranch(input.cwd)
+			if (branch && PROTECTED_BRANCHES.includes(branch)) {
+				if (hasCommitAction) {
+					await denyAndExit(
+						[
+							`BLOCKED: Cannot commit directly to ${branch}.`,
+							'',
+							'Create a feature branch first:',
+							'  git checkout -b <type>/<description>',
+							'',
+							'Then commit on the new branch.',
+						].join('\n'),
+						input,
+					)
+				}
+				if (hasImplicitForceLeasePush) {
+					await denyAndExit(
+						[
+							`BLOCKED: Cannot lease-force-push implicitly to ${branch}.`,
+							'',
+							'Specify an explicit non-protected refspec or push from a feature branch.',
+						].join('\n'),
+						input,
+					)
+				}
+			}
+		}
+
+		// Block --no-verify on non-WIP commits (prevents bypassing pre-commit hooks)
 		if (commitCheck.isCommit) {
 			const isLegitimateWip =
 				commitCheck.hasNoVerify && commitCheck.hasWipMessage
-
-			// Block ALL commits on protected branches (including WIP checkpoints)
-			const branch = await getCurrentBranch(input.cwd)
-			if (branch && PROTECTED_BRANCHES.includes(branch)) {
-				await denyAndExit(
-					[
-						`BLOCKED: Cannot commit directly to ${branch}.`,
-						'',
-						'Create a feature branch first:',
-						'  git checkout -b <type>/<description>',
-						'',
-						'Then commit on the new branch.',
-					].join('\n'),
-					input,
-				)
-			}
-
-			// Block --no-verify on non-WIP commits (prevents bypassing pre-commit hooks)
 			if (commitCheck.hasNoVerify && !isLegitimateWip) {
 				await denyAndExit(
 					[

@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test'
-import { checkCommand, checkFileEdit, isCommitCommand } from './git-safety.ts'
+import {
+	checkCommand,
+	checkFileEdit,
+	hasImplicitProtectedBranchForceLeasePush,
+	hasProtectedBranchCommitAction,
+	isCommitCommand,
+} from './git-safety.ts'
 import { extractCommandHead, splitShellSegments, tokenizeShell } from './shell-tokenizer.ts'
 
 describe('git-safety worktree patterns', () => {
@@ -125,6 +131,47 @@ describe('git push --force-with-lease on protected branches', () => {
 	])('allows on feature branch: %s', (command) => {
 		const result = checkCommand(command)
 		expect(result.blocked).toBe(false)
+	})
+
+	test.each([
+		['git push --force-with-lease'],
+		['git push --force-if-includes'],
+		['git push origin --force-with-lease'],
+		['git push upstream --force-if-includes'],
+	])('detects implicit lease-force push targeting upstream branch: %s', (command) => {
+		expect(hasImplicitProtectedBranchForceLeasePush(command)).toBe(true)
+	})
+
+	test.each([
+		['git push --force-with-lease origin feat/my-feature'],
+		['git push --force-if-includes origin HEAD:feat/my-feature'],
+		['git push --force-with-lease origin main'],
+	])('does not mark explicit refspec pushes as implicit: %s', (command) => {
+		expect(hasImplicitProtectedBranchForceLeasePush(command)).toBe(false)
+	})
+})
+
+describe('protected-branch commit action detection', () => {
+	test.each([
+		['git commit -m "feat: x"'],
+		['git cherry-pick abc123'],
+		['git revert abc123'],
+		['git merge --no-ff feature/foo'],
+		['git merge --commit feature/foo'],
+	])('detects commit-creating action: %s', (command) => {
+		expect(hasProtectedBranchCommitAction(command)).toBe(true)
+	})
+
+	test.each([
+		['git cherry-pick -n abc123'],
+		['git cherry-pick --no-commit abc123'],
+		['git revert -n abc123'],
+		['git revert --no-commit abc123'],
+		['git merge --squash feature/foo'],
+		['git merge feature/foo'],
+		['git status'],
+	])('does not detect non-commit action: %s', (command) => {
+		expect(hasProtectedBranchCommitAction(command)).toBe(false)
 	})
 })
 
