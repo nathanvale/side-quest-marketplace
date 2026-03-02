@@ -78,19 +78,13 @@ const PROTECTED_FILE_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
 	},
 ]
 
-function collectShortFlags(args: string[]): string {
-	return args
-		.filter((arg) => /^-[A-Za-z]+$/.test(arg))
-		.map((arg) => arg.slice(1))
-		.join('')
-}
-
 function hasLongFlag(args: string[], flag: string): boolean {
 	return args.some((arg) => arg === flag)
 }
 
+/** Only valid for single-character flag lookups. */
 function hasShortFlag(args: string[], flag: string): boolean {
-	return collectShortFlags(args).includes(flag)
+	return args.some((arg) => /^-[A-Za-z]+$/.test(arg) && arg.includes(flag))
 }
 
 function extractCommitMessages(args: string[]): string[] {
@@ -228,6 +222,36 @@ function checkParsedSegments(
 							reason:
 								'Force push (even with --force-with-lease) to a protected branch can destroy shared history. Push to a feature branch and open a PR instead.',
 						}
+					}
+				}
+
+				// Block remote branch deletion targeting protected branches
+				const hasDelete =
+					hasLongFlag(args, '--delete') || hasShortFlag(args, 'd')
+				if (hasDelete) {
+					const nonFlagArgs = args.filter((a) => !a.startsWith('-'))
+					const deletesProtected = nonFlagArgs.some((a) =>
+						PROTECTED_BRANCHES.includes(a),
+					)
+					if (deletesProtected) {
+						return {
+							blocked: true,
+							reason:
+								'Deleting a protected remote branch can destroy shared history. Use branch protection rules on the remote instead.',
+						}
+					}
+				}
+
+				// Block refspec-based deletion (git push origin :<branch>)
+				const nonFlagArgsPush = args.filter((a) => !a.startsWith('-'))
+				const deletesProtectedViaRefspec = nonFlagArgsPush.some(
+					(a) => a.startsWith(':') && PROTECTED_BRANCHES.includes(a.slice(1)),
+				)
+				if (deletesProtectedViaRefspec) {
+					return {
+						blocked: true,
+						reason:
+							'Deleting a protected remote branch can destroy shared history. Use branch protection rules on the remote instead.',
 					}
 				}
 			}
@@ -549,10 +573,9 @@ export function hasProtectedBranchCommitAction(
 		}
 
 		if (subcommand === 'merge') {
-			const createsCommit =
-				(hasLongFlag(args, '--no-ff') || hasLongFlag(args, '--commit')) &&
-				!hasLongFlag(args, '--squash')
-			if (createsCommit) return true
+			const noCommit =
+				hasLongFlag(args, '--no-commit') || hasLongFlag(args, '--squash')
+			if (!noCommit) return true
 		}
 	}
 

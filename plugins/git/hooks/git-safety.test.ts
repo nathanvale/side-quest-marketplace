@@ -151,6 +151,31 @@ describe('git push --force-with-lease on protected branches', () => {
 	})
 })
 
+describe('git push remote branch deletion', () => {
+	test.each([
+		['git push origin --delete main'],
+		['git push origin -d main'],
+		['git push origin --delete master'],
+		['git push origin :main'],
+		['git push origin :master'],
+	])('blocks deletion of protected branch: %s', (command) => {
+		const result = checkCommand(command)
+		expect(result.blocked).toBe(true)
+		expect(result.reason).toContain('protected remote branch')
+	})
+
+	test.each([
+		['git push origin --delete feature/foo'],
+		['git push origin -d feature/foo'],
+		['git push origin :feature/foo'],
+		['git push origin --delete dev'],
+		['git push origin :dev'],
+	])('allows deletion of non-protected branch: %s', (command) => {
+		const result = checkCommand(command)
+		expect(result.blocked).toBe(false)
+	})
+})
+
 describe('protected-branch commit action detection', () => {
 	test.each([
 		['git commit -m "feat: x"'],
@@ -158,6 +183,7 @@ describe('protected-branch commit action detection', () => {
 		['git revert abc123'],
 		['git merge --no-ff feature/foo'],
 		['git merge --commit feature/foo'],
+		['git merge feature/foo'],
 	])('detects commit-creating action: %s', (command) => {
 		expect(hasProtectedBranchCommitAction(command)).toBe(true)
 	})
@@ -168,7 +194,7 @@ describe('protected-branch commit action detection', () => {
 		['git revert -n abc123'],
 		['git revert --no-commit abc123'],
 		['git merge --squash feature/foo'],
-		['git merge feature/foo'],
+		['git merge --no-commit feature/foo'],
 		['git status'],
 	])('does not detect non-commit action: %s', (command) => {
 		expect(hasProtectedBranchCommitAction(command)).toBe(false)
