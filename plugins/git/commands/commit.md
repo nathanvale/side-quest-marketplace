@@ -5,4 +5,4 @@ allowed-tools: Bash(git status:*), Bash(git add:*), Bash(git diff:*), Bash(git l
 argument-hint: [description]
 ---
 
-Use the **git-expert** skill to create a conventional commit. $ARGUMENTS
+Use the **workflow** skill to create a conventional commit. $ARGUMENTS

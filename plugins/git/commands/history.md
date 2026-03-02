@@ -5,4 +5,4 @@ allowed-tools: Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git sta
 argument-hint: [search-query]
 ---
 
-Use the **git-expert** skill to explore git history. $ARGUMENTS
+Use the **workflow** skill to explore git history. $ARGUMENTS

@@ -8,12 +8,12 @@ dependencies: []
 
 ## Problem Statement
 
-The context loader routing table injected at session start lumps `/git:history`, `/git:changelog`, `/git:compare`, and `/git:review-pr` under "invoke git-expert skill", which is not actionable for sub-agent callers. After compaction, this is the only context Claude has.
+The context loader routing table injected at session start lumps `/git:history`, `/git:changelog`, `/git:compare`, and `/git:review-pr` under "invoke workflow skill", which is not actionable for sub-agent callers. After compaction, this is the only context Claude has.
 
 ## Findings
 
 - `git-context-loader.ts` lines 123-136: routing table only lists 6 of 10 commands explicitly
-- "invoke git-expert skill" is ambiguous -- sub-agents cannot invoke skills directly
+- "invoke workflow skill" is ambiguous -- sub-agents cannot invoke skills directly
 - After compaction, the routing table is the sole reference for available commands
 
 ## Proposed Solutions

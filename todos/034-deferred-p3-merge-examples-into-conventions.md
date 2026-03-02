@@ -29,7 +29,7 @@ Then delete `examples.md` and remove it from any reference loading config.
 
 ## Technical Details
 
-- **Files**: `plugins/git/skills/git-expert/references/examples.md`, `plugins/git/skills/git-expert/references/conventions.md`
+- **Files**: `plugins/git/skills/workflow/references/examples.md`, `plugins/git/skills/workflow/references/conventions.md`
 - Estimated savings: ~60 lines / reduced token cost per skill activation
 
 ## Acceptance Criteria

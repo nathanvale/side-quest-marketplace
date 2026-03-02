@@ -5,4 +5,4 @@ allowed-tools: Bash(git log:*), Bash(git tag:*), Bash(git diff:*), Bash(git desc
 argument-hint: [version]
 ---
 
-Use the **git-expert** skill to generate a changelog. $ARGUMENTS
+Use the **workflow** skill to generate a changelog. $ARGUMENTS

@@ -16,7 +16,7 @@ source:
 # Git Plugin V2
 
 ## V1 Baseline
-### 1 Skill (git-expert)
+### 1 Skill (workflow)
 - 4 reference files
 ### 10 Slash Commands
 - commit, checkpoint, squash

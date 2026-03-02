@@ -281,7 +281,7 @@ if (import.meta.main) {
 		const contextParts: string[] = [
 			`Git state at compaction:\n${gitState}`,
 			'\nGit workflow: /git:commit, /git:squash, /git:checkpoint',
-			'git-expert skill handles: commits, PRs, history, worktrees, changelog, branch compare, squash, safety guards',
+			'workflow skill handles: commits, PRs, history, worktrees, changelog, branch compare, squash, safety guards',
 		]
 
 		if (cortexEntries.length > 0) {

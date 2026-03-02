@@ -15,7 +15,7 @@ SKILL.md says "NEVER git reset --hard without explicit user confirmation" which 
 ## Findings
 
 - **Source:** Agent-native reviewer (2026-03-03)
-- **File:** `plugins/git/skills/git-expert/SKILL.md` lines 52-54, 61
+- **File:** `plugins/git/skills/workflow/SKILL.md` lines 52-54, 61
 
 ## Proposed Solutions
 

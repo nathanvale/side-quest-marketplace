@@ -1,6 +1,7 @@
 ---
-name: git-expert
+name: workflow
 description: Provides git workflow expertise -- conventional commits, history exploration, worktree management, PR creation, squash, rebase, merge, stash, and safety guards. Use for any git-related task including committing, branching, history, repository analysis, or worktree coordination. Do not use when no git operations are involved.
+user-invocable: false
 allowed-tools:
   - Bash(git *:*)
   - Bash(gh *:*)
@@ -9,7 +10,7 @@ allowed-tools:
   - Grep
 ---
 
-# Git Expert
+# Git Workflow
 
 Unified git workflow skill. Routes to the right procedure based on what the user needs.
 
@@ -53,7 +54,7 @@ These are non-negotiable:
 - **NEVER** `git clean -f` -- blocked by safety hook, no override
 - **NEVER** `git checkout .` or `git restore .` -- blocked by safety hook, no override
 - **NEVER** commit secrets (`.env`, credentials, API keys)
-- **NEVER** use `git add .` or `git add -A` — stage specific files (exception: `git add -u` for WIP checkpoints, which only stages tracked file changes)
+- **NEVER** use `git add .` or `git add -A` -- stage specific files (exception: `git add -u` for WIP checkpoints, which only stages tracked file changes)
 - **NEVER** skip hooks (`--no-verify`) except for WIP/checkpoint commits on feature branches
 - **ALWAYS** check branch before committing -- if on `main`/`master`, create a feature branch first (no exceptions, including WIP checkpoints)
 - **ALWAYS** verify on feature branch before squash (abort if `main`)
@@ -63,7 +64,7 @@ These are non-negotiable:
 
 ## Lifecycle Hooks
 
-This plugin runs 5 hooks that fire automatically — you don't invoke them, but be aware of their effects:
+This plugin runs 5 hooks that fire automatically -- you don't invoke them, but be aware of their effects:
 
 | Hook | Event | What It Does |
 |------|-------|--------------|

@@ -19,7 +19,7 @@
 		"compare"
 	],
 	"license": "MIT",
-	"skills": ["./skills/git-expert"],
+	"skills": ["./skills/workflow"],
 	"commands": [
 		"./commands/changelog.md",
 		"./commands/checkpoint.md",

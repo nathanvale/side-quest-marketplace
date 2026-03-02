@@ -12,7 +12,7 @@ The Review PR workflow requires human approval before posting ("Draft -> Show ->
 
 ## Findings
 
-- File: `plugins/git/skills/git-expert/references/workflows.md` lines 107-109
+- File: `plugins/git/skills/workflow/references/workflows.md` lines 107-109
 - The workflow mandates user approval before posting a review to GitHub
 - `AskUserQuestion` does not work in Codex, headless agents, or sub-agent callers (per skill authoring conventions in MEMORY.md)
 - This makes the review-pr command a dead end when invoked by another agent

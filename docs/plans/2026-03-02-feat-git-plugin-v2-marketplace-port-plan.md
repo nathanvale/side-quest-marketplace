@@ -37,7 +37,7 @@ These decisions were already made during brainstorming and are NOT re-evaluated 
 
 | Decision | Source |
 |----------|--------|
-| Keep 1 skill (git-expert) with references/ restructure, not multiple skills | marketplace-port brainstorm, Section "Skill Architecture" |
+| Keep 1 skill (workflow) with references/ restructure, not multiple skills | marketplace-port brainstorm, Section "Skill Architecture" |
 | Keep shared modules (event-bus-client, git-status-parser) -- DRY wins over self-contained hooks | marketplace-port brainstorm, Section "Shared vs Self-Contained" |
 | Keep `bunx @side-quest/git` for worktree management | marketplace-port brainstorm, Section "Worktree CLI Dependency" |
 | Port `/worktree` command as-is, no worktree strategy changes | feature-evaluation, Section 3 |
@@ -89,7 +89,7 @@ plugins/git/
     hooks.json
     session-summary.ts
   skills/
-    git-expert/
+    workflow/
       SKILL.md
       CONVENTIONS.md
       EXAMPLES.md
@@ -178,7 +178,7 @@ selfDestruct.unref();
 Move flat companion files into `references/` subdirectory:
 
 ```
-skills/git-expert/
+skills/workflow/
   SKILL.md
   references/
     conventions.md    (was CONVENTIONS.md)
@@ -354,7 +354,7 @@ allowed-tools:
 argument-hint: [description]
 ---
 
-Use the **git-expert** skill to create a conventional commit, push, and create a pull request.
+Use the **workflow** skill to create a conventional commit, push, and create a pull request.
 
 **Workflow:**
 1. Check for WIP commits (chore(wip): pattern) -- if found, squash them first using the squash workflow
@@ -382,7 +382,7 @@ allowed-tools:
 argument-hint: [--dry-run]
 ---
 
-Use the **git-expert** skill to clean up branches with deleted remote tracking branches.
+Use the **workflow** skill to clean up branches with deleted remote tracking branches.
 
 **Workflow:**
 1. Run `git fetch --prune` to update remote tracking info
@@ -527,11 +527,11 @@ All files copied from `~/code/side-quest-plugins/plugins/git/` then reformatted 
 |------|-------|
 | `plugins/git/.claude-plugin/plugin.json` | Plugin manifest |
 | `plugins/git/README.md` | New -- written for marketplace |
-| `plugins/git/skills/git-expert/SKILL.md` | Skill definition |
-| `plugins/git/skills/git-expert/CONVENTIONS.md` | Moved to `references/` in Phase 2 |
-| `plugins/git/skills/git-expert/WORKFLOWS.md` | Moved to `references/` in Phase 2 |
-| `plugins/git/skills/git-expert/WORKTREE.md` | Moved to `references/` in Phase 2 |
-| `plugins/git/skills/git-expert/EXAMPLES.md` | Moved to `references/` in Phase 2 |
+| `plugins/git/skills/workflow/SKILL.md` | Skill definition |
+| `plugins/git/skills/workflow/CONVENTIONS.md` | Moved to `references/` in Phase 2 |
+| `plugins/git/skills/workflow/WORKFLOWS.md` | Moved to `references/` in Phase 2 |
+| `plugins/git/skills/workflow/WORKTREE.md` | Moved to `references/` in Phase 2 |
+| `plugins/git/skills/workflow/EXAMPLES.md` | Moved to `references/` in Phase 2 |
 | `plugins/git/commands/*.md` (10 files) | All 10 V1 commands |
 | `plugins/git/hooks/*.ts` (5 entry points) | git-context-loader, git-safety, command-logger, session-summary, auto-commit-on-stop |
 | `plugins/git/hooks/*.ts` (2 shared modules) | event-bus-client, git-status-parser |
@@ -548,7 +548,7 @@ All files copied from `~/code/side-quest-plugins/plugins/git/` then reformatted 
 | `plugins/git/hooks/session-summary.ts` | Add self-destruct timer |
 | `plugins/git/hooks/auto-commit-on-stop.ts` | Add self-destruct timer |
 | `plugins/git/hooks/event-bus-client.ts` | Global observability path with fallback |
-| `plugins/git/skills/git-expert/SKILL.md` | Polish description (WHAT+WHEN+WHEN-NOT), update reference paths |
+| `plugins/git/skills/workflow/SKILL.md` | Polish description (WHAT+WHEN+WHEN-NOT), update reference paths |
 | `plugins/git/.claude-plugin/plugin.json` | Update description, author, repository, version to 2.0.0 |
 | `.claude-plugin/marketplace.json` | Add git plugin entry, bump to 0.2.0 |
 
@@ -566,16 +566,16 @@ All files copied from `~/code/side-quest-plugins/plugins/git/` then reformatted 
 | `plugins/git/commands/commit-push-pr.md` | New orchestration command |
 | `plugins/git/commands/clean-gone.md` | New branch cleanup command |
 | `plugins/git/.claude-plugin/plugin.json` | Register 2 new commands |
-| `plugins/git/skills/git-expert/SKILL.md` | Add routing table entries |
+| `plugins/git/skills/workflow/SKILL.md` | Add routing table entries |
 | `plugins/git/hooks/git-context-loader.ts` | Update SessionStart routing table |
-| `plugins/git/skills/git-expert/references/workflows.md` | Add commit-push-pr workflow |
+| `plugins/git/skills/workflow/references/workflows.md` | Add commit-push-pr workflow |
 
 ### Phase 5 -- Reference content updates
 
 | File | Change |
 |------|--------|
-| `plugins/git/skills/git-expert/references/conventions.md` | Dual-audience, anti-slop, AI-assistant trailer, narrative ordering |
-| `plugins/git/skills/git-expert/references/workflows.md` | Safety-net companion recommendation |
+| `plugins/git/skills/workflow/references/conventions.md` | Dual-audience, anti-slop, AI-assistant trailer, narrative ordering |
+| `plugins/git/skills/workflow/references/workflows.md` | Safety-net companion recommendation |
 
 ---
 

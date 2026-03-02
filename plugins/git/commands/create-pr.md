@@ -5,4 +5,4 @@ allowed-tools: Bash(git push:*), Bash(gh pr:*), Bash(git log:*), Bash(git diff:*
 argument-hint: "[title]"
 ---
 
-Use the **git-expert** skill to create a pull request. $ARGUMENTS
+Use the **workflow** skill to create a pull request. $ARGUMENTS

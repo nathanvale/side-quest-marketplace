@@ -39,7 +39,7 @@ Create the target directories:
 mkdir -p plugins/git/.claude-plugin
 mkdir -p plugins/git/commands
 mkdir -p plugins/git/hooks
-mkdir -p plugins/git/skills/git-expert
+mkdir -p plugins/git/skills/workflow
 ```
 
 ### Step 2: Copy all files
@@ -94,11 +94,11 @@ hooks/hooks.json
 
 **Skill (5 files):**
 ```
-skills/git-expert/SKILL.md
-skills/git-expert/CONVENTIONS.md
-skills/git-expert/EXAMPLES.md
-skills/git-expert/WORKFLOWS.md
-skills/git-expert/WORKTREE.md
+skills/workflow/SKILL.md
+skills/workflow/CONVENTIONS.md
+skills/workflow/EXAMPLES.md
+skills/workflow/WORKFLOWS.md
+skills/workflow/WORKTREE.md
 ```
 
 **Excluded from copy:** `plans/`, `research/` -- these already exist at `docs/` level in the marketplace.

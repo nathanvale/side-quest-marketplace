@@ -39,7 +39,7 @@ Provides intelligent git context, history exploration, smart commit capabilities
 
 ### Slash Commands
 
-All commands are thin wrappers that delegate to the git-expert skill:
+All commands are thin wrappers that delegate to the workflow skill:
 
 - `/git:commit` - Smart commits with Conventional Commits format
 - `/git:squash` - Squash WIP commits into one conventional commit
@@ -52,7 +52,7 @@ All commands are thin wrappers that delegate to the git-expert skill:
 - `/git:session-log` - Show session git activity
 - `/git:worktree <subcommand>` - Manage git worktrees (create, list, delete, sync, clean, status)
 
-### Skill: git-expert
+### Skill: workflow
 
 Unified skill covering all git workflows. Claude auto-activates for git tasks:
 - "Commit my changes" → Conventional commit workflow

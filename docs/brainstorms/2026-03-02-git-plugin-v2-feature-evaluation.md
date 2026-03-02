@@ -50,7 +50,7 @@ This is the right instinct. But NOT the Anthropic way (single-shot, no review). 
 
 This is a **thin orchestration command** that chains existing procedures. The skill already knows how to do both -- we just need a command that says "do both."
 
-**Implementation:** New `commands/commit-push-pr.md` that delegates to git-expert skill with both procedures. Model: `sonnet`.
+**Implementation:** New `commands/commit-push-pr.md` that delegates to workflow skill with both procedures. Model: `sonnet`.
 
 **Decision: V2 -- include.**
 
@@ -93,7 +93,7 @@ Anthropic's implementation is actually decent here -- finds `[gone]` branches (r
 **What we could do in V2.1 without the full dependency:**
 - Add a reference doc explaining the Git AI standard for users who want it
 - Support a `--git-ai` flag on `/commit` that runs `git-ai checkpoint` if installed
-- The git-expert skill could detect if git-ai is installed and suggest using `git-ai blame`
+- The workflow skill could detect if git-ai is installed and suggest using `git-ai blame`
 
 **Decision: V2.1 consideration -- add awareness, not dependency.**
 
@@ -137,7 +137,7 @@ From the research: good commits have "what changed + why + what it affects." Bad
 
 ### 1h. Subagent Commit Pattern -- ALREADY DOING THIS
 
-The research highlighted isolating commit message generation from conversation context via a subagent. Our commands already delegate to the git-expert skill, which acts as a focused context -- the model reads the diff and recent log, not the debugging transcript. This is functionally the same pattern.
+The research highlighted isolating commit message generation from conversation context via a subagent. Our commands already delegate to the workflow skill, which acts as a focused context -- the model reads the diff and recent log, not the debugging transcript. This is functionally the same pattern.
 
 **Decision: No action needed -- V1 already does this via skill routing.**
 

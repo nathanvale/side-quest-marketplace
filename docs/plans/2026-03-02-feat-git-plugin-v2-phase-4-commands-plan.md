@@ -70,7 +70,7 @@ Add two new commands identified in the feature evaluation brainstorm: `/commit-p
 - `/commit-push-pr`: "I'd love that -- I've been doing commit then push then create PR."
 - `/clean-gone`: "I love that, because I've owned that with Styleship."
 
-Both commands delegate to the `git-expert` skill. The skill already knows all the underlying procedures -- we're just adding orchestration commands that say "do these steps in sequence."
+Both commands delegate to the `workflow` skill. The skill already knows all the underlying procedures -- we're just adding orchestration commands that say "do these steps in sequence."
 
 ---
 
@@ -88,7 +88,7 @@ allowed-tools: Bash(git status:*), Bash(git add:*), Bash(git diff:*), Bash(git l
 argument-hint: [description] [--draft] [--skip-validate]
 ---
 
-Use the **git-expert** skill to commit, push, and create a pull request in one workflow. $ARGUMENTS
+Use the **workflow** skill to commit, push, and create a pull request in one workflow. $ARGUMENTS
 ```
 
 **Design decisions:**
@@ -116,7 +116,7 @@ allowed-tools: Bash(git fetch:*), Bash(git for-each-ref:*), Bash(git branch -d:*
 argument-hint: [--confirm]
 ---
 
-Use the **git-expert** skill to clean up local branches whose remote tracking branch has been deleted. $ARGUMENTS
+Use the **workflow** skill to clean up local branches whose remote tracking branch has been deleted. $ARGUMENTS
 ```
 
 **Design decisions:**
@@ -158,7 +158,7 @@ Alphabetical order for consistency (existing commands are already alphabetical).
 
 ## Step 4: Update SKILL.md routing table
 
-Add two new rows to the routing table in `plugins/git/skills/git-expert/SKILL.md`.
+Add two new rows to the routing table in `plugins/git/skills/workflow/SKILL.md`.
 
 Add after "Create PR" row:
 
@@ -190,7 +190,7 @@ Insert before the "Anything else git" catch-all row (which remains last).
 
 ## Step 6: Add Commit-Push-PR and Clean-Gone workflow sections
 
-Add two new sections to `plugins/git/skills/git-expert/references/workflows.md`.
+Add two new sections to `plugins/git/skills/workflow/references/workflows.md`.
 
 **Structural convention (architecture review):** The existing workflows.md has atomic procedures (Commit, Squash, PR). Commit-Push-PR is an orchestration that chains atomics. Orchestration workflows reference atomic procedures by name, not re-describe them.
 

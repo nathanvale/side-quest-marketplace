@@ -48,7 +48,7 @@ A skill doesn't appear in the tool palette. How do we make Claude proactively ga
 
 ### Option A: Reference-based context loading
 
-Add `references/git-reads.md` to git-expert skill teaching Claude the structured git commands. When the skill activates, Claude learns how to proactively run:
+Add `references/git-reads.md` to workflow skill teaching Claude the structured git commands. When the skill activates, Claude learns how to proactively run:
 
 ```
 | Need | Command |
@@ -64,7 +64,7 @@ Add `references/git-reads.md` to git-expert skill teaching Claude the structured
 ```
 
 **Pro:** Zero overhead, teaches Claude the right patterns
-**Con:** Only triggers when git-expert skill activates, not on general coding tasks
+**Con:** Only triggers when workflow skill activates, not on general coding tasks
 
 ### Option B: SessionStart hook enhancement
 
@@ -86,7 +86,7 @@ SessionStart for initial context, reference for mid-session refreshes.
 
 1. **Scope of SessionStart enhancement** -- How much context is too much? The current hook loads branch + status + recent commits (~10 lines). Should it add stash, ahead/behind, diff summary? Where's the token budget ceiling?
 
-2. **Reference loading trigger** -- The reference only loads when git-expert skill activates. But general coding tasks (editing files, running tests) would also benefit from proactive git status. Is there a way to make the reference available more broadly?
+2. **Reference loading trigger** -- The reference only loads when workflow skill activates. But general coding tasks (editing files, running tests) would also benefit from proactive git status. Is there a way to make the reference available more broadly?
 
 3. **Token cost** -- The MCP tools were on-demand (only called when needed). A reference is always loaded when the skill is active. Is the always-loaded cost justified?
 

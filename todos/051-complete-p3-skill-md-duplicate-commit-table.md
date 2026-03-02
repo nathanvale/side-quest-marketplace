@@ -15,7 +15,7 @@ SKILL.md has a "Commit Format" section (lines 87-98) that repeats the commit typ
 ## Findings
 
 - **Source:** Simplicity reviewer (2026-03-03)
-- **File:** `plugins/git/skills/git-expert/SKILL.md` lines 87-98
+- **File:** `plugins/git/skills/workflow/SKILL.md` lines 87-98
 
 ## Proposed Solutions
 

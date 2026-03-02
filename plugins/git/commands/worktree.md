@@ -5,4 +5,4 @@ allowed-tools: Bash(bunx @side-quest/git:*), Bash(git worktree:*), Bash(git bran
 argument-hint: <create|list|delete|sync|clean|status> [branch-name]
 ---
 
-Use the **git-expert** skill to manage git worktrees. $ARGUMENTS
+Use the **workflow** skill to manage git worktrees. $ARGUMENTS

@@ -139,7 +139,7 @@ export function formatAdditionalContext(
 		'| Compare branches | /git:compare (compare branches with AI summary) |\n'
 	routing +=
 		'| Session activity | /git:session-log (git activity during this Claude session) |\n'
-	routing += '| Anything else git | invoke git-expert skill |'
+	routing += '| Anything else git | invoke workflow skill |'
 	sections.push(routing)
 
 	// Section 3: Safety rules -- critical after compaction when Claude loses memory

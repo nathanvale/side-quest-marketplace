@@ -17,7 +17,7 @@ The goal is to port it into `side-quest-marketplace` and uplift it to V2, matchi
 
 ## What Exists (V1)
 
-- **1 skill** (git-expert) with 4 reference files (CONVENTIONS, WORKFLOWS, WORKTREE, EXAMPLES)
+- **1 skill** (workflow) with 4 reference files (CONVENTIONS, WORKFLOWS, WORKTREE, EXAMPLES)
 - **10 slash commands** (commit, checkpoint, squash, create-pr, review-pr, changelog, compare, history, session-log, worktree)
 - **5 lifecycle hooks** (SessionStart, PreToolUse, PostToolUse, PreCompact, Stop)
 - **Shared modules** (event-bus-client.ts, git-status-parser.ts)
@@ -88,14 +88,14 @@ Compared against cortex-engineering conventions:
 | Tests | 3 files | Keep and port | Port as-is |
 | Event bus | HTTP fire-and-forget | Unique to git | Keep |
 | Description quality | Decent | "Pushy" with negative scope | Polish |
-| Naming | git-expert | Convention-compliant | Good |
+| Naming | workflow | Convention-compliant | Good |
 
 ## Key Decisions
 
 ### 1. Skill Architecture
 
 **Options explored:**
-- (a) Keep 1 skill (git-expert) with references/ restructure
+- (a) Keep 1 skill (workflow) with references/ restructure
 - (b) Split into multiple skills (git-commit, git-safety, git-worktree, git-history)
 - (c) Keep 1 main skill + background knowledge skills
 

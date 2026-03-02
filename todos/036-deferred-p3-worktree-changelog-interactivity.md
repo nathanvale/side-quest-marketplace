@@ -28,7 +28,7 @@ For example:
 
 ## Technical Details
 
-- **Files**: `plugins/git/skills/git-expert/references/worktree.md`, `plugins/git/skills/git-expert/references/workflows.md`
+- **Files**: `plugins/git/skills/workflow/references/worktree.md`, `plugins/git/skills/workflow/references/workflows.md`
 - Skills should present numbered options only when disambiguation is needed
 - Fully specified invocations should execute without gates
 

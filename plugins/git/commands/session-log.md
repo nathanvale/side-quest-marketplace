@@ -5,4 +5,4 @@ allowed-tools: Bash(git log:*), Bash(git diff:*), Bash(git status:*)
 argument-hint: "[time-range]"
 ---
 
-Use the **git-expert** skill to show session git activity. $ARGUMENTS
+Use the **workflow** skill to show session git activity. $ARGUMENTS

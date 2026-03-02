@@ -72,8 +72,8 @@ Before editing reference files, verify prerequisites:
 
 ```bash
 # Phase 4 must be complete -- reference files must exist
-test -f plugins/git/skills/git-expert/references/conventions.md || echo "MISSING: conventions.md"
-test -f plugins/git/skills/git-expert/references/workflows.md || echo "MISSING: workflows.md"
+test -f plugins/git/skills/workflow/references/conventions.md || echo "MISSING: conventions.md"
+test -f plugins/git/skills/workflow/references/workflows.md || echo "MISSING: workflows.md"
 ```
 
 Both files must exist. If either is missing, Phase 4 is not complete -- stop and complete it first.
@@ -275,7 +275,7 @@ Install: `npm install -g claude-code-safety-net`
 
 ```bash
 # 1. Verify no em dashes slipped into the new content
-grep -r '—' plugins/git/skills/git-expert/references/ && echo "FAIL: em dash found" || echo "OK: no em dashes"
+grep -r '—' plugins/git/skills/workflow/references/ && echo "FAIL: em dash found" || echo "OK: no em dashes"
 
 # 2. Run full validation
 bun run validate

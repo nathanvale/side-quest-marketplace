@@ -5,4 +5,4 @@ allowed-tools: Bash(git add:*), Bash(git commit:*), Bash(git diff:*), Bash(git s
 argument-hint: [description]
 ---
 
-Use the **git-expert** skill to create a quick WIP checkpoint commit. $ARGUMENTS
+Use the **workflow** skill to create a quick WIP checkpoint commit. $ARGUMENTS

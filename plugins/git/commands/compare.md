@@ -5,4 +5,4 @@ allowed-tools: Bash(git log:*), Bash(git diff:*), Bash(git branch:*), Bash(git m
 argument-hint: [branch]
 ---
 
-Use the **git-expert** skill to compare branches. $ARGUMENTS
+Use the **workflow** skill to compare branches. $ARGUMENTS

@@ -216,7 +216,7 @@ Move the 4 flat companion files into a `references/` subdirectory with lowercase
 
 **Before:**
 ```
-skills/git-expert/
+skills/workflow/
   SKILL.md
   CONVENTIONS.md
   EXAMPLES.md
@@ -226,7 +226,7 @@ skills/git-expert/
 
 **After:**
 ```
-skills/git-expert/
+skills/workflow/
   SKILL.md
   references/
     conventions.md
@@ -237,11 +237,11 @@ skills/git-expert/
 
 **Commands:**
 ```bash
-mkdir -p plugins/git/skills/git-expert/references
-mv plugins/git/skills/git-expert/CONVENTIONS.md plugins/git/skills/git-expert/references/conventions.md
-mv plugins/git/skills/git-expert/EXAMPLES.md plugins/git/skills/git-expert/references/examples.md
-mv plugins/git/skills/git-expert/WORKFLOWS.md plugins/git/skills/git-expert/references/workflows.md
-mv plugins/git/skills/git-expert/WORKTREE.md plugins/git/skills/git-expert/references/worktree.md
+mkdir -p plugins/git/skills/workflow/references
+mv plugins/git/skills/workflow/CONVENTIONS.md plugins/git/skills/workflow/references/conventions.md
+mv plugins/git/skills/workflow/EXAMPLES.md plugins/git/skills/workflow/references/examples.md
+mv plugins/git/skills/workflow/WORKFLOWS.md plugins/git/skills/workflow/references/workflows.md
+mv plugins/git/skills/workflow/WORKTREE.md plugins/git/skills/workflow/references/worktree.md
 ```
 
 ### Research Insights
@@ -458,7 +458,7 @@ Consider adding a test case for the global path. Also consider adding a test for
 After the restructure in Step 2, confirm zero occurrences of old flat paths:
 
 ```bash
-grep -r "CONVENTIONS.md\|WORKFLOWS.md\|WORKTREE.md\|EXAMPLES.md" plugins/git/skills/git-expert/ \
+grep -r "CONVENTIONS.md\|WORKFLOWS.md\|WORKTREE.md\|EXAMPLES.md" plugins/git/skills/workflow/ \
   | grep -v "references/"
 ```
 
@@ -480,7 +480,7 @@ Each referenced file must exist at the specified path relative to `${CLAUDE_PLUG
 Check if any of the 4 reference files link to each other:
 
 ```bash
-grep -l "conventions\|examples\|workflows\|worktree" plugins/git/skills/git-expert/references/*.md
+grep -l "conventions\|examples\|workflows\|worktree" plugins/git/skills/workflow/references/*.md
 ```
 
 If cross-links exist, verify they use the new paths (just the filename, since they're now in the same directory).
@@ -520,7 +520,7 @@ This takes 2 minutes and catches integration failures that unit tests miss (hook
 - [ ] Reference files moved to `references/` subdirectory with lowercase names
 - [ ] No files remain at old flat locations (CONVENTIONS.md, EXAMPLES.md, WORKFLOWS.md, WORKTREE.md)
 - [ ] All 10 SKILL.md reference links point to `references/` paths
-- [ ] No stale flat-path references remain anywhere in `plugins/git/skills/git-expert/` (grep verification)
+- [ ] No stale flat-path references remain anywhere in `plugins/git/skills/workflow/` (grep verification)
 - [ ] Intra-reference cross-links updated if they exist
 - [ ] SKILL.md description has verb-led WHAT + WHEN + WHEN-NOT pattern
 - [ ] No em dashes in SKILL.md description (uses `--`)

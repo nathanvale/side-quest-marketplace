@@ -26,7 +26,7 @@ dependencies: []
 
 ## Technical Details
 
-- **Files**: `plugins/git/skills/git-expert/references/workflows.md`, `plugins/git/skills/git-expert/references/worktree.md`
+- **Files**: `plugins/git/skills/workflow/references/workflows.md`, `plugins/git/skills/workflow/references/worktree.md`
 
 ## Acceptance Criteria
 
