@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p1
 issue_id: "041"
 tags: [code-review, typescript, safety-hook]

@@ -1,11 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import {
-	checkCommand,
-	extractCommandHead,
-	isCommitCommand,
-	splitShellSegments,
-	tokenizeShell,
-} from './git-safety.ts'
+import { checkCommand, checkFileEdit, isCommitCommand } from './git-safety.ts'
+import { extractCommandHead, splitShellSegments, tokenizeShell } from './shell-tokenizer.ts'
 
 describe('git-safety worktree patterns', () => {
 	describe('git worktree remove --force', () => {
@@ -108,6 +103,28 @@ describe('git branch force delete variants', () => {
 	])('blocks: %s', (command) => {
 		const result = checkCommand(command)
 		expect(result.blocked).toBe(true)
+	})
+})
+
+describe('git push --force-with-lease on protected branches', () => {
+	test.each([
+		['git push --force-with-lease origin main'],
+		['git push --force-with-lease origin master'],
+		['git push --force-if-includes origin main'],
+		['git push --force-with-lease=origin/main origin main'],
+	])('blocks on protected branch: %s', (command) => {
+		const result = checkCommand(command)
+		expect(result.blocked).toBe(true)
+		expect(result.reason).toContain('protected branch')
+	})
+
+	test.each([
+		['git push --force-with-lease origin feat/my-feature'],
+		['git push --force-with-lease origin dev'],
+		['git push --force-if-includes origin feat/auth'],
+	])('allows on feature branch: %s', (command) => {
+		const result = checkCommand(command)
+		expect(result.blocked).toBe(false)
 	})
 })
 
@@ -228,10 +245,74 @@ describe('git checkout <ref> -- <path>', () => {
 	})
 
 	test.each([
+		['git checkout HEAD file.txt'],
+		['git checkout main src/'],
+		['git checkout abc123 lib/utils.ts'],
+	])('blocks ref + path without --: %s', (command) => {
+		const result = checkCommand(command)
+		expect(result.blocked).toBe(true)
+		expect(result.reason).toContain('checkout')
+	})
+
+	test.each([
 		['git checkout feature-branch'],
 		['git checkout -b new-branch'],
 		['git checkout -b feat/auth main'],
+		['git checkout -b new-branch base-branch'],
 	])('allows: %s', (command) => {
+		const result = checkCommand(command)
+		expect(result.blocked).toBe(false)
+	})
+})
+
+describe('git rebase --exec with destructive commands', () => {
+	test.each([
+		['git rebase --exec "git reset --hard" HEAD~3'],
+		['git rebase -x "git clean -f" HEAD~2'],
+		['git rebase --exec="git push --force" main'],
+	])('blocks: %s', (command) => {
+		const result = checkCommand(command)
+		expect(result.blocked).toBe(true)
+		expect(result.reason).toContain('rebase --exec')
+	})
+
+	test.each([
+		['git rebase --exec "echo test" HEAD~3'],
+		['git rebase main'],
+		['git rebase --continue'],
+		['git rebase --abort'],
+	])('allows: %s', (command) => {
+		const result = checkCommand(command)
+		expect(result.blocked).toBe(false)
+	})
+})
+
+describe('git restore destructive operations', () => {
+	test.each([
+		['git restore file.txt'],
+		['git restore src/index.ts'],
+		['git restore src/'],
+	])('blocks restore <path> without --staged: %s', (command) => {
+		const result = checkCommand(command)
+		expect(result.blocked).toBe(true)
+		expect(result.reason).toContain('restore')
+	})
+
+	test.each([
+		['git restore --source=HEAD file.txt'],
+		['git restore --source=main src/index.ts'],
+		['git restore --source HEAD -- file.txt'],
+	])('blocks restore --source with paths: %s', (command) => {
+		const result = checkCommand(command)
+		expect(result.blocked).toBe(true)
+		expect(result.reason).toContain('restore')
+	})
+
+	test.each([
+		['git restore --staged file.txt'],
+		['git restore --staged src/index.ts'],
+		['git restore -S file.txt'],
+	])('allows restore --staged: %s', (command) => {
 		const result = checkCommand(command)
 		expect(result.blocked).toBe(false)
 	})
@@ -444,6 +525,21 @@ describe('issue 4: git global options do not bypass safety checks', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Issue 4b: ANSI-C quoting ($'...') must not bypass safety checks
+// ---------------------------------------------------------------------------
+describe('issue 4b: ANSI-C quoting does not bypass safety checks', () => {
+	test.each([
+		["git reset $'--hard'"],
+		["git push $'--force'"],
+		["git clean $'-f'"],
+		["git clean $'-fd'"],
+	])('blocks: %s', (command) => {
+		const result = checkCommand(command)
+		expect(result.blocked).toBe(true)
+	})
+})
+
+// ---------------------------------------------------------------------------
 // Issue 5: wrapper/subshell bypasses
 // ---------------------------------------------------------------------------
 describe('issue 5: shell indirection does not bypass safety checks', () => {
@@ -614,5 +710,23 @@ describe('extractCommandHead', () => {
 
 	test('returns null for empty string', () => {
 		expect(extractCommandHead('')).toBe(null)
+	})
+})
+
+// ---------------------------------------------------------------------------
+// checkFileEdit: .env pattern tests
+// ---------------------------------------------------------------------------
+describe('checkFileEdit .env pattern', () => {
+	test.each([
+		['.env'],
+		['.env.local'],
+		['.env.production'],
+		['config/.env'],
+		['config/.env.local'],
+		['.env/secrets'],
+	])('blocks: %s', (filePath) => {
+		const result = checkFileEdit(filePath)
+		expect(result.blocked).toBe(true)
+		expect(result.reason).toContain('.env')
 	})
 })

@@ -423,8 +423,11 @@ export function extractCommandHead(segment: string): string | null {
 	return null
 }
 
-/** Removes surrounding single or double quotes from a word. */
+/** Removes surrounding single, double, or ANSI-C ($'...') quotes from a word. */
 function unquoteWord(word: string): string {
+	if (word.length >= 3 && word.startsWith("$'") && word.endsWith("'")) {
+		return word.slice(2, -1)
+	}
 	if (word.length >= 2 && word.startsWith("'") && word.endsWith("'")) {
 		return word.slice(1, -1)
 	}

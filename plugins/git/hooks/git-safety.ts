@@ -24,13 +24,6 @@ import {
 	splitShellSegments,
 } from './shell-tokenizer'
 
-// Re-export tokenizer functions used by tests and external consumers
-export {
-	extractCommandHead,
-	splitShellSegments,
-	tokenizeShell,
-} from './shell-tokenizer'
-
 interface PreToolUseHookInput {
 	tool_name: string
 	tool_input?: {
@@ -38,6 +31,24 @@ interface PreToolUseHookInput {
 		file_path?: unknown
 	}
 	cwd?: string
+}
+
+/** Type guard that validates raw stdin JSON conforms to PreToolUseHookInput shape. */
+function isPreToolUseHookInput(value: unknown): value is PreToolUseHookInput {
+	if (!value || typeof value !== 'object') return false
+	if (!('tool_name' in value) || typeof value.tool_name !== 'string')
+		return false
+	if ('tool_input' in value && value.tool_input !== undefined) {
+		if (typeof value.tool_input !== 'object' || value.tool_input === null)
+			return false
+	}
+	if (
+		'cwd' in value &&
+		value.cwd !== undefined &&
+		typeof value.cwd !== 'string'
+	)
+		return false
+	return true
 }
 
 interface PreToolUseHookSpecificOutput {
@@ -54,7 +65,7 @@ const WIP_MESSAGE_PATTERNS = [/chore\(wip\):/, /wip:/i]
 
 const PROTECTED_FILE_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
 	{
-		pattern: /\.env($|\.)/,
+		pattern: /\.env($|[./])/,
 		reason: '.env files may contain secrets.',
 	},
 	{
@@ -118,14 +129,29 @@ function hasRecursiveForceRmArgs(args: string[]): boolean {
  * Checks a shell command string for destructive operations that should be
  * blocked. Recursively analyzes piped segments, shell wrappers, and command
  * substitutions so nested danger (e.g., `sh -c "git reset --hard"`) is caught.
+ *
+ * Returns the parsed shell segments alongside the result so callers can reuse
+ * them (e.g., for commit analysis) without re-tokenizing the command.
  */
 export function checkCommand(command: string): {
 	blocked: boolean
 	reason?: string
+	segments: string[]
 } {
-	return checkCommandInternal(command, 0)
+	const { segments, unbalanced } = splitShellSegments(command)
+	if (unbalanced) {
+		return {
+			blocked: true,
+			reason:
+				'Unbalanced shell input detected. Refusing to run safety checks on ambiguous command.',
+			segments,
+		}
+	}
+	const result = checkParsedSegments(segments, 0)
+	return { ...result, segments }
 }
 
+/** Splits a command into segments and checks them. Used for recursive calls. */
 function checkCommandInternal(
 	command: string,
 	depth: number,
@@ -145,7 +171,17 @@ function checkCommandInternal(
 				'Unbalanced shell input detected. Refusing to run safety checks on ambiguous command.',
 		}
 	}
+	return checkParsedSegments(segments, depth)
+}
 
+/**
+ * Checks pre-parsed segments for destructive operations. Called by
+ * checkCommand (depth 0) and recursively by checkCommandInternal.
+ */
+function checkParsedSegments(
+	segments: string[],
+	depth: number,
+): { blocked: boolean; reason?: string } {
 	for (const segment of segments) {
 		const wrapped = extractWrappedShellCommand(segment)
 		if (wrapped) {
@@ -163,11 +199,36 @@ function checkCommandInternal(
 		if (gitInvocation) {
 			const { subcommand, args } = gitInvocation
 
-			if (subcommand === 'push' && hasForceFlag(args)) {
-				return {
-					blocked: true,
-					reason:
-						'Force push can destroy remote history. Use --force-with-lease if you must.',
+			if (subcommand === 'push') {
+				const hasForce = hasForceFlag(args)
+				const hasForceWithLease =
+					hasLongFlag(args, '--force-with-lease') ||
+					args.some((a) => a.startsWith('--force-with-lease='))
+				const hasForceIfIncludes = hasLongFlag(args, '--force-if-includes')
+				if (hasForce) {
+					return {
+						blocked: true,
+						reason:
+							'Force push can destroy remote history. Use --force-with-lease on a feature branch if you must.',
+					}
+				}
+				if (hasForceWithLease || hasForceIfIncludes) {
+					const nonFlagArgs = args.filter((a) => !a.startsWith('-'))
+					const targetsProtected = nonFlagArgs.some((a) =>
+						PROTECTED_BRANCHES.some(
+							(branch) =>
+								a === branch ||
+								a.endsWith(`:${branch}`) ||
+								a.startsWith(`${branch}:`),
+						),
+					)
+					if (targetsProtected) {
+						return {
+							blocked: true,
+							reason:
+								'Force push (even with --force-with-lease) to a protected branch can destroy shared history. Push to a feature branch and open a PR instead.',
+						}
+					}
 				}
 			}
 			if (subcommand === 'reset' && args.includes('--hard')) {
@@ -195,10 +256,35 @@ function checkCommandInternal(
 					reason: 'git checkout . discards all unstaged changes permanently.',
 				}
 			}
-			if (subcommand === 'restore' && args.includes('.')) {
-				return {
-					blocked: true,
-					reason: 'git restore . discards all unstaged changes permanently.',
+			if (subcommand === 'restore') {
+				const hasStaged =
+					hasLongFlag(args, '--staged') || hasShortFlag(args, 'S')
+				const hasSource = args.some((a) => a.startsWith('--source'))
+				const nonFlagArgs = args.filter(
+					(a) => !a.startsWith('-') && !a.startsWith('--'),
+				)
+				// Block `git restore .` (discards all unstaged changes)
+				if (args.includes('.')) {
+					return {
+						blocked: true,
+						reason: 'git restore . discards all unstaged changes permanently.',
+					}
+				}
+				// Block `git restore --source=<ref> <path>` (overwrites from ref)
+				if (hasSource && nonFlagArgs.length > 0) {
+					return {
+						blocked: true,
+						reason:
+							'git restore --source overwrites working tree files from another ref. Use `git diff` to review changes first.',
+					}
+				}
+				// Block `git restore <path>` without --staged (discards unstaged)
+				if (!hasStaged && !hasSource && nonFlagArgs.length > 0) {
+					return {
+						blocked: true,
+						reason:
+							'git restore <path> discards unstaged changes permanently. Use `git restore --staged <path>` to unstage, or `git stash` to save changes first.',
+					}
 				}
 			}
 			if (subcommand === 'branch' && hasShortFlag(args, 'D')) {
@@ -277,6 +363,35 @@ function checkCommandInternal(
 						'git gc --prune=now/all permanently removes unreachable objects immediately. Use `git gc` without --prune=now to allow the default grace period.',
 				}
 			}
+			if (subcommand === 'rebase') {
+				for (let idx = 0; idx < args.length; idx++) {
+					const arg = args[idx] || ''
+					let execCmd: string | undefined
+					if (arg === '--exec' || arg === '-x') {
+						execCmd = args[idx + 1]
+					} else if (arg.startsWith('--exec=')) {
+						let val = arg.slice('--exec='.length)
+						// Strip surrounding quotes left by shell word splitting
+						if (
+							val.length >= 2 &&
+							((val.startsWith('"') && val.endsWith('"')) ||
+								(val.startsWith("'") && val.endsWith("'")))
+						) {
+							val = val.slice(1, -1)
+						}
+						execCmd = val
+					}
+					if (execCmd) {
+						const execResult = checkCommandInternal(execCmd, depth + 1)
+						if (execResult.blocked) {
+							return {
+								blocked: true,
+								reason: `git rebase --exec runs a destructive command: ${execResult.reason}`,
+							}
+						}
+					}
+				}
+			}
 			if (subcommand === 'checkout') {
 				const sepIdx = args.indexOf('--')
 				if (sepIdx >= 0 && sepIdx < args.length - 1) {
@@ -284,6 +399,26 @@ function checkCommandInternal(
 						blocked: true,
 						reason:
 							'git checkout <ref> -- <path> overwrites files without backup. Use `git stash` to save changes first, or `git diff <ref> -- <path>` to review.',
+					}
+				}
+				// Block `git checkout <ref> <path>` (2+ non-flag args, no -b/-B)
+				// Allow: `git checkout branch-name`, `git checkout -b new base`
+				if (sepIdx < 0) {
+					const hasBranchCreate =
+						hasShortFlag(args, 'b') ||
+						hasShortFlag(args, 'B') ||
+						hasLongFlag(args, '--branch') ||
+						hasLongFlag(args, '-b') ||
+						hasLongFlag(args, '-B')
+					if (!hasBranchCreate) {
+						const nonFlagArgs = args.filter((a) => !a.startsWith('-'))
+						if (nonFlagArgs.length >= 2) {
+							return {
+								blocked: true,
+								reason:
+									'git checkout <ref> <path> overwrites files without backup. Use `git stash` to save changes first, or `git diff <ref> -- <path>` to review.',
+							}
+						}
 					}
 				}
 			}
@@ -352,12 +487,15 @@ export function checkFileEdit(filePath: string): {
  * from flag scanning, and `||` is recognized as a segment boundary.
  * A legitimate WIP checkpoint requires both --no-verify AND a WIP message pattern.
  */
-export function isCommitCommand(command: string): {
+export function isCommitCommand(
+	command: string,
+	preParsedSegments?: string[],
+): {
 	isCommit: boolean
 	hasNoVerify: boolean
 	hasWipMessage: boolean
 } {
-	const { segments } = splitShellSegments(command)
+	const segments = preParsedSegments ?? splitShellSegments(command).segments
 	const commitSegments = segments
 		.map((seg) => ({ seg, parsed: parseGitInvocation(seg) }))
 		.filter(({ parsed }) => parsed?.subcommand === 'commit')
@@ -387,6 +525,28 @@ export function isCommitCommand(command: string): {
 	return { isCommit: true, hasNoVerify, hasWipMessage }
 }
 
+/** Emits a deny decision, posts a best-effort event, and exits with code 2. */
+async function denyAndExit(
+	reason: string,
+	input: { cwd?: string; tool_name?: string },
+): Promise<never> {
+	const hookSpecificOutput: PreToolUseHookSpecificOutput = {
+		hookEventName: 'PreToolUse',
+		permissionDecision: 'deny',
+		permissionDecisionReason: reason,
+	}
+	console.log(JSON.stringify({ hookSpecificOutput }))
+	try {
+		await postEvent(input.cwd || process.cwd(), 'safety.blocked', {
+			tool: input.tool_name,
+			reason: hookSpecificOutput.permissionDecisionReason,
+		})
+	} catch {
+		// event emission is best-effort
+	}
+	process.exit(2)
+}
+
 if (import.meta.main) {
 	// Self-destruct timer: first executable line when run as entry point.
 	// FAIL-CLOSED: PreToolUse safety hook exits with code 2 (deny) on timeout.
@@ -410,9 +570,9 @@ if (import.meta.main) {
 	selfDestruct.unref()
 
 	try {
-		let input: PreToolUseHookInput
+		let raw: unknown
 		try {
-			input = (await Bun.stdin.json()) as PreToolUseHookInput
+			raw = await Bun.stdin.json()
 		} catch {
 			console.log(
 				JSON.stringify({
@@ -427,23 +587,20 @@ if (import.meta.main) {
 			process.exit(2)
 		}
 
-		if (
-			!input ||
-			typeof input !== 'object' ||
-			typeof input.tool_name !== 'string'
-		) {
+		if (!isPreToolUseHookInput(raw)) {
 			console.log(
 				JSON.stringify({
 					hookSpecificOutput: {
 						hookEventName: 'PreToolUse',
 						permissionDecision: 'deny',
 						permissionDecisionReason:
-							'Invalid hook payload. Safety hook is failing closed.',
+							'Malformed hook input. Safety hook is failing closed.',
 					},
 				}),
 			)
 			process.exit(2)
 		}
+		const input: PreToolUseHookInput = raw
 
 		const toolInput = input.tool_input
 
@@ -455,21 +612,7 @@ if (import.meta.main) {
 
 			const fileResult = checkFileEdit(filePath)
 			if (fileResult.blocked) {
-				const hookSpecificOutput: PreToolUseHookSpecificOutput = {
-					hookEventName: 'PreToolUse',
-					permissionDecision: 'deny',
-					permissionDecisionReason: fileResult.reason,
-				}
-				console.log(JSON.stringify({ hookSpecificOutput }))
-				try {
-					await postEvent(input.cwd || process.cwd(), 'safety.blocked', {
-						tool: input.tool_name,
-						reason: hookSpecificOutput.permissionDecisionReason,
-					})
-				} catch {
-					// event emission is best-effort
-				}
-				process.exit(2)
+				await denyAndExit(fileResult.reason ?? 'Protected file.', input)
 			}
 
 			process.exit(0)
@@ -486,24 +629,10 @@ if (import.meta.main) {
 
 		const commandResult = checkCommand(command)
 		if (commandResult.blocked) {
-			const hookSpecificOutput: PreToolUseHookSpecificOutput = {
-				hookEventName: 'PreToolUse',
-				permissionDecision: 'deny',
-				permissionDecisionReason: commandResult.reason,
-			}
-			console.log(JSON.stringify({ hookSpecificOutput }))
-			try {
-				await postEvent(input.cwd || process.cwd(), 'safety.blocked', {
-					tool: input.tool_name,
-					reason: hookSpecificOutput.permissionDecisionReason,
-				})
-			} catch {
-				// event emission is best-effort
-			}
-			process.exit(2)
+			await denyAndExit(commandResult.reason ?? 'Blocked command.', input)
 		}
 
-		const commitCheck = isCommitCommand(command)
+		const commitCheck = isCommitCommand(command, commandResult.segments)
 		if (commitCheck.isCommit) {
 			const isLegitimateWip =
 				commitCheck.hasNoVerify && commitCheck.hasWipMessage
@@ -511,10 +640,8 @@ if (import.meta.main) {
 			// Block ALL commits on protected branches (including WIP checkpoints)
 			const branch = await getCurrentBranch(input.cwd)
 			if (branch && PROTECTED_BRANCHES.includes(branch)) {
-				const hookSpecificOutput: PreToolUseHookSpecificOutput = {
-					hookEventName: 'PreToolUse',
-					permissionDecision: 'deny',
-					permissionDecisionReason: [
+				await denyAndExit(
+					[
 						`BLOCKED: Cannot commit directly to ${branch}.`,
 						'',
 						'Create a feature branch first:',
@@ -522,42 +649,22 @@ if (import.meta.main) {
 						'',
 						'Then commit on the new branch.',
 					].join('\n'),
-				}
-				console.log(JSON.stringify({ hookSpecificOutput }))
-				try {
-					await postEvent(input.cwd || process.cwd(), 'safety.blocked', {
-						tool: input.tool_name,
-						reason: hookSpecificOutput.permissionDecisionReason,
-					})
-				} catch {
-					// event emission is best-effort
-				}
-				process.exit(2)
+					input,
+				)
 			}
 
 			// Block --no-verify on non-WIP commits (prevents bypassing pre-commit hooks)
 			if (commitCheck.hasNoVerify && !isLegitimateWip) {
-				const hookSpecificOutput: PreToolUseHookSpecificOutput = {
-					hookEventName: 'PreToolUse',
-					permissionDecision: 'deny',
-					permissionDecisionReason: [
+				await denyAndExit(
+					[
 						'BLOCKED: --no-verify is only allowed for WIP checkpoint commits.',
 						'',
 						'For regular commits, remove --no-verify so pre-commit hooks run.',
 						'For WIP checkpoints, use a WIP message pattern:',
 						'  git commit --no-verify -m "chore(wip): <description>"',
 					].join('\n'),
-				}
-				console.log(JSON.stringify({ hookSpecificOutput }))
-				try {
-					await postEvent(input.cwd || process.cwd(), 'safety.blocked', {
-						tool: input.tool_name,
-						reason: hookSpecificOutput.permissionDecisionReason,
-					})
-				} catch {
-					// event emission is best-effort
-				}
-				process.exit(2)
+					input,
+				)
 			}
 		}
 	} catch (error) {

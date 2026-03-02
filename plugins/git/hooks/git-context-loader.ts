@@ -65,17 +65,18 @@ export async function getGitContext(
 		return null
 	}
 
-	const statusResult = await runGit(['status', '--porcelain', '-b'], { cwd })
+	const [statusResult, commitsResult] = await Promise.all([
+		runGit(['status', '--porcelain', '-b'], { cwd }),
+		runGit(['log', '--oneline', `-${commitCount}`, '--format=%h %s (%ar)'], {
+			cwd,
+		}),
+	])
+
 	if (statusResult.exitCode !== 0) {
 		return null
 	}
 
 	const { branch, counts } = parsePorcelainStatus(statusResult.stdout)
-
-	const commitsResult = await runGit(
-		['log', '--oneline', `-${commitCount}`, '--format=%h %s (%ar)'],
-		{ cwd },
-	)
 
 	const recentCommits =
 		commitsResult.exitCode === 0
@@ -165,16 +166,6 @@ if (import.meta.main) {
 			}
 			input = parsed
 		} catch {
-			process.exit(0)
-		}
-
-		const relevantSources: SessionSource[] = [
-			'startup',
-			'resume',
-			'compact',
-			'clear',
-		]
-		if (!relevantSources.includes(input.source as SessionSource)) {
 			process.exit(0)
 		}
 

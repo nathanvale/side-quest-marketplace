@@ -49,9 +49,9 @@ Unified git workflow skill. Routes to the right procedure based on what the user
 These are non-negotiable:
 
 - **NEVER** force push (`git push --force` / `-f`)
-- **NEVER** `git reset --hard` without explicit user confirmation
-- **NEVER** `git clean -f` without explicit user confirmation
-- **NEVER** `git checkout .` or `git restore .` without user confirmation
+- **NEVER** `git reset --hard` -- blocked by safety hook, no override
+- **NEVER** `git clean -f` -- blocked by safety hook, no override
+- **NEVER** `git checkout .` or `git restore .` -- blocked by safety hook, no override
 - **NEVER** commit secrets (`.env`, credentials, API keys)
 - **NEVER** use `git add .` or `git add -A` — stage specific files (exception: `git add -u` for WIP checkpoints, which only stages tracked file changes)
 - **NEVER** skip hooks (`--no-verify`) except for WIP/checkpoint commits on feature branches
@@ -81,18 +81,4 @@ If a hook blocks an action, resolve the underlying git safety issue rather than 
 <type>(<scope>): <subject>
 ```
 
-See [conventions.md](references/conventions.md) for full spec and examples.
-
-| Type | Use for |
-|------|---------|
-| feat | New feature |
-| fix | Bug fix |
-| docs | Documentation only |
-| refactor | Code change (no feature/fix) |
-| test | Adding/updating tests |
-| chore | Maintenance |
-| perf | Performance |
-| style | Formatting |
-| build | Build system |
-| ci | CI/CD |
-| revert | Revert changes |
+See [conventions.md](references/conventions.md) for full type table, scope guidelines, and examples.

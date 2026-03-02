@@ -169,16 +169,18 @@ export function extractFromTranscript(transcriptText: string): CortexEntry[] {
 
 async function getGitStateSummary(cwd: string): Promise<string> {
 	const opts = { cwd, stderr: 'pipe' as const }
-	const branchResult = await runGit(['branch', '--show-current'], opts)
+
+	const [branchResult, commitsResult, statusResult] = await Promise.all([
+		runGit(['branch', '--show-current'], opts),
+		runGit(['log', '--oneline', '--since=1 hour ago'], opts),
+		runGit(['status', '--porcelain'], opts),
+	])
+
 	const branch =
 		branchResult.exitCode === 0
 			? branchResult.stdout || '(detached)'
 			: '(detached)'
 
-	const commitsResult = await runGit(
-		['log', '--oneline', '--since=1 hour ago'],
-		opts,
-	)
 	const commits =
 		commitsResult.exitCode === 0
 			? commitsResult.stdout
@@ -188,7 +190,6 @@ async function getGitStateSummary(cwd: string): Promise<string> {
 					.slice(0, 10)
 			: []
 
-	const statusResult = await runGit(['status', '--porcelain'], opts)
 	const status =
 		statusResult.exitCode === 0
 			? statusResult.stdout
@@ -290,14 +291,10 @@ if (import.meta.main) {
 			}
 		}
 
-		console.log(
-			JSON.stringify({
-				hookSpecificOutput: {
-					hookEventName: 'PreCompact',
-					additionalContext: contextParts.join('\n'),
-				},
-			}),
-		)
+		// Use plain stdout instead of JSON hookSpecificOutput.additionalContext.
+		// Plugin hooks.json has a known bug (#16538) where additionalContext
+		// is silently discarded. Plain stdout is reliably injected as context.
+		console.log(contextParts.join('\n'))
 
 		try {
 			await postEvent(input.cwd, 'session.compacted', {
