@@ -22,8 +22,7 @@ interface PostToolUseHookInput {
 
 function isPostToolUseHookInput(value: unknown): value is PostToolUseHookInput {
 	if (!value || typeof value !== 'object') return false
-	const input = value as { tool_name?: unknown }
-	return typeof input.tool_name === 'string'
+	return 'tool_name' in value && typeof value.tool_name === 'string'
 }
 
 export interface CommandLogEntry {
@@ -33,6 +32,10 @@ export interface CommandLogEntry {
 	command: string
 }
 
+/**
+ * Builds a structured log entry from a PostToolUse hook payload. Returns null
+ * for non-Bash tools so only shell commands are recorded in the audit trail.
+ */
 export function createLogEntry(
 	input: PostToolUseHookInput,
 ): CommandLogEntry | null {

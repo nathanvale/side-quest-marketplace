@@ -1,5 +1,5 @@
 ---
-status: pending
+status: deferred
 priority: p2
 issue_id: "019"
 tags: [git, safety-hook, false-positive]

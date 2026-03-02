@@ -11,6 +11,7 @@ import { postEvent } from './event-bus-client'
 import { PROTECTED_BRANCHES } from './git-policy'
 import type { FileStatusCounts } from './git-status-parser'
 import { parsePorcelainStatus } from './git-status-parser'
+import { getCurrentBranch, runGit } from './git-utils'
 
 interface StopHookInput {
 	cwd: string
@@ -20,57 +21,26 @@ interface StopHookInput {
 
 function isStopHookInput(value: unknown): value is StopHookInput {
 	if (!value || typeof value !== 'object') return false
-	const input = value as {
-		cwd?: unknown
-		transcript_path?: unknown
-		stop_hook_active?: unknown
-	}
+	if (!('cwd' in value) || typeof value.cwd !== 'string') return false
 	if (
-		typeof input.cwd !== 'string' ||
-		typeof input.transcript_path !== 'string'
-	) {
+		!('transcript_path' in value) ||
+		typeof value.transcript_path !== 'string'
+	)
 		return false
-	}
 	if (
-		typeof input.stop_hook_active !== 'undefined' &&
-		typeof input.stop_hook_active !== 'boolean'
+		'stop_hook_active' in value &&
+		typeof value.stop_hook_active !== 'undefined' &&
+		typeof value.stop_hook_active !== 'boolean'
 	) {
 		return false
 	}
 	return true
 }
 
-async function runGit(
-	args: string[],
-	cwd: string,
-): Promise<{ stdout: string; exitCode: number }> {
-	const proc = Bun.spawn(['git', ...args], {
-		cwd,
-		stdout: 'pipe',
-		stderr: 'ignore',
-	})
-	const stdout = await new Response(proc.stdout).text()
-	const exitCode = await proc.exited
-	return { stdout, exitCode }
-}
-
-/** Returns the current branch name, or null if not in a git repo. */
-export async function getCurrentBranch(cwd: string): Promise<string | null> {
-	try {
-		const result = await runGit(['branch', '--show-current'], cwd)
-		if (result.exitCode !== 0) {
-			return null
-		}
-		return result.stdout.trim() || null
-	} catch {
-		return null
-	}
-}
-
 export async function getGitStatus(
 	cwd: string,
 ): Promise<FileStatusCounts | null> {
-	const result = await runGit(['status', '--porcelain'], cwd)
+	const result = await runGit(['status', '--porcelain'], { cwd })
 	if (result.exitCode !== 0) {
 		return null
 	}
@@ -125,15 +95,14 @@ export async function createAutoCommit(
 	cwd: string,
 	message: string,
 ): Promise<boolean> {
-	const addResult = await runGit(['add', '-u'], cwd)
+	const addResult = await runGit(['add', '-u'], { cwd })
 	if (addResult.exitCode !== 0) {
 		return false
 	}
 
-	const commitResult = await runGit(
-		['commit', '--no-verify', '-m', message],
+	const commitResult = await runGit(['commit', '--no-verify', '-m', message], {
 		cwd,
-	)
+	})
 	return commitResult.exitCode === 0
 }
 

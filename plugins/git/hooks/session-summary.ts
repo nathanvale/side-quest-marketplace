@@ -6,11 +6,12 @@
  * PreCompact hook that extracts salient content and appends summary artifacts.
  */
 
-import { mkdir, readFile } from 'node:fs/promises'
+import { appendFile, mkdir, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { getRepoKeyFromGitRoot, postEvent } from './event-bus-client'
 import { getMainWorktreeRoot } from './git-status-parser'
+import { isGitRepo, runGit } from './git-utils'
 
 interface PreCompactHookInput {
 	cwd: string
@@ -19,11 +20,11 @@ interface PreCompactHookInput {
 
 function isPreCompactHookInput(value: unknown): value is PreCompactHookInput {
 	if (!value || typeof value !== 'object') return false
-	const input = value as { cwd?: unknown; transcript_path?: unknown }
-	if (typeof input.cwd !== 'string') return false
+	if (!('cwd' in value) || typeof value.cwd !== 'string') return false
 	if (
-		typeof input.transcript_path !== 'undefined' &&
-		typeof input.transcript_path !== 'string'
+		'transcript_path' in value &&
+		typeof value.transcript_path !== 'undefined' &&
+		typeof value.transcript_path !== 'string'
 	) {
 		return false
 	}
@@ -88,6 +89,11 @@ const SALIENCE_PATTERNS: SaliencePattern[] = [
 	},
 ]
 
+/**
+ * Scans a JSONL conversation transcript for salient patterns (decisions,
+ * error fixes, learnings, preferences) and returns structured cortex entries.
+ * These survive compaction so valuable context is not lost between sessions.
+ */
 export function extractFromTranscript(transcriptText: string): CortexEntry[] {
 	const entries: CortexEntry[] = []
 	const now = new Date().toISOString()
@@ -161,27 +167,9 @@ export function extractFromTranscript(transcriptText: string): CortexEntry[] {
 	})
 }
 
-async function runGit(
-	args: string[],
-	cwd: string,
-): Promise<{ stdout: string; exitCode: number }> {
-	const proc = Bun.spawn(['git', ...args], {
-		cwd,
-		stdout: 'pipe',
-		stderr: 'pipe',
-	})
-	const stdout = await new Response(proc.stdout).text()
-	const exitCode = await proc.exited
-	return { stdout: stdout.trim(), exitCode }
-}
-
-async function isGitRepo(cwd: string): Promise<boolean> {
-	const { exitCode } = await runGit(['rev-parse', '--git-dir'], cwd)
-	return exitCode === 0
-}
-
 async function getGitStateSummary(cwd: string): Promise<string> {
-	const branchResult = await runGit(['branch', '--show-current'], cwd)
+	const opts = { cwd, stderr: 'pipe' as const }
+	const branchResult = await runGit(['branch', '--show-current'], opts)
 	const branch =
 		branchResult.exitCode === 0
 			? branchResult.stdout || '(detached)'
@@ -189,7 +177,7 @@ async function getGitStateSummary(cwd: string): Promise<string> {
 
 	const commitsResult = await runGit(
 		['log', '--oneline', '--since=1 hour ago'],
-		cwd,
+		opts,
 	)
 	const commits =
 		commitsResult.exitCode === 0
@@ -200,7 +188,7 @@ async function getGitStateSummary(cwd: string): Promise<string> {
 					.slice(0, 10)
 			: []
 
-	const statusResult = await runGit(['status', '--porcelain'], cwd)
+	const statusResult = await runGit(['status', '--porcelain'], opts)
 	const status =
 		statusResult.exitCode === 0
 			? statusResult.stdout
@@ -270,14 +258,10 @@ if (import.meta.main) {
 			const cortexDir = join(homedir(), '.claude', 'cortex')
 			await ensureDirectory(cortexDir)
 			const cortexPath = join(cortexDir, `${repoName}.jsonl`)
-			const existing = (await Bun.file(cortexPath).exists())
-				? await Bun.file(cortexPath).text()
-				: ''
-			const separator = existing.endsWith('\n') || existing === '' ? '' : '\n'
 			const lines = cortexEntries
-				.map((entry) => JSON.stringify(entry))
-				.join('\n')
-			await Bun.write(cortexPath, `${existing}${separator}${lines}\n`)
+				.map((entry) => `${JSON.stringify(entry)}\n`)
+				.join('')
+			await appendFile(cortexPath, lines)
 		}
 
 		const gitState = await getGitStateSummary(input.cwd)

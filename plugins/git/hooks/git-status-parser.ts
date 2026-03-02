@@ -4,9 +4,9 @@
  * Used by both git-context-loader (SessionStart) and auto-commit-on-stop (Stop)
  * to avoid duplicating porcelain parsing logic.
  *
- * Also provides getMainWorktreeRoot and getStableRepoName for worktree-aware
- * repo identification -- ensuring all worktrees of the same repo share the
- * same identity key (e.g. for cortex files).
+ * Also provides getMainWorktreeRoot for worktree-aware repo identification --
+ * ensuring all worktrees of the same repo share the same identity key
+ * (e.g. for cortex files).
  */
 
 export interface FileStatusCounts {
@@ -86,14 +86,4 @@ export async function getMainWorktreeRoot(cwd: string): Promise<string | null> {
 	// The first "worktree <path>" line is always the main worktree
 	const match = stdout.match(/^worktree\s+(.+)$/m)
 	return match?.[1] ?? null
-}
-
-/**
- * Returns a stable repo name that is consistent across all worktrees.
- * Uses getMainWorktreeRoot (not git rev-parse --show-toplevel) to get the
- * real repo root, so all linked worktrees resolve to the same name.
- */
-export async function getStableRepoName(cwd: string): Promise<string> {
-	const root = await getMainWorktreeRoot(cwd)
-	return root?.split('/').pop() || 'unknown'
 }

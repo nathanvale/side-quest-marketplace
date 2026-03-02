@@ -11,7 +11,7 @@ Step-by-step procedures for common git operations.
 2. **Review changes**: `git diff --staged` (if staged) or `git diff` (if unstaged)
 3. **Stage if needed**: `git add <specific-files>` — never blind `git add .` or `git add -A`
 4. **Review recent commits** for style consistency: `git log --oneline -5`
-5. **Compose message** following [conventions.md](conventions.md) and [examples.md](examples.md)
+5. **Compose message** following [conventions.md](conventions.md)
 6. **Commit** using HEREDOC format:
    ```bash
    git commit -m "$(cat <<'EOF'

@@ -63,3 +63,45 @@ feat(api)!: change response format
 BREAKING CHANGE: Response now returns array instead of object.
 Migration: Update client code to handle array response.
 ```
+
+## Full Examples
+
+### Simple single-line commit
+
+```
+chore(deps): update dependencies to latest versions
+
+Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+### Commit with body and footer
+
+```
+fix(api): handle null response in user endpoint
+
+The /api/users endpoint was crashing when the database
+returned null for deleted users. Now returns 404.
+
+Fixes #234
+
+Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+### Breaking change commit
+
+```
+feat(api)!: change authentication to JWT
+
+BREAKING CHANGE: Session-based auth removed. All clients must
+update to use Bearer token authentication.
+
+Migration guide: https://docs.example.com/auth-migration
+
+Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+```

@@ -4,7 +4,6 @@ import {
 	extractCommandHead,
 	isCommitCommand,
 	splitShellSegments,
-	stripQuotedContents,
 	tokenizeShell,
 } from './git-safety.ts'
 
@@ -109,6 +108,86 @@ describe('git branch force delete variants', () => {
 	])('blocks: %s', (command) => {
 		const result = checkCommand(command)
 		expect(result.blocked).toBe(true)
+	})
+})
+
+describe('git history/ref destructive operations', () => {
+	describe('git filter-branch', () => {
+		test.each([
+			['git filter-branch --tree-filter "rm -rf secrets" -- --all'],
+			['git filter-branch --env-filter "export GIT_AUTHOR_NAME=x" HEAD'],
+			['git -C /repo filter-branch --subdirectory-filter dir -- --all'],
+		])('blocks: %s', (command) => {
+			const result = checkCommand(command)
+			expect(result.blocked).toBe(true)
+			expect(result.reason).toContain('filter-branch')
+		})
+	})
+
+	describe('git reflog expire', () => {
+		test.each([
+			['git reflog expire --expire=now --all'],
+			['git reflog expire --expire=all'],
+			['git reflog expire --expire=now refs/heads/main'],
+			['git -C /repo reflog expire --expire=now'],
+		])('blocks: %s', (command) => {
+			const result = checkCommand(command)
+			expect(result.blocked).toBe(true)
+			expect(result.reason).toContain('reflog expire')
+		})
+
+		test.each([
+			['git reflog'],
+			['git reflog show'],
+			['git reflog show HEAD'],
+		])('allows: %s', (command) => {
+			const result = checkCommand(command)
+			expect(result.blocked).toBe(false)
+		})
+	})
+
+	describe('git update-ref -d/--delete', () => {
+		test.each([
+			['git update-ref -d refs/heads/feature/foo'],
+			['git update-ref --delete refs/tags/v1'],
+			['git -C /repo update-ref -d HEAD'],
+			['git update-ref --delete refs/heads/main'],
+		])('blocks: %s', (command) => {
+			const result = checkCommand(command)
+			expect(result.blocked).toBe(true)
+			expect(result.reason).toContain('update-ref')
+		})
+
+		test.each([
+			['git update-ref refs/heads/main abc123'],
+			['git update-ref refs/tags/v2 abc123'],
+		])('allows: %s', (command) => {
+			const result = checkCommand(command)
+			expect(result.blocked).toBe(false)
+		})
+	})
+
+	describe('git gc --prune=now/all', () => {
+		test.each([
+			['git gc --prune=now'],
+			['git gc --prune=all'],
+			['git gc --aggressive --prune=now'],
+			['git -C /repo gc --prune=now'],
+		])('blocks: %s', (command) => {
+			const result = checkCommand(command)
+			expect(result.blocked).toBe(true)
+			expect(result.reason).toContain('gc --prune=now')
+		})
+
+		test.each([
+			['git gc'],
+			['git gc --aggressive'],
+			['git gc --auto'],
+			['git gc --prune=2weeks'],
+		])('allows: %s', (command) => {
+			const result = checkCommand(command)
+			expect(result.blocked).toBe(false)
+		})
 	})
 })
 
@@ -386,6 +465,14 @@ describe('issue 5: shell indirection does not bypass safety checks', () => {
 		expect(result.blocked).toBe(true)
 		expect(result.reason).toContain('Unbalanced shell input')
 	})
+
+	test('excessive shell nesting fails closed', () => {
+		const result = checkCommand(
+			'sh -c "sh -c \\"sh -c \\\\\\"sh -c \\\\\\\\\\\\\\"sh -c \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"git reset --hard\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"\\\\\\\\\\\\\\"\\\\\\\\"\\\\""',
+		)
+		expect(result.blocked).toBe(true)
+		expect(result.reason ?? '').toMatch(/nesting too deep|Unbalanced shell input/i)
+	})
 })
 
 // ---------------------------------------------------------------------------
@@ -502,32 +589,6 @@ describe('splitShellSegments', () => {
 		for (const seg of segments) {
 			expect(seg).not.toContain('--no-verify in body')
 		}
-	})
-})
-
-// ---------------------------------------------------------------------------
-// stripQuotedContents unit tests
-// ---------------------------------------------------------------------------
-describe('stripQuotedContents', () => {
-	test('strips double-quoted content', () => {
-		expect(stripQuotedContents('echo "git reset --hard"')).toBe('echo ""')
-	})
-
-	test('strips single-quoted content', () => {
-		expect(stripQuotedContents("echo 'git reset --hard'")).toBe("echo ''")
-	})
-
-	test('preserves unquoted content', () => {
-		expect(stripQuotedContents('git reset --hard')).toBe('git reset --hard')
-	})
-
-	test('handles mixed quotes', () => {
-		const result = stripQuotedContents('echo "foo" bar \'baz\'')
-		expect(result).toBe('echo "" bar \'\'')
-	})
-
-	test('handles escaped characters', () => {
-		expect(stripQuotedContents('echo \\$HOME')).toBe('echo \\$HOME')
 	})
 })
 

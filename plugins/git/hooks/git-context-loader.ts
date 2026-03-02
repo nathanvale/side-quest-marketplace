@@ -17,6 +17,7 @@
 
 import { postEvent } from './event-bus-client'
 import { parsePorcelainStatus } from './git-status-parser'
+import { isGitRepo, runGit } from './git-utils'
 
 type SessionSource = 'startup' | 'resume' | 'compact' | 'clear'
 
@@ -35,15 +36,13 @@ function isSessionStartHookInput(
 	value: unknown,
 ): value is SessionStartHookInput {
 	if (!value || typeof value !== 'object') return false
-	const input = value as {
-		cwd?: unknown
-		source?: unknown
-		session_id?: unknown
-	}
 	return (
-		typeof input.cwd === 'string' &&
-		typeof input.source === 'string' &&
-		typeof input.session_id === 'string'
+		'cwd' in value &&
+		typeof value.cwd === 'string' &&
+		'source' in value &&
+		typeof value.source === 'string' &&
+		'session_id' in value &&
+		typeof value.session_id === 'string'
 	)
 }
 
@@ -57,25 +56,6 @@ interface GitContext {
 	recentCommits: string[]
 }
 
-async function runGit(
-	args: string[],
-	cwd: string,
-): Promise<{ stdout: string; exitCode: number }> {
-	const proc = Bun.spawn(['git', ...args], {
-		cwd,
-		stdout: 'pipe',
-		stderr: 'ignore',
-	})
-	const stdout = await new Response(proc.stdout).text()
-	const exitCode = await proc.exited
-	return { stdout: stdout.trim(), exitCode }
-}
-
-async function isGitRepo(cwd: string): Promise<boolean> {
-	const { exitCode } = await runGit(['rev-parse', '--git-dir'], cwd)
-	return exitCode === 0
-}
-
 /** Gathers git state. Uses fewer commits on compact/clear to save context budget. */
 export async function getGitContext(
 	cwd: string,
@@ -85,7 +65,7 @@ export async function getGitContext(
 		return null
 	}
 
-	const statusResult = await runGit(['status', '--porcelain', '-b'], cwd)
+	const statusResult = await runGit(['status', '--porcelain', '-b'], { cwd })
 	if (statusResult.exitCode !== 0) {
 		return null
 	}
@@ -94,7 +74,7 @@ export async function getGitContext(
 
 	const commitsResult = await runGit(
 		['log', '--oneline', `-${commitCount}`, '--format=%h %s (%ar)'],
-		cwd,
+		{ cwd },
 	)
 
 	const recentCommits =
@@ -151,7 +131,7 @@ export function formatAdditionalContext(
 	routing +=
 		'| Manage worktrees | /git:worktree (create, list, delete, sync, clean, status) |\n'
 	routing +=
-		'| Anything else git | git-expert skill (history, changelog, compare, review) |'
+		'| Anything else git | invoke git-expert skill (history, changelog, compare, review) |'
 	sections.push(routing)
 
 	// Section 3: Safety rules -- critical after compaction when Claude loses memory

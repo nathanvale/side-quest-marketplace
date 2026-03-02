@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { getMainWorktreeRoot, getStableRepoName, parsePorcelainStatus } from './git-status-parser'
+import { getMainWorktreeRoot, parsePorcelainStatus } from './git-status-parser'
 
 describe('parsePorcelainStatus', () => {
 	test('parses branch and empty status', () => {
@@ -73,29 +73,5 @@ describe('getMainWorktreeRoot', () => {
 		const root = await getMainWorktreeRoot('/tmp')
 
 		expect(root).toBeNull()
-	})
-})
-
-describe('getStableRepoName', () => {
-	test('returns non-empty name for a git repository', async () => {
-		const name = await getStableRepoName(process.cwd())
-
-		expect(name).not.toBe('unknown')
-		expect(name.length).toBeGreaterThan(0)
-	})
-
-	test('returns "unknown" for a non-git directory', async () => {
-		const name = await getStableRepoName('/tmp')
-
-		expect(name).toBe('unknown')
-	})
-
-	test('returns the basename of the main worktree root', async () => {
-		const root = await getMainWorktreeRoot(process.cwd())
-		const name = await getStableRepoName(process.cwd())
-
-		// The name should be the last path segment of the root
-		const expected = root?.split('/').pop() ?? ''
-		expect(name).toBe(expected)
 	})
 })

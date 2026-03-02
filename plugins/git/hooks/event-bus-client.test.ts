@@ -133,9 +133,9 @@ describe('event-bus-client', () => {
 	}, 5000)
 
 	test('server error (500) does not throw', async () => {
-		globalThis.fetch = (async () => {
+		globalThis.fetch = (async (_input: string | URL | Request, _init?: RequestInit) => {
 			return new Response('Internal Server Error', { status: 500 })
-		}) as unknown as typeof fetch
+		}) as typeof fetch
 
 		const { tempHome, cleanup } = await createPortFileSetup('43125')
 		process.env.HOME = tempHome
@@ -149,10 +149,10 @@ describe('event-bus-client', () => {
 
 	test('SIDE_QUEST_EVENTS=0 skips emission entirely', async () => {
 		let requestSent = false
-		globalThis.fetch = (async () => {
+		globalThis.fetch = (async (_input: string | URL | Request, _init?: RequestInit) => {
 			requestSent = true
 			return new Response('ok', { status: 200 })
-		}) as unknown as typeof fetch
+		}) as typeof fetch
 
 		const { tempHome, cleanup } = await createPortFileSetup('43126')
 		process.env.HOME = tempHome
@@ -178,10 +178,10 @@ describe('event-bus-client', () => {
 
 		// Now create a valid port file -- second call should still skip due to negative cache
 		let requestSent = false
-		globalThis.fetch = (async () => {
+		globalThis.fetch = (async (_input: string | URL | Request, _init?: RequestInit) => {
 			requestSent = true
 			return new Response('ok', { status: 200 })
-		}) as unknown as typeof fetch
+		}) as typeof fetch
 
 		const repoRoot = await getRepoRootForTest(process.cwd())
 		const repoName = getRepoKeyFromGitRoot(repoRoot)
@@ -199,10 +199,10 @@ describe('event-bus-client', () => {
 
 	test('falls back to repo port when global port file is stale', async () => {
 		let receivedUrl = ''
-		globalThis.fetch = (async (input: string | URL | Request) => {
+		globalThis.fetch = (async (input: string | URL | Request, _init?: RequestInit) => {
 			receivedUrl = String(input)
 			return new Response('ok', { status: 200 })
-		}) as unknown as typeof fetch
+		}) as typeof fetch
 
 		const repoRoot = await getRepoRootForTest(process.cwd())
 		const repoName = getRepoKeyFromGitRoot(repoRoot)
@@ -235,10 +235,10 @@ describe('event-bus-client', () => {
 
 	test('nested cwd resolves to repo-root key for per-repo port lookup', async () => {
 		let requestSent = false
-		globalThis.fetch = (async () => {
+		globalThis.fetch = (async (_input: string | URL | Request, _init?: RequestInit) => {
 			requestSent = true
 			return new Response('ok', { status: 200 })
-		}) as unknown as typeof fetch
+		}) as typeof fetch
 
 		const tempHome = join(
 			tmpdir(),

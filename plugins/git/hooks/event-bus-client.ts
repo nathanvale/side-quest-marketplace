@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { homedir } from 'node:os'
+import { runGit } from './git-utils'
 
 const EMISSION_TIMEOUT_MS = 500
 const SCHEMA_VERSION = 1
@@ -45,24 +46,10 @@ async function getRepoIdentity(
 	return cachedIdentity
 }
 
-async function runGit(
-	args: string[],
-	cwd: string,
-): Promise<{ stdout: string; exitCode: number }> {
-	const proc = Bun.spawn(['git', ...args], {
-		cwd,
-		stdout: 'pipe',
-		stderr: 'ignore',
-	})
-	const stdout = await new Response(proc.stdout).text()
-	const exitCode = await proc.exited
-	return { stdout: stdout.trim(), exitCode }
-}
-
 async function resolveRepoRoot(cwd: string): Promise<string | null> {
 	const commonDirResult = await runGit(
 		['rev-parse', '--path-format=absolute', '--git-common-dir'],
-		cwd,
+		{ cwd },
 	)
 	if (commonDirResult.exitCode !== 0 || commonDirResult.stdout.length === 0) {
 		return null

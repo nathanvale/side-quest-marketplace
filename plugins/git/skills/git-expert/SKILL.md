@@ -17,7 +17,7 @@ Unified git workflow skill. Routes to the right procedure based on what the user
 
 | User wants... | Reference | Key commands |
 |---------------|-----------|-------------|
-| Create a commit | [workflows.md](references/workflows.md) § Commit + [conventions.md](references/conventions.md) + [examples.md](references/examples.md) | `git status`, `git diff`, `git add`, `git commit` |
+| Create a commit | [workflows.md](references/workflows.md) § Commit + [conventions.md](references/conventions.md) | `git status`, `git diff`, `git add`, `git commit` |
 | Quick checkpoint | [workflows.md](references/workflows.md) § Checkpoint | `git add -u`, `git commit --no-verify` |
 | Squash WIP commits | [workflows.md](references/workflows.md) § Squash | `git merge-base`, `git reset --soft`, `git commit` |
 | Explore history | Decision tree below | `git log`, `git blame`, `git show`, `git diff` |
@@ -81,7 +81,7 @@ If a hook blocks an action, resolve the underlying git safety issue rather than 
 <type>(<scope>): <subject>
 ```
 
-See [conventions.md](references/conventions.md) for full spec and [examples.md](references/examples.md) for examples.
+See [conventions.md](references/conventions.md) for full spec and examples.
 
 | Type | Use for |
 |------|---------|
