@@ -153,6 +153,10 @@ export function formatAdditionalContext(
 		'| Compare branches | /dx-git:compare (compare branches with AI summary) |\n'
 	routing +=
 		'| Session activity | /dx-git:session-log (git activity during this Claude session) |\n'
+	routing +=
+		'| Commit + create PR | /dx-git:commit-push-pr (squash WIP, commit, push, create PR) |\n'
+	routing +=
+		'| Clean merged branches | /dx-git:clean-gone (delete branches with gone remotes) |\n'
 	routing += '| Anything else git | invoke workflow skill |'
 	sections.push(routing)
 

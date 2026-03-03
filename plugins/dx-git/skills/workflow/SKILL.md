@@ -23,6 +23,8 @@ Unified git workflow skill. Routes to the right procedure based on what the user
 | Squash WIP commits | [workflows.md](references/workflows.md) § Squash | `git merge-base`, `git reset --soft`, `git commit` |
 | Explore history | Decision tree below | `git log`, `git blame`, `git show`, `git diff` |
 | Create PR | [workflows.md](references/workflows.md) § PR | `git push -u`, `gh pr create` |
+| Commit + PR in one step | [workflows.md](references/workflows.md) § Commit-Push-PR | `git status`, `git add`, `git commit`, `git push`, `gh pr create` |
+| Clean merged branches | [workflows.md](references/workflows.md) § Clean-Gone | `git fetch --prune`, `git for-each-ref`, `git branch -d` |
 | Session activity | [workflows.md](references/workflows.md) § Session Log | `git log --since="1 hour ago"` |
 | Manage worktrees | [worktree.md](references/worktree.md) | CLI via `bunx @side-quest/git worktree <command>` |
 | Review a PR | [workflows.md](references/workflows.md) § Review PR | `gh pr view`, `gh pr diff`, `gh api` |

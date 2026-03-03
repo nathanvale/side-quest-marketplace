@@ -70,6 +70,8 @@ All commands are thin wrappers that delegate to the workflow skill:
 - `/dx-git:commit` - Smart commits with Conventional Commits format
 - `/dx-git:squash` - Squash WIP commits into one conventional commit
 - `/dx-git:checkpoint` - Quick WIP checkpoint commits
+- `/dx-git:commit-push-pr [description] [--draft] [--skip-validate]` - Commit, push, and create PR in one workflow
+- `/dx-git:clean-gone [--confirm]` - Delete local branches with deleted remote tracking
 - `/dx-git:create-pr` - Create pull requests with proper formatting
 - `/dx-git:review-pr <number>` - Review a GitHub pull request with inline comments
 - `/dx-git:changelog [version]` - Generate changelog from conventional commits
@@ -179,6 +181,21 @@ Groups conventional commits into Keep a Changelog format. Suggests version bump 
 /dx-git:compare feature/auth
 ```
 Shows commit summary, file impact, and AI analysis of differences between current branch and target.
+
+### Commit and Create PR
+```
+/dx-git:commit-push-pr
+/dx-git:commit-push-pr add OAuth2 login
+/dx-git:commit-push-pr --draft
+```
+Squashes WIP commits if any, validates, creates a conventional commit, pushes, and creates a PR. Detects existing PRs and updates them.
+
+### Clean Merged Branches
+```
+/dx-git:clean-gone
+/dx-git:clean-gone --confirm
+```
+Fetches, prunes, and shows local branches whose remote tracking branch is gone. Run without `--confirm` to preview, with `--confirm` to delete. Detects squash-merged branches that git considers "unmerged."
 
 ## License
 

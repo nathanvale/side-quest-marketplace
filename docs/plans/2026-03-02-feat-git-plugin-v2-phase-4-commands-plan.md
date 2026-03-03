@@ -471,16 +471,16 @@ Both must pass. No new tests needed -- the commands are pure markdown files that
 
 ## Success Criteria
 
-- [ ] `commands/commit-push-pr.md` exists with one-liner body, tightened allowed-tools, and `[description] [--draft] [--skip-validate]` hint
-- [ ] `commands/clean-gone.md` exists with one-liner body, sonnet model, specific allowed-tools, and `[--confirm]` hint
-- [ ] plugin.json lists 12 commands (alphabetical order)
-- [ ] SKILL.md routing table has 2 new rows (with `git for-each-ref` in clean-gone key commands)
-- [ ] SessionStart routing table (git-context-loader.ts) has 2 new rows
-- [ ] workflows.md has Commit-Push-PR section with: pre-flight checks, WIP decision tree, validate gate, existing PR detection, step reporting, idempotent re-run
-- [ ] workflows.md has Clean-Gone section with: `for-each-ref` pipe-delimited format, worktree prune, protected branch config, categorized preview, batch deletion, squash merge detection, `--confirm` pattern
-- [ ] README has both new commands with full argument hints and usage examples
-- [ ] `bun run validate` passes
-- [ ] `bun test plugins/git/` passes
+- [x] `commands/commit-push-pr.md` exists with one-liner body, tightened allowed-tools, and `[description] [--draft] [--skip-validate]` hint
+- [x] `commands/clean-gone.md` exists with one-liner body, sonnet model, specific allowed-tools, and `[--confirm]` hint
+- [x] plugin.json lists 12 commands (alphabetical order)
+- [x] SKILL.md routing table has 2 new rows (with `git for-each-ref` in clean-gone key commands)
+- [x] SessionStart routing table (git-context-loader.ts) has 2 new rows
+- [x] workflows.md has Commit-Push-PR section with: pre-flight checks, WIP decision tree, validate gate, existing PR detection, step reporting, idempotent re-run
+- [x] workflows.md has Clean-Gone section with: `for-each-ref` pipe-delimited format, worktree prune, protected branch config, categorized preview, batch deletion, squash merge detection, `--confirm` pattern
+- [x] README has both new commands with full argument hints and usage examples
+- [x] `bun run validate` passes
+- [x] `bun test plugins/dx-git/` passes
 
 ---
 

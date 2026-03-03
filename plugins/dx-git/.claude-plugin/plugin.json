@@ -23,7 +23,9 @@
 	"commands": [
 		"./commands/changelog.md",
 		"./commands/checkpoint.md",
+		"./commands/clean-gone.md",
 		"./commands/commit.md",
+		"./commands/commit-push-pr.md",
 		"./commands/compare.md",
 		"./commands/create-pr.md",
 		"./commands/history.md",
