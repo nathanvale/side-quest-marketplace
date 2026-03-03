@@ -83,6 +83,7 @@ export function tokenizeShell(command: string): TokenizeResult {
 	let prevState: LexerState = 'normal' // for escape returns
 	let depth = 0 // nesting depth for $() and ${}
 	const parenReturnStack: LexerState[] = [] // state to return to when $() closes
+	const braceReturnStack: LexerState[] = [] // state to return to when ${} closes
 	let buf = ''
 	let heredocDelimiter: string | null = null
 	let heredocStrip = false // true for <<- (strip leading tabs)
@@ -205,6 +206,7 @@ export function tokenizeShell(command: string): TokenizeResult {
 					buf += '$('
 					i += 2
 				} else if (ch === '$' && i + 1 < i_max && command[i + 1] === '{') {
+					braceReturnStack.push('normal')
 					state = 'dollar-brace'
 					depth++
 					buf += '${'
@@ -271,6 +273,7 @@ export function tokenizeShell(command: string): TokenizeResult {
 					buf += '$('
 					i += 2
 				} else if (ch === '$' && i + 1 < i_max && command[i + 1] === '{') {
+					braceReturnStack.push('double-quote')
 					state = 'dollar-brace'
 					depth++
 					buf += '${'
@@ -434,7 +437,7 @@ export function tokenizeShell(command: string): TokenizeResult {
 					buf += ch
 					i++
 					if (depth === 0) {
-						state = 'normal'
+						state = braceReturnStack.pop() ?? 'normal'
 					}
 				} else {
 					buf += ch
@@ -607,8 +610,12 @@ function expandAnsiCEscapes(body: string): string {
 	return result
 }
 
-/** Removes surrounding single, double, or ANSI-C ($'...') quotes from a word. */
+/**
+ * Performs POSIX/Bash-style quote removal on a word. Handles fully quoted
+ * words, mixed fragments (e.g. --fo"rce" -> --force), and ANSI-C $'...' escapes.
+ */
 function unquoteWord(word: string): string {
+	// Fast paths for fully quoted words
 	if (word.length >= 3 && word.startsWith("$'") && word.endsWith("'")) {
 		return expandAnsiCEscapes(word.slice(2, -1))
 	}
@@ -618,7 +625,36 @@ function unquoteWord(word: string): string {
 	if (word.length >= 2 && word.startsWith('"') && word.endsWith('"')) {
 		return word.slice(1, -1)
 	}
-	return word
+	// No quotes at all - return as-is
+	if (!word.includes("'") && !word.includes('"') && !word.includes('\\')) {
+		return word
+	}
+	// Mixed quoted/unquoted fragments: strip quotes per POSIX quote removal
+	let out = ''
+	let i = 0
+	let inSingle = false
+	let inDouble = false
+	while (i < word.length) {
+		const ch = word[i]!
+		if (ch === "'" && !inDouble) {
+			inSingle = !inSingle
+			i++
+			continue
+		}
+		if (ch === '"' && !inSingle) {
+			inDouble = !inDouble
+			i++
+			continue
+		}
+		if (ch === '\\' && !inSingle && i + 1 < word.length) {
+			out += word[i + 1]!
+			i += 2
+			continue
+		}
+		out += ch
+		i++
+	}
+	return out
 }
 
 /**
@@ -1159,6 +1195,16 @@ export function extractWrappedShellCommand(segment: string): string | null {
 	}
 
 	if (normalizedHead === 'env') {
+		const envOptionsWithValue = new Set([
+			'-u',
+			'--unset',
+			'-C',
+			'--chdir',
+			'-a',
+			'--argv0',
+			'-S',
+			'--split-string',
+		])
 		let i = 0
 		while (i < args.length) {
 			const arg = args[i] || ''
@@ -1166,7 +1212,16 @@ export function extractWrappedShellCommand(segment: string): string | null {
 				i++
 				break
 			}
-			if (arg === '-u') {
+			if (
+				arg.startsWith('--chdir=') ||
+				arg.startsWith('--unset=') ||
+				arg.startsWith('--argv0=') ||
+				arg.startsWith('--split-string=')
+			) {
+				i++
+				continue
+			}
+			if (envOptionsWithValue.has(arg)) {
 				i += 2
 				continue
 			}

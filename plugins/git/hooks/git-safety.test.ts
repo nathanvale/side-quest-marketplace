@@ -116,6 +116,17 @@ describe('git branch force delete variants', () => {
 	})
 })
 
+describe('mixed-quote flag bypass attempts', () => {
+	test.each([
+		['git push --fo"rce" origin main'],
+		["git reset --ha'rd'"],
+		['git clean -f"d"'],
+	])('blocks mixed-quote flag bypass: %s', (command) => {
+		const result = checkCommand(command)
+		expect(result.blocked).toBe(true)
+	})
+})
+
 describe('git push --force-with-lease on protected branches', () => {
 	test.each([
 		['git push --force-with-lease origin main'],
@@ -747,6 +758,10 @@ describe('issue 5: shell indirection does not bypass safety checks', () => {
 		['dash -c "git push --force origin main"'],
 		['ksh -c "git reset --hard"'],
 		['env git reset --hard'],
+		['env --chdir /tmp git reset --hard'],
+		['env -C /tmp git reset --hard'],
+		['env -a myname git reset --hard'],
+		['env --argv0=myname git reset --hard'],
 		['command git reset --hard'],
 		['time git clean -fd'],
 		['time -f %E git clean -fd'],
