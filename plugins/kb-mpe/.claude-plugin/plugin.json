@@ -1,0 +1,16 @@
+{
+	"name": "kb-mpe",
+	"description": "Reference knowledge for Markdown Preview Enhanced VS Code extension",
+	"version": "1.0.0",
+	"author": { "name": "Nathan Vale" },
+	"keywords": [
+		"knowledge-bank",
+		"markdown-preview-enhanced",
+		"vscode",
+		"mpe",
+		"diagrams",
+		"export"
+	],
+	"license": "MIT",
+	"skills": ["./skills/mpe"]
+}

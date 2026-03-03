@@ -4,7 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A Claude Code plugin marketplace -- a monorepo containing the `cortex-engineering` plugin, an agent-native knowledge system with research, brainstorm, and knowledge capture skills. Each plugin lives under `plugins/<name>/` and is registered in `.claude-plugin/marketplace.json`.
+A Claude Code plugin marketplace -- a monorepo of plugins registered in `.claude-plugin/marketplace.json`. Each plugin lives under `plugins/<name>/` and serves a different purpose:
+
+| Plugin | Tier | Category | Purpose |
+|--------|------|----------|---------|
+| `cortex-engineering` | Core | productivity | Agent-native knowledge system with research, brainstorm, and knowledge capture skills |
+| `kb-mpe` | Knowledge bank | learning | Reference knowledge for Markdown Preview Enhanced VS Code extension |
 
 ## Commands
 
@@ -84,6 +89,19 @@ The validation script (`scripts/validate-marketplace.ts`) enforces:
 
 All paths are relative to the plugin root and validated by `claude plugin validate .`.
 
+### Plugin Tiers
+
+Plugins are organized by tier. The tier determines naming convention and lifecycle:
+
+| Tier | Prefix | Lifecycle | When to use |
+|------|--------|-----------|-------------|
+| Core | none | Always-on, foundational | Workflow plugins with skills, commands, agents, hooks |
+| Knowledge bank | `kb-*` | Toggle per-session | Reference knowledge for a specific tool or framework. Single skill with `user-invocable: false`, routing table hub pointing to `references/` files. No commands, agents, or hooks. |
+| Developer experience | `dx-*` | Toggle per-project | Dev tooling plugins (linters, formatters, test runners). May have hooks and commands. |
+| Integration | `int-*` | Toggle as needed | External service wrappers (APIs, CLIs, cloud services). May have MCP tools. |
+
+When adding a new plugin, pick the tier first -- it determines the name prefix and expected structure.
+
 ### Progressive Disclosure Pattern
 
 Skills use a references/ subdirectory for conditional context loading. The main SKILL.md is always loaded (~2,000 tokens). References are loaded only when relevant flags, modes, or tools are detected. This keeps default token cost low.
@@ -111,6 +129,7 @@ Available events: `SessionStart`, `PreToolUse`, `PostToolUse`, `PostToolUseFailu
 - **Formatting:** Biome -- tabs, single quotes, 80-char line width
 - **Single biome.json at root** -- NEVER create nested configs
 - **Commits:** Conventional Commits (`feat(scope): subject`)
+- **Plugin names:** `kb-` prefix for knowledge bank plugins, no prefix for core plugins
 - **Branches:** `type/description` (e.g., `feat/add-cortex`)
 - **Hook TypeScript:** always include a self-destruct timer as the first executable line for safety
 
