@@ -31,7 +31,7 @@
 		"node": ">=22.20"
 	},
 	"scripts": {
-		"check": "biome check --write .",
+		"check": "git ls-files -z -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' '*.json' '*.jsonc' | xargs -0 biome check --write",
 		"coverage": "bun test --coverage",
 		"format": "biome format --write .",
 		"format:check": "biome format .",

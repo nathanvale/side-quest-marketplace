@@ -1,0 +1,35 @@
+{
+	"name": "git",
+	"description": "Enforces conventional commits, blocks destructive git operations, and automates the commit-push-PR workflow",
+	"version": "2.0.0",
+	"author": {
+		"name": "Nathan Vale"
+	},
+	"repository": "https://github.com/nathanvale/side-quest-marketplace",
+	"keywords": [
+		"git",
+		"commits",
+		"history",
+		"conventional-commits",
+		"session",
+		"worktree",
+		"safety",
+		"pr-review",
+		"changelog",
+		"compare"
+	],
+	"license": "MIT",
+	"skills": ["./skills/workflow"],
+	"commands": [
+		"./commands/changelog.md",
+		"./commands/checkpoint.md",
+		"./commands/commit.md",
+		"./commands/compare.md",
+		"./commands/create-pr.md",
+		"./commands/history.md",
+		"./commands/review-pr.md",
+		"./commands/session-log.md",
+		"./commands/squash.md",
+		"./commands/worktree.md"
+	]
+}

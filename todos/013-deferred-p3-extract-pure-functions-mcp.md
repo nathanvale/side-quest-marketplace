@@ -1,5 +1,5 @@
 ---
-status: pending
+status: deferred
 priority: p3
 issue_id: "013"
 tags: [code-review, architecture, stage-1]
