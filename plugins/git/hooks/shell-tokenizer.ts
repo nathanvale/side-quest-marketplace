@@ -53,6 +53,12 @@ export interface GitInvocation {
 	args: string[]
 }
 
+/** Result of removing benign command-execution prefixes (time/nice/command). */
+interface PrefixStripResult {
+	headIndex: number
+	skippedPrefix: boolean
+}
+
 // ---------------------------------------------------------------------------
 // Core tokenizer
 // ---------------------------------------------------------------------------
@@ -795,6 +801,175 @@ const GIT_OPTIONS_WITH_VALUE = new Set([
 	'--config-env',
 ])
 
+function isWordOption(word: string): boolean {
+	return word.startsWith('-')
+}
+
+/**
+ * Strips common execution prefixes that wrap a real command while preserving
+ * command semantics (e.g., `command git ...`, `time git ...`, `nice -n 5 git ...`).
+ */
+function stripExecutionPrefixes(
+	words: string[],
+	startIndex: number,
+): PrefixStripResult {
+	let i = startIndex
+	let skippedPrefix = false
+
+	while (i < words.length) {
+		const head = normalizeExecutableName(words[i] || null)
+		if (!head) break
+
+		if (head === 'command' || head === 'builtin') {
+			skippedPrefix = true
+			i++
+			while (i < words.length) {
+				const word = words[i] || ''
+				if (word === '--') {
+					i++
+					break
+				}
+				if (!isWordOption(word)) break
+				i++
+			}
+			continue
+		}
+
+		if (head === 'time') {
+			skippedPrefix = true
+			i++
+			while (i < words.length) {
+				const word = words[i] || ''
+				if (word === '--') {
+					i++
+					break
+				}
+				if (!isWordOption(word)) break
+				i++
+			}
+			continue
+		}
+
+		if (head === 'nice') {
+			skippedPrefix = true
+			i++
+			while (i < words.length) {
+				const word = words[i] || ''
+				if (word === '--') {
+					i++
+					break
+				}
+				if (word === '-n' || word === '--adjustment') {
+					i += 2
+					continue
+				}
+				if (word.startsWith('-n')) {
+					i++
+					continue
+				}
+				if (!isWordOption(word)) break
+				i++
+			}
+			continue
+		}
+
+		if (head === 'nohup' || head === 'chronic') {
+			skippedPrefix = true
+			i++
+			if ((words[i] || '') === '--') i++
+			continue
+		}
+
+		if (head === 'sudo') {
+			skippedPrefix = true
+			i++
+			const optionsWithValue = new Set([
+				'-u',
+				'-g',
+				'-h',
+				'-p',
+				'-C',
+				'-r',
+				'-t',
+				'-T',
+			])
+			while (i < words.length) {
+				const word = words[i] || ''
+				if (word === '--') {
+					i++
+					break
+				}
+				if (!isWordOption(word)) break
+				if (optionsWithValue.has(word)) {
+					i += 2
+					continue
+				}
+				i++
+			}
+			continue
+		}
+
+		if (head === 'stdbuf') {
+			skippedPrefix = true
+			i++
+			while (i < words.length) {
+				const word = words[i] || ''
+				if (word === '--') {
+					i++
+					break
+				}
+				if (!isWordOption(word)) break
+				if (word === '-i' || word === '-o' || word === '-e') {
+					i += 2
+					continue
+				}
+				i++
+			}
+			continue
+		}
+
+		if (head === 'chrt' || head === 'ionice' || head === 'setsid') {
+			skippedPrefix = true
+			i++
+			while (i < words.length) {
+				const word = words[i] || ''
+				if (word === '--') {
+					i++
+					break
+				}
+				if (!isWordOption(word)) break
+				// Some flags for chrt/ionice consume a value; this is conservative.
+				if (
+					word === '-p' ||
+					word === '--pid' ||
+					word === '-c' ||
+					word === '--class' ||
+					word === '-n' ||
+					word === '--classdata'
+				) {
+					i += 2
+					continue
+				}
+				i++
+			}
+			// chrt commonly uses: chrt -r <priority> <command> ...
+			const maybePriority = words[i] || ''
+			if (
+				head === 'chrt' &&
+				/^\d+$/.test(maybePriority) &&
+				i + 1 < words.length
+			) {
+				i++
+			}
+			continue
+		}
+
+		break
+	}
+
+	return { headIndex: i, skippedPrefix }
+}
+
 /**
  * Parses a shell segment to extract a git subcommand and its arguments,
  * skipping global git options (e.g., `-C`, `--git-dir`). Returns null if
@@ -802,10 +977,13 @@ const GIT_OPTIONS_WITH_VALUE = new Set([
  */
 export function parseGitInvocation(segment: string): GitInvocation | null {
 	const { words, cmdIndex, head } = getCommandWords(segment)
-	if (cmdIndex === -1 || normalizeExecutableName(head) !== 'git') return null
+	if (cmdIndex === -1 || !head) return null
+	const { headIndex } = stripExecutionPrefixes(words, cmdIndex)
+	if (headIndex >= words.length) return null
+	if (normalizeExecutableName(words[headIndex] || null) !== 'git') return null
 
 	// Skip git global options before subcommand.
-	let i = cmdIndex + 1
+	let i = headIndex + 1
 	while (i < words.length) {
 		const word = words[i] || ''
 
@@ -1004,6 +1182,24 @@ export function extractWrappedShellCommand(segment: string): string | null {
 			i++
 		}
 		return args.slice(i).join(' ').trim() || null
+	}
+
+	if (
+		normalizedHead === 'command' ||
+		normalizedHead === 'builtin' ||
+		normalizedHead === 'time' ||
+		normalizedHead === 'nice' ||
+		normalizedHead === 'nohup' ||
+		normalizedHead === 'chronic' ||
+		normalizedHead === 'sudo' ||
+		normalizedHead === 'stdbuf' ||
+		normalizedHead === 'chrt' ||
+		normalizedHead === 'ionice' ||
+		normalizedHead === 'setsid'
+	) {
+		const { headIndex, skippedPrefix } = stripExecutionPrefixes(words, cmdIndex)
+		if (!skippedPrefix || headIndex >= words.length) return null
+		return words.slice(headIndex).join(' ').trim() || null
 	}
 
 	return null

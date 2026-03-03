@@ -644,6 +644,12 @@ describe('issue 4: git global options do not bypass safety checks', () => {
 		['/usr/bin/git commit -m "feat: test"', true],
 		['git -c core.editor=true commit -n -m "wip: checkpoint"', true],
 		['git diff --quiet || git -C /repo commit -m "feat: test"', true],
+		['command git commit -m "feat: test"', true],
+		['time git commit -m "feat: test"', true],
+		['nice -n 10 git commit -m "feat: test"', true],
+		['nohup git commit -m "feat: test"', true],
+		['sudo git commit -m "feat: test"', true],
+		['stdbuf -o0 git commit -m "feat: test"', true],
 	])('detects commit command with globals/chaining: %s', (command, expected) => {
 		const result = isCommitCommand(command)
 		expect(result.isCommit).toBe(expected)
@@ -723,6 +729,15 @@ describe('issue 5: shell indirection does not bypass safety checks', () => {
 		['sh -c "git reset --hard"'],
 		['bash -lc "git clean -fd"'],
 		['env git reset --hard'],
+		['command git reset --hard'],
+		['time git clean -fd'],
+		['nice -n 5 git push --force origin main'],
+		['nohup git reset --hard'],
+		['sudo git reset --hard'],
+		['stdbuf -o0 git reset --hard'],
+		['chrt -r 1 git reset --hard'],
+		['ionice -c3 git reset --hard'],
+		['setsid git reset --hard'],
 		['eval "git push --force origin main"'],
 		['python -c "import os; os.system(\'git push --force origin main\')"'],
 		["node -e \"require('child_process').execSync('git reset --hard')\""],
