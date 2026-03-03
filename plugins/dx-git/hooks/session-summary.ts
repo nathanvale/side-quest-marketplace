@@ -131,7 +131,7 @@ if (import.meta.main) {
 
 		const contextParts: string[] = [
 			`Git state at compaction:\n${gitState}`,
-			'\nGit workflow: /git:commit, /git:squash, /git:checkpoint',
+			'\nGit workflow: /dx-git:commit, /dx-git:squash, /dx-git:checkpoint',
 			'workflow skill handles: commits, PRs, history, worktrees, changelog, branch compare, squash, safety guards',
 		]
 

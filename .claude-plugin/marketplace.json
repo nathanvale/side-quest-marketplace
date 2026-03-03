@@ -1,7 +1,7 @@
 {
 	"$schema": "https://code.claude.com/docs/en/plugin-marketplaces",
 	"name": "side-quest-marketplace",
-	"version": "0.3.0",
+	"version": "1.0.0",
 	"description": "Agent-native knowledge system with research, brainstorm, and knowledge capture skills",
 	"owner": {
 		"name": "Nathan Vale",
@@ -16,8 +16,8 @@
 			"tags": ["knowledge", "research", "brainstorm", "frontmatter"]
 		},
 		{
-			"name": "git",
-			"source": "./plugins/git",
+			"name": "dx-git",
+			"source": "./plugins/dx-git",
 			"description": "Git workflow automation with conventional commits, safety hooks, worktree management, and PR creation",
 			"category": "development",
 			"tags": [

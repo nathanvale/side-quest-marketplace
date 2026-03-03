@@ -136,21 +136,23 @@ export function formatAdditionalContext(
 	routing += '| Need | Command |\n'
 	routing += '|------|--------|\n'
 	routing +=
-		'| Commit changes | /git:commit (analyzes diff, conventional commit) |\n'
-	routing += '| Quick save | /git:checkpoint (WIP commit, skips hooks) |\n'
+		'| Commit changes | /dx-git:commit (analyzes diff, conventional commit) |\n'
+	routing += '| Quick save | /dx-git:checkpoint (WIP commit, skips hooks) |\n'
 	routing +=
-		'| Squash WIP commits | /git:squash (combines into one clean commit) |\n'
-	routing += '| Create PR | /git:create-pr (push + gh pr create) |\n'
+		'| Squash WIP commits | /dx-git:squash (combines into one clean commit) |\n'
+	routing += '| Create PR | /dx-git:create-pr (push + gh pr create) |\n'
 	routing +=
-		'| Manage worktrees | /git:worktree (create, list, delete, sync, clean, status) |\n'
-	routing += '| Review a PR | /git:review-pr (review a GitHub pull request) |\n'
-	routing += '| Explore history | /git:history (explore git commit history) |\n'
+		'| Manage worktrees | /dx-git:worktree (create, list, delete, sync, clean, status) |\n'
 	routing +=
-		'| Generate changelog | /git:changelog (changelog from conventional commits) |\n'
+		'| Review a PR | /dx-git:review-pr (review a GitHub pull request) |\n'
 	routing +=
-		'| Compare branches | /git:compare (compare branches with AI summary) |\n'
+		'| Explore history | /dx-git:history (explore git commit history) |\n'
 	routing +=
-		'| Session activity | /git:session-log (git activity during this Claude session) |\n'
+		'| Generate changelog | /dx-git:changelog (changelog from conventional commits) |\n'
+	routing +=
+		'| Compare branches | /dx-git:compare (compare branches with AI summary) |\n'
+	routing +=
+		'| Session activity | /dx-git:session-log (git activity during this Claude session) |\n'
 	routing += '| Anything else git | invoke workflow skill |'
 	sections.push(routing)
 

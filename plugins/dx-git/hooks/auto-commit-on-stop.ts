@@ -106,7 +106,7 @@ export function generateCommitMessage(prompt: string | null): string {
 			: 'session checkpoint'
 	const truncatedPrompt = truncateForSubject(effectivePrompt, subjectMaxLen)
 
-	return `${prefix}${truncatedPrompt}\n\nSession work in progress - run /git:commit to squash.`
+	return `${prefix}${truncatedPrompt}\n\nSession work in progress - run /dx-git:commit to squash.`
 }
 
 /**
@@ -199,7 +199,7 @@ export async function createAutoCommit(
 export function printUserNotification(commitMessage: string): void {
 	const subjectLine = commitMessage.split('\n')[0]
 	console.log(`✓ WIP checkpoint saved: ${subjectLine}`)
-	console.log('  Run /git:commit when ready to finalize')
+	console.log('  Run /dx-git:commit when ready to finalize')
 }
 
 if (import.meta.main) {

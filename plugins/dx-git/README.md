@@ -1,6 +1,6 @@
-# Git Plugin for Claude Code
+# dx-git Plugin for Claude Code
 
-> **v2.0.0** -- Lean skills-based architecture (no MCP server)
+> **v3.0.0** -- Renamed from `git` to `dx-git` (Developer experience tier)
 
 Provides intelligent git context, history exploration, smart commit capabilities, and safety guardrails for Claude Code sessions.
 
@@ -13,7 +13,7 @@ Provides intelligent git context, history exploration, smart commit capabilities
 **SessionStart** - Loads git context:
 - Current branch and status
 - Last 5 commits
-- Skill nudge for /git:commit, /git:squash, /git:checkpoint
+- Skill nudge for /dx-git:commit, /dx-git:squash, /dx-git:checkpoint
 
 **PreToolUse** - Git safety guard:
 - Blocks destructive commands (force push, hard reset, clean -f, checkout ., branch -D)
@@ -39,7 +39,7 @@ Recommended rollout:
 
 Run these checks before merging safety changes to `main`:
 
-1. `bun test plugins/git/hooks/`
+1. `bun test plugins/dx-git/hooks/`
 2. `bun run typecheck`
 3. Runtime mode smoke checks:
   - `strict`: destructive command should deny
@@ -67,16 +67,16 @@ Operational default:
 
 All commands are thin wrappers that delegate to the workflow skill:
 
-- `/git:commit` - Smart commits with Conventional Commits format
-- `/git:squash` - Squash WIP commits into one conventional commit
-- `/git:checkpoint` - Quick WIP checkpoint commits
-- `/git:create-pr` - Create pull requests with proper formatting
-- `/git:review-pr <number>` - Review a GitHub pull request with inline comments
-- `/git:changelog [version]` - Generate changelog from conventional commits
-- `/git:compare [branch]` - Compare branches with AI summary
-- `/git:history [query]` - Interactive history exploration
-- `/git:session-log` - Show session git activity
-- `/git:worktree <subcommand>` - Manage git worktrees (create, list, delete, sync, clean, status)
+- `/dx-git:commit` - Smart commits with Conventional Commits format
+- `/dx-git:squash` - Squash WIP commits into one conventional commit
+- `/dx-git:checkpoint` - Quick WIP checkpoint commits
+- `/dx-git:create-pr` - Create pull requests with proper formatting
+- `/dx-git:review-pr <number>` - Review a GitHub pull request with inline comments
+- `/dx-git:changelog [version]` - Generate changelog from conventional commits
+- `/dx-git:compare [branch]` - Compare branches with AI summary
+- `/dx-git:history [query]` - Interactive history exploration
+- `/dx-git:session-log` - Show session git activity
+- `/dx-git:worktree <subcommand>` - Manage git worktrees (create, list, delete, sync, clean, status)
 
 ### Skill: workflow
 
@@ -126,57 +126,57 @@ Uses [Conventional Commits](https://www.conventionalcommits.org/) specification:
 
 ### Smart Commits
 ```
-/git:commit
+/dx-git:commit
 ```
 Claude analyzes changes, suggests type/scope, and creates a well-formatted commit.
 
 ### Squash WIP Commits
 ```
-/git:squash
+/dx-git:squash
 ```
 Combines WIP commits on a feature branch into one clean conventional commit.
 
 ### Quick Checkpoints
 ```
-/git:checkpoint before refactor
+/dx-git:checkpoint before refactor
 ```
 Creates a quick WIP commit to save current state.
 
 ### History Exploration
 ```
-/git:history auth
+/dx-git:history auth
 ```
 Searches for commits related to "auth".
 
 ### Session Summary
 ```
-/git:session-log
+/dx-git:session-log
 ```
 Shows commits made and current changes during this session.
 
 ### Create Pull Request
 ```
-/git:create-pr
+/dx-git:create-pr
 ```
 Analyzes all commits on the branch and creates a PR with proper formatting.
 
 ### Review a Pull Request
 ```
-/git:review-pr 42
+/dx-git:review-pr 42
 ```
 Fetches PR diff, reviews for bugs/issues, presents findings, and posts a batched review on approval.
 
 ### Generate Changelog
 ```
-/git:changelog
-/git:changelog 2.1.0
+/dx-git:changelog
+/dx-git:changelog 2.1.0
 ```
 Groups conventional commits into Keep a Changelog format. Suggests version bump if not specified.
 
 ### Compare Branches
 ```
-/git:compare
-/git:compare feature/auth
+/dx-git:compare
+/dx-git:compare feature/auth
 ```
 Shows commit summary, file impact, and AI analysis of differences between current branch and target.
 

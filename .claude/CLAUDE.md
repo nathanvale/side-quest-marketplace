@@ -9,6 +9,7 @@ A Claude Code plugin marketplace -- a monorepo of plugins registered in `.claude
 | Plugin | Tier | Category | Purpose |
 |--------|------|----------|---------|
 | `cortex-engineering` | Core | productivity | Agent-native knowledge system with research, brainstorm, and knowledge capture skills |
+| `dx-git` | Developer experience | development | Git workflow automation with conventional commits, safety hooks, and PR creation |
 | `kb-mpe` | Knowledge bank | learning | Reference knowledge for Markdown Preview Enhanced VS Code extension |
 
 ## Commands
