@@ -1,0 +1,8 @@
+{
+	"mcpServers": {
+		"bun-runner": {
+			"command": "bunx",
+			"args": ["--bun", "@side-quest/bun-runner"]
+		}
+	}
+}
