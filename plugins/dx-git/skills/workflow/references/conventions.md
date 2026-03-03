@@ -45,11 +45,17 @@ Use the body to explain:
 
 Separate from subject with a blank line.
 
+When a commit touches multiple areas, name the affected modules or services in the body so readers know which diffs matter without reading every changed file.
+
 ## Footer (Optional)
 
 - `BREAKING CHANGE:` for breaking changes
 - `Fixes #123` or `Closes #123` for issue references
 - `Co-Authored-By:` for pair programming
+
+### AI Attribution
+
+Always add `Co-Authored-By: Claude <noreply@anthropic.com>` when Claude generates or substantially modifies code. GitHub renders this as a co-author avatar in the commit list.
 
 ## Breaking Changes
 
@@ -105,3 +111,70 @@ Generated with [Claude Code](https://claude.ai/code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```
+
+## Anti-Slop Guardrails
+
+Bad commit messages echo the debugging session. Good ones describe the outcome.
+
+**Bad -- narrates the journey:**
+
+```
+fix(auth): fix token validation
+
+First I checked the error logs and saw null pointer exceptions.
+After investigating, I found that validateToken() didn't handle
+empty OAuth payloads. I added a null guard and updated the tests.
+```
+
+**Good -- describes the outcome:**
+
+```
+fix(auth): reject null OAuth tokens before validation
+
+Empty OAuth payloads from the provider caused a null pointer in
+validateToken(). The null guard returns 401 before reaching the
+JWT decoder.
+```
+
+**Bad -- subtle process narration:**
+
+```
+refactor(db): refactor query builder for better performance
+
+The investigation revealed that the query builder was generating
+suboptimal joins. Testing confirmed that rewriting the join logic
+reduced query time across all endpoints.
+```
+
+**Good -- states what changed and why:**
+
+```
+perf(db): rewrite join logic in query builder
+
+Inner joins replace left joins where nulls are impossible.
+Benchmarked: 3x faster on the /users endpoint.
+```
+
+**Common slop transformations:**
+
+| Slop | Clean |
+|------|-------|
+| `This commit adds JWT auth support` | `feat(auth): add JWT authentication` |
+| `Updated user service to ensure proper error handling` | `fix(user): handle null response in getUser` |
+| `Refactored and streamlined the database query` | `perf(db): add index on users.email` |
+| `Let's fix the bug where login fails` | `fix(auth): prevent login failure on expired token` |
+
+**Words that signal AI-generated text** (avoid in commit messages):
+
+| Avoid | Use instead |
+|-------|-------------|
+| ensure | verify, check, guard |
+| comprehensive | (omit -- show scope via file list) |
+| robust | (omit -- tests prove robustness) |
+| streamline | simplify, reduce |
+| enhance | improve, add |
+| leverage | use |
+| seamless | (omit -- users decide) |
+| proper | correct, valid |
+
+The diff shows *how*. The message explains *what* and *why*.

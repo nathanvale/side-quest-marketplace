@@ -49,6 +49,10 @@ Run these checks before merging safety changes to `main`:
 Operational default:
 - Keep `CLAUDE_GIT_SAFETY_MODE` unset in production (`strict` by default).
 
+### Companion: claude-code-safety-net
+
+Our `git-safety.ts` hook uses pattern matching on raw commands. For deeper Bash analysis (wrapped commands, nested interpreters), consider [claude-code-safety-net](https://github.com/kenryu42/claude-code-safety-net) (`cc-safety-net` on npm). Both hooks coexist as sequential PreToolUse hooks.
+
 **PostToolUse** - Command logger:
 - Appends Bash commands to ~/.claude/logs/git-command-log.jsonl
 - Fire-and-forget audit trail

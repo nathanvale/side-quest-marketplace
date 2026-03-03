@@ -26,6 +26,7 @@ Step-by-step procedures for common git operations.
    )"
    ```
 7. **Handle hook failures**: If pre-commit modifies files, stage and create a NEW commit (never amend unless explicitly asked)
+8. **Split large changes**: When a commit spans multiple concerns, split into atomic commits ordered so each builds on the previous -- reviewers should be able to follow the progression without jumping between commits
 
 ## Squash
 
