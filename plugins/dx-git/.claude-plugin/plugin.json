@@ -1,7 +1,7 @@
 {
 	"name": "dx-git",
 	"description": "Enforces conventional commits, blocks destructive git operations, and automates the commit-push-PR workflow",
-	"version": "3.0.0",
+	"version": "3.1.0",
 	"author": {
 		"name": "Nathan Vale"
 	},
