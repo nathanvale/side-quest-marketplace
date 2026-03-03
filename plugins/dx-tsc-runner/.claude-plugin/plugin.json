@@ -1,0 +1,10 @@
+{
+	"name": "dx-tsc-runner",
+	"description": "Runs TypeScript type checking after every edit and at session end, surfacing errors inline",
+	"version": "1.0.0",
+	"author": { "name": "Nathan Vale" },
+	"repository": "https://github.com/nathanvale/side-quest-marketplace",
+	"keywords": ["typescript", "tsc", "type-checking", "diagnostics", "hooks"],
+	"license": "MIT",
+	"commands": ["./commands/show-logs.md"]
+}
