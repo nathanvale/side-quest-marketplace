@@ -1,0 +1,20 @@
+flowchart LR
+    classDef primary fill:#0072B2,stroke:#005a8c,color:#fff,stroke-width:2px
+    classDef info fill:#56B4E9,stroke:#2A8ABF,color:#000,stroke-width:2px
+    classDef success fill:#009E73,stroke:#006B4F,color:#fff,stroke-width:2px
+    classDef warning fill:#E69F00,stroke:#B37A00,color:#000,stroke-width:2px
+
+    subgraph "Plugin Tiers"
+        CORE["Core<br/>(no prefix)"]:::primary
+        KB["Knowledge Bank<br/>(kb-*)"]:::info
+        DX["Dev Experience<br/>(dx-*)"]:::warning
+        INT["Integration<br/>(int-*)"]:::success
+    end
+
+    subgraph "marketplace.json v0.2.0"
+        CE[cortex-engineering]:::primary
+        MPE[kb-mpe]:::info
+    end
+
+    CORE -->|established| CE
+    KB -->|"this PR"| MPE

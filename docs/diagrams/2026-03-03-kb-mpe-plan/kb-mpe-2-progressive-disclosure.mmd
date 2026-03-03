@@ -1,0 +1,27 @@
+flowchart TD
+    classDef primary fill:#0072B2,stroke:#005a8c,color:#fff,stroke-width:2px
+    classDef info fill:#56B4E9,stroke:#2A8ABF,color:#000,stroke-width:2px
+    classDef success fill:#009E73,stroke:#006B4F,color:#fff,stroke-width:2px
+    classDef warning fill:#E69F00,stroke:#B37A00,color:#000,stroke-width:2px
+
+    HUB["SKILL.md Hub<br/>user-invocable: false"]:::primary
+
+    HUB --> INLINE["Inline Quick Ref<br/>Top settings + FAQs"]:::info
+
+    subgraph "On-Demand References"
+        R1[settings]:::success
+        R2[code-chunks]:::success
+        R3[file-imports]:::success
+        R4[diagrams]:::success
+        R5[presentations]:::success
+        R6[export]:::success
+        R7[custom-css]:::success
+    end
+
+    HUB -->|"per query"| R1
+    HUB -->|"per query"| R2
+    HUB -->|"per query"| R3
+    HUB -->|"per query"| R4
+    HUB -->|"per query"| R5
+    HUB -->|"per query"| R6
+    HUB -->|"per query"| R7
