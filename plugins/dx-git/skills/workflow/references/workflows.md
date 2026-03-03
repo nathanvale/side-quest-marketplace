@@ -171,13 +171,14 @@ Determine the base branch once, use throughout. 4-tier fallback chain ordered by
 
 ```bash
 # Tier 1: gh CLI (authoritative, requires auth + network)
-DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null) \
+DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null) || \
   # Tier 2: git symbolic-ref (fast, local, fails if origin/HEAD not set)
-  || DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||') \
-  # Tier 3: git config (user-configured default)
-  || DEFAULT_BRANCH=$(git config init.defaultBranch 2>/dev/null) \
-  # Tier 4: hardcoded fallback
-  || DEFAULT_BRANCH="main"
+  DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null)
+[ -n "$DEFAULT_BRANCH" ] && DEFAULT_BRANCH="${DEFAULT_BRANCH#refs/remotes/origin/}"
+# Tier 3: git config (user-configured default)
+[ -n "$DEFAULT_BRANCH" ] || DEFAULT_BRANCH=$(git config --get init.defaultBranch 2>/dev/null)
+# Tier 4: hardcoded fallback
+[ -n "$DEFAULT_BRANCH" ] || DEFAULT_BRANCH="main"
 ```
 
 Note: Git 2.48+ auto-updates `refs/remotes/origin/HEAD` on fetch, making Tier 2 more reliable on modern git.
@@ -188,7 +189,7 @@ Run checks in parallel groups where possible (network latency is the bottleneck)
 
 **Group A (local, ~50ms total) -- run in parallel:**
 1. **Branch check**: `git symbolic-ref --short HEAD` -- must be on a feature branch (not main/master). If HEAD is detached, abort.
-2. **Working tree check**: `git status --porcelain -b` -- verify there are changes to commit OR existing unpushed commits. If clean AND nothing to push, check for existing PR: `gh pr list --head "$(git branch --show-current)" --state open --json url --jq '.[0].url'`. If PR exists, report "Nothing to commit or push. Existing PR: <url>" and exit. If no PR, report "Nothing to commit or push. No PR found for this branch." and exit.
+2. **Working tree check**: `git status --porcelain -b` -- verify there are changes to commit OR existing unpushed commits.
 3. **Remote check**: `git remote get-url origin` -- verify remote exists.
 
 **Group B (network, ~500-2000ms) -- run in parallel after Group A passes:**
@@ -196,7 +197,11 @@ Run checks in parallel groups where possible (network latency is the bottleneck)
 5. **Fetch base**: `git fetch origin $DEFAULT_BRANCH` -- update local view of default branch for divergence check. If fetch fails (network), warn but continue.
 
 **Sequential after Group B:**
-6. **Divergence check**: `git rev-list --left-right --count origin/$DEFAULT_BRANCH...HEAD` -- report commits ahead/behind. If 0 ahead and nothing to commit, same idempotent exit as Step 2 (check for PR URL).
+6. **Divergence check**: `git rev-list --left-right --count origin/$DEFAULT_BRANCH...HEAD` -- report commits ahead/behind.
+7. **Idempotent no-op check**: If working tree is clean AND ahead=0, then check for existing PR:
+   - `gh pr list --head "$(git branch --show-current)" --state open --json url --jq '.[0].url'`
+   - If PR exists: report "Nothing to commit or push. Existing PR: <url>" and exit.
+   - If no PR: report "Nothing to commit or push. No PR found for this branch." and exit.
 
 ### Phase 2: Squash WIP (conditional)
 
@@ -237,20 +242,13 @@ Run the full Commit workflow above (branch check, staging, conventional commit).
 
 ### Phase 4: Validate (unless --skip-validate)
 
-First check if a validate script exists. If not, skip with a warning:
-
-```bash
-# Check if validate script exists in package.json
-bun run --silent validate 2>/dev/null
-```
-
-If no validate script found: report "No validate script found -- skipping validation gate." and proceed to push.
-
-If validate script exists, run it:
+Run validate:
 
 ```bash
 bun run validate
 ```
+
+If command output indicates no validate script exists (for example, script not found), report "No validate script found -- skipping validation gate." and proceed to push.
 
 **Why after commit, before push:** the commit preserves work as a local rollback point. The push is the quality gate for "code leaving your machine."
 
@@ -321,11 +319,11 @@ git worktree prune  # MUST run after fetch (needs updated tracking refs)
 
 # Round 3 (parallel, depends on prune): enumerate state
 git worktree list --porcelain  # must run after prune (avoids stale entries)
-git for-each-ref --format='%(refname:short)|%(objectname:short)|%(creatordate:relative)|%(upstream:track)|%(subject)' -- refs/heads/  # must run after fetch ([gone] detection needs pruned refs)
+git for-each-ref --format='%(refname:short)%00%(objectname:short)%00%(creatordate:relative)%00%(upstream:track)%00%(subject)%00' -- refs/heads/  # NUL-delimited to avoid delimiter collisions in subjects
 ```
 
 **Format string notes:**
-- Use `|` (pipe) as delimiter -- branch names can contain `/` and `.` but never `|`
+- Use NUL (`%00`) as field delimiter -- safe even when commit subjects contain `|` or other punctuation
 - `%(upstream:track)` produces `[gone]` for deleted upstreams, empty string for branches with no upstream (distinct cases)
 - `%(upstream:trackshort)` does NOT detect `[gone]` -- must use `%(upstream:track)`
 - `%(creatordate:relative)` gives "3 days ago" style dates for the preview report
@@ -334,7 +332,7 @@ git for-each-ref --format='%(refname:short)|%(objectname:short)|%(creatordate:re
 
 Priority order:
 1. Git config: `git config --get-all cleanup.protectedBranch` (user-configured per-repo or global)
-2. Auto-detect default branch: `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||'` (falls back to `git config init.defaultBranch`, then "main")
+2. Auto-detect default branch: `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null` then trim prefix `refs/remotes/origin/` (falls back to `git config --get init.defaultBranch`, then "main")
 3. Hardcoded fallback: main, master, develop, staging, production
 
 ### Step 3: Identify and categorize candidates
