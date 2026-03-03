@@ -1,0 +1,29 @@
+{
+	"description": "TypeScript type checker hooks: incremental post-edit check and full project check on stop",
+	"hooks": {
+		"PostToolUse": [
+			{
+				"matcher": "Write|Edit|MultiEdit",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/tsc-check.ts",
+						"timeout": 30
+					}
+				]
+			}
+		],
+		"Stop": [
+			{
+				"matcher": "*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/tsc-ci.ts",
+						"timeout": 120
+					}
+				]
+			}
+		]
+	}
+}
