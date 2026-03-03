@@ -164,6 +164,8 @@ describe('git push protected branch deletion', () => {
 		['git push origin --delete refs/heads/master'],
 		['git push --delete main'],
 		['git push --delete refs/heads/main'],
+		['git push --delete=main'],
+		['git push --delete=refs/heads/main'],
 		['git push -d main'],
 		['git push -d refs/heads/main'],
 		['git push -d origin main'],
@@ -182,12 +184,25 @@ describe('git push protected branch deletion', () => {
 	test.each([
 		['git push origin --delete feat/my-feature'],
 		['git push origin --delete refs/heads/feat/my-feature'],
+		['git push --delete=feat/my-feature'],
 		['git push -d feat/my-feature'],
 		['git push -d origin feat/my-feature'],
 		['git push origin :feat/my-feature'],
 	])('allows non-protected branch deletion: %s', (command) => {
 		const result = checkCommand(command)
 		expect(result.blocked).toBe(false)
+	})
+})
+
+describe('git push force by +refspec', () => {
+	test.each([
+		['git push +HEAD:refs/heads/main'],
+		['git push origin +HEAD:refs/heads/main'],
+		['git push +main'],
+	])('blocks force push via +refspec: %s', (command) => {
+		const result = checkCommand(command)
+		expect(result.blocked).toBe(true)
+		expect(result.reason).toContain('Force push')
 	})
 })
 
@@ -206,11 +221,17 @@ describe('protected-branch commit action detection', () => {
 	test.each([
 		['git cherry-pick -n abc123'],
 		['git cherry-pick --no-commit abc123'],
+		['git cherry-pick --abort'],
+		['git cherry-pick --continue'],
+		['git revert --abort'],
+		['git revert --continue'],
 		['git revert -n abc123'],
 		['git revert --no-commit abc123'],
 		['git merge --squash feature/foo'],
 		['git merge --no-commit feature/foo'],
 		['git merge --ff-only feature/foo'],
+		['git merge --abort'],
+		['git merge --continue'],
 		['git status'],
 	])('does not detect non-commit action: %s', (command) => {
 		expect(hasProtectedBranchCommitAction(command)).toBe(false)

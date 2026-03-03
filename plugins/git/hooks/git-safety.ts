@@ -93,6 +93,10 @@ function hasShortFlag(args: string[], flag: string): boolean {
 	return collectShortFlags(args).includes(flag)
 }
 
+function hasLongFlagPrefix(args: string[], prefix: string): boolean {
+	return args.some((arg) => arg.startsWith(prefix))
+}
+
 function extractCommitMessages(args: string[]): string[] {
 	const messages: string[] = []
 	for (let i = 0; i < args.length; i++) {
@@ -154,6 +158,14 @@ function getPushRefspecArgs(args: string[]): string[] {
 
 	// Standard form: first is remote, remaining are refspecs.
 	return nonFlagArgs.slice(1)
+}
+
+function getPushDeleteTargets(args: string[], refspecArgs: string[]): string[] {
+	const optionTargets = args
+		.filter((arg) => arg.startsWith('--delete='))
+		.map((arg) => arg.slice('--delete='.length))
+		.filter(Boolean)
+	return [...refspecArgs, ...optionTargets]
 }
 
 /**
@@ -232,12 +244,15 @@ function checkParsedSegments(
 
 			if (subcommand === 'push') {
 				const hasForce = hasForceFlag(args)
+				const hasForceByRefspec = getPushRefspecArgs(args).some((arg) =>
+					arg.startsWith('+'),
+				)
 				const hasForceWithLease =
 					hasLongFlag(args, '--force-with-lease') ||
 					args.some((a) => a.startsWith('--force-with-lease='))
 				const hasForceIfIncludes = hasLongFlag(args, '--force-if-includes')
 				const refspecArgs = getPushRefspecArgs(args)
-				if (hasForce) {
+				if (hasForce || hasForceByRefspec) {
 					return {
 						blocked: true,
 						reason:
@@ -261,9 +276,13 @@ function checkParsedSegments(
 				}
 
 				// Block remote deletion of protected branches (plain or fully-qualified refs)
-				if (hasLongFlag(args, '--delete') || hasShortFlag(args, 'd')) {
-					const deleteTargets = refspecArgs.map((arg) =>
-						normalizeBranchRef(arg),
+				if (
+					hasLongFlag(args, '--delete') ||
+					hasShortFlag(args, 'd') ||
+					hasLongFlagPrefix(args, '--delete=')
+				) {
+					const deleteTargets = getPushDeleteTargets(args, refspecArgs).map(
+						(arg) => normalizeBranchRef(arg),
 					)
 					if (deleteTargets.some((target) => isProtectedBranchRef(target))) {
 						return {
@@ -598,12 +617,23 @@ export function hasProtectedBranchCommitAction(
 		if (subcommand === 'commit') return true
 
 		if (subcommand === 'cherry-pick' || subcommand === 'revert') {
+			const isControlFlow =
+				hasLongFlag(args, '--abort') ||
+				hasLongFlag(args, '--continue') ||
+				hasLongFlag(args, '--quit') ||
+				hasLongFlag(args, '--skip')
+			if (isControlFlow) continue
 			const noCommit =
 				hasLongFlag(args, '--no-commit') || hasShortFlag(args, 'n')
 			if (!noCommit) return true
 		}
 
 		if (subcommand === 'merge') {
+			const isControlFlow =
+				hasLongFlag(args, '--abort') ||
+				hasLongFlag(args, '--continue') ||
+				hasLongFlag(args, '--quit')
+			if (isControlFlow) continue
 			const suppressesCommit =
 				hasLongFlag(args, '--squash') ||
 				hasLongFlag(args, '--ff-only') ||
