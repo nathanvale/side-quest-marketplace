@@ -1,0 +1,29 @@
+{
+	"description": "Bun test hooks: incremental post-edit check for test files and full test run on stop",
+	"hooks": {
+		"PostToolUse": [
+			{
+				"matcher": "Write|Edit|MultiEdit",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/bun-test.ts",
+						"timeout": 30
+					}
+				]
+			}
+		],
+		"Stop": [
+			{
+				"matcher": "*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/bun-test-ci.ts",
+						"timeout": 120
+					}
+				]
+			}
+		]
+	}
+}
