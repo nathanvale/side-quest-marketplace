@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p2
 issue_id: "070"
 tags: [code-review, security, dx-git, phase-4, allowed-tools]
@@ -50,8 +50,8 @@ Keep `Bash(git config:*)` and rely on the safety hook + LLM judgment.
 
 ## Acceptance Criteria
 
-- [ ] `clean-gone.md` allowed-tools uses `Bash(git config --get:*), Bash(git config --get-all:*)` instead of `Bash(git config:*)`
-- [ ] Plan document updated to reflect the narrowed pattern
+- [x] `clean-gone.md` allowed-tools uses `Bash(git config --get:*), Bash(git config --get-all:*)` instead of `Bash(git config:*)`
+- [x] Plan document updated to reflect the narrowed pattern
 
 ## Work Log
 

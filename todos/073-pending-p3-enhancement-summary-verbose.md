@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p3
 issue_id: "073"
 tags: [code-review, quality, dx-git, phase-4, documentation]
@@ -33,8 +33,8 @@ The plan is a living document. The audit trail has value.
 
 ## Acceptance Criteria
 
-- [ ] Enhancement Summary is concise enough for quick scanning
-- [ ] Decision rationale is preserved (either inline or in appendix)
+- [x] Enhancement Summary is concise enough for quick scanning
+- [x] Decision rationale is preserved (either inline or in appendix)
 
 ## Work Log
 

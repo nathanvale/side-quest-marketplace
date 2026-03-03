@@ -19,6 +19,11 @@ deepened-round-2: 2026-03-02
 
 ## Enhancement Summary
 
+Deepened across 3 rounds (21 agents). SpecFlow analysis identified 16 gaps, 8 resolved. See collapsed details for full decision audit trail.
+
+<details>
+<summary>Decision audit trail (3 rounds, 22 improvements)</summary>
+
 **Deepened:** 2026-03-02 (2 rounds, 12 research/review agents total)
 
 **Round 1 agents (9):** branch cleanup best practices, commit-push-PR chaining, Claude Code command design, security sentinel, code simplicity, architecture strategist, performance oracle, pattern recognition, agent-native parity
@@ -55,6 +60,8 @@ deepened-round-2: 2026-03-02
 - `git fetch --prune` failure should fall back to cached local state, not abort
 - `git symbolic-ref refs/remotes/origin/HEAD` fails if remote HEAD not fetched -- need fallback for default branch detection
 - Parent plan inconsistency: `Bash(git *:*)` in master plan vs enumerated patterns here -- phase 4 supersedes
+
+</details>
 
 ---
 
@@ -334,7 +341,7 @@ git symbolic-ref --short HEAD 2>/dev/null
 ```
 
 **Format string notes:**
-- Use `|` (pipe) as delimiter -- branch names can contain `/` and `.` but never `|`
+- Use `|` (pipe) as delimiter -- pipes are technically valid in branch names but extremely rare in practice. If a branch contains `|`, field parsing will misalign but `-d` (not `-D`) prevents accidental deletion
 - `%(upstream:track)` produces `[gone]` for deleted upstreams, empty string for branches with no upstream (distinct cases)
 - `%(upstream:trackshort)` does NOT detect `[gone]` -- must use `%(upstream:track)`
 - `%(creatordate:relative)` gives "3 days ago" style dates for the preview report

@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p3
 issue_id: "072"
 tags: [code-review, security, dx-git, phase-4]
@@ -44,8 +44,8 @@ git for-each-ref --format='%(refname:short)<|>%(objectname:short)<|>...' -- refs
 
 ## Acceptance Criteria
 
-- [ ] Delimiter choice documented accurately (remove false claim about `|`)
-- [ ] If delimiter changed, plan and workflows.md updated
+- [x] Delimiter choice documented accurately (remove false claim about `|`)
+- [x] If delimiter changed, plan and workflows.md updated
 
 ## Work Log
 

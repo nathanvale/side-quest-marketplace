@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p2
 issue_id: "071"
 tags: [code-review, agent-native, dx-git, phase-4]
@@ -59,10 +59,10 @@ If the user passed a description, assume they want the workflow to complete auto
 
 ## Acceptance Criteria
 
-- [ ] Each of the 3 prompts documents a default behavior for non-interactive callers
-- [ ] Non-fast-forward options clarified as manual user instructions
-- [ ] `--on-diverge` added to deferred items table
-- [ ] Plan document updated
+- [x] Each of the 3 prompts documents a default behavior for non-interactive callers
+- [x] Non-fast-forward options clarified as manual user instructions
+- [x] `--on-diverge` added to deferred items table
+- [x] Plan document updated
 
 ## Work Log
 
