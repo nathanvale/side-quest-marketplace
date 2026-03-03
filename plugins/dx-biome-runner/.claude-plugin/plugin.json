@@ -1,0 +1,10 @@
+{
+	"name": "dx-biome-runner",
+	"description": "Runs Biome linting and formatting after every edit and at session end, surfacing diagnostics inline",
+	"version": "1.0.0",
+	"author": { "name": "Nathan Vale" },
+	"repository": "https://github.com/nathanvale/side-quest-marketplace",
+	"keywords": ["biome", "linting", "formatting", "diagnostics", "hooks"],
+	"license": "MIT",
+	"commands": ["./commands/show-logs.md"]
+}
