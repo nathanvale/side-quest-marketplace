@@ -5,4 +5,4 @@ allowed-tools: Bash(bunx *), Bash(open *), Bash(mkdir *), Read, Glob, Grep, Writ
 argument-hint: "<path, topic, or concept>"
 ---
 
-Use the **visualize** skill to generate a Mermaid diagram and export to print-ready SVG/PDF. $ARGUMENTS
+Read skills/visualize/SKILL.md and follow its workflow exactly. $ARGUMENTS

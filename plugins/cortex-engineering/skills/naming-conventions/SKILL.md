@@ -1,6 +1,6 @@
 ---
 name: naming-conventions
-description: Naming conventions for Claude Code plugin components -- skills, commands, agents, argument hints, and descriptions. Use when creating, renaming, or auditing any plugin component to ensure correct naming patterns, description quality, and context budget optimization.
+description: "Naming conventions for Claude Code plugin components -- plugins (tier prefixes: kb-*, dx-*, int-*), skills, commands, agents, argument hints, and descriptions. Use when creating, renaming, or auditing any plugin component to ensure correct naming patterns, description quality, and context budget optimization."
 user-invocable: false
 ---
 
@@ -14,12 +14,28 @@ Every component type has a natural part of speech. Consistency within a type cre
 
 | Entity | Case | Part of Speech | Length | Examples |
 |--------|------|---------------|--------|---------|
-| Plugin | kebab-case | Noun/noun-compound | 1-3 words | `cortex-engineering`, `git-workflow` |
+| Plugin (core) | kebab-case | Noun/noun-compound | 1-3 words | `cortex-engineering`, `git-workflow` |
+| Plugin (knowledge bank) | `kb-` + kebab-case | Prefix + tool noun | 2-3 words | `kb-mpe`, `kb-obsidian`, `kb-tailwind` |
+| Plugin (dev experience) | `dx-` + kebab-case | Prefix + tool noun | 2-3 words | `dx-biome`, `dx-eslint` |
+| Plugin (integration) | `int-` + kebab-case | Prefix + service noun | 2-3 words | `int-firecrawl`, `int-rclone` |
 | Skill (action) | kebab-case | Verb or verb-phrase | 1-3 words | `research`, `deploy-staging` |
 | Skill (knowledge) | kebab-case | Noun or noun-compound | 1-3 words | `api-conventions`, `frontmatter` |
 | Command | kebab-case | Verb (imperative) | 1-2 words | `deploy`, `fix-issue` |
 | Agent | kebab-case | Role-noun | 1-3 words | `debugger`, `code-reviewer` |
 | argument-hint | POSIX brackets | Descriptive noun | <30 chars | `<topic>`, `[format]` |
+
+## Plugin Tier Prefixes
+
+Plugins use a tier prefix to signal their lifecycle and purpose. Pick the tier first -- it determines the name prefix.
+
+| Tier | Prefix | When to use | Skill pattern |
+|------|--------|-------------|---------------|
+| Core | none | Foundational workflow plugins (skills, commands, agents, hooks) | Mixed action + knowledge skills |
+| Knowledge bank | `kb-` | Reference knowledge for a specific tool or framework | Single `user-invocable: false` skill with routing table hub |
+| Developer experience | `dx-` | Dev tooling (linters, formatters, test runners) | May have hooks and commands |
+| Integration | `int-` | External service wrappers (APIs, CLIs, cloud services) | May have MCP tools |
+
+The tier prefix is part of the published plugin name and is an API contract (renaming = semver-major). For `kb-*` plugins, the skill name is the tool noun without the prefix -- e.g., plugin `kb-mpe` has skill `mpe`, making the fully qualified name `kb-mpe:mpe`.
 
 ## Naming Patterns by Use Case
 

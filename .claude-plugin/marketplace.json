@@ -28,6 +28,20 @@
 				"worktree",
 				"pr"
 			]
+		},
+		{
+			"name": "kb-mpe",
+			"source": "./plugins/kb-mpe",
+			"description": "Reference knowledge for Markdown Preview Enhanced (MPE) VS Code extension. Covers settings, code chunks, @import, diagram engines, presentations, export modes, and custom CSS. Enable when actively working with MPE.",
+			"category": "learning",
+			"tags": [
+				"knowledge-bank",
+				"markdown-preview-enhanced",
+				"vscode",
+				"mpe",
+				"diagrams",
+				"export"
+			]
 		}
 	]
 }

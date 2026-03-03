@@ -1,0 +1,17 @@
+flowchart LR
+    classDef primary fill:#0072B2,stroke:#005a8c,color:#fff,stroke-width:2px
+    classDef info fill:#56B4E9,stroke:#2A8ABF,color:#000,stroke-width:2px
+    classDef success fill:#009E73,stroke:#006B4F,color:#fff,stroke-width:2px
+    classDef warning fill:#E69F00,stroke:#B37A00,color:#000,stroke-width:2px
+    classDef highlight fill:#F0E442,stroke:#8A8200,color:#000,stroke-width:3px
+
+    DESC["Description<br/>~150 tokens"]:::warning
+    SKILL["SKILL.md body<br/>~3K tokens"]:::primary
+    REFS["1-2 references<br/>~2-5K tokens"]:::info
+    TOTAL["Typical session<br/>~5-8K tokens"]:::success
+    WORST["All references<br/>~20K tokens"]:::highlight
+
+    DESC -->|"MPE detected"| SKILL
+    SKILL -->|"MPE detected"| REFS
+    REFS -->|"per query"| TOTAL
+    REFS -.->|"never expected"| WORST

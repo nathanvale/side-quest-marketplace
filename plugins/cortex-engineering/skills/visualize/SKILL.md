@@ -8,7 +8,6 @@ allowed-tools:
   - Bash(node *)
   - Bash(open *)
   - Bash(mkdir *)
-  - Bash(rm mindmap.html)
   - Read
   - Glob
   - Grep
@@ -178,17 +177,17 @@ node "$CLAUDE_PLUGIN_ROOT/skills/visualize/references/export-markmap.mjs" \
   mindmap.html mindmap \
   --css "$CLAUDE_PLUGIN_ROOT/skills/visualize/references/markmap-theme.css"
 
-# Step 3: Clean up intermediate HTML
-rm mindmap.html
 ```
 
-Produces: `mindmap.svg` + `mindmap.pdf`
+Produces: `mindmap.html` (interactive) + `mindmap.svg` + `mindmap.pdf`
 
 **If `bunx` fails:** Try `npx markmap-cli` instead.
 
 #### Fallback chain (both engines)
 
-SVG + PDF -> SVG only -> .mmd source only. Always report what succeeded.
+**Mermaid:** SVG + PDF -> SVG only -> .mmd source only.
+**Markmap:** HTML + SVG + PDF -> HTML + SVG only -> HTML only -> .mmd source only.
+Always report what succeeded.
 
 **On syntax error (Mermaid):** Retry generation once with the error message as context. If still invalid, save .mmd source only and report the error.
 
@@ -200,6 +199,7 @@ Save to `docs/diagrams/YYYY-MM-DD-<topic-slug>/`:
 
 - `index.md` -- diagram source with frontmatter (via **frontmatter** skill)
 - `<type>.mmd` -- raw diagram source (for re-rendering)
+- `<type>.html` -- interactive browser viewing (Markmap only)
 - `<type>.svg` -- screen/print viewing
 - `<type>.pdf` -- direct printing
 
@@ -278,12 +278,22 @@ When "Overwrite existing" is chosen for a same-type collision:
 
 ### 6. Report and open
 
-Report all file paths. Mention the engine used and the chosen paper size (e.g. "Markmap mind map, print the PDF at A4"). For Markmap exports, add: "The SVG renders best in a browser; use the PDF for printing." Offer to open:
+Report all file paths. Mention the engine used and the chosen paper size (e.g. "Markmap mind map, print the PDF at A4"). For Markmap exports, add: "Open the HTML for the best experience (pan/zoom); use the PDF for printing." Offer to open:
+
+**Mermaid:**
 
 > 1. Open diagram (SVG in browser)
 > 2. Open in Preview (PDF for print preview)
 > 3. Open folder (Finder)
 > 4. Skip
+
+**Markmap:**
+
+> 1. Open interactive (HTML in browser - pan/zoom)
+> 2. Open diagram (SVG in browser)
+> 3. Open in Preview (PDF for print preview)
+> 4. Open folder (Finder)
+> 5. Skip
 
 Use macOS `open` command.
 
