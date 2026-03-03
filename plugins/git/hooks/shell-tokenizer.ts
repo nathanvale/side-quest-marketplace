@@ -1115,11 +1115,19 @@ export function extractWrappedShellCommand(segment: string): string | null {
 	if (
 		normalizedHead === 'sh' ||
 		normalizedHead === 'bash' ||
-		normalizedHead === 'zsh'
+		normalizedHead === 'zsh' ||
+		normalizedHead === 'fish' ||
+		normalizedHead === 'pwsh' ||
+		normalizedHead === 'powershell'
 	) {
 		for (let i = 0; i < args.length - 1; i++) {
 			const arg = args[i] || ''
-			if (arg === '-c' || (/^-[A-Za-z]+$/.test(arg) && arg.includes('c'))) {
+			if (
+				arg === '-c' ||
+				arg === '--command' ||
+				arg === '-Command' ||
+				(/^-[A-Za-z]+$/.test(arg) && arg.includes('c'))
+			) {
 				return args[i + 1] || null
 			}
 		}

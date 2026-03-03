@@ -57,6 +57,23 @@ interface PreToolUseHookSpecificOutput {
 	permissionDecisionReason?: string
 }
 
+export type GitSafetyMode = 'strict' | 'commit-guard' | 'advisory'
+
+/**
+ * Reads git safety mode from env.
+ * - strict: enforce all destructive-command and commit protections
+ * - commit-guard: enforce protected-branch commit and --no-verify rules only
+ * - advisory: never deny; emit warning events only
+ */
+export function getGitSafetyMode(
+	env: Record<string, string | undefined> = process.env,
+): GitSafetyMode {
+	const raw = (env.CLAUDE_GIT_SAFETY_MODE || '').trim().toLowerCase()
+	if (raw === 'commit-guard') return 'commit-guard'
+	if (raw === 'advisory') return 'advisory'
+	return 'strict'
+}
+
 /**
  * Patterns that identify a commit as a legitimate WIP checkpoint.
  * Only commits matching these patterns may use --no-verify.
@@ -95,6 +112,10 @@ function hasShortFlag(args: string[], flag: string): boolean {
 
 function hasLongFlagPrefix(args: string[], prefix: string): boolean {
 	return args.some((arg) => arg.startsWith(prefix))
+}
+
+function hasHereScriptRedirection(segment: string): boolean {
+	return /(^|[\s;|&])<<<?/.test(segment)
 }
 
 function getInlineExecScript(
@@ -564,6 +585,18 @@ function checkParsedSegments(
 						'Inline interpreter execution (-c/-e/-r/--eval) cannot be safety-analyzed reliably. Use direct commands instead.',
 				}
 			}
+			if (
+				hasHereScriptRedirection(segment) &&
+				['python', 'python3', 'node', 'ruby', 'perl', 'php', 'lua'].includes(
+					normalizedHead ?? '',
+				)
+			) {
+				return {
+					blocked: true,
+					reason:
+						'Interpreter commands receiving heredoc/here-string input cannot be safety-analyzed reliably.',
+				}
+			}
 		}
 		if (normalizedHead === 'xargs' && cmdIndex >= 0) {
 			const args = words.slice(cmdIndex + 1)
@@ -596,11 +629,23 @@ function checkParsedSegments(
 		}
 		if (
 			cmdIndex >= 0 &&
-			['sh', 'bash', 'zsh', 'dash', 'ksh'].includes(normalizedHead ?? '')
+			[
+				'sh',
+				'bash',
+				'zsh',
+				'dash',
+				'ksh',
+				'fish',
+				'pwsh',
+				'powershell',
+			].includes(normalizedHead ?? '')
 		) {
 			const args = words.slice(cmdIndex + 1)
 			const readsCommandsFromStdin =
-				args.length === 0 || args.includes('-s') || args.includes('--stdin')
+				args.length === 0 ||
+				args.includes('-s') ||
+				args.includes('--stdin') ||
+				hasHereScriptRedirection(segment)
 			if (readsCommandsFromStdin) {
 				return {
 					blocked: true,
@@ -884,10 +929,23 @@ if (import.meta.main) {
 		if (typeof command !== 'string') {
 			process.exit(0)
 		}
+		const safetyMode = getGitSafetyMode()
 
 		const commandResult = checkCommand(command)
 		if (commandResult.blocked) {
-			await denyAndExit(commandResult.reason ?? 'Blocked command.', input)
+			if (safetyMode === 'strict') {
+				await denyAndExit(commandResult.reason ?? 'Blocked command.', input)
+			}
+			try {
+				await postEvent(input.cwd || process.cwd(), 'safety.warn', {
+					tool: input.tool_name,
+					mode: safetyMode,
+					reason: commandResult.reason ?? 'Blocked command.',
+					command,
+				})
+			} catch {
+				// event emission is best-effort
+			}
 		}
 
 		const commitCheck = isCommitCommand(command, commandResult.segments)
@@ -900,7 +958,10 @@ if (import.meta.main) {
 			commandResult.segments,
 		)
 
-		if (hasCommitAction || hasImplicitForceLeasePush) {
+		if (
+			safetyMode !== 'advisory' &&
+			(hasCommitAction || hasImplicitForceLeasePush)
+		) {
 			const branch = await getCurrentBranch(input.cwd)
 			if (branch && PROTECTED_BRANCHES.includes(branch)) {
 				if (hasCommitAction) {
@@ -930,7 +991,7 @@ if (import.meta.main) {
 		}
 
 		// Block --no-verify on non-WIP commits (prevents bypassing pre-commit hooks)
-		if (commitCheck.isCommit) {
+		if (safetyMode !== 'advisory' && commitCheck.isCommit) {
 			const isLegitimateWip =
 				commitCheck.hasNoVerify && commitCheck.hasWipMessage
 			if (commitCheck.hasNoVerify && !isLegitimateWip) {

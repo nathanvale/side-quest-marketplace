@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import {
 	checkCommand,
 	checkFileEdit,
+	getGitSafetyMode,
 	hasImplicitProtectedBranchForceLeasePush,
 	hasProtectedBranchCommitAction,
 	isCommitCommand,
@@ -738,6 +739,11 @@ describe('issue 5: shell indirection does not bypass safety checks', () => {
 		['chrt -r 1 git reset --hard'],
 		['ionice -c3 git reset --hard'],
 		['setsid git reset --hard'],
+		["bash <<'EOF'\ngit reset --hard\nEOF"],
+		['ksh <<EOF\ngit push --force origin main\nEOF'],
+		['fish -c "git reset --hard"'],
+		['pwsh -c "git reset --hard"'],
+		['python - <<\'PY\'\nimport os\nos.system("git reset --hard")\nPY'],
 		['eval "git push --force origin main"'],
 		['python -c "import os; os.system(\'git push --force origin main\')"'],
 		["node -e \"require('child_process').execSync('git reset --hard')\""],
@@ -940,5 +946,27 @@ describe('checkFileEdit .git pattern', () => {
 		const result = checkFileEdit(filePath)
 		expect(result.blocked).toBe(true)
 		expect(result.reason).toContain('.git')
+	})
+})
+
+describe('getGitSafetyMode', () => {
+	test('defaults to strict', () => {
+		expect(getGitSafetyMode({})).toBe('strict')
+		expect(getGitSafetyMode({ CLAUDE_GIT_SAFETY_MODE: undefined })).toBe('strict')
+	})
+
+	test('parses commit-guard', () => {
+		expect(getGitSafetyMode({ CLAUDE_GIT_SAFETY_MODE: 'commit-guard' })).toBe('commit-guard')
+		expect(getGitSafetyMode({ CLAUDE_GIT_SAFETY_MODE: ' COMMIT-GUARD ' })).toBe('commit-guard')
+	})
+
+	test('parses advisory', () => {
+		expect(getGitSafetyMode({ CLAUDE_GIT_SAFETY_MODE: 'advisory' })).toBe('advisory')
+		expect(getGitSafetyMode({ CLAUDE_GIT_SAFETY_MODE: ' Advisory ' })).toBe('advisory')
+	})
+
+	test('falls back to strict on unknown values', () => {
+		expect(getGitSafetyMode({ CLAUDE_GIT_SAFETY_MODE: 'off' })).toBe('strict')
+		expect(getGitSafetyMode({ CLAUDE_GIT_SAFETY_MODE: 'permissive' })).toBe('strict')
 	})
 })

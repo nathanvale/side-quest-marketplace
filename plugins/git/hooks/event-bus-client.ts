@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 export type HookEventType =
 	| 'session.started'
 	| 'safety.blocked'
+	| 'safety.warn'
 	| 'command.executed'
 	| 'session.compacted'
 	| 'session.ended'
