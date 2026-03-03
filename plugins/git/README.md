@@ -22,6 +22,19 @@ Provides intelligent git context, history exploration, smart commit capabilities
 - Blocks Write/Edit to protected files (.env, credentials, .git/ directory)
 - Returns deny decision with explanation
 
+#### Safety Modes
+
+Control strictness with `CLAUDE_GIT_SAFETY_MODE`:
+
+- `strict` (default) - Full enforcement. Denies destructive git/shell commands and commit policy violations.
+- `commit-guard` - Enforces commit policies only (protected branches + `--no-verify` rules). Destructive commands emit warnings instead of denials.
+- `advisory` - Never denies; emits warnings/events only.
+
+Recommended rollout:
+- Keep `strict` for normal operation.
+- Use `commit-guard` during temporary migration/debugging windows.
+- Use `advisory` only for diagnostics with explicit team consent.
+
 **PostToolUse** - Command logger:
 - Appends Bash commands to ~/.claude/logs/git-command-log.jsonl
 - Fire-and-forget audit trail

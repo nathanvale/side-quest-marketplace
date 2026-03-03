@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { PROTECTED_BRANCHES } from './git-policy.ts'
 import {
 	checkCommand,
 	checkFileEdit,
@@ -968,5 +969,76 @@ describe('getGitSafetyMode', () => {
 	test('falls back to strict on unknown values', () => {
 		expect(getGitSafetyMode({ CLAUDE_GIT_SAFETY_MODE: 'off' })).toBe('strict')
 		expect(getGitSafetyMode({ CLAUDE_GIT_SAFETY_MODE: 'permissive' })).toBe('strict')
+	})
+})
+
+function simulateModeDecision(
+	command: string,
+	mode: 'strict' | 'commit-guard' | 'advisory',
+	branch: string | null,
+): { denied: boolean; warned: boolean } {
+	const commandResult = checkCommand(command)
+	const commitCheck = isCommitCommand(command, commandResult.segments)
+	const hasCommitAction = hasProtectedBranchCommitAction(command, commandResult.segments)
+	const hasImplicitForceLeasePush = hasImplicitProtectedBranchForceLeasePush(
+		command,
+		commandResult.segments,
+	)
+	const isProtected = branch ? PROTECTED_BRANCHES.includes(branch) : false
+
+	if (mode === 'strict' && commandResult.blocked) {
+		return { denied: true, warned: false }
+	}
+
+	if (mode !== 'advisory' && isProtected && (hasCommitAction || hasImplicitForceLeasePush)) {
+		return { denied: true, warned: false }
+	}
+
+	if (mode !== 'advisory' && commitCheck.isCommit) {
+		const isLegitimateWip = commitCheck.hasNoVerify && commitCheck.hasWipMessage
+		if (commitCheck.hasNoVerify && !isLegitimateWip) {
+			return { denied: true, warned: false }
+		}
+	}
+
+	return { denied: false, warned: commandResult.blocked }
+}
+
+describe('runtime mode behavior', () => {
+	test('strict denies destructive commands', () => {
+		const result = simulateModeDecision('git reset --hard', 'strict', 'feature/foo')
+		expect(result.denied).toBe(true)
+		expect(result.warned).toBe(false)
+	})
+
+	test('commit-guard allows destructive commands but warns', () => {
+		const result = simulateModeDecision('git reset --hard', 'commit-guard', 'feature/foo')
+		expect(result.denied).toBe(false)
+		expect(result.warned).toBe(true)
+	})
+
+	test('commit-guard blocks commits on protected branches', () => {
+		const result = simulateModeDecision('git commit -m "feat: x"', 'commit-guard', 'main')
+		expect(result.denied).toBe(true)
+	})
+
+	test('commit-guard blocks non-WIP --no-verify commits', () => {
+		const result = simulateModeDecision(
+			'git commit --no-verify -m "feat: x"',
+			'commit-guard',
+			'feature/foo',
+		)
+		expect(result.denied).toBe(true)
+	})
+
+	test('advisory never denies protected-branch commit attempts', () => {
+		const result = simulateModeDecision('git commit -m "feat: x"', 'advisory', 'main')
+		expect(result.denied).toBe(false)
+	})
+
+	test('advisory allows destructive commands with warnings', () => {
+		const result = simulateModeDecision('git clean -fd', 'advisory', 'main')
+		expect(result.denied).toBe(false)
+		expect(result.warned).toBe(true)
 	})
 })
