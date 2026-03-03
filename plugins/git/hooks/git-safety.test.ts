@@ -726,6 +726,8 @@ describe('issue 5: shell indirection does not bypass safety checks', () => {
 		['eval "git push --force origin main"'],
 		['printf "%s\\n" "git push --delete=main" | sh'],
 		['printf "%s\\n" "git push --delete=main" | bash -s'],
+		['printf "%s\\n" "git push --delete=main" | xargs -I{} sh -c "{}"'],
+		['printf "%s\\n" "git push --delete=main" | xargs -I{} bash -lc "{}"'],
 		['printf "%s\\n" "foo" | xargs git reset --hard'],
 		['echo "$(git reset --hard)"'],
 		['echo `git clean -fd`'],

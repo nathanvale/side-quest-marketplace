@@ -528,6 +528,35 @@ function checkParsedSegments(
 
 		const { words, cmdIndex, head } = getCommandWords(segment)
 		const normalizedHead = normalizeExecutableName(head)
+		if (normalizedHead === 'xargs' && cmdIndex >= 0) {
+			const args = words.slice(cmdIndex + 1)
+			const hasReplaceTemplate = args.some(
+				(arg) =>
+					arg === '-I' ||
+					arg.startsWith('-I') ||
+					arg === '--replace' ||
+					arg.startsWith('--replace='),
+			)
+			if (hasReplaceTemplate) {
+				// With replacement templates, runtime stdin content becomes executable
+				// command text. If this fans into a shell wrapper, static analysis is
+				// not reliable, so fail closed.
+				const tail = extractWrappedShellCommand(segment)
+				const tailHead = tail
+					? normalizeExecutableName(getCommandWords(tail).head)
+					: null
+				if (
+					tailHead &&
+					['sh', 'bash', 'zsh', 'dash', 'ksh'].includes(tailHead)
+				) {
+					return {
+						blocked: true,
+						reason:
+							'xargs replacement templates piped into shell commands cannot be safety-analyzed. Avoid xargs -I with sh/bash.',
+					}
+				}
+			}
+		}
 		if (
 			cmdIndex >= 0 &&
 			['sh', 'bash', 'zsh', 'dash', 'ksh'].includes(normalizedHead ?? '')
