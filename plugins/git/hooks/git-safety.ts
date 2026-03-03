@@ -65,7 +65,7 @@ const WIP_MESSAGE_PATTERNS = [/chore\(wip\):/, /wip:/i]
 
 const PROTECTED_FILE_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
 	{
-		pattern: /\.env($|[./])/,
+		pattern: /\.env($|[./\\])/,
 		reason: '.env files may contain secrets.',
 	},
 	{
@@ -73,7 +73,7 @@ const PROTECTED_FILE_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
 		reason: 'Credential files should not be modified by agents.',
 	},
 	{
-		pattern: /\.git\//,
+		pattern: /\.git([/\\]|$)/,
 		reason: 'Direct .git directory modifications are dangerous.',
 	},
 ]
@@ -135,6 +135,25 @@ function normalizeBranchRef(ref: string): string {
 function isProtectedBranchRef(ref: string): boolean {
 	const normalized = normalizeBranchRef(ref)
 	return PROTECTED_BRANCHES.includes(normalized)
+}
+
+function getPushRefspecArgs(args: string[]): string[] {
+	const nonFlagArgs = args.filter((a) => !a.startsWith('-'))
+	if (nonFlagArgs.length <= 0) return []
+
+	// With a single non-flag arg, git push accepts either <remote> or <refspec>.
+	// Treat clear refspec-shaped values as refspecs so safety checks fail closed.
+	if (nonFlagArgs.length === 1) {
+		const only = nonFlagArgs[0] ?? ''
+		const looksLikeRefspec =
+			only.includes(':') ||
+			only.startsWith('refs/heads/') ||
+			PROTECTED_BRANCHES.includes(normalizeBranchRef(only))
+		return looksLikeRefspec ? [only] : []
+	}
+
+	// Standard form: first is remote, remaining are refspecs.
+	return nonFlagArgs.slice(1)
 }
 
 /**
@@ -217,8 +236,7 @@ function checkParsedSegments(
 					hasLongFlag(args, '--force-with-lease') ||
 					args.some((a) => a.startsWith('--force-with-lease='))
 				const hasForceIfIncludes = hasLongFlag(args, '--force-if-includes')
-				const nonFlagArgs = args.filter((a) => !a.startsWith('-'))
-				const refspecArgs = nonFlagArgs.length > 1 ? nonFlagArgs.slice(1) : []
+				const refspecArgs = getPushRefspecArgs(args)
 				if (hasForce) {
 					return {
 						blocked: true,
@@ -586,9 +604,11 @@ export function hasProtectedBranchCommitAction(
 		}
 
 		if (subcommand === 'merge') {
-			const createsCommit =
-				(hasLongFlag(args, '--no-ff') || hasLongFlag(args, '--commit')) &&
-				!hasLongFlag(args, '--squash')
+			const suppressesCommit =
+				hasLongFlag(args, '--squash') ||
+				hasLongFlag(args, '--ff-only') ||
+				hasLongFlag(args, '--no-commit')
+			const createsCommit = !suppressesCommit
 			if (createsCommit) return true
 		}
 	}
@@ -617,8 +637,7 @@ export function hasImplicitProtectedBranchForceLeasePush(
 		const hasForceIfIncludes = hasLongFlag(args, '--force-if-includes')
 		if (!hasForceWithLease && !hasForceIfIncludes) continue
 
-		const nonFlagArgs = args.filter((a) => !a.startsWith('-'))
-		const explicitRefspecs = nonFlagArgs.length > 1 ? nonFlagArgs.slice(1) : []
+		const explicitRefspecs = getPushRefspecArgs(args)
 		if (explicitRefspecs.length === 0) return true
 	}
 

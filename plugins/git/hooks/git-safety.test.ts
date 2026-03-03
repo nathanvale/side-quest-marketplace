@@ -120,6 +120,8 @@ describe('git push --force-with-lease on protected branches', () => {
 		['git push --force-with-lease=origin/main origin main'],
 		['git push --force-with-lease origin HEAD:refs/heads/main'],
 		['git push --force-if-includes origin HEAD:refs/heads/master'],
+		['git push --force-with-lease HEAD:refs/heads/main'],
+		['git push --force-if-includes refs/heads/master'],
 	])('blocks on protected branch: %s', (command) => {
 		const result = checkCommand(command)
 		expect(result.blocked).toBe(true)
@@ -148,6 +150,7 @@ describe('git push --force-with-lease on protected branches', () => {
 		['git push --force-with-lease origin feat/my-feature'],
 		['git push --force-if-includes origin HEAD:feat/my-feature'],
 		['git push --force-with-lease origin main'],
+		['git push --force-with-lease refs/heads/main'],
 	])('does not mark explicit refspec pushes as implicit: %s', (command) => {
 		expect(hasImplicitProtectedBranchForceLeasePush(command)).toBe(false)
 	})
@@ -159,9 +162,13 @@ describe('git push protected branch deletion', () => {
 		['git push origin --delete master'],
 		['git push origin --delete refs/heads/main'],
 		['git push origin --delete refs/heads/master'],
+		['git push --delete main'],
+		['git push --delete refs/heads/main'],
 		['git push origin :main'],
 		['git push origin :refs/heads/main'],
 		['git push upstream :refs/heads/master'],
+		['git push :main'],
+		['git push :refs/heads/main'],
 	])('blocks protected branch deletion: %s', (command) => {
 		const result = checkCommand(command)
 		expect(result.blocked).toBe(true)
@@ -183,6 +190,7 @@ describe('protected-branch commit action detection', () => {
 		['git commit -m "feat: x"'],
 		['git cherry-pick abc123'],
 		['git revert abc123'],
+		['git merge feature/foo'],
 		['git merge --no-ff feature/foo'],
 		['git merge --commit feature/foo'],
 	])('detects commit-creating action: %s', (command) => {
@@ -195,7 +203,8 @@ describe('protected-branch commit action detection', () => {
 		['git revert -n abc123'],
 		['git revert --no-commit abc123'],
 		['git merge --squash feature/foo'],
-		['git merge feature/foo'],
+		['git merge --no-commit feature/foo'],
+		['git merge --ff-only feature/foo'],
 		['git status'],
 	])('does not detect non-commit action: %s', (command) => {
 		expect(hasProtectedBranchCommitAction(command)).toBe(false)
@@ -848,9 +857,23 @@ describe('checkFileEdit .env pattern', () => {
 		['config/.env'],
 		['config/.env.local'],
 		['.env/secrets'],
+		['config\\.env'],
+		['config\\.env.local'],
 	])('blocks: %s', (filePath) => {
 		const result = checkFileEdit(filePath)
 		expect(result.blocked).toBe(true)
 		expect(result.reason).toContain('.env')
+	})
+})
+
+describe('checkFileEdit .git pattern', () => {
+	test.each([
+		['.git/config'],
+		['repo/.git/hooks/pre-commit'],
+		['C:\\repo\\.git\\config'],
+	])('blocks: %s', (filePath) => {
+		const result = checkFileEdit(filePath)
+		expect(result.blocked).toBe(true)
+		expect(result.reason).toContain('.git')
 	})
 })
