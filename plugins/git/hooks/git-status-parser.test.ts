@@ -47,6 +47,14 @@ describe('parsePorcelainStatus', () => {
 		expect(result.counts.untracked).toBe(0)
 	})
 
+	test('parses "No commits yet on" branch prefix', () => {
+		const output = '## No commits yet on main\n?? README.md\n'
+		const result = parsePorcelainStatus(output)
+
+		expect(result.branch).toBe('main')
+		expect(result.counts.untracked).toBe(1)
+	})
+
 	test('parses added files correctly', () => {
 		const output = ['## main', 'A  new-staged.ts', 'AM staged-then-modified.ts'].join('\n')
 		const result = parsePorcelainStatus(output)

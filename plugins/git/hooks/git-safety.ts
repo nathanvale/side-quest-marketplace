@@ -480,7 +480,7 @@ function checkParsedSegments(
 			}
 			if (
 				subcommand === 'branch' &&
-				hasLongFlag(args, '--delete') &&
+				(hasLongFlag(args, '--delete') || hasShortFlag(args, 'd')) &&
 				hasForceFlag(args)
 			) {
 				return {

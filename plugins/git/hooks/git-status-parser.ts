@@ -27,9 +27,14 @@ export function parsePorcelainStatus(output: string): {
 	const branchLine = lines.find((line) => line.startsWith('##'))
 	let branch: string | null = null
 	if (branchLine) {
-		const parsed = branchLine.slice(3).split('...')[0]
-		if (parsed) {
-			branch = parsed.trim()
+		const header = branchLine.slice(3).trim()
+		if (header.startsWith('No commits yet on ')) {
+			branch = header.slice('No commits yet on '.length).trim() || null
+		} else {
+			const parsed = header.split('...')[0]
+			if (parsed) {
+				branch = parsed.trim()
+			}
 		}
 	}
 

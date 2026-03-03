@@ -838,6 +838,7 @@ function stripExecutionPrefixes(
 		if (head === 'time') {
 			skippedPrefix = true
 			i++
+			const timeOptionsWithValue = new Set(['-f', '-o', '--format', '--output'])
 			while (i < words.length) {
 				const word = words[i] || ''
 				if (word === '--') {
@@ -845,6 +846,10 @@ function stripExecutionPrefixes(
 					break
 				}
 				if (!isWordOption(word)) break
+				if (timeOptionsWithValue.has(word)) {
+					i += 2
+					continue
+				}
 				i++
 			}
 			continue
@@ -885,13 +890,21 @@ function stripExecutionPrefixes(
 			i++
 			const optionsWithValue = new Set([
 				'-u',
+				'--user',
 				'-g',
+				'--group',
 				'-h',
+				'--host',
 				'-p',
+				'--prompt',
 				'-C',
+				'--close-from',
 				'-r',
+				'--role',
 				'-t',
+				'--type',
 				'-T',
+				'--command-timeout',
 			])
 			while (i < words.length) {
 				const word = words[i] || ''
@@ -900,6 +913,11 @@ function stripExecutionPrefixes(
 					break
 				}
 				if (!isWordOption(word)) break
+				// Handle --option=value form
+				if (word.includes('=')) {
+					i++
+					continue
+				}
 				if (optionsWithValue.has(word)) {
 					i += 2
 					continue

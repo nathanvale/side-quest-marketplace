@@ -40,8 +40,11 @@ export async function runGit(
 		stdout: 'pipe',
 		stderr,
 	})
-	const rawStdout = await new Response(proc.stdout).text()
-	const exitCode = await proc.exited
+	// Drain stdout concurrently with proc.exited to avoid pipe deadlock
+	const [rawStdout, exitCode] = await Promise.all([
+		new Response(proc.stdout).text(),
+		proc.exited,
+	])
 	return { stdout: trim ? rawStdout.trim() : rawStdout, exitCode }
 }
 

@@ -108,6 +108,8 @@ describe('git branch force delete variants', () => {
 	test.each([
 		['git branch -D feature/foo'],
 		['git branch --delete --force feature/foo'],
+		['git branch -d -f feature/foo'],
+		['git branch -df feature/foo'],
 	])('blocks: %s', (command) => {
 		const result = checkCommand(command)
 		expect(result.blocked).toBe(true)
@@ -655,9 +657,14 @@ describe('issue 4: git global options do not bypass safety checks', () => {
 		['env -u CI git commit --no-verify -m "chore(wip): checkpoint"', true],
 		['command git commit -m "feat: test"', true],
 		['time git commit -m "feat: test"', true],
+		['time -f %E git commit -m "feat: test"', true],
+		['time -o /tmp/t.log git commit -m "feat: test"', true],
 		['nice -n 10 git commit -m "feat: test"', true],
 		['nohup git commit -m "feat: test"', true],
 		['sudo git commit -m "feat: test"', true],
+		['sudo -u root git commit -m "feat: test"', true],
+		['sudo --user root git commit -m "feat: test"', true],
+		['sudo --user=root git commit -m "feat: test"', true],
 		['stdbuf -o0 git commit -m "feat: test"', true],
 	])('detects commit command with globals/chaining: %s', (command, expected) => {
 		const result = isCommitCommand(command)
@@ -742,9 +749,12 @@ describe('issue 5: shell indirection does not bypass safety checks', () => {
 		['env git reset --hard'],
 		['command git reset --hard'],
 		['time git clean -fd'],
+		['time -f %E git clean -fd'],
 		['nice -n 5 git push --force origin main'],
 		['nohup git reset --hard'],
 		['sudo git reset --hard'],
+		['sudo -u root git reset --hard'],
+		['sudo --user root git reset --hard'],
 		['stdbuf -o0 git reset --hard'],
 		['chrt -r 1 git reset --hard'],
 		['ionice -c3 git reset --hard'],
