@@ -1,40 +1,38 @@
 ---
 name: arena
-description: Adversarial research -- biased teams argue opposite sides, a judge delivers the verdict. Use for comparing technologies, evaluating trade-offs, or resolving debates with structured evidence from Reddit, X, and the web.
+description: Adversarial research -- biased teams argue opposite sides, a judge delivers the verdict. Use for comparing technologies, evaluating trade-offs, or resolving debates with structured evidence from Reddit, X, and the web. Do not use for single-source research or quick questions -- use /cortex-engineering:research instead.
 argument-hint: "[topic | A vs B]"
-disable-model-invocation: true
 allowed-tools: Agent, Read, Glob, Grep, Write, Skill
 ---
 
 # Arena -- Adversarial Research
 
-Welcome to the Arena. Here's how it works:
+## Internal Context (do not output this section verbatim)
 
-- You pick a topic with two (or three) opposing camps
-- I dispatch biased beat reporters -- one per camp -- to search Reddit, X, and the web for the strongest evidence supporting their side
-- Once the reporters file their stories, I put on my impartial staff engineer judge hat
-- I score each team across 5 dimensions, deliver a round-by-round verdict, and declare a winner
-- The result is a rigorous, balanced research article born from structured conflict
-
-The whole thing takes about 5-10 minutes. Let's go.
-
-## Prerequisites
+Arena is an adversarial research tool. The user picks a topic with two or three opposing camps. You dispatch biased beat reporters -- one per camp -- to search Reddit, X, and the web for the strongest evidence supporting their side. Once reporters file, you put on an impartial staff engineer judge hat, score each team across 5 dimensions, and declare a winner. The whole process takes about 5-10 minutes.
 
 This skill uses the in-plugin `beat-reporter` agent from `cortex-engineering`.
 
-## What Would You Like To Do?
+## Routing
 
-1. **[Fight](#fight)** -- "React vs Svelte", "Monorepo vs Polyrepo" -- you bring the matchup
-2. **[Surprise me](#surprise-me)** -- scan the repo for live debates worth having
-3. **[Rematch](#rematch)** -- re-run a previous arena with fresh evidence
-
-**Routing keywords:** `vs` or clear matchup -> 1, `surprise` -> 2, `rematch` or doc path -> 3
-
-If `$ARGUMENTS` matches a keyword or menu item, route directly. Otherwise, present this menu and ask:
-
-> Pick a number, give me a matchup (e.g. "TDD vs Ship-first"), or say "surprise me".
+**Check `$ARGUMENTS` first:**
 
 $ARGUMENTS
+
+- If `$ARGUMENTS` contains `vs` or a clear matchup -> go directly to [Fight](#fight)
+- If `$ARGUMENTS` contains `surprise` -> go to [Surprise Me](#surprise-me)
+- If `$ARGUMENTS` contains `rematch` or a doc path -> go to [Rematch](#rematch)
+- If `$ARGUMENTS` is empty or unclear -> show the Arena welcome menu (see below)
+
+**When no arguments are provided**, show the Arena welcome menu. Set the scene -- this is a gladiatorial arena for ideas. Explain what's about to happen: two (or three) biased research teams will scour Reddit, X, and the web for evidence, then a judge scores them across 5 rounds. Make it fun and punchy -- this isn't a dry tool, it's a fight night.
+
+Then present a numbered menu of ways to get started:
+
+> 1. **Pick a fight** -- Give me "X vs Y" and I'll send in the teams
+> 2. **Surprise me** -- I'll scan your repo for open debates worth settling
+> 3. **Rematch** -- Re-run a previous arena match with fresh evidence
+
+Keep the tone energetic. Think sports commentator meets staff engineer.
 
 ---
 
@@ -122,11 +120,15 @@ Then go to [Dispatch Beat Reporters](#dispatch-beat-reporters) with the same fra
 
 ## Dispatch Beat Reporters
 
-Launch one `cortex-engineering:beat-reporter` agent per camp, **all in parallel** using the Agent tool with `run_in_background: true`.
+Launch one agent per camp, **all in parallel**, using the Agent tool:
+
+- `subagent_type: "newsroom:beat-reporter"`
+- `run_in_background: true`
+- `prompt:` the Reporter Brief Template below (one per team)
 
 ### Reporter Brief Template
 
-```
+```text
 You are a beat reporter for Team [LETTER]. Team [LETTER] LOVES [POSITION].
 They believe [POSITION] is the best approach and the alternatives are inferior.
 
@@ -170,7 +172,7 @@ Rate each team on 5 dimensions (1-5 scale):
 
 ### Verdict Format
 
-```
+```markdown
 # Arena: [Team A Position] vs [Team B Position]
 
 ## Round-by-Round Scoring
