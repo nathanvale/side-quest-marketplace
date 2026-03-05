@@ -59,6 +59,16 @@
 			}
 		},
 		{
+			"includes": ["**/*.css"],
+			"linter": {
+				"rules": {
+					"complexity": {
+						"noImportantStyles": "off"
+					}
+				}
+			}
+		},
+		{
 			"includes": ["**/*.test.*", "**/__tests__/**/*", "**/fixtures/**/*"],
 			"formatter": {
 				"lineWidth": 100
