@@ -2,7 +2,7 @@
 	"mcpServers": {
 		"tsc-runner": {
 			"command": "bunx",
-			"args": ["@side-quest/tsc-runner"]
+			"args": ["--bun", "@side-quest/tsc-runner"]
 		}
 	}
 }
