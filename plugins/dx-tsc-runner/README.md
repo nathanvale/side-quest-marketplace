@@ -8,6 +8,7 @@ TypeScript type checker with post-edit hooks and an MCP server for on-demand che
 |-----------|-----------|---------|----------|
 | `tsc_check` MCP tool | JSON-RPC over stdio | On-demand | Structured JSON with `file:line:col` errors |
 | PostToolUse hook | Shell script via bun | Write/Edit/MultiEdit on .ts | Blocks on errors in edited files only |
+| MCP dedup hook | `sq-claude-hook` via bunx | PostToolUse/PostToolUseFailure on runner MCP tools | Points Claude to MCP output instead of repeating diagnostics |
 | Stop hook | Shell script via bun | Session end | Blocks on any project-wide errors |
 
 ## MCP Tool
@@ -28,6 +29,13 @@ tsc_check({ response_format: "json" })
 - Returns structured JSON with `decision: "block"` and error details
 - 30s timeout, exits cleanly on timeout (non-blocking)
 
+**PostToolUse/PostToolUseFailure MCP dedup adapter (`sq-claude-hook`)**
+- Fires after `tsc_check`
+- Runs `SQ_HOOK_DEDUP_ENABLED=1 bunx @side-quest/claude-hooks posttool` and `posttool-failure`
+- Emits a short pointer back to the MCP output when Claude already has structured runner diagnostics
+- Falls back to a compact hook summary if the MCP response is unavailable
+- Uses bounded stdin parsing, short-lived dedup cache entries, and stderr-only observability from `@side-quest/claude-hooks`
+
 **Stop (tsc-ci.ts)**
 - Fires at session end
 - Runs full project-wide type check (all errors, not just edited files)
@@ -47,6 +55,7 @@ Both hooks use `--incremental` for 80-95% faster warm-cache checks. This writes 
 - [Bun](https://bun.sh/) runtime
 - TypeScript project with `tsconfig.json`
 - `@side-quest/tsc-runner` npm package (for MCP tool)
+- `bunx` access to `@side-quest/claude-hooks` (for MCP dedup hook adapter)
 
 ## License
 

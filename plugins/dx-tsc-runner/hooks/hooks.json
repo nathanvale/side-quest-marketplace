@@ -1,5 +1,5 @@
 {
-	"description": "TypeScript type checker hooks: incremental post-edit check and full project check on stop",
+	"description": "TypeScript type checker hooks: incremental post-edit check, MCP dedup adapter, and full project check on stop",
 	"hooks": {
 		"PostToolUse": [
 			{
@@ -9,6 +9,28 @@
 						"type": "command",
 						"command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/tsc-check.ts",
 						"timeout": 30
+					}
+				]
+			},
+			{
+				"matcher": "mcp__.*tsc-runner__tsc_check",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "SQ_HOOK_DEDUP_ENABLED=1 bunx @side-quest/claude-hooks posttool",
+						"timeout": 5
+					}
+				]
+			}
+		],
+		"PostToolUseFailure": [
+			{
+				"matcher": "mcp__.*tsc-runner__tsc_check",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "SQ_HOOK_DEDUP_ENABLED=1 bunx @side-quest/claude-hooks posttool-failure",
+						"timeout": 5
 					}
 				]
 			}
