@@ -1,11 +1,16 @@
 ---
 name: memory-management
-description: Two-tier memory system that makes Claude a true workplace collaborator. Decodes shorthand, acronyms, nicknames, and internal language so Claude understands requests like a colleague would. CLAUDE.md for working memory, memory/ directory for the full knowledge base.
+description: Two-tier memory system that makes Claude a workplace collaborator. Decodes shorthand, acronyms, nicknames, and internal language. Use when the user asks to remember something, look up a person/term, or manage workplace context. Do not use for task operations.
+allowed-tools:
+  - Read
+  - Write
+  - Glob
+  - Grep
 ---
 
 # Memory Management
 
-Memory makes Claude your workplace collaborator - someone who speaks your internal language.
+Memory makes Claude your workplace collaborator -- someone who speaks your internal language.
 
 ## The Goal
 
@@ -13,25 +18,25 @@ Transform shorthand into understanding:
 
 ```
 User: "ask todd to do the PSR for oracle"
-              ↓ Claude decodes
+              -> Claude decodes
 "Ask Todd Martinez (Finance lead) to prepare the Pipeline Status Report
  for the Oracle Systems deal ($2.3M, closing Q2)"
 ```
 
 Without memory, that request is meaningless. With memory, Claude knows:
-- **todd** → Todd Martinez, Finance lead, prefers Slack
-- **PSR** → Pipeline Status Report (weekly sales doc)
-- **oracle** → Oracle Systems deal, not the company
+- **todd** -> Todd Martinez, Finance lead, prefers Slack
+- **PSR** -> Pipeline Status Report (weekly sales doc)
+- **oracle** -> Oracle Systems deal, not the company
 
 ## Architecture
 
 ```
-CLAUDE.md          ← Hot cache (~30 people, common terms)
+CLAUDE.md          <- Hot cache (~30 people, common terms)
 memory/
-  glossary.md      ← Full decoder ring (everything)
-  people/          ← Complete profiles
-  projects/        ← Project details
-  context/         ← Company, teams, tools
+  glossary.md      <- Full decoder ring (everything)
+  people/          <- Complete profiles
+  projects/        <- Project details
+  context/         <- Company, teams, tools
 ```
 
 **CLAUDE.md (Hot Cache):**
@@ -42,7 +47,7 @@ memory/
 - **Goal: Cover 90% of daily decoding needs**
 
 **memory/glossary.md (Full Glossary):**
-- Complete decoder ring - everyone, every term
+- Complete decoder ring -- everyone, every term
 - Searched when something isn't in CLAUDE.md
 - Can grow indefinitely
 
@@ -56,15 +61,15 @@ memory/
 User: "ask todd about the PSR for phoenix"
 
 1. Check CLAUDE.md (hot cache)
-   → Todd? ✓ Todd Martinez, Finance
-   → PSR? ✓ Pipeline Status Report
-   → Phoenix? ✓ DB migration project
+   -> Todd? Todd Martinez, Finance
+   -> PSR? Pipeline Status Report
+   -> Phoenix? DB migration project
 
-2. If not found → search memory/glossary.md
-   → Full glossary has everyone/everything
+2. If not found -> search memory/glossary.md
+   -> Full glossary has everyone/everything
 
-3. If still not found → ask user
-   → "What does X mean? I'll remember it."
+3. If still not found -> ask user
+   -> "What does X mean? I'll remember it."
 ```
 
 This tiered approach keeps CLAUDE.md lean (~100 lines) while supporting unlimited scale in memory/.
@@ -90,7 +95,7 @@ Use tables for compactness. Target ~50-80 lines total.
 | **Todd** | Todd Martinez, Finance lead |
 | **Sarah** | Sarah Chen, Engineering (Platform) |
 | **Greg** | Greg Wilson, Sales |
-→ Full list: memory/glossary.md, profiles: memory/people/
+-> Full list: memory/glossary.md, profiles: memory/people/
 
 ## Terms
 | Term | Meaning |
@@ -98,14 +103,14 @@ Use tables for compactness. Target ~50-80 lines total.
 | PSR | Pipeline Status Report |
 | P0 | Drop everything priority |
 | standup | Daily 9am sync |
-→ Full glossary: memory/glossary.md
+-> Full glossary: memory/glossary.md
 
 ## Projects
 | Name | What |
 |------|------|
 | **Phoenix** | DB migration, Q2 launch |
 | **Horizon** | Mobile app redesign |
-→ Details: memory/projects/
+-> Details: memory/projects/
 
 ## Preferences
 - 25-min meetings with buffers
@@ -113,9 +118,19 @@ Use tables for compactness. Target ~50-80 lines total.
 - No meetings Friday afternoons
 ```
 
+## Extending CLAUDE.md
+
+As your workflow matures, CLAUDE.md can grow beyond the base template. Common extensions:
+
+- **Tools** -- Table of tools used (Notion, Jira, Slack, etc.) with what each is used for
+- **Structural Rules** -- How files are organized, naming conventions, nesting limits
+- **Quick Reference** -- Key people, context files, shortcuts
+
+Keep CLAUDE.md under ~100 lines. When a section grows large, extract the detail to `memory/` and leave a pointer (e.g., "-> Full list: memory/glossary.md").
+
 ## Deep Memory Format (memory/)
 
-**memory/glossary.md** - The decoder ring:
+**memory/glossary.md** -- The decoder ring:
 ```markdown
 # Glossary
 
@@ -136,7 +151,7 @@ Workplace shorthand, acronyms, and internal language.
 | ship it | Deploy to production |
 | escalate | Loop in leadership |
 
-## Nicknames → Full Names
+## Nicknames -> Full Names
 | Nickname | Person |
 |----------|--------|
 | Todd | Todd Martinez (Finance) |
@@ -184,9 +199,9 @@ Workplace shorthand, acronyms, and internal language.
 Database migration from legacy Oracle to PostgreSQL.
 
 ## Key People
-- Sarah - tech lead
-- Todd - budget owner
-- Greg - stakeholder (sales impact)
+- Sarah -- tech lead
+- Todd -- budget owner
+- Greg -- stakeholder (sales impact)
 
 ## Context
 $1.2M budget, 6-month timeline. Critical path for Horizon project.
@@ -225,10 +240,10 @@ $1.2M budget, 6-month timeline. Critical path for Horizon project.
 **Always** decode shorthand before acting on requests:
 
 ```
-1. CLAUDE.md (hot cache)     → Check first, covers 90% of cases
-2. memory/glossary.md        → Full glossary if not in hot cache
-3. memory/people/, projects/ → Rich detail when needed
-4. Ask user                  → Unknown term? Learn it.
+1. CLAUDE.md (hot cache)     -> Check first, covers 90% of cases
+2. memory/glossary.md        -> Full glossary if not in hot cache
+3. memory/people/, projects/ -> Rich detail when needed
+4. Ask user                  -> Unknown term? Learn it.
 ```
 
 Example:
@@ -236,12 +251,12 @@ Example:
 User: "ask todd to do the PSR for oracle"
 
 CLAUDE.md lookup:
-  "todd" → Todd Martinez, Finance ✓
-  "PSR" → Pipeline Status Report ✓
-  "oracle" → (not in hot cache)
+  "todd" -> Todd Martinez, Finance
+  "PSR" -> Pipeline Status Report
+  "oracle" -> (not in hot cache)
 
 memory/glossary.md lookup:
-  "oracle" → Oracle Systems deal ($2.3M) ✓
+  "oracle" -> Oracle Systems deal ($2.3M)
 
 Now Claude can act with full context.
 ```
@@ -257,12 +272,12 @@ When user says "remember this" or "X means Y":
 2. **People:**
    - Create/update memory/people/{name}.md
    - Add to CLAUDE.md Key People if important
-   - **Capture nicknames** - critical for decoding
+   - **Capture nicknames** -- critical for decoding
 
 3. **Projects:**
    - Create/update memory/projects/{name}.md
    - Add to CLAUDE.md Active Projects if current
-   - **Capture codenames** - "Phoenix", "the migration", etc.
+   - **Capture codenames** -- "Phoenix", "the migration", etc.
 
 4. **Preferences:** Add to CLAUDE.md Preferences section
 
@@ -284,7 +299,7 @@ When user asks "who is X" or "what does X mean":
 
 ## Bootstrapping
 
-Use `/productivity:start` to initialize by scanning your chat, calendar, email, and documents. Extracts people, projects, and starts building the glossary.
+Use `/productivity:start` to initialize by scanning your tasks, calendar, email, and documents. Extracts people, projects, and starts building the glossary.
 
 ## Conventions
 
@@ -306,7 +321,7 @@ Use `/productivity:start` to initialize by scanning your chat, calendar, email, 
 | Nickname | In Key People if top 30 | glossary.md (all nicknames) |
 | Company context | Quick reference only | context/company.md |
 | Preferences | All preferences | - |
-| Historical/stale | ✗ Remove | ✓ Keep in memory/ |
+| Historical/stale | Remove | Keep in memory/ |
 
 ## Promotion / Demotion
 

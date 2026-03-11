@@ -1,10 +1,18 @@
 ---
-description: Initialize the productivity system and open the dashboard
+description: Initialize the productivity system -- tasks, memory, and dashboard
+model: sonnet
+disable-model-invocation: true
+allowed-tools:
+  - Read
+  - Write
+  - Glob
+  - Grep
+  - Bash(open *)
+  - Bash(xdg-open *)
+  - Bash(cp *)
 ---
 
 # Start Command
-
-> If you see unfamiliar placeholders or need to check which tools are connected, see [CONNECTORS.md](../CONNECTORS.md).
 
 Initialize the task and memory systems, then open the unified dashboard.
 
@@ -13,10 +21,10 @@ Initialize the task and memory systems, then open the unified dashboard.
 ### 1. Check What Exists
 
 Check the working directory for:
-- `TASKS.md` — task list
-- `CLAUDE.md` — working memory
-- `memory/` — deep memory directory
-- `dashboard.html` — the visual UI
+- `TASKS.md` -- task list
+- `CLAUDE.md` -- working memory
+- `memory/` -- deep memory directory
+- `dashboard.html` -- the visual UI
 
 ### 2. Create What's Missing
 
@@ -24,11 +32,15 @@ Check the working directory for:
 
 **If `dashboard.html` doesn't exist:** Copy it from `${CLAUDE_PLUGIN_ROOT}/skills/dashboard.html` to the current working directory.
 
-**If `CLAUDE.md` and `memory/` don't exist:** This is a fresh setup — after opening the dashboard, begin the memory bootstrap workflow (see below). Place these in the current working directory.
+**If `CLAUDE.md` and `memory/` don't exist:** This is a fresh setup -- after opening the dashboard, begin the memory bootstrap workflow (see below). Place these in the current working directory.
 
 ### 3. Open the Dashboard
 
-Do NOT use `open` or `xdg-open` — in Cowork, the agent runs in a VM and shell open commands won't reach the user's browser. Instead, tell the user: "Dashboard is ready at `dashboard.html`. Open it from your file browser to get started."
+Try to open `dashboard.html` in the user's browser:
+- **macOS:** `open dashboard.html`
+- **Linux:** `xdg-open dashboard.html`
+
+If the command fails or the platform is unrecognized, tell the user: "Dashboard is ready at `dashboard.html`. Open it from your file browser to get started."
 
 ### 4. Orient the User
 
@@ -36,7 +48,7 @@ If everything was already initialized:
 ```
 Dashboard open. Your tasks and memory are both loaded.
 - /productivity:update to sync tasks and check memory
-- /productivity:update --comprehensive for a deep scan of all activity
+- /productivity:update --deep for a comprehensive scan of all activity
 ```
 
 If memory hasn't been bootstrapped yet, continue to step 5.
@@ -59,6 +71,8 @@ I'll use your tasks to learn your workplace shorthand.
 
 **Once you have access to the task list:**
 
+Reference the **connectors** skill for MCP tool names if the user points to an external app. If the tool is unavailable, ask the user to paste or describe their tasks instead.
+
 For each task item, analyze it for potential shorthand:
 - Names that might be nicknames
 - Acronyms or abbreviations
@@ -79,28 +93,29 @@ I see some terms I want to make sure I understand:
 
 Continue through each task, asking only about terms you haven't already decoded.
 
-### 6. Optional Comprehensive Scan
+### 6. Optional Deep Scan
 
 After task list decoding, offer:
 ```
-Do you want me to do a comprehensive scan of your messages, emails, and documents?
-This takes longer but builds much richer context about the people, projects, and terms in your work.
+Do you want me to do a deep scan of your messages, emails, and documents?
+This takes longer but builds much richer context about the people, projects,
+and terms in your work.
 
 Or we can stick with what we have and add context later.
 ```
 
-**If they choose comprehensive scan:**
+**If they choose deep scan:**
 
-Gather data from available MCP sources:
+Gather data from available MCP sources (reference the **connectors** skill for tool names, skip unavailable sources):
 - **Chat:** Recent messages, channels, DMs
 - **Email:** Sent messages, recipients
 - **Documents:** Recent docs, collaborators
 - **Calendar:** Meetings, attendees
 
 Build a braindump of people, projects, and terms found. Present findings grouped by confidence:
-- **Ready to add** (high confidence) — offer to add directly
-- **Needs clarification** — ask the user
-- **Low frequency / unclear** — note for later
+- **Ready to add** (high confidence) -- offer to add directly
+- **Needs clarification** -- ask the user
+- **Low frequency / unclear** -- note for later
 
 ### 7. Write Memory Files
 
@@ -133,10 +148,10 @@ From everything gathered, create:
 ```
 
 **memory/** directory:
-- `memory/glossary.md` — full decoder ring (acronyms, terms, nicknames, codenames)
-- `memory/people/{name}.md` — individual profiles
-- `memory/projects/{name}.md` — project details
-- `memory/context/company.md` — teams, tools, processes
+- `memory/glossary.md` -- full decoder ring (acronyms, terms, nicknames, codenames)
+- `memory/people/{name}.md` -- individual profiles
+- `memory/projects/{name}.md` -- project details
+- `memory/context/company.md` -- teams, tools, processes
 
 ### 8. Report Results
 
@@ -146,12 +161,12 @@ Productivity system ready:
 - Memory: X people, X terms, X projects
 - Dashboard: open in browser
 
-Use /productivity:update to keep things current (add --comprehensive for a deep scan).
+Use /productivity:update to keep things current (add --deep for a comprehensive scan).
 ```
 
 ## Notes
 
 - If memory is already initialized, this just opens the dashboard
-- Nicknames are critical — always capture how people are actually referred to
+- Nicknames are critical -- always capture how people are actually referred to
 - If a source isn't available, skip it and note the gap
 - Memory grows organically through natural conversation after bootstrap

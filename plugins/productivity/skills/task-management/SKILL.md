@@ -1,6 +1,11 @@
 ---
 name: task-management
-description: Simple task management using a shared TASKS.md file. Reference this when the user asks about their tasks, wants to add/complete tasks, or needs help tracking commitments.
+description: Manages tasks in a shared TASKS.md file. Use when the user asks about tasks, wants to add/complete tasks, or needs help tracking commitments. Do not use for memory or calendar operations.
+allowed-tools:
+  - Read
+  - Write
+  - Glob
+  - Grep
 ---
 
 # Task Management
@@ -14,20 +19,6 @@ Tasks are tracked in a simple `TASKS.md` file that both you and the user can edi
 - If it exists, read/write to it
 - If it doesn't exist, create it with the template below
 
-## Dashboard Setup (First Run)
-
-A visual dashboard is available for managing tasks and memory. **On first interaction with tasks:**
-
-1. Check if `dashboard.html` exists in the current working directory
-2. If not, copy it from `${CLAUDE_PLUGIN_ROOT}/skills/dashboard.html` to the current working directory
-3. Inform the user: "I've added the dashboard. Run `/productivity:start` to set up the full system."
-
-The task board:
-- Reads and writes to the same `TASKS.md` file
-- Auto-saves changes
-- Watches for external changes (syncs when you edit via CLI)
-- Supports drag-and-drop reordering of tasks and sections
-
 ## Format & Template
 
 When creating a new TASKS.md, use this exact template (without example tasks):
@@ -35,14 +26,16 @@ When creating a new TASKS.md, use this exact template (without example tasks):
 ```markdown
 # Tasks
 
-## Active
+## In Progress
 
 ## Waiting On
 
-## Someday
+## To Do
 
 ## Done
 ```
+
+Section names are flexible. The dashboard accepts any `## Header` as a column.
 
 Task format:
 - `- [ ] **Task title** - context, for whom, due date`
@@ -53,11 +46,11 @@ Task format:
 
 **When user asks "what's on my plate" / "my tasks":**
 - Read TASKS.md
-- Summarize Active and Waiting On sections
+- Summarize In Progress and Waiting On sections
 - Highlight anything overdue or urgent
 
 **When user says "add a task" / "remind me to":**
-- Add to Active section with `- [ ] **Task**` format
+- Add to To Do section with `- [ ] **Task**` format
 - Include context if provided (who it's for, due date)
 
 **When user says "done with X" / "finished X":**
@@ -87,4 +80,4 @@ When summarizing meetings or conversations, offer to add extracted tasks:
 - Action items assigned to them
 - Follow-ups mentioned
 
-Ask before adding - don't auto-add without confirmation.
+Ask before adding -- don't auto-add without confirmation.
