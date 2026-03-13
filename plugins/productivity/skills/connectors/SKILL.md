@@ -58,14 +58,15 @@ Tool routing table for external data sources. Reference this skill when you need
 | Tool | What it does |
 |------|-------------|
 | `notion-search` | Search Notion pages |
+| `notion-fetch` | Read a specific Notion page (full content) |
 | `notion-query-database-view` | Query a Notion database |
 
 **Other options:** Confluence (`searchConfluenceUsingCql`), Google Drive, Obsidian.
 
 **Common patterns:**
+- Meeting transcription search and retrieval for `/update` meeting notes sync
 - Recently modified docs for `--deep` mode
 - Project documentation lookup
-- Meeting notes retrieval
 
 ## Chat
 

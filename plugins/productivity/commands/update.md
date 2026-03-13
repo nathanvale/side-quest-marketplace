@@ -1,5 +1,5 @@
 ---
-description: Sync tasks and refresh memory from calendar, email, and project trackers
+description: Sync tasks and refresh memory from calendar, email, meeting notes, and project trackers
 argument-hint: "[--deep]"
 model: sonnet
 disable-model-invocation: true
@@ -14,7 +14,7 @@ allowed-tools:
 
 Keep your task list and memory current. Two modes:
 
-- **Default:** Sync from calendar, email, and project trackers (if connected), triage stale items, decode tasks, fill memory gaps
+- **Default:** Sync from calendar, email, meeting notes, and project trackers (if connected), triage stale items, decode tasks, fill memory gaps
 - **`--deep`:** Everything in default, plus deep scan of chat, sent email, docs -- flag missed todos and suggest new memories
 
 Reference the **connectors** skill for available MCP tool names. If a source is unavailable, skip it gracefully.
@@ -45,6 +45,24 @@ Check for available sources and sync each one. Reference the **connectors** skil
 - Scan unread inbox messages
 - Extract action items and commitments received
 - Note senders for people cross-referencing
+
+**Meeting notes** (if calendar + knowledge base available):
+
+Create structured meeting notes from knowledge base transcriptions matched to calendar events. This follows the same sync pattern as Email -- pull data, extract action items, offer to add to TASKS.md.
+
+1. **Get calendar events** -- Query the past 2 days of calendar events (reuse data from Calendar sync above). Filter out declined events and all-day events.
+
+2. **Check for existing notes** -- Glob `docs/meetings/YYYY-MM-DD-*.md` for each date. Skip any event that already has a notes file (match by date + slug, or by checking the `transcription` frontmatter field for the same knowledge base page ID).
+
+3. **Find transcriptions** -- Search the knowledge base for meeting transcriptions created on the same dates. Transcriptions are voice memos that get transcribed and summarized by the knowledge base tool, typically auto-titled with timestamps (e.g., `@Today 11:02 AM`). Reference the **connectors** skill for knowledge base tool names.
+
+4. **Match transcriptions to events** -- Match by time alignment: extract the time from the transcription title and match to the calendar event whose start time is closest (within 15 minutes). Confirm by checking that the transcription content mentions keywords from the calendar event summary. Transcriptions that don't match any event are silently ignored.
+
+5. **Create meeting notes** -- For each matched event, fetch the full transcription content from the knowledge base. Read the project's meeting template (typically `Templates/meeting.md`) and create `docs/meetings/YYYY-MM-DD-slug.md`. Fill frontmatter from calendar event data (attendees, meeting type, date) and content sections from the transcription (key discussion points, decisions, action items). Resolve attendee emails to full names using CLAUDE.md People section. Slug: lowercase kebab-case from event summary, strip common prefixes.
+
+6. **Extract action items** -- Collect action items from all newly created meeting notes. These feed into the same "offer to add to TASKS.md" flow as Email and Project Tracker action items (presented in Step 9 report).
+
+If calendar or knowledge base tools are unavailable, skip with a note.
 
 **Project tracker** (if available -- Jira, Asana, Linear, GitHub Issues):
 - Fetch tasks assigned to the user (open/in-progress)
@@ -114,18 +132,38 @@ Tasks often contain richer context than memory. Extract and update:
 - **Relationships** ("Todd's sign-off on Maya's proposal") -- cross-reference people
 - **Deadlines** -- add to project files
 
-### 8. Report
+### 8. CLAUDE.md Health Check
+
+Scan all CLAUDE.md files for token budget and scaffold markers.
+
+**Token budget:**
+- Count words in all CLAUDE.md files (`~/.claude/CLAUDE.md`, `./CLAUDE.md`, `.claude/CLAUDE.md`)
+- Estimate tokens (words * 1.3)
+- Compare against norms: global 1-3K, project 3-10K, local 500-2K
+
+**Scaffold markers:**
+- Grep all CLAUDE.md files for `<!-- scaffold:` comments
+- Cross-reference against sync results from Steps 2-3:
+  - If update synced from Jira and found assigned tasks -> flag "Jira pending" scaffold as actionable
+  - If update synced personal Gmail -> flag "Gmail disconnected" scaffold as actionable
+  - If no signal for a scaffold item, mark as "not yet actionable"
+- Report count and any actionable items
+
+Include in the report summary (Step 9).
+
+### 9. Report
 
 ```
 Update complete:
-- Sources: calendar (12 events), email (5 unread), Jira (8 tasks)
+- Sources: calendar (12 events), email (5 unread), meetings (2 created, 1 skipped), Jira (8 tasks)
   Skipped: chat (not connected)
-- Tasks: +3 from Jira, 1 completed, 2 triaged
+- Tasks: +3 from Jira, +2 from meeting notes, 1 completed, 2 triaged
 - Memory: 2 gaps filled, 1 project enriched
 - All tasks decoded
+- CLAUDE.md: 3,311 tokens (22% of 15K budget), 4 scaffold items (1 actionable)
 ```
 
-### 9. Suggest Deep Scan
+### 10. Suggest Deep Scan
 
 If memory gaps remain or sources were skipped:
 ```
@@ -168,6 +206,16 @@ From your activity, these look like todos you haven't captured:
 ```
 
 Let user pick which to add.
+
+### Extra Step: CLAUDE.md Deep Health
+
+Everything from the default health check (Step 8), plus:
+
+- **Show each scaffold marker** with surrounding context (2 lines above/below)
+- **Interactive triage** for each: keep / update / delete
+- **Scan for unmarked scaffold candidates** -- grep CLAUDE.md files for patterns like "pending", "TBD", "disconnected", "TODO", "not yet", "access needed" that aren't already marked as scaffold
+- **Suggest new scaffold markers** for any matches found
+- **Token trend** -- if a previous budget comment exists, compare current vs. previous and note direction
 
 ### Extra Step: Suggest New Memories
 

@@ -11,8 +11,7 @@
 	"skills": [
 		"./skills/task-management",
 		"./skills/memory-management",
-		"./skills/connectors",
-		"./skills/nlm"
+		"./skills/connectors"
 	],
 	"commands": ["./commands/start.md", "./commands/update.md"]
 }
