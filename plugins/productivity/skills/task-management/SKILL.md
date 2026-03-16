@@ -12,12 +12,15 @@ allowed-tools:
 
 Tasks are tracked in a simple `TASKS.md` file that both you and the user can edit.
 
+Use the shared Memory OS contract at `~/.config/memory/AGENTS.md` when available.
+
 ## File Location
 
-**Always use `TASKS.md` in the current working directory.**
+**Use `TASKS.md` in the owning repo.**
 
-- If it exists, read/write to it
+- If the owning repo already has one, read/write to it
 - If it doesn't exist, create it with the template below
+- Do not assume the current working directory is always the right owner when the shared Memory OS is present
 
 ## Format & Template
 
@@ -81,3 +84,5 @@ When summarizing meetings or conversations, offer to add extracted tasks:
 - Follow-ups mentioned
 
 Ask before adding -- don't auto-add without confirmation.
+
+When external connectors are available, keep using them. Gmail, calendar, knowledge base, and project-tracker sync remain valid sources for task discovery; the Memory OS only changes where those tasks should live.

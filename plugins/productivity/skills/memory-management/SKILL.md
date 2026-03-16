@@ -12,6 +12,8 @@ allowed-tools:
 
 Memory makes Claude your workplace collaborator -- someone who speaks your internal language.
 
+Use the shared Memory OS contract at `~/.config/memory/AGENTS.md` when available.
+
 ## The Goal
 
 Transform shorthand into understanding:
@@ -76,8 +78,10 @@ This tiered approach keeps CLAUDE.md lean (~100 lines) while supporting unlimite
 
 ## File Locations
 
-- **Working memory:** `CLAUDE.md` in current working directory
-- **Deep memory:** `memory/` subdirectory
+- **Working memory:** `CLAUDE.md` in the owning repo
+- **Deep memory:** `memory/` subdirectory in the owning repo
+
+Do not assume the current working directory is automatically the right owner. If the repo declares a Memory OS profile, follow that repo's ownership rules. Keep repo-specific memory local unless promotion rules clearly apply.
 
 ## Working Memory Format (CLAUDE.md)
 
@@ -300,6 +304,8 @@ When user asks "who is X" or "what does X mean":
 ## Bootstrapping
 
 Use `/productivity:start` to initialize by scanning your tasks, calendar, email, and documents. Extracts people, projects, and starts building the glossary.
+
+When the shared Memory OS is present, keep external connector behavior unchanged but route the resulting memory according to repo ownership and promotion rules.
 
 ## Conventions
 

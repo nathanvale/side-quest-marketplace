@@ -32,9 +32,13 @@ Reference the **connectors** skill for available MCP tool names. If a source is 
 
 Read `TASKS.md` and `memory/` directory. If they don't exist, suggest `/productivity:start` first.
 
+If `~/.config/memory/AGENTS.md` exists, resolve the owning repo first and treat that repo as the local task and memory surface.
+
 ### 2. Sync from Connected Sources
 
 Check for available sources and sync each one. Reference the **connectors** skill for tool names. If a tool is unavailable, skip that source with a note.
+
+Keep connector behavior unchanged. Gmail, calendar, project trackers, knowledge bases, and chat remain valid inputs.
 
 **Calendar** (if available):
 - Fetch events from the past 2 days + next 3 days
@@ -124,6 +128,8 @@ I found terms in your tasks I don't have context for:
 
 Add answers to the appropriate memory files (people/, projects/, glossary.md).
 
+When the shared Memory OS is present, keep those writes local to the owning repo unless the result is clearly durable and cross-context.
+
 ### 7. Capture Enrichment
 
 Tasks often contain richer context than memory. Extract and update:
@@ -131,6 +137,8 @@ Tasks often contain richer context than memory. Extract and update:
 - **Status changes** ("launch done") -- update project status, demote from CLAUDE.md
 - **Relationships** ("Todd's sign-off on Maya's proposal") -- cross-reference people
 - **Deadlines** -- add to project files
+
+Recommend promotion to `my-second-brain` only when the enrichment becomes durable beyond the owning repo.
 
 ### 8. CLAUDE.md Health Check
 

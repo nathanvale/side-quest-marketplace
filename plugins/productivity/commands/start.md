@@ -18,6 +18,8 @@ Initialize the task and memory systems, then open the unified dashboard.
 
 ## Instructions
 
+If `~/.config/memory/AGENTS.md` exists, use it as the shared contract for repo ownership and promotion before creating or updating local task and memory files.
+
 ### 1. Check What Exists
 
 Check the working directory for:
@@ -33,6 +35,8 @@ Check the working directory for:
 **If `dashboard.html` doesn't exist:** Copy it from `${CLAUDE_PLUGIN_ROOT}/skills/dashboard.html` to the current working directory.
 
 **If `CLAUDE.md` and `memory/` don't exist:** This is a fresh setup -- after opening the dashboard, begin the memory bootstrap workflow (see below). Place these in the current working directory.
+
+If the shared Memory OS is present, interpret "current working directory" as the owning repo resolved by the Memory OS rules, not merely the shell cwd.
 
 ### 3. Open the Dashboard
 
@@ -72,6 +76,8 @@ I'll use your tasks to learn your workplace shorthand.
 **Once you have access to the task list:**
 
 Reference the **connectors** skill for MCP tool names if the user points to an external app. If the tool is unavailable, ask the user to paste or describe their tasks instead.
+
+Keep external connectors unchanged. Gmail, calendar, project trackers, knowledge bases, and chat tools should continue to work through the existing category-based connector mapping.
 
 For each task item, analyze it for potential shorthand:
 - Names that might be nicknames
@@ -152,6 +158,8 @@ From everything gathered, create:
 - `memory/people/{name}.md` -- individual profiles
 - `memory/projects/{name}.md` -- project details
 - `memory/context/company.md` -- teams, tools, processes
+
+When the shared Memory OS is present, keep this memory local to the owning repo by default. Promote only durable cross-context knowledge into `my-second-brain`.
 
 ### 8. Report Results
 

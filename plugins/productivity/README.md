@@ -16,6 +16,15 @@ claude plugin add side-quest-marketplace/productivity
 - **Workplace memory** -- A two-tier memory system that teaches Claude your shorthand, people, projects, and terminology. Say "ask todd to do the PSR for oracle" and Claude knows exactly who, what, and which deal.
 - **Visual dashboard** -- A local HTML file that gives you a board view of your tasks and a live view of what Claude knows about your workplace. Edit from the board or the file -- they stay in sync.
 
+## Memory OS Integration
+
+When used in Nathan's setup, this plugin should operate inside the shared user-scope Memory OS rather than as a separate parallel system.
+
+- Shared contract: `~/.config/memory/AGENTS.md`
+- Shared integration guide: `~/.config/memory/docs/productivity-integration.md`
+- External connectors remain tool-agnostic and keep working through the existing category mapping
+- Repo ownership still matters: keep local work memory and task churn in the owning repo, promote only durable knowledge into `my-second-brain`
+
 ## Commands
 
 | Command | What it does |
