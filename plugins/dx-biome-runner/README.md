@@ -10,6 +10,7 @@ Biome linter and formatter with post-edit hooks and an MCP server for on-demand 
 | `biome_lintFix` MCP tool | JSON-RPC over stdio | On-demand | Auto-fix lint and format issues |
 | `biome_formatCheck` MCP tool | JSON-RPC over stdio | On-demand | Check formatting without changes |
 | PostToolUse hook | Shell script via bun | Write/Edit/MultiEdit | Blocks on errors in edited files only |
+| MCP dedup hook | `sq-claude-hook` via bunx | PostToolUse/PostToolUseFailure on runner MCP tools | Points Claude to MCP output instead of repeating diagnostics |
 | Stop hook | Shell script via bun | Session end | Blocks on any project-wide errors |
 
 ## MCP Tools
@@ -32,6 +33,13 @@ biome_formatCheck({ response_format: "json" })
 - Returns structured JSON with `decision: "block"` and diagnostic details
 - 30s timeout, exits cleanly on timeout (non-blocking)
 
+**PostToolUse/PostToolUseFailure MCP dedup adapter (`sq-claude-hook`)**
+- Fires after `biome_lintCheck`, `biome_lintFix`, and `biome_formatCheck`
+- Runs `SQ_HOOK_DEDUP_ENABLED=1 bunx @side-quest/claude-hooks posttool` and `posttool-failure`
+- Emits a short pointer back to the MCP output when Claude already has structured runner diagnostics
+- Falls back to a compact hook summary if the MCP response is unavailable
+- Uses bounded stdin parsing, short-lived dedup cache entries, and stderr-only observability from `@side-quest/claude-hooks`
+
 **Stop (biome-ci.ts)**
 - Fires at session end
 - Runs `biome check --reporter=json` on the project root (all errors, not just edited files)
@@ -48,6 +56,7 @@ biome_formatCheck({ response_format: "json" })
 - [Bun](https://bun.sh/) runtime
 - Project with `biome.json` configuration
 - `@side-quest/biome-runner` npm package (for MCP tools)
+- `bunx` access to `@side-quest/claude-hooks` (for MCP dedup hook adapter)
 
 ## License
 
