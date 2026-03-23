@@ -1,0 +1,27 @@
+{
+	"name": "node-cert",
+	"version": "1.0.0",
+	"description": "Expert guidance for fixing Node.js certificate trust issues behind corporate SSL-inspecting proxies. Covers certificate extraction, proxy environment variables, and tool-specific fixes for Claude Code, npm, git, and other Node.js tools.",
+	"author": {
+		"name": "Nathan Vale",
+		"url": "https://github.com/nathanvale"
+	},
+	"homepage": "https://github.com/nathanvale/side-quest-plugins/tree/main/plugins/node-cert",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/nathanvale/side-quest-plugins.git",
+		"directory": "plugins/node-cert"
+	},
+	"license": "MIT",
+	"keywords": [
+		"certificate",
+		"proxy",
+		"ssl",
+		"tls",
+		"vpn",
+		"node.js",
+		"corporate",
+		"zscaler",
+		"palo-alto"
+	]
+}
